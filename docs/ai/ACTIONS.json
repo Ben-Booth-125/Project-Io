@@ -23,7 +23,7 @@
    "id": "gameplay.build",
    "family": "gameplay",
    "surface": "Tile construction ledger (fold-out column), opened from the Selection band of a selected tile; a shortcut lives on a selected owned building ('Build another here').",
-   "press": "Single-click a tile on the Planetary canvas (the Selection band appears), click 'Construct Buildings' in the band's action grid, then click 'Build' on a candidate row in the ledger. Rows are one per extractable resource deposited on the tile (plus a coastal Fishing Wharf row even with zero deposit), one per processing recipe, then Port, Launchpad, Inland Logistics Hub. Alternate press: with an owned building selected, 'Build another here' repeats its type/target on the same tile, gated by the tile's stack capacity.",
+   "press": "Single-click a tile on the Planetary canvas (the Selection band appears), click 'Construct Buildings' in the band's action grid, then click 'Build' on a candidate row in the ledger. Rows are one per extractable resource deposited on the tile (plus a coastal Fishing Wharf row even with zero deposit), one per processing recipe, then Port, Launchpad, Inland Logistics Hub, Military Base. Alternate press: with an owned building selected, 'Build another here' repeats its type/target on the same tile, gated by the tile's stack capacity.",
    "args": [
     {
      "name": "tile",
@@ -33,7 +33,7 @@
     {
      "name": "type",
      "type": "building_type",
-     "meaning": "Which building — extraction_site, processing_facility, port, launchpad, inland_logistics_hub. Set by which row is pressed."
+     "meaning": "Which building — extraction_site, processing_facility, port, launchpad, inland_logistics_hub, military_base. Set by which row is pressed."
     },
     {
      "name": "target",
@@ -53,7 +53,7 @@
     "The corporation's balance covers the full capex: registry build_cost plus the material costs priced at the tile's local market (rejected_funds). The UI shows this one credit total and disables Build with 'Can't afford' when short."
    ],
    "expected_output": "The press enqueues a construction request; the app's mutable pass executes construct_building the same frame. On success a building entity exists immediately — staffed at 50% workforce (0 for a port), a processing facility seeded with the pressed row's recipe — and the capex is debited up front. Construction is then DURATIVE and material-gated: each economy tick (one quarter) it advances at a rate in [0,1] set by how much of its per-tick material need the local market can supply; scarce materials stretch the ETA and total shortage shows 'Paused - market can't supply materials'. Management controls unlock only when construction completes. A rejected attempt mutates nothing; the reason string appears at the top of the ledger (construction.last_message), and invalid rows already show reason-coded text in place of the Build button ('Cannot build on water', 'A port must sit on the coast', ...).",
-   "reason_to_select": "The only way to add productive capacity. Extraction turns a tile deposit into pool stock to sell; processing turns inputs into higher-margin outputs; ports/hubs move goods cheaper and a launchpad gates space access. The ledger ranks candidates by expected net per quarter and prints payback, so build is the press when a candidate's expected profit beats holding the cash."
+   "reason_to_select": "The only way to add productive capacity. Extraction turns a tile deposit into pool stock to sell; processing turns inputs into higher-margin outputs; ports/hubs move goods cheaper, a launchpad gates space access, and a military base is where units muster (BL-325; hire moves onto it in S2 — until then it is positioning ahead of that change). The ledger ranks candidates by expected net per quarter and prints payback, so build is the press when a candidate's expected profit beats holding the cash."
   },
   {
    "id": "gameplay.demolish",
@@ -1085,20 +1085,20 @@
   {
    "id": "ledger.history_body_selector",
    "family": "ledger",
-   "surface": "History ledger, 'Body' combo (Story and Tiles views only)",
+   "surface": "History ledger, 'Body' combo (Story view only)",
    "press": "Open the Body combo and pick a body",
    "args": [
     {
      "name": "body",
      "type": "entity",
-     "meaning": "Which body's story or tile table to show"
+     "meaning": "Which body's story to show"
     }
    ],
    "preconditions": [
     "History ledger is open",
-    "Active view is Story or Tiles (Chain has no per-body selector)"
+    "Active view is Story (Chain has no per-body selector)"
    ],
-   "expected_output": "Repoints the Story prose or the Tiles table at the chosen body. Cross-cutting selector - exempt from the toggle rule.",
+   "expected_output": "Repoints the Story prose at the chosen body. Cross-cutting selector - exempt from the toggle rule.",
    "reason_to_select": "Chooses which body's generation record to read - e.g. checking a prospective mining body's deposit story before committing."
   },
   {
@@ -1123,33 +1123,33 @@
   {
    "id": "ledger.history_view_expand",
    "family": "ledger",
-   "surface": "History ledger, chevron on the tab row (Story and Tiles views)",
+   "surface": "History ledger, chevron on the tab row (Story view only)",
    "press": "Click the fold chevron at the right end of the tab row",
    "args": [],
    "preconditions": [
     "History ledger is open",
-    "Active view is Story or Tiles (Chain carries no view-level chevron)"
+    "Active view is Story (Chain carries no view-level chevron; its stages carry their own)"
    ],
-   "expected_output": "Opens the current view as a full-screen overlay - the honest fix for the Tiles table, whose ~29 columns overflow the 380 px column. Re-clicking the chevron (or Esc) folds back to the in-column view.",
-   "reason_to_select": "The Tiles table is unreadable at column width; expanding is how to actually read all its columns at once. Story gains room for long biographies."
+   "expected_output": "Opens the Story view as a full-screen overlay, giving the biography prose the width the 380 px column breaks every line of. Re-clicking the chevron (or Esc) folds back to the in-column view.",
+   "reason_to_select": "A long body biography is unreadable as wrapped fragments in the column; expanding is how to read it as continuous prose."
   },
   {
    "id": "ledger.history_view_tab",
    "family": "ledger",
    "surface": "History ledger, view tab strip",
-   "press": "Click the 'Story', 'Chain', or 'Tiles' tab button",
+   "press": "Click the 'Story' or 'Chain' tab button",
    "args": [
     {
      "name": "view",
      "type": "enum",
-     "meaning": "'Story' (body biography prose), 'Chain' (generation chain charts across all bodies), or 'Tiles' (raw per-tile data table)"
+     "meaning": "'Story' (body biography prose) or 'Chain' (generation chain charts across all bodies)"
     }
    ],
    "preconditions": [
     "History ledger is open"
    ],
-   "expected_output": "Switches the view. Re-clicking the currently-active tab closes the whole History ledger (toggle rule); switching tabs is an ordinary view change. Story and Tiles are about one body (see the Body selector); Chain compares every body side by side and hides the selector.",
-   "reason_to_select": "Story answers 'what is this body's biography?'; Chain answers 'how do the bodies compare through the generation stages?'; Tiles answers 'what are the exact numbers per tile?'"
+   "expected_output": "Switches the view. Re-clicking the currently-active tab closes the whole History ledger (toggle rule); switching tabs is an ordinary view change. Story is about one body (see the Body selector); Chain compares every body side by side and hides the selector. A third tab, Tiles, was retired 2026-08-03 (BL-281) - it was a current-state readout in a ledger about the past; its buildings list is on the canvas and in the Selection element, its market data in the market surfaces.",
+   "reason_to_select": "Story answers 'what is this body's biography?'; Chain answers 'how do the bodies compare through the generation stages?' - the two halves of how this world came to be."
   },
   {
    "id": "ledger.market_body_selector",
@@ -1256,6 +1256,18 @@
    "reason_to_select": "Answers 'how do rivals' finances compare to mine?' - the only side-by-side rival-balance read in the game."
   },
   {
+   "id": "ledger.nav_economy",
+   "family": "ledger",
+   "surface": "Nav rail, slot 3 (Workforce icon - provisionally hosts the Economy panel)",
+   "press": "Click the workforce (population) glyph on the left icon rail",
+   "args": [],
+   "preconditions": [
+    "In-game"
+   ],
+   "expected_output": "Toggles the Economy panel open in the fold-out column; re-click closes; opening closes any other ledger. Open, it splits across three views - Corps (the player's balance trend, every corporation's balance, and the workforce table), Holdings (stockpile pools by body) and Markets (supply, demand and price per body). Workforce itself is not built; this panel is the slot's provisional occupant.",
+   "reason_to_select": "Answers 'what is the whole economy doing?' in one surface - balances, labour, stock on hand and market state side by side, rather than one body or one corporation at a time."
+  },
+  {
    "id": "ledger.nav_history",
    "family": "ledger",
    "surface": "Nav rail, slot 9 (History icon)",
@@ -1264,8 +1276,8 @@
    "preconditions": [
     "In-game"
    ],
-   "expected_output": "Toggles the History ledger open in the fold-out column; re-click closes; opening closes any other ledger. Open, it shows how the world was generated, split into Story / Chain / Tiles views for a chosen body.",
-   "reason_to_select": "Answers 'why is this world the way it is?' - body biography, the generation chain, and the raw per-tile numbers; feeds site-selection and understanding of deposit placement."
+   "expected_output": "Toggles the History ledger open in the fold-out column; re-click closes; opening closes any other ledger. Open, it shows how the world was generated, split into Story and Chain views.",
+   "reason_to_select": "Answers 'why is this world the way it is?' - the body's biography and the generation chain behind it; feeds site-selection and understanding of deposit placement."
   },
   {
    "id": "ledger.nav_market",

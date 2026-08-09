@@ -1,5 +1,5 @@
 -- Demo capture: each map-lens overlay over the Planetary canvas (Kepler).
-verify.goto_surface("Kepler")
+verify.goto_surface("home")
 
 verify.set_overlay("corporation")
 verify.capture("lens_corporation")

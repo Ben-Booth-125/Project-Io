@@ -28,14 +28,19 @@ void building(ImDrawList* dl, ImVec2 centre, float r, building_type type, ImU32 
 /// @param res    Resource whose identity colour to use.
 void resource(ImDrawList* dl, ImVec2 centre, float r, resource_type res);
 
-/// Draw a unit / convoy marker — an upward chevron — in @p colour. For unit
-/// stacks and (Layer 5) convoy heads on the canvases.
+/// Draw an under-construction marker — a crane silhouette — in @p colour. Drawn
+/// IN PLACE OF a building's type silhouette while `ticks_remaining > 0` (BL-327,
+/// replacing the BL-323 S4 desaturation treatment: dimming read as "faded", not
+/// "being built"). Stroke-only, like the landform family — a filled silhouette
+/// says "something is installed here", which is exactly the wrong claim for a
+/// site that is not yet finished.
 ///
 /// @param dl     Draw list to render into.
 /// @param centre Marker centre, screen pixels.
 /// @param r      Half-extent of the marker, screen pixels.
-/// @param colour Fill colour (e.g. a faction colour).
-void unit(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+/// @param colour Stroke colour (the owner-tinted marker colour, so identity
+///               still reads while the type does not).
+void under_construction(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
 /// Draw a ledger glyph — a small ruled table outline — in @p colour. Used by the
 /// navigation pane for slots that open a ledger window (e.g. the Tile Ledger).
@@ -112,7 +117,7 @@ void production(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
 /// Draw the Corporation-lens glyph — a filled square with a centred inner dot, a
 /// "seal" silhouette — in @p colour. Distinct from the processing-facility plain
-/// square (the inner dot), the extraction diamond, and the port/unit triangle.
+/// square (the inner dot), the extraction diamond, and the port triangle.
 /// For the overlay-lens control strip. See LENSES.md § Corporation lens.
 ///
 /// @param dl     Draw list to render into.
@@ -291,8 +296,8 @@ void strategy(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 void diplomacy(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
 /// Draw a market-centre marker — a small circle with a centred cross (+) — in
-/// @p colour. Distinct from the building square/diamond/triangle glyphs and the
-/// unit chevron. Used as an on-canvas selectable marker for market entities
+/// @p colour. Distinct from the building square/diamond/triangle glyphs.
+/// Used as an on-canvas selectable marker for market entities
 /// (BL-059, BL-031). For hit-zone display on the Planetary canvas.
 ///
 /// @param dl     Draw list to render into.

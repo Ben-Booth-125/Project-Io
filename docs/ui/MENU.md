@@ -8,7 +8,7 @@ This document is a placeholder to be expanded; the notes below record current un
 
 ## Structure
 
-- A vertical strip of **nine square icon slots** (`nav_pane.cpp`; BL-174 dropped the glyph-less tenth). **Five are live** — Corporation overview, Budget, Market Ledger, Construction, History; **four are reserved** — Workforce, Research, Corp. Strategy, Diplomacy — disabled, but each carrying its own dimmed glyph so the rail teaches the shape of the game rather than showing a row of identical blanks (BL-174, nav-rail legibility).
+- A vertical strip of **nine square icon slots** (`nav_pane.cpp`; BL-174 dropped the glyph-less tenth). **Five carry their own subject** — Corporation overview, Budget, Market Ledger, Construction, History. **Three carry a provisional occupant** — the subject is unbuilt, but the slot hosts a surface that would otherwise have no door: Workforce hosts the **Economy panel** (BL-292), Research the **tech-tree design mock** (BL-310), Diplomacy the **all-corporations balance table** (NR-012). Each of the three keeps its real subject's name and glyph, lit like any other live slot, so the rail does not start teaching the wrong vocabulary. **One is reserved** — Corp. Strategy — disabled, but carrying its own dimmed glyph so the rail teaches the shape of the game rather than showing a blank (BL-174, nav-rail legibility).
 - Each slot shows a **vector glyph** (`src/ui/icons.hpp`) instead of a worded label; the slot's name plus a one-line blurb is shown in a wrapping hover tooltip (BL-174). The rail is deliberately narrow — the profile above keeps its own (wider) `profile_panel_width` rather than matching the rail.
 - Each slot toggles a panel open/closed; the open slot lights its glyph in the selection accent — the same idiom as the minimap lens bar, so the two icon strips read as one vocabulary.
 - Opened menus **fold out into the shell column** to the rail's right (`foldout_begin`, `src/ui/foldout_column.hpp` — see `LAYOUT.md` § Ledger windows). **Nothing floats and there is no ✕**: closing is the toggle — re-click the slot, re-click the active sub-view tab (BL-126 toggle rule), or open another slot (accordion, `close_all_panels`).
@@ -42,7 +42,8 @@ slot (see `docs/development/BACKLOG.md` § Ledger / § Selection info element).
 > Tile Ledger at slot 8, with nine disabled hollow-square placeholders and glyphs framed
 > as temporary. The rail is now the nine-slot, five-live, per-slot-glyph strip described
 > under § Structure; the Tile Ledger's content lives under the **History** slot (slot 9,
-> BL-211 — Story / Chain / Tiles) and docks in the fold-out column like everything else.
+> BL-211 — Story / Chain, since BL-281 retired Tiles) and docks in the fold-out column
+> like everything else.
 
 ## Menu set and ordering (2026-06-15)
 
@@ -59,7 +60,7 @@ list, so the curation is auditable.
 |---|---|---|---|
 | 1 | **Corporation overview** (dashboard) | 0 | the player corporation at a glance |
 | 2 | **Budget** *(was Balance Ledger — scope Q&A)* | 2 | Budget ([A4]) |
-| 3 | **Workforce / Population Ledger** | 4 | Workforce ([A4]) / Population ([S4]) |
+| 3 | **Workforce / Population Ledger** *(provisionally hosts the Economy panel — BL-292)* | 4 | Workforce ([A4]) / Population ([S4]) |
 | 4 | **Research** | 7 | Research |
 | 5 | **Market Ledger** | 1 | Trade ([A4]) |
 | 6 | **Construction / Buildings** *(identity Q&A — buildings folded out)* | 3 | Infrastructure |
@@ -103,7 +104,10 @@ Notes on the mapping:
 
   The slot previously drew an **all-corporations balance table**, which was neither this nor the
   MVP — a cross-corp comparison surface, and a duplicate of the **Economy panel's Corps view**
-  that still carries it. It was retired with this item rather than left as a second home.
+  that still carries it. It was retired from *this* slot rather than left as a second home; Ben
+  then restored the table itself (NR-012), and it lives on **slot 8** (Diplomacy, provisionally).
+  Both homes are now reachable: the Economy panel got its own door on **slot 3** under BL-292,
+  having previously been drawn every frame with nothing able to open it.
 
 - **Buildings have no dedicated ledger (settled 2026-06-15, [F4]).** A standalone buildings
   overview proved more "good to know" than goal-driving, so it is **dropped as a reserved slot**.
@@ -114,9 +118,10 @@ Notes on the mapping:
   in the pending **nav-rail ordering** pass (BACKLOG § Menu); construction *in progress* still needs
   a home, folded into the dashboard/market surfaces rather than its own ledger.
 - **Layer-4 ledgers** are the near-term build (the [A4] ledger family — Budget, Workforce,
-  Market, and the Corporation dashboard); the strategy slots (Corp. Strategy, Diplomacy) are
-  reserved placeholders until their systems land, following the *ledgers-start-closed* and
-  reserved-placeholder conventions above.
+  Market, and the Corporation dashboard); **Corp. Strategy** is the one still-reserved
+  placeholder, and **Diplomacy** is reserved in name only (it hosts the corporations table
+  provisionally). Both follow the *ledgers-start-closed* and reserved-placeholder conventions
+  above.
 - **Scope-changing renames (settled by Q&A 2026-06-15).**
   — **Budget** (slot 2, was Balance Ledger): broadens to the full **Budget-system** surface —
     income vs expenditure broken down (sales, input purchases, maintenance, wages) **plus budget
@@ -134,11 +139,17 @@ Notes on the mapping:
     relates to the **Generation Ledger** (`../generation/GENERATION_LEDGER.md`) — likely the same
     rail surface. **Open note:** lengthen the pre-game generation phase and design how that
     history is *presented*; per-tile environment inspection moves to the tile Selection element.
-    **Built 2026-07-29 (BL-211):** the slot now splits into **Story / Chain / Tiles** — the
-    body's dated biography, the generation stage charts (one collapsing accordion per chain
-    stage, under the wizard's three round tabs), and the tile/building/market tables. The
-    charts come from `ui::generation_charts`, shared verbatim with the New World wizard, so
-    the plots a player decided a world on are the plots they can reopen mid-campaign.
+    **Built 2026-07-29 (BL-211):** the slot splits into **Story / Chain** — the body's dated
+    biography and the generation stage charts (one fold per chain stage, under the wizard's
+    three round tabs). The charts come from `ui::generation_charts`, shared verbatim with the
+    New World wizard, so the plots a player decided a world on are the plots they can reopen
+    mid-campaign.
+    **Narrowed 2026-08-03 (BL-281, Ben via NR-020):** a third view, **Tiles** — the
+    tile/building/market tables — was **retired, not renamed**. Renaming it to "Body" would
+    have fixed the label and kept the real defect: a current-state readout living inside a
+    ledger about the past. The two surviving views share one honest premise — *how this world
+    came to be* — and a third view about *now* weakened it. Nothing was orphaned: buildings are
+    on the canvas and in the Selection element, market data in the market surfaces.
     **Still owed:** exploration-gating (the slot is ungated today) and the post-generation
     *advisory* read.
   — **Construction / Buildings** (slot 6): **construction-in-progress only** — a build-queue /
@@ -203,5 +214,6 @@ Separate from the nav-rail ledgers above (per-system overviews) and from the in-
 
 - `STARTUP.md` — the app's entry screens (main menu → New World wizard → in-game).
 - `LAYOUT.md` — placement in the shell.
-- `CANVASES.md` — the History ledger's Tiles view (slot 9) reads from the selected body/tile.
+- `CANVASES.md` — where the per-body buildings read went when BL-281 retired the History
+  ledger's Tiles view (slot 9): the canvas, and the Selection element (`SELECTION.md`).
 - `CHAT.md` — the comms surface that superseded the Explorer (BL-205).

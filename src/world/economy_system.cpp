@@ -3,7 +3,9 @@
 #include "budget_system.hpp"   // compute_building_opex, body_mean_habitability (BL-181 solver)
 #include "building_profit.hpp" // estimate_building_profit (BL-079 corp agency)
 #include "corp_ai.hpp"         // run_corp_strategic_step (BL-202 strategic tier)
+#include "logistics.hpp"       // invalidate_logistics_caches (anchor-set changes)
 #include "market_clearing.hpp" // market_for_tile (BL-095 construction gate)
+#include "placement_rules.hpp" // stack_output_scalar (BL-193 building stacks)
 #include "workforce.hpp"
 
 #include <algorithm>
@@ -41,14 +43,53 @@ void log_reflex_agency(world& w, entity_id corp, entity_id body, const char* wha
     w.history_log.push_back(std::move(e));
 }
 
+/// BL-193 building stacks: the per-tick state one extraction site shares with the
+/// rest of its tile's stack, handed down by the pre-pass in run_economy_step.
+///
+/// `rank` is the site's 1-based place in stored order, which sets how far down the
+/// diminishing-returns curve it sits. `taper` is computed ONCE per stack, against
+/// the stack's COMBINED nominal draw rather than each site's own — that is what
+/// makes a stack exhaust *together* instead of dribbling out of a spent deposit
+/// one site at a time, and what makes a five-site stack burn its taper band five
+/// sites' worth faster.
+struct stack_draw
+{
+    int   rank             = 1;    ///< 1-based position in the tile's stack.
+    float combined_nominal = 0.0f; ///< What the whole stack draws this tick, decay included.
+    float taper            = 1.0f; ///< Shared depletion scalar (1 = reserve is ample).
+};
+
+/// The rate one extraction site would yield at full reserve, BEFORE its stack
+/// decay: base_rate × richness × effective workforce × target × (1 − hazard).
+/// Shared by the stack pre-pass and run_extraction so the figure the taper is
+/// sized against is always the same figure that is actually drawn.
+float extraction_nominal(const world& w, const recipe_registry& reg,
+                         const building_component& b, float contention)
+{
+    const auto tile_it = w.tiles.find(b.tile);
+    if (tile_it == w.tiles.end())
+        return 0.0f;
+    const tile_component& tc = tile_it->second;
+    const std::size_t     ri = static_cast<std::size_t>(b.target_resource);
+    // Apply the player's workforce target (0–200 % of nominal capacity).
+    const float wt_scalar = std::clamp(b.workforce_target / 100.0f, 0.0f, 2.0f);
+    return reg.economics(building_type::extraction_site).base_rate
+         * tc.resource_deposit[ri]
+         * (b.workforce_assigned * contention)
+         * wt_scalar
+         * (1.0f - tc.hazard_level);
+}
+
 /// Extraction: credit the (corp, body) pool with the target resource and draw the
 /// same amount from the tile's finite reserve. Nominal output is
-/// base_rate × richness × workforce × (1 − hazard); it tapers as the reserve nears
-/// empty and the building reports `exhausted` once the reserve falls below the
-/// minimum taper of nominal. Deposits never refill.
+/// base_rate × richness × workforce × (1 − hazard), diminished by this site's rank
+/// in its tile's stack (BL-193); it tapers as the *stack's* shared reserve nears
+/// empty and the building reports `exhausted` once that reserve falls below the
+/// minimum taper. Deposits never refill.
 building_report run_extraction(world& w, const recipe_registry& reg,
                                entity_id corp, entity_id building_id,
-                               const building_component& b, float contention)
+                               const building_component& b, float contention,
+                               const stack_draw& stack)
 {
     building_report rep;
     rep.building        = building_id;
@@ -73,14 +114,14 @@ building_report run_extraction(world& w, const recipe_registry& reg,
 
     tile_component& tc = tile_it->second;
     const std::size_t ri = static_cast<std::size_t>(b.target_resource);
-    const float richness = tc.resource_deposit[ri];
-    const float base_rate = reg.economics(building_type::extraction_site).base_rate;
 
-    // Apply the player's workforce target (0–200 % of nominal capacity).
-    const float wt_scalar = std::clamp(b.workforce_target / 100.0f, 0.0f, 2.0f);
-
-    // Rate the deposit would yield at full reserve (richness sets the rate).
-    const float nominal = base_rate * richness * effective_workforce * wt_scalar * (1.0f - tc.hazard_level);
+    // Rate the deposit would yield at full reserve (richness sets the rate),
+    // diminished by this site's rank in the tile's stack (BL-193): the second site
+    // yields 0.8 of the first, the third 0.64, and so on. Stacking therefore pays
+    // sub-linearly — and there is no clamp under the curve, because the curve is
+    // the economics.
+    const float nominal = extraction_nominal(w, reg, b, contention)
+                        * placement_rules::stack_output_scalar(stack.rank);
     if (nominal <= 0.0f)
     {
         rep.idle = true; // unstaffed, no deposit of the target, or fully hazardous
@@ -91,8 +132,10 @@ building_report run_extraction(world& w, const recipe_registry& reg,
 
     // Taper output as the reserve approaches empty: full until the last
     // (taper_ticks × nominal) of reserve, then linearly down toward the floor.
-    const float taper_band = deposit_taper_ticks * nominal;
-    const float taper = std::clamp(remaining / taper_band, 0.0f, 1.0f);
+    // The nominal in question is the whole STACK's (BL-193) — every site on this
+    // deposit rides the same curve and reports exhausted on the same tick, and a
+    // full stack reaches that tick sooner than a lone site would.
+    const float taper = stack.taper;
     if (taper < deposit_min_taper)
     {
         rep.exhausted = true; // out of resources — the reserve is spent
@@ -408,7 +451,13 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
             --b.ticks_remaining;
         }
         if (b.ticks_remaining <= 0)
+        {
             b.construction_progress = 0.0f;
+            // COMPLETION is when a port/hub starts anchoring supply
+            // (is_supply_anchor's ticks_remaining contract, 2026-08-08), so the
+            // reach field goes stale at this moment too, not only at placement.
+            invalidate_logistics_caches(w);
+        }
     }
 }
 
@@ -467,6 +516,10 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
     // Building counts per (corp, body) for apportionment.
     std::map<std::pair<entity_id, entity_id>, int> bldg_count_by_corp_body;
     std::map<entity_id, int>                        bldg_count_by_body;
+    // Owner of each building (BL-193): the stack pre-pass has to price a stack's
+    // members whoever owns them — a rival may stack onto the same deposit — and
+    // ownership is otherwise only readable the other way round, corp → assets.
+    std::map<entity_id, entity_id>                  corp_of_building;
     for (const auto& [corp, cc] : w.corporations)
     {
         for (const entity_id bid : cc.assets)
@@ -474,6 +527,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
             const auto bit = w.buildings.find(bid);
             if (bit == w.buildings.end())
                 continue;
+            corp_of_building[bid] = corp;
             const entity_id body = building_body(w, bit->second);
             if (body == null_entity)
                 continue;
@@ -489,6 +543,13 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
         corp_ids.push_back(kv.first);
     std::sort(corp_ids.begin(), corp_ids.end());
 
+    // ── Pass 1: labour contention for every (corp, body).
+    //
+    // Hoisted out of the production loop (BL-193). The stack pre-pass below has to
+    // size a stack's combined draw across ALL its members, and a member may belong
+    // to a corp the production loop has not reached yet — so every corp's scalar
+    // has to exist before any building produces.
+    std::map<std::pair<entity_id, entity_id>, float> contention_by_corp_body;
     for (const entity_id corp : corp_ids)
     {
         const corporation_component& cc = w.corporations.at(corp);
@@ -533,21 +594,128 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
             const float share  = (total_bldgs > 0) ? static_cast<float>(corp_bldgs) / static_cast<float>(total_bldgs) : 1.0f;
             const float supply = (pop_total > 0.0f) ? pop_total * share : w.workforce_supply(corp, body);
             const float scalar = (demand > supply && demand > 0.0f) ? supply / demand : 1.0f;
-            contention_by_body[body] = scalar;
+            contention_by_corp_body[{corp, body}] = scalar;
             report.workforce_contention[std::make_pair(corp, body)] = scalar;
         }
+    }
 
-        auto contention_for = [&](entity_id body) {
-            const auto it = contention_by_body.find(body);
-            return (it != contention_by_body.end()) ? it->second : 1.0f;
-        };
+    auto contention_for = [&](entity_id corp, entity_id body) -> float {
+        const auto it = contention_by_corp_body.find({corp, body});
+        return (it != contention_by_corp_body.end()) ? it->second : 1.0f;
+    };
+
+    // ── Pass 2: BL-181 workforce auto-solve, player corp only (opt-out via
+    //    workforce_auto; io-standing-rules.md § player-corp exception).
+    //
+    // Runs after contention (which reads workforce_assigned, not the target) and
+    // ahead of the stack pre-pass, rather than inline in the production loop where
+    // it used to sit: the targets the pre-pass sizes a stack's combined draw from
+    // must be the same targets the sites then produce at. The solver reads only
+    // market and tile state, neither of which production moves, so hoisting it
+    // changes nothing else.
+    if (const auto pit = w.corporations.find(w.player_entity); pit != w.corporations.end())
+    {
+        for (const entity_id building_id : pit->second.assets)
+        {
+            const auto bit = w.buildings.find(building_id);
+            if (bit == w.buildings.end())
+                continue;
+            building_component& b = bit->second; // mutable: the auto-solver sets the target
+            if (b.decommissioned || b.ticks_remaining > 0)
+                continue;
+            if (!b.workforce_auto)
+                continue;
+            if (b.type != building_type::extraction_site &&
+                b.type != building_type::processing_facility)
+                continue;
+            b.workforce_target = solve_workforce_target(
+                w, reg, b, contention_for(w.player_entity, building_body(w, b)));
+        }
+    }
+
+    // ── Pass 3: BL-193 extraction stack pre-pass.
+    //
+    // A tile's (type, target) stack works one shared reserve, so the depletion
+    // taper is sized ONCE against the stack's combined nominal draw and handed to
+    // every member. Taper each site against its own nominal instead and the stack
+    // desynchronises: the members drop off one at a time and the deposit dribbles
+    // out. Sizing it here, before any site draws, also stops the sites that run
+    // first from tapering the sites that run after them within the same tick.
+    //
+    // Everything below walks in stored order (ascending entity id, which is
+    // creation order): that order picks who is rank 1 and takes the undiminished
+    // yield, so it can never be read off world::buildings' own iteration.
+    std::map<entity_id, stack_draw> stack_by_building;
+    {
+        std::vector<entity_id> extraction_ids;
+        extraction_ids.reserve(w.buildings.size());
+        for (const auto& [bid, bc] : w.buildings)
+            if (bc.type == building_type::extraction_site)
+                extraction_ids.push_back(bid);
+        std::sort(extraction_ids.begin(), extraction_ids.end());
+
+        // (tile, target) → the stack, oldest site first. std::map for a
+        // deterministic walk over the stacks themselves.
+        std::map<std::pair<entity_id, std::size_t>, std::vector<entity_id>> stacks;
+        for (const entity_id bid : extraction_ids)
+        {
+            const building_component& b = w.buildings.at(bid);
+            stacks[{b.tile, static_cast<std::size_t>(b.target_resource)}].push_back(bid);
+        }
+
+        for (const auto& [key, members] : stacks)
+        {
+            // Combined draw: what the whole stack takes off this deposit this tick,
+            // decay included. A mothballed or half-built site keeps its RANK — rank
+            // is simply place in the tile's build order, the same population the
+            // placement ceiling counts — but contributes nothing to the draw.
+            float combined = 0.0f;
+            for (std::size_t i = 0; i < members.size(); ++i)
+            {
+                const building_component& b = w.buildings.at(members[i]);
+                if (b.decommissioned || b.ticks_remaining > 0)
+                    continue;
+                const entity_id body = building_body(w, b);
+                if (body == null_entity)
+                    continue;
+                const auto      oit   = corp_of_building.find(members[i]);
+                const entity_id ocorp = (oit != corp_of_building.end()) ? oit->second : null_entity;
+                const float     n     = extraction_nominal(w, reg, b, contention_for(ocorp, body))
+                                      * placement_rules::stack_output_scalar(static_cast<int>(i) + 1);
+                if (n > 0.0f)
+                    combined += n;
+            }
+
+            float taper = 1.0f;
+            if (const auto tit = w.tiles.find(key.first);
+                tit != w.tiles.end() && combined > 0.0f)
+            {
+                const float remaining = tit->second.resource_remaining[key.second];
+                taper = std::clamp(remaining / (deposit_taper_ticks * combined), 0.0f, 1.0f);
+            }
+
+            for (std::size_t i = 0; i < members.size(); ++i)
+            {
+                stack_draw sd;
+                sd.rank             = static_cast<int>(i) + 1;
+                sd.combined_nominal = combined;
+                sd.taper            = taper;
+                stack_by_building[members[i]] = sd;
+            }
+        }
+    }
+
+    // ── Pass 4: production.
+    for (const entity_id corp : corp_ids)
+    {
+        const corporation_component& cc = w.corporations.at(corp);
 
         for (const entity_id building_id : cc.assets)
         {
             const auto bit = w.buildings.find(building_id);
             if (bit == w.buildings.end())
                 continue;
-            building_component& b = bit->second; // mutable: the auto-solver may set the target
+            building_component& b = bit->second;
             const entity_id body = building_body(w, b);
 
             // Decommissioned buildings produce nothing — skip production entirely.
@@ -557,28 +725,27 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
             if (b.ticks_remaining > 0)
                 continue;
 
-            // BL-181: auto-solve the player's workforce target to maximise this
-            // building's profit before it produces. Player corp only, opt-out via
-            // workforce_auto (io-standing-rules.md § player-corp exception). Placed
-            // here — after contention is computed (which reads workforce_assigned, not
-            // the target) — so overwriting the target now is safe for this tick.
-            if (corp == w.player_entity && b.workforce_auto &&
-                (b.type == building_type::extraction_site ||
-                 b.type == building_type::processing_facility))
-                b.workforce_target = solve_workforce_target(w, reg, b, contention_for(body));
-
             switch (b.type)
             {
                 case building_type::extraction_site:
+                {
+                    // A site with no pre-pass entry cannot happen (Pass 3 walks every
+                    // extraction site), but the default stack_draw is a lone,
+                    // untapered site — the honest fallback rather than a zero.
+                    const auto sit = stack_by_building.find(building_id);
+                    const stack_draw stack =
+                        (sit != stack_by_building.end()) ? sit->second : stack_draw{};
                     report.buildings.push_back(
-                        run_extraction(w, reg, corp, building_id, b, contention_for(body)));
+                        run_extraction(w, reg, corp, building_id, b,
+                                       contention_for(corp, body), stack));
                     break;
+                }
                 case building_type::processing_facility:
                 {
                     const bool has_market = bodies_with_market.count(body) != 0;
                     report.buildings.push_back(
                         run_processing(w, reg, corp, building_id, b, has_market,
-                                       contention_for(body), report));
+                                       contention_for(corp, body), report));
                     break;
                 }
                 default:
@@ -772,6 +939,8 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
                     if (++b.loss_streak >= loss_streak_to_idle)
                     {
                         b.decommissioned = true;
+                        // An idled port/hub stops anchoring supply — reach stale.
+                        invalidate_logistics_caches(w);
                         report.agency_events.push_back(
                             {corp, bid, agency_event::kind::idled, 0});
                         log_reflex_agency(w, corp, building_body(w, b), "idled a loss-making building");

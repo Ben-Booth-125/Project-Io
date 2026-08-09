@@ -11,7 +11,7 @@
 -- Inspect: screenshots/construction_panel*.png
 
 -- Land on the home planet so the surface (and any corporate buildings) are in scope.
-verify.goto_surface("Kepler")
+verify.goto_surface("home")
 
 -- Open the panel and arm extraction placement targeting iron ore, so the capture
 -- shows the Build section, the target selector, and the armed placement status.

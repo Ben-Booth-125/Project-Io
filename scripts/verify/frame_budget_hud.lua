@@ -21,7 +21,7 @@
 -- 1. OFF BY DEFAULT. An audit instrument must not appear in an ordinary frame; if this
 --    capture ever shows the HUD, every other golden in the suite is contaminated.
 verify.show_panel("economy", false)
-verify.goto_surface("Kepler")
+verify.goto_surface("home")
 verify.capture("frame_hud_absent_by_default")
 
 -- 2. Parked open over the Planetary canvas. The HUD anchors into the canvas area's

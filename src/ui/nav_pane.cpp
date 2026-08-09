@@ -83,10 +83,13 @@ void draw_nav_pane(ui_state& state, float top_offset)
     ImGui::Begin("##nav_pane", nullptr, flags);
 
     // Nine slots from MENU.md § Menu set and ordering. Slots 1–9 match the
-    // MENU.md curated sequence; live slots toggle their panel; reserved slots
-    // (Workforce, Research, Corp. Strategy, Diplomacy) are disabled but each
-    // carries its OWN glyph so the rail teaches the shape of the game rather
-    // than showing a row of identical blanks (BL-174).
+    // MENU.md curated sequence; live slots toggle their panel. Corp. Strategy is
+    // the one still-disabled slot, and it carries its OWN glyph so the rail
+    // teaches the shape of the game rather than showing a row of identical
+    // blanks (BL-174). Workforce, Research and Diplomacy are unbuilt subjects
+    // whose slots provisionally host a homeless surface — the Economy panel
+    // (BL-292), the tech-tree mock (BL-310) and the corporations table (NR-012)
+    // — keeping their real subject's name and glyph.
     //
     // BL-174 dropped the former slot 10 — a disabled placeholder with no glyph
     // and no tooltip, so it was pure noise a new player could not interpret.
@@ -122,11 +125,22 @@ void draw_nav_pane(ui_state& state, float top_offset)
             }
             slot_tooltip("Budget", "Income, costs, and where the money went.", false);
             break;
-        case 3: // Workforce / Population — placeholder (BL-042 step 2 feeds this)
-            ImGui::BeginDisabled();
-            ImGui::Selectable(id, false, 0, {slot_size, slot_size});
-            ImGui::EndDisabled();
-            slot_tooltip("Workforce", "Labour supply, contention, and habitability.", true);
+        // Workforce is still unbuilt, but the slot is no longer disabled: it hosts the
+        // Economy panel, provisionally. That panel has been drawn every frame with
+        // nothing able to open it — no rail slot, no action entry — so a player could
+        // not reach it at all (BL-292). Slot 3 is the least-wrong host because the
+        // panel's Corps view already carries the labour table this slot is eventually
+        // for, and because reusing a reserved slot leaves the rail's length free for
+        // BL-094's law/force slots. Same idiom as slot 8: the slot keeps its real
+        // subject's name and glyph so the rail does not start teaching
+        // "Workforce = the economy tables".
+        case 3: // Workforce — provisional host for the Economy panel (BL-292)
+            if (ImGui::Selectable(id, state.show_economy_panel, 0, {slot_size, slot_size})) {
+                const bool was_open = state.show_economy_panel;
+                close_all_panels(state);
+                state.show_economy_panel = !was_open;
+            }
+            slot_tooltip("Workforce", "Not yet built. For now: the Economy panel - corporation balances, labour, holdings and markets.", false);
             break;
         case 4: // Research (BL-310, 2026-08-06): opens the F9 mock tech-tree
                 // viewer, same flag F9 drives. Was a hard-disabled placeholder;
@@ -209,7 +223,10 @@ void draw_nav_pane(ui_state& state, float top_offset)
         {
         case 1: icons::corporation(dl, centre, r, lit(state.show_corporation_panel));  break;
         case 2: icons::ledger(dl, centre, r, lit(state.show_balance_ledger));          break;
-        case 3: icons::population(dl, centre, r, dim);   break;  // Workforce (reserved)
+        // Slot 3 is live only because it provisionally hosts the Economy panel
+        // (BL-292); the subject it is NAMED for is still unbuilt, so the glyph lights
+        // like any other live slot rather than staying dim — same as slot 8.
+        case 3: icons::population(dl, centre, r, lit(state.show_economy_panel));        break;
         case 4: icons::research(dl, centre, r, lit(state.show_tech_tree)); break;  // Research (BL-310)
         case 5: icons::market(dl, centre, r, lit(state.show_market_ledger));           break;
         // Slot 6 draws the factory, NOT building(processing_facility): that glyph

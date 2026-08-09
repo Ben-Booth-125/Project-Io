@@ -24,7 +24,7 @@ Continent the eighth); "off the bar" lenses are reached by the keyboard lens-cyc
 
 | `overlay_mode` | Bar | Surface (one line) | Status |
 |---|---|---|---|
-| `corporation` | 1 | Planetary tile tint per owning corp, player border, rival HQ reach rings (BL-182) | built |
+| `corporation` | 1 | Planetary tile tint per owning corp, player/rival HQ markers (BL-182; the reach ring retired BL-329) | built |
 | `country` | 2 | Planetary nation tint + owner borders + per-nation key (BL-133, landed 2026-07-09) | built |
 | `resource` | 3 | Planetary contiguous-deposit flat fill; good selector in the legend (BL-134) | built |
 | `market` | 4 | Planetary **catchment tint** — one colour per market (BL-015) + city-name key; Circumplanetary price strip | built |
@@ -104,7 +104,7 @@ a dependency (named in the lens section).
 | Lens | Solar | Circumplanetary | Planetary |
 |---|---|---|---|
 | Supply *(keyboard-cycle only)* | **✓ per-convoy route lines** | **✓ per-body convoy-count badge** | **✓ per-tile convoy glyph** (regenerated table, 2026-07-31 — Layer 5 convoys live) |
-| **Corporation** | — | — | **✓ tile tint + player border + rival reach rings (BL-182)** |
+| **Corporation** | — | — | **✓ tile tint + player/rival HQ markers (BL-182; reach ring retired BL-329)** |
 | **Country** | — | — | **✓ tile tint + owner borders + nation key (BL-133)** |
 | **Resource** | — | — | **✓ contiguous-deposit flat fill + key** |
 | **Market** | — | ✓ per-body price strip | **✓ catchment tint + city-name key (BL-015)** |
@@ -199,17 +199,18 @@ corporation (not just the player) a readable tile tint. See also the BL-085 home
 drawn only on the player's home body, which is a further, distinct layer of the same identity
 chrome.
 
-**Corporate reach (BL-182, visual slice — shipped; foundation BL-201).** Beyond tinting *held
-tiles*, the lens draws each **rival** corporation's **HQ-projected border**: a **reach ring**
-centred on that corp's HQ plus an `hq` star, in the corp's identity colour. As of BL-201 the ring
-reads the corp's **persisted** seat + range (`corporation_component::hq_building` /
-`influence_range`, designated at generation — CORPORATION_GENERATION.md § Pass 3b), not a
-render-time recompute; the ring radius is `influence_range · hex_size · zoom`. The player's border
-and every rival's are now drawn through **one shared `draw_corp_border` path**, each on that corp's
-**home body** (the single-home model; branch offices on other bodies are deferred). This extends
-the identity language of the always-on player-only home ring/HQ star (BL-085) to rivals, so
-corporations read as having **borders too** — the corporation-side counterpart to the Country
-lens's national borders. The player's own border stays always-on; the rival layer shows under this
+**Corporate HQ marker (BL-182 foundation; the reach RING retired BL-329, 2026-08-08).** Beyond
+tinting *held tiles*, the lens draws each **rival** corporation's `hq` star, in the corp's identity
+colour, reading the corp's **persisted** seat (`corporation_component::hq_building`, designated at
+generation — CORPORATION_GENERATION.md § Pass 3b). It previously also drew a fixed-radius **reach
+ring** around that seat (`influence_range · hex_size · zoom`); Ben's live critique retired the ring
+— it never grew as the player built outward and, with the BL-323 reach fog now showing supply
+reach properly, "doesn't show anything informative." `influence_range` is still computed and
+stored (a future operate-gate may want it); only the ring's render call was removed. The player's
+marker and every rival's are drawn through **one shared `draw_corp_hq` path** (formerly
+`draw_corp_border`), each on that corp's **home body** (the single-home model; branch offices on
+other bodies are deferred). This extends the identity language of the always-on player-only home
+star (BL-085) to rivals. The player's own marker stays always-on; the rival layer shows under this
 lens (no double-draw of the player). This layer is **render-only chrome** — it gates nothing. The
 full *gameplay* mechanic (range that gates operations, the national origin gate, multi-HQ building
 via advancement, the tall/wide axis, law/tech levers) stays deferred in
@@ -343,8 +344,9 @@ is built: the Circumplanetary strip and the Planetary wash share the resolved
 `market_component.price`.
 
 **Implemented 2026-06-16** (Market lens render Brief; design confirmed in the batch-close Q&A).
-Planetary wash in `body_surface_canvas.cpp` (`diverging_colour`, composited over terrain at ~0.55
-alpha); the per-body strip in **`circumplanetary_canvas.cpp`** — the Circumplanetary rung, *not*
+Planetary wash in `body_surface_canvas.cpp` (since BL-015 a catchment-boundary tint — one colour
+per market, composited over terrain; the original diverging price ramp is deleted, BL-294); the
+per-body strip in **`circumplanetary_canvas.cpp`** — the Circumplanetary rung, *not*
 `solar_system_canvas.cpp` as the Session-2 handoff's file list said (Solar has no market surface).
 The good-selector is the shared combo from the Resource lens (bound to
 `ui_state.lens_resource`; since BL-134, 2026-07-09, it lives **in the on-canvas lens legend** —
@@ -570,9 +572,9 @@ Idle / exhausted / unbuilt tiles produce nothing → no entry → cold.
 table). Guarded behind `overlay_mode::production`.
 
 **Colour.** Each producing tile's value is taken **relative to the body's
-producing-tile geometric mean** and run through the diverging warm↔cool ramp
-(`diverging_colour`, the same band the Market wash uses): above the mean reads warm,
-below cool, composited at 0.6 over terrain. So contrast is meaningful across bodies
+producing-tile geometric mean** and run through the dedicated red→yellow→green ramp
+(`production_colour`, BL-137): above the mean reads green, below red, the mean
+yellow, composited at 0.6 over terrain. So contrast is meaningful across bodies
 of very different absolute output; a body of similar producers reads near-neutral
 (honest — there is little intensity spread to show).
 

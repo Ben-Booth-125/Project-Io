@@ -95,6 +95,20 @@ economy = {
             build_duration_ticks = 3.0,
             resource_costs = { steel = 30.0 },
         },
+        -- BL-325 S1: Military Base — the unit muster building. Produces nothing
+        -- (base_rate 0, staffs at zero like the port/hub); its value is where
+        -- units are raised (hire moves onto it in BL-325 S2). Deliberately NOT a
+        -- supply anchor: military reach IS the economic reach field (ruling 3),
+        -- so a base extends nothing. Dearer than a hub (a garrison installation,
+        -- not a waypoint), cheaper than a launchpad.
+        military_base = {
+            base_rate   = 0.0,
+            maintenance = 15.0,
+            base_wage   = 10.0,
+            build_cost  = 300.0,
+            build_duration_ticks = 4.0,
+            resource_costs = { steel = 35.0 },
+        },
     },
 
     -- Player-placeable roads, now a three-tier ladder (BL-172; BL-147 shipped a single tier). A
@@ -158,6 +172,34 @@ economy = {
     -- so a starved build takes up to max_stretch × its base duration, then stalls.
     construction = {
         max_stretch = 10.0, -- longest a starved build stretches to (×base duration); below 1/max_stretch it pauses.
+
+        -- BL-323 S2 — LOGISTICAL MAX BUILDING RANGE.
+        -- The furthest a new building may sit from its nearest supply anchor (a
+        -- city, a port, or an inland logistics hub), in the same weighted units
+        -- the convoy A* pays: per-tile landform cost (plains 1.0 → mountain 2.0),
+        -- discounted by road tier, averaged across each edge.
+        --
+        -- So ~24 means roughly two dozen tiles of easy roaded plains, or barely a
+        -- dozen of trackless mountain. Remote ground is not forbidden — it is
+        -- forbidden UNTIL you pay for a hub or a road to reach it, which is the
+        -- decision the rule exists to create.
+        --
+        -- Negative disables the rule entirely (the pre-BL-323 behaviour).
+        max_logistics_reach = 24.0,
+
+        -- BL-323 S3 — BUILD TIME DEPENDS ON THE SITE. Three multipliers on the
+        -- base build_duration_ticks, applied once at placement: landform reuses
+        -- logistics.hpp's own cost function (no separate table to author here).
+        --   site_time_reach_scale     — extra time (as a fraction of base) at the
+        --     furthest placeable reach; 1.0 means a site right at the
+        --     max_logistics_reach budget takes 2x base, one at an anchor takes 1x.
+        --   site_time_stack_discount  — per-existing-building discount on a tile
+        --     that already carries the same building type; 0.15 means the second
+        --     site there takes 0.85x, the third 0.70x, ...
+        --   site_time_stack_min       — floor on the stack discount.
+        site_time_reach_scale    = 1.0,
+        site_time_stack_discount = 0.15,
+        site_time_stack_min      = 0.5,
     },
 }
 

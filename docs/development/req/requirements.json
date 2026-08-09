@@ -8476,9 +8476,9 @@
    "difficulty": 2,
    "importance": "C",
    "evaluated_difficulty": null,
-   "status": "active",
-   "resolved": null,
-   "resolution": null,
+   "status": "closed",
+   "resolved": "2026-08-09",
+   "resolution": "Closed retroactively with the NR-075 cut audit (ratified by Ben 2026-08-09): BL-312/BL-313 landed in 9ecbbcf but were never flipped, so this group was never closed. Rows stand as pending-at-closure; the work shipped and the visual state was accepted in use — verification was overtaken by the closure, not performed.",
    "promoted_from": "backlog.json BL-312, BL-313",
    "batch": null,
    "rows": [
@@ -8534,6 +8534,774 @@
      "status": "pending",
      "result_metric": "",
      "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "history-ages-view",
+   "title": "History ledger: the Ages view — the Era -1 political time-lapse over BL-271's history sim (landed 2026-08-05, 'The Ages view: two thousand years of borders, scrubbable')",
+   "difficulty": 2,
+   "importance": "B",
+   "evaluated_difficulty": 2,
+   "status": "complete",
+   "resolved": "2026-08-04",
+   "resolution": "Complete. Fourth History tab; the sim runs lazily over a COPY of the body's settlement state when the view opens, so world generation is untouched. scripts/verify/history_ages.lua captures three years. Captures inspected; NOT blessed as goldens — the software renderer fails on this machine, so any golden blessed here would be GPU-specific and would widen the Windows-vs-Linux golden drift the first Linux CTest baseline (43/49, 2026-08-04) recorded. (The review notes for both — pre-rebase ids NR-064/NR-065 — did not survive the 2026-08-07 rebase; those ids now name unrelated 2026-08-06 entries.)",
+   "promoted_from": "Ben, 2026-08-04: 'How can you transform this into something viewable in the history ledger?' -> build it now.",
+   "batch": null,
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "The History ledger carries a fourth tab, Ages, showing the Era -1 political time-lapse: a year scrubber, Play/Restart transport, and a province-ownership map coloured by polity.",
+     "class": "visual",
+     "status": "complete",
+     "notes": "history_ages_start/mid/epoch captures."
+    },
+    {
+     "id": "R2",
+     "requirement": "Opening the view never touches world generation: the sim runs on a copy of the settlement state, cached per body, and no generated world state changes.",
+     "class": "visual",
+     "status": "complete",
+     "notes": "Structural — entry->settlement is copied; the report is const."
+    },
+    {
+     "id": "R3",
+     "requirement": "Scrubbing the year changes the map: the antiquity frame shows more, smaller, mixed-colour holdings than the epoch frame, which shows regionally consolidated blocs.",
+     "class": "visual",
+     "status": "complete",
+     "notes": "0 CE = 82 provinces mixed; 1960 CE = 453 provinces, clusters colour-uniform."
+    },
+    {
+     "id": "R4",
+     "requirement": "The view reports the run's own cost honestly — change count and byte size — so the time-lapse substrate's cheapness is visible rather than asserted.",
+     "class": "visual",
+     "status": "complete",
+     "notes": "'Time-lapse: 654 changes, 5232 bytes' on the epoch capture."
+    }
+   ]
+  },
+  {
+   "brief": "history-sweep",
+   "title": "The history sweep: distributions over a seed spread (BL-275)",
+   "difficulty": 3,
+   "importance": "B",
+   "evaluated_difficulty": 3,
+   "status": "complete",
+   "resolved": "2026-08-04",
+   "resolution": "Complete. tools/verify/history_sweep.cpp reports and does not gate, per the item's own instruction. First spread (12 seeds) found hegemony 0/12 and elimination 0/12 — filed in-session as the no-elimination finding (pre-rebase id BL-308; the 2026-08-07 rebase reassigned that id, and Ben's same-day ruling retired the finding as a standalone item — its target, elimination possible and subject-nation release possible, is recorded on BL-271), since a model where no polity can die makes BL-224's invariant unmeasurable.",
+   "promoted_from": "Ben, 2026-08-04, choosing the sweep as the next work.",
+   "batch": null,
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "The sweep runs N seeds of world generation through the full 0->1960 sim and reports per-seed rows plus aggregate distributions, taking the seed count as an argument.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "S1: every seed produced a world and completed."
+    },
+    {
+     "id": "R2",
+     "requirement": "A sweep row is replayable from its seed alone — re-running one swept seed reproduces its battle and conquest counts exactly.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "S2."
+    },
+    {
+     "id": "R3",
+     "requirement": "Seeds genuinely diverge: the sweep measures a spread of worlds, not one world sampled N times.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "S3. Battles range 316..3688 across 12 seeds."
+    },
+    {
+     "id": "R4",
+     "requirement": "The sweep REPORTS and does not GATE: hegemony and elimination rates are printed as measured rates, with no assertion binding them to a target nobody has chosen.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "Only structural checks are PASS/FAIL; the header states why."
+    },
+    {
+     "id": "R5",
+     "requirement": "Output is machine-readable as well as printed — history_sweep.json carries one object per world.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "Open question 2 settled as the lean: JSON + printed summary."
+    }
+   ]
+  },
+  {
+   "brief": "era-rosters-and-great-powers",
+   "title": "Era-keyed rosters (BL-274), the great-power seed (BL-299), and the first fix attempt at the no-elimination finding (pre-rebase id BL-308)",
+   "difficulty": 3,
+   "importance": "B",
+   "evaluated_difficulty": 3,
+   "status": "complete",
+   "resolved": "2026-08-04",
+   "resolution": "Complete for BL-274 and BL-299; the no-elimination fix (pre-rebase id BL-308) PARTIAL and stays open. Hegemony became reachable (0/12 -> 1/12) but elimination did not (still 0/12), with the weakest power now measured at median 6 provinces, range 1..22 — a sharper diagnosis rather than a fix.",
+   "promoted_from": "Ben, 2026-08-04: complete the remaining items, then review.",
+   "batch": "era-minus-1",
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "Unit availability is DERIVED from a province's endowment, not chosen: ore country fields types bare ground cannot, and a port fields ships a landlocked province cannot.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "B274a, B274b."
+    },
+    {
+     "id": "R2",
+     "requirement": "The roster honours the settled band grouping: shock cavalry is absent from the classical band (the stirrup is a T2 unlock), and capacity bands 1/3/4/6 map to classical/medieval/gunpowder/industrial.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "B274c, B274e."
+    },
+    {
+     "id": "R3",
+     "requirement": "Bands are cumulative — a later-band polity keeps the earlier rows, because nothing un-invents a spear.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "B274d."
+    },
+    {
+     "id": "R4",
+     "requirement": "combat.{hpp,cpp} is not modified: the roster resolves INTO combat's types rather than combat gaining a roster table it was designed not to have.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "Structural — unit_roster.cpp includes combat.hpp, not the reverse."
+    },
+    {
+     "id": "R5",
+     "requirement": "The great-power seed produces exactly two majors carrying OPPOSED creeds, and the periphery survives as actors rather than terrain.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "B299a, B299b, B299c."
+    },
+    {
+     "id": "R6",
+     "requirement": "Defeat compounds: a polity that loses ground fights measurably worse, and the effect is escapable only by consolidating for several years.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "Cohesion multiplies stack readiness; recovery is slower than loss."
+    },
+    {
+     "id": "R7",
+     "requirement": "The no-elimination finding's target outcome (pre-rebase id BL-308) — a polity is eliminated in at least one world of a seed spread — is NOT met. Recorded as failed rather than re-scoped.",
+     "class": "headless",
+     "status": "failed",
+     "notes": "Elimination 0/12 after the fix. Weakest power median 6 provinces, range 1..22. The finding kept the sharper diagnosis and was then retired as a standalone item (Ben, 2026-08-07): elimination possible and subject-nation release possible stand as design intent on BL-271 (Era -1 history sim)."
+    }
+   ]
+  },
+  {
+   "brief": "era-minus-1-review-fixes",
+   "title": "Review fixes: province stacking, Ages cache key, and the vacuous stall assertion (pre-rebase ids BL-310/311/312; landed 2026-08-05, 'Four review items: three land, one reverts, and the stall was never real')",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": 3,
+   "status": "complete",
+   "resolved": "2026-08-04",
+   "resolution": "Settle stacking, the Ages cache key and the vacuous-stall batch (pre-rebase ids BL-310/311/312 — reassigned to unrelated items by the 2026-08-07 rebase) complete. The verb-scales fix (pre-rebase id BL-309) attempted and REVERTED — range-based normalisation structurally favours the narrowest-range verb, so it needs a scorer redesign (unnumbered in the 2026-08-07 working tree; re-file if it stalls). The stacking fix carried most of the benefit anyway: LAST CHANGE YEAR 458 -> 967, first-tenth share 36% -> 5%.",
+   "promoted_from": "Ben, 2026-08-04: batch deliver the review items.",
+   "batch": "era-minus-1",
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "Settle never founds a province on an occupied grid cell; the map's distinct-cell count equals its province count.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "Occupancy search with widening ring. Conquests 201 -> 3568 as a side effect."
+    },
+    {
+     "id": "R2",
+     "requirement": "History recurs across the run rather than firing early and stopping: the last ownership change lands well beyond the first quarter, and the first tenth holds a small minority of changes.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "LAST CHANGE YEAR median 458 -> 967; first-tenth share 36% -> 5%. Instrumented in history_sweep."
+    },
+    {
+     "id": "R3",
+     "requirement": "The Ages view re-runs its sim when the world is regenerated, rather than showing the previous world's political history.",
+     "class": "visual",
+     "status": "complete",
+     "notes": "Cache keyed on a generation fingerprint, not the hard-coded body name."
+    },
+    {
+     "id": "R4",
+     "requirement": "The supply-decay stall assertion is non-vacuous: the far objective is genuinely scored and attacked, and the test states which mechanism actually stops distant expansion.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "R3a2/R3a3/R3b/R3b2. Found that supply decay ALONE does not stop conquest — the w_dist score penalty does. Q2 of BL-277 (Era -1 military strategy) corrected accordingly in-session; the correction to that item's design prose did not survive the 2026-08-07 rebase, so the record of it lives here and in the 2026-08-05 commit."
+    },
+    {
+     "id": "R5",
+     "requirement": "No comment in the sim describes behaviour the code does not implement, and the uint16 province index cannot silently wrap.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "Four comments corrected; owner_index_limit guards the change list."
+    }
+   ]
+  },
+  {
+   "brief": "unit-hire-surface",
+   "title": "Wire units into the campaign build (BL-324)",
+   "difficulty": 4,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-08-08",
+   "resolution": "Code-complete and headless-verified 2026-08-08. R1/R6's manual-visual leg (a human clicking the Hire button in a live app session) was not run in this headless environment — filed as NR-086, same shape as NR-026's frame-budget gap for BL-249: shipped complete with the human-verification step open as a named follow-up, not silently skipped.",
+   "promoted_from": "backlog.json BL-324",
+   "batch": null,
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "Brief-spanning: the unit record matches BL-157's settled schema (id-keyed map beside world::buildings, owner = nation or corp, position = a tile id, one fixed-point strength scalar, type index into the roster) and a hire affordance beside the build affordance can raise one, visible in the Selection panel.",
+     "verification": [
+      "headless",
+      "visual: manual (no golden covers unit placement yet)"
+     ],
+     "status": "complete",
+     "result_metric": "Record shape + verb path headless-verified (combat_harness, corp_ai_harness, ai_skill_harness, full CTest); the affordance itself was never clicked in a live app session here.",
+     "notes": "Manual-visual leg owed — no display in this environment, see NR-086. Everything else is code-complete."
+    },
+    {
+     "id": "R2",
+     "requirement": "unit_component carries position as a tile id (not body) and a fixed-point strength scalar, stored in a new id-keyed map beside world::buildings.",
+     "verification": [
+      "code",
+      "headless"
+     ],
+     "status": "complete",
+     "result_metric": "combat_harness, corp_ai_harness PASS against the new field shape; full app + all harnesses build clean.",
+     "notes": "src/world/components.hpp, src/world/world.hpp (world::units already existed as the id-keyed map)"
+    },
+    {
+     "id": "R3",
+     "requirement": "A campaign hire gate reads the corp's stockpile and market access (not a province endowment) to determine which roster rows are hireable.",
+     "verification": [
+      "headless"
+     ],
+     "status": "complete",
+     "result_metric": "Exercised live by corp_ai's hire candidates across the ai_skill_harness benchmark seeds (525 hires/run pre-cap, gate-driven and identical across all 5 seeds, confirming it fires on presence not RNG).",
+     "notes": "src/world/unit_roster.{hpp,cpp} — campaign_gate_input + corp_stockpile_total, binary presence (1000/0)"
+    },
+    {
+     "id": "R4",
+     "requirement": "A corp_verb raises a unit: committing it debits the gating cost from the corp's stockpile and constructs a unit_component at the chosen tile.",
+     "verification": [
+      "headless"
+     ],
+     "status": "complete",
+     "result_metric": "corp_ai_harness + ai_skill_harness PASS; apply_corp_command's hire_unit path exercised every eval a corp is eligible.",
+     "notes": "src/world/corp_command.hpp/.cpp — two-phase check-then-commit debit, all-or-nothing"
+    },
+    {
+     "id": "R5",
+     "requirement": "corp_ai scores the hire verb for rival corporations the same way it scores build/demolish/survey/road, so rival corps can raise units without a special case.",
+     "verification": [
+      "headless"
+     ],
+     "status": "complete",
+     "result_metric": "ai_skill_harness: hire_unit appears in every seed's action tally, capped at 1/eval + 3 units/corp (the cap added after measuring unconditional firing against the presence gate).",
+     "notes": "src/world/corp_ai.cpp"
+    },
+    {
+     "id": "R6",
+     "requirement": "A hire affordance beside the build affordance in the construction panel commits through the verb above; the Selection panel's existing (currently unreachable) unit case renders the resulting unit.",
+     "verification": [
+      "visual: manual (no golden covers unit placement yet)"
+     ],
+     "status": "complete",
+     "result_metric": "Builds clean; ProjectIo target compiles with the new Hire section wired to pending_hire_tile/pending_hire_unit_type -> apply_corp_command. Never clicked live, see NR-086.",
+     "notes": "Landed in src/ui/selection_panel.cpp's construction ledger, not construction_panel.cpp as originally scoped — that's where the tile ledger's Build candidates already lived. Manual-visual leg owed."
+    },
+    {
+     "id": "R7",
+     "requirement": "io-standing-rules.md gains an entry recording the AI-hire exception, alongside the BL-079/BL-202/BL-181 entries, at landing.",
+     "verification": [
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "Entry added, reviewed by re-reading the file.",
+     "notes": ".claude/rules/io-standing-rules.md"
+    }
+   ]
+  },
+  {
+   "brief": "nation-corp-generation-visibility",
+   "title": "Visualise the political steps of generation (BL-305)",
+   "difficulty": 3,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "active",
+   "resolved": null,
+   "resolution": null,
+   "promoted_from": "backlog.json BL-305",
+   "batch": null,
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "Brief-spanning: the nation territory carve and corporation seeding are watchable during/after generation, with every GENERATION_STRATEGY.md pass either covered or explicitly marked invisible-by-design.",
+     "verification": [
+      "visual: manual"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "The nation territory carve (Voronoi BFS) is watched live as a generation-screen stage extending BL-256's globe, not only inspectable after generation completes.",
+     "verification": [
+      "visual: manual"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": "src/world/hard_coded_world.cpp, src/core/app.cpp"
+    },
+    {
+     "id": "R3",
+     "requirement": "The corp asset-placement step renders spatially on the generation-screen canvas/globe.",
+     "verification": [
+      "visual: manual"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R4",
+     "requirement": "The corp financial-profile derivation step surfaces as a card/ledger entry, not a canvas overlay.",
+     "verification": [
+      "visual: manual"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R5",
+     "requirement": "A coverage pass confirms every step in GENERATION_STRATEGY.md's pass map has a named visibility surface; any step without one gets an explicit \"invisible by design\" note in that doc.",
+     "verification": [
+      "code"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": "docs/generation/GENERATION_STRATEGY.md, docs/generation/NATION_GENERATION.md, docs/generation/CORPORATION_GENERATION.md"
+    }
+   ]
+  },
+  {
+   "brief": "buildings-rework-first-slice",
+   "title": "Buildings rework — extraction padding, site-dependent build time, construction legibility",
+   "difficulty": null,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-08-08",
+   "resolution": "All 7 rows met. k_extractable widened 4->15 targets (11 already-deposited resources reached, no other placement_rules.cpp change needed). recipes.lua gained the Smelter's iron-nickel-ore recipe. construct_building now scales build_duration_ticks by landform x reach x stack at placement (recipe_registry.hpp construction_params + economy.lua construction knobs). A building under construction reads desaturated on the canvas and the glance-then-stick hover card states its remaining ticks. buildings_rework_harness: 12/12 PASS. Full ProjectIo build clean; CTest 46/55 pass -- the 9 non-passing tests are pre-existing environment timeouts/failures (history_sim_harness, history_sweep, mediterranean_sweep, notable_worlds, earthlike_lean_trace, earthlike_tile_census timeouts; econ_stability, world_audit, ai_skill_harness failures) documented in the 2026-08-08 audit-note DEVLOG entry, unrelated to this change and reproduced identically without it.",
+   "promoted_from": "backlog.json BL-323 (BUILDINGS_REWORK) — S1 (partial: extraction targets only, no new resource_type values), S3, S4. S2/S2b already landed pre-promotion. S1's full roster (new processing chains: Chemical Plant, Electronics Lab, Fabricator, Assembly Plant, most Refinery outputs) is blocked on a resource_type expansion that is its own design item and stays out of this slice.",
+   "batch": null,
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "Brief-spanning: the extraction roster widens to every resource already generated on tiles (coal, silica, copper ore, rare earth ore, stone, sand, clay, timber, iron-nickel ore, platinum group metals, regolith), build time depends on the site (landform, logistics distance, established stack) rather than a flat per-type constant, and a building under construction reads as such at a glance on the canvas.",
+     "verification": [
+      "headless: buildings_rework_harness",
+      "visual: manual"
+     ],
+     "status": "complete",
+     "result_metric": "12/12 buildings_rework_harness PASS; full build clean",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "k_extractable (placement_rules.hpp) includes the 11 additional resource types PRODUCTION.md's Mine/Quarry/Lumber Camp/Ice Extractor/Surface Extractor design; each is placeable wherever its tile deposit is >0, with no placement_rules.cpp logic change (the check is already generic over k_extractable).",
+     "verification": [
+      "headless: buildings_rework_harness",
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "k_extractable 4 -> 15 targets; R1/R2 harness assertions PASS",
+     "notes": "src/world/placement_rules.hpp"
+    },
+    {
+     "id": "R3",
+     "requirement": "The Smelter gains its second designed recipe (iron-nickel ore -> steel, PRODUCTION.md), authored in recipes.lua with no enum churn.",
+     "verification": [
+      "headless: buildings_rework_harness",
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "R3 harness assertions PASS (iron-nickel recipe distinct from iron recipe, still outputs steel)",
+     "notes": "scripts/recipes.lua"
+    },
+    {
+     "id": "R4",
+     "requirement": "construct_building scales the base build_duration_ticks by three site factors at placement: the tile's landform_logistics_cost (plains 1.0x .. mountain 2.0x), a reach-distance factor (near an anchor cheaper, up to the max_logistics_reach budget dearer), and an established-stack discount (a tile that already carries a building of the same kind builds faster). Constants authored in economy.lua, not hard-coded.",
+     "verification": [
+      "headless: buildings_rework_harness",
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "R4 harness assertions PASS (landform, reach, stack all move ticks_remaining as designed)",
+     "notes": "src/world/construction.cpp, src/world/recipe_registry.{hpp,cpp}, scripts/economy.lua"
+    },
+    {
+     "id": "R5",
+     "requirement": "The site-time multiplier composes correctly with BL-095's material-starvation stretch (max_stretch) -- a remote, mountainous, first-of-its-kind build is slower from BOTH mechanisms, neither overrides the other, and ticks_remaining never rounds to zero.",
+     "verification": [
+      "headless: buildings_rework_harness"
+     ],
+     "status": "complete",
+     "result_metric": "R5 harness assertions PASS (floor at 1 tick for real durations; 0-duration stays instant)",
+     "notes": ""
+    },
+    {
+     "id": "R6",
+     "requirement": "A building under construction (ticks_remaining > 0) renders visually distinct from a completed building on the Planetary surface canvas (desaturated/dimmed marker) -- reads at a glance, no click required.",
+     "verification": [
+      "visual: manual"
+     ],
+     "status": "complete",
+     "result_metric": "Verified visually via a zoomed capture (zoomcheck_built) -- desaturated marker renders on the built tile",
+     "notes": "src/ui/body_surface_canvas.cpp"
+    },
+    {
+     "id": "R7",
+     "requirement": "The glance-then-stick hover card for a player-owned building under construction shows its remaining tick count.",
+     "verification": [
+      "visual: manual"
+     ],
+     "status": "complete",
+     "result_metric": "Code review: hover_building_supply construction branch added, outranks decommissioned/idle lines",
+     "notes": "src/ui/hover_content.cpp hover_building_supply"
+    }
+   ]
+  },
+  {
+   "brief": "reach-rule-hardening",
+   "title": "Reach-rule hardening — cache invalidation, first-anchor bootstrap, anchor completion",
+   "difficulty": null,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-08-08",
+   "resolution": "All rows met. Three BL-323 S2 defects found by Ben's outside-the-box review, each ruled on live: (1) every place/demolish/completion/decommission-flip now invalidates the logistics caches via the shared invalidate_logistics_caches helper (Ben chose the simple every-event rule); (2) the first anchor-type placement on an anchor-less body skips the reach rule (existence of any committed anchor ends the exemption — no free-anchor spam); (3) is_supply_anchor now requires completion + not-decommissioned, matching the convoy-discount contract. logistics_reach_harness extended R9-R11: 26/26 PASS.",
+   "promoted_from": "backlog.json BL-323 (reach-rule S2 hardening, rulings 2026-08-08)",
+   "batch": null,
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "Brief-spanning: the reach field never lies — every event that changes the anchor set or traversal costs (place, demolish, completion, decommission/resume, road) invalidates the caches; the first anchor on a virgin body is placeable; an unbuilt or decommissioned port/hub anchors nothing.",
+     "verification": [
+      "headless: logistics_reach_harness R9-R11"
+     ],
+     "status": "complete",
+     "result_metric": "26/26 PASS",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "construct_building and demolish_building invalidate both caches themselves; a hub placed or demolished through the real path changes the reach field with no manual clear.",
+     "verification": [
+      "headless: logistics_reach_harness R11"
+     ],
+     "status": "complete",
+     "result_metric": "R11 rows PASS",
+     "notes": "invalidate_logistics_caches helper, logistics.hpp"
+    },
+    {
+     "id": "R3",
+     "requirement": "An anchor-type placement (port/hub) on a body with NO anchor of any kind skips the reach rule; a non-anchor building is still refused there; committing the first anchor (even under construction) ends the exemption.",
+     "verification": [
+      "headless: logistics_reach_harness R10"
+     ],
+     "status": "complete",
+     "result_metric": "R10 rows PASS",
+     "notes": "body_has_supply_anchor, placement_rules.cpp"
+    },
+    {
+     "id": "R4",
+     "requirement": "is_supply_anchor requires ticks_remaining <= 0 and !decommissioned for port/hub — the same completion contract as the convoy discount; completion and decommission flips invalidate the caches at all five flip sites.",
+     "verification": [
+      "headless: logistics_reach_harness R9",
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "R9 rows PASS",
+     "notes": "corp_command idle verb, selection_panel Idle/Resume, construction_panel Decommission, economy_system idle-loser + completion"
+    }
+   ]
+  },
+  {
+   "brief": "military-base-s1",
+   "title": "Military base S1 — the muster building exists end-to-end",
+   "difficulty": null,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-08-08",
+   "resolution": "All 5 rows met. building_type::military_base = 6 end-to-end: economics array bumped 6->7, Lua name-map + economy.lua entry (produces nothing, staffs at zero), explicit can_place case (any non-ocean land, reach rule applies, NO anchor exemption), shield glyph in icons::building + ICONS.md row, name in presentation.cpp, build ledger candidate + primed-check rows, gameplay.build dictionary entry updated + mirror regenerated, verify place_mode extended (launchpad/logistics_hub/military_base). buildings_rework_harness extended R6/R7: 19/19 PASS. Campaign visual check: base placed via the real path at tile (135,83), shield renders (dimmed under construction per BL-323 S4), Selection band names it. Ruling 3 held in code: a completed base is not a supply anchor and the reach field is unchanged by building one.",
+   "promoted_from": "backlog.json BL-325 (military base + supply), S1 only",
+   "batch": null,
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "Brief-spanning: building_type::military_base exists end-to-end — enum, economics (Lua-authored), placement rule, glyph, naming — and is offered/placeable through the campaign build surfaces.",
+     "verification": [
+      "headless: buildings_rework_harness",
+      "visual: manual"
+     ],
+     "status": "complete",
+     "result_metric": "19/19 harness PASS; campaign placement verified via --verify (mb_zoom capture)",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "Placement: valid on any non-ocean land tile within the logistics reach budget, no deposit requirement; ocean refused; the reach rule applies (a base placement is NOT exempt — it is not an anchor type).",
+     "verification": [
+      "headless: buildings_rework_harness"
+     ],
+     "status": "complete",
+     "result_metric": "R6 rows PASS (land-in-reach ok, ocean refused, beyond-reach refused, no exemption)",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "requirement": "Economics: authored in economy.lua (produces nothing, base_rate 0); the built base staffs at zero workforce like the port/hub; the BL-323 S3 site-time multiplier applies unchanged.",
+     "verification": [
+      "headless: buildings_rework_harness",
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "R7 staffs-at-zero PASS; economics Lua-authored; S3 multiplier applies via the shared path",
+     "notes": ""
+    },
+    {
+     "id": "R4",
+     "requirement": "Ruling 3 holds in code: a military_base is NOT a supply anchor — placing and completing one changes neither is_supply_anchor nor the reach field.",
+     "verification": [
+      "headless: buildings_rework_harness"
+     ],
+     "status": "complete",
+     "result_metric": "R7 rows PASS (completed base not an anchor; reach field unchanged)",
+     "notes": ""
+    },
+    {
+     "id": "R5",
+     "requirement": "The glyph: a distinct shield silhouette in icons::building (not the fallback circle), catalogued in ICONS.md per its add-a-glyph rule.",
+     "verification": [
+      "code",
+      "visual: manual"
+     ],
+     "status": "complete",
+     "result_metric": "Shield glyph renders distinct (mb_zoom capture); ICONS.md row added",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "critique-batch-ui-polish",
+   "title": "Critique batch: build-ledger grouping + warning, construction glyph, reach-circle retirement, military start",
+   "difficulty": null,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-08-08",
+   "resolution": "All 6 rows met. BL-326: build ledger candidates grouped (Extraction/Processing/Infrastructure/Military), two-tier alphabetical sort replacing profit-first ranking, TreeNodeEx fold per group. BL-328: construction_rate() surfaced pre-commit on every candidate row, gated on placement validity so it never stacks with an existing rejection reason; row height bumped to avoid clipping. BL-327: a dedicated crane glyph (icons::under_construction) replaces the BL-323 S4 dimming, drawn in place of the type silhouette while ticks_remaining > 0; cataloged in ICONS.md. BL-329: draw_corp_border's AddCircle ring removed (renamed draw_corp_hq), the icons::hq marker kept; LENSES.md/PLANETARY.md/components.hpp updated to match, corporate_reach.lua's own comments corrected. BL-330: player corp seeded with one military_base + one unit at generation, deterministic, via a nearest-valid-tile search from the HQ. Verified: full ProjectIo build clean; CTest 45/55 pass -- the 10 non-passing all reproduce identically on the pre-batch baseline (isolated via git stash), confirming none are regressions from this batch. Visual checks via --verify captures for the grouped ledger, the crane glyph, and the retired ring.",
+   "promoted_from": "backlog.json BL-326, BL-327, BL-328, BL-329, BL-330 (Ben's 2026-08-08 live critique)",
+   "batch": true,
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "BL-326: the tile construction ledger groups candidates into expandable groups (Extraction / Processing / Infrastructure / Military), sorted two-tier alphabetical (group, then row) -- not by expected profit.",
+     "verification": [
+      "visual: manual",
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "Visual: tile_build_ledger.lua captures show Extraction/Infrastructure folds; code review confirms Military/Processing groups wired",
+     "notes": "src/ui/selection_panel.cpp"
+    },
+    {
+     "id": "R2",
+     "requirement": "BL-328: a candidate row whose prospective material rate is 0 (or a material-starved partial rate) shows a warning/ETA line BEFORE commit, using the existing construction_rate() function.",
+     "verification": [
+      "visual: manual",
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "Visual: material-supply warning renders on candidate rows, gated correctly against invalid placement (fixed a real stacking bug found in review)",
+     "notes": "src/ui/selection_panel.cpp"
+    },
+    {
+     "id": "R3",
+     "requirement": "BL-327: a building with ticks_remaining > 0 renders a dedicated under-construction glyph IN PLACE OF its type silhouette, not a desaturated version of it; the BL-323 S4 dimming path is removed.",
+     "verification": [
+      "visual: manual",
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "Visual: glyph_check captures show the crane glyph rendering in place of the type silhouette on a building under construction",
+     "notes": "src/ui/icons.cpp, src/ui/body_surface_canvas.cpp, docs/ui/ICONS.md"
+    },
+    {
+     "id": "R4",
+     "requirement": "BL-329: the corp-border ring (draw_corp_border's AddCircle) is removed for both the player's always-on chrome and rival borders under the Corporation lens; the HQ marker glyph itself is kept.",
+     "verification": [
+      "visual: manual",
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "Visual: corporate_reach.lua captures confirm the ring is gone; HQ star marker unaffected",
+     "notes": "src/ui/body_surface_canvas.cpp"
+    },
+    {
+     "id": "R5",
+     "requirement": "BL-330: a fresh campaign seeds the player corporation with one military_base and one unit, deterministically (same seed -> same placement).",
+     "verification": [
+      "headless",
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "Code review + determinism/world_audit/corp_terrain_matrix harnesses all pass; visual capture confirms placement",
+     "notes": "src/world/corporation_generation.cpp"
+    },
+    {
+     "id": "R6",
+     "requirement": "Full ProjectIo build stays clean; buildings_rework_harness and any new/existing headless harnesses touched by BL-330 still pass.",
+     "verification": [
+      "headless"
+     ],
+     "status": "complete",
+     "result_metric": "Full build clean (0 errors); CTest 45/55 -- the 10 non-passing reproduce identically on the pre-batch baseline, isolated via git stash",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "text-wrap-render-audit",
+   "title": "Render-precision audit: ui::text_fit module, overflow ledger, charts reflow, display floor (BL-215)",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-08-09",
+   "resolution": "Landed with BL-215; verified by scripts/verify/text_overflow_floor.lua (0 overflow records at the 1280x720 floor).",
+   "promoted_from": "backlog.json BL-215",
+   "batch": null,
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "src/ui/text_fit.{hpp,cpp} exists with the exact ratified API (text_box x10, overflow_severity, text_align, fit_text, wrap_text, add_fit_text, fit_width, fitted, recorder surface); profile_panel.cpp's private fit_ellipsis/text_ellipsized are deleted and routed through fit_text.",
+     "verification": [
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "",
+     "notes": "Module landed; profile_panel helpers deleted, both lines route through fit_text(header_strip)."
+    },
+    {
+     "id": "R2",
+     "requirement": "Overflow recording is on in Debug and unconditionally under --verify; records dedupe on (site,text) keeping worst severity; no source string is ever shortened and no font shrunk by the helper.",
+     "verification": [
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "",
+     "notes": "set_overflow_recording(true) in Debug ctor + run_verify; dedupe on (site,text) keeps worst severity."
+    },
+    {
+     "id": "R3",
+     "requirement": "Display floor: SDL_SetWindowMinimumSize(1280*s, 720*s) on creation and re-applied from apply_ui_scale; persisted-settings floor moved 640x480 -> 1280x720; DEVELOPMENT_PRACTICES.md states the contract.",
+     "verification": [
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "",
+     "notes": "Min size on creation + apply_ui_scale (s = scale_px/16); settings floor 1280x720; § Display environment updated."
+    },
+    {
+     "id": "R4",
+     "requirement": "charts.cpp is measure-first: legend_width replaces the 190px guess, measure_chart/chart_metrics/chart_row_height(metrics) added with chart_row_height(float) verbatim, draw_bars legend_place is a caller opt-in (no internal width test), tick gutters measured, threshold_line takes the resolved legend reserve, titles wrap to two lines then elide-with-tooltip.",
+     "verification": [
+      "code",
+      "visual: scripts/verify/text_overflow_floor.lua"
+     ],
+     "status": "complete",
+     "result_metric": "verify.expect_no_clipping: 0 failures, 0 records",
+     "notes": "text_overflow_floor.lua PASS on Linux Debug build: 0 clipped/unfittable, 0 elided after the band fix."
+    },
+    {
+     "id": "R5",
+     "requirement": "verify.clipping() and verify.expect_no_clipping(label) exist; capture_frame names the overflow frame; scripts/verify/text_overflow_floor.lua walks the shell at 1280x720 and asserts zero clipped/unfittable records.",
+     "verification": [
+      "visual: scripts/verify/text_overflow_floor.lua"
+     ],
+     "status": "complete",
+     "result_metric": "verify.expect_no_clipping: 0 failures, 0 records",
+     "notes": "Bindings live; script walks ledgers/views/lenses/selection/wizard/history at 1280x720; exit 0."
+    },
+    {
+     "id": "R6",
+     "requirement": "Coverage: rg -n \"AddText(\" src/ui src/core returns only text_fit.cpp, icons.cpp, or lines carrying a trailing // fit-exempt: <reason> comment; LAYOUT.md carries container row 10, the widened container-4 row, and the closing amendment note.",
+     "verification": [
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "",
+     "notes": "Coverage grep clean (only text_fit.cpp, icons.cpp, fit-exempt lines); LAYOUT.md row 10 + container 4 + note added."
+    }
+   ]
+  },
+  {
+   "brief": "selection-always-open",
+   "title": "BL-266: Selection element always open — retire dismissal, empty state rests on player corp",
+   "difficulty": 3,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "active",
+   "requirements": [
+    {
+     "id": "R1",
+     "requirement": "BL-266: selection_hidden_for is deleted (all eleven call sites — draw gate, dismiss writer, three canvas click handlers, Esc rung, card_open test, two re-show paths); Esc's terminal rung becomes the system menu.",
+     "verification": [
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "Field deleted; 18 sites removed (design counted 11 - extra verify hooks + canvas files); Esc terminal rung = system menu; build clean",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "BL-266: with nothing selected the band rests on the player's own corporation via the existing corporation builder; selection_kind::none is never rendered by the band (rule stated in code comment); deselect returns the band to the player corp.",
+     "verification": [
+      "visual: harness",
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "Band substitutes player corp for null/stale selection via swap-draw-restore (selected_entity stays null, deselect representable); none never rendered, rule in comment; resting capture verified",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "requirement": "BL-266: docs/ui/SELECTION.md updated in the same change — dismissal retired, empty state documented, Esc ladder described as ending at the system menu.",
+     "verification": [
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "SELECTION.md updated in the same change",
+     "notes": ""
+    },
+    {
+     "id": "R4",
+     "requirement": "BL-266: every verify script that pressed Esc expecting the band to hide is updated to assert the band persists showing the player corp (state assertion preferred over pixels); drill/fold goldens re-blessed.",
+     "verification": [
+      "visual: harness"
+     ],
+     "status": "pending",
+     "result_metric": "sticky_card.lua + continents_terrain.lua updated and run; dismiss_selection Lua hook replaced by clear_selection",
+     "notes": "Goldens NOT re-blessed: on this Linux box every golden diffs ~20-35% even on untouched captures (environment mismatch). Re-bless list in NR-104."
     }
    ]
   }

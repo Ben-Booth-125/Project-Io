@@ -13,12 +13,12 @@ The prototype UI is built with Dear ImGui (see TECH_FOUNDATIONS). Everything her
 │ Profile          │           Header            │  Time panel  │
 │ (identity tile)  │   (budget + resource strip) │ (date + bar, │
 ├─────┬────────────┤ — one top band, level tiles │  speed ctl)  │
-│ Nav │ Fold-out   ├─────────────────────────────┴──────────────┤
-│ rail│ column:    │                                            │
-│ ▢   │ ledger     │            Primary canvas                  │
-│ ▢   │            │   (Solar / Circumplanetary / Surface)      │
-│ ▢ … │ (stops at  │                                            │
-│ ▦   │ the comms  │                             ┌──────────────┤
+│ Nav │ Fold-out   ├─────────────────────────────┼──────────────┤
+│ rail│ column:    │                             │ PINNED ITEMS │
+│ ▢   │ ledger     │       Primary canvas        │ (watch list; │
+│ ▢   │            │ (Solar / Circumpl./Surface) │  the slot    │
+│ ▢ … │ (stops at  │                             │  comms left) │
+│ ▦   │ the comms  │                             ├──────────────┤
 │ ▢ … │ dock's top │                             │   Minimap    │
 │ ▢   │ edge)      │                             │  [lens bar]  │
 │     ├────────────┴──────┬──────────────────────┤              │
@@ -34,6 +34,34 @@ the fold-out column's width), the **Selection band** from the dock's right edge 
 the right chrome column, and the **minimap** in the corner. The fold-out column
 stops at the dock's top edge, so every ledger is permanently shorter by the strip's
 height — see *Selection band* and *Comms dock* below.
+
+The **right chrome column** splits two ways and elastically: the content-derived
+**time panel** on top, the ratio-locked **minimap** at the foot, and the whole
+residual middle to **pinned items** — the slot comms vacated when BL-227 moved it
+down. The minimap does not move.
+
+### One owner for the rect algebra (BL-216)
+
+The regions above are not each other's business, but their **edges** are. The right
+chrome column's left edge alone used to be re-derived by hand in five places in
+`app.cpp` — minimap, time panel, system gear, the header's right bound, the Selection
+band's right edge — and they had already drifted: BL-312 flushed the minimap to the
+screen edge and the other four did not follow.
+
+**`src/ui/shell_metrics.{hpp,cpp}`** now owns that algebra, and every call site asks
+it for a rect: `right_chrome_width` / `right_chrome_left`, `minimap_rect`,
+`time_panel_rect`, `bottom_band_budget`, `selection_band_rect`, `pinned_panel_rect`.
+It **consumes** `foldout_column.hpp`'s primitives (`shell_column_width`,
+`minimap_width`/`_height`, `selection_band_height`, `foldout_column_rect`,
+`comms_dock_rect`) rather than duplicating them — the split is primitives there,
+composed rects here. Widths round to whole pixels, so every region edge lands on a
+pixel boundary.
+
+> One live inconsistency is **recorded, not silently fixed**: the minimap is flush to
+> the screen edge (`disp.x - mm_w`, BL-312) while the column's other occupants stop a
+> `shell_margin` short of it (`right_chrome_left`). `minimap_rect` and
+> `right_chrome_left` therefore disagree by 8 px, deliberately and in one visible
+> place, instead of five invisible ones.
 
 Two layers compose the screen:
 
@@ -58,7 +86,10 @@ across resolutions rather than a magic constant. BL-122 originally **widened** t
 ledgers; **BL-213 (2026-07-28) narrowed it back down** to `[380, 460]` once Selection moved
 out to its own fixed bottom band (see *Selection band* below) and no longer needed room in
 this column at all — the freed width goes to the band instead. It now resolves to ~380 px at
-1720 wide, ~410 px at 1920. The column is reserved down the whole left edge:
+1720 wide, 384 px at 1920, ~410 px at 2048 — the 380 floor binds across almost the
+whole common range (this line used to claim "~410 px at 1920", which is arithmetically
+wrong: `0.20 · 1920 = 384`; corrected under BL-216). The column is reserved down the
+whole left edge:
 
 - The **identity tile** (profile) caps it at top, taking the full width `W`.
 - The narrow **icon nav rail** (56 px) runs down its left sub-edge, full height.
@@ -115,7 +146,7 @@ A fixed, full-height **icon rail** pinned to the left edge (`nav_pane_width`, cu
 
 - Holds a vertical strip of **nine square icon slots** (BL-174 dropped the glyph-less tenth) — the home for the game's menus and ledgers. **Every slot carries its own vector glyph** (`src/ui/icons.hpp`) — live slots in the bright stroke, reserved slots dimmed — plus a wrapping name-and-blurb tooltip (BL-174, nav-rail legibility).
 - Each slot toggles a panel open/closed; the open slot lights its glyph in the selection accent. An active slot **folds its ledger out into the shell column** to the rail's right (`[nav_pane_width, W]`, BL-122) rather than spawning a floating window; opening one collapses whichever was open (accordion, via `close_all_panels`).
-- **Five slots are live** (`nav_pane.cpp`): Corporation overview, Budget, Market Ledger, Construction, History. **Four are reserved**, disabled with dimmed glyphs: Workforce, Research, Corp. Strategy, Diplomacy. Full slot semantics in `MENU.md`.
+- **Eight slots are live** (`nav_pane.cpp`): five carry their own subject — Corporation overview, Budget, Market Ledger, Construction, History — and three carry a **provisional occupant**, an unbuilt subject whose slot hosts a surface that would otherwise have no door: Workforce hosts the Economy panel (BL-292), Research the tech-tree mock (BL-310), Diplomacy the corporations table (NR-012). **One is reserved**, disabled with a dimmed glyph: Corp. Strategy. Full slot semantics in `MENU.md`.
 
 ---
 
@@ -125,6 +156,8 @@ A fixed, full-height **icon rail** pinned to the left edge (`nav_pane_width`, cu
 Three canvases — Solar, Circumplanetary, Planetary — form a **zoom ladder** and share the window. One is **primary** (fills the window) and the rung one step *out* from it is shown in the **minimap** (a fixed inset, bottom-right). The player **descends** (zooms in) by clicking a body in the primary canvas and **ascends** (zooms out) by clicking the minimap. Full detail — visual language, coordinate mapping, interaction, and the ladder navigation rules — lives in **`CANVASES.md`**.
 
 The canvases render behind the foreground panels, so the chrome currently occludes the edges of the primary canvas. Insetting the primary region clear of the chrome is a known follow-up.
+
+**The region has a name: `ui::canvas_rect()`** (`src/ui/foldout_column.{hpp,cpp}`) — bounded by the shell column on the left, the header strip on top and the bottom strip below, with the minimap floating inside it rather than reserving a column. It exists because BL-265 needed something for a full-canvas takeover to *take*, and three ad-hoc derivations of the same region already existed. Anything that occupies the main stage without being a canvas — a takeover, the tech-tree viewer — is sized to this rect. Migrating the zoom-ladder canvases themselves onto it is a follow-on; `CANVASES.md` owns them.
 
 ---
 
@@ -231,10 +264,44 @@ decision surface, so it gave up the prime right-edge slot under the time panel; 
 quarter-width it gives back goes to the Selection band. The icon rail keeps its full
 height past the dock — at the 1280×720 floor a shortened rail would clip two slots.
 
-It replaced the Explorer placeholder (2026-07-26) in its original right-middle home —
-pinning was never wired; **BL-216 (chat pinning)** is the open item for its return as a
-chat-adjacent affordance, not a reserved band. The diplomacy-as-communication principle
-behind the surface: `docs/ai/AI_OPPONENT.md` § 7.
+It replaced the Explorer placeholder (2026-07-26) in its original right-middle home.
+That home is not left empty: **BL-216 (shell re-plan)** gives it back to *pinned items*
+— see below. The diplomacy-as-communication principle behind the surface:
+`docs/ai/AI_OPPONENT.md` § 7.
+
+Inside the dock, **rows are the scarce axis, not width** — it is `selection_band_height`
+tall (260 px at 1280–1920) against the ~700 px right-column band it used to have. The
+log's message form, channel selector and group popup are laid out for that (BL-216); see
+`CHAT.md` § Layout in the dock.
+
+---
+
+## Pinned items — right column, middle
+**Spec: `PINS.md`**
+
+The residual middle of the right chrome column — between the time panel and the minimap
+— is the **pinned-items watch list**: a short, player-curated set of entities kept
+visible while the player works elsewhere. It is the affordance the Explorer placeholder
+originally reserved, and the slot the comms log occupied between 2026-07-26 and BL-227.
+
+- **Rect:** `ui::pinned_panel_rect(disp, time_h)` (`shell_metrics.hpp`) — exactly the
+  rect comms vacated: `right_chrome_left` across, from one margin below the time panel
+  down to one margin above the minimap. 336 × ~698 px at 1720×1080, 336 × ~338 px at
+  1280×720.
+- **The minimap does not move.** The column's split stays two-way elastic — the time
+  panel is content-derived, the minimap is ratio-locked, and pins take the whole
+  residual. Comms *left* as pins *arrive*: a swap, not a third claimant.
+- **Not a second action surface.** A pin is a watch card — kind glyph, name, and the
+  shared `entity_summary` stat block — over which single-click selects (the Selection
+  band then shows the full action content) and double-click navigates, per the click
+  model in `SELECTION.md`. Acting on a pin is one click away, by design.
+- **No nav-rail slot.** Fixed shell chrome, not a ledger — absent from
+  `close_all_panels` / `any_panel_open`, exactly like the comms dock and the Selection
+  band.
+
+> **Status.** The geometry landed with BL-216's `shell_metrics` foundation; the panel
+> itself, the pin toggle on the Selection band header, and the pin glyph land with the
+> item's pinned-items slice. `PINS.md` is that slice's spec.
 
 ---
 
@@ -276,7 +343,8 @@ splits: the **Construction** panel — **Construction / Buildings** (BL-143, bui
 redesign; the Build front door moved to the tile Selection element and Sell Orders moved out;
 defaults to Buildings, BL-176); the **Market Ledger** — **Prices / Sell Orders** (BL-159,
 sell orders on the market surface); the **Economy** panel — Corps / Holdings / Markets
-(`ui_state::economy_view`); the **History** ledger — Story / Chain / Tiles (BL-211). The
+(`ui_state::economy_view`, reachable from nav slot 3 since BL-292); the **History** ledger —
+Story / Chain (BL-211, narrowed from three views by BL-281). The
 **Balance** and **Corporation** ledgers remain single-question — no split. The principle is
 *one question per view, a menu to move between views* — not a mandate to split every panel.
 
@@ -333,27 +401,32 @@ need not rediscover them:
 
 ## Container vocabulary (BL-141)
 
-A closed set of **nine** container kinds recur across the shell and canvases. Each
+A closed set of **ten** container kinds recur across the shell and canvases. Each
 combines a sizing rule with exactly one text policy — **wrap** (`PushTextWrapPos` +
 `TextWrapped`, reflowing to the box) or **guaranteed-fit** (`CalcTextSize` measured first,
 the box sized to the text — the pattern the market-legend key established) — plus an
 overflow rule for when content still exceeds the box. New UI work should land in one of
-these nine rather than inventing a tenth.
+these ten rather than inventing an eleventh.
 
 | # | Container | Sizing | Text policy | Overflow |
 |---|---|---|---|---|
-| 1 | **Fold-out ledger column** (`foldout_begin`, `foldout_column.cpp`) | Fixed-width (`[nav_pane_width, W]`), stretches from below the identity tile to the **comms dock's top edge** (BL-227 — no longer the full column height) | Wrap to inner width | Vertical scroll |
+| 1 | **Fixed shell column / dock** — three instances: the **fold-out ledger column** (`foldout_begin`, `foldout_column.cpp`), the **comms dock** (`chat_panel.cpp`) and the **pinned items panel** | Fixed-width rect. The ledger column is `[nav_pane_width, W]`, from below the identity tile to the **comms dock's top edge** (BL-227 — no longer the full column height); the dock and the pins panel take their rects from `shell_metrics.hpp` | Wrap to inner width | Vertical scroll |
 | 2 | **On-canvas lens legend box** (draw-list, `body_surface_canvas.cpp`) | Fit-to-content — box sized from its own entries | Guaranteed-fit | None — box grows to fit |
 | 3 | **Selection band** (`draw_selection_band`, `selection_card.cpp` framing `draw_selection_content`, `selection_panel.cpp`) | Fixed rect — comms dock's right edge to the right chrome column, `selection_band_height` tall (minimap-derived) | Wrap | Vertical scroll |
-| 4 | **Header / balance strip** (`header_panel.cpp`) | Stretch-to-width, fixed height | Guaranteed-fit — segments measured, never wraps | Elide-with-tooltip, only as a last resort; never silent truncation |
+| 4 | **Header / balance strip** (`header_panel.cpp`) **and the identity tile** (`profile_panel.cpp`) | Stretch-to-width (strip) / fixed card (tile), fixed height | Guaranteed-fit — segments measured, never wraps | Elide-with-tooltip, only as a last resort; never silent truncation |
 | 5 | **Time panel** (`app.cpp`) | Fixed width (shares the minimap's), content-derived height (BL-097) | Guaranteed-fit — authored to fit | None |
 | 6 | **Hover card** (`draw_hover_card`, `hover_card.cpp`) | Fit-to-content, capped at 200 px max width, auto height | Wrap at the max width | Grows vertically |
 | 7 | **Minimap lens bar** | Fixed strip | Icon-only / guaranteed-fit labels | None |
 | 8 | **Nav rail** | Fixed (56 px) | Icon-only; tooltips wrap (`nav_pane.cpp`, BL-174 — `PushTextWrapPos`, implementing this row's stated policy) | None (tooltip wrap absorbs it) |
 | 9 | **ImGui table** (ledgers) | Stretch columns with per-column min widths | Per-cell guaranteed-fit (clip + tooltip) for numeric/identity columns, wrap for description columns | Horizontal scroll on the table; never silent truncation of a load-bearing value |
+| 10 | **Hand-drawn chart plot** (draw-list, `charts.cpp`) | Host-supplied screen-space box, measured before it is reserved | Guaranteed-fit, **reflowing** — labels measured, the plot's own geometry yields to them | Legend reflows below the plot, then elide-with-record; never silent truncation of a plotted value |
 
-The **comms dock** (BL-227) is not a tenth kind: it is a fixed-rect docked panel obeying
-container 1's policy (wrap, vertical scroll) in the bottom strip.
+Neither surface BL-216 touches invents a tenth kind. The **comms dock** (BL-227, landed) and
+the **pinned items panel** (geometry only so far — `pinned_panel_rect` exists, the panel does
+not) are both fixed-rect docked panels obeying container 1's policy (wrap, vertical scroll) —
+which is why row 1 is named for the *policy* rather than for the fold-out column alone.
+Declaring that up front means BL-215's audit inherits two compliant surfaces rather than two
+new offenders.
 
 This table is the baseline the open **BL-215 (text-wrap render audit)** consumes — an
 audit of every container's *rendered* wrap behaviour against the policy declared here —
@@ -373,25 +446,33 @@ A few cross-cutting notes:
 - These are prototype-tuned concrete behaviours (BL-122's `foldout_column`, the market
   legend's measure-then-size pattern), not a general layout engine — see
   `docs/tech/TECH_FOUNDATIONS.md` for why a retained-mode framework is out of scope.
+- Amending this set is a deliberate act, recorded here. Inventing a tenth ad hoc is what
+  BL-215 was filed to clean up. Every text draw names its container through `ui::text_fit`;
+  a draw that names none is caught by the coverage grep in `verifier-visual`.
 
 ---
 
-## Drill-through (BL-214)
+## Drill-through (BL-214, revised by BL-265)
 
 **One disclosure idiom, obeyed by every dense surface.** Before this, each surface had
 invented its own way of showing more — a collapsing header in the History Chain, a pager
 in the Selection band, a permanent horizontal scroll in the Tiles table, nothing at all in
-the wizard. Drill-through is the single idiom that replaces them, and it has exactly **two**
-states:
+the wizard. Drill-through is the single idiom that replaces them, and it has **three**
+states reached by **two** controls:
 
 | State | What it is | Control |
 |---|---|---|
-| **Folded** | A verdict line — a figure, a label, a glyph. No sentences. | a single chevron, pointing down |
-| **Expanded** | A **true full-screen overlay** showing everything the surface has at once — chart, legend, prose, and any drill opened from it. | the same chevron, pointing up |
+| **Folded** | A verdict line — a figure, a label, a glyph. No sentences. | — (the resting state) |
+| **Expanded in place** | The row grows where it sits: one graph, or an accordion of graphs for a more complex menu. The rest of the screen keeps working. | `⌄` (becomes `⌃`, and collapses on click) |
+| **Full canvas** | A takeover of the **canvas region** showing everything the surface has at once — every item of an accordion, open, top to bottom, scrolled. | `›` (leave with `‹`, or Esc) |
 
-Expanded is a **real mode switch**, not an in-place grow. That was Ben's call (2026-07-31)
-after reviewing four live exemplars that prototyped the alternative, and it **supersedes**
-the three-level Glance / Read / Study stepper the item was originally designed around.
+BL-214 shipped this as a **binary** model on Ben's 2026-07-31 supersession of the
+three-level Glance / Read / Study stepper: folded, or a full-screen overlay, nothing
+between. **BL-265 restores the middle rung** (Ben, 2026-08-02, after using it) — a
+full-screen takeover turned out to be too big a step for *"I want to see this one chart
+properly"*. What is **not** restored is the stepper's single cycling control: these are two
+distinct affordances with two distinct meanings, which is what makes them legible where one
+cycling control was not.
 
 ### Three axes, never conflated
 
@@ -400,44 +481,124 @@ different questions wearing one costume. Naming the three is most of the fix:
 
 | Axis | Question | Gesture | State |
 |---|---|---|---|
-| **Depth** | *How much of this subject do I want?* | the chevron | `ui_state::expanded` |
+| **Depth** | *How much of this subject do I want?* | `⌄` in place, `›` full canvas | `ui_state::expanded` (the takeover target **and** the in-place set) |
 | **Subject** (BL-196) | *What am I looking at?* | click the element; breadcrumb + back | `ui_state::card_stack`, `corp_rollup_drill` |
 | **Host** (SELECTION.md) | *Where does this properly live?* | `[>]` go-to | `ui::focus_on_entity` |
 
 BL-196 is therefore the **sibling axis**, not a competitor and not folded in.
 
+### The geometry: a takeover takes the CANVAS, not the window
+
+`fold_overlay_begin` is sized to **`ui::canvas_rect()`**, not to the display (BL-265 change
+2, Ben: *"full screen should actually just take the place of a canvas, rather than the
+entire view. I would prefer to see consistency in the UI really."*). The nav rail, identity
+tile, header, clock, comms dock, Selection band and minimap all survive a takeover, and the
+player never loses their selection to open a chart.
+
+The argument is consistency and it is the good one: the canvas region is already the app's
+main stage, and the zoom ladder already swaps what occupies it. A ledger going full canvas
+is therefore the **same kind of event as descending the ladder**, using the same rectangle,
+rather than a second full-window mode with its own rules.
+
+**One exception, and it is real rather than a special case:** the New World wizard's chain
+stages (`generation_stage`). The wizard runs on its own screen *before* the shell exists, so
+there is no canvas to take and no chrome to preserve; its takeover stays window-wide. That
+is what "take the main stage" means on that screen. `takeover_rect` in
+`src/ui/detail_level.cpp` is the single place this is decided.
+
 ### The invariants
 
-1. **One thing is expanded at a time.** This falls out of expanded being an overlay rather
-   than being imposed: the state is a single `(surface, key)` target
-   (`fold_state`, `src/ui/detail_level.hpp`), not a remembered level per surface. Expanding
-   a second card folds the first, so folding is never ambiguous.
-2. **The level is not remembered.** A full-screen overlay is a transient mode, and which
-   card was last open is a display preference — so it is view state, never serialised, and
-   reset by `ui::fold`.
-3. **A fixed-rect container does not fold to one line.** The Selection band's rect is a
-   *derived* 260 px (`selection_band_height`) that cannot shrink, so folding its metric card
-   would spend ~220 px on emptiness. Fixed-rect surfaces therefore rest **expanded in place**
-   and their chevron means *give this the whole screen* (Ben, 2026-08-01, asked with the
-   measurements). Folded-by-default governs **scrolling** containers, where a fold buys real
-   room back.
-4. **Drill-through adds no tenth container.** The nine kinds above say *how text fits*; this
-   says *how much of it there is*. The overlay is container **1**'s policy (wrap, vertical
-   scroll) at screen size.
+1. **One TAKEOVER at a time — and only the takeover is single-target.** BL-214 derived "one
+   thing expanded at a time" from expanded being a window-wide overlay. Both halves of that
+   derivation moved, so BL-265 restates it as two rules rather than one:
+   - The **takeover** stays a single `(surface, key)` target (`fold_state::surface`/`key`),
+     for the original reason: it owns one rectangle, so a second has nowhere to go. Opening
+     a second replaces the first.
+   - **In-place** expansion is **not** single-target — it is a **set**
+     (`fold_state::in_place`). An accordion of graphs is by definition several rows open at
+     once; a single-target in-place expander would close the first graph when you opened the
+     second, which is the opposite of what an accordion is.
+2. **Inside a takeover the in-place set is ignored.** Every item renders open, top to
+   bottom, in a scroll region — *"anything full screen deserves its full space"* only holds
+   if the takeover does not depend on which rows the player happened to unfold first.
+   Nothing writes the set on the takeover's behalf, so returning via `‹` restores the folded
+   view **exactly**: the takeover is non-destructive.
+3. **A takeover and the fold-out ledger column coexist by design, not by tolerance.**
+   `foldout_column_rect()` is entirely left of `canvas_rect()`, so the row that opened a
+   takeover **stays visible** in the left column while the canvas changes. That reads
+   correctly for Ben's own stated reason — it is the same event as clicking a body on the
+   canvas: the source stays put, the stage changes. Do not "fix" it by dimming the ledger.
+4. **The level is not remembered.** A takeover is a transient mode and the in-place set is a
+   reading preference — both are view state, never serialised.
+5. **A fixed-rect container does not fold to one line, and has no `⌄`.** The Selection band's
+   rect is a *derived* 260 px (`selection_band_height`) that cannot shrink, so folding its
+   metric card would spend ~220 px on emptiness. Fixed-rect surfaces therefore rest
+   **expanded in place already** (Ben, 2026-08-01, asked with the measurements) — there is no
+   in-place state left to reach, so they take the `›` control alone. The same holds for a
+   single-block view that already shows its content in the column (History Story, History
+   Tiles). Folded-by-default governs **scrolling** containers, where a fold buys real room
+   back.
+6. **Drill-through adds no tenth container.** The nine kinds above say *how text fits*; this
+   says *how much of it there is*. The takeover is container **1**'s policy (wrap, vertical
+   scroll) at canvas size.
 
-### The controls
+### The controls, and where they sit
 
-- **The chevron** (`ui::fold_chevron`) sits on the surface's title row, right-aligned,
-  immediately left of the `[>]` / `[x]` cluster. It **is** a toggle — re-clicking while
-  expanded folds — unlike the superseded three-segment stepper, which was exempt precisely
-  because its set had no null member to undo to. The standing toggle rule therefore applies
-  here with no exemption owed.
-- **Esc** folds the overlay, one rung **below** the subject drills: exit-confirm → system
-  menu → pop `card_stack` → pop `corp_rollup_drill` → **fold** → hide selection → open menu.
-  A single press never both unwinds a drill and closes the overlay hosting it. *(This
-  departs from BL-214's Decision 10, which kept depth off the ladder — that decision
-  reasoned about an in-place stepper; a full-screen mode with no keyboard exit is a defect,
-  not a principle.)*
+**The rule, in one line: controls that operate on an item in a list are right-gutter-aligned;
+the control that leaves a view is top-left.** Any future disclosure surface is checked
+against that sentence.
+
+A **foldable row**:
+
+```
+Expandable item          verdict                       ⌄  ›
+```
+
+Both controls sit in a **fixed right gutter** (`ui::disclosure_controls`,
+`ui::disclosure_gutter_width`) — not immediately after the label, because a gutter is what
+makes them line up in one vertical column across every row. **A title's length must never
+move its controls**, which is what Ben reported: *"it is disorienting when a button is not
+in the same column, but does the same job."* Before BL-265 the placement was split —
+`generation_charts.cpp` and `corporation_dashboard.cpp` drew the chevron *left* of the
+label, `tile_inspector.cpp` and `selection_panel.cpp` pushed it to the right edge. All four
+are now the same column. A row that offers only `›` leaves the gutter's **left slot empty**
+rather than letting `›` slide sideways, so the full-canvas column never moves. A row's
+verdict is drawn through `ui::gutter_text`, which clips it short of the gutter so a long
+verdict cannot run underneath the controls.
+
+`⌄` **is** a toggle — re-clicking while open collapses — so the standing toggle rule applies
+with no exemption owed.
+
+The **full-canvas view**:
+
+```
+‹ Example title
+  <everything, scrolled>
+```
+
+One control, **top left**, immediately before the title: `‹`, which returns. Nothing sits in
+a right gutter here — there is no list of rows to align with, and a return affordance
+belongs where a reader starts, not where they finish. The two placements answer two
+different questions: in a list the controls act *on a row*; in a takeover the control acts
+on the *whole view* and means "back", and back is top-left everywhere in software, including
+this app's own zoom ladder.
+
+**All four glyphs are DRAWN, never typed.** `⌄ ⌃ ‹ ›` are notation for the design; none of
+those codepoints are in the font atlas, and BL-234 fixed a defect of exactly this shape (26
+strings rendering `?`). `draw_caret` and `draw_open_arrow` in `src/ui/detail_level.cpp` build
+them through `ImDrawList`. Do not reintroduce them as string literals.
+
+**Esc** closes the takeover, one rung **below** the subject drills: exit-confirm → system
+menu → pop `card_stack` → pop `corp_rollup_drill` → **close the takeover** → open menu. A
+single press never both unwinds a drill and closes the view hosting it. Esc **does not**
+collapse in-place expansions: that is a reading preference, the kind of state Esc has never
+collapsed, and putting it on the ladder would make Esc unpredictable (sometimes leaving a
+view, sometimes re-folding four graphs you deliberately opened). *(The takeover rung itself
+departs from BL-214's Decision 10, which kept depth off the ladder — that decision reasoned
+about an in-place stepper; a takeover with no keyboard exit is a defect, not a principle.)*
+
+The takeover's **entry/exit transition** is deliberately unsettled and currently instant —
+a feel question that wants the live app, not a paragraph.
 
 ### The chart question log (BL-247) — *removed 2026-08-02*
 
@@ -452,15 +613,30 @@ was never part of this item. It stands.
 
 ### The surfaces, and the extension recipe
 
-On the ladder today: the Selection band's metric card, the History ledger's Story / Chain /
-Tiles views, the wizard's chain stages (per stage — Ben, 2026-08-01), and the Corporation
-dashboard's four roll-ups.
+On the ladder today, with what each one's takeover shows:
+
+| Surface | `⌄` in place | `›` full canvas |
+|---|---|---|
+| Selection band's metric card | — (rests expanded, invariant 5) | that metric's chart, on the canvas |
+| History ledger — Story | — (already shown in the column) | the whole biography, on the canvas |
+| History ledger — Chain (per stage) | that stage's title, explainer and charts | the **whole round** — every stage open, scrolled |
+| New World wizard — chain stages | that stage's title, explainer and charts | the **whole round**, scrolled (window-wide; no shell yet) |
+| Corporation dashboard — 4 roll-ups | that card's chart or rows | **all four** roll-ups, headed and scrolled |
+
+The three accordions — History Chain, wizard stages, corp roll-ups — are the ones BL-265
+change 3 names: a surface that has taken the largest rectangle available has no excuse for
+showing a subset.
+
+> A `history_tiles` surface sat on this ladder until **BL-281** retired the view it belonged
+> to, in the same batch that landed BL-265. Removing a surface is the same two edits in
+> reverse. The History ledger's third tab is now **Ages**, which takes no disclosure control
+> at all — its map sizes itself to whatever column it is given.
 
 Adding surface #N is **two edits**: an enumerator in `detail_surface`, and a
-`fold_chevron` + `fold_overlay_begin` pair at the call site. Nothing else — no new control,
-no new state, no new container kind. A surface with many foldable blocks needs **one**
-enumerator, not one per block: the `key` disambiguates instances (a chain stage, a roll-up
-card).
+`disclosure_controls` + `fold_overlay_begin` pair at the call site. Nothing else — no new
+control, no new state, no new container kind. A surface with many foldable blocks needs
+**one** enumerator, not one per block: the `key` disambiguates instances (a chain stage, a
+roll-up card).
 
 ---
 

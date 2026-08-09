@@ -10,7 +10,7 @@ word interface to play through.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*115 entries — 11 gameplay · 24 canvas · 15 lens · 36 ledger · 29 chrome.*
+*116 entries — 11 gameplay · 24 canvas · 15 lens · 37 ledger · 29 chrome.*
 
 ---
 
@@ -18,12 +18,12 @@ word interface to play through.
 
 ### `gameplay.build` — Tile construction ledger (fold-out column), opened from the Selection band of a selected tile; a shortcut lives on a selected owned building ('Build another here').
 
-**Press.** Single-click a tile on the Planetary canvas (the Selection band appears), click 'Construct Buildings' in the band's action grid, then click 'Build' on a candidate row in the ledger. Rows are one per extractable resource deposited on the tile (plus a coastal Fishing Wharf row even with zero deposit), one per processing recipe, then Port, Launchpad, Inland Logistics Hub. Alternate press: with an owned building selected, 'Build another here' repeats its type/target on the same tile, gated by the tile's stack capacity.
+**Press.** Single-click a tile on the Planetary canvas (the Selection band appears), click 'Construct Buildings' in the band's action grid, then click 'Build' on a candidate row in the ledger. Rows are one per extractable resource deposited on the tile (plus a coastal Fishing Wharf row even with zero deposit), one per processing recipe, then Port, Launchpad, Inland Logistics Hub, Military Base. Alternate press: with an owned building selected, 'Build another here' repeats its type/target on the same tile, gated by the tile's stack capacity.
 
 | Arg | Type | Meaning |
 |---|---|---|
 | `tile` | `entity_id` | The selected tile the building goes on. |
-| `type` | `building_type` | Which building — extraction_site, processing_facility, port, launchpad, inland_logistics_hub. Set by which row is pressed. |
+| `type` | `building_type` | Which building — extraction_site, processing_facility, port, launchpad, inland_logistics_hub, military_base. Set by which row is pressed. |
 | `target` | `resource_type` | Extraction rows only: the deposited resource the site extracts. Ignored for other types. |
 | `recipe` | `uint16 recipe id` | Processing rows only: the recipe the facility is seeded with (the row it was priced on). no_recipe elsewhere; a recipe-less processor seeds the default steel recipe. |
 
@@ -35,7 +35,7 @@ word interface to play through.
 
 **Expected output.** The press enqueues a construction request; the app's mutable pass executes construct_building the same frame. On success a building entity exists immediately — staffed at 50% workforce (0 for a port), a processing facility seeded with the pressed row's recipe — and the capex is debited up front. Construction is then DURATIVE and material-gated: each economy tick (one quarter) it advances at a rate in [0,1] set by how much of its per-tick material need the local market can supply; scarce materials stretch the ETA and total shortage shows 'Paused - market can't supply materials'. Management controls unlock only when construction completes. A rejected attempt mutates nothing; the reason string appears at the top of the ledger (construction.last_message), and invalid rows already show reason-coded text in place of the Build button ('Cannot build on water', 'A port must sit on the coast', ...).
 
-**Reason to select.** The only way to add productive capacity. Extraction turns a tile deposit into pool stock to sell; processing turns inputs into higher-margin outputs; ports/hubs move goods cheaper and a launchpad gates space access. The ledger ranks candidates by expected net per quarter and prints payback, so build is the press when a candidate's expected profit beats holding the cash.
+**Reason to select.** The only way to add productive capacity. Extraction turns a tile deposit into pool stock to sell; processing turns inputs into higher-margin outputs; ports/hubs move goods cheaper, a launchpad gates space access, and a military base is where units muster (BL-325; hire moves onto it in S2 — until then it is positioning ahead of that change). The ledger ranks candidates by expected net per quarter and prints payback, so build is the press when a candidate's expected profit beats holding the cash.
 
 ### `gameplay.demolish` — Selection band, player-owned building layout, bottom action row.
 
@@ -918,19 +918,19 @@ word interface to play through.
 
 **Reason to select.** The table gives one number per rival; selecting a row is how to ask 'tell me more about this one'.
 
-### `ledger.history_body_selector` — History ledger, 'Body' combo (Story and Tiles views only)
+### `ledger.history_body_selector` — History ledger, 'Body' combo (Story view only)
 
 **Press.** Open the Body combo and pick a body
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `body` | `entity` | Which body's story or tile table to show |
+| `body` | `entity` | Which body's story to show |
 
 **Valid when:**
 - History ledger is open
-- Active view is Story or Tiles (Chain has no per-body selector)
+- Active view is Story (Chain has no per-body selector)
 
-**Expected output.** Repoints the Story prose or the Tiles table at the chosen body. Cross-cutting selector - exempt from the toggle rule.
+**Expected output.** Repoints the Story prose at the chosen body. Cross-cutting selector - exempt from the toggle rule.
 
 **Reason to select.** Chooses which body's generation record to read - e.g. checking a prospective mining body's deposit story before committing.
 
@@ -950,32 +950,32 @@ word interface to play through.
 
 **Reason to select.** Each round answers a different comparison - which bodies are physically viable, which grew life, what remains - stepping through them builds the whole system picture.
 
-### `ledger.history_view_expand` — History ledger, chevron on the tab row (Story and Tiles views)
+### `ledger.history_view_expand` — History ledger, chevron on the tab row (Story view only)
 
 **Press.** Click the fold chevron at the right end of the tab row
 
 **Valid when:**
 - History ledger is open
-- Active view is Story or Tiles (Chain carries no view-level chevron)
+- Active view is Story (Chain carries no view-level chevron; its stages carry their own)
 
-**Expected output.** Opens the current view as a full-screen overlay - the honest fix for the Tiles table, whose ~29 columns overflow the 380 px column. Re-clicking the chevron (or Esc) folds back to the in-column view.
+**Expected output.** Opens the Story view as a full-screen overlay, giving the biography prose the width the 380 px column breaks every line of. Re-clicking the chevron (or Esc) folds back to the in-column view.
 
-**Reason to select.** The Tiles table is unreadable at column width; expanding is how to actually read all its columns at once. Story gains room for long biographies.
+**Reason to select.** A long body biography is unreadable as wrapped fragments in the column; expanding is how to read it as continuous prose.
 
 ### `ledger.history_view_tab` — History ledger, view tab strip
 
-**Press.** Click the 'Story', 'Chain', or 'Tiles' tab button
+**Press.** Click the 'Story' or 'Chain' tab button
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `view` | `enum` | 'Story' (body biography prose), 'Chain' (generation chain charts across all bodies), or 'Tiles' (raw per-tile data table) |
+| `view` | `enum` | 'Story' (body biography prose) or 'Chain' (generation chain charts across all bodies) |
 
 **Valid when:**
 - History ledger is open
 
-**Expected output.** Switches the view. Re-clicking the currently-active tab closes the whole History ledger (toggle rule); switching tabs is an ordinary view change. Story and Tiles are about one body (see the Body selector); Chain compares every body side by side and hides the selector.
+**Expected output.** Switches the view. Re-clicking the currently-active tab closes the whole History ledger (toggle rule); switching tabs is an ordinary view change. Story is about one body (see the Body selector); Chain compares every body side by side and hides the selector. A third tab, Tiles, was retired 2026-08-03 (BL-281) - it was a current-state readout in a ledger about the past; its buildings list is on the canvas and in the Selection element, its market data in the market surfaces.
 
-**Reason to select.** Story answers 'what is this body's biography?'; Chain answers 'how do the bodies compare through the generation stages?'; Tiles answers 'what are the exact numbers per tile?'
+**Reason to select.** Story answers 'what is this body's biography?'; Chain answers 'how do the bodies compare through the generation stages?' - the two halves of how this world came to be.
 
 ### `ledger.market_body_selector` — Market Ledger, 'Body' combo
 
@@ -1068,6 +1068,17 @@ word interface to play through.
 
 **Reason to select.** Answers 'how do rivals' finances compare to mine?' - the only side-by-side rival-balance read in the game.
 
+### `ledger.nav_economy` — Nav rail, slot 3 (Workforce icon - provisionally hosts the Economy panel)
+
+**Press.** Click the workforce (population) glyph on the left icon rail
+
+**Valid when:**
+- In-game
+
+**Expected output.** Toggles the Economy panel open in the fold-out column; re-click closes; opening closes any other ledger. Open, it splits across three views - Corps (the player's balance trend, every corporation's balance, and the workforce table), Holdings (stockpile pools by body) and Markets (supply, demand and price per body). Workforce itself is not built; this panel is the slot's provisional occupant.
+
+**Reason to select.** Answers 'what is the whole economy doing?' in one surface - balances, labour, stock on hand and market state side by side, rather than one body or one corporation at a time.
+
 ### `ledger.nav_history` — Nav rail, slot 9 (History icon)
 
 **Press.** Click the history glyph on the left icon rail
@@ -1075,9 +1086,9 @@ word interface to play through.
 **Valid when:**
 - In-game
 
-**Expected output.** Toggles the History ledger open in the fold-out column; re-click closes; opening closes any other ledger. Open, it shows how the world was generated, split into Story / Chain / Tiles views for a chosen body.
+**Expected output.** Toggles the History ledger open in the fold-out column; re-click closes; opening closes any other ledger. Open, it shows how the world was generated, split into Story and Chain views.
 
-**Reason to select.** Answers 'why is this world the way it is?' - body biography, the generation chain, and the raw per-tile numbers; feeds site-selection and understanding of deposit placement.
+**Reason to select.** Answers 'why is this world the way it is?' - the body's biography and the generation chain behind it; feeds site-selection and understanding of deposit placement.
 
 ### `ledger.nav_market` — Nav rail, slot 5 (Market Ledger icon)
 

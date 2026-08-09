@@ -1,5 +1,6 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "body_surface_canvas.hpp"
+#include "text_fit.hpp"
 
 #include "entity_summary.hpp"
 #include "highlight.hpp"
@@ -61,6 +62,21 @@ ImU32 lerp_colour(ImU32 a, ImU32 b, float t)
     return IM_COL32(r, g, bl, 255);
 }
 
+/// The intra-body reach fog's wash (BL-151/152/154): dim a colour toward the fog dark
+/// by how little the player sees the tile — `vision` 1 = fully lit, 0 = unreached.
+/// Alpha is preserved (lerp_colour forces opaque, which would change how a translucent
+/// road span reads). Every layer the fog covers goes through this one function — the
+/// lens fill and, since BL-185, the road spans — so the fog reads as a single wash
+/// rather than a dark ground with brightly-lit roads laid over it.
+ImU32 fog_dim(ImU32 c, float vision)
+{
+    if (vision >= 1.0f)
+        return c;
+    const ImU32 alpha = (c >> IM_COL32_A_SHIFT) & 0xFFu;
+    const ImU32 dim   = lerp_colour(c, IM_COL32(8, 10, 16, 255), 0.5f * (1.0f - vision));
+    return (dim & ~(0xFFu << IM_COL32_A_SHIFT)) | (alpha << IM_COL32_A_SHIFT);
+}
+
 /// Fill colour of a tile that carries a building — its **plate**. A built tile is
 /// swapped out of the terrain palette entirely (Ben, 2026-07-22): it fills with a
 /// desaturated wash of the owning corporation's identity colour, so ownership — the
@@ -100,14 +116,8 @@ ImU32 ryg_colour(float t)
                     : lerp_colour(yellow, green,  (t - 0.5f) * 2.0f);
 }
 
-/// Diverging warm↔cool colour for a ratio relative to 1.0 (defined below); forward
-/// declared so the Production key (above its definition) can sample the same band.
-ImU32 diverging_colour(float ratio);
-
 /// Diverging red→green colour for a ratio relative to 1.0 (defined below); forward
 /// declared so the Production key (above its definition) can sample the same band.
-/// Distinct ramp from diverging_colour (BL-137) — dedicated so the Market lens's
-/// cool/warm scale is untouched.
 ImU32 production_colour(float ratio);
 
 /// Shared chrome for an on-canvas lens key: a rounded dark panel of @p box_w ×
@@ -233,12 +243,12 @@ void draw_scroll_list_key(ImVec2 anchor, float top_limit, float bottom_limit,
         y += kLensComboH + 4.0f;
     }
 
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), header);
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), header); // fit-exempt: legend box sized to its measured entries (container 2)
     y += header_h;
 
     if (rows.empty())
     {
-        dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), empty_note);
+        dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), empty_note); // fit-exempt: legend box sized to its measured entries (container 2)
         return;
     }
 
@@ -276,7 +286,7 @@ void draw_scroll_list_key(ImVec2 anchor, float top_limit, float bottom_limit,
             }
         }
         const float text_x = (r.marker == key_marker::bar) ? (bar_max + 6.0f) : (swatch + 4.0f);
-        wdl->AddText({ c.x + text_x, c.y }, r.label_colour, r.label.c_str());
+        wdl->AddText({ c.x + text_x, c.y }, r.label_colour, r.label.c_str()); // fit-exempt: legend box sized to its measured entries (container 2)
         ImGui::Dummy({ body_w, row_h });
     }
     ImGui::EndChild();
@@ -299,14 +309,14 @@ void draw_resource_key(ImDrawList* dl, ImVec2 anchor,
     draw_lens_resource_combo(state, {x, y}, bar_w);
     y += kLensComboH + 4.0f;
 
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Resource deposit");
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Resource deposit"); // fit-exempt: legend box sized to its measured entries (container 2)
     y += line_h + 4.0f;
     dl->AddRectFilled({x, y + 2.0f}, {x + 10.0f, y + 12.0f},
                       presentation_of(state.lens_resource).colour);
-    dl->AddText({x + 14.0f, y}, IM_COL32(235, 235, 235, 255),
+    dl->AddText({x + 14.0f, y}, IM_COL32(235, 235, 235, 255), // fit-exempt: legend box sized to its measured entries (container 2)
                 presentation_of(state.lens_resource).name);
     y += line_h + 4.0f;
-    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "filled = deposit present");
+    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "filled = deposit present"); // fit-exempt: legend box sized to its measured entries (container 2)
 }
 
 /// On-canvas legend for the Opportunity lens (BL-136): a body-relative red→green
@@ -323,7 +333,7 @@ void draw_opportunity_key(ImDrawList* dl, ImVec2 anchor)
     float x, y, bar_w;
     begin_lens_key(dl, anchor, 168.0f, body_h, pad, x, y, bar_w);
 
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Opportunity");
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Opportunity"); // fit-exempt: legend box sized to its measured entries (container 2)
     y += line_h + 4.0f;
     constexpr int segs = 24;
     for (int i = 0; i < segs; ++i)
@@ -334,9 +344,9 @@ void draw_opportunity_key(ImDrawList* dl, ImVec2 anchor)
                           { x + bar_w * static_cast<float>(i + 1) / segs, y + bar_h }, c);
     }
     y += bar_h + 2.0f;
-    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "low");
+    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "low"); // fit-exempt: legend box sized to its measured entries (container 2)
     const ImVec2 ts = ImGui::CalcTextSize("high");
-    dl->AddText({x + bar_w - ts.x, y}, IM_COL32(170, 175, 185, 255), "high");
+    dl->AddText({x + bar_w - ts.x, y}, IM_COL32(170, 175, 185, 255), "high"); // fit-exempt: legend box sized to its measured entries (container 2)
 }
 
 /// On-canvas legend for the Production lens (BL-009): a diverging cool→warm bar
@@ -350,7 +360,7 @@ void draw_production_key(ImDrawList* dl, ImVec2 anchor)
     float x, y, bar_w;
     begin_lens_key(dl, anchor, 168.0f, body_h, pad, x, y, bar_w);
 
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Production intensity");
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Production intensity"); // fit-exempt: legend box sized to its measured entries (container 2)
     y += line_h + 4.0f;
     constexpr int segs = 24;
     for (int i = 0; i < segs; ++i)
@@ -361,30 +371,16 @@ void draw_production_key(ImDrawList* dl, ImVec2 anchor)
                           { x + bar_w * static_cast<float>(i + 1) / segs, y + bar_h }, c);
     }
     y += bar_h + 2.0f;
-    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "low");
+    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "low"); // fit-exempt: legend box sized to its measured entries (container 2)
     const ImVec2 ts = ImGui::CalcTextSize("high");
-    dl->AddText({x + bar_w - ts.x, y}, IM_COL32(170, 175, 185, 255), "high");
-}
-
-/// Diverging warm↔cool colour for a price relative to its base (floor) price.
-/// `ratio = price / base_price`: 1.0 is the neutral mid-tone, < 1 (cheap) trends
-/// cool, > 1 (dear) trends warm. Centred on the log of the ratio so the symmetric
-/// price band `[0.25×, 4×]` (the market clamp) maps to the full [cool, warm] span.
-ImU32 diverging_colour(float ratio)
-{
-    ratio = std::clamp(ratio, 0.25f, 4.0f);
-    const float d = std::log(ratio) / std::log(4.0f); // [-1, 1]
-    constexpr ImU32 neutral = IM_COL32(205, 205, 210, 255);
-    constexpr ImU32 cool    = IM_COL32( 70, 140, 225, 255);
-    constexpr ImU32 warm    = IM_COL32(232, 120,  60, 255);
-    return d < 0.0f ? lerp_colour(neutral, cool, -d) : lerp_colour(neutral, warm, d);
+    dl->AddText({x + bar_w - ts.x, y}, IM_COL32(170, 175, 185, 255), "high"); // fit-exempt: legend box sized to its measured entries (container 2)
 }
 
 /// Diverging red→yellow→green colour for a ratio relative to 1.0 (BL-137, Production
 /// lens): `ratio = value / mean`; 1.0 is the yellow mid-tone, < 1 (below mean) trends
-/// red, > 1 (above mean) trends green. Same log-of-ratio centring as diverging_colour,
-/// but routed through the shared ryg_colour ramp — diverging_colour stays untouched for
-/// the Market lens.
+/// red, > 1 (above mean) trends green. Centred on the log of the ratio so the
+/// symmetric band `[0.25×, 4×]` maps to the full span, routed through the shared
+/// ryg_colour ramp.
 ImU32 production_colour(float ratio)
 {
     ratio = std::clamp(ratio, 0.25f, 4.0f);
@@ -416,10 +412,10 @@ void draw_market_key(ImVec2 anchor, float top_limit, float bottom_limit, const w
               [](const auto& a, const auto& b) { return a.first < b.first; });
 
     // Size the box to the widest label so long city names are not clipped.
-    float label_w = ImGui::CalcTextSize("Market catchments").x;
+    float label_w = ui::fit_width("Market catchments");
     for (const auto& [mid, col] : entries)
         label_w = std::max(label_w,
-            swatch + 4.0f + ImGui::CalcTextSize(market_city_name(w, mid).c_str()).x);
+            swatch + 4.0f + ui::fit_width(market_city_name(w, mid).c_str()));
     const float box_w = std::max(140.0f, label_w + 2.0f * pad);
 
     std::vector<key_row> rows;
@@ -456,13 +452,13 @@ void draw_country_key(ImVec2 anchor, float top_limit, float bottom_limit,
     const float line_h = ImGui::GetTextLineHeight();
     const float swatch = line_h;
 
-    float name_w = ImGui::CalcTextSize("Countries").x;
+    float name_w = ui::fit_width("Countries");
     for (const entity_id nid : present)
     {
         const auto nat_it = w.nations.find(nid);
         if (nat_it == w.nations.end())
             continue;
-        name_w = std::max(name_w, ImGui::CalcTextSize(nat_it->second.name.c_str()).x);
+        name_w = std::max(name_w, ui::fit_width(nat_it->second.name.c_str()));
     }
     const float box_w = pad * 2.0f + swatch + 4.0f + name_w;
 
@@ -500,7 +496,7 @@ void draw_population_key(ImDrawList* dl, ImVec2 anchor)
     const float bar_w = box_w - 2.0f * pad;
     float       y     = p0.y + pad * 0.5f;
 
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Workforce efficiency");
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Workforce efficiency"); // fit-exempt: legend box sized to its measured entries (container 2)
     y += line_h + 4.0f;
 
     // Red→green rank bar (BL-135): mirrors the per-tile value-mark dot the lens
@@ -515,9 +511,9 @@ void draw_population_key(ImDrawList* dl, ImVec2 anchor)
                           { x + bar_w * static_cast<float>(i + 1) / segs, y + bar_h }, c);
     }
     y += bar_h + 2.0f;
-    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "low");
+    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "low"); // fit-exempt: legend box sized to its measured entries (container 2)
     const ImVec2 hts = ImGui::CalcTextSize("high");
-    dl->AddText({x + bar_w - hts.x, y}, IM_COL32(170, 175, 185, 255), "high");
+    dl->AddText({x + bar_w - hts.x, y}, IM_COL32(170, 175, 185, 255), "high"); // fit-exempt: legend box sized to its measured entries (container 2)
 }
 
 /// On-canvas legend for the Industry lens (BL-084): a low→high amber gradient bar
@@ -568,23 +564,23 @@ void draw_continent_key(ImDrawList* dl, ImVec2 anchor, const continent_state* pl
     const float x = p0.x + pad;
     float       y = p0.y + pad * 0.5f;
 
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Tectonic plates");
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Tectonic plates"); // fit-exempt: legend box sized to its measured entries (container 2)
     y += line_h + 6.0f;
 
     if (!plates)
     {
-        dl->AddText({x, y}, IM_COL32(170, 170, 180, 255), "No plate record");
+        dl->AddText({x, y}, IM_COL32(170, 170, 180, 255), "No plate record"); // fit-exempt: legend box sized to its measured entries (container 2)
         y += line_h + 4.0f;
-        dl->AddText({x, y}, IM_COL32(150, 150, 160, 255), "for this body.");
+        dl->AddText({x, y}, IM_COL32(150, 150, 160, 255), "for this body."); // fit-exempt: legend box sized to its measured entries (container 2)
         return;
     }
 
     const int n = static_cast<int>(plates->plates.size());
     if (n <= 1)
     {
-        dl->AddText({x, y}, IM_COL32(170, 170, 180, 255), "Stagnant lid:");
+        dl->AddText({x, y}, IM_COL32(170, 170, 180, 255), "Stagnant lid:"); // fit-exempt: legend box sized to its measured entries (container 2)
         y += line_h + 4.0f;
-        dl->AddText({x, y}, IM_COL32(150, 150, 160, 255), "one immobile plate.");
+        dl->AddText({x, y}, IM_COL32(150, 150, 160, 255), "one immobile plate."); // fit-exempt: legend box sized to its measured entries (container 2)
         return;
     }
 
@@ -602,12 +598,12 @@ void draw_continent_key(ImDrawList* dl, ImVec2 anchor, const continent_state* pl
     // legend shows the actual treatment rather than describing it.
     dl->AddRectFilled({ x, y }, { x + sw, y + sw },
                       lerp_colour(plate_colour(0), IM_COL32(255, 255, 245, 255), 0.45f));
-    dl->AddText({ x + sw + 6.0f, y - 1.0f }, IM_COL32(220, 220, 228, 255), "pale = boundary");
+    dl->AddText({ x + sw + 6.0f, y - 1.0f }, IM_COL32(220, 220, 228, 255), "pale = boundary"); // fit-exempt: legend box sized to its measured entries (container 2)
     y += sw + 4.0f;
 
     char buf[64];
     std::snprintf(buf, sizeof(buf), "%d plates - uplift & rift", n);
-    dl->AddText({x, y}, IM_COL32(170, 170, 180, 255), buf);
+    dl->AddText({x, y}, IM_COL32(170, 170, 180, 255), buf); // fit-exempt: legend box sized to its measured entries (container 2)
 }
 
 void draw_industry_key(ImDrawList* dl, ImVec2 anchor)
@@ -627,7 +623,7 @@ void draw_industry_key(ImDrawList* dl, ImVec2 anchor)
     const float bar_w = box_w - 2.0f * pad;
     float       y     = p0.y + pad * 0.5f;
 
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Industry throughput");
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Industry throughput"); // fit-exempt: legend box sized to its measured entries (container 2)
     y += line_h + 4.0f;
 
     // Gradient mirrors the tile tint lerp (terrain hue -> industrial amber at
@@ -642,9 +638,9 @@ void draw_industry_key(ImDrawList* dl, ImVec2 anchor)
                           { x + bar_w * static_cast<float>(i + 1) / segs, y + bar_h }, c);
     }
     y += bar_h + 2.0f;
-    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "low");
+    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "low"); // fit-exempt: legend box sized to its measured entries (container 2)
     const ImVec2 hts = ImGui::CalcTextSize("high");
-    dl->AddText({x + bar_w - hts.x, y}, IM_COL32(170, 175, 185, 255), "high");
+    dl->AddText({x + bar_w - hts.x, y}, IM_COL32(170, 175, 185, 255), "high"); // fit-exempt: legend box sized to its measured entries (container 2)
 }
 
 /// On-canvas legend for the Scarcity lens: an abundant→scarce gradient bar (no tint
@@ -671,7 +667,7 @@ void draw_scarcity_key(ImDrawList* dl, ImVec2 anchor,
     draw_lens_resource_combo(state, {x, y}, bar_w);
     y += kLensComboH + 4.0f;
 
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Market scarcity");
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Market scarcity"); // fit-exempt: legend box sized to its measured entries (container 2)
     y += line_h + 4.0f;
 
     // Met (substrate, no tint) → scarce (hot). Mirrors the per-market composite.
@@ -686,14 +682,14 @@ void draw_scarcity_key(ImDrawList* dl, ImVec2 anchor,
                           { x + bar_w * static_cast<float>(i + 1) / segs, y + bar_h }, c);
     }
     y += bar_h + 2.0f;
-    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "met");
+    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "met"); // fit-exempt: legend box sized to its measured entries (container 2)
     const ImVec2 sts = ImGui::CalcTextSize("scarce");
-    dl->AddText({x + bar_w - sts.x, y}, IM_COL32(170, 175, 185, 255), "scarce");
+    dl->AddText({x + bar_w - sts.x, y}, IM_COL32(170, 175, 185, 255), "scarce"); // fit-exempt: legend box sized to its measured entries (container 2)
     y += line_h + 4.0f;
 
     dl->AddRectFilled({x, y + 2.0f}, {x + 10.0f, y + 12.0f},
                       presentation_of(state.lens_resource).colour);
-    dl->AddText({x + 14.0f, y}, IM_COL32(235, 235, 235, 255),
+    dl->AddText({x + 14.0f, y}, IM_COL32(235, 235, 235, 255), // fit-exempt: legend box sized to its measured entries (container 2)
                 presentation_of(state.lens_resource).name);
 }
 
@@ -910,7 +906,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         {
             const char* msg = "No body selected";
             const ImVec2 ts = ImGui::CalcTextSize(msg);
-            dl->AddText(origin + (size - ts) * 0.5f, IM_COL32(150, 150, 150, 255), msg);
+            dl->AddText(origin + (size - ts) * 0.5f, IM_COL32(150, 150, 150, 255), msg); // fit-exempt: legend box sized to its measured entries (container 2)
         }
         return;
     }
@@ -938,7 +934,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         char title[176];
         std::snprintf(title, sizeof(title), "%s  -  %s  (%dx%d)%s",
             body.name.c_str(), body_type_name(body.type), body.grid_width, body.grid_height, survey_note);
-        dl->AddText(origin + ImVec2{4.0f, 2.0f}, IM_COL32(235, 235, 235, 255), title);
+        dl->AddText(origin + ImVec2{4.0f, 2.0f}, IM_COL32(235, 235, 235, 255), title); // fit-exempt: legend box sized to its measured entries (container 2)
     }
 
     const int gw = std::max(1, body.grid_width);
@@ -1244,13 +1240,14 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // where the land ended up, then folded its verdict into Pass 1's heightmap and
     // vanished — by the time a tile exists, the plate that raised it is unreadable
     // from the terrain. The generation report retains the plate field precisely so
-    // this lens can put it back on the map. Matched by body NAME, the same stable
-    // key the Tile Ledger's biography uses (body_entry carries no entity_id).
+    // this lens can put it back on the map. Matched by ENTITY ID (BL-257) — body
+    // names are generated and display-only, so the old name match was a display
+    // string standing in for an identity.
     const continent_state* plates = nullptr;
     if (state.overlay == overlay_mode::continent)
     {
         for (const auto& be : gen.bodies)
-            if (be.name == body.name) { plates = &be.continents; break; }
+            if (be.id == state.active_body) { plates = &be.continents; break; }
         // A world generated before the field was retained (or a body absent from
         // the report) leaves this null — the lens then draws plain terrain and
         // says so in its key, rather than inventing plates.
@@ -1410,6 +1407,17 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         }
     }
 
+    // A tile's vision scalar (0..1): 1 inside the permanent layers (building pockets +
+    // the corp-centre->market corridors), else the moving beam's intensity. Hoisted out
+    // of the tile loop's fill block for BL-185, because the road pass now needs the same
+    // number for a *neighbour* tile — the fog must size identically wherever it is read.
+    auto tile_vision = [&](entity_id tid) -> float {
+        if (state.permanent_vision.find(tid) != state.permanent_vision.end())
+            return 1.0f;
+        const auto bi = beam_intensity.find(tid);
+        return (bi != beam_intensity.end()) ? bi->second : 0.0f;
+    };
+
     const ImVec2 mouse = state.mouse.active
                          ? ImVec2{state.mouse.x, state.mouse.y}
                          : ImVec2{-1.0f, -1.0f}; // off-screen sentinel suppresses hover
@@ -1429,6 +1437,43 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // Use the full circumradius for hit-testing so small hexes stay clickable.
     const float draw_r = hex_size * zoom - 1.0f;
     const float hit_r  = hex_size * zoom;
+
+    // --- Fill level-of-detail (BL-269) ------------------------------------------
+    // MEASURED 2026-08-09, pan_perf on the real renderer, Kepler (15,120 tiles):
+    //
+    //   zoom            vertices   submit ms
+    //   0.9 whole grid   157,084      14.25
+    //   1.1                6,172       0.47
+    //   3.0               23,620       1.95
+    //
+    // A 25x vertex cliff at the whole-grid view, and submit alone blows the 8 ms
+    // frame budget there. Panning is NOT the cost -- the static and panning phases
+    // measured identically (157,084 vs 158,407) -- which is why this is a draw-cost
+    // fix and not an input fix. Panning only makes the hitches visible, because a
+    // frame that takes 3x as long applies 3x the accumulated MouseDelta at once:
+    // the right destination by a jumpy route.
+    //
+    // The cause is `AddConvexPolyFilled(verts, 6, ...)`: with anti-aliasing on, a
+    // 6-gon costs ~10 vertices once the AA fringe is counted, times every tile.
+    // `AddRectFilled` with no rounding costs 4 and emits no fringe.
+    //
+    // The threshold is DERIVED, not picked. A hexagon differs from its inscribed
+    // rect by the corner cut, `draw_r * (1 - sqrt(3)/2)` = `draw_r * 0.134`. That
+    // difference stops being drawable when it falls under one pixel, i.e. at
+    // draw_r < 1 / 0.134 = 7.46 px. Round down to 7: at that radius the corner cut
+    // is 0.94 px, and the per-tile landform icons (drawn at 0.42 * draw_r, so ~3 px)
+    // are already unreadable.
+    //
+    // The first attempt used 5 px and did not fire at all — at a 1080-tall window
+    // the whole-grid view sits at draw_r ~5.1-5.7, just the wrong side of it. Worth
+    // recording, because it is the argument for deriving the bound from the geometry
+    // rather than eyeballing a constant that happens to work at one window size.
+    //
+    // Terrain colour, relief shading, the survey mask and the fog wash are all
+    // UNAFFECTED — they are colour, not geometry — so the analytic read the
+    // whole-grid view exists for is exactly as legible.
+    constexpr float k_lod_radius_px = 7.0f;
+    const bool      coarse_fill     = draw_r <= k_lod_radius_px;
 
     // --- Infinite horizontal scroll ---
     // The grid is a cylinder: column gw wraps onto column 0. In screen space the
@@ -1673,20 +1718,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // convoy beam's contribution (bright at the head, dimming down the tail). The
         // fog wash scales with (1 − vision), so the surface reads mostly unknown, lit
         // along the player's corridors, with a convoy's beam gliding and trailing over
-        // them. Survey mask owns unrevealed tiles, so this skips them.
+        // them. Survey mask owns unrevealed tiles, so this skips them. The road pass
+        // below reads the same scalar (BL-185) — hence the hoist out of the branch.
+        const float vision = tile_vision(id);
         if (revealed)
-        {
-            float vision = (state.permanent_vision.find(id) != state.permanent_vision.end())
-                               ? 1.0f : 0.0f;
-            if (vision < 1.0f)
-            {
-                const auto bi = beam_intensity.find(id);
-                if (bi != beam_intensity.end())
-                    vision = std::max(vision, bi->second);
-            }
-            if (vision < 1.0f)
-                fill = lerp_colour(fill, IM_COL32(8, 10, 16, 255), 0.5f * (1.0f - vision));
-        }
+            fill = fog_dim(fill, vision);
 
         // Wrap copies inside the canvas: k_min/k_max were computed at the top of
         // the loop body (BL-268), where they double as the column cull.
@@ -1695,9 +1731,34 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             const float cx = sc.x + static_cast<float>(k) * period_px;
             const float cy = sc.y;
 
+            // The vertices are still needed below — hover and selection outline this
+            // hex, and those read as hexes at any zoom. Computing them is arithmetic;
+            // it is EMITTING them as a filled 6-gon that costs.
             ImVec2 verts[6];
             hex_vertices(verts, cx, cy, draw_r);
-            dl->AddConvexPolyFilled(verts, 6, fill);
+
+            // Coarse fill below the LOD threshold (BL-269): a rect instead of a
+            // 6-gon, ~4 vertices against ~10 and no AA fringe.
+            //
+            // SIZED TO THE GRID STEP, not to the hex radius. Rows step by
+            // 1.5 * hex_size while a hex is 2 * hex_size tall — consecutive rows
+            // OVERLAP. A rect built from the radius is shorter than the row pitch and
+            // the terrain renders as horizontal stripes, which is exactly what the
+            // first attempt did. Because odd rows are offset by half a column, rects
+            // of (col_step x row_step) brick-lay and tile the plane exactly.
+            //
+            // `hex_size * zoom` is recovered as `draw_r + 1` (draw_r is that minus the
+            // 1 px border shrink), and the same 1 px is taken back off each axis so the
+            // background still shows through as the grid texture the hexes give.
+            if (coarse_fill)
+            {
+                const float step = draw_r + 1.0f; // hex_size * zoom
+                const float hw   = kSqrt3 * step * 0.5f - 0.5f;
+                const float hh   = 1.5f   * step * 0.5f - 0.5f;
+                dl->AddRectFilled({ cx - hw, cy - hh }, { cx + hw, cy + hh }, fill);
+            }
+            else
+                dl->AddConvexPolyFilled(verts, 6, fill);
 
             // Masked region: locked fill only — no borders, markers, selection, or
             // hit-testing for this copy. This single gate also *is* the rival-marker
@@ -1719,6 +1780,17 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // rounds junctions and keeps an isolated / just-placed road tile visible. Styled by
             // THIS tile's tier — Track(1) thin/dim, Road(2) medium, Highway(3) thick/bright — so a
             // tier change reads as a taper at the midpoint. Seam-crossing edges shift one period.
+            //
+            // BL-185: roads dim with the intra-body reach fog, through the same fog_dim wash
+            // the lens fill takes, so an unreached road recedes with the ground under it rather
+            // than reading as brightly as one on your own corridor. A road edge spans two tiles,
+            // so the pair's vision is combined with MAX — a road is lit if EITHER end is reached.
+            // Max is the choice for two reasons: it is SYMMETRIC, so both tiles' halves fog to the
+            // same value and the span stays one continuous weight (the BL-172 no-from/to-asymmetry
+            // property the geometry already guarantees); and reach is a flood outward from where
+            // the player operates, so an edge touching a reached tile is inside that reach — a
+            // corridor's roads should not darken one hop early at its rim. Survey (BL-067) still
+            // owns genuinely unrevealed tiles; this is only the commercial-reach fog.
             if (tile.road_level > 0)
             {
                 ImU32 col; float thick;
@@ -1728,6 +1800,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     case 2:  col = IM_COL32(205, 188, 140, 225); thick = std::max(1.8f, draw_r * 0.18f); break;
                     default: col = IM_COL32(225, 205, 150, 238); thick = std::max(2.4f, draw_r * 0.24f); break;
                 }
+
+                // The junction cap takes the brightest edge meeting at this centre, so it
+                // never reads as a dark blot on the end of a lit span.
+                float cap_vision = vision;
 
                 static const int card_off[4][2] = {{+1, 0}, {-1, 0}, {0, +1}, {0, -1}};
                 for (int n = 0; n < 4; ++n)
@@ -1757,10 +1833,13 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     // This tile's half only: centre -> shared-edge midpoint (the neighbour draws
                     // its half, and the two meet — continuous and symmetric, no "from vs to").
                     const ImVec2 mid = {(cx + nb_sc.x) * 0.5f, (cy + nb_sc.y) * 0.5f};
-                    dl->AddLine({cx, cy}, mid, col, thick);
+                    const float edge_vision = std::max(vision, tile_vision(nb_id));
+                    cap_vision = std::max(cap_vision, edge_vision);
+                    dl->AddLine({cx, cy}, mid, fog_dim(col, edge_vision), thick);
                 }
                 // Centre cap: rounds junctions and keeps a lone / just-placed road tile visible.
-                dl->AddCircleFilled({cx, cy}, std::max(1.5f, thick * 0.75f), col);
+                dl->AddCircleFilled({cx, cy}, std::max(1.5f, thick * 0.75f),
+                                    fog_dim(col, cap_vision));
             }
 
             // Rivers (BL-170 data; this render is new, 2026-08-02). Always-on terrain like
@@ -1930,12 +2009,36 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 const ImU32 marker_col =
                     lerp_colour(owner_col, IM_COL32(255, 255, 255, 255), 0.5f);
 
+                // BL-327 (replacing BL-323 S4's dimming, same-day: Ben found the
+                // desaturated silhouette read as "faded", not "being built"): a
+                // site with ticks_remaining > 0 draws the dedicated crane glyph
+                // IN PLACE OF its type silhouette, at full owner-tinted colour —
+                // identity still reads, the type does not, which is honest: the
+                // installation is not that type yet. ticks_remaining is the single
+                // source of truth economy_system counts down; no separate flag.
+                bool under_construction = false;
+                if (k == 0)
+                {
+                    const auto ctb_it = tile_to_bld.find(id);
+                    if (ctb_it != tile_to_bld.end())
+                    {
+                        const auto cbld_it = w.buildings.find(ctb_it->second);
+                        if (cbld_it != w.buildings.end() && cbld_it->second.ticks_remaining > 0)
+                            under_construction = true;
+                    }
+                }
+
                 // The Workforce (Population lens) and Opportunity lenses replace the
                 // building silhouette with the per-tile value mark drawn below
                 // (BL-135) — the mark reads the tile's rank, not its installation.
                 if (state.overlay != overlay_mode::population &&
                     state.overlay != overlay_mode::opportunity)
-                    icons::building(dl, {cx, cy}, sil_r, built_type, marker_col);
+                {
+                    if (under_construction)
+                        icons::under_construction(dl, {cx, cy}, sil_r, marker_col);
+                    else
+                        icons::building(dl, {cx, cy}, sil_r, built_type, marker_col);
+                }
 
                 // Owner-identity tag (BL-090): a small corp emblem tucked into the
                 // hex's lower-right corner, for BOTH player and rival buildings —
@@ -2275,31 +2378,25 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     const char* name = settlement_names[
                         (static_cast<uint32_t>(a.tile) * 2654435761u) % settlement_name_count];
                     const ImVec2 tp{ mc.x + sr + 3.0f, mc.y - sr };
-                    dl->AddText({ tp.x + 1.0f, tp.y + 1.0f }, IM_COL32(20, 22, 28, 200), name); // shadow
-                    dl->AddText(tp, IM_COL32(236, 230, 214, 255), name);
+                    dl->AddText({ tp.x + 1.0f, tp.y + 1.0f }, IM_COL32(20, 22, 28, 200), name); // shadow // fit-exempt: legend box sized to its measured entries (container 2)
+                    dl->AddText(tp, IM_COL32(236, 230, 214, 255), name); // fit-exempt: legend box sized to its measured entries (container 2)
                 }
             }
         }
     }
 
-    // Corporate borders (BL-182 foundation). A corp's border now reads from its
-    // PERSISTED seat + range (corporation_component::hq_building / influence_range,
-    // designated deterministically at generation), replacing the render-time
-    // centroid+hull recompute the player home-ring (BL-085) and rival reach slice
-    // (BL-183) each open-coded. influence_range is unit-hex distance (hex_size = 1),
-    // so the pixel radius is range * hex_size * zoom — matching hex_local_centre
-    // exactly. Drawn on the corp's HOME body only (the single-home model; branch
-    // offices on other bodies are deferred with the full BL-182 mechanic). Still
-    // render-only: the border gates nothing until the deferred operate-gate lands.
-    //
-    // OWED EYEBALL (no in-session build; SDL FetchContent 403): the range is fixed
-    // at generation, so the ring no longer grows as the player builds outward, and a
-    // single projected-range constant now sizes both player and rival rings. Both are
-    // deliberate foundation choices, flagged for a play-test look.
-    auto draw_corp_border = [&](entity_id corp_id, const corporation_component& cc,
-                                unsigned edge_alpha)
+    // Corporate HQ marker (BL-182 foundation; the border RING retired BL-329,
+    // 2026-08-08 — Ben's live critique: "retire the circle around corp
+    // buildings. It doesn't show anything informative." The reach fog/lens
+    // already shows supply reach properly; this fixed-radius, non-growing ring
+    // duplicated that less accurately and added noise). What remains is just
+    // the seat marker itself, from the PERSISTED hq_building (designated
+    // deterministically at generation) — drawn on the corp's HOME body only
+    // (the single-home model; branch offices are deferred with the full
+    // BL-182 mechanic).
+    auto draw_corp_hq = [&](entity_id corp_id, const corporation_component& cc)
     {
-        if (cc.hq_building == null_entity || cc.influence_range <= 0.0f)
+        if (cc.hq_building == null_entity)
             return;
         const auto b = w.buildings.find(cc.hq_building);
         if (b == w.buildings.end())
@@ -2309,48 +2406,43 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             return;
 
         const ImU32  accent = corp_identity(corp_id);
-        const ImU32  edge   = (accent & 0x00FFFFFFu) | (edge_alpha << 24);
         const ImVec2 hq_lc  = hex_local_centre(t->second.grid_x, t->second.grid_y, hex_size);
         const ImVec2 hq_s   = to_screen(hq_lc);
-        const float  ring_r = cc.influence_range * hex_size * zoom;
         const float  hq_r   = std::max(4.0f, draw_r * 0.5f);
 
         const int k_min = (period_px > 0.0f)
-            ? static_cast<int>(std::ceil((visible_left  - hq_s.x - ring_r) / period_px)) : 0;
+            ? static_cast<int>(std::ceil((visible_left  - hq_s.x - hq_r) / period_px)) : 0;
         const int k_max = (period_px > 0.0f)
-            ? static_cast<int>(std::floor((visible_right - hq_s.x + ring_r) / period_px)) : 0;
+            ? static_cast<int>(std::floor((visible_right - hq_s.x + hq_r) / period_px)) : 0;
         for (int k = k_min; k <= k_max; ++k)
         {
             const float off = static_cast<float>(k) * period_px;
-            dl->AddCircle({ hq_s.x + off, hq_s.y }, ring_r, edge, 0, 2.5f);
             icons::hq(dl, { hq_s.x + off, hq_s.y }, hq_r, accent);
         }
     };
 
-    // The player's border is always-on identity chrome (BL-085 lineage), drawn on the
-    // player's home body regardless of the active lens.
+    // The player's HQ marker is always-on identity chrome (BL-085 lineage), drawn on
+    // the player's home body regardless of the active lens.
     if (state.active_body == w.home_body && w.player_entity != null_entity)
     {
         const auto pc = w.corporations.find(w.player_entity);
         if (pc != w.corporations.end())
-            draw_corp_border(w.player_entity, pc->second, 140u);
+            draw_corp_hq(w.player_entity, pc->second);
     }
 
-    // Rival borders (BL-183 lineage): under the Corporation lens, every rival corp's
-    // border reads from the same persisted seat + range via the shared lambda above,
-    // so corporations read as having borders too — the corporation-side counterpart
-    // to the Country lens's national borders. The player's own border is the
-    // always-on chrome above (excluded here, no double-draw). Each rival's border is
-    // drawn on its OWN home body (draw_corp_border gates on the seat's body), so a
-    // rival only shows a ring when its home body is the one on screen. Still
-    // render-only; the operate-gating mechanic stays deferred (BL-182, post-v0.1.0).
+    // Rival HQ markers (BL-183 lineage): under the Corporation lens, every rival
+    // corp's seat reads from the same persisted hq_building via the shared lambda
+    // above. The player's own marker is the always-on chrome above (excluded here,
+    // no double-draw). Each rival's marker is drawn on its OWN home body
+    // (draw_corp_hq gates on the seat's body), so a rival only shows one when its
+    // home body is the one on screen.
     if (state.overlay == overlay_mode::corporation)
     {
         for (const auto& [corp_id, cc] : w.corporations)
         {
             if (corp_id == w.player_entity)
                 continue;
-            draw_corp_border(corp_id, cc, 150u);
+            draw_corp_hq(corp_id, cc);
         }
     }
 
@@ -2378,7 +2470,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // ghost is red — and the reason legible — *before* the click, not after
         // construct_building refuses it (BL-071).
         const placement_rules::placement_result pr = placement_rules::can_place_in_world(
-            w, hovered_tile, state.construction.type, state.construction.target);
+            w, hovered_tile, state.construction.type, state.construction.target,
+            state.max_logistics_reach);
         const ImU32 ghost_col = pr ? palette::positive : palette::negative;
 
         icons::building(dl, {gx, gy}, mr, state.construction.type, ghost_col);
@@ -2393,7 +2486,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             dl->AddRectFilled({tp.x - 3.0f, tp.y - 1.0f},
                               {tp.x + tsz.x + 3.0f, tp.y + tsz.y + 1.0f},
                               IM_COL32(0, 0, 0, 180), 2.0f);
-            dl->AddText(tp, palette::negative, why);
+            dl->AddText(tp, palette::negative, why); // fit-exempt: legend box sized to its measured entries (container 2)
         }
     }
 
@@ -2625,10 +2718,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     fallback = tb->second;
 
             state.selected_entity = (marker_hit != null_entity) ? marker_hit : fallback;
-            // A fresh click is an explicit select gesture: re-show the panel even
-            // when it re-selects the same entity the player had dismissed (close
-            // hides, does not destroy — SELECTION.md).
-            state.selection_hidden_for = null_entity;
         }
         else if (hovered_tile != null_entity)
         {

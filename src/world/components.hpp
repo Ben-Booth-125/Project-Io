@@ -57,17 +57,19 @@ enum class resource_type : uint8_t
     food_rations          = 22, ///< Processed from agricultural produce.
     // --- Logistics goods (BL-286, 2026-08-04) ---
     //
-    // Enum + serialization + base-price wiring only (BL-286). The consumption,
-    // transport-capacity range cap, salt shelf-life gate, and bullion purchase
-    // mechanics that give these goods behaviour land in BL-287–290. See
-    // docs/economy/RESOURCES.md § Logistics goods.
-    grain                 = 23, ///< Human ration staple; per-tick army/unit draw (BL-287, not yet implemented).
-    fodder                = 24, ///< Draft-animal/cavalry feed; per-tick draw alongside grain (BL-287, not yet implemented).
-    salt                  = 25, ///< Preservative; gates ration shelf-life (BL-289, not yet implemented).
-    transport_capacity    = 26, ///< Abstract logistics-train throughput good; caps supply range (BL-288, not yet implemented).
+    // Enum + serialization + base-price wiring only (BL-286). The follow-on
+    // behaviours — consumption, transport-capacity range cap, salt shelf-life
+    // gate, bullion purchase — are NOT yet filed; ids get allocated via
+    // `node tools/session/next_id.js` when they are. Do not cite placeholder
+    // ids here: a wrong id routes the reader to unrelated work, which is worse
+    // than no id. See docs/economy/RESOURCES.md § Logistics goods.
+    grain                 = 23, ///< Human ration staple; per-tick army/unit draw (behaviour unfiled).
+    fodder                = 24, ///< Draft-animal/cavalry feed; per-tick draw alongside grain (behaviour unfiled).
+    salt                  = 25, ///< Preservative; gates ration shelf-life (behaviour unfiled).
+    transport_capacity    = 26, ///< Abstract logistics-train throughput good; caps supply range (behaviour unfiled).
     charcoal              = 27, ///< Refined fuel-wood; pre-coal smelting/heating input.
     iron_blooms           = 28, ///< Bloomery-refined iron intermediate — distinct from raw iron/iron-nickel ore.
-    bullion               = 29, ///< Minted precious-metal specie; local purchase medium (BL-290, not yet implemented).
+    bullion               = 29, ///< Minted precious-metal specie; local purchase medium (behaviour unfiled).
     trade_goods_misc      = 30, ///< Placeholder endemic-luxury-class good; a specific luxury name is a later design step.
     count                 = 31
 };
@@ -125,6 +127,9 @@ enum class building_type : uint8_t
     port                = 3,
     launchpad           = 4, ///< Space-launch facility; gates space-mode convoy dispatch.
     inland_logistics_hub = 5, ///< BL-149: land-mode logistics node; its tile discounts intra-body haul cost (like a city).
+    military_base       = 6, ///< BL-325 S1: unit muster building. Produces nothing, staffs at zero,
+                             ///< and is deliberately NOT a supply anchor — military reach IS the
+                             ///< economic reach field (BL-325 ruling 3). Hire moves onto it in S2.
 };
 
 /// Sentinel `building_component.recipe` value meaning "no processing recipe is
@@ -415,12 +420,19 @@ struct population_centre_component
 /// resolved into an army_stack_entry for resolve_battle. `type` is an opaque
 /// index into whichever roster table the current era supplies (BL-274 owns
 /// rosters, not this file) — unit_component itself does not interpret it.
+///
+/// BL-157 ruled tile position canonical over body/province (2026-08-07); this
+/// struct shipped with a `body` field ahead of that ruling — `position`
+/// (BL-324, 2026-08-08) is the fix, landed with the hire-unit item that first
+/// needed tile grain rather than deferring it back to BL-157.
 struct unit_component
 {
-    entity_id body;      ///< Body where the unit is currently located.
-    entity_id owner;     ///< Corporation or faction entity that controls this unit.
-    int       count;     ///< Number of units in the group.
-    uint16_t  type = 0;  ///< Opaque roster-type index; see combat.hpp's army_stack_entry.
+    entity_id position;      ///< Tile the unit currently occupies (BL-157: tile-canonical).
+    entity_id owner;         ///< Corporation or faction entity that controls this unit.
+    int       count;         ///< Number of units in the group.
+    uint16_t  type = 0;      ///< Opaque roster-type index; see combat.hpp's army_stack_entry.
+    int32_t   strength = 0;  ///< Fixed-point combat strength scalar (BL-157). Not a stat block —
+                              ///< a single number, same spirit as building_component's own scalars.
 };
 
 // ---------------------------------------------------------------------------
@@ -530,6 +542,14 @@ struct corporation_component
     /// holdings on its home body keeps `{null_entity, 0}` — no border. **Render-only
     /// today**: the border gates nothing until the deferred BL-182 operate-gate
     /// lands (post-v0.1.0). See docs/generation/CORPORATION_GENERATION.md, LENSES.md.
+    ///
+    /// **The border RING itself was retired 2026-08-08 (BL-329)** — Ben's live
+    /// critique: a fixed-radius circle that never grew as the player built
+    /// outward showed nothing informative once the BL-323 reach fog existed to
+    /// show supply reach properly. `influence_range` is still computed and
+    /// stored (a future operate-gate may want it); only `body_surface_canvas.cpp`'s
+    /// `draw_corp_hq` (formerly `draw_corp_border`) stopped drawing it — the HQ
+    /// marker glyph itself is unaffected.
     entity_id hq_building     = null_entity;
     float     influence_range = 0.0f;
 };

@@ -216,30 +216,47 @@ The prototype bodies are generated against the full model by the six-pass pipeli
 
 **Both axes now render (BL-231, 2026-07-31).** Until then the canvas drew *composition only* — `terrain_colour` switched on the composition enum and landform never reached the screen, so mountain, highland, canyon, valley, crater and rift all appeared as flat hexes despite driving build cost, hazard, habitability and deposit richness. Landform is now a second, independent render channel: a subtle **relief tint** for the common ground and a **glyph** for the four dramatic landforms. The split is authored in `docs/ui/CANVASES.md` § Terrain channels; the glyph shapes are catalogued in `docs/ui/ICONS.md` § Landform glyphs.
 
-**Measured landform distribution — ⚠ STALE, and blocked on a broken harness (2026-08-04).**
+**Measured landform distribution — re-issued 2026-08-07 (BL-291).**
 
-The figures below were superseded twice on 2026-08-04. `802421c` (larger mountain clusters) took
-relief — mountain plus highland — from 6.8% to 17.5% of land; `71e8a9b` (convergent-boundary
-seeding) then settled it at **~14.0%**, with mountain seeds moving `2/4/5` → `5/11/13`. Kepler's
-"0.0% valley" is from the same superseded census and the ring→landform mapping has changed since.
+Measured by `tools/verify/world_audit.cpp` against `make_hard_coded_world()` on the default seed.
+This replaces the table superseded twice on 2026-08-04 by `802421c` (larger mountain clusters) and
+`71e8a9b` (convergent-boundary seeding), and it retires the "cannot be re-measured, harness is
+broken" banner that stood here: **the harness was never broken.** It builds, runs, and emits this
+census in full; it exits non-zero on one unrelated assertion (see § Biome balance below), which had
+been read as the whole harness failing.
 
-**They cannot be re-measured yet:** `world_audit`, the harness that produced this table, currently
-fails — filed as BL-291 (world_audit harness fails), which owns both the fix and the re-issue.
-Treat every number here as indicative only; a *measured* table that has gone stale reads as
-verified, which is why it is flagged rather than quietly left.
+Percentages are of each body's **land** tiles; ocean is excluded.
 
 | Landform | System | Kepler (home) | Build cost |
 |---|---|---|---|
-| Plains | 77.0% | 89.8% | ×1.0 |
-| Valley | 18.0% | 0.0% | ×1.1 |
-| Highland | 3.5% | 7.7% | ×1.25 |
-| Crater | 0.8% | 0.4% | ×1.3 |
-| Mountain | 0.6% | 1.5% | ×2.0 |
-| Canyon | 0.1% | 0.4% | ×1.5 |
+| Plains | 68.8% | 83.1% | ×1.0 |
+| Valley | 18.1% | 0.0% | ×1.1 |
+| Highland | 10.7% | 13.1% | ×1.25 |
+| Mountain | 1.4% | 2.2% | ×2.0 |
+| Crater | 0.7% | 0.6% | ×1.3 |
+| Canyon | 0.2% | 0.8% | ×1.5 |
 | Rift | 0.1% | 0.3% | ×1.6 |
+
+Land-tile counts behind the shares: system 25,412 — Cinder 15,120 (no ocean, so every tile is
+land), Kepler 6,092 of 15,120, Selene 3,780, Pallas 420.
+
+**Relief lands lower than the 2026-08-04 note projected.** Mountain plus highland is **12.1%** system-wide
+and **15.3%** on Kepler, against the ~14.0% that note recorded — it was quoting a home-body figure as
+though it were the system one. **Kepler's 0.0% valley is real, not a stale artifact**: it survives
+re-measurement, because Kepler's ring→landform mapping routes its mid-elevation band to highland
+where the drier bodies route it to valley.
 
 *(Build-cost multipliers are unaffected — they are authored constants in
 `landform_logistics_cost`, not measurements.)*
+
+**Biome balance — ⚠ the one live failure (2026-08-07).** `world_audit`'s S2 check wants
+forest + wetland ≥ 3% of Kepler's tiles. It measures **2.41%** (forest 353 = 2.33%, wetland
+**12 = 0.08%**) and fails. Wetland is the striking half: twelve tiles on the whole home body is
+effectively extinct, not merely scarce. The likely cause is collateral from the same two relief
+commits — more highland displaces the low, wet ground both biomes need — but that is untested.
+Two things are unsettled and are Ben's call: whether 3% is still the right target after the relief
+change, and whether the denominator should be *all* tiles or *land* tiles (against land, the same
+measurement reads 6.0%). Filed as a review entry rather than retuned silently.
 
 **Terrain has a graded combat value (BL-233, 2026-07-31).** SYSTEMS.md § Environment has always
 assigned terrain "the difficulty of military operations", but the only code expressing it was a
@@ -280,4 +297,4 @@ barren/icy pair) and is now **325**; per-body land means now separate (defence 8
 
 **Open tuning question raised by that measurement: Kepler generated no valley tiles at all.** Valley is assigned to unclaimed non-ocean ground below the height threshold (Pass 5), but on a wet body the ocean has already taken everything that low — so the ×1.1 fertile landform was unreachable on exactly the bodies where river valleys should be most characteristic. Dry bodies carried 20–27% valley. Self-consistent rather than a defect, but a generation-tuning question; it belongs with the tile-generation refinements (BL-051).
 
-*Whether it still holds is unknown (2026-08-04): Pass 5's ring→landform mapping was rewritten and the ocean band moved, so this needs re-measuring alongside the census — BL-291.*
+*Re-measured and it still holds (2026-08-09, closing BL-291). Pass 5's ring→landform mapping was rewritten and the ocean band moved after the original measurement, so this was re-run against the current generator: **Kepler 0.0% valley**, against Cinder 24.9%, Pallas 24.8% and Selene 19.8%. The wet-body/dry-body split is reproducible and is a real property of the generator, not a stale artifact. It stays a tuning question for the tile-generation refinements (BL-051), not a defect.*

@@ -88,6 +88,15 @@ struct construction_state
     entity_id     pending_road_tile = null_entity;
     std::uint8_t  pending_road_tier = 1;
 
+    /// Pending hire-unit request (BL-324) — set by the build front door's Hire
+    /// affordance (the construction ledger's roster section) and executed by
+    /// `app::render` via `apply_corp_command`'s `hire_unit` verb. Same deferred
+    /// path as `pending_tile`, for the same reason (const-world UI surfaces).
+    /// `null_entity` = nothing pending; `pending_hire_unit_type` is an index
+    /// into `unit_roster_table()`.
+    entity_id     pending_hire_tile      = null_entity;
+    std::uint16_t pending_hire_unit_type = 0;
+
     /// Pending demolition request — set by the building Selection element's Demolish
     /// control and executed by `app::render` via `demolish_building`. Takes the same
     /// deferred path as `pending_tile` for the same reason (UI surfaces hold only
@@ -132,7 +141,6 @@ struct ui_state
     entity_id    active_body   = null_entity;         ///< Navigation anchor: drives the lower rungs (circumplanetary anchor and surface). Changed by *navigation* (double-click / focus), not by selection. null_entity = no anchor.
     entity_id    active_tile   = null_entity;         ///< Navigation anchor for the surface rung; set by a tile navigation. Distinct from the selection.
     entity_id    selected_entity = null_entity;       ///< The entity the player single-clicked to inspect — drives the Selection info element. Distinct from the active_* anchors: selecting never moves the canvas. null_entity = nothing selected. See SELECTION.md, ui/selection.hpp.
-    entity_id    selection_hidden_for = null_entity;   ///< The selection the player dismissed with the panel's close button. The Selection info element stays hidden while selected_entity equals this; a *new* selection re-shows it. See SELECTION.md (close hides, does not destroy).
     canvas_level primary_level = canvas_level::solar; ///< Which canvas rung fills the window.
     overlay_mode overlay       = overlay_mode::none; ///< Active canvas overlay lens; toggled by the bottom overlay control strip. Defaults to none — the plain canvas — at campaign start (reverses BL-013's Corporation-default): a click never re-skins the canvas, so it opens unskinned. Single-select with a null state (re-clicking clears to none).
 
@@ -191,8 +199,15 @@ struct ui_state
     int  market_ledger_view = 0;
 
     /// History ledger: 0=Story (the body's biography), 1=Chain (the generation
-    /// charts), 2=Tiles (the tile/building/market tables). BL-211.
+    /// charts), 2=Tiles (the tile/building/market tables), 3=Ages (the Era -1
+    /// political time-lapse, BL-277). BL-211.
     int  history_view = 0;
+
+    /// Ages view: the year currently scrubbed to, and whether playback is
+    /// running. VIEW state — not serialised; where the scrubber was parked is a
+    /// display detail, not part of the campaign.
+    int  ages_year    = 0;
+    bool ages_playing = false;
 
     /// F9 mock tech-tree viewer: one era per view — 0=Era -1 Antiquity (placeholder),
     /// 1=Era 0, 2=Era 1, 3=Standing lines. Defaults to Era 0, the campaign's era.
@@ -207,14 +222,32 @@ struct ui_state
     float tech_tree_pan_y = 0.0f;
     float tech_tree_zoom  = 1.0f;
 
-    // --- drill-through disclosure (BL-214 / BL-247) ---
-    // The one idiom every dense surface obeys: folded (a verdict line + a chevron)
-    // or expanded (a full-screen overlay showing everything at once). Because
-    // expanded IS an overlay, only one thing can be expanded at a time, so this is a
-    // single target rather than a level per surface. VIEW state — not serialised,
-    // and deliberately not remembered: which card was last open is a display
-    // preference, not something to restore. See ui/detail_level.hpp.
+    // --- drill-through disclosure (BL-214, revised BL-265) ---
+    // The one idiom every dense surface obeys. BL-214's model was BINARY — folded, or
+    // a full-WINDOW overlay — and this comment used to reason from it: because expanded
+    // IS an overlay, only one thing can be expanded, so a single target suffices.
+    //
+    // BL-265 split that into TWO controls and the reasoning no longer holds as one rule:
+    //   * the TAKEOVER is still single-target, and for the original reason — it owns one
+    //     rectangle (now the CANVAS, not the window), so opening a second replaces the
+    //     first. That is what this member tracks.
+    //   * IN-PLACE expansion is a SET, not a target (fold_state::in_place). A surface
+    //     that grows where it sits does not displace its siblings, and a single-target
+    //     in-place expander would make an accordion unbuildable.
+    // A canvas-bounded takeover may therefore coexist with an open ledger column, which
+    // is intended rather than a leak.
+    //
+    // VIEW state — not serialised, and deliberately not remembered: which card was last
+    // open is a display preference, not something to restore. See ui/detail_level.hpp.
     fold_state expanded{};
+
+    /// One-shot latch: has the building-management view seeded its default open
+    /// section yet (BL-229)? Production rests OPEN, which is the answer to variant C's
+    /// own objection — the control a player touches constantly should not start behind
+    /// a click. It is a LATCH rather than a per-frame default so that folding Production
+    /// away STAYS folded; re-defaulting every frame would make the section unclosable.
+    /// VIEW state, not serialised, like everything else here.
+    bool building_section_seeded = false;
 
     /// Which row of the expanded Corporation-dashboard roll-up is drilled into
     /// (BL-248); -1 = the roll-up itself. One index is enough because only one card
@@ -264,6 +297,18 @@ struct ui_state
     /// here as player game-intent; authored from the construction / building-
     /// management panel. See sell_order, docs/SYSTEMS.md § Trade.
     std::vector<sell_order> sell_orders;
+
+    /// BL-323 S2b: the logistics-reach budget the UI must filter on, mirrored here
+    /// from `recipe_registry::construction().max_logistics_reach` at load time.
+    ///
+    /// Carried on ui_state rather than threaded through every draw signature for a
+    /// specific reason: the placement surfaces disagree about what they hold — the
+    /// canvas and the construction ledger take a `const world&` plus a registry,
+    /// while `draw_tile_selection` takes a mutable world and no registry. One
+    /// mirrored float lets all of them apply the SAME rule the authoritative gate
+    /// applies, which is the point: a tile offered and then refused at commit reads
+    /// as a broken build rather than a rule. Negative disables, as everywhere else.
+    float max_logistics_reach = -1.0f;
 
     // --- solar system canvas view (primary only; the minimap always shows the
     // default framing) ---

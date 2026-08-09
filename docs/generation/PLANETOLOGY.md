@@ -736,6 +736,57 @@ is both truer and a second free axis.
 wizard's live `preview_system()` walk that same list with the same seeds, so **the charts a player
 decides against cannot drift from the world actually built.**
 
+The **physical facts** in that list are authored (mass and orbit are what a prototype body set
+*is*). The **names are not** — see § Body naming below. The literals still sitting in the
+`prototype_entry` table are placeholders that no longer reach the world; `make_hard_coded_world`
+overwrites `body_inputs::name` with the coined name before the chain runs.
+
+## Body naming *(BL-257, landed 2026-08-09)*
+
+**Body names are generated, and a body's identity is its entity id.** The five bodies used to
+carry string literals — Helios / Cinder / Kepler / Selene / Pallas — which made the system read
+as authored rather than generated.
+
+**Identity first.** Several places compared a body's *name* to decide *which body it was*, so
+randomising names would have been a silent correctness bug rather than a cosmetic change.
+`generation_report::body_entry` now carries the world `entity_id` it describes plus an
+`is_homeworld` flag, and every consumer reads one of those: the settlement merge in
+`hard_coded_world.cpp`, `seed_genesis_history`, the Tile Ledger's biography lookup and its Ages
+sim cache, the Continent lens's plate lookup, and the verify harnesses. **A body name is a display
+string and nothing else.** Verify scripts address bodies by *role* — `home`, `star`, `moon`,
+`asteroid`, `inner` — resolved by `find_body` in `app.cpp`, never by display name.
+
+**One tongue.** Names are coined by `src/world/body_names.{hpp,cpp}` from `world/tongue.hpp` —
+the same phoneme inventory and word builder every culture, nation and city name comes from
+(BL-290). Bodies are not a fourth naming bank; they are that sound system applied to the sky.
+
+**Why a seed-rolled tongue rather than a culture's.** The cradle cultures do not exist until the
+creeds pass, which needs the homeworld's tiles, which needs the chain — and the chain *writes body
+names into the biography prose it emits*. A name decided later would leave that prose stale. So
+the sky-watchers' tongue is rolled from the world seed before anything else runs. It shares the
+machinery, not one culture's inventory.
+
+**The register rule.** Ben, 2026-08-01 (NR-006): *a deliberate mix, governed by a rule*, so the
+mixing is legible rather than noisy. Which register a body gets is decided by **what the body is**,
+and each register wears a different **shape**:
+
+| Body | Register | Shape | Why |
+|---|---|---|---|
+| Star, planets | Mythological | One bare coined word | Named first, from a distance, by people who could only see lights |
+| Moons | Descriptive | Coined qualifier + the parent's name (`Zair Huhaidar`) | Named later, close up, by whoever surveyed them — so a moon reads as belonging to its planet |
+| The home body | Descriptive-of-the-ground | Coined root + the tongue's own "place" morpheme | The one world named by people standing *on* it |
+| Asteroids | Catalogue | Coined word + catalogue index (`Tatar 1`) | Neither a light in the sky nor ground underfoot — a line in a list |
+
+The player never has to articulate the rule; they only have to sense that the names are not
+arbitrary. **A later session extending the set must extend it the same way** — an unstated rule
+decays into the noise it was meant to prevent.
+
+**Determinism and verification.** `generate_body_names` is a pure function of the world seed: same
+seed, same catalogue, run to run. No two bodies in a system share a name, moons included.
+`tools/verify/body_names_harness.cpp` asserts determinism, uniqueness, cross-seed variety and the
+structural half of the register rule, and prints each catalogue — a name generator is judged by
+reading its output. `world_audit` prints and checks the canonical world's catalogue.
+
 **Charts** are drawn by `src/ui/charts.{hpp,cpp}`, extracted from the tile-selection deposit graphs
 (BL-123) so every chart in the app shares one implementation. At two bars `draw_bars` lays out
 pixel-identically to the original, which is what let the tile graphs move onto it.

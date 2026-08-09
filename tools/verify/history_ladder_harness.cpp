@@ -137,8 +137,9 @@ int main()
 
     const generation_report::body_entry* k1 = nullptr;
     const generation_report::body_entry* k2 = nullptr;
-    for (const auto& b : r1.bodies) if (b.name == "Kepler") k1 = &b;
-    for (const auto& b : r2.bodies) if (b.name == "Kepler") k2 = &b;
+    // The home body is identified by its flag, never by its (generated) name - BL-257.
+    for (const auto& b : r1.bodies) if (b.is_homeworld) k1 = &b;
+    for (const auto& b : r2.bodies) if (b.is_homeworld) k2 = &b;
     check(k1 && k2, "H1 Kepler appears in the generation report");
     if (!k1 || !k2) { std::printf("\n=== FAILURES PRESENT ===\n"); return 1; }
 
@@ -197,21 +198,49 @@ int main()
         // a fact about the world, not a stage-ordering violation. The
         // whole-biography ORDER is already asserted just above; what belongs
         // here is the ladder's own causal claim, so it is asserted directly on
-        // the three stage lines by their text.
+        // the three stage lines.
+        //
+        // UN-NARROWED 2026-08-09 (BL-285 task 2). These three used to be found
+        // by matching line TEXT — "granary", "Charter Act", "Great Accord" —
+        // so rewording any biography line silently changed what H4 asserted
+        // over, which is the failure mode a golden is supposed to catch rather
+        // than exhibit. Each ladder line now carries its own `ladder_rung`
+        // (planetology.hpp), so the selection is structural: reword freely,
+        // and the check still asserts the same causal claim. Stage 2 writes
+        // either the accord or the hegemon line and both tag `borders`, so
+        // either satisfies the ordering — H5 below is what pins which.
         const history_event* granary = nullptr;
         const history_event* charter = nullptr;
         const history_event* accord  = nullptr;
         for (const history_event* h : ladder)
         {
-            if (!granary && h->event.find("granary") != std::string::npos) granary = h;
-            if (!charter && h->event.find("Charter Act") != std::string::npos) charter = h;
-            // Stage 2 writes one line or the other — the accord or the hegemon
-            // — and H5 below is what pins which; either satisfies the ordering.
-            if (!accord && (h->event.find("Great Accord") != std::string::npos
-                         || h->event.find("absorbed the rest") != std::string::npos)) accord = h;
+            if (!granary && h->rung == ladder_rung::surplus) granary = h;
+            if (!charter && h->rung == ladder_rung::charter) charter = h;
+            if (!accord  && h->rung == ladder_rung::borders) accord  = h;
         }
         check(granary && charter && accord,
               "H4 all three ladder stages emitted their line");
+
+        // Each rung is written EXACTLY once. This is what stops the tag from
+        // rotting the way the text match did: a future emitter that tags a
+        // second line with an existing rung would otherwise leave the three
+        // lookups above silently picking whichever came first, and every
+        // assertion here would still pass. Note the window this scans is the
+        // recorded-history window, not the ladder alone — creeds (BL-235) and
+        // settlement (BL-218) write into it too, and their lines correctly
+        // carry `ladder_rung::none`, so counting tagged lines is the only
+        // exhaustiveness claim that is actually true here.
+        int n_surplus = 0, n_charter = 0, n_borders = 0;
+        for (const history_event* h : ladder)
+        {
+            if (h->rung == ladder_rung::surplus) ++n_surplus;
+            if (h->rung == ladder_rung::charter) ++n_charter;
+            if (h->rung == ladder_rung::borders) ++n_borders;
+        }
+        std::printf("      rung counts: surplus=%d charter=%d borders=%d\n",
+                    n_surplus, n_charter, n_borders);
+        check(n_surplus == 1 && n_charter == 1 && n_borders == 1,
+              "H4 each ladder rung is tagged exactly once (BL-285)");
         const bool staged =
             (!granary || !charter || granary->years_before_epoch > charter->years_before_epoch)
          && (!charter || !accord  || charter->years_before_epoch > accord->years_before_epoch);
@@ -257,7 +286,7 @@ int main()
             make_hard_coded_world(p, &rr);
             for (const auto& b : rr.bodies)
             {
-                if (b.name != "Kepler") continue;
+                if (!b.is_homeworld) continue;
                 ++seeds;
                 for (const history_event& h : b.state.history)
                 {

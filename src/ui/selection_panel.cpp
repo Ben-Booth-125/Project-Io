@@ -2,12 +2,13 @@
 
 #include "charts.hpp"
 
-#include "detail_level.hpp"   // fold_chevron — the drill-through idiom (BL-214)
+#include "detail_level.hpp"   // disclosure_controls — the drill-through idiom (BL-214/BL-265)
 #include "foldout_column.hpp" // shell fold-out column host (shared with the ledgers)
 #include "hex_render.hpp"      // draw_tile_neighbourhood — the card's zoomed tile view
 #include "icons.hpp"
 #include "presentation.hpp"
 #include "selection.hpp"
+#include "text_fit.hpp"
 #include "view_nav.hpp"
 
 #include "world/budget_system.hpp"    // compute_building_opex / body_mean_habitability (BL-162 estimate)
@@ -15,9 +16,11 @@
 #include "world/economy_system.hpp" // economy_report (workforce cap, BL-069)
 #include "world/market_clearing.hpp"
 #include "world/construction.hpp"    // demolish path (the building element's Demolish)
+#include "world/logistics.hpp"       // invalidate_logistics_caches (idle/resume flips the anchor set)
 #include "world/placement_rules.hpp" // buildable-type validity + stack capacity
 #include "world/recipe_registry.hpp" // recipe/economics lookups for the building element
 #include "world/survey_system.hpp"
+#include "world/unit_roster.hpp" // campaign hire gate + roster table (BL-324)
 
 #include <imgui.h>
 
@@ -502,8 +505,16 @@ void draw_selection_action(const world& w, const recipe_registry& reg,
                     ImGui::TextColored(construction_status_colour(rate), "%s",
                         construction_status(rate, b.ticks_remaining).c_str());
                 }
-                // The tile-scoped Manage front door was removed (Ben's 2026-07-15
-                // review) — a selected building shows its facts / build status only.
+                // Manage is a deliberate step now, not the selection itself
+                // (2026-08-08: selecting a building must land on the Selection
+                // view first). The button opens the management ledger's
+                // Buildings tab, which already keys off selected_entity.
+                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Operate");
+                if (ImGui::Button("Manage"))
+                {
+                    ui.show_construction_panel  = true;
+                    ui.construction.panel_view  = 1; // the Buildings tab
+                }
             }
             else
             {
@@ -600,6 +611,21 @@ void glyph_reserved(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
     dl->AddCircle(c, r * 0.30f, col, 12, 1.5f);
 }
 
+// Name of a tile's road tier, or nullptr when the tile carries no road (BL-184).
+// The wording matches the construction ledger's tier affordances below and the
+// canvas weight ladder (Track thin/dim -> Highway thick/bright); >3 reads as the
+// top tier, exactly as body_surface_canvas.cpp's switch default does.
+const char* road_tier_name(std::uint8_t road_level)
+{
+    switch (road_level)
+    {
+        case 0:  return nullptr;
+        case 1:  return "Track";
+        case 2:  return "Road";
+        default: return "Highway";
+    }
+}
+
 // A square icon button: an ImGui::Button frame with a glyph drawn over it and a
 // hover tooltip (Ben's call: icons, text only on hover). Disabled buttons dim the
 // glyph and show the reason. Returns true only on an enabled click.
@@ -648,11 +674,22 @@ void draw_tile_selection(world& w, ui_state& ui)
         ImGui::SetCursorScreenPos({hc.x + ir * 2.0f + style.ItemSpacing.x, hc.y});
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
                            "Tile [%d, %d]", tile.grid_x, tile.grid_y);
-        ImGui::SameLine(avail - frame_h);
-        if (ImGui::Button("x", {frame_h, frame_h}))
-            ui.selection_hidden_for = sel;
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Close");
+
+        // Road tier (BL-184). The three tiers render on the canvas by line weight and
+        // brightness alone, with no key anywhere: roads are always-on terrain rather
+        // than a lens (Ben, BL-147), so the per-lens legend drawer cannot carry them.
+        // Naming the tier here teaches that visual code contextually, at the moment of
+        // interest, without adding permanent chrome. Roadless tiles show nothing.
+        if (const char* tier = road_tier_name(tile.road_level))
+        {
+            ImGui::SameLine();
+            ImGui::TextDisabled("\xc2\xb7 %s", tier);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Road tier: Track (thin) - Road - Highway (thick, bright).\n"
+                                  "A better road moves goods across this tile faster.");
+        }
+
+        // No close button: the band is always open (BL-266).
     }
     ImGui::Separator();
 
@@ -698,15 +735,21 @@ void draw_tile_selection(world& w, ui_state& ui)
         page = std::clamp(page, 0, n - 1);
         const tile_metric& mp = pages[static_cast<std::size_t>(page)];
 
-        // Pager row: ‹  Metric (i/N)  ›  ⌄
+        // Pager row: [prev]  Metric (i/N)  [next]  [full canvas]
         //
         // The band rests EXPANDED-IN-PLACE (Ben, 2026-08-01): its rect is a fixed
         // 260 px that cannot shrink, so a folded one-liner here would spend ~220 px
         // on emptiness — the objection the superseded three-level design raised
-        // against Glance-everywhere. The chevron therefore does not fold this card
-        // away; it opens the same metric FULL SCREEN, where the chart has ten times
-        // the height and can carry its question log (BL-247).
-        const float aw = ImGui::GetContentRegionAvail().x;
+        // against Glance-everywhere. It therefore takes the full-canvas control
+        // alone (BL-265): there is no `⌄` state to reach, because this card is
+        // already expanded. The control opens the same metric on the CANVAS, where
+        // the chart has ten times the height.
+        //
+        // `right` is the row's true right edge, and the pager's next-page button and
+        // the disclosure control are both hung off it — so the control lands in the
+        // same column it occupies on every other surface.
+        const float aw    = ImGui::GetContentRegionAvail().x;
+        const float right = ImGui::GetCursorPosX() + aw;
         ImGui::BeginDisabled(page == 0);
         if (ImGui::ArrowButton("##res_prev", ImGuiDir_Left)) --page;
         ImGui::EndDisabled();
@@ -715,19 +758,18 @@ void draw_tile_selection(world& w, ui_state& ui)
 
         char hdr[64];
         std::snprintf(hdr, sizeof hdr, "%s  (%d/%d)", mp.label.c_str(), page + 1, n);
-        const float name_w = ImGui::CalcTextSize(hdr).x;
+        const float name_w = ui::fit_width(hdr); // BL-215: measured through the shared module
         ImGui::SameLine(std::max(frame_h + style.ItemSpacing.x, (aw - name_w) * 0.5f));
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", hdr);
 
-        ImGui::SameLine(aw - 2.0f * frame_h - style.ItemSpacing.x);
+        ImGui::SameLine(right - 2.0f * frame_h - style.ItemSpacing.x);
         ImGui::BeginDisabled(page == n - 1);
         if (ImGui::ArrowButton("##res_next", ImGuiDir_Right)) ++page;
         ImGui::EndDisabled();
         if (ImGui::IsItemHovered() && page < n - 1)
             ImGui::SetTooltip("Next");
 
-        ImGui::SameLine(aw - frame_h);
-        fold_chevron(ui, detail_surface::selection_metric, page);
+        disclosure_controls(ui, detail_surface::selection_metric, page, /*in_place=*/false);
 
         // The current page's graph, filling the rest of the container. Deposited
         // resources are click-drillable into their time series (BL-196);
@@ -797,15 +839,18 @@ void draw_tile_selection(world& w, ui_state& ui)
         bool any_placeable = false;
         for (const resource_type er : placement_rules::k_extractable)
             if (tile.resource_deposit[static_cast<std::size_t>(er)] > 0.0f &&
-                placement_rules::can_place_in_world(w, sel, building_type::extraction_site, er).ok())
+                placement_rules::can_place_in_world(w, sel, building_type::extraction_site, er,
+                                                   ui.max_logistics_reach).ok())
             { any_placeable = true; break; }
         if (!any_placeable)
         {
             for (const building_type bt : {building_type::processing_facility,
                                            building_type::port,
                                            building_type::launchpad,
-                                           building_type::inland_logistics_hub})
-                if (placement_rules::can_place_in_world(w, sel, bt, resource_type::iron_ore).ok())
+                                           building_type::inland_logistics_hub,
+                                           building_type::military_base})
+                if (placement_rules::can_place_in_world(w, sel, bt, resource_type::iron_ore,
+                                                       ui.max_logistics_reach).ok())
                 { any_placeable = true; break; }
         }
 
@@ -843,8 +888,7 @@ void draw_tile_selection(world& w, ui_state& ui)
                              glyph_gear) &&
             bld_here != null_entity)
         {
-            ui.selected_entity      = bld_here;
-            ui.selection_hidden_for = null_entity;
+            ui.selected_entity = bld_here;
         }
 
         tile_icon_button("##act_history", bsz, /*enabled=*/false,
@@ -861,401 +905,6 @@ void draw_tile_selection(world& w, ui_state& ui)
     }
 }
 
-// --- The building Selection element (Ben's 2026-07-22 review) ----------------
-// The old card showed four numbers and a Net line, and nothing else — Ben's verdict
-// was that the screen is useless. The four questions it now answers, in his words:
-// how profitable is this building; what can I do to make it more profitable; how
-// many more of this can I build; how do I remove it and build something else.
-//
-// Output leads, not profit (his call). Profit is a consequence you read second; the
-// physical fact of what the thing is producing, and whether that is anywhere near
-// what it could produce, is what you act on.
-
-/// The primary output resource of a recipe — the argmax of its outputs. Tags a
-/// production method with a resource pip. (construction_panel.cpp keeps its own
-/// copy for the Buildings-tab combo; both are three lines over the same array.)
-resource_type primary_output_resource(const recipe& r)
-{
-    std::size_t best = 0;
-    float best_v = -1.0f;
-    for (std::size_t i = 0; i < resource_count; ++i)
-        if (r.outputs[i] > best_v) { best_v = r.outputs[i]; best = i; }
-    return static_cast<resource_type>(best);
-}
-
-/// Whether this building type produces anything on the economy tick. Ports,
-/// logistics hubs and launchpads are passive infrastructure — economy_system runs
-/// extraction and processing only, so the rest have no output, no recipe and no
-/// report row. Showing them an output figure would invent one (a port would read
-/// "0.0 Iron Ore / tick" purely because iron ore is the default target).
-bool produces_output(building_type t)
-{
-    return t == building_type::extraction_site ||
-           t == building_type::processing_facility;
-}
-
-/// The building's own report row from the last economy step, or nullptr if it did
-/// not appear (never ticked, or built since).
-const building_report* report_row_for(const economy_report& report, entity_id id)
-{
-    for (const building_report& br : report.buildings)
-        if (br.building == id)
-            return &br;
-    return nullptr;
-}
-
-/// Output the building would credit this tick at a 100 % workforce target with no
-/// labour contention — the ceiling its realised output is read against.
-///
-/// Derived from the same constants the economy tick uses (economy_system.cpp
-/// run_extraction / run_processing) rather than an independent guess, so the ratio
-/// means something: below 1 is contention, depletion taper, or a missing input;
-/// above 1 is a workforce target pushed past nominal.
-float output_ceiling(const world& w, const recipe_registry& reg,
-                     const building_component& b)
-{
-    const float base = reg.economics(b.type).base_rate;
-
-    if (b.type == building_type::extraction_site)
-    {
-        const auto tit = w.tiles.find(b.tile);
-        if (tit == w.tiles.end())
-            return 0.0f;
-        const tile_component& tc = tit->second;
-        const float richness = tc.resource_deposit[static_cast<std::size_t>(b.target_resource)];
-        return base * richness * b.workforce_assigned * (1.0f - tc.hazard_level);
-    }
-
-    if (b.type == building_type::processing_facility)
-    {
-        const recipe* rcp = reg.get_recipe(b.recipe);
-        if (rcp == nullptr)
-            return 0.0f;
-        // Report output_quantity sums a processor's outputs, so the ceiling has to
-        // be in the same units: batches at nominal x the units one batch yields.
-        float per_batch = 0.0f;
-        for (std::size_t i = 0; i < resource_count; ++i)
-            per_batch += rcp->outputs[i];
-        return base * b.workforce_assigned * per_batch;
-    }
-
-    return 0.0f; // ports / hubs are passive infrastructure — no L3 production
-}
-
-/// One-line verdict on what the building is doing, and why it isn't doing more.
-/// Returns the colour to print it in via @p col.
-const char* production_status(const building_component& b,
-                              const building_report* row, ImU32& col)
-{
-    if (b.decommissioned) { col = palette::neutral;  return "Idled - producing nothing"; }
-    if (row == nullptr)   { col = palette::neutral;  return "No data yet - run an economy quarter"; }
-    if (row->exhausted)   { col = palette::negative; return "Deposit exhausted"; }
-    if (row->idle)        { col = palette::negative; return "Idle - unstaffed or misconfigured"; }
-    if (row->has_limiting)
-    {
-        col = palette::negative;
-        return "Input-limited";
-    }
-    col = palette::positive;
-    return "Active";
-}
-
-void draw_building_selection(world& w, const recipe_registry& reg,
-                             const economy_report& report, ui_state& ui)
-{
-    const entity_id sel = ui.selected_entity;
-    const auto bit = w.buildings.find(sel);
-    if (bit == w.buildings.end())
-    {
-        ImGui::TextDisabled("\xe2\x80\x94");
-        return;
-    }
-    building_component& b = bit->second;
-
-    const ImGuiStyle& style     = ImGui::GetStyle();
-    ImDrawList*       dl        = ImGui::GetWindowDrawList();
-    const float       content_w = ImGui::GetContentRegionAvail().x;
-    const float       frame_h   = ImGui::GetFrameHeight();
-
-    // ── Under construction: nothing to operate yet, so the build status IS the
-    //    panel. Showing dials for a building that does not exist yet is noise. ──
-    if (b.ticks_remaining > 0)
-    {
-        const float rate = construction_rate(w, reg, b.type, b.tile);
-        ImGui::TextColored(construction_status_colour(rate), "%s",
-                           construction_status(rate, b.ticks_remaining).c_str());
-        ImGui::Spacing();
-        ImGui::TextDisabled("Controls unlock when construction completes.");
-        return;
-    }
-
-    const building_report* row = report_row_for(report, sel);
-
-    // ── (1) Output & rate — the lead. Passive infrastructure has no output to
-    //    lead with, so it says what it is instead of printing a hollow zero. ──
-    if (!produces_output(b.type))
-    {
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::neutral),
-                           "Infrastructure - produces nothing directly");
-        ImGui::TextDisabled("It earns through what it enables, not what it makes.");
-    }
-    else
-    {
-        // What it makes: the extraction target, or the recipe's primary output.
-        resource_type made = b.target_resource;
-        if (b.type == building_type::processing_facility)
-            if (const recipe* rcp = reg.get_recipe(b.recipe); rcp != nullptr)
-                made = primary_output_resource(*rcp);
-
-        const float produced = (row != nullptr) ? row->output_quantity : 0.0f;
-        const float ceiling  = output_ceiling(w, reg, b);
-
-        // Big figure + resource pip, the one number worth reading at a glance.
-        const ImVec2 p   = ImGui::GetCursorScreenPos();
-        const float  pip = frame_h * 0.34f;
-        icons::resource(dl, {p.x + pip, p.y + frame_h * 0.5f}, pip, made);
-        ImGui::Dummy({pip * 2.0f + 6.0f, frame_h});
-        ImGui::SameLine();
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
-                           "%.1f %s / qtr", produced, presentation_of(made).name);
-
-        // Rate against the uncontended nominal ceiling, as a bar plus its percentage.
-        if (ceiling > 0.0f)
-        {
-            const float frac = produced / ceiling;
-            const ImVec2 bp  = ImGui::GetCursorScreenPos();
-            const float  bh  = frame_h * 0.42f;
-            const float  bw  = content_w;
-            dl->AddRectFilled(bp, {bp.x + bw, bp.y + bh}, IM_COL32(52, 52, 58, 255), 2.0f);
-            // A target above 100 % can push past nominal, so the bar clamps at full
-            // while the printed percentage keeps telling the truth.
-            const float fill_frac = frac > 1.0f ? 1.0f : frac;
-            const ImU32 bar_col = (frac >= 0.98f) ? palette::positive
-                                : (frac >= 0.50f) ? palette::neutral
-                                                  : palette::negative;
-            dl->AddRectFilled(bp, {bp.x + bw * fill_frac, bp.y + bh}, bar_col, 2.0f);
-            ImGui::Dummy({bw, bh});
-            ImGui::TextDisabled("%.0f%% of nominal (%.1f)", frac * 100.0f, ceiling);
-        }
-
-        ImU32 scol = palette::neutral;
-        const char* status = production_status(b, row, scol);
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(scol), "%s", status);
-        // Name the binding input rather than just flagging that one exists — the
-        // whole point of the line is telling the player what to go fix.
-        if (row != nullptr && row->has_limiting && !b.decommissioned)
-        {
-            ImGui::SameLine();
-            ImGui::TextDisabled("(%s)", presentation_of(row->limiting_input).name);
-        }
-    }
-
-    ImGui::Spacing();
-    ImGui::Separator();
-
-    // ── (2) Profitability — the consequence. ──
-    draw_building_profit(w, reg, report, sel);
-
-    ImGui::Spacing();
-    ImGui::Separator();
-
-    // ── (3) Production method — the first lever on profitability. Nothing to
-    //    choose on a building that produces nothing, so the section is absent
-    //    rather than present-and-empty. ──
-    if (produces_output(b.type))
-    {
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Production method");
-        const int   n_recipes = reg.recipe_count(b.type);
-        const float pipr      = ImGui::GetFontSize() * 0.42f;
-        const auto  method_res = [&](int i) -> resource_type {
-            if (b.type == building_type::extraction_site) return b.target_resource;
-            return primary_output_resource(reg.recipe_at(b.type, i));
-        };
-
-        if (n_recipes >= 1)
-        {
-            b.active_recipe_index = std::clamp(b.active_recipe_index, 0, n_recipes - 1);
-            const recipe& cur     = reg.recipe_at(b.type, b.active_recipe_index);
-            const char*   preview = cur.name.empty() ? "-" : cur.name.c_str();
-
-            const ImVec2 gp = ImGui::GetCursorScreenPos();
-            icons::resource(dl, {gp.x + pipr, gp.y + frame_h * 0.5f}, pipr,
-                            method_res(b.active_recipe_index));
-            ImGui::Dummy({pipr * 2.0f + 6.0f, frame_h});
-            ImGui::SameLine();
-            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-            if (ImGui::BeginCombo("##sel_method", preview))
-            {
-                ImDrawList* pdl = ImGui::GetWindowDrawList(); // the popup's own list
-                for (int i = 0; i < n_recipes; ++i)
-                {
-                    const recipe& ri  = reg.recipe_at(b.type, i);
-                    const bool    on  = (i == b.active_recipe_index);
-                    const ImVec2  ip  = ImGui::GetCursorScreenPos();
-                    const std::string lbl = std::string("     ") + (ri.name.empty() ? "-" : ri.name);
-                    if (ImGui::Selectable(lbl.c_str(), on))
-                    {
-                        b.active_recipe_index = i;
-                        b.recipe = reg.recipe_id(ri.name);
-                    }
-                    icons::resource(pdl, {ip.x + pipr + 2.0f,
-                                          ip.y + ImGui::GetTextLineHeight() * 0.5f},
-                                    pipr, method_res(i));
-                    if (on)
-                        ImGui::SetItemDefaultFocus();
-                }
-                ImGui::EndCombo();
-            }
-        }
-        else
-            ImGui::TextDisabled("Single method - nothing to switch");
-
-        ImGui::Spacing();
-    }
-
-    // ── (4) Workforce — the second lever. Auto (BL-181) owns the dial unless the
-    //    player takes it; moving the slider is itself the act of taking it. ──
-    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Workforce");
-    {
-        bool  autos = b.workforce_auto;
-        if (ImGui::Checkbox("Auto##sel_wf_auto", &autos))
-            b.workforce_auto = autos;
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Solve the target each quarter for maximum profit.");
-
-        ImGui::SameLine();
-        ImGui::BeginDisabled(b.workforce_auto);
-        int target = b.workforce_target;
-        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-        if (ImGui::SliderInt("##sel_wf", &target, 0, 200, "%d%% of nominal"))
-        {
-            b.workforce_target = target;
-            b.workforce_auto   = false; // a manual move pins the dial
-        }
-        ImGui::EndDisabled();
-
-        // ── BL-179: the habitability→workforce reason, where the player decides.
-        //    The slider says what was ASKED for; this says what the body actually
-        //    ALLOWS, and why. The chain is target → assigned → x contention →
-        //    effective, and contention is set by the corp's labour demand against
-        //    a pool that habitability sizes (POPULATION.md § Workforce model).
-        //    Phrasing comes from the shared ui::fmt::labour_contention helper, so
-        //    this and the Economy panel's staffing table are the same ceiling in
-        //    the same words - the "one consistent story" BL-179 requires.
-        const auto tile_it = w.tiles.find(b.tile);
-        if (tile_it != w.tiles.end())
-        {
-            const entity_id body = tile_it->second.body;
-            const entity_id corp = owner_corp_of(w, sel);
-            const auto      cit  = report.workforce_contention.find({corp, body});
-            const float     scal = (cit != report.workforce_contention.end()) ? cit->second : 1.0f;
-            const std::string shortfall = fmt::labour_contention(scal);
-
-            if (!shortfall.empty())
-            {
-                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative),
-                                   "Body allows %s", shortfall.c_str());
-                const auto hit = report.body_habitability.find(body);
-                if (hit != report.body_habitability.end())
-                {
-                    ImGui::SameLine();
-                    ImGui::TextDisabled("- habitability %.2f", hit->second);
-                }
-                if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip(
-                        "Your labour demand on this body exceeds the workforce pool,\n"
-                        "so every building you own here is throttled by the same\n"
-                        "fraction. The pool is sized by population and habitability -\n"
-                        "raising the target asks for labour that is not there.");
-            }
-        }
-    }
-
-    ImGui::Spacing();
-    ImGui::Separator();
-
-    // ── (5) How many more of this can I build here (Ben's question C). Buildings
-    //    stack on a tile up to a ceiling the deposit sets — see
-    //    placement_rules::stack_capacity, which the placement gate reads too, so
-    //    this readout and what construction actually permits cannot drift. ──
-    {
-        const auto tit = w.tiles.find(b.tile);
-        if (tit != w.tiles.end())
-        {
-            const int cap  = placement_rules::stack_capacity(tit->second, b.type, b.target_resource);
-            const int here = placement_rules::buildings_on_tile(w, b.tile, b.type, b.target_resource);
-            const int more = (cap > here) ? cap - here : 0;
-
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "On this tile");
-            ImGui::Text("%d of %d", here, cap);
-            ImGui::SameLine();
-            if (more > 0)
-                ImGui::TextDisabled("- room for %d more", more);
-            else
-                ImGui::TextDisabled("- tile is at capacity");
-
-            ImGui::BeginDisabled(more <= 0);
-            if (ImGui::Button("Build another here", {content_w, frame_h * 1.4f}))
-            {
-                ui.construction.pending_tile   = b.tile;
-                ui.construction.pending_type   = b.type;
-                ui.construction.pending_target = b.target_resource;
-            }
-            ImGui::EndDisabled();
-            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-                ImGui::SetTooltip("The stack ceiling is provisional - the rule for how "
-                                  "richness sets it is not settled yet.");
-        }
-    }
-
-    ImGui::Spacing();
-
-    // ── (6) Stop / remove. Two different acts, kept visibly different: idling is
-    //    reversible and keeps the asset (wages stop, material upkeep continues);
-    //    demolition frees the tile and refunds nothing. Demolish therefore asks. ──
-    {
-        const float bw = (content_w - style.ItemSpacing.x) * 0.5f;
-
-        if (b.decommissioned)
-        {
-            if (ImGui::Button("Resume##sel_idle", {bw, frame_h * 1.4f}))
-                b.decommissioned = false;
-        }
-        else
-        {
-            if (ImGui::Button("Idle##sel_idle", {bw, frame_h * 1.4f}))
-                b.decommissioned = true;
-        }
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip(b.decommissioned
-                ? "Put it back to work."
-                : "Stop production and wages. Keeps the building and its tile.");
-
-        ImGui::SameLine();
-        if (ImGui::Button("Demolish##sel_demolish", {bw, frame_h * 1.4f}))
-            ImGui::OpenPopup("##sel_demolish_confirm");
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Remove it and free the tile. No refund.");
-
-        if (ImGui::BeginPopup("##sel_demolish_confirm"))
-        {
-            ImGui::TextUnformatted("Demolish this building?");
-            ImGui::TextDisabled("The tile is freed. The build cost is not returned.");
-            ImGui::Spacing();
-            if (ImGui::Button("Demolish", {110.0f, 0.0f}))
-            {
-                // Deferred: app executes it against the mutable world after the
-                // draw completes (erasing here would invalidate this iteration).
-                ui.construction.pending_demolish = sel;
-                ImGui::CloseCurrentPopup();
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("Cancel", {110.0f, 0.0f}))
-                ImGui::CloseCurrentPopup();
-            ImGui::EndPopup();
-        }
-    }
-}
 
 } // namespace
 
@@ -1264,8 +913,9 @@ void draw_selection_content(world& w, const recipe_registry& reg,
 {
     const selection_kind kind = selection_kind_of(w, ui.selected_entity);
 
-    // Nothing valid selected — draw nothing. (The card frame owns the open/hidden
-    // gate on selection_hidden_for; this content function only draws the entity.)
+    // Nothing valid selected — draw nothing. (The band frame never lets this
+    // happen: with no valid selection it substitutes the player corporation
+    // before calling here, BL-266. This guard covers other callers only.)
     if (kind == selection_kind::none)
         return;
 
@@ -1306,32 +956,25 @@ void draw_selection_content(world& w, const recipe_registry& reg,
             ImGui::TextDisabled("%s", kname);
         }
 
-        // Right-align the two chrome buttons at the content region's right edge.
+        // Right-align the 'go to' button at the content region's right edge.
         // bar_w is the available content width (padding already excluded), so the
         // offset is measured from the content-left, no WindowPadding term needed.
+        // No close button: the band is always open (BL-266).
         const float btn = frame_h;
-        ImGui::SameLine(bar_w - 2.0f * btn - style.ItemSpacing.x);
+        ImGui::SameLine(bar_w - btn);
         if (ImGui::Button(">", {btn, btn}))
             focus_on_entity(w, ui, ui.selected_entity);
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Go to");
-        ImGui::SameLine();
-        if (ImGui::Button("x", {btn, btn}))
-            ui.selection_hidden_for = ui.selected_entity;
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Close");
     }
 
     ImGui::Separator();
 
-    // A selected player building takes its own vertical layout (Ben's 2026-07-22
-    // review: the old four-numbers card "is useless"). Rival buildings stay on the
-    // action|facts split — intel only, nothing to operate.
-    if (kind == selection_kind::building && is_player_owned(w, ui.selected_entity))
-    {
-        draw_building_selection(w, reg, report, ui);
-        return;
-    }
+    // A selected player building used to BYPASS this layout and render the full
+    // management view as its card (2026-07-22). Reversed 2026-08-08 (Ben: "selection
+    // of a building skips the selection menu, going straight to manage. This is a
+    // bug.") — a building now takes the same action|facts Selection view as every
+    // other kind, with an explicit Manage action routing to the management ledger.
 
     // ── Action (left, dominant) │ Facts (right, muted) ──
     const float content_w = bar_w;
@@ -1485,7 +1128,9 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
         building_profit profit;
         float           capex    = 0.0f; ///< build_cost + materials at the local market.
         bool            produces = false; ///< Extraction/processing earn directly; infrastructure does not.
-        int             group    = 0;    ///< Sort band: 0 = ranked, 1 = valid unranked, 2 = invalid.
+        int             group    = 0;    ///< Render band: 0 = ranked/priced, 1 = valid unranked, 2 = invalid.
+        std::string     category;        ///< Fold group (BL-326): Extraction / Processing / Infrastructure / Military.
+        float           material_rate = 1.0f; ///< construction_rate at this tile (BL-328 pre-commit warning).
     };
     std::vector<candidate> cands;
     for (const resource_type er : placement_rules::k_extractable)
@@ -1508,11 +1153,24 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
     cands.push_back({building_type::port,                 resource_type::iron_ore, "Port"});
     cands.push_back({building_type::launchpad,            resource_type::iron_ore, "Launchpad"});
     cands.push_back({building_type::inland_logistics_hub, resource_type::iron_ore, "Inland Logistics Hub"}); // BL-149
+    cands.push_back({building_type::military_base,        resource_type::iron_ore, "Military Base"});        // BL-325 S1
+
+    // BL-326: fold group by building family — Ben rejected the profit-ranked flat list
+    // for named, expandable groups. Assigned by type rather than parsed from the display
+    // name, so a future rename of "Extraction: X" can't silently drop a row into the
+    // wrong group.
+    for (candidate& c : cands)
+        c.category = (c.type == building_type::extraction_site)     ? "Extraction"
+                    : (c.type == building_type::processing_facility) ? "Processing"
+                    : (c.type == building_type::military_base)       ? "Military"
+                                                                      : "Infrastructure";
 
     for (candidate& c : cands)
     {
         const building_economics& econ = reg.economics(c.type);
-        c.pr = placement_rules::can_place_in_world(w, tile_id, c.type, c.target);
+        c.pr = placement_rules::can_place_in_world(w, tile_id, c.type, c.target,
+                                                  ui.max_logistics_reach);
+        c.material_rate = construction_rate(w, reg, c.type, tile_id); // BL-328 pre-commit warning
 
         // Capex is the figure construction.cpp actually gates on: build cost PLUS the
         // materials priced at the local market. This ledger used to gate on build_cost
@@ -1531,17 +1189,16 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
                                                          : 1;
     }
 
-    // Ranked candidates first, by expected net descending; then valid infrastructure
-    // (and anything the market cannot price); then the unbuildable, which keep their
-    // reason text because that vocabulary is the ledger's teaching surface. stable_sort
-    // with a declaration-order tie-break keeps the order frame-stable and deterministic.
+    // Two-tier alphabetical (BL-326): group name, then row name — Ben's explicit call
+    // against the old profit-ranked flat list ("not most profit first"). A refused
+    // candidate stays in its group rather than dropping out, so the reason text (the
+    // ledger's teaching surface) is still visible under its fold. stable_sort with a
+    // declaration-order tie-break keeps ties frame-stable and deterministic.
     std::stable_sort(cands.begin(), cands.end(),
                      [](const candidate& a, const candidate& b) {
-                         if (a.group != b.group)
-                             return a.group < b.group;
-                         if (a.group != 0)
-                             return false;
-                         return a.profit.net() > b.profit.net();
+                         if (a.category != b.category)
+                             return a.category < b.category;
+                         return a.name < b.name;
                      });
 
     // One ceiling shared across the whole list, so the bars compare directly. Only the
@@ -1571,11 +1228,14 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
                        "the bar; see payback.");
     ImGui::PopStyleColor();
 
-    // Four lines per candidate: name / cost + payback / profit bar / action.
+    // Five lines per candidate: name / cost + payback / supply warning (BL-328,
+    // reserved unconditionally so a warning row never clips against a fixed-height
+    // sibling that lacks one) / profit bar / action.
     constexpr float bar_h = 14.0f;
     const float     row_h = style.WindowPadding.y * 2.0f
                           + ImGui::GetTextLineHeightWithSpacing()       // name
                           + ImGui::GetTextLineHeightWithSpacing()       // cost + payback
+                          + ImGui::GetTextLineHeightWithSpacing()       // supply warning (blank if none)
                           + std::max(bar_h, ImGui::GetTextLineHeight()) // profit bar or its text
                           + style.ItemSpacing.y
                           + ImGui::GetFrameHeight();                    // Build / reason
@@ -1586,8 +1246,24 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
 
     ImGui::BeginChild("##build_list", {0.0f, 0.0f}, false,
                       ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysVerticalScrollbar);
+    // BL-326: candidates are pre-sorted category-then-name, so each category's rows are
+    // contiguous — walk the list opening a TreeNodeEx (this file's existing fold idiom,
+    // e.g. economy_panel.cpp) whenever the category changes, and close it once its rows
+    // are drawn. Defaulted open, matching the fold usage elsewhere in the UI.
+    std::string open_category;
+    bool        category_open = false;
     for (const candidate& c : cands)
     {
+        if (c.category != open_category)
+        {
+            if (category_open)
+                ImGui::TreePop();
+            open_category = c.category;
+            category_open = ImGui::TreeNodeEx(open_category.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
+        }
+        if (!category_open)
+            continue;
+
         const bool affordable = balance >= c.capex;
 
         ImGui::BeginChild(c.name.c_str(), {0.0f, row_h}, true,
@@ -1618,6 +1294,22 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
                     : " - payback ~" + std::to_string(static_cast<int>(pb)) + " qtrs";
         }
         ImGui::TextDisabled("%s", cost.c_str());
+
+        // Pre-commit material-supply warning (BL-328): the same construction_rate the
+        // in-progress building card reads, checked before the player commits capex —
+        // "will this stall" answered up front instead of via a post-hoc paused status.
+        // Gated on c.pr.ok(): an already-invalid tile (ocean, wrong deposit, ...) shows
+        // ITS reason below and needs no second, redundant warning stacked on top. The
+        // line always occupies its row_h slot (blank when there is nothing to say) so
+        // rows stay a uniform height rather than the sibling below clipping into it.
+        if (c.pr.ok() && c.material_rate <= 0.0f)
+            ImGui::TextColored(construction_status_colour(0.0f), "%s",
+                               "No local supply - build will stall");
+        else if (c.pr.ok() && c.material_rate < 1.0f)
+            ImGui::TextColored(construction_status_colour(c.material_rate), "%s",
+                               "Supply-limited - will stretch");
+        else
+            ImGui::Dummy({0.0f, ImGui::GetTextLineHeight()});
 
         // Profit row — exactly one of three states.
         if (c.group == 0)
@@ -1666,6 +1358,39 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
 
         ImGui::EndChild();
         ImGui::Spacing();
+    }
+    if (category_open)
+        ImGui::TreePop();
+
+    // Hire (BL-324) — the campaign roster gated on the player corp's OWN
+    // stockpile/market access (unit_roster.hpp), not this tile's deposit or
+    // placement rules; the tile is only where the raised unit is sited. Beside
+    // Build rather than folded into it: hiring never touches building slots or
+    // terrain validity, so it does not belong in the candidate loop above.
+    {
+        const auto& table = unit_roster_table();
+        const auto  avail = available_rows(w, w.player_entity, campaign_roster_band);
+        if (!avail.empty())
+        {
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Hire");
+            ImGui::BeginChild("##hire_list", {0.0f, row_h * std::min<std::size_t>(avail.size(), 3)},
+                              false, ImGuiWindowFlags_NoSavedSettings);
+            for (const roster_row* row : avail)
+            {
+                const auto idx = static_cast<std::uint16_t>(row - table.data());
+                ImGui::PushID(static_cast<int>(idx));
+                ImGui::TextUnformatted(row->name);
+                ImGui::SameLine(bar_w - style.WindowPadding.x - 70.0f);
+                if (ImGui::Button("Hire", {60.0f, 0.0f}))
+                {
+                    ui.construction.pending_hire_tile      = tile_id;
+                    ui.construction.pending_hire_unit_type = idx;
+                }
+                ImGui::PopID();
+            }
+            ImGui::EndChild();
+            ImGui::Spacing();
+        }
     }
 
     // Road placement (BL-147 core, BL-172 tier ladder) — a per-tile mutation, not a building, so

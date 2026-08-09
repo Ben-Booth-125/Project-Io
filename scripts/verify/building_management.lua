@@ -6,7 +6,7 @@ verify.show_panel("economy", false)
 verify.show_panel("construction", true)
 
 -- Navigate to a body with buildings so the building detail section populates
-verify.goto_surface("Kepler")
+verify.goto_surface("home")
 verify.capture("building_management_panel")
 
 -- Show a close-up of a player building to confirm on-canvas marker convention

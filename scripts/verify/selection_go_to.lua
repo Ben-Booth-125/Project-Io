@@ -17,10 +17,10 @@ verify.capture("go_to_00_kepler_home")
 
 -- A different planet: must now land on its Planetary surface, not Cinder's
 -- circumplanetary view. This is the case the old dispatch got wrong.
-verify.go_to("Cinder")
+verify.go_to("inner")
 verify.capture("go_to_01_cinder_planet")
 
 -- A moon: focus_on_entity resolves a moon through focus_on_surface too, so 'go to'
 -- lands on Selene's own tile surface.
-verify.go_to("Selene")
+verify.go_to("moon")
 verify.capture("go_to_02_selene_moon")

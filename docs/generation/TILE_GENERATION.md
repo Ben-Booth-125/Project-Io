@@ -86,6 +86,11 @@ hand-authored values — 23 of 24 fields reproduce exactly (`PLANETOLOGY.md`
 § Implementation) — so this table now serves as the regression reference the
 harness asserts against, not as authored constants.
 
+> **The names in this table are slot labels, not in-game names (BL-257).** Body names are
+> generated per seed — see `PLANETOLOGY.md` § Body naming. "Cinder" here means "the hot inner
+> planet", the prototype slot; the world the player sees calls it something coined. Nothing in
+> code may test a body's name to decide which body it is.
+
 | Body | `temperature_class` | `atmosphere_class` | `hydrological_state` | `geological_activity` | `water_fraction` | `composition_bias` |
 |---|---|---|---|---|---|---|
 | Cinder | `scorching` | `none` | `none` | `low` | 0.0 | `standard` |

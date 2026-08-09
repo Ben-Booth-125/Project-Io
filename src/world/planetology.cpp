@@ -1,5 +1,6 @@
 #include "planetology.hpp"
 
+#include "body_names.hpp" // the generated catalogue the preview must quote (BL-257)
 #include "star_map.hpp"
 
 #include <algorithm>
@@ -418,9 +419,14 @@ void preview_system(const planetology_params& p, float home_orbit_au, uint32_t s
 {
     out.clear();
     out.reserve(static_cast<std::size_t>(k_prototype_count));
+    // The generated catalogue, not the table's placeholder literals (BL-257) —
+    // the chain quotes the body's name in the biography lines it emits, and the
+    // preview must describe the world the player will actually get.
+    const body_naming naming = generate_body_names(seed);
     for (int i = 0; i < k_prototype_count; ++i)
     {
         body_inputs in = k_prototypes[i].in;
+        in.name = naming.bodies[static_cast<std::size_t>(i)].c_str();
         // The homeworld's orbit is derived from the star, so the preview has to
         // use it too — otherwise the charts describe a world at 1 AU that the
         // generator never builds.

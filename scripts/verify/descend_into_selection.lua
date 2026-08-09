@@ -7,11 +7,11 @@
 -- descend: the final frame must be Cinder's Planetary surface, not Kepler's and
 -- not the Circumplanetary rung.
 
-verify.goto_surface("Kepler")   -- active_body = Kepler, on Planetary
+verify.goto_surface("home")   -- active_body = Kepler, on Planetary
 verify.command("ascend")        -- -> Circumplanetary
 verify.command("ascend")        -- -> Solar (active_body still Kepler)
 verify.capture("descend_sel_solar")
 
-verify.select_body("Cinder")    -- single-click-select a different body
+verify.select_body("inner")    -- single-click-select a different body
 verify.command("descend")       -- selection-aware dive into Cinder's surface
 verify.capture("descend_sel_planetary")

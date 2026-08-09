@@ -243,4 +243,6 @@ void generate_roads(world& w, entity_id body)
     // (the "invalidated when road_level changes" contract, world.hpp). The raster
     // index is road-independent and stays. Generation-time, so clearing all is cheap.
     w.astar_cost_cache.clear();
+    // Roads change traversal cost, so they change reach too (BL-323 S2).
+    w.body_reach_cost.clear();
 }

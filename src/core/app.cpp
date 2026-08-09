@@ -21,10 +21,12 @@
 #include "ui/chat_panel.hpp"
 #include "ui/fonts.hpp"
 #include "ui/generation_charts.hpp" // the shared chain-stage charts (BL-211)
+#include "ui/generation_preview.hpp" // the wizard's painted right pane
 #include "ui/format.hpp"
 #include "ui/frame_stats.hpp" // frame-budget HUD (BL-249, v0.1.0 quality audit)
 #include "ui/header_panel.hpp"
 #include "ui/foldout_column.hpp" // shell_column_width — permanent left shell column (BL-122)
+#include "ui/shell_metrics.hpp"  // the shell's rect algebra, one owner (BL-216)
 #include "ui/nav_pane.hpp"
 #include "ui/overlay.hpp"
 #include "ui/presentation.hpp"
@@ -35,6 +37,7 @@
 #include "ui/solar_system_canvas.hpp"
 #include "ui/star_map_view.hpp"
 #include "ui/tech_tree_panel.hpp"
+#include "ui/text_fit.hpp" // overflow ledger + verify.clipping bindings (BL-215)
 #include "ui/tile_inspector.hpp"
 #include "ui/view_nav.hpp"
 #include "world/budget_system.hpp"
@@ -44,6 +47,8 @@
 #include "world/placement_rules.hpp"
 #include "world/survey_system.hpp"
 #include "world/hard_coded_world.hpp"
+
+#include <chrono> // poll_wizard_surface's zero-wait future probe
 #include "world/logistics.hpp"
 #include "world/market_clearing.hpp"
 #include "world/orbital_system.hpp"
@@ -213,12 +218,47 @@ resource_type resource_from_name(const std::string& s)
     return it != m.end() ? it->second : resource_type::iron_ore;
 }
 
-/// Find a body by case-insensitive name, or the home body for "home". Returns
+/// Find a body by ROLE, or failing that by case-insensitive name. Returns
 /// null_entity when no match is found.
+///
+/// The roles are the stable handle (BL-257): body names are generated per seed,
+/// so a verify script naming a body by its display string would break the moment
+/// the seed changed. Every script should use a role; the name path remains for
+/// interactive/ad-hoc use.
+///
+///   home     - the homeworld
+///   star     - the central star
+///   moon     - the lowest-id moon of the homeworld
+///   asteroid - the lowest-id asteroid
+///   inner    - the innermost planet that is not the homeworld
 entity_id find_body(const world& w, const std::string& name)
 {
     if (name == "home")
         return w.home_body;
+    if (name == "star")
+        return w.star_body;
+    if (name == "moon" || name == "asteroid" || name == "inner")
+    {
+        entity_id best = null_entity;
+        float     best_orbit = 0.0f;
+        for (const auto& [id, body] : w.bodies)
+        {
+            const bool match =
+                  (name == "moon")     ? (body.type == body_type::moon && body.parent == w.home_body)
+                : (name == "asteroid") ? (body.type == body_type::asteroid)
+                                       : (body.type == body_type::planet && id != w.home_body);
+            if (!match) continue;
+            // Lowest id wins for moon/asteroid (creation order is deterministic);
+            // "inner" wants the smallest orbit, which is the meaningful ordering.
+            if (best == null_entity
+                || (name == "inner" ? body.orbital_radius_au < best_orbit : id < best))
+            {
+                best = id;
+                best_orbit = body.orbital_radius_au;
+            }
+        }
+        return best;
+    }
     auto lower = [](std::string v) {
         for (char& c : v) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
         return v;
@@ -238,6 +278,13 @@ app::app()
         throw std::runtime_error(std::string("SDL_Init failed: ") + SDL_GetError());
 
     m_window   = SDL_CreateWindow("Project Io", window_w, window_h, SDL_WINDOW_RESIZABLE);
+
+    // BL-215 display contract: the smallest supported display is 1280x720 at UI
+    // scale 1.0x (DEVELOPMENT_PRACTICES.md § Display environment). Below it the
+    // shell fails soft (zero-width Selection band, header early-out), so the OS
+    // is told not to go there. apply_ui_scale re-applies this scaled by the
+    // active UI-scale step.
+    SDL_SetWindowMinimumSize(m_window, 1280, 720);
 
     // Dev-machine preference (2026-07-06): Ben runs a two-monitor setup and wants
     // the game on the secondary display, keeping the primary free. Pick the first
@@ -294,6 +341,12 @@ app::app()
     // fractional positions moving bodies produce. The renderer backend uploads
     // the atlas on the first NewFrame.
     ui::load_ui_font();
+
+#ifndef NDEBUG
+    // BL-215: the text-overflow ledger records in Debug builds (and always under
+    // --verify, armed in run_verify); off in Release interactive.
+    ui::set_overflow_recording(true);
+#endif
 }
 
 namespace {
@@ -305,6 +358,14 @@ void app::apply_ui_scale()
     const int step = std::clamp(m_settings.ui_scale_step, 0, static_cast<int>(k_ui_scale_px.size()) - 1);
     ui::reload_ui_font(k_ui_scale_px[static_cast<std::size_t>(step)]);
     ImGui_ImplSDLRenderer3_DestroyFontsTexture();
+
+    // The display floor scales with the font (BL-215): BL-063 grows the atlas
+    // without ScaleAllSizes, so the hard-coded px chrome stays at 1.0x while
+    // text grows — at 1.5x the same layout honestly needs 1920x1080.
+    const float s = k_ui_scale_px[static_cast<std::size_t>(step)] / k_ui_scale_px[0];
+    SDL_SetWindowMinimumSize(m_window,
+                             static_cast<int>(1280.0f * s),
+                             static_cast<int>(720.0f * s));
 }
 
 app::~app()
@@ -411,6 +472,9 @@ void app::refresh_wizard_preview()
     // (resolved_world::attempts), which the round surfaces rather than hides.
     m_wiz_resolved = resolve_preferences(m_pending_world_params.preferences,
                                          m_pending_world_params.seed);
+    // The system's coined catalogue for this seed (BL-257) — the wizard must
+    // name the bodies the campaign will actually name them.
+    m_wiz_names = generate_body_names(m_pending_world_params.seed);
     preview_system(m_wiz_resolved.params, m_wiz_resolved.home_orbit_au,
                    m_pending_world_params.seed, m_wiz_preview);
 
@@ -422,6 +486,54 @@ void app::refresh_wizard_preview()
     undrawn.drawdown = 0.0f;
     preview_system(undrawn, m_wiz_resolved.home_orbit_au,
                    m_pending_world_params.seed, m_wiz_undrawn);
+
+    // The globe's real surface. Synchronous under --verify (a capture must never
+    // race the worker); asynchronous in play, marked stale if already in flight.
+    if (!m_golden_dir.empty())
+    {
+        world scratch;
+        const entity_id probe = scratch.create_entity();
+        const auto tiles = generate_home_surface_preview(scratch, probe,
+                                                         m_pending_world_params);
+        m_wiz_surface.resize(tiles.size());
+        for (std::size_t i = 0; i < tiles.size(); ++i)
+            m_wiz_surface[i] = static_cast<uint8_t>(scratch.tiles.at(tiles[i]).composition);
+    }
+    else if (m_wiz_surface_future.valid())
+        m_wiz_surface_stale = true;
+    else
+        launch_wizard_surface_build();
+}
+
+void app::launch_wizard_surface_build()
+{
+    m_wiz_surface_future = std::async(std::launch::async,
+        [params = m_pending_world_params]() {
+            world scratch;
+            const entity_id probe = scratch.create_entity();
+            const auto tiles = generate_home_surface_preview(scratch, probe, params);
+            std::vector<uint8_t> comp(tiles.size());
+            for (std::size_t i = 0; i < tiles.size(); ++i)
+                comp[i] = static_cast<uint8_t>(scratch.tiles.at(tiles[i]).composition);
+            return comp;
+        });
+}
+
+void app::poll_wizard_surface()
+{
+    if (!m_wiz_surface_future.valid())
+        return;
+    if (m_wiz_surface_future.wait_for(std::chrono::seconds(0))
+            != std::future_status::ready)
+        return;
+    m_wiz_surface = m_wiz_surface_future.get();
+    if (m_wiz_surface_stale)
+    {
+        // Preferences moved while that build ran: it is already the wrong
+        // world, so go straight around again with the current params.
+        m_wiz_surface_stale = false;
+        launch_wizard_surface_build();
+    }
 }
 
 void app::start_new_game()
@@ -475,6 +587,19 @@ void app::load_economy()
     m_lua.load("scripts/recipes.lua");
     m_lua.load("scripts/economy.lua");
     m_registry.load_from_lua(m_lua);
+
+    // BL-323 S2b: mirror the reach budget onto ui_state so every placement surface
+    // filters on the same number the authoritative gate uses. Done here, once, right
+    // after the registry is loaded — a surface that filtered on a different budget
+    // would offer tiles construct_building then refuses.
+    m_ui.max_logistics_reach = m_registry.construction().max_logistics_reach;
+
+    // BL-321 Era -1 works table. Loaded here rather than at generation time so a
+    // malformed works.lua fails at startup, alongside every other data-layer
+    // error, instead of midway through world generation. load_from_lua validates
+    // the table and throws; see works_registry.cpp for what it enforces.
+    m_lua.load("scripts/works.lua");
+    m_works.load_from_lua(m_lua);
 
     // BL-087 mock tech/quest tree — display data for the F9 viewer only; no
     // simulation system reads it (the tech system is post-prototype).
@@ -903,6 +1028,11 @@ int app::run_verify(const std::string& script_path, bool bless)
     // screen. A menu-verification script re-enters the menu with verify.show_menu.
     m_screen = app_screen::in_game;
 
+    // BL-215: the text-overflow ledger records unconditionally under --verify,
+    // whatever the build configuration.
+    ui::set_overflow_recording(true);
+    ui::clear_overflows();
+
     // Force the fixed verify capture size (verify_w × verify_h), decoupled from the
     // interactive window default (window_w × window_h) which is now larger. This
     // keeps captures + committed goldens at the 1280×720 standard regardless of the
@@ -1093,6 +1223,10 @@ int app::run_verify(const std::string& script_path, bool bless)
     v.set_function("panel_view", [this](const std::string& name, int view) {
         if (name == "history")            m_ui.history_view = view;
         else if (name == "history_round") m_ui.history_round = view;
+        // The Ages time-lapse is a scrubber, so its YEAR is the thing a capture
+        // needs to park — parking only the view would pin every shot to year 0,
+        // the one frame where no history has happened yet (BL-277).
+        else if (name == "ages_year")     m_ui.ages_year = view;
         else if (name == "economy")       m_ui.economy_view = view;
         else if (name == "market")        m_ui.market_ledger_view = view;
         else if (name == "tech_tree")     m_ui.tech_tree_view = view;
@@ -1114,7 +1248,6 @@ int app::run_verify(const std::string& script_path, bool bless)
         if      (n == "selection_metric") s = detail_surface::selection_metric;
         else if (n == "history_story")    s = detail_surface::history_story;
         else if (n == "history_chain")    s = detail_surface::history_chain;
-        else if (n == "history_tiles")    s = detail_surface::history_tiles;
         else if (n == "generation_stage") s = detail_surface::generation_stage;
         else if (n == "corp_rollup")      s = detail_surface::corp_rollup;
         if (s == detail_surface::none) ui::fold(m_ui);
@@ -1146,6 +1279,9 @@ int app::run_verify(const std::string& script_path, bool bless)
             if (type == "extraction")      bt = building_type::extraction_site;
             else if (type == "processing") bt = building_type::processing_facility;
             else if (type == "port")       bt = building_type::port;
+            else if (type == "launchpad")  bt = building_type::launchpad;
+            else if (type == "logistics_hub") bt = building_type::inland_logistics_hub;
+            else if (type == "military_base") bt = building_type::military_base; // BL-325 S1
             if (bt == building_type::none)
                 return;
             m_ui.construction.active = true;
@@ -1178,7 +1314,12 @@ int app::run_verify(const std::string& script_path, bool bless)
         {
             if (tc.body != m_ui.active_body || occupied.count(tid))
                 continue;
-            if (!placement_rules::can_place_in_world(m_world, tid, bt, tgt))
+            // BL-323 S2: filter on the SAME reach budget construct_building will
+            // enforce. Without this the scan offers a tile the authoritative gate
+            // then refuses, which reads as a broken build rather than a rule.
+            body_reach_field(m_world, tc.body);
+            if (!placement_rules::can_place_in_world(m_world, tid, bt, tgt,
+                                                     m_registry.construction().max_logistics_reach))
                 continue;
             entity_id built = null_entity;
             const construction_result r = construct_building(
@@ -1192,10 +1333,7 @@ int app::run_verify(const std::string& script_path, bool bless)
                 r == construction_result::slot_occupied          ? "slot_occupied" :
                 r == construction_result::insufficient_materials ? "insufficient_materials" : "failed";
             if (r == construction_result::placed)
-            {
-                m_ui.selected_entity      = built;
-                m_ui.selection_hidden_for = null_entity;
-            }
+                m_ui.selected_entity = built;
             SDL_Log("verify.build_first_valid: %s at tile (%d,%d)", name, tc.grid_x, tc.grid_y);
             return std::string(name);
         }
@@ -1229,10 +1367,7 @@ int app::run_verify(const std::string& script_path, bool bless)
                 r == construction_result::slot_occupied          ? "slot_occupied" :
                 r == construction_result::insufficient_materials ? "insufficient_materials" : "failed";
             if (r == construction_result::placed)
-            {
-                m_ui.selected_entity      = built;
-                m_ui.selection_hidden_for = null_entity;
-            }
+                m_ui.selected_entity = built;
             SDL_Log("verify.build_at: %s at tile (%d,%d)", name, col, row);
             return std::string(name);
         }
@@ -1247,6 +1382,34 @@ int app::run_verify(const std::string& script_path, bool bless)
         if (!ok) ++m_verify_failures;
         SDL_Log("verify.expect %s: %s", ok ? "PASS" : "FAIL",
                 msg ? msg->c_str() : "");
+    });
+
+    // BL-215 text-overflow ledger. clipping() reads the running FAIL count
+    // (clipped + unfittable); expect_no_clipping(label) logs every FAIL record,
+    // adds them to m_verify_failures, and writes screenshots/text_overflow.txt.
+    // Sanctioned elide-with-tooltip records stay WARN-only.
+    v.set_function("clipping", [this]() -> int {
+        return static_cast<int>(ui::overflow_failures());
+    });
+    v.set_function("expect_no_clipping", [this](sol::optional<std::string> label) -> int {
+        const std::size_t fails = ui::overflow_failures();
+        for (const ui::text_overflow& r : ui::overflows())
+        {
+            if (r.sev == ui::overflow_severity::elided)
+                continue;
+            SDL_Log("verify.expect_no_clipping FAIL [%s] %s: \"%s\" "
+                    "(needed %.0fpx, available %.0fpx, frame %s)",
+                    label ? label->c_str() : "", r.site, r.text.c_str(),
+                    static_cast<double>(r.needed), static_cast<double>(r.available),
+                    r.frame.empty() ? "-" : r.frame.c_str());
+            ++m_verify_failures;
+        }
+        std::error_code ec;
+        std::filesystem::create_directories("screenshots", ec);
+        ui::write_overflow_report("screenshots/text_overflow.txt");
+        SDL_Log("verify.expect_no_clipping %s: %zu failure(s), %zu record(s) total",
+                fails == 0 ? "PASS" : "FAIL", fails, ui::overflows().size());
+        return static_cast<int>(fails);
     });
 
     // === BL-113 interactive-flow acceptance primitives ======================
@@ -1453,13 +1616,13 @@ int app::run_verify(const std::string& script_path, bool bless)
     v.set_function("select_tile", [this](int col, int row) {
         for (const auto& [tid, tc] : m_world.tiles)
             if (tc.body == m_ui.active_body && tc.grid_x == col && tc.grid_y == row)
-            { m_ui.selected_entity = tid; m_ui.selection_hidden_for = null_entity; break; }
+            { m_ui.selected_entity = tid; break; }
     });
-    v.set_function("dismiss_selection", [this]() {
-        // Test hook for the Selection band's dismiss path (BL-194) — the x button
-        // and Esc both hide the current selection this same way; no key-event
-        // injection exists in the headless harness, so this is the equivalent.
-        m_ui.selection_hidden_for = m_ui.selected_entity;
+    v.set_function("clear_selection", [this]() {
+        // Deselect (BL-266): the band never hides — with no selection it rests on
+        // the player's own corporation. This is the empty-space-click equivalent;
+        // no click/key injection exists in the headless harness.
+        m_ui.selected_entity = null_entity;
     });
     v.set_function("card_drill", [this]() {
         // Drive the Selection band's resource drill-down (BL-196) for the currently
@@ -1492,7 +1655,7 @@ int app::run_verify(const std::string& script_path, bool bless)
             if (tit == m_world.tiles.end()) continue;
             if (tit->second.body == m_ui.active_body &&
                 tit->second.grid_x == col && tit->second.grid_y == row)
-            { m_ui.selected_entity = bid; m_ui.selection_hidden_for = null_entity; break; }
+            { m_ui.selected_entity = bid; break; }
         }
     });
     // Switch the construction panel's sub-view (0 = Construction/queue, 1 = Buildings/
@@ -1503,8 +1666,7 @@ int app::run_verify(const std::string& script_path, bool bless)
         // Acknowledge the current selection so the new-selection panel-close (render()
         // § "new selection takes the column") does not stomp the panel we're staging
         // for capture. Harness-only convenience; the interactive path never needs it.
-        m_prev_selection          = m_ui.selected_entity;
-        m_ui.selection_hidden_for = m_ui.selected_entity;
+        m_prev_selection = m_ui.selected_entity;
     });
 
     // Press the construction ledger's Build button on the CURRENT tile selection
@@ -1571,9 +1733,12 @@ int app::run_verify(const std::string& script_path, bool bless)
     // Circumplanetary canvas would (sets selected_entity to the body). Lets a
     // script stage the selection-aware descend gesture (BL-165).
     v.set_function("select_body", [this](const std::string& name) {
-        for (const auto& [bid, bc] : m_world.bodies)
-            if (bc.name == name)
-            { m_ui.selected_entity = bid; m_ui.selection_hidden_for = null_entity; break; }
+        // Same resolver as goto_surface/go_to, so a script can name a body by
+        // ROLE ("home", "inner", "moon") rather than by its generated display
+        // name (BL-257).
+        const entity_id b = find_body(m_world, name);
+        if (b != null_entity)
+            m_ui.selected_entity = b;
     });
 
     // Force the player corp balance to an exact value (verify harness): lets a
@@ -1926,6 +2091,7 @@ void app::capture_frame(const std::string& name)
 {
     m_capture_name      = name;
     m_capture_requested = true;
+    ui::set_overflow_frame(name); // BL-215: overflow records name the capture they happened in
     render(); // composits the frame, then save_screenshot() runs before present
 }
 
@@ -1986,9 +2152,8 @@ void app::handle_key_down(const SDL_KeyboardEvent& key)
     // while the popup (or another panel) holds focus. Precedence, highest first: an
     // armed exit-confirm backs out; an open system menu closes; an open sticky
     // detail card unwinds one drill level; an open fold overlay folds up (BL-214);
-    // then the card hides (BL-194/196 — Esc reaches the menu only once the card is
-    // fully closed, so a single press never both closes the card and opens the
-    // menu); otherwise the menu opens.
+    // otherwise the menu opens. The Selection band never hides (BL-266) — its
+    // former hide rung is gone, so the system menu is the terminal rung.
     //
     // The fold rung is a deliberate departure from BL-214's Decision 10, which kept
     // depth off this ladder. That decision reasoned about an in-place stepper, where
@@ -1999,11 +2164,10 @@ void app::handle_key_down(const SDL_KeyboardEvent& key)
     // the drill above the card.
     if (key.scancode == SDL_SCANCODE_ESCAPE)
     {
-        // Mirror the card's own draw gate exactly (selection_card.cpp): a valid,
-        // non-dismissed selection whose kind actually resolves — so Esc never acts
-        // on an invisible card.
+        // A drill can only exist over a real selection: a valid selection whose
+        // kind actually resolves — so Esc never unwinds an invisible drill. The
+        // band itself is always open (BL-266) and has no hide rung.
         const bool card_open = m_ui.selected_entity != null_entity &&
-                               m_ui.selected_entity != m_ui.selection_hidden_for &&
                                ui::selection_kind_of(m_world, m_ui.selected_entity) !=
                                    ui::selection_kind::none;
         if (m_ui.confirm_exit_pending)
@@ -2016,10 +2180,8 @@ void app::handle_key_down(const SDL_KeyboardEvent& key)
             m_ui.corp_rollup_drill = -1;                      // back to the roll-up (BL-248)
         else if (ui::any_expanded(m_ui))
             ui::fold(m_ui);                                   // fold the full-screen overlay
-        else if (card_open)
-            m_ui.selection_hidden_for = m_ui.selected_entity; // hide, not destroy
         else
-            m_ui.show_system_menu = true;
+            m_ui.show_system_menu = true;                     // terminal rung (BL-266): the band never hides
         return;
     }
 
@@ -2240,14 +2402,17 @@ bool lean_row(const char* id, const char* label, lean& value,
 
     // PushID scopes the four buttons to this row, so two rows sharing an option
     // name ("Balanced" appears under both Ocean and Oxygen) never collide.
+    // Label on its own line, options in a 2x2 grid beneath — the wizard's
+    // control column is a third of the panel now, and four radios in a row
+    // ("Old and cold ... Young and vigorous") no longer fit one line.
     ImGui::PushID(id);
-    ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted(label);
 
+    const float col2 = ImGui::GetContentRegionAvail().x * 0.5f;
     bool changed = false;
     for (int i = 0; i < 4; ++i)
     {
-        ImGui::SameLine(i == 0 ? 170.0f : 0.0f);
+        if (i % 2 == 1) ImGui::SameLine(col2);
         int v = static_cast<int>(value);
         if (ImGui::RadioButton(names[i], &v, static_cast<int>(order[i])))
         {
@@ -2287,6 +2452,10 @@ void app::draw_generation_screen()
     if (m_wiz_preview.empty())
         return; // defensive: the preview is the wizard's only data source
 
+    // Adopt a finished real-surface build (and chain a relaunch if the params
+    // moved mid-build). Cheap zero-wait probe; runs every wizard frame.
+    poll_wizard_surface();
+
     static_assert(ui::chain_round_count == wizard_round_count,
                   "the wizard's round count and the shared chain-round table must agree");
 
@@ -2311,7 +2480,7 @@ void app::draw_generation_screen()
     {
         const std::size_t k = static_cast<std::size_t>(i);
         chart_bodies.push_back(ui::generation_chart_body{
-            prototype_body(i).name,
+            m_wiz_names.bodies[k].c_str(), // generated, not the table placeholder (BL-257)
             &m_wiz_preview[k],
             (k < m_wiz_undrawn.size()) ? &m_wiz_undrawn[k] : nullptr });
     }
@@ -2333,7 +2502,9 @@ void app::draw_generation_screen()
     // A wide centred surface — this is the first thing a player sees, so it takes
     // the screen rather than the menu's 280px column. Same borderless,
     // background-less idiom as draw_main_menu; the render clear colour is the backdrop.
-    const float panel_w = std::min(disp.x - 96.0f, 1180.0f);
+    // Split 1/3 : 2/3 — controls (stage folds, leans, reroll) left, the round's
+    // painted preview right, so every reroll is SEEN, not just re-plotted.
+    const float panel_w = std::min(disp.x - 96.0f, 1440.0f);
     const float panel_h = std::max(420.0f, disp.y - 96.0f);
     ImGui::SetNextWindowPos({disp.x * 0.5f, disp.y * 0.5f}, ImGuiCond_Always, {0.5f, 0.5f});
     ImGui::SetNextWindowSize({panel_w, panel_h}, ImGuiCond_Always);
@@ -2345,6 +2516,14 @@ void app::draw_generation_screen()
     {
         char buf[256];
 
+        // ── Left third: everything the player DOES — header, stage folds, leans,
+        //    navigation. The stage folds still expand to their full chart views
+        //    (the fold idiom is unchanged); they simply live in a column now. ──
+        const float col_w = (panel_w - style.WindowPadding.x * 2.0f
+                             - style.ItemSpacing.x) / 3.0f;
+        ImGui::BeginChild("##wiz_left", {col_w, 0.0f}, false,
+                          ImGuiWindowFlags_NoBackground);
+
         // ── (a) Header: the round name large, what it settles beneath, progress right ──
         {
             ImDrawList*  dl    = ImGui::GetWindowDrawList();
@@ -2354,11 +2533,11 @@ void app::draw_generation_screen()
 
             // The atlas carries a single size, so the title is scaled through the
             // draw list rather than by swapping fonts (there is no second font).
-            dl->AddText(ImGui::GetFont(), big, p, col_bright, wr.name);
+            dl->AddText(ImGui::GetFont(), big, p, col_bright, wr.name); // fit-exempt: chrome strip authored to fit at the 1280x720 floor
 
             std::snprintf(buf, sizeof buf, "Round %d of %d", m_wiz_round + 1, wizard_round_count);
             const ImVec2 ts = ImGui::CalcTextSize(buf);
-            dl->AddText({p.x + avail - ts.x, p.y + (big - ts.y) * 0.5f}, col_dim, buf);
+            dl->AddText({p.x + avail - ts.x, p.y + (big - ts.y) * 0.5f}, col_dim, buf); // fit-exempt: chrome strip authored to fit at the 1280x720 floor
 
             ImGui::Dummy({avail, big + 2.0f});
         }
@@ -2386,12 +2565,14 @@ void app::draw_generation_screen()
         //    charts they act on. ──
         const float frame_h  = ImGui::GetFrameHeight();
         const float line_h   = ImGui::GetTextLineHeightWithSpacing();
+        // Each lean row is now a label line plus a 2x2 radio grid (three lines).
         const float decide_h = static_cast<float>(round_pref_count(m_wiz_round))
-                                   * (frame_h + style.ItemSpacing.y)
+                                   * (line_h + 2.0f * (frame_h + style.ItemSpacing.y))
                              + line_h * static_cast<float>(round_note_lines(m_wiz_round)
                                                            + (m_wiz_resolved.gave_up ? 2 : 0))
                              + style.ItemSpacing.y * 3.0f;
-        const float footer_h = 34.0f + style.ItemSpacing.y * 2.0f;
+        // Two button rows now: Reroll full-width above, Back / Continue below.
+        const float footer_h = 34.0f * 2.0f + style.ItemSpacing.y * 3.0f;
         ImGui::BeginChild("##wiz_charts", {0.0f, -(decide_h + footer_h)}, false,
                           ImGuiWindowFlags_NoBackground);
 
@@ -2470,39 +2651,85 @@ void app::draw_generation_screen()
         }
 
         // ── (d) Navigation. Reroll re-draws THIS round from a fresh number (and
-        //    everything downstream of it, because the chain is causal); Back is a plain
-        //    revision, since a round's leans feed its own gates and the ones after
-        //    them, never a chart the player has already been shown. ──
-        const ImVec2 btn  = {150.0f, 34.0f};
-        const bool   last = (m_wiz_round == wizard_round_count - 1);
+        //    everything downstream of it, because the chain is causal); the preview
+        //    pane repaints from the same roll, so what changed is SEEN. The seed
+        //    still names a determinate family: (seed, leans, roll counters) is the
+        //    whole input, and the same triple always returns the same world. ──
+        const bool  last  = (m_wiz_round == wizard_round_count - 1);
+        const float bar_w = ImGui::GetContentRegionAvail().x;
+
+        // Reroll full-width and first — it is the wizard's main verb now.
+        if (ImGui::Button("Reroll##wizroll", {bar_w, 34.0f}))
+        {
+            ++pf.roll[m_wiz_round];
+            m_wiz_dirty = true;
+        }
 
         // Back always steps out one level, and the level outside round 0 is the main
         // menu — a wizard the player cannot leave is a trap (nothing is generated
         // until "Begin", so leaving costs nothing). Preferences survive the trip, so
         // re-entering resumes the same leans from round 0.
-        if (ImGui::Button("Back##wizback", btn))
+        const float half = (bar_w - style.ItemSpacing.x) * 0.5f;
+        if (ImGui::Button("Back##wizback", {half, 34.0f}))
         {
             if (m_wiz_round == 0)
                 m_screen = app_screen::menu;
             else
                 --m_wiz_round;
         }
-
         ImGui::SameLine();
-        if (ImGui::Button("Reroll##wizroll", btn))
-        {
-            ++pf.roll[m_wiz_round];
-            m_wiz_dirty = true;
-        }
-
-        ImGui::SameLine(panel_w - style.WindowPadding.x - btn.x);
-        if (ImGui::Button(last ? "Begin##wizgo" : "Continue##wizgo", btn))
+        if (ImGui::Button(last ? "Begin##wizgo" : "Continue##wizgo", {half, 34.0f}))
         {
             if (last)
                 start_new_game(); // the one and only generation call
             else
                 ++m_wiz_round;
         }
+        ImGui::EndChild(); // ##wiz_left
+
+        // ── Right two-thirds: what this roll LOOKS like. A stylised painting read
+        //    straight from the preview states — the system in round 0, the homeworld
+        //    surface in round 1, its industrial history in round 2. ──
+        ImGui::SameLine();
+        ImGui::BeginChild("##wiz_preview", {0.0f, 0.0f}, false,
+                          ImGuiWindowFlags_NoBackground);
+        {
+            std::vector<ui::preview_body> pv;
+            pv.reserve(static_cast<std::size_t>(n_bodies));
+            for (int i = 0; i < n_bodies; ++i)
+            {
+                const body_inputs& bi = prototype_body(i);
+                pv.push_back(ui::preview_body{
+                    m_wiz_names.bodies[static_cast<std::size_t>(i)].c_str(), // BL-257
+                    bi.orbit_au, bi.mass_earths, bi.parent_orbit_au,
+                    bi.is_homeworld, &m_wiz_preview[static_cast<std::size_t>(i)] });
+            }
+            // Kepler turns slowly — one revolution per minute, wall-clock — so
+            // the far hemisphere can be read too. Frozen under --verify
+            // (m_golden_dir set): a golden capture must never race an animation.
+            const float rot = m_golden_dir.empty()
+                ? static_cast<float>(std::fmod(ImGui::GetTime() / 60.0, 1.0)) * 6.2831853f
+                : 0.0f;
+            const ui::preview_surface_view surf{
+                home_grid_width, home_grid_height,
+                m_wiz_surface.size() == static_cast<std::size_t>(home_grid_width)
+                                            * static_cast<std::size_t>(home_grid_height)
+                    ? m_wiz_surface.data() : nullptr };
+            ui::draw_generation_preview(pv.data(), pv.size(),
+                                        m_wiz_resolved.params, m_wiz_round, rot, surf);
+
+            // The honest wait note: while a build is in flight the globe still
+            // shows the PREVIOUS roll's surface (or the stylised stand-in on
+            // the very first frames).
+            if (m_wiz_surface_future.valid() && m_wiz_round > 0)
+            {
+                ImGui::SetCursorPosY(ImGui::GetWindowHeight() - 28.0f);
+                ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(120, 128, 145, 255));
+                ImGui::TextUnformatted("  resolving the surface...");
+                ImGui::PopStyleColor();
+            }
+        }
+        ImGui::EndChild();
     }
     ImGui::End();
 }
@@ -2574,24 +2801,17 @@ void app::render()
     // sized off the minimap width so the right-hand column stays aligned.
     ImGuiIO&     io     = ImGui::GetIO();
     const ImVec2 disp   = io.DisplaySize;
-    constexpr float margin = 8.0f;
-    // Single source of truth (foldout_column.hpp): the bottom strip's height is
-    // derived from mm_h so the two stay aligned, which they cannot do if this
-    // formula is also written out here.
-    const float  mm_w   = ui::minimap_width(disp.x, disp.y);
-    const float  mm_h   = ui::minimap_height(disp.x, disp.y);
-    // Right edge flush to the screen edge (BL-312, Ben 2026-08-06: "wrap the
-    // minimap to the full edges of the canvas ... we aren't using the space
-    // effectively") — was `disp.x - margin - mm_w`, an unused 8px gap with no
-    // neighbour to its right to justify it. The BOTTOM edge keeps its margin
-    // deliberately: selection_band_height (foldout_column.hpp) is
-    // `minimap_height + chrome_margin`, computed so the Selection band's top
-    // edge lands exactly on the minimap's top edge (both equal
-    // `disp.y - mm_h - 8`, chrome_margin and this local `margin` both being
-    // 8.0f) — the "one band across the full width" fix from 2026-07-30.
-    // Flushing the bottom too would drop the minimap 8px lower than the strip
-    // and break that alignment; not done here.
-    const ImVec2 mm_origin = {disp.x - mm_w, disp.y - margin - mm_h};
+    constexpr float margin = ui::shell_margin;
+    // Single owner for the shell's rect algebra (BL-216, ui/shell_metrics.hpp).
+    // This block used to hand-roll `disp.x - margin - mm_w`, and so did four other
+    // places -- the time panel, the system gear, the header's right bound and the
+    // Selection band each re-derived the same right-chrome edge independently.
+    // That is how BL-312's flush-right minimap came to disagree with the four that
+    // did not follow it. Every site below now asks shell_metrics for a rect.
+    const ui::shell_rect mm        = ui::minimap_rect(disp);
+    const float          mm_w      = mm.w;
+    const float          mm_h      = mm.h;
+    const ImVec2         mm_origin = {mm.x, mm.y};
 
     // --- Primary canvases (Layer 2) — the zoom ladder ---
     // The primary rung fills the window; the rung one step *out* renders in the
@@ -2654,6 +2874,12 @@ void app::render()
                 // a non-const world for the route-cached pathfinder, so it cannot live in
                 // the const-world draw. Derived VIEW state — no feedback into the sim.
                 ui::update_body_vision(m_world, m_ui, m_ui.sim_now_days);
+                // BL-323 S2b: build the logistics reach field for the body about to be
+                // drawn, for the same reason and in the same place as the vision update
+                // above — the Dijkstra needs a mutable world, the draw is const. Cached,
+                // so this is a map lookup on every frame but the first after an
+                // invalidation (a road laid, a building placed or demolished).
+                body_reach_field(m_world, m_ui.active_body);
                 ui::draw_body_surface_canvas(m_world, m_ui, m_registry, m_last_econ_report,
                                              m_generation_report, {0.0f, 0.0f}, disp, primary_input,
                                              {mm_origin.x, mm_origin.y + mm_h * 0.5f});
@@ -2681,7 +2907,7 @@ void app::render()
 
         // Title bar.
         bdl->AddRectFilled(mm_origin, {mm_origin.x + mm_w, mm_origin.y + title_h}, IM_COL32(28, 30, 40, 255));
-        bdl->AddText({mm_origin.x + 5.0f, mm_origin.y + 3.0f}, IM_COL32(220, 225, 235, 255), mm_title);
+        bdl->AddText({mm_origin.x + 5.0f, mm_origin.y + 3.0f}, IM_COL32(220, 225, 235, 255), mm_title); // fit-exempt: chrome strip authored to fit at the 1280x720 floor
 
         // Lens mode bar along the bottom of the minimap box (BL-093). The bar fill
         // is chrome (drawn here); the interactive seven-glyph row is an ImGui window
@@ -2709,7 +2935,7 @@ void app::render()
     // thirds is "time controls" (the pause/speed-tier buttons + active-rate
     // label) — half the row count, so it fits. The panel takes input (the
     // speed buttons), so it is not flagged NoInputs.
-    const float tick_w = mm_w;
+    const float tick_w = ui::right_chrome_width(disp);
     const float col_gap  = ImGui::GetStyle().ItemSpacing.x;
     const float prog_w   = tick_w / 3.0f - col_gap * 0.5f;
     const float ctrl_w   = tick_w - prog_w - col_gap;
@@ -2738,8 +2964,10 @@ void app::render()
     const float time_content_h = time_line_h + std::max(prog_col_h, ctrl_col_h);
     const float time_h         = time_content_h + ImGui::GetStyle().WindowPadding.y * 2.0f;
     {
-        ImGui::SetNextWindowPos({disp.x - margin - tick_w, margin});
-        ImGui::SetNextWindowSize({tick_w, time_h});
+        // Head of the right chrome column (BL-216: shell_metrics owns the edge).
+        const ui::shell_rect tp = ui::time_panel_rect(disp, time_h);
+        ImGui::SetNextWindowPos({tp.x, tp.y});
+        ImGui::SetNextWindowSize({tp.w, tp.h});
         constexpr ImGuiWindowFlags time_flags =
             ImGuiWindowFlags_NoTitleBar          |
             ImGuiWindowFlags_NoResize            |
@@ -2894,7 +3122,8 @@ void app::render()
     // the same popup (handle_key_down). See docs/ui/MENU.md.
     {
         constexpr float gear = 26.0f;
-        const ImVec2 gear_pos{ (disp.x - margin - mm_w) - margin - gear, margin };
+        // One margin left of the right chrome column (BL-216).
+        const ImVec2 gear_pos{ ui::right_chrome_left(disp) - margin - gear, margin };
 
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0.0f, 0.0f});
         ImGui::SetNextWindowPos(gear_pos);
@@ -2970,7 +3199,7 @@ void app::render()
     // the identity tile / balance bar / Selection all clear the same permanent W (BL-122).
     {
         const float header_left  = ui::shell_column_width(disp.x);
-        const float header_right = (disp.x - margin - tick_w) - margin;
+        const float header_right = ui::right_chrome_left(disp) - margin;
         ui::draw_header_panel(m_world, m_balance_history, header_left, header_right);
     }
 
@@ -3053,13 +3282,13 @@ void app::render()
         // The band starts at the COMMS DOCK's right edge, not the shell column
         // edge: the dock narrowed to 3/4 of the column (2026-07-30) and the band
         // takes the quarter it gave back, so the bottom strip stays solid rather
-        // than showing a canvas sliver between the two.
-        const ui::foldout_rect comms      = ui::comms_dock_rect();
-        const float            band_left  = comms.x + comms.w;
-        const float            right_edge = disp.x - margin - mm_w; // left edge of the right chrome column
-        const float            band_h     = ui::selection_band_height(disp.x, disp.y);
-        const ImVec2 band_origin = { band_left, disp.y - band_h };
-        const ImVec2 band_size   = { std::max(0.0f, right_edge - band_left), band_h };
+        // than showing a canvas sliver between the two. The whole rect -- both
+        // flush edges and the shared strip height -- comes from shell_metrics
+        // (BL-216), so the band and the dock cannot disagree about where the
+        // seam between them falls.
+        const ui::shell_rect band = ui::selection_band_rect(disp);
+        const ImVec2 band_origin = { band.x, band.y };
+        const ImVec2 band_size   = { band.w, band.h };
         const ui::resource_history_view rhist{ &m_body_resource_hist,
                                                &m_tile_resource_hist,
                                                &m_resource_hist_days };
@@ -3109,10 +3338,7 @@ void app::render()
                 // inside the ledger. So reselect only when some OTHER surface (a placement-mode
                 // canvas click) initiated the build.
                 if (!m_ui.show_build_ledger)
-                {
-                    m_ui.selected_entity      = built;        // inspect the new building
-                    m_ui.selection_hidden_for = null_entity;  // re-show the panel
-                }
+                    m_ui.selected_entity = built;             // inspect the new building
                 break;
             case construction_result::invalid_tile:
                 m_ui.construction.last_message = "Can't build there."; break;
@@ -3155,6 +3381,32 @@ void app::render()
                 m_ui.construction.last_message = "Road placement failed."; break;
         }
         m_ui.construction.pending_road_tile = null_entity; // consume the request
+    }
+
+    // Execute any hire-unit request queued this frame by the build front door's
+    // Hire affordance (BL-324). Routes through the same corp_verb seam corp_ai
+    // scores for rival corps — the player takes no shortcut around it.
+    if (m_ui.construction.pending_hire_tile != null_entity)
+    {
+        corp_command cmd;
+        cmd.corp      = m_world.player_entity;
+        cmd.verb      = corp_verb::hire_unit;
+        cmd.tile      = m_ui.construction.pending_hire_tile;
+        cmd.unit_type = m_ui.construction.pending_hire_unit_type;
+        entity_id hired = null_entity;
+        const corp_command_result r = apply_corp_command(m_world, m_registry, cmd, &hired);
+        switch (r)
+        {
+            case corp_command_result::applied:
+                m_ui.construction.last_message = "Unit raised.";
+                m_ui.selected_entity           = hired; // inspect the new unit
+                break;
+            case corp_command_result::rejected_funds:
+                m_ui.construction.last_message = "Can't supply it."; break;
+            default:
+                m_ui.construction.last_message = "Hiring failed."; break;
+        }
+        m_ui.construction.pending_hire_tile = null_entity; // consume the request
     }
 
     // Execute a demolition queued this frame by the building Selection element. The
@@ -3370,9 +3622,11 @@ void app::load_settings()
         catch (const std::exception&) { /* skip malformed value */ }
     }
 
-    // Clamp to a sane floor so a corrupt file can't produce an unusable window.
-    m_settings.window_w = std::max(640, m_settings.window_w);
-    m_settings.window_h = std::max(480, m_settings.window_h);
+    // Clamp to the supported display floor (BL-215: 1280x720 @ 1.0x is the
+    // smallest supported display) so a corrupt or stale file can't open the
+    // shell below the size it is authored against.
+    m_settings.window_w = std::max(1280, m_settings.window_w);
+    m_settings.window_h = std::max(720, m_settings.window_h);
     m_settings.ui_scale_step = std::clamp(m_settings.ui_scale_step, 0, 2);
 }
 

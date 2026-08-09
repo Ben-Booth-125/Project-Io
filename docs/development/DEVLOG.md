@@ -10,7 +10,328 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — C-route feasibility: both gates pass, and Cicero says the model is on the wrong layer (2026-08-08, latest)
+## Session — Cut v0.1.9: five worktree agents, and three of them branched from a base that had already moved (2026-08-09, latest)
+
+Full mode, Batch Delivery + release — the fourth cut of the session. Ben: *"cut v0.1.9 next."*
+Five worktree sub-agents (roads; History+Economy; stacks; shell; disclosure), integration and every
+conflict resolution in the main session.
+
+**Four rulings taken up front rather than letting them stall the batch.** Nine items, four of which
+carried open design questions, so they were batched into one Q&A before any code was written: the
+road-tier legend goes **contextual** (Selection/hover); roads **do** dim with the fog; the Economy
+panel **gets a door** rather than being retired; and **BL-229** moves to v0.1.10 because the item
+says in as many words *"DESIGN OWED — do not guess the layout. Ben designs this one."* Asking cost
+one round trip; guessing would have cost the item.
+
+**THE LESSON OF THIS BATCH: three of five agents branched from a base that had already moved, and
+every one of them produced code that would not merge cleanly.** Worktrees isolate writes, which is
+what they are for — they do not isolate you from the *history* moving underneath. The three cases,
+because the shape repeats:
+
+1. **Roads agent** reintroduced `ui_state::selection_hidden_for`, deleted hours earlier by BL-266
+   (Selection always open). Its hunk restored a close button on a band that no longer closes.
+2. **History agent** dropped the **Ages** view along with Tiles. BL-281 does say "drops to two
+   views" — but it was designed 2026-08-03 and Ages landed 2026-08-05. *The design predates the
+   feature rather than judging it.* Ages kept; only Tiles retired. That renumbered Ages from view 3
+   to 2, so `history_ages.lua` was re-pointed — without which the Ages check would have driven a
+   stale index and silently captured Story.
+3. **Disclosure agent** paired Story with Tiles and referenced `detail_surface::history_tiles`,
+   removed by the History agent *in the same batch*. It would not have compiled.
+
+None of these is an agent failing at its task; each did its own job well. They are the cost of
+parallelism over a moving `main`, and the mitigation is that integration reads every hunk rather
+than trusting a clean auto-merge.
+
+**A fourth agent got it right in the way that matters most.** The shell agent found that BL-216's
+sections 1–3 are **superseded by BL-227**, a *complete* item that landed a different, later geometry
+on Ben's own 2026-07-30 call — and refused to implement its brief, because doing so would have
+reverted a landed decision. Newest-dated wins. It shipped the half that was still true: the
+`shell_metrics` module and the migration of all five `app.cpp` sites that each re-derived the same
+rect by hand. It also surfaced a live **8 px drift** (BL-312 flushed the minimap to the screen edge;
+four siblings did not follow), now expressed once instead of invisibly five times.
+
+**The measurement that nearly got waved away.** `econ_stability` began failing after the stacks work
+merged. It is a `bench`-labelled test — the label *this session added* precisely so a failure there
+reads as "re-run it idle" — and load was 2.35, so the easy conclusion was available and wrong.
+Rebuilding the harness at the parent commit and running both on the same machine:
+
+| bodies × corps | pre-BL-193 min | post min | factor |
+|---|---|---|---|
+| 1 × 8   | 0.0106 ms | 0.0181 ms | 1.71× |
+| 8 × 256 | **0.9581 ms** | **2.0449 ms** | 2.13× |
+
+`min` is the load-insensitive statistic, and the cost appears at **every** rung including the
+smallest — the signature of fixed per-tick work, not a scaling term. Filed as **BL-347** (priority
+A) with the table and a fix direction. **Prototype scale is unaffected** (0.20 ms mean, 5× headroom),
+so it is lost growth headroom, the same category BL-250 filed BL-253 for. The `bench` label did its
+job — it stopped the failure being read as a regression *automatically* — but it must not become a
+reason to stop looking.
+
+**BL-260's codegen has nothing to feed.** Ben ruled codegen-at-build-time the same day; on
+implementation, BL-247's in-UI question log and the `why_note` seam it would generate into turn out
+to have been removed 2026-08-02 (NR-018). No call sites exist. Codegen whose output nothing includes
+is machinery for its own sake — which is what *"the docs are the audit"* rules out — so the store
+ships as documentation and the ruling is recorded in its own `_note` for whenever a consumer
+returns. 13 of 16 entries are `drafted`, because writing the pair **is** the design check.
+
+**Gate:** 54 tests, **2 failures**, both known, filed and named in the changelog —
+`world_audit`'s biome balance (BL-338) and `econ_stability`'s absolute bound (BL-347). Visual
+inspection by eye per the Linux policy (goldens are Windows-authoritative): shell renders correctly
+post-merge, roads read with tier-varying brightness, fogged regions dimmer than the lit centre.
+
+**Runtime:** not tracked.
+
+---
+
+## Session — Cut v0.1.8: ten test failures, one real defect, and a tool that had been lying since it was written (2026-08-09)
+
+Full mode, Batch Delivery + release — the third cut of the session. Ben: *"move BL-288 and cut
+v0.1.8."* Two worktree sub-agents (next_id.js; the SDL3 posture), the entangled harness/golden
+core in the main session.
+
+**BL-288 moved from v0.1.3 first.** A priority-A build-health item had been sitting inside the
+Laws design stub, where it blocked a minor it had nothing to do with.
+
+**The finding that reframed the whole minor.** Every item here was filed on the premise that
+something was *broken*. Measurement said the tooling was mostly **misreporting**, which is worse.
+`build_linux/` is already Ninja + Release, so BL-288's "the default tree is Debug" premise was
+already obsolete on Linux — and a full Release run reported **ten failures of which exactly one
+was a failing assertion**. Running each harness alone on an idle machine sorted them:
+
+- **Four pass but exceed the flat 60 s bound** — `earthlike_lean_trace` 121 s, `notable_worlds`
+  105 s, `mediterranean_sweep` 87 s, `earthlike_tile_census` 58 s (passing by *luck*, 2 s under).
+- **Two never finish** — `history_sim_harness` and `history_sweep` both ran past 400 s. They are
+  open-ended research sweeps, not regression checks; their cost is the point.
+- **Two are load artifacts** — `econ_stability` and `home_surface_bench` assert *absolute*
+  wall-clock times, pass standalone, and failed only because a concurrent session's build was
+  loading the box.
+- **One is a world-generation finding** — `world_audit`, 1 failing assertion of 26 (BL-291).
+- **One was real** — `ai_skill_harness`'s stale GCC goldens, which had sat unnoticed among nine
+  false positives for days. *That* is the cost of a noisy gate, stated as a measurement rather
+  than as a principle.
+
+Fix: three tiers (default 60 s, long 240 s widened to the four measured slow ones), a `sweep`
+label with no timeout excluded from the gate, and a `bench` label so a wall-clock failure reads as
+"re-run idle". Gate went **10 failures → 1**, the survivor being `world_audit`'s biome balance —
+carried by BL-338, and the gate reporting it is the gate working.
+
+**BL-322 — the root cause nobody would have guessed.** `execSync` runs through `/bin/sh`, which is
+`dash` here, and the unquoted `(` in `--format=%(refname)` made dash abort with a syntax error
+*before git ran*. `stdio: ['ignore']` discarded the message and `catch { return [] }` turned total
+failure into "this repo has no branches". Platform-dependent, so it worked on the Windows box where
+it was written and failed silently everywhere it was needed. It had been issuing ids **25 below the
+true ceiling** — the direct mechanical account of how BL-326..BL-333 each landed twice. Refs
+scanned 0 → 53. A second latent silent failure was caught in passing: `backlog.json` at 832 KB
+against node's 1 MB default `maxBuffer`, 79% of the way to throwing ENOBUFS into the same
+swallowing `catch`.
+
+**BL-302 — the item's own preferred option was disproved by testing it.** A shared
+`FETCHCONTENT_BASE_DIR` *hard-fails* across build trees, because each `<dep>-subbuild` carries a
+generator-locked cache and this checkout has four trees side by side. Per-dependency
+`FETCHCONTENT_SOURCE_DIR_<dep>` works and landed. Honest limit recorded rather than papered over:
+a from-cold configure **succeeds** on Linux in ~74 s, so the Windows schannel fault does not
+reproduce here and the fix is untested against its own symptom — filed as **BL-341**, and moved to
+v0.1.9 rather than left open inside the minor being cut, which is the exact trap v0.1.1 fell into.
+
+**BL-285 — the judgement call worth Ben's eye.** The GCC re-bless moves **downward**, unlike the
+MSVC re-bless of 2026-08-02 which was uniformly upward: seed 1 fell 81% and went from highest of
+the five to lowest, while seed 4 fell only 25%. Constraining siting (v0.1.2's reach rule) and
+adding a cash outflow (unit hiring, 21 per seed) should cost net worth, and a *per-seed reshuffle*
+is what a placement constraint would produce, so the shape matches the cause; survival held in
+band on all five, so corps are poorer rather than dying. Recorded in the harness rather than waved
+through, because "the AI got poorer" is also what a genuine skill regression looks like. Also
+flagged in place: the **MSVC set is now stale for the identical reason** and will fail on the next
+Windows run. Task 2 landed too — ladder lines carry a `ladder_rung` tag, so H4 filters structurally
+instead of matching the prose "granary"/"Charter Act"/"Great Accord".
+
+**Runtime:** not tracked. Gate takes ~9.5 minutes, which is itself worth an item.
+
+---
+
+## Session — Cut v0.1.1: the word interface ships, and the retrofit that made it uncuttable is undone (2026-08-09)
+
+Full mode, release — the second cut of the same session, immediately after v0.1.2. Ben:
+*"cut v0.1.2 first, then v0.1.1."*
+
+**The diagnosis, restated because it is the whole point.** v0.1.1's theme — the word interface —
+had been complete since 2026-08-03: blackboard export (BL-206), action dictionary (BL-270) and Io
+MCP server (BL-278) all landed. The minor stayed open anyway because three later waves of
+unrelated work were hung on it after the fact, 26 items at the peak. `ROADMAP.md` recorded this
+in its own words — *"Retrofitted 2026-08-08 — still open"* — without registering it as a problem.
+It is the concrete instance of NR-103: **a theme with no done-definition has no test for
+*finished*, so it absorbs work indefinitely.**
+
+**The cut.** 28 items terminal. Beyond the three theme legs the minor genuinely carried a lot —
+the sticky-card family (BL-194–BL-198, BL-214, BL-247), the corporation dashboard (BL-248), the
+commercial-activity fog (BL-150–BL-154), hover freeze and glance-then-stick (BL-228, BL-230), the
+radial tech-tree viewer (BL-310), the minimap/header reflow (BL-312, BL-313), the wizard's
+real-tile preview (BL-319), the Mediterranean rift sea (BL-276) and the GPU/multicore pass
+(BL-267). A done-definition was written at the cut, on the v0.1.0 model.
+
+**The narrowing, stated rather than papered over.** The write leg is partial: `place_sell_order`,
+`remove_sell_order` and `set_workforce_auto` are in the dictionary but have no `corp_verb`. The
+cause is structural, not three missing verbs — sell orders live in `ui_state`, the world holds no
+order book to mutate, and no serialisation path touches them (BL-293's own 2026-08-07 scope
+correction). `ACTIONS.json`'s note already says so explicitly, so the dictionary does not
+overclaim. BL-293 moves to v0.2.0, where a text-driven player is what needs it.
+
+**The re-homing (NR-111, decision-taken).** The 24 items still open went to three coherent new
+minors — **v0.1.8** build health, **v0.1.9** shell & legibility, **v0.1.10** generation & content —
+with BL-293 and BL-262 (standing) to **v0.2.0**. None cancelled; all kept their priority. The
+judgement call worth checking is the *numbering*: they were appended rather than inserted at
+v0.1.3, so no existing minor had to be renumbered — at the cost of their number understating
+their priority, since all three are buildable now while v0.1.3–v0.1.6 are design-forward stubs.
+The roadmap states plainly that number is not sequence here.
+
+**Gate.** Rebuilt after the concurrent session's `src/` changes (21 files, BL-215/BL-266 work) —
+green. The CTest baseline established earlier in the session stands: 45/55, ten failures identical
+to the 2026-08-08 set.
+
+**Two versions cut in one session**, against a six-day stretch where 119 commits produced none.
+
+**Runtime:** not tracked.
+
+---
+
+## Session — Cut v0.1.2: the buildings rework ships, and the roadmap gets its first per-minor done-definition (2026-08-09)
+
+Full mode, release. Ben, after a roadmap gap review: *"cut as many versions as we can now, rather
+than working on the lofty, conceptual stuff"* — then, on the plan: *"cut v0.1.2 first, then
+v0.1.1."*
+
+**What the review found.** 119 commits since the `v0.1.0` tag and not one version cut, with
+`CHANGELOG.md`'s `[Unreleased]` still reading *"Nothing yet"* — so the changelog was not merely
+un-stamped, it was not accruing. In the same window the roadmap kept extending *forward* (v1.0.0
+named, the Era −1 arc folded into v0.3.0, stub minors re-sequenced). The root cause, filed as
+**NR-103**: the roadmap writes done-definitions for exactly two versions, v0.1.0 and v1.0.0, and
+those are the only two ever cut or scheduled. A theme with no done-definition has no test for
+*finished*, so it absorbs items indefinitely — which is precisely what v0.1.1 did, taking on 26
+retrofitted items after its own three legs had shipped. Seven findings filed, **NR-097**–**NR-103**.
+
+**The cut.** v0.1.2 was the cheapest available: six items, all terminal, the work landed and
+verified 2026-08-07/08. Closing it needed bookkeeping rather than code —
+
+- **BL-340** (processing-chain roster) filed, because BL-323's own completion note scoped out the
+  processing half of S1 in as many words (new `resource_type` values with market/price/
+  serialisation wiring — a save-format change, not Lua authoring) and no item carried it. Closing
+  BL-323 without it would have silently dropped the work.
+- **BL-323** flipped to `complete` with a resolution covering all four strands, and its 11.3 KB of
+  design prose archived to the Q3 cold store.
+- **A done-definition written for v0.1.2** — six bullets on the v0.1.0 model, the first of the
+  per-minor definitions NR-103 asks for.
+
+**Gate.** Full rebuild green (150/150, app + every harness); the app smoke-launched clean; CTest
+**45/55**, and the ten failures are exactly the pre-existing baseline set recorded in
+`LastTestsFailed.log` on 2026-08-08 — `ai_skill_harness`, `earthlike_lean_trace`,
+`earthlike_tile_census`, `econ_stability`, `history_sim_harness`, `history_sweep`,
+`home_surface_bench`, `mediterranean_sweep`, `notable_worlds`, `world_audit`. No new failure
+introduced. Six of the ten are 60-second timeouts, which is most of the suite's 573-second runtime.
+
+**Three things the cut surfaced that the gate would otherwise have missed.**
+
+1. **`main` did not compile.** The BL-266 merge (Selection always open) retired
+   `ui_state::selection_hidden_for` but left the hire-unit path in `app.cpp` assigning to it. Found
+   by running the release build; fixed at `711b666` while this session was in flight. Worth noting
+   for what it says about the gate: there is no CI, so a broken `main` stays invisible until
+   somebody builds it.
+2. **`archive_designs.js` reformats the entire backlog.** It writes `JSON.stringify(data, null, 2)`
+   while `backlog.json` is stored at 1-space indent, so archiving one item produced a
+   7531-insertion / 7502-deletion diff and *grew* the file by 11.5 KB while reporting
+   *"-1% smaller"* (the size delta prints negated). Normalised back to indent=1 by hand, which
+   returned the diff to 32/3. Filed as **NR-109** — a two-line fix that will bite on the next
+   landing if left.
+3. **Two sessions were writing this repo at once**, and it showed: a duplicated NR-104, cut
+   bookkeeping swept into an unrelated commit (`7c423fa`), and `main` advancing four times
+   mid-cut. Filed as **NR-110**, with the suggestion that concurrent main-tree sessions use
+   worktree branches the way sub-agents already do.
+
+**Runtime:** not tracked.
+
+---
+
+## Session — Build-heavy v0.1.1 batch: BL-215, BL-266, and the XS sweep, three worktree agents (2026-08-09)
+
+Full mode, Batch Delivery, first all-Linux delivery session (no PowerShell — status read via
+`backlog_query.js`; builds via `build_linux/` Ninja). Three concurrent worktree agents, merged
+in the main session with an integrating build after each. Runtime: ~1h wall (agents 10–28 min each).
+
+**BL-215 (text-wrap render audit, A)** — `ui::text_fit` module + overflow ledger; display floor
+1280×720 enforced via `SDL_SetWindowMinimumSize`; charts measure-first rework; § 6 site adoption;
+`verify.expect_no_clipping` + `scripts/verify/text_overflow_floor.lua` (PASS, 0 clipped —
+one real overflow found and fixed in the wizard legends). verifier-visual SKILL.md section added
+with Ben's in-session approval. Riders: NR-107 (tick abbreviate threshold), NR-108 (golden drift).
+
+**BL-266 (selection always open, B)** — `selection_hidden_for` deleted (18 sites, not the design's
+11); Esc terminates at the system menu; band rests on the player corp (swap-draw-restore keeps
+deselect representable). Rider: NR-104 — golden re-bless list + the Continent-lens-key overlap call.
+
+**XS sweep (C)** — BL-294 (dead `diverging_colour`/`icons::unit` + two doc corrections), BL-295
+(phantom-id comment rewritten), BL-339 (parked `draw_building_selection` deleted, ~410 lines).
+
+Merge notes: main moved mid-flight (another session's header-chrome drain + NR renumber), so all
+three merges were true merges; the BL-215 branch carried stale NR ids — its two entries re-filed
+as NR-107/108, two duplicates of NR-088/094 dropped. One committed-mid-flight bare `AddText`
+(`generation_preview.cpp`) marked fit-exempt. NR-095 records BL-262 (scoring) skipped as
+not-buildable (production axis needs a visible-information proxy). Goldens NOT re-blessed on this
+box (environment mismatch, 5–10% drift on untouched captures) — Ben's Windows pass owns that.
+
+---
+
+## Session — Two of NR-094's footnotes promoted to their own backlog items (2026-08-08)
+
+Light mode, doc-only. Ben: the C-route ruling's open questions shouldn't just sit as prose inside
+BL-334. Filed **BL-335** (measure the real per-decision token cost through BL-278 — cheap,
+independent, no dependency on BL-334 landing) and **BL-336** (the goal-layer/myopia question,
+explicitly PARKED pending observed evidence — a fix for a failure mode nobody has measured Io's
+own scorer producing yet is scope, not defense). BL-334's design field and AI_OPPONENT.md § 10g's
+closing note updated to point at them instead of carrying the questions inline. The other two of
+BL-334's open questions (BL-207-vs-Stage-C precedence, model attach mechanics) stayed as BL-334's
+own design-owed detail — they resolve when BL-334 itself is promoted, not independently.
+
+---
+
+## Session — Ruling on NR-094: Stage C takes the dialogue layer, the scorer keeps the action seam (2026-08-08)
+
+Light mode, design ruling — no code. Ben, direct instruction after reading the pulled-in cloud
+research: *"Rule on NR-094 now."* Runtime: not tracked.
+
+**The ruling.** Accepted the C-route feasibility note's layer recommendation
+(`docs/ai/LANGUAGE_POLICY_FEASIBILITY.md` § 9). `corp_ai.cpp`'s deterministic scored-utility core
+stays the action generator indefinitely — distilling it can only reproduce it (no skill upside),
+and the note's measured constraint tax (91.5% → 48.0% executable accuracy under a hard schema)
+is a live, avoidable risk at exactly the scale a local model would run at. The diplomacy
+capability that motivated the C-route in the first place is separable from action generation —
+Cicero's own architecture proves it at 2.7B — and Io already named this Stage ("the LLM planner
+speaks in-character in channels") in `AI_OPPONENT.md` § 7 back on 2026-07-26, just never
+decomposed it into a buildable item.
+
+**AI_OPPONENT.md gained § 10g**, recording the ruling and — this is the actual correction, not
+just an endorsement — naming precisely where § 10d drifted: its "small local model plays through
+text" framing reads as the model calling `issue_command` directly, which is Stage A/B territory,
+not Stage C. MCP, BL-278, and the local-model-as-runtime-target all stand unchanged; only which
+Stage the model occupies was wrong.
+
+**BL-334 filed** (design-owed): Stage C's dialogue layer, shaped by the ruling — a small model
+(Cicero's reference point, 2.7B) conditioned on the `corp_decision` ring's winning command +
+reason code as an intent, speaking into the Public/private channels, never emitting
+`corp_command` itself. The concrete build (trigger cadence, prompt template, composition with
+Stage A's existing templated messages) is left open; the shape is settled, the item is not
+promotable yet. **BL-279 rescoped in place**, not cancelled or reopened: its corpus now trains
+BL-334 instead of an action-emitting model, bootstrapped from `corp_ai.cpp`'s own decision ring
+first per the note's own instruction, before any cloud spend.
+
+**Left deliberately open, not ruled on.** The note's third recommendation (a goal layer above the
+scorer, for the documented step-wise-myopia failure mode) — filed as an open question inside
+BL-334 rather than accepted or rejected, since Io's own play has not yet shown that failure mode;
+ruling on a mitigation for an unobserved problem would be guessing. The ~300-token-per-decision
+figure the note flags as an assumption also stays unmeasured — noted as a cheap, independent
+follow-up, not a precondition on this ruling.
+
+**NR-094 resolved.** Regenerated `NEEDS_REVIEW.md`.
+
+---
+
+## Session — C-route feasibility: both gates pass, and Cicero says the model is on the wrong layer (2026-08-08)
 
 Full mode, doc-only (no `src/` touched, so the item-spanning requirement gate doesn't apply).
 Ben, carrying context from the 2023 entailment-tree dissertation into Io: *see what patterns we
@@ -49,7 +370,7 @@ exceed `corp_ai.cpp`, and it walks straight into the **constraint tax** (a 1.5B 
 instructions suppress deliberation rather than at the decoder).
 
 **Left open, deliberately.** The layer recommendation contradicts § 10d, which Ben *accepted* on
-2026-08-03, so it is filed as **NR-079** (`decision-taken`, open) rather than written into
+2026-08-03, so it is filed as **NR-094** (`decision-taken`, open) rather than written into
 `AI_OPPONENT.md`, and the note itself carries a `⟳` saying plainly that it does not supersede
 § 10d. The § 4–5 feasibility findings stand independently of the § 7/§ 9 judgement call, and the
 NR entry separates them so Ben can accept one and reject the other. The recommended first move is
@@ -57,7 +378,499 @@ neither: § 10 flags the ~300-token-per-decision figure as an assumption, and on
 through the already-landed BL-278 MCP server would replace it with a measurement for free.
 
 **Not done.** No `backlog.json` item was filed — the note is evidence for a ruling, not a build
-brief, and BL-279's scope depends on which way NR-079 goes.
+brief, and BL-279's scope depends on which way NR-094 goes.
+
+**Id note (2026-08-08 merge):** filed on the cloud session's branch as NR-079, which collided
+with an unrelated, already-landed local entry of that id (era-minus-1 rebase fallout) — renumbered
+to NR-094 integrating this session, per the same collision-renumbering practice as the morning's
+roadmap-extension merge.
+
+---
+
+## Session — Critique batch delivered: build ledger grouping, construction glyph, reach-circle retirement, military start (2026-08-08)
+
+Full mode, Batch Delivery, sub-agent fan-out (Ben's steer). Promoted BL-326, BL-327, BL-328,
+BL-329, BL-330 from the prior session's critique into REFINED.md as a three-way file-disjoint
+split; delivered, verified, drained. Runtime: not tracked.
+
+**A — build ledger grouping + pre-commit warning (BL-326 + BL-328), one sub-agent, worktree-
+isolated.** `selection_panel.cpp`'s candidate list now groups by building family (Extraction /
+Processing / Infrastructure / Military) and sorts two-tier alphabetical — group, then row name —
+replacing the profit-ranked flat list Ben rejected ("not most profit first"). Each row also
+surfaces `construction_rate()` before commit: a stalled or supply-limited build says so up front
+instead of via the post-hoc paused status. **The agent's own worktree had branched from a stale
+base** (missing the Military Base row landed earlier this session) — its diff was extracted and
+hand-applied onto current `main` rather than merged wholesale. **One real bug found integrating
+it**: the warning rendered even on an already-invalid candidate ("Cannot build on water" AND
+"Local market can't supply materials" stacked on the same row) — fixed by gating the warning on
+`c.pr.ok()`, and the row height (four lines, hardcoded) clipped the new fifth line — fixed by
+reserving it unconditionally so every row stays a uniform height.
+
+**B — construction glyph + reach-circle retirement (BL-327 + BL-329), main session (same file,
+recently-authored code).** A new `icons::under_construction` — a stroke-only crane silhouette
+(mast, boom, back-stay, hook) — draws IN PLACE OF a building's type silhouette while
+`ticks_remaining > 0`, replacing the BL-323 S4 desaturation Ben found read as "faded" not "being
+built"; full owner-tinted colour, so identity still reads. `draw_corp_border`'s `AddCircle` ring
+is gone (renamed `draw_corp_hq`) for both the player's always-on chrome and rival borders under
+the Corporation lens — Ben's read: a fixed-radius ring that never grew as the player built
+outward showed nothing informative once the BL-323 reach fog existed to show supply reach
+properly. The `hq` star marker is unaffected. `influence_range` stays computed and stored (a
+future operate-gate may want it); LENSES.md, PLANETARY.md, `components.hpp`'s own doc comment,
+and `corporate_reach.lua`'s comments all updated to describe the marker rather than the retired
+ring.
+
+**C — military start (BL-330), one sub-agent, twice.** The first dispatch returned a placeholder
+("I'll report back once it completes") without actually editing anything; its worktree was
+auto-cleaned (no changes made) before the resume could reach it. The SECOND dispatch (or the
+same agent, retried) implemented it directly — the diff simply appeared in the main tree,
+complete and correct: the player corporation is seeded with one `military_base` and one unit
+(roster index 0, manpower 50, mirroring `hire_unit`'s own constant) at generation, on the nearest
+valid land tile to its HQ, skipped gracefully on a degenerate land-poor world. Rival corps are
+NOT seeded — player-only, per scope. `author_building`'s zero-staff condition extended to
+`military_base` to match.
+
+**Verification, all three slices.** Full `ProjectIo` build clean throughout. CTest: 45/55 —
+**investigated the one count that changed** (`home_surface_bench`, not in the prior session's
+documented baseline) by re-running it standalone (0 failures — a CTest parallel-load timing
+artifact, not a regression) and separately **isolated `ai_skill_harness`'s 7 failures** by
+`git stash`-ing this session's entire diff and re-running against the pre-batch commit: identical
+7 failures, confirming they predate this batch rather than being caused by BL-330's extra RNG
+draws (a real question worth checking, not assumed). Visual: `tile_build_ledger.lua`,
+`corporate_reach.lua`, and two ad-hoc zoomed captures (`glyph_check`, `mil_zoom`) inspected by eye
+per DEVELOPMENT_PRACTICES.md's Windows-authoritative rule (Linux golden-diffs on these all FAIL
+by the expected 4–7% platform noise; not re-blessed since none of the touched surfaces have a
+Windows-blessed baseline to diff against in this environment).
+
+**REFINED.md drained** per the retain-one policy. Requirements: requirements.json §
+critique-batch-ui-polish (R1–R6, all complete).
+
+---
+
+## Session — Live critique: seven items filed, the building-selection bypass fixed (2026-08-08)
+
+Light-to-Full mix: Ben played the day's landed work in the live app and critiqued surface by
+surface; the sliced-globe render (committed separately, same sitting: 48 slices, Ben's pick from
+a six-form comparison) came out of the same session. Runtime: not tracked.
+
+**Filed from the critique, one item per directive** (all dated, all carrying Ben's words):
+BL-326 (build-ledger groups — expandable, two-tier alphabetical, explicitly NOT profit-first),
+BL-327 (a dedicated under-construction glyph REPLACING the BL-323 S4 dimming — superseded
+same-day, the dimming read as "faded" not "building"), BL-328 (pre-commit "this building won't
+get materials" warning — construction_rate already computes it, the ledger just never shows it),
+BL-329 (retire the corp-reach circle now the reach fog shows supply properly; blocked on
+BL-333), BL-330 (player starts with a military base + one unit), BL-331 (nuclear weapons develop
+in-game — WW3 is a nuclear threat; design-owed, hangs off BL-223's averted rupture and the
+BL-087 tech constellation), BL-332 (military points produced by bases + a dedicated research
+building, because nothing today measures how tech gets done; design-owed, the two halves
+designed together).
+
+**The one outright bug, fixed in-session (BL-333).** Selecting a player building bypassed the
+Selection element entirely — draw_selection_content routed it straight into the full management
+card (the 2026-07-22 "four-numbers card is useless" layout call, now superseded). A building now
+takes the same action|facts Selection view as every other kind: construction status, an
+Operate → **Manage** button (opens the construction ledger's Buildings tab, which already keys
+off selected_entity), profitability facts right. The ~300-line rich management card is PARKED
+`[[maybe_unused]]`, not deleted — whether it becomes the Buildings tab's detail pane or dies is
+NR-093, Ben's call. Verified by capture: the Selection band shows header / status / Manage /
+profitability on a fresh player building.
+
+**Approved in the same critique, no action needed:** the wizard globe (committed as the sliced
+render) and the reach-fog display of supply reach.
+
+---
+
+## Session — Military base S1: the muster building lands (2026-08-08)
+
+Full mode, Delivery: BL-325 (military bases + supply) promoted, S1 delivered and drained; S2
+(hire-at-base) and S3 (out-of-supply decay) deliberately left in the item. Same sitting as the
+hardening entry below. Runtime: not tracked.
+
+**The type, end to end.** `building_type::military_base = 6` — economics array bumped 6 → 7 (the
+kind of silent-size bug the array's own comment now names), Lua name-map + `economy.lua` entry
+(produces nothing, staffs at zero alongside port/hub, dearer than a hub, cheaper than a
+launchpad), an explicit `can_place` case (any non-ocean land, no deposit requirement), named in
+`presentation.cpp`. The BL-323 machinery applies without a line of new code: the reach rule gates
+placement (deliberately NO anchor-type exemption — ruling 3 says the base extends nothing), the
+S3 site-time multiplier prices its build, and the S4 construction dimming renders it.
+
+**The glyph.** A filled shield — flat top, shoulders tapering to a bottom point — in
+`icons::building`, catalogued in ICONS.md per its add-a-glyph rule. Echoes the unit chevron's
+martial downward-point reading while staying unconfusable with it: the chevron is stroke-only,
+every building glyph is filled.
+
+**The surfaces and the dictionary.** Offered in the tile build ledger and the Selection primed
+check; `gameplay.build`'s ACTIONS.json entry updated (typed-args domain + reason_to_select names
+the base as where units muster once S2 moves hire onto it) and the mirror regenerated. The verify
+seam's `place_mode` was also missing launchpad and logistics_hub, not just the new type — all
+three added, so scripts can now arm any placeable building.
+
+**Verified.** `buildings_rework_harness` extended R6/R7: 19/19 PASS — land-in-reach placeable,
+ocean refused, beyond-reach refused (no exemption), staffs at zero, and ruling 3 held in code (a
+COMPLETED base is not a supply anchor; building one changes nothing in the reach field). A
+campaign `--verify` run placed one through the real construct path (tile 135,83) and the zoomed
+capture shows the shield rendering dimmed-under-construction with the Selection band naming it.
+Requirements: requirements.json § military-base-s1 (R1–R5, all complete).
+
+---
+
+## Session — Reach-rule hardening: three S2 defects ruled and fixed, and the military-base design settled (2026-08-08)
+
+Full mode, same sitting as the first-slice delivery below. Ben's steer: consider outside-the-box
+problems with BL-323 (buildings × visibility, buildings × the unfinished logistics system,
+buildings × military), then work the bugs one by one with a Q&A. Runtime: not tracked.
+
+**The review found three real defects in the already-landed S2, each ruled live via Q&A.**
+
+- **Stale caches (Ben: invalidate on EVERY event, the simple rule).** Placing a port/hub never
+  cleared `body_reach_cost` — the new anchor took effect only when an unrelated road placement
+  happened to clear the cache. Demolition cleared nothing, leaving ghost anchors. Fixed with a
+  shared `invalidate_logistics_caches` helper (logistics.hpp) called at every place, demolish,
+  construction completion, decommission/resume flip (all five flip sites: the corp-command idle
+  verb, the Selection panel's Idle/Resume pair, the construction panel's Decommission button, the
+  economy system's idle-a-loser reflex) and road placement.
+- **The virgin-body bootstrap was broken (Ben: first anchor free on anchor-less bodies).** The
+  anchor-tile exemption only covered tiles that already WERE anchors — none exist on a virgin
+  body, so the all-infinite field refused everything including the first hub, making Era 1
+  off-world expansion impossible once reach is enforced. An anchor-type placement now skips the
+  rule when `body_has_supply_anchor` is false. The guard: EXISTENCE of any committed anchor
+  (under construction included) ends the exemption, so the player cannot spam free hubs across a
+  virgin body while the first is still building.
+- **An unbuilt hub anchored supply (Ben: anchor only when complete).** `is_supply_anchor` ignored
+  `ticks_remaining` while the convoy-discount path required completion — the two disagreed, and a
+  construction-site shell extended placement reach. Now both use the same contract
+  (`ticks_remaining <= 0 && !decommissioned`), and hub-chaining outward gains natural build-time
+  pacing: the next reach step waits for the hub to finish.
+
+**Verified.** `logistics_reach_harness` extended with R9–R11 (completion contract, bootstrap with
+its no-spam guard, invalidation through the REAL construct/demolish path with no manual clears):
+26/26 PASS. Sibling harnesses re-run clean (buildings_rework, construction, corp_ai,
+supply_advance, trade_routes, econ). Full app build clean. Requirements:
+requirements.json § reach-rule-hardening (R1–R4, all complete).
+
+**The military thread settled into BL-325 (military bases + supply), four rulings via Q&A.**
+One new `building_type::military_base` (muster building, distinct rule + glyph); hiring moves
+onto the base (superseding BL-324's hire-anywhere — the base becomes the economy→military
+interface); **one reach field, not two** — Ben's own words: "a nation's reach for economy is also
+the military reach," so the economic logistics network IS the military supply envelope and the
+base is NOT an anchor (recorded as an interpretation in NR-091, overturnable — his "directional"
+could also have meant forward bases extend the envelope); units beyond the boundary suffer
+deterministic per-tick strength decay, the campaign twin of the Era −1 sim's supply attrition.
+Filed `designed`, priority B, v0.1.5 (the military-systems minor), requires BL-324.
+
+**Also logged.** NR-090 (question): rival construction state is publicly visible via the S4
+dimming — BL-068 never ruled on it; recommended ratifying it as public. NR-092 (observation):
+reach gates placement but never operation — a grandfathered remote building operates and ships
+freely; the asymmetry stands until BL-288's transport-capacity work and is noted for its design.
+
+---
+
+## Session — Buildings rework, first slice: extraction padding, site-dependent build time, construction legibility (2026-08-08)
+
+Full mode, Delivery lifecycle: promote BL-323 (Buildings rework) into REFINED.md, deliver, drain.
+Runtime: not tracked. Ben's steer: pull from origin, work the roadmap, land the uncommitted
+tree, then pick up BL-323 next.
+
+**Scoped honestly rather than promoted whole.** BL-323 has four sub-slices; S2 (logistics reach)
+and its S2b UI wiring were already landed in the prior session. Of the remaining three, S1
+(roster pad) was promoted **partially**: PRODUCTION.md's designed extraction table (Mine, Quarry,
+Lumber Camp, Ice Extractor, Surface Extractor) all target resources already in the current
+`resource_type` enum, but most of its processing chains (Chemical Plant, Electronics Lab,
+Fabricator, Assembly Plant, most Refinery outputs) need NEW resource types with no market/price/
+serialisation wiring — a design item of its own, not a Lua-authoring pass. Flagged in REFINED.md
+rather than silently narrowing the item's promoted scope.
+
+**A — extraction roster padded, zero logic changes.** `k_extractable` (`placement_rules.hpp`)
+widened from 4 to 15 targets: coal, silica, copper_ore, rare_earth_ore, stone, sand, clay, timber,
+iron_nickel_ore, platinum_group_metals, regolith — every resource `tile_generation.cpp` already
+deposits (confirmed by reading the generation code, not assumed) but that no extraction target
+reached. `can_place`, the build-mode target picker (`selection_panel.cpp`, `body_surface_canvas.cpp`),
+and the resource presentation table (names, short codes, colours) were all already generic over
+this list, so the whole pad is an 11-line whitelist addition.
+
+**B — the Smelter's second recipe.** `iron_nickel_ore -> steel` added to `recipes.lua`
+(PRODUCTION.md's designed Era-1 Smelter input, no carbon reagent needed since metallic asteroids
+are already reduced) — no enum churn, recipe count 4 -> 5.
+
+**C — build time depends on the site (S3, landed in full).** `construct_building` now scales the
+base `build_duration_ticks` by three multipliers at placement, each 1.0 at the cheapest case so an
+anchor-adjacent plains first-of-its-kind build reproduces the old flat behaviour exactly:
+**landform** reuses `landform_logistics_cost` (plains 1.0 .. mountain 2.0, no second terrain
+table); **reach** is linear in the tile's distance from its nearest supply anchor, from 1.0 at the
+anchor to `1 + site_time_reach_scale` at the `max_logistics_reach` budget edge; **stack** discounts
+an established site (a tile already carrying the same building type), floored at
+`site_time_stack_min`. New `construction_params` fields (`recipe_registry.hpp`), authored in
+`economy.lua`. `ticks_remaining` floors at 1 for any real-duration type; a 0-duration type (some
+infrastructure, by design) stays instant regardless of site.
+
+**D — construction reads as such at a glance (S4).** A building with `ticks_remaining > 0` renders
+desaturated/half-alpha on the Planetary canvas — previously identical to a finished building until
+clicked. The glance-then-stick hover card (`hover_building_supply` in `hover_content.cpp`) gained a
+"under construction — N ticks remaining" line, outranking the decommissioned/idle status lines
+(construction has no output to explain yet regardless of workforce). The Selection panel's fuller
+rate/stall diagnosis (`construction_status`, already existing) is unchanged — this closes the
+canvas-legibility gap the item's own design record named, not the click-through detail, which
+already existed.
+
+**Verification.** New `tools/verify/buildings_rework_harness.cpp`: 12/12 PASS (every widened
+`k_extractable` target placeable on its own deposit and refused without one; the iron-nickel
+recipe resolves distinctly from the iron recipe; landform/reach/stack each move `ticks_remaining`
+the right direction; the 1-tick floor and the 0-duration instant case both hold). One harness bug
+caught and fixed in-session: the R5 fixture built only the tiles under test rather than the full
+grid, so the reach-field's A* found a gap and read the remote test tile as unreachable
+(`out_of_logistics_range`) rather than merely far — fixed by building a complete grid, as the
+existing `logistics_reach_harness` fixture already does. Full `ProjectIo` build clean. CTest
+46/55 — the 9 non-passing (`ai_skill_harness`, `econ_stability`, `world_audit` failures;
+`earthlike_lean_trace`/`earthlike_tile_census`/`history_sim_harness`/`history_sweep`/
+`mediterranean_sweep`/`notable_worlds` timeouts) all match the pre-existing failures the prior
+session's audit note and this session's own environment already documented — reproduced
+identically without this change, not a regression it introduced. A zoomed `--verify` capture
+(`zoomcheck_built`, not a golden — a one-off inspection tool) confirmed the desaturated marker
+renders correctly on a freshly-placed, still-building tile.
+
+**What stayed open, recorded in BL-323's own design field rather than silently dropped.** The
+processing-chain half of S1 (see above). Requirements: requirements.json § buildings-rework-
+first-slice (R1–R7, all complete). REFINED.md drained per the retain-one policy.
+
+---
+
+## Session — landing the uncommitted generation-preview / Era -1 terrain work (2026-08-08)
+
+Full mode: review and land the foreign uncommitted working-tree state the prior audit-note entry
+(below) found but deliberately left untouched. Runtime: not tracked. Ben's steer: sort out the
+uncommitted work before picking up new roadmap items.
+
+**What it actually is, confirmed against the code rather than assumed from the audit note.**
+Four distinct pieces, all real and all verified, none previously landed:
+
+- **BL-316 S1 (Era -1 real terrain).** `src/world/sim_terrain_build.hpp` (new) — the ECS-to-view
+  adapter `build_sim_terrain` that raster-samples a body's tiles into the `sim_terrain_view` the
+  history sim reads. Before this every Era -1 battle in every run was fought on default
+  grassland/plains, so `terrain_combat`'s modifiers were dead code. `history_sim_harness` and
+  `history_sweep` wired to use it; the sweep's grid dims were also silently wrong (168×90 vs the
+  real 180×84 — both 15120 tiles, so the mismatch never crashed, it just misaligned every terrain
+  lookup) and its S2 recheck was comparing against an EMPTY terrain view rather than the real one
+  used to produce the row being rechecked — a guaranteed false result the moment terrain affects
+  a decision. Both fixed.
+- **BL-323 S2b (the reach-budget gate's last two call sites).** The item's own design record
+  named this as "required rather than cosmetic" and still owed at three UI call sites; two were
+  already fixed, this session's diff wires the third and fourth: `run_verify`'s tile-scan path
+  (was offering tiles the authoritative gate would then refuse) and the live canvas render
+  loop's per-frame `body_reach_field` build (the interactive game was never calling it at all).
+- **BL-321 wiring.** `works_registry` (landed as `src/world/works_roster.{hpp,cpp}` in an earlier
+  commit) gets an `m_works` member and a `load_from_lua("scripts/works.lua")` call in
+  `app::load_economy` — the runtime loader was written but never actually wired into the app.
+- **The wizard's real-surface preview pane — NOT BL-256.** `src/ui/generation_preview.{cpp,hpp}`
+  (new) plus `generate_home_surface_preview` (new in `hard_coded_world.{hpp,cpp}`, extracted
+  from `make_hard_coded_world` so the wizard and the real build share one seed-choice function
+  by construction) replace the wizard's charts-only screen with a 1/3-controls : 2/3-preview
+  split, painting a hex-sampled orthographic globe of Kepler's ACTUAL generated surface (parity
+  verified tile-for-tile against `make_hard_coded_world`, see below), built async off-thread so a
+  control click never blocks and synchronous under `--verify` so goldens don't race the worker.
+  **This is a smaller, different thing than BL-256** (`GENERATION_GLOBE_PREVIEW`, still
+  `designed`, v0.1.1): no player pan (rotation is wall-clock only), no pole-treatment
+  measurement, no BL-265 fold-vocabulary integration for the demoted charts, no debug-window
+  task-1 prototype. Filed as NR-089 rather than silently treated as BL-256's landing — Ben's
+  call on whether BL-256 is now superseded/narrowed or still wanted in full.
+
+**Verification, since none of this had run before.** Fixed one real bug found in review: the new
+`generate_home_surface_preview` declaration had landed mid-way through `make_hard_coded_world`'s
+own doc comment in the header, splitting it from the function it documents. `home_surface_bench`
+(new harness, `tools/verify/home_surface_bench.cpp`) confirms the preview surface is
+byte-identical to `make_hard_coded_world`'s Kepler across five seeds, worst case 793 ms (under
+the 1 s ceiling the wizard's async path exists to guard against). `works_roster_harness` 18/18
+PASS. Full `ProjectIo` + `home_surface_bench` + `history_sim_harness` + `history_sweep` +
+`works_roster_harness` build clean. The wizard/menu goldens in the tree were already re-blessed
+for the new layout; Linux golden-diff numbers (0.75–20%) are expected noise per
+DEVELOPMENT_PRACTICES.md's Windows-authoritative rule — inspected all six captures by eye
+instead, all correct (`planetology_wizard_1_life.png` shows the real Kepler terrain painted as
+hexes, matching the live canvas's own rendering). `history_sim_harness` and `history_sweep`
+themselves ran past two minutes in this environment without finishing — consistent with the
+prior audit note's finding that this specific harness runs anomalously slowly here independent
+of code changes; not re-litigated, since the code-level correctness (terrain adapter, dimension
+fix, recheck fix) was verified by reading and the harness's own logic is unit-testable by
+inspection.
+
+**Local-only artifacts discarded, not committed.** `docs/ui/mockdata/*.csv` and the six
+`perf_*.csv` files at repo root are regenerated output from running verify scripts locally, not
+source — reverted rather than landed, per the prior audit note's own read of them.
+
+---
+
+## Session — military design thread + BL-324 batch delivery (2026-08-08)
+
+Full mode: design conversation (BL-157/BL-324/BL-305/BL-280), then Batch Delivery of the two
+items that reached `designed`. Runtime: not tracked — no session timer available in this
+environment; treat as missing rather than guessed.
+
+**Military design thread (BL-157).** Recorded as an open thread, not a ruling: hybrid units
+(lean toward blended roster-entry class weights over a composite/force model, to avoid
+reopening BL-157's own "no force record, unit grain" settlement), zone of control (a
+radius-1 tile-neighbourhood projection, 5-8 tiles, open question on what it actually denies),
+and multi-round battle resolution (a bounded outer loop around `resolve_battle`, seeded RNG,
+keeping the Era -1 sweep's single-evaluation cost contract intact). Three rendering sketches
+produced to react to, none chosen. See BL-157's `design` field for the full write-up.
+
+**Three items designed in one pass, question-by-question.** BL-324 (unit hire surface): hire
+gate reads the corp's own stockpile/market access; the `unit_component.body`->tile grain fix
+lands inside this item rather than reopening BL-157; rival AI corps get the hire verb from day
+one. BL-305 (nation/corp generation visibility): territory carve watched live on the
+generation screen; corp step splits by surface (canvas for placement, card for the financial
+profile). BL-280 (negotiated tax rate): negotiation surface (Laws ledger) and cadence
+(player-initiated, at a cost) settled; the counterparty-cost mechanism stayed explicitly
+parked, so BL-280 stays `design-owed` — not every open question resolves in one pass.
+
+**BL-324 promoted and delivered in full — all 5 tasks, all 7 requirements met.**
+- **A — the unit record.** `unit_component.position` (a tile id, replacing `body`) + a
+  fixed-point `strength` scalar; `world::units` already existed as the id-keyed map BL-157
+  asked for. Two other consumers of the old `.body` field were still on it and needed fixing
+  alongside components.hpp: `entity_summary.cpp`'s Selection-panel render and `view_nav.cpp`'s
+  go-to-selection navigation — both resolve the body through the tile now.
+- **B — the campaign hire gate.** `unit_roster.cpp` gained a `gate_met` overload taking four
+  raw ints (shared by both the province path and this one) plus `campaign_gate_input`, which
+  derives ore/farm/port/energy axis values from the corp's own summed stockpile
+  (`corp_stockpile_total`, exported for corp_command.cpp to reuse) and whether it holds a
+  port. Binary presence (1000 or 0) by design — a yes/no supply-chain question, not graduated
+  tuning.
+- **C — the hire verb.** `corp_verb::hire_unit` debits a flat per-axis cost from the gated
+  resources (two-phase check-then-commit, all-or-nothing) and constructs the unit at the
+  target tile. `corp_ai.cpp` scores it in its own candidate bucket, capped at one hire per
+  eval — and, after the AI skill harness measured the consequence, at **three units per corp
+  total**: the presence-based gate never runs out on its own (unlike build sites or
+  unsurveyed bodies), so without a ceiling a corp with steady extraction hired every single
+  eligible eval, forever (measured: 525 hires in a 300-tick/5-corp run, identical across all
+  five benchmark seeds — the count was gate-driven, not score-driven). The cap is a first-cut
+  brake (a modest garrison, not full mobilisation), not a tuned balance figure.
+- **D — the hire affordance.** A Hire section in the tile Selection element's construction
+  ledger (`selection_panel.cpp`), beside the existing Build candidates — not folded into that
+  loop, since hiring never touches building slots or placement validity. `selection_kind::unit`
+  was already wired end-to-end (label, render) from BL-157's stub; this is what finally makes
+  it reachable.
+- **E — the standing-rules record.** `io-standing-rules.md` gained the rival-corp hiring
+  exception entry, alongside BL-079/BL-202/BL-181.
+
+**Two harness regressions found and fixed, both from the same root cause.** `corp_ai_harness`'s
+cooldown check and `ai_skill_harness`'s dial-thrash-ceiling check both classify "not build, not
+survey" as a per-building dial — `hire_unit` is neither (it never sets `cmd.subject`), so both
+harnesses needed `hire_unit` excluded from that classification. Caught by running the harnesses
+after each change, not assumed clean from a compile pass.
+
+**What stayed out.** BL-305 was promoted into REFINED.md (4 tasks, requirements written) but
+**paused before any code**, on discovering its file scope (`hard_coded_world.cpp`, `app.cpp`)
+exactly matches the uncommitted generation-preview/Era -1 work already sitting in the tree from
+another session (see the entry below). Recorded as NR-085, `decision-taken`: safer to land the
+disjoint, complete BL-324 delivery than risk colliding with unreviewed foreign edits on the same
+files. BL-305's tasks stay in REFINED.md, ready to resume.
+
+**Pre-existing failures surfaced, none caused by this session's changes** (verified by stashing
+this session's diff and re-running against the bare tree, twice — before and after the unit
+cap): `ai_skill_harness`'s seed 0/1 net-worth bands and seed 3's dial-thrash ceiling, and
+`world_audit`'s S2 forest+wetland target, all fail identically with or without this session's
+code. `history_sim_harness` alone (no contention) still ran past 30s in isolation against its
+own documented ~2.1s budget — so `earthlike_lean_trace` / `history_sweep` /
+`mediterranean_sweep` / `notable_worlds` timing out under CTest's 60s bound is plausibly the
+same cause, not CPU contention. All of these touch files the uncommitted foreign work already
+modifies (`hard_coded_world.cpp`, the Era -1 sim's terrain view); left unreviewed and unfixed
+per this session's scope, consistent with pausing BL-305 for the same reason.
+
+---
+
+## Session — audit note: uncommitted generation-preview / Era -1 terrain work found in the tree (2026-08-08)
+
+Not a build session — nothing here was authored in this session. Recorded per Ben's steer
+("fill a phantom devlog for the work... if we don't have to review it, that's ok") so a chunk of
+real, uncommitted working-tree state doesn't sit unexplained for whoever finds it next. Runtime:
+not applicable — this is an inspection record, not delivered work, ~10 min of `git diff`/`grep`.
+
+**What was found.** While auditing whether the buildings rework (BL-323) was actually complete
+(it isn't — see the entry below), `git status` turned up a second, unrelated body of uncommitted
+work already sitting in the tree, apparently mid-flight from another session:
+
+- `src/ui/generation_preview.{cpp,hpp}` (new, 525 lines) + an `app.hpp`/`app.cpp` diff — the New
+  World wizard's preview pane now builds the REAL homeworld surface asynchronously
+  (`generate_home_surface_preview`, new in `hard_coded_world.hpp`) instead of a stylised
+  painting; async off-thread so a wizard control click never blocks, synchronous under
+  `--verify` so goldens don't race the worker. `tools/verify/home_surface_bench.cpp` (new)
+  benches it.
+- `src/world/sim_terrain_build.hpp` (new) — an ECS-to-view adapter for the Era -1 sim (BL-316
+  S1). Its own header comment records a real bug this fixes: every Era -1 battle before this was
+  fought on default grassland/plains regardless of actual terrain, so `terrain_combat`'s
+  defence/attrition modifiers were dead code in every run to date.
+- `app.hpp` also wires in `works_registry` (BL-321, Era -1 works table).
+- `tools/verify/history_sim_harness.cpp` / `history_sweep.cpp` — R7's timing bound relaxed
+  1s -> 3s, with an in-code comment explaining why (the settle-occupancy fix quadrupled real
+  province count — correct behaviour, more work — measured ~2.1s; the sub-second bar is filed to
+  return once BL-320, Era -1 sim runtime, lands its index).
+- `perf_*.csv`, `docs/ui/mockdata/*.csv`, and the re-captured golden PNGs are just local
+  perf/verify-script output, not source changes.
+
+**State.** BL-316, BL-321 and BL-274 (era-keyed rosters, which this touches too) are all still
+`designed` in `backlog.json` — no matching `complete`/`resolution`, no prior DEVLOG entry, no
+stash. This is live, uncommitted, working-tree state, most plausibly another session still open
+elsewhere. Left untouched — not reviewed, not committed, not reverted. If it's yours, it's
+exactly where you left it.
+
+---
+
+## Session — The Era -1 arc's second day: Ages view, sweep verdict, review, and the fixes (2026-08-05)
+
+Retroactive entry, written 2026-08-07: this session's five commits reached `main` that day by
+rebase onto `origin/main`, and the arc had no DEVLOG record until this repair (NR-079). Full
+mode, delivery. Runtime: reconstructed from commit stamps — 08:42 to 12:26, ~3.7 h.
+
+**The Ages view** (*The Ages view: two thousand years of borders, scrubbable*). A fourth History
+tab replaying the Era -1 sim's ownership change list: year scrubber, Play/Restart transport,
+provinces coloured by polity, the run's own cost printed under it. The sim runs lazily over a
+COPY of the body's settlement state — deliberately not in the generation path, so BL-271's
+(Era -1 history sim) open question 2 stayed open rather than being answered by accident. Delta
+encoding is what makes it possible: any year materialises from 654 changes / 5.2 KB. Captures
+inspected, NOT blessed — the software renderer fails on this machine, so a golden blessed here
+would be GPU-specific.
+
+**The sweep, and the answer is no** (*The history sweep, and the answer it gives is no*).
+BL-275 (history sweep distributions) landed as `tools/verify/history_sweep.cpp` — reports, does
+not gate. First spread: hegemony 0/12, elimination 0/12, powers-at-epoch equals powers-at-start
+in every world. BL-224's non-hegemony invariant satisfied for a degenerate reason — elimination
+and collapse are unreachable — which is the false confidence the sweep existed to expose. Filed
+in-session as the no-elimination finding, priority A (see the id note below).
+
+**Rosters and two great powers** (*Rosters, two great powers, and a death spiral that does not
+quite kill*). BL-274 (era-keyed rosters) landed as `src/world/unit_roster.{hpp,cpp}` — 19 rows
+over four bands, availability derived from province endowment, resolving INTO combat's types
+rather than combat gaining a roster table it was designed not to have. BL-299 (great-power
+seed) seeds two majors with opposed creeds off `history_sim_params`. The first no-elimination
+fix attempt (cohesion, a settle gate, a sack, transfer relief) made hegemony reachable (0/12 to
+1/12) but not elimination (still 0/12); the weakest power measures median 6 provinces, range
+1..22 — the model "gets to the brink and stops", recorded as a FAILED requirement row rather
+than re-scoped.
+
+**The review that reframed it** (*The review lands, and the sim stops in year 458*). Cold
+review, nine findings. The severe one: the four verbs score on incommensurable scales, so
+Invest pins at its ceiling once populations mature and no other verb can win the argmax again.
+Measured: last ownership change at median year 458 of a 0–1960 run, 36% of changes in the first
+tenth. Three quarters of every run inert — which supersedes the no-elimination diagnosis. Four
+items filed (see the id note below).
+
+**Four review items: three land, one reverts** (*Four review items: three land, one reverts,
+and the stall was never real*). The settle-stacking fix was the biggest lever in the arc: an
+occupancy search instead of nine untested candidates, conquests 201 → 3568, LAST CHANGE YEAR
+458 → 967, first-tenth share 36% → 5%. The Ages cache re-keyed on a generation fingerprint. The
+verb-scales fix REVERTED — normalising by each verb's own range structurally favours the
+narrowest range; the real fix is one scale by construction, a scorer redesign. And the
+vacuous-stall finding exposed the arc's biggest design correction: with the radius widened and
+`w_dist` zeroed, under-supplied campaigns still TAKE the far province — the stall that BL-277's
+(Era -1 military strategy) Q2 attributed to supply decay is a score preference, not a physical
+limit. Full-run cost measured at ~2.1 s (749 real provinces instead of 191 — the growth is the
+improvement).
+
+**The id note (2026-08-07 rebase).** These sessions filed their findings as backlog ids 308–313
+and review-queue notes 064–066; the rebase onto `origin/main` kept origin's ids, which the
+2026-08-06 sessions had already spent on unrelated items (propellant, deeds, tech tree, works
+doctrine, minimap, time panel). The landed fixes need no re-file. The two still-open findings —
+no-elimination and verb scales — currently have NO backlog id (the scorer redesign sits
+unnumbered in the 2026-08-07 working tree), and BL-277's (Era -1 military strategy) design
+prose lost both its five answers and the Q2 correction. NR-079 records the debt; requirement
+groups `history-sweep`, `era-rosters-and-great-powers` and `era-minus-1-review-fixes` carry the
+corrected citations.
 
 ---
 
@@ -265,6 +1078,40 @@ choice to differentiate it; a band that opens 3-band gaps needs the gaps explain
 checked rather than asserted — region 38 objects, web-wide 88, extrapolating to ~120–135. Open,
 in NR-064: whether Works Doctrine gates corporation generation (lean yes — file it when BL-296
 lands), and whether the region earns its own viewer tab (lean no — the era strip means eras).
+
+---
+
+## Session — Roster bands become a partition, and the Era -1 sim lands (2026-08-04)
+
+Retroactive entry, written 2026-08-07 alongside the 2026-08-05 arc entry above — the rebased
+commits carried no DEVLOG record (NR-079). A late-evening sitting, commits at 23:06 and 23:30.
+Full mode, design then delivery. Runtime: reconstructed from commit stamps; the visible span is
+the last ~25 min of a longer evening.
+
+**The partition** (*Roster bands become a partition, and the Era -1 scorer is designed*). The
+ladder's roster grouping had T2 in two groups at once — never a partition, so never
+implementable. Settled off the Military column: classical=T1, medieval=T2–T3, gunpowder=T4,
+industrial=T5–T6, the T1/T2 break resolving forward because stirrup heavy cavalry IS the
+medieval military revolution. Consequence: a 0 CE start is classical alone; shock cavalry is a
+T2 unlock, not an epoch unit. BL-277 (Era -1 military strategy) had all five of its questions
+answered in design: ring-closure objectives, supply-decay force commitment, naval as
+crossing-enabler only, marginal-score peace at province granularity, creed-led doctrine.
+Seasonality amended against BL-271 (Era -1 history sim): season is an axis of the action, not a
+phase of the clock — a year tick stands, and "campaign in winter" is a scored candidate.
+Convergence settled as rejection sampling on the 1960 output, reusing the C1 rejection-census
+idiom. (The rebase later dropped these design-prose edits from `backlog.json`; the answers
+survive in the commit message and this entry — see the id note in the entry above.)
+
+**The sim** (*Era -1 history sim: the year tick runs, and the scorer decides*). Landed as
+`src/world/history_sim.{hpp,cpp}` — a year tick over polities seeded from cultures, each
+picking from a bounded candidate set by integer score: the corp-AI stage-A idiom, reused
+because BL-271's transfer contract says the architecture graduates and the constants do not.
+Territory moves at province granularity, never tile; `combat.{hpp,cpp}` untouched. The harness
+flushed three defects, all fixed rather than tuned around: the 1.87 MB per-year ownership grid
+delta-encoded down to 6 KB; a quadratic candidate scan cut from 2554 ms to 626 ms with a
+prebuilt neighbour index; and winter campaigns scored-but-never-chosen until the defender
+readiness penalty entered the score. The first Linux CTest baseline was recorded in-session:
+43/49, six failures predating the work (Windows-blessed goldens and sweep timeouts).
 
 ---
 

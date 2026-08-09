@@ -59,6 +59,21 @@ struct generation_report
     struct body_entry
     {
         std::string       name;
+
+        /// The world entity this entry describes — the IDENTITY key (BL-257).
+        /// Every consumer that used to match a report entry to a world body by
+        /// comparing `name` matches on this instead: names are generated and
+        /// display-only, so a name test is a display string standing in for an
+        /// identity. `null_entity` only on a report built without a world
+        /// (none today; the wizard's preview uses `generate_body_previews`).
+        entity_id         id = null_entity;
+
+        /// True for the homeworld — the same flag `body_inputs::is_homeworld`
+        /// carries, copied through so a consumer holding only a report (a
+        /// harness comparing two generations, with no `world` in hand) can ask
+        /// "which entry is the home body" without a name test.
+        bool              is_homeworld = false;
+
         planetology_state state;
 
         /// The same body with the industrial drawdown dialled to zero — what the
@@ -126,3 +141,19 @@ struct generation_report
 /// @return A fully populated world ready to drive the simulation.
 world make_hard_coded_world(world_params params = {}, generation_report* report = nullptr,
                             const world_gen_config& gen_cfg = {});
+
+/// The homeworld's tile grid dimensions — one authority for the 180×84 the
+/// build and the wizard preview both assume.
+inline constexpr int home_grid_width  = 180;
+inline constexpr int home_grid_height = 84;
+
+/// Generate ONLY the homeworld tile surface into @p w (a scratch world), exactly
+/// as make_hard_coded_world builds Kepler's: same resolved preferences, same
+/// planetology chain, same Continents pass, same BL-276 acceptance gate, same
+/// seed formulas — the gate is literally the same function. The New World
+/// wizard's preview pane calls this so the map a player rerolls IS the map
+/// "Begin" hands them. Rivers and the political layer (sibling passes the
+/// preview does not show) are skipped. Returns raster-order tile ids.
+std::vector<entity_id> generate_home_surface_preview(world& w, entity_id body,
+                                                     const world_params& params,
+                                                     const world_gen_config& gen_cfg = {});

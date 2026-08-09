@@ -41,6 +41,12 @@ rule has a fuller authority, it is cited — this file does not redefine it.
   manual target in the management UI pins it), and it never places, relocates, retargets,
   or decommissions. This is the *only* sanctioned auto-action on the player's corp; anything
   beyond this one dial stays prohibited. See `solve_workforce_target` in economy_system.cpp.
+  **Rival-corp hiring exception (BL-324, landed 2026-08-08):** background corporations may
+  raise units through the same `hire_unit` corp_verb the player uses — scored alongside
+  build/demolish/survey/road in `corp_ai.cpp`'s candidate list, capped at one hire per
+  evaluation, gated on the corp's own stockpile/market access (never on cash). A deliberate
+  widening of the BL-202/BL-203 exception, not a new category: hiring is one more legal verb
+  on the same deterministic scored-utility layer, not a planner of its own.
 - Do **not** introduce a retained-mode UI framework in place of ImGui for the prototype.
 
 ## Terms & docs

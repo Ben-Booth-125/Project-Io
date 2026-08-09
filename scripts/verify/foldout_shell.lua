@@ -18,7 +18,7 @@
 -- 300). The 1920x1080 case shares the shell_column_width() code path (W ~ 326) and is
 -- not separately captured (the harness window is fixed at 1280x720).
 
-verify.goto_surface("Kepler")
+verify.goto_surface("home")
 
 -- A few economy ticks so the header shows a live balance + sparkline and the ledgers
 -- have content to render inside the narrow column.

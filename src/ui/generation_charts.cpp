@@ -90,31 +90,84 @@ const char* stage_explainer(chain_stage s)
     }
 }
 
+/// Which round a stage belongs to — the accordion it is one item of. Derived
+/// rather than passed, so a full-canvas takeover can show the WHOLE accordion
+/// (BL-265 change 3) without either caller having to hand its round bounds down.
+/// Null only if the stage tables and `chain_round_at` ever disagree.
+static const chain_round* round_of(chain_stage s)
+{
+    const int si = static_cast<int>(s);
+    for (int r = 0; r < chain_round_count; ++r)
+    {
+        const chain_round& cr = chain_round_at(r);
+        if (si >= static_cast<int>(cr.first) && si <= static_cast<int>(cr.last))
+            return &cr;
+    }
+    return nullptr;
+}
+
 void draw_stage_fold(const generation_chart_source& src, chain_stage s,
                      ui_state& ui, detail_surface surface)
 {
     const int key = static_cast<int>(s);
 
-    // ── Folded: [chevron] Stage name  ·  verdict ──
+    // ── Folded: Stage name  ·  verdict … ⌄ › ──
     // The verdict is a GLANCE-class figure — a label and a list, no sentences — so
     // it survives at the resting level. The explainer paragraph and the charts are
-    // what expanding buys.
+    // what the controls buy. Both controls sit in the row's right gutter (BL-265
+    // change 4); the chevron used to lead the row here, which is exactly the split
+    // placement Ben called disorienting.
     ImGui::PushID(key);
-    fold_chevron(ui, surface, key);
-    ImGui::SameLine();
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
                        "%s", chain_stage_name(s));
     ImGui::SameLine();
     const std::string verdict = stage_verdict(src, s);
-    ImGui::TextDisabled("%s", verdict.c_str());
+    gutter_text(ImGui::GetColorU32(ImGuiCol_TextDisabled), verdict.c_str());
+    disclosure_controls(ui, surface, key);
     ImGui::PopID();
 
-    // ── Expanded: the whole stage, full screen ──
-    if (fold_overlay_begin(ui, surface, key, chain_stage_name(s)))
+    // ── Expanded in place: this one stage, where it sits ──
+    // Indented under its own verdict line so the accordion reads as a list with
+    // something opened inside it, not as a new section.
+    if (is_open_in_place(ui, surface, key))
     {
+        ImGui::PushID(key);
+        ImGui::Indent();
         ImGui::TextWrapped("%s", chain_stage_title(s));
         ImGui::Spacing();
         draw_stage_charts(src, s, false, &ui);
+        ImGui::Unindent();
+        ImGui::PopID();
+    }
+
+    // ── Full canvas: the whole ROUND, every stage open, scrolled ──
+    // Not just this stage. "Anything full screen deserves its full space" (Ben,
+    // 2026-08-02) — a takeover that showed one item of an accordion and left its
+    // siblings folded behind it was spending the largest rectangle in the app on a
+    // subset. The in-place set is deliberately not consulted: every stage renders
+    // open, so the view does not depend on what the player happened to unfold first.
+    if (!is_expanded(ui, surface, key))
+        return;
+
+    const chain_round* cr    = round_of(s);
+    const char*        title = cr ? cr->name : chain_stage_name(s);
+    if (fold_overlay_begin(ui, surface, key, title))
+    {
+        if (cr)
+        {
+            ImGui::TextDisabled("%s", cr->question);
+            ImGui::Spacing();
+        }
+        const int first = cr ? static_cast<int>(cr->first) : key;
+        const int last  = cr ? static_cast<int>(cr->last)  : key;
+        for (int si = first; si <= last; ++si)
+        {
+            ImGui::PushID(si);
+            // heading = true: each stage names itself, so the scroll reads as a
+            // chain of headed sections rather than one undifferentiated run.
+            draw_stage_charts(src, static_cast<chain_stage>(si), true, &ui);
+            ImGui::PopID();
+        }
         fold_overlay_end(ui);
     }
 }
@@ -247,20 +300,64 @@ void draw_stage_charts(const generation_chart_source& src, chain_stage s, bool h
     // us telling them what they ought to ask of the game." The pairs themselves are
     // not lost and are not being abandoned: they survive in commit d143aa4 and are
     // BL-260's input, which relocates them to a JSON store read by developers.
+    // BL-215: chart geometry is measured BEFORE the box is reserved. row_place /
+    // row_reserve carry the resolved legend placement into the body lambdas, so
+    // draw_bars and threshold_line read the same reserve the row height used.
+    charts::legend_place row_place   = charts::legend_place::beside;
+    float                row_reserve = 0.0f;
+
     auto chart_row = [&](const char* id, const char* title, float h, int span,
-                         auto&& body) {
+                         const charts::bar* row_bars, std::size_t row_n,
+                         const char* row_fmt, auto&& body) {
         const bool full = (span >= cols);
         if (cell != 0 && !full)
             ImGui::SameLine(0.0f, style.ItemSpacing.x);
-        ImGui::BeginChild(id, {full ? 0.0f : col_w, charts::chart_row_height(h)}, true,
+        const float box_w = full ? ImGui::GetContentRegionAvail().x : col_w;
+        const charts::chart_metrics m =
+            charts::measure_chart(box_w, title, row_bars, row_n, row_fmt, h);
+        row_place   = m.place;
+        row_reserve = (m.place == charts::legend_place::beside)
+                      ? charts::legend_width(row_bars, row_n, row_fmt) : 0.0f;
+        ImGui::BeginChild(id, {full ? 0.0f : col_w, charts::chart_row_height(m)}, true,
                           ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
         ImDrawList* cdl = ImGui::GetWindowDrawList();
         ImGui::Indent(charts::gutter);
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", title);
+        // Title: wrap to at most two lines, then elide with a tooltip — a title
+        // is prose, and shortening the string is the fix BL-215 forbids.
+        {
+            const float tw = ImGui::GetContentRegionAvail().x;
+            ImGui::PushStyleColor(ImGuiCol_Text,
+                                  ImGui::ColorConvertU32ToFloat4(palette::selection));
+            if (m.title_lines <= 1)
+            {
+                ImGui::TextUnformatted(title);
+            }
+            else
+            {
+                const float two_lines = ImGui::GetTextLineHeight() * 2.5f;
+                std::string shown = title;
+                if (ImGui::CalcTextSize(title, nullptr, false, tw).y > two_lines)
+                {
+                    while (!shown.empty() &&
+                           ImGui::CalcTextSize((shown + "...").c_str(), nullptr,
+                                               false, tw).y > two_lines)
+                        shown.pop_back();
+                    shown += "...";
+                }
+                ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + tw);
+                ImGui::TextUnformatted(shown.c_str());
+                ImGui::PopTextWrapPos();
+                if (shown != title)
+                    ImGui::SetItemTooltip("%s", title);
+            }
+            ImGui::PopStyleColor();
+        }
         ImGui::Unindent(charts::gutter);
         const ImVec2 p  = ImGui::GetCursorScreenPos();
         const float  cw = ImGui::GetContentRegionAvail().x;
-        ImGui::Dummy({cw, h});
+        const float  extra = (m.legend_rows > 0)
+                             ? static_cast<float>(m.legend_rows) * 20.0f + 6.0f : 0.0f;
+        ImGui::Dummy({cw, h + extra});
         body(cdl, p, ImVec2{p.x + cw, p.y + h});
         ImGui::EndChild();
         cell = full ? 0 : (cell + 1) % cols;
@@ -303,10 +400,10 @@ void draw_stage_charts(const generation_chart_source& src, chain_stage s, bool h
         {
             const std::size_t n = body_bars([](const planetology_state& st) { return st.instellation; });
             const float c = charts::tight_ceil(std::max(bars_peak(n), 1.1f));
-            chart_row("##c_inst", "Instellation (S, Earth = 1)", 120.0f, 1,
+            chart_row("##c_inst", "Instellation (S, Earth = 1)", 120.0f, 1, bars, n, "%.2f",
                       [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx) {
-                charts::draw_bars(dl, mn, mx, bars, n, c, "%.2f");
-                charts::threshold_line(dl, mn, mx, 1.0512f, c, col_gate, "runaway greenhouse");
+                charts::draw_bars(dl, mn, mx, bars, n, c, "%.2f", 0.0f, row_place);
+                charts::threshold_line(dl, mn, mx, 1.0512f, c, col_gate, "runaway greenhouse", row_reserve);
             });
 
             // The homeworld on its own axis. The two gates that decide whether the
@@ -319,11 +416,11 @@ void draw_stage_charts(const generation_chart_source& src, chain_stage s, bool h
             hb[0].label  = name_of(static_cast<int>(home));
             hb[0].hollow = false;
             const float cc = std::max(2.0f, charts::tight_ceil(hs.instellation));
-            chart_row("##c_corridor", "Homeworld corridor (S, Earth = 1)", 120.0f, 1,
+            chart_row("##c_corridor", "Homeworld corridor (S, Earth = 1)", 120.0f, 1, hb, 1, "%.2f",
                       [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx) {
-                charts::draw_bars(dl, mn, mx, hb, 1, cc, "%.2f");
-                charts::threshold_line(dl, mn, mx, 1.0512f, cc, col_gate, "runaway greenhouse");
-                charts::threshold_line(dl, mn, mx, 0.3438f, cc, col_gate, "freeze-out");
+                charts::draw_bars(dl, mn, mx, hb, 1, cc, "%.2f", 0.0f, row_place);
+                charts::threshold_line(dl, mn, mx, 1.0512f, cc, col_gate, "runaway greenhouse", row_reserve);
+                charts::threshold_line(dl, mn, mx, 0.3438f, cc, col_gate, "freeze-out", row_reserve);
             });
             break;
         }
@@ -332,9 +429,9 @@ void draw_stage_charts(const generation_chart_source& src, chain_stage s, bool h
         {
             const std::size_t n = body_bars([](const planetology_state& st) { return st.v_esc_kms; });
             const float c = charts::tight_ceil(bars_peak(n));
-            chart_row("##c_vesc", "Escape velocity (km/s)", 140.0f, 2,
+            chart_row("##c_vesc", "Escape velocity (km/s)", 140.0f, 2, bars, n, "%.2f",
                       [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx) {
-                charts::draw_bars(dl, mn, mx, bars, n, c, "%.2f");
+                charts::draw_bars(dl, mn, mx, bars, n, c, "%.2f", 0.0f, row_place);
             });
             break;
         }
@@ -363,10 +460,10 @@ void draw_stage_charts(const generation_chart_source& src, chain_stage s, bool h
             const std::size_t n = body_bars([](const planetology_state& st) { return st.shore; });
             const float c = charts::tight_ceil(std::max(bars_peak(n), 1.6f));
             chart_row("##c_shore", "Retention shoreline (v_esc^4 / S, Mars = 1)",
-                      120.0f, sn > 0 ? 1 : 2,
+                      120.0f, sn > 0 ? 1 : 2, bars, n, "%.2f",
                       [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx) {
-                charts::draw_bars(dl, mn, mx, bars, n, c, "%.2f");
-                charts::threshold_line(dl, mn, mx, 1.5f, c, col_gate, "retains air");
+                charts::draw_bars(dl, mn, mx, bars, n, c, "%.2f", 0.0f, row_place);
+                charts::threshold_line(dl, mn, mx, 1.5f, c, col_gate, "retains air", row_reserve);
             });
 
             if (sn > 0)
@@ -375,10 +472,10 @@ void draw_stage_charts(const generation_chart_source& src, chain_stage s, bool h
                 for (std::size_t i = 0; i < sn; ++i)
                     peak = std::max(peak, sub[i].value);
                 const float cs = charts::tight_ceil(std::max(peak, 0.06f));
-                chart_row("##c_shore_lo", "Below the shoreline (same axis, rescaled)", 120.0f, 1,
+                chart_row("##c_shore_lo", "Below the shoreline (same axis, rescaled)", 120.0f, 1, sub, sn, "%.3f",
                           [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx) {
-                    charts::draw_bars(dl, mn, mx, sub, sn, cs, "%.3f");
-                    charts::threshold_line(dl, mn, mx, 0.05f, cs, col_gate, "airless below");
+                    charts::draw_bars(dl, mn, mx, sub, sn, cs, "%.3f", 0.0f, row_place);
+                    charts::threshold_line(dl, mn, mx, 0.05f, cs, col_gate, "airless below", row_reserve);
                 });
             }
             break;
@@ -390,11 +487,11 @@ void draw_stage_charts(const generation_chart_source& src, chain_stage s, bool h
             // The ceiling is forced past the upper gate so both edges of the
             // mobile-lid band render; a threshold above the axis top is dropped.
             const float c = charts::tight_ceil(std::max(bars_peak(n), 2.4f));
-            chart_row("##c_theta", "Interior heat budget (Earth now = 1)", 140.0f, 2,
+            chart_row("##c_theta", "Interior heat budget (Earth now = 1)", 140.0f, 2, bars, n, "%.2f",
                       [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx) {
-                charts::draw_bars(dl, mn, mx, bars, n, c, "%.2f");
-                charts::threshold_line(dl, mn, mx, 0.55f, c, col_gate, "mobile lid floor");
-                charts::threshold_line(dl, mn, mx, 2.20f, c, col_gate, "mobile lid ceiling");
+                charts::draw_bars(dl, mn, mx, bars, n, c, "%.2f", 0.0f, row_place);
+                charts::threshold_line(dl, mn, mx, 0.55f, c, col_gate, "mobile lid floor", row_reserve);
+                charts::threshold_line(dl, mn, mx, 2.20f, c, col_gate, "mobile lid ceiling", row_reserve);
             });
             break;
         }
@@ -403,11 +500,11 @@ void draw_stage_charts(const generation_chart_source& src, chain_stage s, bool h
         {
             const std::size_t n = body_bars([](const planetology_state& st) { return st.surface_temp_k; });
             const float c = charts::tight_ceil(std::max(bars_peak(n), 400.0f));
-            chart_row("##c_temp", "Surface temperature (K)", 120.0f, 1,
+            chart_row("##c_temp", "Surface temperature (K)", 120.0f, 1, bars, n, "%.0f",
                       [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx) {
-                charts::draw_bars(dl, mn, mx, bars, n, c, "%.0f");
-                charts::threshold_line(dl, mn, mx, 273.0f, c, col_gate, "water freezes");
-                charts::threshold_line(dl, mn, mx, 373.0f, c, col_gate, "water boils");
+                charts::draw_bars(dl, mn, mx, bars, n, c, "%.0f", 0.0f, row_place);
+                charts::threshold_line(dl, mn, mx, 273.0f, c, col_gate, "water freezes", row_reserve);
+                charts::threshold_line(dl, mn, mx, 373.0f, c, col_gate, "water boils", row_reserve);
             });
 
             // The land/sea split the ocean lean actually produced - it is the
@@ -421,9 +518,9 @@ void draw_stage_charts(const generation_chart_source& src, chain_stage s, bool h
             wb[1].colour = IM_COL32(150, 190, 120, 255);
             wb[1].label  = "Land";
             wb[1].hollow = false;
-            chart_row("##c_ocean", "Homeworld surface split", 120.0f, 1,
+            chart_row("##c_ocean", "Homeworld surface split", 120.0f, 1, wb, 2, "%.0f%%",
                       [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx) {
-                charts::draw_bars(dl, mn, mx, wb, 2, 100.0f, "%.0f%%");
+                charts::draw_bars(dl, mn, mx, wb, 2, 100.0f, "%.0f%%", 0.0f, row_place);
             });
             break;
         }
@@ -435,9 +532,9 @@ void draw_stage_charts(const generation_chart_source& src, chain_stage s, bool h
             const std::size_t n = body_bars([](const planetology_state& st) {
                 return static_cast<float>(st.peak);
             });
-            chart_row("##c_peak", "Peak biology reached (sterile 0 -> civilised 6)", 140.0f, 2,
+            chart_row("##c_peak", "Peak biology reached (sterile 0 -> civilised 6)", 140.0f, 2, bars, n, "%.0f",
                       [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx) {
-                charts::draw_bars(dl, mn, mx, bars, n, 6.0f, "%.0f");
+                charts::draw_bars(dl, mn, mx, bars, n, 6.0f, "%.0f", 0.0f, row_place);
             });
 
             std::string ladder;
@@ -462,9 +559,9 @@ void draw_stage_charts(const generation_chart_source& src, chain_stage s, bool h
                 resource_type::iron_ore, resource_type::coal };
             const std::size_t n = resource_bars(hs, k_trade, 2);
             const float c = charts::tight_ceil(std::max(bars_peak(n), 1.0f));
-            chart_row("##c_trade", "The iron / coal trade (homeworld endowment)", 120.0f, 1,
+            chart_row("##c_trade", "The iron / coal trade (homeworld endowment)", 120.0f, 1, bars, n, "%.2f",
                       [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx) {
-                charts::draw_bars(dl, mn, mx, bars, n, c, "%.2f");
+                charts::draw_bars(dl, mn, mx, bars, n, c, "%.2f", 0.0f, row_place);
             });
 
             // The two windows those resources are actually measured from.
@@ -478,9 +575,9 @@ void draw_stage_charts(const generation_chart_source& src, chain_stage s, bool h
             gb[1].label  = "Marine anoxia";
             gb[1].hollow = false;
             const float cg = charts::tight_ceil(std::max({gb[0].value, gb[1].value, 1.0f}));
-            chart_row("##c_windows", "Anoxic windows (Gyr)", 120.0f, 1,
+            chart_row("##c_windows", "Anoxic windows (Gyr)", 120.0f, 1, gb, 2, "%.2f",
                       [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx) {
-                charts::draw_bars(dl, mn, mx, gb, 2, cg, "%.2f");
+                charts::draw_bars(dl, mn, mx, gb, 2, cg, "%.2f", 0.0f, row_place);
             });
 
             dim_para("Iron is banded-iron deposits laid down while the ocean was still "
@@ -498,9 +595,9 @@ void draw_stage_charts(const generation_chart_source& src, chain_stage s, bool h
             if (n > 0)
             {
                 const float c = charts::tight_ceil(std::max(bars_peak(n), 1.0f));
-                chart_row("##c_green", "What the land era leaves (homeworld endowment)", 120.0f, 1,
+                chart_row("##c_green", "What the land era leaves (homeworld endowment)", 120.0f, 1, bars, n, "%.2f",
                           [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx) {
-                    charts::draw_bars(dl, mn, mx, bars, n, c, "%.2f");
+                    charts::draw_bars(dl, mn, mx, bars, n, c, "%.2f", 0.0f, row_place);
                 });
             }
             else
@@ -514,9 +611,9 @@ void draw_stage_charts(const generation_chart_source& src, chain_stage s, bool h
             ab[0].label  = "Arable";
             ab[0].hollow = false;
             const float ca = charts::tight_ceil(std::max(ab[0].value, 10.0f));
-            chart_row("##c_arable", "Arable share of land", 120.0f, n > 0 ? 1 : 2,
+            chart_row("##c_arable", "Arable share of land", 120.0f, n > 0 ? 1 : 2, ab, 1, "%.0f%%",
                       [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx) {
-                charts::draw_bars(dl, mn, mx, ab, 1, ca, "%.0f%%");
+                charts::draw_bars(dl, mn, mx, ab, 1, ca, "%.0f%%", 0.0f, row_place);
             });
             break;
         }
@@ -543,9 +640,9 @@ void draw_stage_charts(const generation_chart_source& src, chain_stage s, bool h
                 if (n == 0)
                     return;
                 const float c = charts::tight_ceil(std::max(bars_peak(n), 1.0f));
-                chart_row(id, title, h, span,
+                chart_row(id, title, h, span, bars, n, "%.2f",
                           [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx) {
-                    charts::draw_bars(dl, mn, mx, bars, n, c, "%.2f");
+                    charts::draw_bars(dl, mn, mx, bars, n, c, "%.2f", 0.0f, row_place);
                 });
             };
             group("##c_metals", "Metals (homeworld endowment, 1.0 = Earth-typical)",
@@ -573,9 +670,9 @@ void draw_stage_charts(const generation_chart_source& src, chain_stage s, bool h
                 const float c = charts::tight_ceil(std::max(bars_peak(n), 1.0f));
                 chart_row("##c_endemic",
                           "Endemic trade goods - worth more the further you carry them",
-                          130.0f, 2,
+                          130.0f, 2, bars, n, "%.2f",
                           [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx) {
-                    charts::draw_bars(dl, mn, mx, bars, n, c, "%.2f");
+                    charts::draw_bars(dl, mn, mx, bars, n, c, "%.2f", 0.0f, row_place);
                 });
 
                 // Where each one grows. The band and region ARE the value, so they
@@ -668,9 +765,9 @@ void draw_stage_charts(const generation_chart_source& src, chain_stage s, bool h
                 peak = std::max(peak, std::max(before, after));
             }
             const float c = charts::tight_ceil(std::max(peak, 1.0f));
-            chart_row("##c_spend", "Formed against left (homeworld endowment)", 175.0f, 2,
+            chart_row("##c_spend", "Formed against left (homeworld endowment)", 175.0f, 2, sb, sn, "%.2f",
                       [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx) {
-                charts::draw_bars(dl, mn, mx, sb, sn, c, "%.2f");
+                charts::draw_bars(dl, mn, mx, sb, sn, c, "%.2f", 0.0f, row_place);
             });
             if (have_undrawn)
                 dim_para("The hollow column is what the chain formed; the filled one is what "

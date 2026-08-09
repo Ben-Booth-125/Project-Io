@@ -14,6 +14,12 @@ namespace ui {
 // function of the display: it is now DERIVED from the minimap height so the
 // bottom strip's top edge aligns with the minimap's. See
 // `ui::selection_band_height(disp_x, disp_y)`.
+//
+// The band's whole RECT — both flush edges as well as that height — is composed by
+// `ui::selection_band_rect(disp)` (BL-216, `shell_metrics.hpp`), which is what
+// app.cpp passes in below. Nothing else should re-derive it: the band's left edge is
+// the comms dock's right edge and its right edge is the right chrome column's left,
+// so a hand-rolled copy drifts the moment either neighbour moves.
 
 /// The Selection band (BL-213 — supersedes the BL-194/195 click-anchored card) —
 /// a FIXED bottom band, sandwiched between the shell column and the right chrome
@@ -26,12 +32,11 @@ namespace ui {
 /// is once again the only thing that does. See docs/ui/TOOLTIP.md,
 /// docs/ui/SELECTION.md.
 ///
-/// **State model.** A single click already *selects* (SELECTION.md), so the band
-/// is open exactly when
-/// `ui.selected_entity != null_entity && ui.selected_entity != ui.selection_hidden_for`.
-/// Dismissing (the content's `x` button, or Esc handled by app.cpp) sets
-/// `selection_hidden_for` to the current selection — the same hide-not-destroy
-/// mechanism the earlier fold-out panel used.
+/// **State model.** A single click already *selects* (SELECTION.md), and the band
+/// is ALWAYS open (BL-266): there is no dismissal and no hide state. With no
+/// (valid) selection it rests on the player's own corporation — the band never
+/// renders `selection_kind::none`, while `selected_entity` stays null so
+/// deselect remains representable.
 ///
 /// **Placement — fixed, not click-anchored (BL-213).** The band fills the exact
 /// rect the caller passes (@p band_origin / @p band_size) — bottom-anchored,
@@ -50,7 +55,8 @@ namespace ui {
 /// **Recursive drill-down (BL-196).** When `ui.card_stack` is non-empty the band
 /// shows a drilled view instead of the root content — currently a resource
 /// time-series chart (aggregate-vs-this-tile over time), fed by @p history. A back
-/// button (or Esc, handled by app.cpp) pops one frame; at the root, dismiss hides.
+/// button (or Esc, handled by app.cpp) pops one frame; at the root, Esc opens the
+/// system menu (BL-266 — the band itself never hides).
 ///
 /// @param w            World state (mutable — the building layout operates its
 ///                      building directly; destructive acts still defer through
@@ -60,7 +66,7 @@ namespace ui {
 /// @param history      Resource-deposit history for the drill-down chart (BL-198);
 ///                      any member may be null when there is no data yet.
 /// @param ui           Shared UI state; read for the selection + drill stack,
-///                      written by the close/back buttons and drill clicks.
+///                      written by the back button and drill clicks.
 /// @param band_origin  Top-left of the fixed band rect, screen px.
 /// @param band_size     Width and height of the band rect.
 void draw_selection_band(world& w, const recipe_registry& reg,

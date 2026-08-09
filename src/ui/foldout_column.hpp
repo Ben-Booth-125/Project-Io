@@ -6,6 +6,14 @@ namespace ui {
 /// callers read `.w`/`.h` as width/height rather than ImVec4's `.z`/`.w`.
 struct foldout_rect { float x, y, w, h; };
 
+// This header owns the shell column's PRIMITIVES — the column width, the minimap
+// size, the bottom strip's height, and the two rects derived directly from them.
+// The rects composed OUT of those primitives (right chrome column, minimap rect,
+// time panel, Selection band, the freed centre-right slot) live in
+// `shell_metrics.hpp`, which consumes this header. Keep the split: a call site that
+// re-derives a composed rect by hand is how BL-312's flush-right minimap came to
+// disagree with the four other places that computed the same edge (BL-216).
+
 /// Width of the permanent left **shell column** (BL-122), in pixels. The identity tile
 /// caps the column at top, the icon nav rail runs down its left edge, and a fold-out
 /// ledger fills the rest when a nav slot is active. This width is what the balance bar

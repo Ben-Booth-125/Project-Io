@@ -17,7 +17,7 @@
 -- shell column the History captures below need.
 verify.econ_step(4)
 verify.show_panel("economy", false)
-verify.goto_surface("Kepler")
+verify.goto_surface("home")
 -- A tile with a real deposit, so the metric pages are drillable resources rather
 -- than the habitability/hazard fallback (which has no time series to drill into).
 verify.select_tile(110, 79)
@@ -35,15 +35,17 @@ verify.card_drill(0)
 shot("fold_band_expanded_drilled")
 verify.card_drill(-1)
 
--- ── R3: expanding a second surface folds the first. The History ledger's Tiles
---    view is the one the fold helps most — 6 + 23 columns have never fitted the
---    380 px column, so its horizontal scroll was permanent rather than exceptional. ──
+-- ── R3: expanding a second surface folds the first. The subject was the History
+--    ledger's Tiles view until BL-281 retired it; the Story view inherits the same
+--    view-level chevron on the same tab row, so the assertion moves rather than
+--    weakening. Story is what the fold now helps most on this ledger: the biography
+--    is long wrapped prose, and the 380 px column breaks every line of it. ──
 verify.show_panel("tile", true)
-verify.panel_view("history", 2)
+verify.panel_view("history", 0)
 verify.fold()
-shot("fold_history_tiles_folded")
-verify.fold("history_tiles", 0)
-shot("fold_history_tiles_expanded")
+shot("fold_history_story_folded")
+verify.fold("history_story", 0)
+shot("fold_history_story_expanded")
 
 -- ── R1: the History Chain. Its stages used to be CollapsingHeaders — this
 --    surface's own private disclosure idiom, the fourth one the item retires.

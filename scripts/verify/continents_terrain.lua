@@ -2,7 +2,7 @@
 -- Pass 1's heightmap is biased by simulated plate boundaries instead of pure
 -- noise. Plain terrain shows the landmass shape itself; the Country lens shows
 -- how nation borders (Voronoi over that terrain) read against it.
-verify.goto_surface("Kepler")
+verify.goto_surface("home")
 verify.set_zoom(1)
 
 verify.set_overlay("none")
@@ -18,10 +18,11 @@ verify.capture("continents_terrain_country_wide")
 verify.set_overlay("continent")
 verify.capture("continents_lens_kepler_wide")
 
--- The lens key hangs flush-left of the minimap, where the Selection element sits
--- whenever something is selected. Dismiss the selection so the key is actually in
--- frame: plate swatches, the pale boundary swatch, and the plate count.
-verify.dismiss_selection()
+-- The lens key hangs flush-left of the minimap, where the Selection band sits.
+-- Since BL-266 the band never hides (it rests on the player corp when nothing is
+-- selected), so clearing the selection no longer frees this corner — the capture
+-- shows the key's overlap with the resting band, which is the honest state.
+verify.clear_selection()
 verify.capture("continents_lens_kepler_key")
 
 -- Zoomed in, where a boundary is a band of individual hexes rather than a line —

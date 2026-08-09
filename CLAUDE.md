@@ -105,6 +105,20 @@ Surface-level description of the application shell — how the screen regions (n
 **`docs/ui/STARTUP.md`**
 The app's entry screens — the `app_screen` state machine (menu / generating / in_game), the main menu, the New World wizard (preferences in, `world_params` out), the staged generation screen, and the `start_new_game` handoff. Written 2026-07-31; these are the first screens a player (and a fresh session) sees. Read before any work on the title screen, the wizard, or campaign initialisation.
 
+**`docs/ui/question_log.json`** and **`docs/ui/QUESTION_LOG.md`**
+The UI justification store (BL-260) — every information surface declares **the question it
+answers**, **why it earns its space**, and **the backlog item that demanded it**. A two-way
+provenance index: surface → item (why does this exist) and item → surface (what did this item
+actually put on screen). It exposes the two gaps neither `backlog.json` nor `user_stories.json`
+can — a surface no item demanded, and an item claiming a UI outcome that owns no surface — the
+same coverage argument USER_STORIES.md makes on the *intent* axis, applied to the *surface* axis.
+**`question_log.json`** is canonical; **`QUESTION_LOG.md`** is the generated mirror
+(`node tools/session/render_question_log.js`; never hand-edit it). The pair is **required** on
+every surface, and enforcement is **authorship, not machinery** — Ben, 2026-08-01: *"the docs are
+the audit, we don't need an audit method"*, so **do not build a verify check against this file**.
+Entries marked `drafted` are awaiting Ben's wording and are open questions, not settled prose.
+Read/update it whenever you add or materially change a UI surface.
+
 **`docs/ui/ICONS.md`**
 The icon vocabulary — every hand-drawn vector glyph in the `ui::icons` namespace (`src/ui/icons.{hpp,cpp}`, the source of truth): building markers, resource pips, unit markers, nav-rail affordances, and the map-lens glyphs. Catalogues each glyph's shape, meaning, usage, and colour source, the shared `(dl, centre, r, colour)` contract, and the recipe for adding one. Read before adding or changing any on-canvas/strip glyph; identity *colours* live in `presentation.hpp`, not here.
 

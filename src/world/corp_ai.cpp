@@ -6,6 +6,7 @@
 #include "placement_rules.hpp"
 #include "recipe_registry.hpp"
 #include "survey_system.hpp"
+#include "unit_roster.hpp"
 #include "world.hpp"
 
 #include <algorithm>
@@ -50,6 +51,7 @@ entity_id resolve_command_body(const world& w, const corp_command& cmd)
     {
         case corp_verb::build:
         case corp_verb::place_road:
+        case corp_verb::hire_unit: // keys off cmd.tile, same as build/place_road.
             return tile_body(w, cmd.tile);
         case corp_verb::survey:
             return cmd.subject; // subject IS the body for this verb
@@ -73,6 +75,7 @@ const char* corp_verb_label(corp_verb v)
         case corp_verb::resume:        return "resume";
         case corp_verb::place_road:    return "road placement";
         case corp_verb::survey:        return "survey";
+        case corp_verb::hire_unit:     return "hire unit";
     }
     return "action";
 }
@@ -87,6 +90,7 @@ const char* corp_decision_reason_label(corp_decision_reason r)
         case corp_decision_reason::dial_idle:      return "sustained losses";
         case corp_decision_reason::dial_resume:    return "now profitable";
         case corp_decision_reason::survey_expand:  return "discovery within budget";
+        case corp_decision_reason::hire_available: return "roster row available";
     }
     return "unspecified";
 }
@@ -117,6 +121,7 @@ const char* agency_kind_label(agency_event::kind k)
         case agency_event::kind::resumed:             return "resumed an idled facility";
         case agency_event::kind::road_placed:         return "placed a road";
         case agency_event::kind::survey_dispatched:   return "dispatched a survey";
+        case agency_event::kind::hired:                return "raised a unit";
     }
     return "took an agency action";
 }
@@ -251,6 +256,7 @@ corp_priority_bucket bucket_for_reason(corp_decision_reason reason)
             return corp_priority_bucket::should_have; // feeds/tunes a running asset
         case corp_decision_reason::best_build:
         case corp_decision_reason::survey_expand:
+        case corp_decision_reason::hire_available:
         default:
             return corp_priority_bucket::nice_to_have; // expansion
     }
@@ -610,12 +616,70 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             }
         }
 
+        // ---- Hire candidates: campaign roster, gated on the corp's OWN ------
+        // stockpile/market access (unit_roster.hpp), never on cash — the
+        // solvency gate below still applies (spend stays 0.0f: the cost is a
+        // resource debit inside apply_corp_command, not capex). Widening the
+        // AI-agency exception list to include hiring is a deliberate call
+        // (2026-08-08, recorded in io-standing-rules.md) — rival corps raise
+        // units through the exact seam the player uses, no special case.
+        {
+            const entity_id muster_tile = [&]() -> entity_id
+            {
+                if (cc.hq_building != null_entity)
+                {
+                    const auto hb = w.buildings.find(cc.hq_building);
+                    if (hb != w.buildings.end())
+                        return hb->second.tile;
+                }
+                for (const entity_id bid : cc.assets)
+                {
+                    const auto bit = w.buildings.find(bid);
+                    if (bit != w.buildings.end())
+                        return bit->second.tile;
+                }
+                return null_entity;
+            }();
+
+            // Soft cap: the campaign gate is presence-based (any stockpile at all
+            // makes every eval eligible forever), so without a ceiling a corp with
+            // steady extraction hires literally every eval — an unconditional extra
+            // action outside build/dial's competition for the same budget, measured
+            // to drag net worth out of the ai_skill_harness golden band. A corp's
+            // own existing unit count is the simplest brake: a modest garrison, not
+            // full mobilisation, which matches this being a first cut of the seam.
+            constexpr int max_units_per_corp = 3;
+            int owned_units = 0;
+            for (const auto& [uid, u] : w.units)
+                if (u.owner == corp) ++owned_units;
+
+            if (muster_tile != null_entity && owned_units < max_units_per_corp)
+            {
+                const auto& table = unit_roster_table();
+                const auto  avail = available_rows(w, corp, campaign_roster_band);
+                for (const roster_row* row : avail)
+                {
+                    const auto idx = static_cast<std::size_t>(row - table.data());
+                    candidate c;
+                    c.cmd.tick      = tick; c.cmd.corp = corp;
+                    c.cmd.verb      = corp_verb::hire_unit;
+                    c.cmd.tile      = muster_tile;
+                    c.cmd.unit_type = static_cast<uint16_t>(idx);
+                    c.score  = static_cast<float>(row->weight) * 0.01f * jitter;
+                    c.spend  = 0.0f; // resource-debited inside apply_corp_command
+                    c.reason = corp_decision_reason::hire_available;
+                    c.bucket = bucket_for_reason(c.reason);
+                    cands.push_back(c);
+                }
+            }
+        }
+
         if (cands.empty())
             continue;
         std::sort(cands.begin(), cands.end(), candidate_before);
 
         // ---- Greedy selection under the action budget + solvency gate -------
-        int   builds = 0, dials = 0, surveys = 0;
+        int   builds = 0, dials = 0, surveys = 0, hires = 0;
         float committed = 0.0f;
         std::vector<entity_id> touched_this_eval;
         for (std::size_t i = 0; i < cands.size(); ++i)
@@ -623,10 +687,14 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             const candidate& c = cands[i];
             const bool is_build  = (c.cmd.verb == corp_verb::build);
             const bool is_survey = (c.cmd.verb == corp_verb::survey);
-            const bool is_dial   = !is_build && !is_survey;
+            const bool is_hire   = (c.cmd.verb == corp_verb::hire_unit);
+            const bool is_dial   = !is_build && !is_survey && !is_hire;
             if (is_build  && builds  >= p.max_builds) continue;
             if (is_dial   && dials   >= p.max_dials)  continue;
             if (is_survey && surveys >= 1)            continue;
+            // One hire per evaluation, same cadence as survey — a rival corp
+            // hiring every tick would out-hire the player by pure frequency.
+            if (is_hire   && hires   >= 1)             continue;
             // One touch per building per evaluation: a second dial on a
             // building already commanded this eval is contradictory.
             if (is_dial && std::find(touched_this_eval.begin(), touched_this_eval.end(),
@@ -657,6 +725,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             if (is_build)  ++builds;
             if (is_dial)   ++dials;
             if (is_survey) ++surveys;
+            if (is_hire)   ++hires;
 
             // Cooldown on the touched building (anti-thrash).
             const entity_id touched = is_build ? built : c.cmd.subject;
@@ -690,7 +759,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             // Agency event so the chat feed can render the command (BL-205).
             agency_event ev{};
             ev.corp     = corp;
-            ev.building = is_build ? built : c.cmd.subject;
+            ev.building = (is_build || is_hire) ? built : c.cmd.subject;
             switch (c.cmd.verb)
             {
                 case corp_verb::build:
@@ -710,6 +779,9 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     ev.value = c.cmd.road_tier; break;
                 case corp_verb::survey:
                     ev.what = agency_event::kind::survey_dispatched; ev.tile = c.cmd.subject; break;
+                case corp_verb::hire_unit:
+                    ev.what = agency_event::kind::hired; ev.tile = c.cmd.tile;
+                    ev.value = c.cmd.unit_type; break;
             }
             report.agency_events.push_back(ev);
 

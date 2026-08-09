@@ -2,6 +2,7 @@
 build/
 build-web/
 build_gen/
+build_linux/
 build_live/
 build_rel/
 build_vs/

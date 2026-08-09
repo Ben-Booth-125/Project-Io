@@ -48,63 +48,26 @@ constexpr uint32_t tag_conflict = 0x1B47u; // The tribal-conflict stage.
 int clampi(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
 
 // ---------------------------------------------------------------------------
-// Tongue — a tiny per-culture phonology. Each culture draws a small consonant
-// and vowel inventory from the pools below; every proper noun it ever coins
-// (its own name, its gods) is built from that inventory, so two cultures'
-// names SOUND different because their inventories differ, not because a style
-// flag says so.
+// Tongue — a tiny per-culture phonology, now owned by world/tongue.hpp
+// (BL-290) so the passes downstream can CONSUME it rather than inventing a
+// second sound system. Each culture draws a small consonant and vowel
+// inventory; every proper noun it ever coins (its own name, its gods, and —
+// once it has settled ground — its nations and cities) is built from that
+// inventory, so two cultures' names SOUND different because their inventories
+// differ, not because a style flag says so.
+//
+// The roll itself is unchanged: `roll_tongue`/`tongue_word` consume this
+// stream in exactly the order the local helpers here used to.
 // ---------------------------------------------------------------------------
-struct phonology
-{
-    std::vector<const char*> onsets;
-    std::vector<const char*> vowels;
-    std::vector<const char*> codas;
-};
-
-phonology roll_phonology(rng& r)
-{
-    static const char* onset_pool[] = { "k", "t", "m", "n", "s", "r", "l", "v",
-                                        "th", "sh", "g", "d", "b", "h", "z", "kh" };
-    static const char* vowel_pool[] = { "a", "e", "i", "o", "u", "ai", "ua", "ei" };
-    static const char* coda_pool[]  = { "n", "r", "l", "s", "k", "th", "m" };
-
-    phonology p;
-    // Walk each pool once with an independent keep-roll, so the draw is a
-    // deterministic subset rather than a sample-with-retry loop.
-    for (const char* c : onset_pool) if (r.pick(16) < 6) p.onsets.push_back(c);
-    for (const char* v : vowel_pool) if (r.pick(8)  < 3) p.vowels.push_back(v);
-    for (const char* c : coda_pool)  if (r.pick(7)  < 2) p.codas.push_back(c);
-
-    // An inventory can come up short; backfill deterministically so word()
-    // always has material. The backfill order is fixed, so this stays pure.
-    if (p.onsets.size() < 4) { p.onsets = { "k", "t", "m", "r" }; }
-    if (p.vowels.size() < 2) { p.vowels = { "a", "i" }; }
-    return p;
-}
-
-std::string word(rng& r, const phonology& p, int syllables)
-{
-    std::string s;
-    for (int i = 0; i < syllables; ++i)
-    {
-        s += p.onsets[static_cast<std::size_t>(r.pick(static_cast<int>(p.onsets.size())))];
-        s += p.vowels[static_cast<std::size_t>(r.pick(static_cast<int>(p.vowels.size())))];
-        // A coda closes roughly a third of syllables, when the tongue has any.
-        if (!p.codas.empty() && r.pick(3) == 0)
-            s += p.codas[static_cast<std::size_t>(r.pick(static_cast<int>(p.codas.size())))];
-    }
-    if (!s.empty()) s[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(s[0])));
-    return s;
-}
 
 /// A name unused so far in @p taken. Bounded retry, deterministic: the retry
 /// walk consumes the same stream every run.
-std::string fresh_name(rng& r, const phonology& p, int syllables,
+std::string fresh_name(rng& r, const tongue& p, int syllables,
                        std::vector<std::string>& taken)
 {
     for (int attempt = 0; attempt < 8; ++attempt)
     {
-        std::string n = word(r, p, syllables);
+        std::string n = tongue_word(r, p, syllables);
         if (std::find(taken.begin(), taken.end(), n) == taken.end())
         {
             taken.push_back(n);
@@ -112,7 +75,7 @@ std::string fresh_name(rng& r, const phonology& p, int syllables,
         }
     }
     // Eight collisions means a tiny inventory; suffix the count, still unique.
-    std::string n = word(r, p, syllables) + "-" + std::to_string(taken.size());
+    std::string n = tongue_word(r, p, syllables) + "-" + std::to_string(taken.size());
     taken.push_back(n);
     return n;
 }
@@ -185,7 +148,9 @@ creed_state run_creeds(const planetology_state& pl,
         culture cu;
         cu.cradle = static_cast<int>(ci);
 
-        const phonology p = roll_phonology(r);
+        const tongue p = roll_tongue(r);
+        cu.speech = p; // Retained: the nations and cities on this culture's
+                       // ground are named from the same inventory (BL-290).
         std::vector<std::string> taken;
         cu.name = fresh_name(r, p, 2 + r.pick(2), taken);
 

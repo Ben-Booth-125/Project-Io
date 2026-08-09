@@ -1,6 +1,9 @@
 #include "world/placement_rules.hpp"
 
+#include "world/logistics.hpp"
 #include "world/world.hpp"
+
+#include <algorithm>
 
 namespace placement_rules {
 
@@ -20,6 +23,7 @@ const char* placement_reason_text(placement_reason r)
         case placement_reason::no_tile:           return "No such tile";
         case placement_reason::already_road:      return "This tile already has an equal or better road";
         case placement_reason::deposit_present:   return "This terrain already supports a Farm — no Hydroponics Bay needed here";
+        case placement_reason::out_of_logistics_range: return "Too far from a city, port or logistics hub to be supplied";
     }
     return "Cannot build here";
 }
@@ -119,6 +123,9 @@ placement_result can_place(const tile_component& tc, building_type type, resourc
 
         case building_type::port:
         case building_type::inland_logistics_hub: // BL-149: any non-ocean land tile (the land-network node).
+        case building_type::military_base:        // BL-325 S1: any non-ocean land tile, no deposit — the
+                                                  // reach rule still applies at the world level, and the
+                                                  // base is NOT an anchor, so it earns no exemption there.
         case building_type::none:
         default:
             // Any non-ocean land tile is valid for non-extraction buildings.
@@ -173,7 +180,8 @@ bool is_coastal(const world& w, entity_id tile_id)
 }
 
 placement_result can_place_in_world(const world& w, entity_id tile_id,
-                                    building_type type, resource_type target)
+                                    building_type type, resource_type target,
+                                    float max_reach)
 {
     const auto tc_it = w.tiles.find(tile_id);
     if (tc_it == w.tiles.end())
@@ -209,6 +217,38 @@ placement_result can_place_in_world(const world& w, entity_id tile_id,
         }
     }
 
+    // Logistics reach (BL-323 S2): the site must be suppliable. Checked after the
+    // terrain reasons (which teach more) and before the stack ceiling (which teaches
+    // least). Skipped entirely when the caller passes no budget, or when the body's
+    // reach field has not been built — a rule enforced on a guess is worse than one
+    // not enforced, so `tile_reach_cost`'s -1 means "unknown", never "unreachable".
+    //
+    // A supply anchor itself always passes: a port or hub IS the anchor, so gating it
+    // on being near one would make the first node on a fresh coast unplaceable and
+    // the rule unbootstrappable.
+    //
+    // FIRST-ANCHOR BOOTSTRAP (Ben's ruling, 2026-08-08). The anchor-tile exemption
+    // above only covers tiles that already ARE anchors, which no tile on a virgin
+    // body is — so before this, a body with no city/port/hub refused every
+    // placement including the first hub, and Era 1 off-world expansion was
+    // impossible. An anchor-TYPE placement therefore skips the rule when the body
+    // has no anchor of any kind yet. Existence ends the exemption (see
+    // body_has_supply_anchor): the second hub must chain within reach of the
+    // first, which is the discipline the rule exists to create.
+    if (max_reach >= 0.0f && !::is_supply_anchor(w, tile_id))
+    {
+        const bool placing_anchor = type == building_type::port
+                                 || type == building_type::inland_logistics_hub;
+        const bool bootstrap = placing_anchor
+                            && !::body_has_supply_anchor(w, tc_it->second.body);
+        if (!bootstrap)
+        {
+            const float reach = ::tile_reach_cost(w, tile_id);
+            if (reach >= 0.0f && !(reach <= max_reach))
+                return placement_reason::out_of_logistics_range;
+        }
+    }
+
     // Stack ceiling: a tile carries several sites working one deposit, but not
     // without limit. Checked last — a full stack is the least interesting reason
     // to refuse, and the terrain reasons above teach the player more.
@@ -219,13 +259,17 @@ placement_result can_place_in_world(const world& w, entity_id tile_id,
     return placement_reason::ok;
 }
 
-// --- Building stacks (see the header for the provisional-rule note) -----------
+// --- Building stacks (BL-193; the rule and both constants live in the header) --
 
-/// Deposit richness that buys one additional extraction site. Deposits generate in
-/// the 0-250 band (tile_generation.cpp § generate_deposits), so this puts a thin
-/// seam at 1 site and the richest tiles at 4-5. PROVISIONAL — the value is a
-/// placeholder for a settled rule, not a tuned figure.
-constexpr float k_richness_per_site = 50.0f;
+float stack_output_scalar(int rank)
+{
+    // Repeated multiplication, not std::pow: the same product in the same order on
+    // every platform, so a stacked site's yield cannot drift a save out of sync.
+    float s = 1.0f;
+    for (int k = 1; k < rank; ++k)
+        s *= k_stack_output_decay;
+    return s;
+}
 
 int stack_capacity(const tile_component& tc, building_type type, resource_type target)
 {
@@ -252,6 +296,40 @@ int buildings_on_tile(const world& w, entity_id tile_id,
         ++n;
     }
     return n;
+}
+
+std::vector<entity_id> stack_members(const world& w, entity_id tile_id,
+                                     building_type type, resource_type target)
+{
+    std::vector<entity_id> members;
+    for (const auto& [bid, bc] : w.buildings)
+    {
+        if (bc.tile != tile_id || bc.type != type)
+            continue;
+        // Per-target, exactly as buildings_on_tile counts: three iron sites and one
+        // petroleum site on one tile are two stacks against two deposits.
+        if (type == building_type::extraction_site && bc.target_resource != target)
+            continue;
+        members.push_back(bid);
+    }
+    // world::buildings is an unordered_map — sorting is what makes "stored order"
+    // mean anything at all, and it is the only thing standing between the decay
+    // curve and a non-deterministic answer.
+    std::sort(members.begin(), members.end());
+    return members;
+}
+
+int stack_rank(const world& w, entity_id building_id)
+{
+    const auto it = w.buildings.find(building_id);
+    if (it == w.buildings.end())
+        return 0;
+    const building_component&    b       = it->second;
+    const std::vector<entity_id> members = stack_members(w, b.tile, b.type, b.target_resource);
+    for (std::size_t i = 0; i < members.size(); ++i)
+        if (members[i] == building_id)
+            return static_cast<int>(i) + 1;
+    return 0;
 }
 
 } // namespace placement_rules

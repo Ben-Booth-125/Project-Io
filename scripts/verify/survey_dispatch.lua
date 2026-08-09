@@ -13,7 +13,7 @@
 -- Selene is Kepler's moon: unsurveyed at campaign start (init_survey_states opens
 -- only home + the star), close and small, so its survey is affordable from the
 -- starting balance.
-local target = "Selene"
+local target = "moon"
 
 local cost = verify.survey_cost_of(target)
 verify.expect(cost > 0.0,

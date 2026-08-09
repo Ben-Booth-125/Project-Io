@@ -1,5 +1,7 @@
 #include "hard_coded_world.hpp"
 
+#include "body_names.hpp"
+#include "city_names.hpp"
 #include "continents.hpp"
 #include "corporation_generation.hpp"
 #include "creeds.hpp"
@@ -100,7 +102,86 @@ int largest_enclosed_sea(const world& w, const std::vector<entity_id>& tile_ids,
     return best;
 }
 
+// ---------------------------------------------------------------------------
+// The BL-276 acceptance gate, as one function. Reject-and-reroll over the
+// homeworld tile seed, two bars — the hybrid Ben chose (2026-08-03: "about 90%
+// likely ... never impossible to try"):
+//
+//   ARENA (>= 300 tiles): a playable Mediterranean. Three attempts only —
+//     with the rift-basin mechanism (continents.cpp) putting a single seed
+//     at ~58%, three tries land ~90% of worlds. Deliberately NOT retried to
+//     exhaustion: the ~1-in-10 worlds without an arena are the wanted
+//     hard-Rome tail.
+//   FLOOR (>= 30 tiles): some enclosed sea, so trying is never impossible.
+//     All six attempts may serve it; ~98% of seeds pass on attempt 0.
+//
+// Attempt 0 is the unfolded seed, so worlds already qualifying are untouched;
+// on full exhaustion attempt 0 is kept honestly rather than clamping anything
+// (the resolve_preferences idiom). Each probe is one scratch tile generation
+// (~tens of ms). Extracted (2026-08-07) so the wizard's real-tile preview and
+// make_hard_coded_world choose the SAME seed by calling the same code — a
+// forked copy would drift and the preview would silently stop being the world.
+uint32_t choose_home_tile_seed(const planetology_state& pl,
+                               const std::vector<float>& bias,
+                               const std::vector<uint8_t>& convergent,
+                               uint32_t campaign_seed, float deposit_scalar)
+{
+    uint32_t chosen = campaign_seed ^ 0xE471001u;
+    uint32_t floor_seed = 0;
+    bool have_floor = false;
+    for (int attempt = 0; attempt < 6; ++attempt)
+    {
+        const uint32_t candidate = (campaign_seed ^ 0xE471001u)
+                                 ^ (static_cast<uint32_t>(attempt) * 0x9E3779B9u);
+        world scratch;
+        const entity_id probe = scratch.create_entity();
+        const auto probe_tiles = generate_body_tiles(scratch, probe,
+            home_grid_width, home_grid_height, pl.profile,
+            candidate, deposit_scalar, &pl, nullptr, &bias, &convergent);
+        const int sea = largest_enclosed_sea(scratch, probe_tiles,
+                                             home_grid_width, home_grid_height);
+        if (attempt < 3 && sea >= 300)
+            return candidate;
+        if (!have_floor && sea >= 30) { floor_seed = candidate; have_floor = true; }
+        // Past the arena window with the floor already met: done searching.
+        if (attempt >= 2 && have_floor) break;
+    }
+    if (have_floor) chosen = floor_seed;
+    return chosen;
+}
+
 } // namespace
+
+std::vector<entity_id> generate_home_surface_preview(world& w, entity_id body,
+                                                     const world_params& params,
+                                                     const world_gen_config& gen_cfg)
+{
+    // The same pipeline make_hard_coded_world runs for Kepler, and nothing else:
+    // resolve, chain, Continents, the acceptance gate, the final generation.
+    // Every seed formula below matches its twin in make_hard_coded_world by
+    // construction (the gate IS the same function). Rivers and the political
+    // layer are sibling passes the preview does not show, and are skipped.
+    const float deposit_scalar = deposit_scalar_for(params.abundance, gen_cfg);
+    const resolved_world rw = resolve_preferences(params.preferences, params.seed);
+
+    body_inputs in = prototype_body(1);
+    // The preview must describe the world the player will get, name included —
+    // the chain writes the body's name into the biography prose it emits.
+    const body_naming naming = generate_body_names(params.seed);
+    in.name = naming.bodies[1].c_str();
+    in.orbit_au = rw.home_orbit_au;
+    const uint32_t body_seed = params.seed ^ prototype_body_seed(1);
+    const planetology_state st = run_planetology(in, rw.params, body_seed);
+
+    continent_state cs = run_continents(st, home_grid_width, home_grid_height,
+                                        body_seed ^ 0xC0117E57u);
+
+    const uint32_t tile_seed = choose_home_tile_seed(st, cs.height_bias, cs.convergent,
+                                                     params.seed, deposit_scalar);
+    return generate_body_tiles(w, body, home_grid_width, home_grid_height,
+                               st.profile, tile_seed, deposit_scalar, &st,
+                               nullptr, &cs.height_bias, &cs.convergent);
+}
 
 world make_hard_coded_world(world_params params, generation_report* report,
                             const world_gen_config& gen_cfg)
@@ -111,6 +192,12 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // At the default `standard` tier this is 1.0f, so a default-params world is
     // bit-identical to the pre-BL-114 generation.
     const float deposit_scalar = deposit_scalar_for(params.abundance, gen_cfg);
+
+    // The system's catalogue (BL-257). Coined from one tongue, before anything
+    // else runs — the planetology chain writes body names into the biography
+    // prose it emits, so a name decided later would leave that prose stale.
+    // See body_names.hpp for the register rule.
+    const body_naming naming = generate_body_names(params.seed);
 
     // ---------------------------------------------------------------------
     // Planetology (BL-167). A body-level sibling pass that runs BEFORE the
@@ -145,9 +232,16 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // needs the body's grid dims and an out-param for the bias.
     // `convergent_out` is optional: only Kepler's Pass 5 currently reads it, and
     // the other bodies have no mountain-bearing terrain worth steering.
-    auto plan = [&](int proto_index, int gw, int gh, std::vector<float>& bias_out,
+    // `body_id` is the world entity this plan describes. It is threaded in so the
+    // report entry carries an IDENTITY (BL-257) rather than leaving consumers to
+    // match a report entry to a world body by its display name.
+    auto plan = [&](int proto_index, entity_id body_id, int gw, int gh,
+                    std::vector<float>& bias_out,
                     std::vector<uint8_t>* convergent_out = nullptr) {
         body_inputs in = prototype_body(proto_index);
+        // The generated name, not the prototype's placeholder literal — the
+        // chain's biography lines quote it (BL-257). `naming` outlives `in`.
+        in.name = naming.bodies[static_cast<std::size_t>(proto_index)].c_str();
         if (in.is_homeworld)
             in.orbit_au = rw.home_orbit_au;
         // A moon travels with its planet. The homeworld's orbit is DERIVED from
@@ -181,7 +275,8 @@ world make_hard_coded_world(world_params params, generation_report* report,
             planetology_params undrawn = rw.params;
             undrawn.drawdown = 0.0f;
             report->bodies.push_back(generation_report::body_entry{
-                in.name, st, run_planetology(in, undrawn, body_seed), std::move(cs) });
+                in.name, body_id, in.is_homeworld, st,
+                run_planetology(in, undrawn, body_seed), std::move(cs) });
         }
         return st;
     };
@@ -202,7 +297,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // pass as every other body (with a star style), so it needs no special case.
     const entity_id helios = w.create_entity();
     w.bodies[helios] = body_component{
-        .name                                 = "Helios",
+        .name                                 = naming.star,
         .type                                 = body_type::star,
         .parent                               = null_entity,
         .orbital_radius_au                    = 0.0f,
@@ -221,7 +316,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
 
     const entity_id cinder = w.create_entity();
     w.bodies[cinder] = body_component{
-        .name                                 = "Cinder",
+        .name                                 = naming.bodies[0],
         .type                                 = body_type::planet,
         .parent                               = null_entity,
         .orbital_radius_au                    = 0.39f,
@@ -233,7 +328,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
 
     // Mercury-analogue physical facts; everything else is derived by the chain.
     std::vector<float> cinder_bias;
-    const planetology_state cinder_pl = plan(0, 180, 84, cinder_bias);
+    const planetology_state cinder_pl = plan(0, cinder, 180, 84, cinder_bias);
     generate_body_tiles(w, cinder, 180, 84, cinder_pl.profile,
         /*seed=*/params.seed ^ 0xC1D0001u, deposit_scalar, &cinder_pl, nullptr, &cinder_bias);
 
@@ -245,7 +340,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
 
     const entity_id kepler = w.create_entity();
     w.bodies[kepler] = body_component{
-        .name                                 = "Kepler",
+        .name                                 = naming.bodies[1],
         .type                                 = body_type::planet,
         .parent                               = null_entity,
         // The homeworld orbits where its star can keep it wet, so this is derived
@@ -266,51 +361,17 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // records its margin, and still writes its line.
     std::vector<float> kepler_bias;
     std::vector<uint8_t> kepler_convergent; // Pass 5 seeds mountain ranges along these
-    const planetology_state kepler_pl = plan(1, 180, 84, kepler_bias, &kepler_convergent);
+    const planetology_state kepler_pl = plan(1, kepler, 180, 84, kepler_bias, &kepler_convergent);
     // A non-null generation_record is requested here so the river pass below can read the
     // Pass-1 heightmap it captures; this is a pure capture (TILE_GENERATION.md § Generation
     // history hook) and does not perturb the deterministic tile surface itself.
     generation_record kepler_record;
 
-    // Reject-and-reroll acceptance gate (BL-276), two bars — the hybrid Ben
-    // chose (2026-08-03: "about 90% likely ... never impossible to try"):
-    //
-    //   ARENA (>= 300 tiles): a playable Mediterranean. Three attempts only —
-    //     with the rift-basin mechanism (continents.cpp) putting a single seed
-    //     at ~58%, three tries land ~90% of worlds. Deliberately NOT retried to
-    //     exhaustion: the ~1-in-10 worlds without an arena are the wanted
-    //     hard-Rome tail.
-    //   FLOOR (>= 30 tiles): some enclosed sea, so trying is never impossible.
-    //     All six attempts may serve it; ~98% of seeds pass on attempt 0.
-    //
-    // Attempt 0 is the unfolded seed, so worlds already qualifying are
-    // untouched; on full exhaustion attempt 0 is kept honestly rather than
-    // clamping anything (the resolve_preferences idiom). Each probe is one
-    // scratch tile generation (~tens of ms).
-    uint32_t kepler_tile_seed = params.seed ^ 0xE471001u;
-    {
-        uint32_t floor_seed = 0;
-        bool have_floor = false, have_arena = false;
-        for (int attempt = 0; attempt < 6; ++attempt)
-        {
-            const uint32_t candidate = (params.seed ^ 0xE471001u) ^ (static_cast<uint32_t>(attempt) * 0x9E3779B9u);
-            world scratch;
-            const entity_id probe = scratch.create_entity();
-            const auto probe_tiles = generate_body_tiles(scratch, probe, 180, 84, kepler_pl.profile,
-                candidate, deposit_scalar, &kepler_pl, nullptr, &kepler_bias, &kepler_convergent);
-            const int sea = largest_enclosed_sea(scratch, probe_tiles, 180, 84);
-            if (attempt < 3 && sea >= 300)
-            {
-                kepler_tile_seed = candidate;
-                have_arena = true;
-                break;
-            }
-            if (!have_floor && sea >= 30) { floor_seed = candidate; have_floor = true; }
-            // Past the arena window with the floor already met: done searching.
-            if (attempt >= 2 && have_floor) break;
-        }
-        if (!have_arena && have_floor) kepler_tile_seed = floor_seed;
-    }
+    // Reject-and-reroll acceptance gate (BL-276) — extracted to
+    // choose_home_tile_seed above, SHARED with the wizard's real-tile preview
+    // so both choose the same seed by running the same code.
+    const uint32_t kepler_tile_seed = choose_home_tile_seed(
+        kepler_pl, kepler_bias, kepler_convergent, params.seed, deposit_scalar);
 
     auto kepler_tiles = generate_body_tiles(w, kepler, 180, 84, kepler_pl.profile,
         kepler_tile_seed, deposit_scalar, &kepler_pl, &kepler_record, &kepler_bias, &kepler_convergent);
@@ -379,6 +440,25 @@ world make_hard_coded_world(world_params params, generation_report* report,
                                            /*seed=*/params.seed ^ 0x5E77EDu,
                                            /*stop_year=*/params.epoch_year);
         kepler_np.seed_tiles = settlement_seed_tiles(kepler_settlement);
+
+        // Each anchor carries its province's tongue across into Pass 5, so a
+        // nation is named in the speech of the people who settled its core
+        // rather than out of a bank of its own (BL-290).
+        kepler_np.seed_tongues.reserve(kepler_settlement.provinces.size());
+        for (const province& p : kepler_settlement.provinces)
+        {
+            if (p.anchor < 0) continue;
+            kepler_np.seed_tongues.push_back(
+                p.culture >= 0 && p.culture < static_cast<int>(kepler_creeds.cultures.size())
+                    ? kepler_creeds.cultures[static_cast<std::size_t>(p.culture)].speech
+                    : tongue{});
+        }
+
+        // Same act for the cities: the placeholder names generate_population_
+        // centres coined before there was any culture are replaced with names
+        // in the nearest province's tongue.
+        name_population_centres(w, kepler, 180, kepler_settlement, kepler_creeds,
+                                /*seed=*/params.seed ^ 0xC17910E6u);
     }
 
     const std::vector<entity_id> kepler_nations =
@@ -438,7 +518,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
     {
         for (generation_report::body_entry& be : report->bodies)
         {
-            if (be.name != "Kepler") continue;
+            if (be.id != kepler) continue;
             be.state.history.insert(be.state.history.end(),
                                     kepler_hist.history.begin(), kepler_hist.history.end());
             // The province set / checkpoints / lacunae travel with the report
@@ -458,8 +538,12 @@ world make_hard_coded_world(world_params params, generation_report* report,
     generate_roads(w, kepler);
 
     // Attach installations to the first two land tiles found in raster order.
+    // kepler_home_tile is also the player unit stub's starting position (BL-324) —
+    // reusing the same land-tile lookup rather than a second one.
+    entity_id kepler_home_tile = null_entity;
     {
         auto land = first_land_tiles(kepler_tiles, w, 180, 84, 2);
+        kepler_home_tile = land.size() > 0 ? land[0] : null_entity;
 
         const entity_id kepler_extraction = w.create_entity();
         w.buildings[kepler_extraction] = building_component{
@@ -652,12 +736,14 @@ world make_hard_coded_world(world_params params, generation_report* report,
     generate_corporations(w, corporation_params{ .corporation_count = gen_cfg.corporation_count },
         /*seed=*/params.seed ^ 0x4A71012u, &kepler_settlement);
 
-    // Player unit stub on Kepler.
+    // Player unit stub on Kepler, sited on the same home tile the installations
+    // used (BL-324: position is a tile id, not a body).
     const entity_id kepler_unit = w.create_entity();
     w.units[kepler_unit] = unit_component{
-        .body  = kepler,
-        .owner = w.player_entity,
-        .count = 50,
+        .position = kepler_home_tile,
+        .owner    = w.player_entity,
+        .count    = 50,
+        .strength = 50,
     };
 
     // -----------------------------------------------------------------------
@@ -668,7 +754,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
 
     const entity_id selene = w.create_entity();
     w.bodies[selene] = body_component{
-        .name                                 = "Selene",
+        .name                                 = naming.bodies[2],
         .type                                 = body_type::moon,
         .parent                               = kepler,
         .orbital_radius_au                    = 0.30f,
@@ -682,7 +768,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // instellation); parent_orbit_au is its distance from Kepler, which is what
     // drives the tidal term.
     std::vector<float> selene_bias;
-    const planetology_state selene_pl = plan(2, 90, 42, selene_bias);
+    const planetology_state selene_pl = plan(2, selene, 90, 42, selene_bias);
     generate_body_tiles(w, selene, 90, 42, selene_pl.profile,
         /*seed=*/params.seed ^ 0x5E1E001u, deposit_scalar, &selene_pl, nullptr, &selene_bias);
 
@@ -697,20 +783,20 @@ world make_hard_coded_world(world_params params, generation_report* report,
 
     struct notable_asteroid
     {
-        const char* name;
+        int         proto_index; ///< Its slot in the prototype set — and in `naming`.
         float       radius_au;
         float       angle_rad;
         uint32_t    seed;
     };
     constexpr notable_asteroid notables[] = {
-        { "Pallas", 3.05f, 4.6f, 0x9A11A5u },
+        { 3, 3.05f, 4.6f, 0x9A11A5u },
     };
 
     for (const notable_asteroid& a : notables)
     {
         const entity_id id = w.create_entity();
         w.bodies[id] = body_component{
-            .name                                 = a.name,
+            .name                                 = naming.bodies[static_cast<std::size_t>(a.proto_index)],
             .type                                 = body_type::asteroid,
             .parent                               = null_entity,
             .orbital_radius_au                    = a.radius_au,
@@ -723,7 +809,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
         // Differentiated on 26-Al heat, then stripped: the core_fragment branch
         // exits the chain at accretion and the whole object becomes the deposit.
         std::vector<float> ast_bias;
-        const planetology_state ast_pl = plan(3, 30, 14, ast_bias);
+        const planetology_state ast_pl = plan(a.proto_index, id, 30, 14, ast_bias);
         generate_body_tiles(w, id, 30, 14, ast_pl.profile,
             params.seed ^ a.seed, deposit_scalar, &ast_pl, nullptr, &ast_bias);
     }

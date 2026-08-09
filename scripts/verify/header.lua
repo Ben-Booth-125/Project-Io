@@ -9,7 +9,7 @@
 -- with the balance coloured (red if negative) and the net coloured by direction.
 
 -- Land on the home planet so the player's producing assets are in scope.
-verify.goto_surface("Kepler")
+verify.goto_surface("home")
 
 -- Resolve several economy ticks: each step_economy() moves the balance and pushes
 -- a point into the header's balance history (so the net delta and sparkline draw).

@@ -3,19 +3,36 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 130 entries across 2 volume(s).
+One line per session, newest first — 147 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
+| 2026-08-09 | [Cut v0.1.9: five worktree agents, and three of them branched from a base that had already moved](DEVLOG.md) | BL-193 BL-216 BL-227 BL-229 BL-247 BL-250 BL-253 BL-260 BL-266 BL-281 BL-312 BL-338 BL-347 | DEVLOG.md |
+| 2026-08-09 | [Cut v0.1.8: ten test failures, one real defect, and a tool that had been lying since it was written](DEVLOG.md) | BL-285 BL-288 BL-291 BL-302 BL-322 BL-326 BL-333 BL-338 BL-341 | DEVLOG.md |
+| 2026-08-09 | [Cut v0.1.1: the word interface ships, and the retrofit that made it uncuttable is undone](DEVLOG.md) | BL-150 BL-154 BL-194 BL-198 BL-206 BL-214 BL-215 BL-228 BL-230 BL-247 BL-248 BL-262 BL-266 BL-267 BL-270 BL-276 BL-278 BL-293 BL-310 BL-312 BL-313 BL-319 | DEVLOG.md |
+| 2026-08-09 | [Cut v0.1.2: the buildings rework ships, and the roadmap gets its first per-minor done-definition](DEVLOG.md) | BL-266 BL-323 BL-340 | DEVLOG.md |
+| 2026-08-09 | [Build-heavy v0.1.1 batch: BL-215, BL-266, and the XS sweep, three worktree agents](DEVLOG.md) | BL-215 BL-262 BL-266 BL-294 BL-295 BL-339 | DEVLOG.md |
+| 2026-08-08 | [Two of NR-094's footnotes promoted to their own backlog items](DEVLOG.md) | BL-207 BL-278 BL-334 BL-335 BL-336 | DEVLOG.md |
+| 2026-08-08 | [Ruling on NR-094: Stage C takes the dialogue layer, the scorer keeps the action seam](DEVLOG.md) | BL-278 BL-279 BL-334 | DEVLOG.md |
 | 2026-08-08 | [C-route feasibility: both gates pass, and Cicero says the model is on the wrong layer](DEVLOG.md) | BL-278 BL-279 | DEVLOG.md |
+| 2026-08-08 | [Critique batch delivered: build ledger grouping, construction glyph, reach-circle retirement, military start](DEVLOG.md) | BL-323 BL-326 BL-327 BL-328 BL-329 BL-330 | DEVLOG.md |
+| 2026-08-08 | [Live critique: seven items filed, the building-selection bypass fixed](DEVLOG.md) | BL-087 BL-223 BL-323 BL-326 BL-327 BL-328 BL-329 BL-330 BL-331 BL-332 BL-333 | DEVLOG.md |
+| 2026-08-08 | [Military base S1: the muster building lands](DEVLOG.md) | BL-323 BL-325 | DEVLOG.md |
+| 2026-08-08 | [Reach-rule hardening: three S2 defects ruled and fixed, and the military-base design settled](DEVLOG.md) | BL-068 BL-288 BL-323 BL-324 BL-325 | DEVLOG.md |
+| 2026-08-08 | [Buildings rework, first slice: extraction padding, site-dependent build time, construction legibility](DEVLOG.md) | BL-323 | DEVLOG.md |
+| 2026-08-08 | [landing the uncommitted generation-preview / Era -1 terrain work](DEVLOG.md) | BL-256 BL-265 BL-316 BL-321 BL-323 | DEVLOG.md |
+| 2026-08-08 | [military design thread + BL-324 batch delivery](DEVLOG.md) | BL-079 BL-157 BL-181 BL-202 BL-280 BL-305 BL-324 | DEVLOG.md |
+| 2026-08-08 | [audit note: uncommitted generation-preview / Era -1 terrain work found in the tree](DEVLOG.md) | BL-274 BL-316 BL-320 BL-321 BL-323 | DEVLOG.md |
 | 2026-08-08 | [Roadmap extension: v0.1.x retrofitted, the Era −1 arc given a home, v1.0.0 named](DEVLOG.md) | BL-054 BL-087 BL-094 BL-157 BL-160 BL-203 BL-204 BL-205 BL-207 BL-222 BL-262 BL-271 BL-280 BL-315 | DEVLOG.md |
+| 2026-08-05 | [The Era -1 arc's second day: Ages view, sweep verdict, review, and the fixes](DEVLOG.md) | BL-224 BL-271 BL-274 BL-275 BL-277 BL-299 | DEVLOG.md |
 | 2026-08-05 | [Red herrings and the rupture: making Era 1 failure a skill test](DEVLOG.md) | BL-223 | DEVLOG.md |
 | 2026-08-05 | [The Era 1 tree, first draft: keystones opened by deeds](DEVLOG.md) | — | DEVLOG.md |
 | 2026-08-05 | [Effects: what a tech actually does, mapped to real buildings](DEVLOG.md) | BL-087 BL-149 BL-155 BL-156 BL-157 | DEVLOG.md |
 | 2026-08-05 | [The industrial neighbourhood: the second worked region of the tech web](DEVLOG.md) | BL-273 BL-296 | DEVLOG.md |
+| 2026-08-04 | [Roster bands become a partition, and the Era -1 sim lands](DEVLOG.md) | BL-271 BL-277 | DEVLOG.md |
 | 2026-08-04 | [A world that begins at 0 CE](DEVLOG.md) | BL-271 | DEVLOG.md |
 | 2026-08-04 | [The arena comes home: text-only Rival, the diplomacy battery, and the RTS that lived for an hour](DEVLOG.md) | BL-278 BL-296 BL-306 BL-307 BL-308 BL-309 BL-310 | DEVLOG.md |
 | 2026-08-04 | [The ancient tech ladder, mocked up](DEVLOG.md) | BL-087 BL-271 BL-274 BL-275 BL-296 | DEVLOG.md |

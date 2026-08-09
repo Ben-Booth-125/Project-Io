@@ -29,6 +29,104 @@ if(NOT IO_IS_MULTI_CONFIG AND NOT CMAKE_BUILD_TYPE)
         "Debug" "Release" "RelWithDebInfo" "MinSizeRel")
 endif()
 
+# ---------------------------------------------------------------------------
+# Dependency acquisition posture (BL-302)
+# ---------------------------------------------------------------------------
+# Every dependency below (SDL3, Lua, sol2, ImGui) is fetched at CONFIGURE time
+# — ~120 MB of tarballs from codeload.github.com. BL-302 was filed when a fresh
+# configure on Windows could not download SDL3 at all (a schannel TLS
+# revocation failure), which stops the build before a single file compiles.
+#
+# Posture chosen: seed a shared per-checkout SOURCE cache. Not vendoring the
+# tarballs (120 MB into git to solve a fault seen on one machine), and not a
+# machine-specific TLS fix (not reproducible, not portable).
+#
+# Measured on Linux 2026-08-09, and this is why the cache shares *sources only*
+# rather than a whole shared FETCHCONTENT_BASE_DIR:
+#
+#   * From-cold configure, empty cache, network live:  SUCCEEDS in ~74 s.
+#     The schannel fault is Windows-specific and does NOT reproduce here.
+#   * Shared FETCHCONTENT_BASE_DIR across two build trees: HARD FAILS.
+#     The <dep>-subbuild dir carries a generator-locked CMakeCache, so a
+#     second tree with a different generator dies with "generator : Ninja
+#     does not match the generator used previously: Unix Makefiles".
+#     That rules the whole-base-dir variant out — this checkout has
+#     build_gen / build_vs / build_linux / build_rel side by side.
+#   * Shared FETCHCONTENT_SOURCE_DIR_<dep>: WORKS. Different generator,
+#     FETCHCONTENT_FULLY_DISCONNECTED=ON, zero downloads, exit 0. Each build
+#     tree still owns its own <dep>-build, so nothing is shared that a
+#     generator can lock.
+#
+# Behaviour:
+#   * No cache dir present  -> nothing happens; each build dir downloads as
+#                              before. This is the default on a fresh clone.
+#   * Cache dir present     -> a COLD build tree takes its sources from there
+#                              and never touches the network.
+#   * Build tree already populated -> left completely alone (build_linux and
+#                              friends keep the sources they already have; no
+#                              re-download, no forced SDL rebuild).
+#   * -DFETCHCONTENT_SOURCE_DIR_<dep>=... on the command line always wins.
+#
+# Seed the cache once (see DEVELOPMENT_PRACTICES.md § Dependency acquisition):
+#   cmake -S . -B <throwaway> -DFETCHCONTENT_BASE_DIR="$PWD/_deps_cache"
+#
+# IO_DEPS_CACHE (env var) overrides the location. A sub-agent worktree points
+# it at the main checkout's cache so a fresh worktree configures offline:
+#   export IO_DEPS_CACHE=/path/to/Project-Io/_deps_cache
+set(IO_DEPS_CACHE "$ENV{IO_DEPS_CACHE}")
+if(NOT IO_DEPS_CACHE)
+    set(IO_DEPS_CACHE "${CMAKE_CURRENT_SOURCE_DIR}/_deps_cache")
+endif()
+
+# Where THIS build tree keeps its own populated deps. FETCHCONTENT_BASE_DIR is
+# not defaulted until include(FetchContent) below, so mirror its default here.
+if(FETCHCONTENT_BASE_DIR)
+    set(IO_LOCAL_DEPS "${FETCHCONTENT_BASE_DIR}")
+else()
+    set(IO_LOCAL_DEPS "${CMAKE_CURRENT_BINARY_DIR}/_deps")
+endif()
+
+# "<FetchContent name>|<a file that proves the source tree is really there>".
+# A bare directory test would accept a half-extracted cache.
+set(IO_DEPS_SEEDED "")
+set(IO_DEPS_COLD "")
+foreach(dep_spec IN ITEMS
+        "sdl3|CMakeLists.txt"
+        "lua_src|lua.h"
+        "sol2_src|include/sol/sol.hpp"
+        "imgui_src|imgui.cpp")
+    string(REPLACE "|" ";" dep_parts "${dep_spec}")
+    list(GET dep_parts 0 dep_name)
+    list(GET dep_parts 1 dep_marker)
+
+    string(TOUPPER "${dep_name}" dep_upper)
+    set(dep_var "FETCHCONTENT_SOURCE_DIR_${dep_upper}")
+    set(dep_cached_src "${IO_DEPS_CACHE}/${dep_name}-src")
+
+    if(NOT "${${dep_var}}" STREQUAL "")
+        # Explicitly pointed somewhere by the caller — never second-guess it.
+    elseif(IS_DIRECTORY "${IO_LOCAL_DEPS}/${dep_name}-src")
+        # This build tree already has it; leave warm trees untouched.
+    elseif(EXISTS "${dep_cached_src}/${dep_marker}")
+        set(${dep_var} "${dep_cached_src}" CACHE PATH
+            "Seeded from the shared Io dependency cache (BL-302)")
+        list(APPEND IO_DEPS_SEEDED "${dep_name}")
+    else()
+        list(APPEND IO_DEPS_COLD "${dep_name}")
+    endif()
+endforeach()
+
+# Say cold-or-warm out loud. A green local build dir hides this failure class
+# completely (BL-302) — the configure line is where it becomes visible.
+if(IO_DEPS_SEEDED)
+    message(STATUS "Deps: seeded from ${IO_DEPS_CACHE} -> ${IO_DEPS_SEEDED}")
+endif()
+if(IO_DEPS_COLD)
+    message(STATUS "Deps: COLD -> ${IO_DEPS_COLD}")
+    message(STATUS "      these download at configure time (~120 MB total);"
+                   " no cache at ${IO_DEPS_CACHE}")
+endif()
+
 include(FetchContent)
 
 # ---------------------------------------------------------------------------
@@ -322,7 +420,7 @@ target_compile_features(commercial_fog_harness PRIVATE cxx_std_20)
 enable_testing()
 
 file(GLOB IO_WORLD_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/world/*.cpp")
-list(FILTER IO_WORLD_SOURCES EXCLUDE REGEX "(recipe_registry|tech_tree|world_gen_config)\\.cpp$")
+list(FILTER IO_WORLD_SOURCES EXCLUDE REGEX "(recipe_registry|works_registry|tech_tree|world_gen_config)\\.cpp$")
 
 # ---------------------------------------------------------------------------
 # The world layer, compiled ONCE (BL-287)
@@ -439,12 +537,58 @@ file(GLOB IO_VERIFY_HARNESSES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/too
 # econ_stability and data_creep_harness, whose long-running sweep/1500-tick
 # passes are not yet present in this checkout (see BL-255 report) but land
 # on the same fast-tier build these values must already tolerate.
+#
+# RE-TIERED 2026-08-09 (BL-288, at the v0.1.8 cut). The tiers above were set
+# from Debug measurements before the sweeps existed, and the result was that
+# `ctest` reported ten failures of which only ONE was a failing assertion.
+# Measured on Linux/GCC Release, each harness run alone on an idle machine:
+#
+#   earthlike_lean_trace    121s   PASSES   (was reported Timeout at 60s)
+#   notable_worlds          105s   PASSES   (was reported Timeout at 60s)
+#   mediterranean_sweep      87s   PASSES   (was reported Timeout at 60s)
+#   earthlike_tile_census    58s   PASSES   (2s under the bound - flaky by luck)
+#   history_sim_harness    >400s   did not finish
+#   history_sweep          >400s   did not finish
+#
+# A timeout is not a failing assertion, and reporting it as one trains sessions
+# to ignore a red suite - which is exactly how the real ai_skill_harness golden
+# drift sat unnoticed among nine false positives.
 set(IO_TEST_TIMEOUT_DEFAULT 60)
-set(IO_TEST_TIMEOUT_LONG 120)
+set(IO_TEST_TIMEOUT_LONG 240)
 set(IO_TEST_LONG_HARNESSES
     corp_terrain_matrix
     econ_stability
     data_creep_harness
+    earthlike_lean_trace
+    earthlike_tile_census
+    mediterranean_sweep
+    notable_worlds
+)
+
+# RESEARCH SWEEPS - labelled `sweep`, and NOT part of the routine gate.
+#
+# These are not regression checks that happen to be slow; they are open-ended
+# exploration tools that answer a design question over many generated worlds,
+# and both ran past 400s without finishing. Their cost is the point, so the
+# answer is to stop pretending they are gate tests rather than to keep raising
+# a bound they will always outgrow. Run them deliberately, by name or by label.
+# (Their runtime is BL-320's subject; this only stops them failing the gate.)
+set(IO_TEST_SWEEP_HARNESSES
+    history_sim_harness
+    history_sweep
+)
+
+# WALL-CLOCK BENCHES - labelled `bench`, and only meaningful on an idle machine.
+#
+# These assert ABSOLUTE times (econ_stability's per-tick bound, the 1s ceiling
+# on home_surface_bench's preview), so they measure the machine as much as the
+# code. Both PASS standalone and both failed in the 2026-08-09 suite run purely
+# because a concurrent build was loading the box. Kept in the gate, because the
+# budgets are real and worth defending - but labelled, so a failure here is read
+# as "re-run it idle" rather than as a regression.
+set(IO_TEST_BENCH_HARNESSES
+    econ_stability
+    home_surface_bench
 )
 
 foreach(harness_src ${IO_VERIFY_HARNESSES})
@@ -458,9 +602,16 @@ foreach(harness_src ${IO_VERIFY_HARNESSES})
         target_compile_options(${harness_name} PRIVATE ${IO_WARNING_FLAGS})
     endif()
     add_test(NAME ${harness_name} COMMAND ${harness_name})
-    if(harness_name IN_LIST IO_TEST_LONG_HARNESSES)
+    if(harness_name IN_LIST IO_TEST_SWEEP_HARNESSES)
+        # No TIMEOUT is set deliberately: a sweep runs until it has its answer,
+        # and the `sweep` label is what keeps it out of the routine gate.
+        set_tests_properties(${harness_name} PROPERTIES LABELS "sweep")
+    elseif(harness_name IN_LIST IO_TEST_LONG_HARNESSES)
         set_tests_properties(${harness_name} PROPERTIES TIMEOUT ${IO_TEST_TIMEOUT_LONG})
     else()
         set_tests_properties(${harness_name} PROPERTIES TIMEOUT ${IO_TEST_TIMEOUT_DEFAULT})
+    endif()
+    if(harness_name IN_LIST IO_TEST_BENCH_HARNESSES)
+        set_property(TEST ${harness_name} APPEND PROPERTY LABELS "bench")
     endif()
 endforeach()

@@ -63,7 +63,8 @@ A tile's character has **two axes** (the two-axis model, [TILES.md](../economy/T
 | Background | Dark: `(18, 18, 24)` |
 | Tile | Filled hexagon. Colour from `ui::terrain_colour` (composition hue), composited with the landform relief tint (§ Terrain types above). A 1 px gap between hexes lets the background show through as a border — achieved by drawing each hex at `circumradius - 1 px` rather than adding explicit borders. |
 | Building marker | A small white vector glyph centred on the tile (~22% of hex circumradius), drawn by `ui::icons::building` with a thin dark outline. The silhouette encodes the type: extraction = ore-chunk, processing = square, port = triangle, inland logistics hub = hexagon (BL-149), other = circle. |
-| Road network | **Always-on** (like terrain, not a lens): the generated road lattice (BL-146) plus player-placed roads (BL-147) render as **continuous, symmetric spans** (BL-172). Each roaded tile draws its **own half** of every shared road edge — from its centre to the midpoint of the centre-to-neighbour line — toward each roaded, survey-revealed cardinal neighbour; the two tiles' halves meet at the edge midpoint, so a road spans the pair identically whichever tile is "from" (no from/to asymmetry), and a small centre cap rounds junctions and keeps a lone / just-placed road visible. Cylinder-seam edges shift one period to stay short; drawn only toward survey-revealed neighbours, so roads don't leak past the survey fog. Styled by the drawing tile's **tier** — **Track** (`road_level` 1) thin/dim, **Road** (2) medium, **Highway** (3) thick/bright — so a tier change reads as a taper at the midpoint. |
+| Road network | **Always-on** (like terrain, not a lens): the generated road lattice (BL-146) plus player-placed roads (BL-147) render as **continuous, symmetric spans** (BL-172). Each roaded tile draws its **own half** of every shared road edge — from its centre to the midpoint of the centre-to-neighbour line — toward each roaded, survey-revealed cardinal neighbour; the two tiles' halves meet at the edge midpoint, so a road spans the pair identically whichever tile is "from" (no from/to asymmetry), and a small centre cap rounds junctions and keeps a lone / just-placed road visible. Cylinder-seam edges shift one period to stay short; drawn only toward survey-revealed neighbours, so roads don't leak past the survey fog. Styled by the drawing tile's **tier** — **Track** (`road_level` 1) thin/dim, **Road** (2) medium, **Highway** (3) thick/bright — so a tier change reads as a taper at the midpoint. Spans **dim with the commercial-reach fog** (BL-185), through the same wash the lens fill takes; a road edge is fogged by the **max** of its two tiles' vision (see [DISCOVERY.md](DISCOVERY.md)). The tier ladder has **no on-canvas key** — it is named contextually in the Selection panel instead (BL-184, below). |
+| Road-tier legend | **Contextual, not chrome** (BL-184, Ben's call 2026-08-09). The three tiers render by line weight and brightness alone, and roads are always-on terrain rather than a lens (BL-147), so the per-lens legend drawer cannot carry them. Instead, selecting a roaded tile names its tier beside the coordinates in the Selection panel header — `Tile [x, y] · Highway` — with a hover tooltip giving the thin→thick ladder. A roadless tile shows nothing; no persistent chip is added anywhere. |
 | Selection / hover indicator | Hex outline drawn through the shared highlight convention (`src/ui/highlight.hpp`): white for the selected tile, light blue for the hovered tile (per wrap copy), amber for pinned (not yet wired). |
 | Hover card | The shared glance-then-stick hover card ([TOOLTIP.md](TOOLTIP.md), BL-228/BL-230), content **lens-keyed** (`src/ui/hover_content.cpp`). A tile's default variant: `composition · landform` header (plains unnamed), habitability, and the landform's movement-cost multiplier when not plains (BL-232). Under the Resource lens: the selected resource's deposit richness; under Population: habitability + workforce cap. Buildings and market centres carry their own variants (rival buildings show type + owner only, BL-068). |
 | Body label | Canvas title bar shows the selected body name, type, and grid dimensions. As the Planetary screen is always primary (full size), the title is always shown. A **survey-status suffix** follows it (survey system, BL-067): `UNSURVEYED`, `Survey en route`, or `Surveying k/N` — nothing once surveyed. |
@@ -86,8 +87,8 @@ Beyond the base grid and the chrome in the table above, the draw pass
 - **Built-tile installations** — building markers (enlarged silhouette + corp
   emblem tag on built tiles), road spans (BL-172), settlement conurbation
   markers, the home-cluster ring + HQ star.
-- **Corporate borders** — per-corp seat borders (`draw_corp_border`, BL-201
-  foundation).
+- **Corporate HQ markers** — per-corp seat markers (`draw_corp_hq`, BL-182/201
+  foundation; the reach ring retired BL-329, 2026-08-08 — see LENSES.md).
 - **Activity fog + convoy beams** — the intra-body vision layers
   (`permanent_vision`, `convoy_beams` in `ui_state`, BL-151/152/154) and the
   survey region mask (BL-067). Model authority: [DISCOVERY.md](DISCOVERY.md).
@@ -112,10 +113,47 @@ The per-tile loop is **culled and cached**, not all-tiles-per-frame:
   any built/owner/lens work.
 
 Measured (pan_perf, 1720×1080, 60 Hz vsync): play-zoom pan went 11.3 → 5.0 ms
-work/frame in Release and 41.2 → 6.7 ms in Debug. The remaining heavy case is
+work/frame in Release and 41.2 → 6.7 ms in Debug. The remaining heavy case was
 the whole-grid view (all 15,120 hexes genuinely visible, ~155k vertices): 12.1 ms
-Release — vertex-emission-bound, owned by the zoomed-out LOD/draw-cache follow-on
-(BL-269), not by this loop.
+Release — vertex-emission-bound, and closed by the fill LOD below (BL-269).
+
+### Fill level-of-detail at far zoom (BL-269, 2026-08-09)
+
+Below **`draw_r ≤ 7 px`** the terrain fill is an `AddRectFilled` instead of a
+6-gon: ~4 vertices against ~10 once anti-aliasing's fringe is counted, and no
+fringe to rasterise.
+
+**The bound is derived, not chosen.** A hexagon differs from its inscribed rect by
+the corner cut, `draw_r × (1 − √3⁄2)` = `draw_r × 0.134`, which falls under one
+pixel at `draw_r < 7.46`. At the 7 px bound the cut is 0.94 px, and the per-tile
+landform icons (drawn at `0.42 × draw_r`) are already unreadable.
+
+The rect is sized to the **grid step**, not the hex radius. Rows step by
+`1.5 × hex_size` while a hex is `2 × hex_size` tall, so consecutive rows overlap; a
+radius-sized rect is shorter than the row pitch and the terrain renders as
+horizontal stripes. At `col_step × row_step` the rects brick-lay — odd rows are
+already offset half a column — and tile the plane exactly.
+
+| whole-grid view | before | after |
+|---|---|---|
+| vertices | 157,084 | **63,004** |
+| submit | 14.25 ms | **4.25 ms** |
+
+Zoomed-in phases are unchanged to the vertex (6,172 at z1.1; 23,620 at z3), so the
+LOD provably does not fire where detail is readable. **Terrain colour, relief
+shading, the survey mask and the fog wash are untouched** — they are colour, not
+geometry — so the analytic read this view exists for is unchanged. The visible
+difference is that the far-zoom grid texture is brick-laid rather than hex-dotted.
+
+> **Panning is not the cost, and the measurement is the reason to say so.** The
+> static and panning phases at the same zoom measured identically (157,084 vs
+> 158,407 vertices). Pan is `pan += io.MouseDelta` — 1:1 with the cursor and
+> correct — so a frame that takes 3× as long applies 3× the accumulated delta at
+> once: the right destination by a jumpy route. "Sharp jumps while panning" is a
+> frame-cost symptom, and input-side damping would add latency without touching it.
+
+`build_ms` (~9 ms, ImGui draw-list construction) is untouched and is the next thing
+to look at if this view is still short of budget on low-spec hardware.
 
 ## Cell sizing and coordinate mapping
 

@@ -766,3 +766,59 @@ per corp (`id`, `name`, `is_player`, `home_nation`), then `END`. Six tools, not 
 - Cicero — human-level full-press Diplomacy; controllable dialogue model + planning engine. https://ai.meta.com/research/cicero/ · https://github.com/facebookresearch/diplomacy_cicero
 - Small Language Models for Efficient Agentic Tool Calling — targeted fine-tunes beating much larger models. https://arxiv.org/abs/2512.15943
 - Model Context Protocol — the specification. https://modelcontextprotocol.io
+
+### 10g. Ruling on the C-route feasibility note (Ben, 2026-08-08 — NR-094)
+
+A cloud research session (`docs/ai/LANGUAGE_POLICY_FEASIBILITY.md`) ran the two feasibility gates
+§ 10d implicitly set — can the runtime model be compressed, and does it run in budget — and both
+pass (3–8B compresses to Vox Deorum's already-open-weight-parity bar; the per-decision budget is
+~90s at 1×, ~5.6s at 16× for 8 rivals, computed from `sim_loop`'s own constants, against ~3–7s of
+measured 8B-Q4 decode). Neither gate disqualifies the local-model runtime target.
+
+**But the note is right that § 10d, as written, drifted from this doc's own Stage A/B/C
+decomposition (§ 7).** § 10d's MCP-attached "small local model plays through text" framing reads
+as the model calling `issue_command` directly — i.e. the model AS Stage A/B, replacing or
+augmenting the scorer's action-emission. That was never the plan `list_corps`/`issue_command`'s
+sibling framing in § 7 set: **Stage A/B (the deterministic scorer, BL-202/203) is the action
+generator; Stage C is the LLM speaking in-character in channels** — a dialogue layer over the
+decision stream, not a replacement for it. § 10d's drift is corrected here, not by walking back
+MCP or the local-model target (both stand), but by being explicit about which Stage the model
+occupies.
+
+**Ruling: adopt the Cicero configuration the note recommends, as Stage C's concrete shape.**
+
+- **Stage A/B stays the action generator, indefinitely.** `corp_ai.cpp`'s scored-utility core
+  (or a future RL policy, § 8 of the note — not disqualified, just not chosen yet) keeps emitting
+  `corp_command`. This was never seriously in question once the note's § 9.1 point lands:
+  distilling `corp_ai.cpp` yields, at best, `corp_ai.cpp` — there is no skill upside to buy, only
+  legibility and determinism to lose, and both are named requirements (§ "The goal";
+  `docs/development/DEVLOG.md` inherits nothing from a policy with no rationale to show).
+- **Stage C is a conditioned dialogue layer over the `corp_decision` ring**, not an independent
+  planner. Cicero's shape exactly: the scorer's winning command + reason code IS the "intent" a
+  small (Cicero's own reference point: 2.7B) model is conditioned on to speak in Public/private
+  channels (§ 7). This is where the diplomacy capability § 10d was actually reaching for lives —
+  separable from action generation, per the note's § 7.
+- **A goal layer above the scorer stays a live, separate option** — not decided here, filed as
+  its own open question in BL-334 below — for when/if step-wise myopia (§ 10c.4's documented
+  failure mode) is actually observed rather than assumed.
+- **The constraint tax (the note's § 6) is the reason this isn't merely a style preference.**
+  Small models measured dropping from 91.5% to 48.0% executable accuracy under a hard schema,
+  with the damage entering where instructions suppress deliberation — exactly the failure mode a
+  model-emits-`corp_command`-directly design sits on. Keeping the scorer as the action generator
+  avoids the risk instead of mitigating it.
+- **BL-279 is rescoped, not cancelled.** Its corpus still gets bootstrapped from `corp_ai.cpp`'s
+  own decision ring first (free, no cloud spend, exactly the note's § 9 "bootstrap from the
+  scorer" instruction) — but the corpus now trains the **Stage C dialogue layer** (BL-334), not
+  an action-emitting model. Cloud play through the MCP server remains valuable for a DIFFERENT
+  reason: an external agent (frontier or otherwise) playing a corp interactively is a research/
+  spectacle use of BL-278, not the shipped rival AI's architecture — that capability is
+  unaffected by this ruling and needs no rescoping.
+- **MCP, BL-278, and the local-model-as-runtime-target all stand exactly as § 10d states.** This
+  ruling changes which Stage the model occupies, not the transport or the no-cloud-dependency
+  invariant.
+
+**What this does not settle.** Whether Stage C ships before or after the v0.2.0 corp-AI arc
+closes, and the model size/quantisation for Stage C specifically (Cicero's 2.7B is a reference
+point, not a spec) — both left inside BL-334's design-owed remainder. The goal-layer question and
+the unmeasured token-cost assumption are filed as their own items (BL-336, parked pending
+observed evidence; BL-335, a cheap independent measurement) rather than carried as footnotes.

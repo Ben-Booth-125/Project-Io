@@ -11,20 +11,20 @@
 -- Run with: ProjectIo --verify scripts/verify/survey.lua
 
 -- Planetary mask progression on Cinder.
-verify.goto_surface("Cinder")
+verify.goto_surface("inner")
 
-verify.set_survey("Cinder", 0)        -- hidden: the whole surface is masked
+verify.set_survey("inner", 0)        -- hidden: the whole surface is masked
 verify.capture("survey_planetary_masked")
 
-verify.set_survey("Cinder", 100)      -- partial: ~100/253 regions revealed (raster)
+verify.set_survey("inner", 100)      -- partial: ~100/253 regions revealed (raster)
 verify.capture("survey_planetary_partial")
 
-verify.set_survey("Cinder", 99999)    -- clamped to full: surveyed, whole surface shown
+verify.set_survey("inner", 99999)    -- clamped to full: surveyed, whole surface shown
 verify.capture("survey_planetary_full")
 
 -- Solar badges: Cinder mid-survey (magnifier + k/N), Selene + asteroids hidden (?),
 -- Kepler (home) surveyed (no badge).
-verify.set_survey("Cinder", 100)
+verify.set_survey("inner", 100)
 verify.goto_surface("home")
 verify.command("ascend")   -- Planetary -> Circumplanetary
 verify.command("ascend")   -- Circumplanetary -> Solar

@@ -223,6 +223,7 @@ const char* verb_name(corp_verb v)
         case corp_verb::resume:        return "resume";
         case corp_verb::place_road:    return "place_road";
         case corp_verb::survey:        return "survey";
+        case corp_verb::hire_unit:     return "hire_unit";
     }
     return "?";
 }
@@ -329,8 +330,11 @@ float output. Bless a set from a fresh Clang run and add its own block."
 // industrialised sit on better ground than randomly-placed ones did, which is
 // the intended consequence of the rewrite rather than noise to suppress.
 //
-// The GCC set below is deliberately NOT touched — re-bless it from a fresh Linux
-// run, per the rule above.
+// STALE AS OF 2026-08-09 — see the GCC block's re-bless note below. This set was
+// blessed 2026-08-02, BEFORE BL-323 (the logistics reach rule) and BL-324
+// (unit hiring) changed what the scorer does. It will fail on the next Windows
+// run for the same reason the GCC set just did. Re-bless it from a fresh MSVC
+// run; do NOT copy the GCC numbers across.
 const std::vector<seed_golden> goldens = {
     { 0, {480000.0f, 1150000.0f}, {160000.0f, 380000.0f}, 12, {0.45f, 0.95f},  5, 260 },
     { 1, {235000.0f,  570000.0f}, { 72000.0f, 175000.0f},  5, {0.60f, 1.00f},  5, 290 },
@@ -339,18 +343,49 @@ const std::vector<seed_golden> goldens = {
     { 4, {370000.0f,  895000.0f}, {118000.0f, 284000.0f}, 12, {0.60f, 1.00f},  5, 310 },
 };
 #elif defined(__GNUC__)
-// --- Linux / GCC -O2 — blessed 2026-08-01. Observed:
-//   seed 0: net-worth final=395143.0 min=123180.0 solvency=5/30  survival=0.71  build=0 dial=174
-//   seed 1: net-worth final=550394.2 min=177619.3 solvency=0/30  survival=0.71  build=0 dial=170
-//   seed 2: net-worth final=505318.6 min=155243.2 solvency=0/30  survival=0.71  build=0 dial=244
-//   seed 3: net-worth final=305209.8 min=93584.9  solvency=3/30  survival=0.71  build=0 dial=109
-//   seed 4: net-worth final=182745.5 min=51070.9  solvency=4/30  survival=0.71  build=0 dial=122
+// --- Linux / GCC -O2 — RE-BLESSED 2026-08-09 (BL-285 task 1, at the v0.1.8 cut).
+// Observed on that run:
+//   seed 0: final=248736.1 min=78098.3 solvency=6/30 survival=0.57 build=0 dial=140
+//   seed 1: final=102789.2 min=38965.2 solvency=9/30 survival=0.71 build=0 dial=128
+//   seed 2: final=277622.0 min=78597.0 solvency=4/30 survival=0.57 build=0 dial=252
+//   seed 3: final=160907.5 min=38636.2 solvency=8/30 survival=0.71 build=0 dial=130
+//   seed 4: final=136757.1 min=44641.4 solvency=4/30 survival=0.71 build=0 dial=118
+//
+// The previous set (blessed 2026-08-01) was never re-run after BL-218/BL-219, so
+// it had drifted for the same reason the MSVC block was re-blessed on 2026-08-02
+// — that is the drift BL-285 existed to close. Two further changes landed since,
+// and they are what makes this re-bless EXPLAINED:
+//
+//   * BL-323 (logistics reach rule) — placement is now bounded by distance from a
+//     supply anchor. Roughly 77% of Kepler's land is placeable where 100% was, so
+//     a corp can no longer site on the richest tile irrespective of remoteness.
+//   * BL-324 (unit hiring) — corps now spend on units. All five seeds show
+//     action[hire_unit] = 21, an outflow that simply did not exist at the last
+//     bless. Note hire_unit is excluded from the dial ceiling above, so it moves
+//     net worth without moving the thrash counters.
+//
+// DIRECTION IS DOWNWARD, AND THAT IS THE PART WORTH A SECOND LOOK. The MSVC
+// re-bless of 2026-08-02 moved every divergence UP and was easy to accept. This
+// one moves down, and not uniformly: seed 1 fell from 550394 to 102789 (-81%) and
+// went from the highest of the five to the lowest, while seed 4 fell only 25%.
+// Constraining siting and adding a cash outflow should cost net worth, and a
+// per-seed reshuffle is what a *placement* constraint would produce — some corps'
+// best ground falls outside reach, others' does not. So the shape matches the
+// cause. It is recorded here rather than waved through because "the AI got poorer"
+// is exactly what a genuine skill regression would also look like: if a later
+// session finds the scorer mis-valuing reach-limited sites, this block is the
+// evidence trail, not an alibi.
+//
+// Solvency ceilings rose on seeds 1 and 3 (5 -> 16, 10 -> 15) because corps now
+// dip below zero more often while paying for units; survival held in band on all
+// five, so corps are poorer but not dying — the distinction that says this is
+// cost, not collapse.
 const std::vector<seed_golden> goldens = {
-    { 0, {235000.0f, 555000.0f}, { 70000.0f, 175000.0f}, 12, {0.45f, 0.95f},  5, 240 },
-    { 1, {330000.0f, 770000.0f}, {105000.0f, 250000.0f},  5, {0.45f, 0.95f},  5, 240 },
-    { 2, {300000.0f, 710000.0f}, { 90000.0f, 220000.0f},  5, {0.45f, 0.95f},  5, 330 },
-    { 3, {180000.0f, 430000.0f}, { 55000.0f, 130000.0f}, 10, {0.45f, 0.95f},  5, 160 },
-    { 4, {110000.0f, 255000.0f}, { 30000.0f,  72000.0f}, 10, {0.45f, 0.95f},  5, 180 },
+    { 0, {148000.0f, 350000.0f}, { 46000.0f, 110000.0f}, 12, {0.45f, 0.95f},  5, 200 },
+    { 1, { 61000.0f, 145000.0f}, { 23000.0f,  55000.0f}, 16, {0.45f, 0.95f},  5, 180 },
+    { 2, {165000.0f, 390000.0f}, { 47000.0f, 110000.0f}, 10, {0.45f, 0.95f},  5, 355 },
+    { 3, { 96000.0f, 225000.0f}, { 23000.0f,  54000.0f}, 15, {0.45f, 0.95f},  5, 185 },
+    { 4, { 82000.0f, 192000.0f}, { 26000.0f,  62000.0f}, 10, {0.45f, 0.95f},  5, 165 },
 };
 #else
 #error "ai_skill_harness: no blessed golden band set for this toolchain (BL-252). \
@@ -412,7 +447,11 @@ int main()
         {
             std::printf("    action[%s] = %d\n", verb_name(verb), count);
             if (verb == corp_verb::build) build_total += count;
-            else if (verb != corp_verb::survey) dial_total += count;
+            // hire_unit is neither a build nor a per-building dial (BL-324) —
+            // it never touches a building, so it does not belong in the
+            // dial-thrash ceiling this loop is measuring.
+            else if (verb != corp_verb::survey && verb != corp_verb::hire_unit)
+                dial_total += count;
         }
 
         char label[128];

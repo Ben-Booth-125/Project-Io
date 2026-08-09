@@ -339,7 +339,7 @@ bool draw_constellation(const tech_tree_registry& tree, int era,
                                               (wedges[i].max_radius + kRingSpacing * 0.55f) * std::sin(wedges[i].centre_angle) });
         const std::string label = wedges[i].quest->name;
         const ImVec2 text_size = ImGui::CalcTextSize(label.c_str());
-        dl->AddText({ label_pos.x - text_size.x * 0.5f, label_pos.y - text_size.y * 0.5f },
+        dl->AddText({ label_pos.x - text_size.x * 0.5f, label_pos.y - text_size.y * 0.5f }, // fit-exempt: on-canvas node label, canvas pans to content
                     IM_COL32(190, 200, 215, 220), label.c_str());
     }
 
@@ -381,7 +381,7 @@ bool draw_constellation(const tech_tree_registry& tree, int era,
         dl->AddLine(a, b, IM_COL32(200, 120, 60, 160), 1.5f);
         const ImVec2 mid{ (a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f };
         const ImVec2 text_size = ImGui::CalcTextSize("excludes");
-        dl->AddText({ mid.x - text_size.x * 0.5f, mid.y - text_size.y * 0.5f },
+        dl->AddText({ mid.x - text_size.x * 0.5f, mid.y - text_size.y * 0.5f }, // fit-exempt: on-canvas node label, canvas pans to content
                     IM_COL32(230, 160, 90, 230), "excludes");
     }
 
@@ -431,7 +431,7 @@ bool draw_constellation(const tech_tree_registry& tree, int era,
             // would have had to decode.
             const std::string label = display_label(*nl.node);
             const ImVec2 text_size = ImGui::CalcTextSize(label.c_str());
-            dl->AddText({ spos.x - text_size.x * 0.5f, spos.y + r + 2.0f },
+            dl->AddText({ spos.x - text_size.x * 0.5f, spos.y + r + 2.0f }, // fit-exempt: on-canvas node label, canvas pans to content
                         IM_COL32(170, 178, 190, 210), label.c_str());
         }
 

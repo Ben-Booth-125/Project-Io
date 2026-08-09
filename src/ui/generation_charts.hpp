@@ -103,18 +103,24 @@ std::string stage_verdict(const generation_chart_source& src, chain_stage s);
 void draw_stage_charts(const generation_chart_source& src, chain_stage s, bool heading,
                        ui_state* log_ui = nullptr);
 
-/// One chain stage on the fold model (BL-214) — both of its states, in one call.
+/// One chain stage on the disclosure model (BL-214, revised BL-265) — all three of
+/// its states, in one call.
 ///
-/// FOLDED (the resting state): a chevron, the stage name, and its one-line verdict.
-/// EXPANDED: the full-screen overlay carrying that stage's explainer, casualties and
-/// every chart, with the room they never had in a 380 px ledger column.
+/// FOLDED (the resting state): the stage name, its one-line verdict, and the `⌄ ›`
+///   control pair right-aligned to the row's gutter.
+/// EXPANDED IN PLACE (`⌄`): this stage's title, explainer and charts, indented under
+///   its own verdict line. Several stages may be open at once — that is the accordion.
+/// FULL CANVAS (`›`): the takeover shows the WHOLE ROUND this stage belongs to, every
+///   stage open top to bottom and scrolled, with the room they never had in a 380 px
+///   ledger column. The in-place set is ignored inside it, so the view never depends
+///   on which rows the player happened to unfold first.
 ///
 /// The wizard and the History ledger both call this, which is the point: a chain
 /// stage reads and behaves identically wherever the player meets it. They differ
 /// only in the @p surface they pass, so expanding a stage in one does not expand it
 /// in the other.
 ///
-/// @param ui      UI state — the fold target and the open question-log note.
+/// @param ui      UI state — the disclosure target and set.
 /// @param surface `generation_stage` from the wizard, `history_chain` from the ledger.
 void draw_stage_fold(const generation_chart_source& src, chain_stage s,
                      ui_state& ui, detail_surface surface);

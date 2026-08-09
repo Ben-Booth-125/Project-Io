@@ -70,6 +70,24 @@ void hub_node(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
     dl->AddCircleFilled(c, r * 0.28f, outline); // hub node at the centre
 }
 
+// Shield silhouette — the Military Base marker (BL-325 S1). A flat top with
+// shoulders tapering to a bottom point: the martial building, FILLED like every
+// other building glyph — so it never reads as the port's upward triangle or the
+// hub's hexagon. (The stroke-only unit chevron was deleted uncalled, BL-294; a
+// unit marker returns with BL-157.)
+void shield(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    const ImVec2 v[5] = {
+        { c.x - r,        c.y - r },         // top-left
+        { c.x + r,        c.y - r },         // top-right
+        { c.x + r,        c.y + r * 0.25f }, // right shoulder
+        { c.x,            c.y + r },         // bottom point
+        { c.x - r,        c.y + r * 0.25f }, // left shoulder
+    };
+    dl->AddConvexPolyFilled(v, 5, fill);
+    dl->AddPolyline(v, 5, outline, ImDrawFlags_Closed, 1.0f);
+}
+
 } // namespace
 
 void building(ImDrawList* dl, ImVec2 centre, float r, building_type type, ImU32 fill)
@@ -80,6 +98,7 @@ void building(ImDrawList* dl, ImVec2 centre, float r, building_type type, ImU32 
         case building_type::processing_facility:  square(dl, centre, r, fill);    break;
         case building_type::port:                 triangle(dl, centre, r, fill);  break;
         case building_type::inland_logistics_hub: hub_node(dl, centre, r, fill);  break; // BL-149
+        case building_type::military_base:        shield(dl, centre, r, fill);    break; // BL-325
         default:
             dl->AddCircleFilled(centre, r, fill);
             dl->AddCircle(centre, r, outline, 0, 1.0f);
@@ -92,17 +111,28 @@ void resource(ImDrawList* dl, ImVec2 centre, float r, resource_type res)
     diamond(dl, centre, r, presentation_of(res).colour);
 }
 
-void unit(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+void under_construction(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
 {
-    // Open upward chevron (V): two lines meeting at a bottom point, open at top.
-    // Stroke-only so it is unambiguously distinct from the filled port triangle.
-    const ImVec2 v[3] = {
-        { centre.x - r, centre.y - r * 0.5f },  // top-left arm
-        { centre.x,     centre.y + r },          // bottom point
-        { centre.x + r, centre.y - r * 0.5f },  // top-right arm
+    // Crane silhouette: a mast, an angled boom reaching toward the load, a
+    // back-stay bracing it, and a short hook line hanging from the boom tip.
+    // Four strokes, stroke-only (see the header contract) — distinct from the
+    // convoy chevron (points right) and every filled building glyph. Same
+    // shadow-then-colour pass as convoy() so it reads against any terrain or
+    // lens fill.
+    const ImVec2 base    { centre.x - r * 0.15f, centre.y + r         };
+    const ImVec2 top     { centre.x - r * 0.15f, centre.y - r         };
+    const ImVec2 boom_tip{ centre.x + r,         centre.y - r * 0.60f };
+    const ImVec2 stay    { centre.x - r * 0.85f, centre.y - r * 0.15f };
+    const ImVec2 hook    { boom_tip.x,            boom_tip.y + r * 0.35f };
+
+    const auto stroke = [&](ImVec2 a, ImVec2 b) {
+        dl->AddLine(a, b, outline, 2.5f);
+        dl->AddLine(a, b, colour,  1.5f);
     };
-    dl->AddPolyline(v, 3, outline, ImDrawFlags_None, 2.0f);
-    dl->AddPolyline(v, 3, colour,  ImDrawFlags_None, 1.5f);
+    stroke(base, top);       // mast
+    stroke(top, boom_tip);   // boom
+    stroke(top, stay);       // back-stay
+    stroke(boom_tip, hook);  // hook line
 }
 
 void ledger(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)

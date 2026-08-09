@@ -68,6 +68,10 @@ branch point is `is_player_owned(world, building)` (with `owner_corp_of` behind 
   (subject to the *geographic* fog: a rival marker shows only on surveyed regions).
 - **Rival internals are private** — production rates and stockpile quantities never appear. A rival
   hover card shows **type and owner only**.
+- **Construction state is public** (ruled 2026-08-09, NR-090): a rival's under-construction
+  buildings render with the same BL-323 dimming as the player's own. Scaffolding is externally
+  observable, so a rival's expansion frontier is readable at a glance — deliberate counterplay, not
+  a leak. Tick counts / progress detail stay private (the hover card hides them).
 - **Market supply/demand aggregates and prices are public** — the deliberate signal. The player
   *infers* rival state from market movement: a rising price in a good Kepler Industries is known to
   extract means their output is down, or demand is up elsewhere — not a fact read off a panel.
@@ -174,6 +178,17 @@ Three vision layers, all derived VIEW state (`ui_state`, rebuilt each frame by `
 for the active body — never serialised, no feedback into `world/*`). A tile's `vision` is `1` in the
 permanent layers, else the moving beam's intensity; the fog wash scales with `1 − vision`, applied over
 the lens fill so a fogged region's analytic read dims with it. Survey owns the *unrevealed* tiles.
+
+**Roads take the same wash (BL-185, 2026-08-09).** The road-edge pass used to draw independently of
+the fog, so a road on an unreached tile rendered exactly as brightly as one on the player's own
+corridor — the one bright thing on a dark surface. Both the lens fill and the road spans now go
+through a single `fog_dim` (`body_surface_canvas.cpp`), so the fog reads as one uniform wash. A road
+edge spans **two** tiles, and it is fogged by the **max** of the pair's vision — a road is lit if
+*either* end is reached. Max is chosen because it is **symmetric**, so the two tiles' halves fog to
+the same value and the span stays one continuous weight (the same no-from/to-asymmetry property
+BL-172 gave the geometry); and because reach is a flood outward from where the player operates, so
+an edge touching a reached tile is inside that reach rather than one hop past its rim. A junction's
+centre cap takes the brightest edge meeting there. Presentation only — no `world/*` change.
 
 - **Permanent building pockets (BL-151/154):** a radius-2 flood around each of the player's own
   building tiles — your installations are always visible.

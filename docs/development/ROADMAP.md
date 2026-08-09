@@ -187,7 +187,7 @@ assertion holds.
 (BL-259). What had been listed as owed before it resolved as follows:
 
 - **BL-258** (gate the absolute timing bound on an optimised build) — the live successor is
-  **BL-288** (Release-only test failures, `design-owed`, A, v0.1.2). Four harnesses fail in Release
+  **BL-288** (Release-only test failures, `design-owed`, A, v0.1.3). Four harnesses fail in Release
   and nothing caught it, because the default `build/` tree is Debug. Same root, wider scope.
 - **Frame-budget targets measured against the real app** — still owed, and still needs a human at
   the keyboard: headless capture has no vsync and no real present, so its numbers cannot speak to
@@ -199,7 +199,7 @@ assertion holds.
 no committed systems yet.* Past the cut, the v0.1.x band is where the game's next dimensions get
 their first shape: enough design and stubbing that the v0.3.0 refocus and the v0.4.0 political
 layer land on positioned ground rather than a greenfield. v0.1.1 is a concrete build minor; the
-stub minors (v0.1.2–v0.1.5) are deliberately design-forward — each now has a placeholder
+stub minors (v0.1.3–v0.1.6) are deliberately design-forward — each now has a placeholder
 `design-owed` item that firms into real design as it is reached — and the band closes with
 **v0.1.6**, a second concrete build minor (generation visibility + the UI-alignment review,
 added by Ben 2026-08-04).
@@ -207,14 +207,14 @@ added by Ben 2026-08-04).
 > **What this band is FOR (Ben, 2026-08-03).** Until now the band was themed by what it stubs,
 > not by what the stubs serve. Ben's steer supplies the missing answer: the aim is to play as a
 > **governing body**, *"because it allows law, policy and science to use military might — not
-> just economic."* Laws (v0.1.2), techs (v0.1.3), military (v0.1.4) and politics (v0.1.5) are
+> just economic."* Laws (v0.1.3), techs (v0.1.4), military (v0.1.5) and politics (v0.1.6) are
 > therefore **the governing body's levers**, and each carries a design test it did not have:
 >
 > **Does this system reach military as well as economic outcomes?** If a law can only change a
 > cost, or a technology can only unlock a building, it is being designed for the corporate
 > player we are pivoting away from. See BL-094 (player-identity pivot) § 2026-08-03.
 
-- **v0.1.1 — The word interface, plus shell & legibility follow-through.** *(Re-themed
+- **v0.1.1 — The word interface — CUT 2026-08-09.** *(Re-themed
   2026-07-31 for roads; **re-themed again 2026-08-03**, NR-034 — Ben named the word interface as
   this minor's theme.)* Two threads, and it stays the concrete build minor.
 
@@ -258,19 +258,113 @@ added by Ben 2026-08-04).
   deed-gated keystones (BL-309, see v0.3.0 below). **Build health:** a fresh CMake configure
   can't fetch SDL3 on at least one machine — a TLS revocation failure a populated `_deps` cache
   hides (BL-302).
-- **v0.1.2 — Laws** (**BL-155** law/policy surface design, **BL-186** laws ledger UI, **BL-280**
+
+  **The retrofit was the mistake, and it is undone (2026-08-09, at the cut).** Everything in the
+  paragraph above was assigned to a minor whose own theme had *already shipped* — the three legs
+  landed by 2026-08-03, and three later waves were then hung on the same tag. That is what made
+  v0.1.1 uncuttable for six days, and it is the concrete instance of the root cause NR-103 names:
+  a theme with no done-definition has no test for *finished*, so it absorbs work indefinitely. The
+  24 items still open at the cut were **re-homed into three coherent minors** — v0.1.8 (build
+  health), v0.1.9 (shell & legibility), v0.1.10 (generation & content) — with BL-293 (order-book
+  verbs) and BL-262 (standing) moved to **v0.2.0**, where a text-driven player and legible rivals
+  are what they actually serve. None was cancelled; all kept their priority.
+
+  **Done-definition — v0.1.1.** *Written at the cut, 2026-08-09.* v0.1.1 is cut when:
+
+  - **An agent can read the world state** through a stable export rather than by scraping the UI.
+    *(BL-206, blackboard export.)*
+  - **Every control has a stated meaning** — typed arguments, preconditions, expected output —
+    in a machine-consumable dictionary transcribed from the command seam, not authored beside it.
+    *(BL-270, action dictionary.)*
+  - **Both are reachable by any agent runtime** over a socket the engine ships without an HTTP
+    client, an API key, or a cloud dependency. *(BL-278, `ProjectIo --serve` + `tools/mcp/`.)*
+  - The build is **green** and the loop still verifies.
+  - **Narrowed, honestly:** the write leg is partial. Three order-book presses have no
+    `corp_command` verb, so an agent can read the book and be told what the press means but cannot
+    place a standing sell order — the world has no order book to mutate, and no serialisation path
+    for one. `ACTIONS.md`'s "full word interface" claim is corrected to say so. Carried by
+    **BL-293** in v0.2.0 (NR-099).
+
+  **Cut 2026-08-09.** 28 items terminal. Beyond the three theme legs, the minor also carried the
+  sticky-card family (BL-194–BL-198, BL-214, BL-247), the corporation dashboard (BL-248), the
+  comms-dock re-plan (BL-227), hover freeze / glance-then-stick (BL-228, BL-230), the
+  commercial-activity fog work (BL-150–BL-154), the radial tech-tree viewer (BL-310), the
+  minimap and header reflow (BL-312, BL-313), the New World wizard's real-tile preview (BL-319),
+  the Mediterranean rift sea (BL-276), and the GPU/multicore performance pass (BL-267).
+- **v0.1.2 — Buildings rework — CUT 2026-08-09** (**BL-323**, complete). *(Added by Ben, 2026-08-07: "we need to pad out the
+  number of available buildings, and start enforcing placement rules. Especially for logistical
+  max building range… We need to put a lot of work into this before any simulated games can
+  occur.")* The band's second concrete build minor, and the one the simulated-play arc waits on.
+  Four strands: **pad the roster** out toward `PRODUCTION.md`'s designed ~26 (against 5 generic
+  kinds and 4 recipes today), mostly as Lua authoring rather than enum churn; **enforce a
+  logistical max range** on placement — the rule with no code at all today, built as a reach query
+  over the terrain-weighted cost function `logistics.cpp` already provides; **make build time
+  depend on the site** (landform, logistics distance, established stack) rather than staying a
+  flat per-type constant; and **surface construction on the canvas**.
+
+  **Why it gates simulated play.** With remoteness free, the optimal siting strategy is "the
+  richest tile anywhere" — a lookup, not a decision. An AI player driving the corp-command seam
+  finds that immediately and plays it forever, so neither the v0.2.0 opponent nor a text-driven
+  session tests anything until siting carries a trade-off. It is the placement-side counterpart to
+  the constraint **BL-316** is landing in the Era −1 sim: breadth must cost something.
+
+  **Sequenced ahead of the stub minors (Ben, 2026-08-07, resolving NR-084).** Originally slotted
+  last to avoid renumbering; moved ahead of the design-forward stub minors (Laws, Techs, Military,
+  Politics), which follow it here. None of them depends on this work and it depends on none of
+  them, so the old order delayed the concrete blocker behind four design passes for no technical
+  reason.
+
+  **Done-definition — v0.1.2.** *Written at the cut, 2026-08-09, as the first of the per-minor
+  done-definitions NR-103 asks for; v0.1.0's list above is the model.* v0.1.2 is cut when:
+
+  - **Siting carries a trade-off.** A building cannot be placed at unbounded distance from a
+    supply anchor, and the budget is authored data rather than a constant in code. *(BL-323 S2.)*
+  - **The rule teaches rather than merely refuses** — build surfaces stop offering tiles the gate
+    will reject, and a body with no anchor still has a legal first move. *(S2b + bootstrap.)*
+  - **Build time depends on where you build**, not only on what you build. *(S3.)*
+  - **Construction reads as a process** on the canvas, with its remaining time legible. *(S4,
+    BL-327.)*
+  - The build is **green** and the rework's harnesses pass. *(12/12 and 26/26.)*
+  - Excluded by scope, and filed rather than dropped: the processing-chain roster, which needs new
+    resource types and a save-format change (**BL-340**).
+
+  **Cut 2026-08-09.** All six items terminal — the rework itself (BL-323) plus construction-ledger
+  grouping (BL-326), the under-construction glyph (BL-327), the pre-commitment supply warning
+  (BL-328), the reach-circle retirement (BL-329) and the building-selection click-model fix
+  (BL-330). Tagged ahead of `v0.1.1`, whose theme is cut separately; pre-1.0 numbering is
+  advisory, and each tag documents its own theme.
+- **v0.1.3 — Laws** (**BL-155** law/policy surface design, **BL-186** laws ledger UI, **BL-280**
   negotiated tax rate). First pass at the law / policy surface — what a law *is* as a data
   object, how it gates or modifies economic (and later political) behaviour, and its ledger
   surface. **BL-280** (settled 2026-08-03, NR-024) gives Tax its first concrete lever: a
   chartered corp bargains its rate with its home nation rather than reading a fixed number.
   Design + stub.
-- **v0.1.3 — Techs** (**BL-156**). Early design toward the tech / quest system — the condition-set
+
+  **No longer design-only (2026-08-09).** Two prototype-enablers were filed so this minor can be
+  **cut** rather than merely designed: **BL-342** (the shared `condition_set` evaluator) and
+  **BL-343** (laws MVP — one enacted extraction levy, appearing as its own line in the budget
+  ledger). The unlock was structural: BL-155 and BL-156 had *both* settled on the same predicate
+  object — "a flat AND-list of atomic conditions" — and neither built it, because each was scoped
+  design-only. One small pure evaluator was all that stood between two design-forward minors and
+  two shippable ones. BL-342 lands here because Laws is its first consumer.
+- **v0.1.4 — Techs** (**BL-156**). Early design toward the tech / quest system — the condition-set
   gate model (gate = quest = tech) that BL-087 reframed and the v0.4.0 filter system formalises.
   Design only; precursor to BL-087. **Overtaken in practice, 2026-08-04/05:** BL-087 itself —
   versioned v0.3.0, not this stub, see below — is now under active design as a constellation tech
   web at the same grain as the Era −1 sandbox's ancient tech ladder; BL-156's early pass and
   BL-087's real one are converging rather than cleanly sequencing one after the other.
-- **v0.1.4 — Military systems** (**BL-157**). The Conflict dimension's first data-model footing —
+
+  **No longer design-only (2026-08-09).** **BL-344** (techs MVP) makes it cuttable. More of this
+  minor exists than its status suggested — a tech tree has been in `world/tech_tree.{hpp,cpp}`
+  since 2026-07-08 and BL-310 shipped its radial viewer — but `tech_tree.hpp:49` stores
+  `condition` as a descriptive **string**, so no tech can be earned and nothing can be unlocked.
+  BL-344 promotes that field to BL-342's `condition_set` and closes the loop once, end to end.
+  Its unlock target is deliberately the **military base** (landed with BL-325) rather than another
+  building: BL-094's design test says a technology that can only unlock a building is being
+  designed for the corporate player we are pivoting away from, and gating the base costs the same
+  as gating a smelter. Also a cheap window — no save format exists yet (BL-107 is open), so
+  changing a stored field is a compile-time change today and a migration later.
+- **v0.1.5 — Military systems** (**BL-157**). The Conflict dimension's first data-model footing —
   units, forces, and the seams they need in the world model. Stub, not mechanics (Conflict proper
   stays post-cut scope). **Firmed up substantially by the 2026-08-07 military design session**
   (NR-077, six rulings filed in total — the rest fall under BL-315 below): unit-grain verbs
@@ -280,11 +374,21 @@ added by Ben 2026-08-04).
   actual command verbs once this stub has a seam to transcribe from. Still a stub for *campaign*
   play; the Era −1 sandbox (v0.3.0, below) is where the same architecture gets proven under real
   simulated wars first.
-- **v0.1.5 — Politics (stub)** (**BL-158**). A data-model stub only — enough political layer for
+- **v0.1.6 — Politics (stub)** (**BL-158**). A data-model stub only — enough political layer for
   the v0.3.0 governing actor to have something to own, deferring the working system to v0.4.0.
-- **v0.1.6 — Generation visibility + UI alignment.** *(Added by Ben, 2026-08-04: "a pass on
+
+  **No longer design-only (2026-08-09).** **BL-345** (politics MVP) makes it cuttable, and it is
+  smaller than the minor looks: BL-158's own 2026-08-02 settlement records that most of the stub
+  had already dissolved into other items — political character into nation generation, the lever
+  slots into BL-155 and BL-094 — leaving exactly one unowned axis, **inter-nation relationships**.
+  BL-345 builds that axis *with a consumer*, on a deliberate rule: **a stub nothing reads is
+  indistinguishable from no stub**, and shipping records no code path consults is how you discover
+  at v0.3.0 that the shape was wrong. The consumer is convoy cost across a cold border — a
+  modifier on a cost function logistics already computes, the same cheap shape BL-323's reach rule
+  took — so the political map starts mattering to the economic one.
+- **v0.1.7 — Generation visibility + UI alignment.** *(Added by Ben, 2026-08-04: "a pass on
   generation visibility... visualising the world at each step — we haven't yet done that.")* The
-  band's last minor before the refocus, and its second concrete build minor. Two themes:
+  band's last minor before the refocus, and its third concrete build minor. Two themes:
 
   **Generation visibility.** Every generation step earns a surface the player (and Ben) can
   watch it through: the Generation Ledger build (**BL-303** — the window `GENERATION_LEDGER.md`
@@ -300,6 +404,122 @@ added by Ben 2026-08-04).
   user-story review) is the vehicle, retargeted here from v0.1.1; it consumes
   `user_stories.json` and closes the loop between the band's new systems and the surfaces that
   serve them.
+
+> **v0.1.8–v0.1.10 are concrete, and numbered last only to avoid churn (2026-08-09).** They carry
+> the 22 items re-homed out of v0.1.1 at its cut. Their **numbers are not their sequence**: all
+> three are buildable now, while v0.1.3–v0.1.6 are design-forward stubs, and Ben's standing steer
+> is to cut concrete minors ahead of conceptual ones ("cut as many versions as we can now, rather
+> than working on the lofty, conceptual stuff", 2026-08-09; the same call NR-084 made when
+> buildings jumped the stub queue). They were appended rather than inserted at v0.1.3 purely so no
+> existing minor had to be renumbered — pre-1.0 numbering is advisory, and v0.1.2 was already cut
+> before v0.1.1. Each earns its done-definition at promotion, per NR-103.
+
+- **v0.1.8 — Build health — CUT 2026-08-09.** *Theme: the project's own tooling stops lying.*
+  Five items (BL-288 moved here from v0.1.3, where a priority-A build item was sitting behind the
+  Laws design stub). None ships player-facing content; all five cost time on every session that
+  tripped them.
+
+  **What it actually found.** The premise of every item in this minor was that things were
+  *broken*. Measurement said the tooling was mostly **misreporting**, which is worse, because a
+  red suite that is mostly noise trains you to ignore it:
+
+  - **The suite reported ten failures; exactly one was a failing assertion** (**BL-288**). Four
+    harnesses pass but take longer than the flat 60 s bound (`earthlike_lean_trace` 121 s,
+    `notable_worlds` 105 s, `mediterranean_sweep` 87 s, `earthlike_tile_census` 58 s — passing by
+    luck). Two are open-ended research sweeps that never finish on any bound. Two assert absolute
+    wall-clock times and failed only because a concurrent build was loading the machine. Now three
+    tiers plus a `sweep` label excluded from the gate and a `bench` label that says "re-run idle".
+  - **`world_audit` was never broken** (**BL-291**) — it exits non-zero on 1 assertion of 26, the
+    S2 biome balance, which is a world-generation finding (carried by **BL-338**) rather than a
+    broken instrument. The item's own three-day "stale and blocked" banner on `TILES.md` was the
+    cost of reading an exit code as a verdict.
+  - **`next_id.js` failed for a reason nobody would have guessed** (**BL-322**): `execSync` runs
+    through `dash`, which aborts on the unquoted `(` in `--format=%(refname)` before `git` runs —
+    so it worked on the Windows box where it was written and failed silently everywhere else. It
+    was handing out ids **25 below the true ceiling**, the direct mechanical account of how
+    BL-326..BL-333 each landed twice. Refs scanned went 0 → 53.
+  - **The dependency posture's preferred option was disproved by measuring it** (**BL-302**): a
+    shared `FETCHCONTENT_BASE_DIR` hard-fails across build trees on a generator-locked subbuild
+    cache. Per-dependency `FETCHCONTENT_SOURCE_DIR_<dep>` works and is what landed.
+  - **One real defect** (**BL-285**): `ai_skill_harness`'s GCC goldens, stale since 2026-08-01 —
+    which had sat unnoticed among nine false positives.
+
+  **Done-definition — v0.1.8.** v0.1.8 is cut when:
+
+  - **A red test is a real failure.** No harness is reported failed for exceeding a bound it was
+    never sized against, and research sweeps are not gate tests.
+  - **A load-sensitive failure is legible as one** — absolute-time assertions are labelled, so
+    they are re-run rather than mistaken for a regression.
+  - **The id allocator defends what it claims to defend**, and fails loudly rather than open.
+  - **A from-cold configure is visible** rather than hidden by a populated cache.
+  - **Goldens describe the platform they run on**, and a stale set says so in place.
+  - Excluded by scope, filed rather than dropped: verifying the from-cold check on the Windows
+    machine, where the original TLS failure actually occurs (**BL-341**, v0.1.9) — it does not
+    reproduce on Linux, so the fix is untested against its own symptom.
+
+  **Cut 2026-08-09.** Gate: 53 tests, **1 failure**, down from 10 — and that one is `world_audit`'s
+  biome balance, a genuine world-generation finding rather than an instrument defect.
+- **v0.1.9 — Shell & legibility follow-through — CUT 2026-08-09.** *Theme: the standing UI set,
+  finished.* Eight items. Ben ruled four open design questions at the batch's start rather than
+  letting them stall it: the road-tier legend goes **contextual** (Selection/hover, not a
+  persistent chip — the lens drawer was never available, being keyed to `overlay_mode` while roads
+  render always-on like terrain); roads **do** dim with the commercial-reach fog; the Economy panel
+  **gets a door** rather than being retired; and **BL-229** (building-selection tile format) moved
+  to v0.1.10 because the item reserves that layout for Ben to design.
+
+  Landed: the road tier legend (**BL-184**) and road/fog dimming (**BL-185**), building stack
+  capacity (**BL-193**), the shell rect-algebra foundation (**BL-216**, partial — see below), the
+  UI-justification store (**BL-260**), the disclosure-controls revision (**BL-265**), retiring the
+  History ledger's Tiles view (**BL-281**), and the Economy panel's door (**BL-292**).
+
+  **Three things the batch found that no item had predicted.**
+
+  - **BL-216 is superseded in part by a *later, complete* item.** Its sections 1–3 specify a comms
+    geometry that **BL-227** already replaced on Ben's own 2026-07-30 call — dock at
+    `nav_pane_width` rather than `shell_column_width` (measured: at 1280×720 a shortened nav rail
+    clips two of its nine slots), the fold-out column shortening to clear it, and
+    `selection_band_height` derived rather than fixed at 340. Under *newest-dated wins* those
+    sections were left unimplemented rather than reverting a landed item. What did land is the half
+    that mattered: `shell_metrics.{hpp,cpp}` and the migration of all **five** `app.cpp` sites that
+    each re-derived `disp.x - margin - mm_w` by hand. It also surfaced a live **8 px drift** —
+    BL-312 flushed the minimap to the screen edge and the other four sites did not follow — now
+    expressed once instead of invisibly five times. *Ben's call whether to close it.*
+  - **BL-193 roughly doubled the econ tick** (**BL-347**, priority A, filed). Measured, not
+    inferred: the harness was rebuilt at the parent commit and both run on the same machine.
+    Largest sweep rung `min` 0.958 ms → 2.045 ms, with the cost present at *every* rung including
+    the 1×8 baseline (1.71×) — the signature of fixed per-tick work, not a scaling term. **The
+    prototype is unaffected** (0.20 ms mean, 5× headroom); what is lost is growth headroom, the
+    same category as BL-253.
+  - **BL-260's codegen has nothing to feed.** BL-247's in-UI question log and the `why_note` seam
+    the item planned to generate into were removed 2026-08-02 (NR-018). The store is therefore a
+    documentation artifact, which is the stronger reading of Ben's *"the docs are the audit"* — and
+    13 of its 16 entries are marked `drafted`, because writing the pair **is** the design check and
+    an implementer may draft it but must not ship it as settled.
+
+  **Done-definition — v0.1.9.** v0.1.9 is cut when:
+
+  - **The always-on canvas layers are legible** — a visual code the player cannot decode has a key
+    at the moment of interest, and the fog reads as **one** wash rather than several treatments
+    that resemble each other.
+  - **Stacking is a decision, not a dominant strategy** — later sites pay less, every site draws
+    real reserve, and the player can see both.
+  - **Screen geometry has one owner.** No region re-derives another's edge by hand.
+  - **Disclosure is two controls, not one** — expand in place, or take the canvas — placed in one
+    column, drawn rather than typed, and a full-screened accordion shows all of itself.
+  - **Every surface has a door and states its question.**
+  - Excluded by scope, filed rather than dropped: the building-selection layout (**BL-229**,
+    Ben's to design), the stack-aware profit estimator (**BL-346**), the econ-tick regression
+    (**BL-347**), and the Windows from-cold check (**BL-341**) — all v0.1.10.
+
+  **Cut 2026-08-09.** Gate: 53 tests, 2 failures, both known, filed and named above —
+  `world_audit`'s biome balance (BL-338) and `econ_stability`'s absolute bound (BL-347).
+- **v0.1.10 — Generation & content.** *Theme: what the world is called and what it is made of.*
+  Led by **BL-290** (priority A): the nation and city name banks read Latin/European, in direct
+  breach of the standing no-real-names rule — every generated name must be sci-fi/fantasy from the
+  seeded banks. With it: generated body names (**BL-257**) and the generation-globe preview
+  (**BL-256**), corp placement constrained to the home province (**BL-283**), exclave measurement
+  (**BL-284**), dual-endpoint trade-route log entries (**BL-282**), propellant as a real resource
+  (**BL-308**), deed history-log lines (**BL-309**), and the Kepler wetland re-base (**BL-338**).
 
 ### v0.2.0 — The AI opponent
 
@@ -387,10 +607,10 @@ systems graduate." Its output feeds BL-315 directly — the doctrine presets and
 unit tables authored 2026-08-07 (`Project-Rival/docs/ai/UNITS.json`) are numbers BL-315 inherits,
 not invents from nothing.
 
-**BL-087 (Era 1 tech/quest system) sits here too, not v0.1.3.** Reframed 2026-08-04 as a
+**BL-087 (Era 1 tech/quest system) sits here too, not v0.1.4.** Reframed 2026-08-04 as a
 constellation (rings = bands, sectors = domains, keystones opened by one-time **deeds**),
 overturning the earlier binary-tree call; two regions — the Era 1 tree itself and "the
-industrial neighbourhood" — are worked at that grain as of 2026-08-05. v0.1.3's BL-156 stays the
+industrial neighbourhood" — are worked at that grain as of 2026-08-05. v0.1.4's BL-156 stays the
 early stub pass; BL-087 is the real system, and the two are converging rather than strictly
 sequencing.
 
@@ -491,7 +711,7 @@ test against, the way the v0.1.0 list above is. v1.0.0 is cut when all of the fo
   the player commands (BL-315) and the combat engine proven in the Era −1 sandbox (BL-272).
   Rivals are **beatable and legible** — the standing `AI_OPPONENT.md` goal — not merely present.
 - **Law, policy and science reach military outcomes**, not only economic ones — BL-094's own
-  design test — satisfied once the v0.1.2–v0.1.5 stubs (laws BL-155/186, tech BL-156/BL-087,
+  design test — satisfied once the v0.1.3–v0.1.6 stubs (laws BL-155/186, tech BL-156/BL-087,
   military BL-157/BL-314/BL-315, politics BL-158) have graduated into the real systems above
   rather than stayed placeholders.
 - **The political layer is real** (v0.4.0) — nations carry working political character and

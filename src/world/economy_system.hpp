@@ -84,6 +84,7 @@ struct agency_event
         resumed,           ///< An idled building was brought back online.
         road_placed,       ///< A road was laid (`tile` set; `value` = tier 1–3).
         survey_dispatched, ///< A survey was dispatched (`building` unused; `tile` = body id).
+        hired,             ///< A unit was raised (BL-324; `tile` = muster tile, `value` = roster index).
     };
 
     entity_id corp;

@@ -51,6 +51,22 @@ the "authorising a new check = naming it" convention:
   `verify.show_panel("tile", ...)`, and `verify.panel_view("history"|"history_round", i)` —
   the sub-view hook that lets a capture reach a ledger tab without a click.
 
+## Text-overflow floor check (BL-215)
+
+**`text_overflow_floor.lua`** — the render-precision audit's saved check. Every measured text
+draw routes through `ui::text_fit` and records any string that did not fit its container
+(`elided` = sanctioned WARN; `clipped` / `unfittable` = FAIL). The script walks every ledger,
+wizard round, lens and Selection kind at 1280×720 and ends with `verify.expect_no_clipping("floor")`.
+
+- The harness writes `screenshots/text_overflow.txt` (container, site, text, needed vs available
+  px, frame) and **exits non-zero** on any FAIL record — the integer is the verdict; the PNGs are
+  incidental, never the pass criterion. Bindings: `verify.clipping()` (running FAIL count),
+  `verify.expect_no_clipping(label)`.
+- **Coverage step** (the ledger only sees opted-in sites): `rg -n "AddText\(" src/ui src/core`
+  must return only hits inside `text_fit.cpp`, `icons.cpp`, or lines carrying a trailing
+  `// fit-exempt: <reason>` comment. A bare hit is a site invisible to the check — route it
+  through `ui::text_fit` or exempt it on the record.
+
 ## Determinism: software renderer + headless display (read first)
 
 Goldens must be **renderer- and machine-independent**, so always run `--verify`

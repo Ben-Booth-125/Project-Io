@@ -3,7 +3,7 @@
 -- - extraction sites: faceted ore-chunk silhouette
 -- - processing facilities: distinct shape with dark outline
 -- Also captures a Supply-lens view to show convoy (open V chevron) markers.
-verify.goto_surface("Kepler")
+verify.goto_surface("home")
 verify.set_overlay("corporation")
 
 -- Close-framed tour of all buildings to inspect silhouettes and outlines
