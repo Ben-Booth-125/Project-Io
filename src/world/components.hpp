@@ -57,17 +57,19 @@ enum class resource_type : uint8_t
     food_rations          = 22, ///< Processed from agricultural produce.
     // --- Logistics goods (BL-286, 2026-08-04) ---
     //
-    // Enum + serialization + base-price wiring only (BL-286). The consumption,
-    // transport-capacity range cap, salt shelf-life gate, and bullion purchase
-    // mechanics that give these goods behaviour land in BL-287–290. See
-    // docs/economy/RESOURCES.md § Logistics goods.
-    grain                 = 23, ///< Human ration staple; per-tick army/unit draw (BL-287, not yet implemented).
-    fodder                = 24, ///< Draft-animal/cavalry feed; per-tick draw alongside grain (BL-287, not yet implemented).
-    salt                  = 25, ///< Preservative; gates ration shelf-life (BL-289, not yet implemented).
-    transport_capacity    = 26, ///< Abstract logistics-train throughput good; caps supply range (BL-288, not yet implemented).
+    // Enum + serialization + base-price wiring only (BL-286). The follow-on
+    // behaviours — consumption, transport-capacity range cap, salt shelf-life
+    // gate, bullion purchase — are NOT yet filed; ids get allocated via
+    // `node tools/session/next_id.js` when they are. Do not cite placeholder
+    // ids here: a wrong id routes the reader to unrelated work, which is worse
+    // than no id. See docs/economy/RESOURCES.md § Logistics goods.
+    grain                 = 23, ///< Human ration staple; per-tick army/unit draw (behaviour unfiled).
+    fodder                = 24, ///< Draft-animal/cavalry feed; per-tick draw alongside grain (behaviour unfiled).
+    salt                  = 25, ///< Preservative; gates ration shelf-life (behaviour unfiled).
+    transport_capacity    = 26, ///< Abstract logistics-train throughput good; caps supply range (behaviour unfiled).
     charcoal              = 27, ///< Refined fuel-wood; pre-coal smelting/heating input.
     iron_blooms           = 28, ///< Bloomery-refined iron intermediate — distinct from raw iron/iron-nickel ore.
-    bullion               = 29, ///< Minted precious-metal specie; local purchase medium (BL-290, not yet implemented).
+    bullion               = 29, ///< Minted precious-metal specie; local purchase medium (behaviour unfiled).
     trade_goods_misc      = 30, ///< Placeholder endemic-luxury-class good; a specific luxury name is a later design step.
     count                 = 31
 };

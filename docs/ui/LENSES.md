@@ -344,8 +344,9 @@ is built: the Circumplanetary strip and the Planetary wash share the resolved
 `market_component.price`.
 
 **Implemented 2026-06-16** (Market lens render Brief; design confirmed in the batch-close Q&A).
-Planetary wash in `body_surface_canvas.cpp` (`diverging_colour`, composited over terrain at ~0.55
-alpha); the per-body strip in **`circumplanetary_canvas.cpp`** — the Circumplanetary rung, *not*
+Planetary wash in `body_surface_canvas.cpp` (since BL-015 a catchment-boundary tint — one colour
+per market, composited over terrain; the original diverging price ramp is deleted, BL-294); the
+per-body strip in **`circumplanetary_canvas.cpp`** — the Circumplanetary rung, *not*
 `solar_system_canvas.cpp` as the Session-2 handoff's file list said (Solar has no market surface).
 The good-selector is the shared combo from the Resource lens (bound to
 `ui_state.lens_resource`; since BL-134, 2026-07-09, it lives **in the on-canvas lens legend** —
@@ -571,9 +572,9 @@ Idle / exhausted / unbuilt tiles produce nothing → no entry → cold.
 table). Guarded behind `overlay_mode::production`.
 
 **Colour.** Each producing tile's value is taken **relative to the body's
-producing-tile geometric mean** and run through the diverging warm↔cool ramp
-(`diverging_colour`, the same band the Market wash uses): above the mean reads warm,
-below cool, composited at 0.6 over terrain. So contrast is meaningful across bodies
+producing-tile geometric mean** and run through the dedicated red→yellow→green ramp
+(`production_colour`, BL-137): above the mean reads green, below red, the mean
+yellow, composited at 0.6 over terrain. So contrast is meaningful across bodies
 of very different absolute output; a body of similar producers reads near-neutral
 (honest — there is little intensity spread to show).
 

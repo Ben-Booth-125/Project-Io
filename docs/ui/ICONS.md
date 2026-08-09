@@ -47,10 +47,10 @@ Two settled visual sub-conventions (the resolution of former Open clarifications
 
 - **Every canvas-placed filled marker carries the dark outline** (`IM_COL32(20, 22, 28, 255)`,
   the file-local `outline`) so it reads on any terrain colour — this covers the whole entity-marker
-  family (`building`, `unit`). The resource **pip** is the single documented exception: as a
+  family (`building`). The resource **pip** is the single documented exception: as a
   strip/swatch/deposit glyph it stays **outline-less**.
 - **`colour` means fill or stroke per family, fixed:** the filled families
-  (`building`, `country`, `corporation`, `unit`, resource `pip`, `settlement`, `industry`) treat
+  (`building`, `country`, `corporation`, resource `pip`, `settlement`, `industry`) treat
   `colour` as the **fill**; the stroke families (`supply`, `convoy`, `market`, `ledger`,
   `placeholder`, resource-**lens**) treat it as the **stroke** line colour and have no fill;
   `hq` and `activity` span both — the one `colour` fills the core *and* strokes the ring.
@@ -65,16 +65,15 @@ Glyphs fall into three families by role.
 
 | Glyph | Function | Shape | Colour | Drawn for / where |
 |---|---|---|---|---|
-| **Extraction site** | `building(…, extraction_site, fill)` | Faceted ore/mineral silhouette + outline — an angular eight-sided crystal chunk (wider than tall, corner-cut facets), distinct from the regular gem-diamond pip and the port/unit glyphs | Caller `fill` | Building marker, Planetary canvas |
+| **Extraction site** | `building(…, extraction_site, fill)` | Faceted ore/mineral silhouette + outline — an angular eight-sided crystal chunk (wider than tall, corner-cut facets), distinct from the regular gem-diamond pip and the port triangle | Caller `fill` | Building marker, Planetary canvas |
 | **Processing facility** | `building(…, processing_facility, fill)` | Filled square + outline | Caller `fill` | Building marker, Planetary canvas |
 | **Port** | `building(…, port, fill)` | Filled upward triangle + outline | Caller `fill` | Building marker, Planetary canvas |
 | **Inland logistics hub** | `building(…, inland_logistics_hub, fill)` | Filled flat-top hexagon + outline with a small dark hub dot at the centre — a six-sided network-node silhouette (BL-149), distinct from the launchpad/none circle and the port triangle | Caller `fill` | Building marker, Planetary canvas; build-front-door row |
-| **Military base** | `building(…, military_base, fill)` | Filled shield + outline — flat top, shoulders tapering to a bottom point (BL-325 S1); the martial building, echoing the *unit* chevron's downward-point reading but **filled**, so it never reads as the stroke-only unit marker, the port's upward triangle, or the hub's hexagon | Caller `fill` | Building marker, Planetary canvas; build-front-door row |
+| **Military base** | `building(…, military_base, fill)` | Filled shield + outline — flat top, shoulders tapering to a bottom point (BL-325 S1); the martial building, **filled** like every building glyph, so it never reads as the port's upward triangle or the hub's hexagon | Caller `fill` | Building marker, Planetary canvas; build-front-door row |
 | **Building (none/other)** | `building(…, none, fill)` | Filled circle (dot) — also the fallback for `launchpad` | Caller `fill` | Fallback building marker |
 | **Resource pip** | `resource(…, res)` | Filled diamond (no outline) | **Derived** — `presentation_of(res).colour` | Resource strips, deposit markers |
-| **Unit / convoy** | `unit(…, colour)` | Open upward chevron (V) — two stroke lines meeting at a bottom point, open at the top; drawn with a dark 2 px shadow pass then a 1.5 px colour pass; stroke-only so it never reads as the filled port triangle | Caller `colour` (e.g. a corp colour) | Unit stacks, Layer 5 convoy heads |
-| **Under construction** | `under_construction(…, colour)` | Crane silhouette — a mast, an angled boom, a back-stay brace, and a short hook line, four strokes with the same shadow-then-colour pass as `unit`/`convoy`; stroke-only (BL-327), echoing the landform family's "not yet installed" convention — a filled glyph would claim the site already IS its type | Caller `colour` (the owner-tinted marker colour) | Building marker, Planetary canvas — drawn IN PLACE OF the type silhouette while `ticks_remaining > 0`; replaced the BL-323 S4 desaturation treatment same-day (dimming read as "faded", not "being built") |
-| **Convoy** | `convoy(…, colour)` | Rightward chevron (→) — two stroke lines meeting at a right point (goods in transit); points *right*, never confusable with the *unit* marker's upward chevron | Caller stroke | Supply-lens on-canvas convoy marker — drawn on tiles a player convoy passes through, Planetary canvas |
+| **Under construction** | `under_construction(…, colour)` | Crane silhouette — a mast, an angled boom, a back-stay brace, and a short hook line, four strokes with the same shadow-then-colour pass as `convoy`; stroke-only (BL-327), echoing the landform family's "not yet installed" convention — a filled glyph would claim the site already IS its type | Caller `colour` (the owner-tinted marker colour) | Building marker, Planetary canvas — drawn IN PLACE OF the type silhouette while `ticks_remaining > 0`; replaced the BL-323 S4 desaturation treatment same-day (dimming read as "faded", not "being built") |
+| **Convoy** | `convoy(…, colour)` | Rightward chevron (→) — two stroke lines meeting at a right point (goods in transit); points *right*, distinct from the filled port triangle (the old upward *unit* chevron was deleted uncalled, BL-294; a unit marker returns with BL-157) | Caller stroke | Supply-lens on-canvas convoy marker — drawn on tiles a player convoy passes through, Planetary canvas |
 | **Market centre** | `market_centre(…, colour)` | Circle outline with a centred cross (+); arms reach 60 % of the radius | Caller stroke | Market-centre marker, Planetary canvas |
 | **Settlement** | `settlement(…, tier, colour)` | Tiered skyline — 1–5 filled towers (count = `tier`, clamped) on a baseline + per-tower outline, the middle tallest, heights tapering to the edges; an outpost reads as a lone tower, a metropolis as a dense cluster | Caller `colour` — civic-neutral `palette::settlement` (parchment); host-nation tint (`palette::nation_colour`) only under the Country lens | Population-centre conurbation marker, Planetary canvas (BL-083) |
 | **Unknown** | `unknown(…, colour)` | Question mark — a top hook arc, a short stem, and a dot | Caller stroke (dimmed) | Survey badge for an **unsurveyed** body, Solar canvas (BL-067) |

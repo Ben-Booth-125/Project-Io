@@ -100,14 +100,8 @@ ImU32 ryg_colour(float t)
                     : lerp_colour(yellow, green,  (t - 0.5f) * 2.0f);
 }
 
-/// Diverging warm↔cool colour for a ratio relative to 1.0 (defined below); forward
-/// declared so the Production key (above its definition) can sample the same band.
-ImU32 diverging_colour(float ratio);
-
 /// Diverging red→green colour for a ratio relative to 1.0 (defined below); forward
 /// declared so the Production key (above its definition) can sample the same band.
-/// Distinct ramp from diverging_colour (BL-137) — dedicated so the Market lens's
-/// cool/warm scale is untouched.
 ImU32 production_colour(float ratio);
 
 /// Shared chrome for an on-canvas lens key: a rounded dark panel of @p box_w ×
@@ -366,25 +360,11 @@ void draw_production_key(ImDrawList* dl, ImVec2 anchor)
     dl->AddText({x + bar_w - ts.x, y}, IM_COL32(170, 175, 185, 255), "high");
 }
 
-/// Diverging warm↔cool colour for a price relative to its base (floor) price.
-/// `ratio = price / base_price`: 1.0 is the neutral mid-tone, < 1 (cheap) trends
-/// cool, > 1 (dear) trends warm. Centred on the log of the ratio so the symmetric
-/// price band `[0.25×, 4×]` (the market clamp) maps to the full [cool, warm] span.
-ImU32 diverging_colour(float ratio)
-{
-    ratio = std::clamp(ratio, 0.25f, 4.0f);
-    const float d = std::log(ratio) / std::log(4.0f); // [-1, 1]
-    constexpr ImU32 neutral = IM_COL32(205, 205, 210, 255);
-    constexpr ImU32 cool    = IM_COL32( 70, 140, 225, 255);
-    constexpr ImU32 warm    = IM_COL32(232, 120,  60, 255);
-    return d < 0.0f ? lerp_colour(neutral, cool, -d) : lerp_colour(neutral, warm, d);
-}
-
 /// Diverging red→yellow→green colour for a ratio relative to 1.0 (BL-137, Production
 /// lens): `ratio = value / mean`; 1.0 is the yellow mid-tone, < 1 (below mean) trends
-/// red, > 1 (above mean) trends green. Same log-of-ratio centring as diverging_colour,
-/// but routed through the shared ryg_colour ramp — diverging_colour stays untouched for
-/// the Market lens.
+/// red, > 1 (above mean) trends green. Centred on the log of the ratio so the
+/// symmetric band `[0.25×, 4×]` maps to the full span, routed through the shared
+/// ryg_colour ramp.
 ImU32 production_colour(float ratio)
 {
     ratio = std::clamp(ratio, 0.25f, 4.0f);
