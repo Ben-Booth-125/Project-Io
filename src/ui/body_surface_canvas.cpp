@@ -2625,10 +2625,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     fallback = tb->second;
 
             state.selected_entity = (marker_hit != null_entity) ? marker_hit : fallback;
-            // A fresh click is an explicit select gesture: re-show the panel even
-            // when it re-selects the same entity the player had dismissed (close
-            // hides, does not destroy — SELECTION.md).
-            state.selection_hidden_for = null_entity;
         }
         else if (hovered_tile != null_entity)
         {

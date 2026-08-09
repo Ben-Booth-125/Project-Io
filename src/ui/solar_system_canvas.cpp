@@ -411,9 +411,6 @@ void draw_solar_system_canvas(const world& w, ui_state& state, ImVec2 origin, Im
         if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
         {
             state.selected_entity = hovered_body;
-            // A fresh click re-shows a dismissed panel, even on re-selection
-            // of the same body (close hides, does not destroy — SELECTION.md).
-            state.selection_hidden_for = null_entity;
         }
 
         // A double-click on a body navigates: descend into its circumplanetary

@@ -1192,10 +1192,7 @@ int app::run_verify(const std::string& script_path, bool bless)
                 r == construction_result::slot_occupied          ? "slot_occupied" :
                 r == construction_result::insufficient_materials ? "insufficient_materials" : "failed";
             if (r == construction_result::placed)
-            {
-                m_ui.selected_entity      = built;
-                m_ui.selection_hidden_for = null_entity;
-            }
+                m_ui.selected_entity = built;
             SDL_Log("verify.build_first_valid: %s at tile (%d,%d)", name, tc.grid_x, tc.grid_y);
             return std::string(name);
         }
@@ -1229,10 +1226,7 @@ int app::run_verify(const std::string& script_path, bool bless)
                 r == construction_result::slot_occupied          ? "slot_occupied" :
                 r == construction_result::insufficient_materials ? "insufficient_materials" : "failed";
             if (r == construction_result::placed)
-            {
-                m_ui.selected_entity      = built;
-                m_ui.selection_hidden_for = null_entity;
-            }
+                m_ui.selected_entity = built;
             SDL_Log("verify.build_at: %s at tile (%d,%d)", name, col, row);
             return std::string(name);
         }
@@ -1453,13 +1447,13 @@ int app::run_verify(const std::string& script_path, bool bless)
     v.set_function("select_tile", [this](int col, int row) {
         for (const auto& [tid, tc] : m_world.tiles)
             if (tc.body == m_ui.active_body && tc.grid_x == col && tc.grid_y == row)
-            { m_ui.selected_entity = tid; m_ui.selection_hidden_for = null_entity; break; }
+            { m_ui.selected_entity = tid; break; }
     });
-    v.set_function("dismiss_selection", [this]() {
-        // Test hook for the Selection band's dismiss path (BL-194) — the x button
-        // and Esc both hide the current selection this same way; no key-event
-        // injection exists in the headless harness, so this is the equivalent.
-        m_ui.selection_hidden_for = m_ui.selected_entity;
+    v.set_function("clear_selection", [this]() {
+        // Deselect (BL-266): the band never hides — with no selection it rests on
+        // the player's own corporation. This is the empty-space-click equivalent;
+        // no click/key injection exists in the headless harness.
+        m_ui.selected_entity = null_entity;
     });
     v.set_function("card_drill", [this]() {
         // Drive the Selection band's resource drill-down (BL-196) for the currently
@@ -1492,7 +1486,7 @@ int app::run_verify(const std::string& script_path, bool bless)
             if (tit == m_world.tiles.end()) continue;
             if (tit->second.body == m_ui.active_body &&
                 tit->second.grid_x == col && tit->second.grid_y == row)
-            { m_ui.selected_entity = bid; m_ui.selection_hidden_for = null_entity; break; }
+            { m_ui.selected_entity = bid; break; }
         }
     });
     // Switch the construction panel's sub-view (0 = Construction/queue, 1 = Buildings/
@@ -1503,8 +1497,7 @@ int app::run_verify(const std::string& script_path, bool bless)
         // Acknowledge the current selection so the new-selection panel-close (render()
         // § "new selection takes the column") does not stomp the panel we're staging
         // for capture. Harness-only convenience; the interactive path never needs it.
-        m_prev_selection          = m_ui.selected_entity;
-        m_ui.selection_hidden_for = m_ui.selected_entity;
+        m_prev_selection = m_ui.selected_entity;
     });
 
     // Press the construction ledger's Build button on the CURRENT tile selection
@@ -1573,7 +1566,7 @@ int app::run_verify(const std::string& script_path, bool bless)
     v.set_function("select_body", [this](const std::string& name) {
         for (const auto& [bid, bc] : m_world.bodies)
             if (bc.name == name)
-            { m_ui.selected_entity = bid; m_ui.selection_hidden_for = null_entity; break; }
+            { m_ui.selected_entity = bid; break; }
     });
 
     // Force the player corp balance to an exact value (verify harness): lets a
@@ -1986,9 +1979,8 @@ void app::handle_key_down(const SDL_KeyboardEvent& key)
     // while the popup (or another panel) holds focus. Precedence, highest first: an
     // armed exit-confirm backs out; an open system menu closes; an open sticky
     // detail card unwinds one drill level; an open fold overlay folds up (BL-214);
-    // then the card hides (BL-194/196 — Esc reaches the menu only once the card is
-    // fully closed, so a single press never both closes the card and opens the
-    // menu); otherwise the menu opens.
+    // otherwise the menu opens. The Selection band never hides (BL-266) — its
+    // former hide rung is gone, so the system menu is the terminal rung.
     //
     // The fold rung is a deliberate departure from BL-214's Decision 10, which kept
     // depth off this ladder. That decision reasoned about an in-place stepper, where
@@ -1999,11 +1991,10 @@ void app::handle_key_down(const SDL_KeyboardEvent& key)
     // the drill above the card.
     if (key.scancode == SDL_SCANCODE_ESCAPE)
     {
-        // Mirror the card's own draw gate exactly (selection_card.cpp): a valid,
-        // non-dismissed selection whose kind actually resolves — so Esc never acts
-        // on an invisible card.
+        // A drill can only exist over a real selection: a valid selection whose
+        // kind actually resolves — so Esc never unwinds an invisible drill. The
+        // band itself is always open (BL-266) and has no hide rung.
         const bool card_open = m_ui.selected_entity != null_entity &&
-                               m_ui.selected_entity != m_ui.selection_hidden_for &&
                                ui::selection_kind_of(m_world, m_ui.selected_entity) !=
                                    ui::selection_kind::none;
         if (m_ui.confirm_exit_pending)
@@ -2016,10 +2007,8 @@ void app::handle_key_down(const SDL_KeyboardEvent& key)
             m_ui.corp_rollup_drill = -1;                      // back to the roll-up (BL-248)
         else if (ui::any_expanded(m_ui))
             ui::fold(m_ui);                                   // fold the full-screen overlay
-        else if (card_open)
-            m_ui.selection_hidden_for = m_ui.selected_entity; // hide, not destroy
         else
-            m_ui.show_system_menu = true;
+            m_ui.show_system_menu = true;                     // terminal rung (BL-266): the band never hides
         return;
     }
 
@@ -3109,10 +3098,7 @@ void app::render()
                 // inside the ledger. So reselect only when some OTHER surface (a placement-mode
                 // canvas click) initiated the build.
                 if (!m_ui.show_build_ledger)
-                {
-                    m_ui.selected_entity      = built;        // inspect the new building
-                    m_ui.selection_hidden_for = null_entity;  // re-show the panel
-                }
+                    m_ui.selected_entity = built;             // inspect the new building
                 break;
             case construction_result::invalid_tile:
                 m_ui.construction.last_message = "Can't build there."; break;

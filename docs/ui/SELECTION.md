@@ -49,8 +49,9 @@ two gestures, applied uniformly across all three canvases:
   routes through `ui::focus_on_entity`, which resolves the entity to its most
   informative view (descend a rung, focus a surface/tile, or — for non-spatial
   entities — open the relevant ledger).
-- **Single-click empty space → clear the selection** (panel shows its empty
-  state; see below).
+- **Single-click empty space → clear the selection.** The band stays open and
+  returns to its resting state — the player's own corporation (see § Always
+  open below).
 
 The 'go to' button on the panel is exactly equivalent to a double-click on the
 current selection.
@@ -306,16 +307,29 @@ floating with the cursor."* The band is now:
 - **Header row:** a small coloured **kind icon** (`draw_selection_icon` — circle for body,
   square for building, outlined square for tile, pentagon otherwise; a first pass ahead of a
   richer per-entity icon), then the title line (name · type), then a right-aligned **`[>]`**
-  ('go to') button and **`[x]`** (close) button.
-- **Close hides, it does not destroy.** Closing sets the band hidden; it
-  reappears on the next selection. There is no nav-rail entry to reopen it —
-  selection is the only opener. Being selection-driven with no rail slot, the
-  element is **not** governed by the universal toggle rule (any control whose
-  active state is visible is a toggle): that rule toggles the rail's ledgers, not
-  this element.
-- **Empty / no-selection state:** when nothing is selected (fresh session, or
-  after clicking empty space) the band is hidden. It is shown only while a
-  valid selection exists and has not been closed.
+  ('go to') button. There is no close button (see § Always open).
+- **Always open — dismissal retired (BL-266, 2026-08-09).** The band never hides:
+  the `[x]` button, the Esc hide rung, and the `selection_hidden_for` state are
+  all removed. Dismissal was right for the BL-194/195 floating card over an open
+  canvas; with the shell filling the perimeter, a hidden band reads as a hole in
+  the frame (Ben, NR-017).
+
+  Being selection-driven with no rail slot, the element is still **not** governed
+  by the universal toggle rule: that rule toggles the rail's ledgers, not this
+  element.
+- **Resting state — the player's own corporation.** With nothing selected
+  (fresh session, or after clicking empty space) the band rests on the player
+  corp, through the same `selection_kind::corporation` builder any selection
+  uses. Deselecting means "stop looking at that, back to looking at yourself".
+
+  `selected_entity` stays null while resting, so deselect remains representable;
+  the band substitutes the player corp at draw time and never renders
+  `selection_kind::none`. The player corp exists before the first frame, so
+  there is no bootstrap gap.
+- **Esc ends at the system menu.** With the hide rung gone, Esc's ladder is:
+  exit-confirm → close system menu → pop a drill level → corp roll-up →
+  fold overlay → open the system menu. The "pause screen" IS `show_system_menu`
+  (settled 2026-08-02); nothing new was built for it.
 
 **Click-through.** The band draws as an ordinary ImGui window over the canvas; ImGui's
 `WantCaptureMouse` flag (already how every other chrome window — nav rail, header, minimap —
