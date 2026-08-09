@@ -22,9 +22,11 @@
 //   R3  LIVE SOURCES. Running a short bot-vs-bot economy loop (mirrors
 //       ai_skill_harness.cpp's run_tick/make_registry) produces decision- and
 //       agency-topic entries. A synthetic convoy pair (mirrors
-//       trade_routes_harness.cpp) proves a trade_route entry appears on FIRST
-//       establishment and does NOT duplicate on a repeat completion of the
-//       same lane (which only bumps the existing trade_route).
+//       trade_routes_harness.cpp) proves a trade_route entry PAIR appears on
+//       FIRST establishment — one entry tagged per endpoint, same narration,
+//       source-then-destination order (BL-282) — and does NOT duplicate on a
+//       repeat completion of the same lane (which only bumps the existing
+//       trade_route).
 //
 //   R4  ROUND-TRIP. write_history_log then read_history_log reproduces a
 //       populated log field-for-field.
@@ -304,25 +306,61 @@ int main()
         arrive_convoy(tw, corp, a.market, b.market);
         credit_arrived_convoys(tw, 10);
         check(tw.trade_routes.size() == 1, "R3 the underlying trade_route is created (sanity)");
-        check(count_topic(tw.history_log, history_topic::trade_route) == 1,
-              "R3 exactly one trade_route-topic log entry on FIRST establishment");
+
+        // BL-282: a new route is a TWO-body event, so it pushes TWO entries —
+        // one tagged per endpoint — carrying the SAME narration. A body-scoped
+        // filter then finds the route from either side.
+        check(count_topic(tw.history_log, history_topic::trade_route) == 2,
+              "R3 exactly two trade_route-topic log entries on FIRST establishment (BL-282)");
+        {
+            std::vector<const world_history_entry*> routes;
+            for (const world_history_entry& e : tw.history_log)
+                if (e.topic == history_topic::trade_route)
+                    routes.push_back(&e);
+            const bool paired = routes.size() == 2;
+            check(paired && routes[0]->body != routes[1]->body,
+                  "R3 the two entries carry DISTINCT body tags");
+            check(paired &&
+                      ((routes[0]->body == a.body && routes[1]->body == b.body) ||
+                       (routes[0]->body == b.body && routes[1]->body == a.body)),
+                  "R3 the two body tags are exactly the route's two endpoints");
+            check(paired && routes[0]->event == routes[1]->event,
+                  "R3 both entries carry the same narration naming both endpoints");
+            check(paired && routes[0]->timestamp == routes[1]->timestamp &&
+                      routes[0]->timestamp == 10,
+                  "R3 both entries share the establishing tick");
+            // Order within the tick is fixed source-then-destination, not
+            // iteration-order dependent — the determinism contract.
+            check(paired && routes[0]->body == a.body,
+                  "R3 entry order within the tick is source-then-destination (deterministic)");
+            // The point of the change: filtering by EITHER endpoint finds it.
+            const auto by_body = [&](entity_id id) {
+                int n = 0;
+                for (const world_history_entry& e : tw.history_log)
+                    if (e.topic == history_topic::trade_route && e.body == id)
+                        ++n;
+                return n;
+            };
+            check(by_body(a.body) == 1, "R3 a body-scoped filter on the SOURCE finds the route");
+            check(by_body(b.body) == 1, "R3 a body-scoped filter on the DESTINATION finds the route");
+        }
 
         // A second completion on the SAME (unordered) lane bumps the existing
         // trade_route (trade_routes_harness.cpp's own R1 covers that byte-for-
-        // byte) but must NOT add a second log entry.
+        // byte) but must NOT add further log entries.
         arrive_convoy(tw, corp, b.market, a.market);
         credit_arrived_convoys(tw, 25);
         check(tw.trade_routes.size() == 1, "R3 the repeat completion still bumps the SAME trade_route");
-        check(count_topic(tw.history_log, history_topic::trade_route) == 1,
-              "R3 the repeat completion does NOT duplicate the trade_route log entry");
+        check(count_topic(tw.history_log, history_topic::trade_route) == 2,
+              "R3 the repeat completion does NOT duplicate the trade_route log entries");
 
         // A distinct lane (different body pair) is a genuinely new route and
-        // DOES get its own entry.
+        // DOES get its own pair of entries.
         const body_market c = make_body_market(tw, "C");
         arrive_convoy(tw, corp, a.market, c.market);
         credit_arrived_convoys(tw, 30);
-        check(count_topic(tw.history_log, history_topic::trade_route) == 2,
-              "R3 a genuinely distinct lane adds its own trade_route log entry");
+        check(count_topic(tw.history_log, history_topic::trade_route) == 4,
+              "R3 a genuinely distinct lane adds its own PAIR of trade_route log entries");
     }
 
     // =========================================================================

@@ -489,10 +489,28 @@ that already read `ai_decisions`, `agency_events`, or `trade_routes`):
 - **agency** — both the BL-079 reflex tier (`economy_system.cpp`'s recipe-rescue and idle-a-loser
   sites) and the BL-202 strategic tier (`corp_ai.cpp`) additionally log a narrated `agency` entry.
   `economy_report::agency_events` (the chat feed's existing source) is untouched.
-- **trade_route** — `supply_system.cpp`'s `credit_arrived_convoys` logs an entry only when a
-  body-pair lane is **first established** (the `rit == w.trade_routes.end()` branch), never on a
-  repeat completion (which only bumps the existing `trade_route`). `world::trade_routes` and
+- **trade_route** — `supply_system.cpp`'s `credit_arrived_convoys` logs only when a body-pair lane
+  is **first established** (the `rit == w.trade_routes.end()` branch), never on a repeat completion
+  (which only bumps the existing `trade_route`). `world::trade_routes` and
   `body_activity_visibility` are untouched, byte-for-byte.
+
+  **Two entries per establishment (BL-282, landed 2026-08-09).** A new route is a *two-body* event
+  but `world_history_entry` carries one body tag, so tagging only the destination made a
+  body-scoped "what happened at X" filter miss the route from its **source** side. The branch now
+  pushes **two** entries — one tagged `src_body`, one tagged `dest_body` — carrying the *same*
+  narration naming both endpoints. Order within the tick is fixed **source then destination**, not
+  iteration-dependent, so replays stay byte-identical.
+
+  *Why not widen the struct.* A `body_b` field would change a struct four other call sites depend
+  on, for one topic's need, and would leave every other topic carrying a field it never sets. Two
+  tagged entries keep the one-body invariant and keep every existing reader correct unmodified.
+
+  *The cost.* Route establishment doubles in log volume — bounded by **body-pair count**, not
+  convoy traffic (a route is logged once, not per delivery), so the absolute growth is small: with
+  *n* bodies the ceiling is `2 × n(n−1)/2` entries per corp instead of `n(n−1)/2`. The real price
+  is duplicated narration: a reader rendering chronologically sees the same sentence twice with
+  different body tags. Mitigation if that reads badly — keep the narration identical (it is) and
+  let the renderer de-duplicate on `(tick, event)` when it is *not* filtering by body.
 
 **Serialisation** (`write_history_log`/`read_history_log`): a leading 4-byte magic (`"IOHL"`) plus
 a `uint32_t` version (BL-107's "first thing to add when the serialiser lands" rule), then an entry

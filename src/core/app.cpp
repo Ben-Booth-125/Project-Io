@@ -213,6 +213,7 @@ resource_type resource_from_name(const std::string& s)
         {"steel", resource_type::steel},
         {"refined_fuel", resource_type::refined_fuel},
         {"food_rations", resource_type::food_rations},
+        {"propellant", resource_type::propellant},
     };
     const auto it = m.find(s);
     return it != m.end() ? it->second : resource_type::iron_ore;
