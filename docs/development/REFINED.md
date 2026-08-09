@@ -1,45 +1,11 @@
 # Project Io — REFINED (active worklist)
 
-## Render-precision audit (promoted from BL-215, text-wrap render audit) — 2026-08-09
 
-Requirements: requirements.json § text-wrap-render-audit (R1–R6)
-
-- **[3] A — `src/ui/text_fit.{hpp,cpp}` (new): the shared fit/wrap/measure module + overflow
-  ledger**, per the design's exact API; delete `profile_panel.cpp`'s private
-  `fit_ellipsis`/`text_ellipsized` into it. Files: `src/ui/text_fit.{hpp,cpp}`,
-  `src/ui/profile_panel.cpp`, `CMakeLists.txt`. Deps: foundation. Satisfies: R1.
-- **[2] B — display floor**: `SDL_SetWindowMinimumSize(1280*s, 720*s)` + persisted floor +
-  DEVELOPMENT_PRACTICES § Display environment. Files: `src/core/app.cpp`,
-  `docs/development/DEVELOPMENT_PRACTICES.md`. Deps: independent root. Satisfies: R3.
-- **[3] C — charts measure-first rework** (`legend_width`, `chart_metrics`, `measure_chart`,
-  `legend_place` opt-in; gutters/caption measured; `chart_row_height(float)` verbatim).
-  Files: `src/ui/charts.{hpp,cpp}`, `src/ui/generation_charts.cpp`. Deps: A. Satisfies: R4.
-- **[2] D — remaining-site adoption** (tile_inspector, chat_panel tab strip, selection_panel,
-  header_panel, body_surface_canvas legend boxes). Files: per § 6 table. Deps: A. Satisfies: R1.
-- **[2] E — verify bindings + `scripts/verify/text_overflow_floor.lua`** + LAYOUT.md row 10 +
-  coverage grep. Files: `src/core/app.cpp`, `scripts/verify/text_overflow_floor.lua`,
-  `docs/ui/LAYOUT.md`. Deps: A. Satisfies: R2, R5, R6.
-
-Parallelisation note: one coherent vertical slice, single worktree agent, sequential
-A → {B..E}. The verifier-visual SKILL.md edit needs Ben's permission — left to the main
-session to request; script runs ad hoc meanwhile.
-
-## Selection always open (promoted from BL-266) — 2026-08-09
-
-Requirements: requirements.json § selection-always-open (R1–R4)
-
-- **[2] A — delete `selection_hidden_for`** (eleven call sites) and the Esc hide rung; Esc's
-  terminal rung is the system menu. Files: `src/core/app.cpp`, `src/ui/selection_card.cpp`,
-  `src/ui/ui_state.hpp`. Deps: foundation. Satisfies: R1.
-- **[2] B — resting band on the player corporation** (existing corporation builder; `none`
-  never rendered by the band). Files: `src/ui/selection_card.cpp`, `src/ui/selection_panel.cpp`.
-  Deps: A. Satisfies: R2.
-- **[1] C — SELECTION.md aligned; Esc verify scripts re-asserted/re-blessed.**
-  Files: `docs/ui/SELECTION.md`, `scripts/verify/*`. Deps: A, B. Satisfies: R3, R4.
-
-Parallelisation note: one worktree agent, sequential A → B → C. Runs concurrent with the
-BL-215 agent — both touch `src/core/app.cpp` (worktree isolation; merge in main session,
-BL-215 first, then rebase-merge this one).
+> Drained 2026-08-09: build-heavy v0.1.1 batch — render-precision audit (BL-215, 5 tasks
+> COMPLETE) and selection always open (BL-266, 3 tasks COMPLETE; R4 golden re-bless pending,
+> NR-104) — removed per the retain-one policy. Record lives in DEVLOG.md (2026-08-09 entry),
+> backlog.json BL-215/BL-266 `resolution` fields, and requirements.json
+> § text-wrap-render-audit (R1–R6) / § selection-always-open (R1–R4).
 
 > Drained 2026-08-08: critique batch (BL-326/327/328/329/330), all 3 tasks COMPLETE — removed
 > per the retain-one policy. Record lives in DEVLOG.md (2026-08-08 entry), backlog.json's five
@@ -352,4 +318,4 @@ later waves. After each wave the integrator wires hooks, **builds, and verifies*
 wave. Verify retroactively — do not assume an agent's self-reported success.
 
 ---
-
+

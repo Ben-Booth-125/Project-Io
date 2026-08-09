@@ -112,7 +112,7 @@ constexpr ImU32 col_dim = IM_COL32(120, 128, 145, 255);
 void label_centred(ImDrawList* dl, ImVec2 at, const char* text, ImU32 col)
 {
     const ImVec2 ts = ImGui::CalcTextSize(text);
-    dl->AddText({at.x - ts.x * 0.5f, at.y}, col, text);
+    dl->AddText({at.x - ts.x * 0.5f, at.y}, col, text); // fit-exempt: free-floating canvas label, sized to its own text, no bounding box to overflow
 }
 
 // ---------------------------------------------------------------------------

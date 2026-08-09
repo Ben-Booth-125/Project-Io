@@ -10,7 +10,35 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — Two of NR-094's footnotes promoted to their own backlog items (2026-08-08, latest)
+## Session — Build-heavy v0.1.1 batch: BL-215, BL-266, and the XS sweep, three worktree agents (2026-08-09, latest)
+
+Full mode, Batch Delivery, first all-Linux delivery session (no PowerShell — status read via
+`backlog_query.js`; builds via `build_linux/` Ninja). Three concurrent worktree agents, merged
+in the main session with an integrating build after each. Runtime: ~1h wall (agents 10–28 min each).
+
+**BL-215 (text-wrap render audit, A)** — `ui::text_fit` module + overflow ledger; display floor
+1280×720 enforced via `SDL_SetWindowMinimumSize`; charts measure-first rework; § 6 site adoption;
+`verify.expect_no_clipping` + `scripts/verify/text_overflow_floor.lua` (PASS, 0 clipped —
+one real overflow found and fixed in the wizard legends). verifier-visual SKILL.md section added
+with Ben's in-session approval. Riders: NR-107 (tick abbreviate threshold), NR-108 (golden drift).
+
+**BL-266 (selection always open, B)** — `selection_hidden_for` deleted (18 sites, not the design's
+11); Esc terminates at the system menu; band rests on the player corp (swap-draw-restore keeps
+deselect representable). Rider: NR-104 — golden re-bless list + the Continent-lens-key overlap call.
+
+**XS sweep (C)** — BL-294 (dead `diverging_colour`/`icons::unit` + two doc corrections), BL-295
+(phantom-id comment rewritten), BL-339 (parked `draw_building_selection` deleted, ~410 lines).
+
+Merge notes: main moved mid-flight (another session's header-chrome drain + NR renumber), so all
+three merges were true merges; the BL-215 branch carried stale NR ids — its two entries re-filed
+as NR-107/108, two duplicates of NR-088/094 dropped. One committed-mid-flight bare `AddText`
+(`generation_preview.cpp`) marked fit-exempt. NR-095 records BL-262 (scoring) skipped as
+not-buildable (production axis needs a visible-information proxy). Goldens NOT re-blessed on this
+box (environment mismatch, 5–10% drift on untouched captures) — Ben's Windows pass owns that.
+
+---
+
+## Session — Two of NR-094's footnotes promoted to their own backlog items (2026-08-08)
 
 Light mode, doc-only. Ben: the C-route ruling's open questions shouldn't just sit as prose inside
 BL-334. Filed **BL-335** (measure the real per-decision token cost through BL-278 — cheap,

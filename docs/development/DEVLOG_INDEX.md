@@ -3,13 +3,14 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 142 entries across 2 volume(s).
+One line per session, newest first — 143 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
+| 2026-08-09 | [Build-heavy v0.1.1 batch: BL-215, BL-266, and the XS sweep, three worktree agents](DEVLOG.md) | BL-215 BL-262 BL-266 BL-294 BL-295 BL-339 | DEVLOG.md |
 | 2026-08-08 | [Two of NR-094's footnotes promoted to their own backlog items](DEVLOG.md) | BL-207 BL-278 BL-334 BL-335 BL-336 | DEVLOG.md |
 | 2026-08-08 | [Ruling on NR-094: Stage C takes the dialogue layer, the scorer keeps the action seam](DEVLOG.md) | BL-278 BL-279 BL-334 | DEVLOG.md |
 | 2026-08-08 | [C-route feasibility: both gates pass, and Cicero says the model is on the wrong layer](DEVLOG.md) | BL-278 BL-279 | DEVLOG.md |
