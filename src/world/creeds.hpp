@@ -25,6 +25,7 @@
 
 #include "history_ladder.hpp"
 #include "planetology.hpp"
+#include "tongue.hpp"
 
 #include <string>
 #include <vector>
@@ -48,6 +49,11 @@ struct culture
 {
     int cradle = -1;                 ///< Index into history_ladder_state::cradles.
     std::string name;                ///< The people's own name for themselves.
+    /// The people's tongue — the phoneme inventory their own name and their
+    /// gods were coined from, kept so the naming passes downstream (nations,
+    /// cities) coin from the SAME sounds rather than a bank of their own
+    /// (BL-290, world/tongue.hpp).
+    ::tongue speech;
     std::vector<culture_god> pantheon;
 
     /// 0-1000 — how readily this culture's war-bands march, derived from the

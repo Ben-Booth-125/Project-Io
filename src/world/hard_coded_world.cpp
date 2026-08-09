@@ -1,5 +1,6 @@
 #include "hard_coded_world.hpp"
 
+#include "city_names.hpp"
 #include "continents.hpp"
 #include "corporation_generation.hpp"
 #include "creeds.hpp"
@@ -379,6 +380,25 @@ world make_hard_coded_world(world_params params, generation_report* report,
                                            /*seed=*/params.seed ^ 0x5E77EDu,
                                            /*stop_year=*/params.epoch_year);
         kepler_np.seed_tiles = settlement_seed_tiles(kepler_settlement);
+
+        // Each anchor carries its province's tongue across into Pass 5, so a
+        // nation is named in the speech of the people who settled its core
+        // rather than out of a bank of its own (BL-290).
+        kepler_np.seed_tongues.reserve(kepler_settlement.provinces.size());
+        for (const province& p : kepler_settlement.provinces)
+        {
+            if (p.anchor < 0) continue;
+            kepler_np.seed_tongues.push_back(
+                p.culture >= 0 && p.culture < static_cast<int>(kepler_creeds.cultures.size())
+                    ? kepler_creeds.cultures[static_cast<std::size_t>(p.culture)].speech
+                    : tongue{});
+        }
+
+        // Same act for the cities: the placeholder names generate_population_
+        // centres coined before there was any culture are replaced with names
+        // in the nearest province's tongue.
+        name_population_centres(w, kepler, 180, kepler_settlement, kepler_creeds,
+                                /*seed=*/params.seed ^ 0xC17910E6u);
     }
 
     const std::vector<entity_id> kepler_nations =

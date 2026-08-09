@@ -1,5 +1,6 @@
 #pragma once
 
+#include "tongue.hpp"
 #include "world.hpp"
 
 #include <cstdint>
@@ -69,6 +70,13 @@ struct nation_params
     /// its own separation rule and re-filtering here would silently discard
     /// history).
     std::vector<int> seed_tiles;
+
+    /// Parallel to `seed_tiles`: the tongue of the culture that settled each
+    /// anchor (BL-290). Pass 5 names a nation in the speech of the province it
+    /// grew from, so a realm, its gods and its cities share one sound system as
+    /// a consequence of the generation chain rather than by coincidence. Short,
+    /// empty, or unusable entries fall back to a tongue rolled in Pass 5.
+    std::vector<tongue> seed_tongues;
 };
 
 /// Generate nations over the tile map of one body and register all results in @p w.

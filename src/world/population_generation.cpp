@@ -205,7 +205,14 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed)
         }
         std::sort(ids.begin(), ids.end());
         std::mt19937 name_rng(seed ^ 0x9E3779B9u);
+        // This pass runs BEFORE the creeds, so there is no culture to name
+        // from yet: roll one tongue for the body and name every centre from
+        // it, so the placeholder names are at least internally consistent.
+        // `name_population_centres` overwrites them per-province once the
+        // settlement record exists (BL-290).
+        mt_picker picker(name_rng);
+        const tongue body_speech = roll_tongue(picker);
         for (entity_id cid : ids)
-            w.population_centre_name[cid] = generate_city_name(name_rng);
+            w.population_centre_name[cid] = generate_city_name(name_rng, body_speech);
     }
 }
