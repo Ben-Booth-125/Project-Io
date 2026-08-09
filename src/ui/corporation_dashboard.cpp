@@ -43,10 +43,18 @@ const char* body_name(const world& w, entity_id id)
     return (it == w.bodies.end()) ? "?" : it->second.name.c_str();
 }
 
-/// One drillable row: a labelled horizontal magnitude bar. Clicking it drills.
-/// draw_value_bar rather than draw_bars — the column is narrow and the list is
-/// long, which is exactly the case that idiom exists for (charts.hpp).
-bool rollup_row(int index, const rollup_item& it, float ceiling, ImU32 colour, const char* fmt)
+/// One row: a labelled horizontal magnitude bar. Clicking it drills, when the host
+/// can hold a drill. draw_value_bar rather than draw_bars — the column is narrow and
+/// the list is long, which is exactly the case that idiom exists for (charts.hpp).
+///
+/// @param drillable false in the ledger column's in-place expansion (BL-265). The
+///        drill state is a single `corp_rollup_drill` index with no card scope, and
+///        several cards can now be expanded in place at once — so an in-place drill
+///        would be ambiguous about which card it belonged to. The takeover scopes it
+///        unambiguously (`expanded.key` IS the card), and it is where a drill has the
+///        room anyway. In place, this row is a graph, not a door.
+bool rollup_row(int index, const rollup_item& it, float ceiling, ImU32 colour, const char* fmt,
+                bool drillable)
 {
     const float h = ImGui::GetFrameHeight();
     // Keyed on the ROW INDEX, not on it.subject: a Trade row's subject is the lane's
@@ -54,8 +62,17 @@ bool rollup_row(int index, const rollup_item& it, float ceiling, ImU32 colour, c
     // second row would silently stop responding to clicks. Nothing in a build or a
     // golden capture would show that.
     ImGui::PushID(index);
-    const bool clicked = ImGui::InvisibleButton("##row", {ImGui::GetContentRegionAvail().x, h});
-    const bool hot     = ImGui::IsItemHovered();
+    bool clicked = false;
+    bool hot     = false;
+    if (drillable)
+    {
+        clicked = ImGui::InvisibleButton("##row", {ImGui::GetContentRegionAvail().x, h});
+        hot     = ImGui::IsItemHovered();
+    }
+    else
+    {
+        ImGui::Dummy({ImGui::GetContentRegionAvail().x, h});
+    }
     ImGui::PopID();
 
     const ImVec2 mn = ImGui::GetItemRectMin();
@@ -77,15 +94,16 @@ bool rollup_row(int index, const rollup_item& it, float ceiling, ImU32 colour, c
     return clicked;
 }
 
-/// The folded resting line of one card: chevron, title, verdict.
+/// The folded resting line of one card: title, verdict, then the `⌄ ›` gutter.
+/// The chevron used to LEAD this row; BL-265 moved both controls to the right
+/// gutter, so a card row's controls sit in the same column as every other row's.
 bool card_row(ui_state& s, int card, const char* title, const char* verdict, ImU32 col)
 {
     ImGui::PushID(card);
-    const bool changed = fold_chevron(s, detail_surface::corp_rollup, card);
-    ImGui::SameLine();
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", title);
     ImGui::SameLine();
-    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(col), "%s", verdict);
+    gutter_text(col, verdict);
+    const bool changed = disclosure_controls(s, detail_surface::corp_rollup, card);
     ImGui::PopID();
     return changed;
 }
@@ -106,6 +124,87 @@ void drill_breadcrumb(ui_state& s, const char* corp, const char* card, const cha
     ImGui::SameLine();
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", subject);
     ImGui::Separator();
+}
+
+/// The four cards' titles. One table, because BL-265 made the takeover show all
+/// four rather than only the one that was clicked.
+const char* const k_card_titles[4] = {"Production", "Trade", "Workforce", "Finance"};
+
+/// The rows behind a card. Finance drills into its own flows rather than a
+/// per-item list, so it is the one card with none — build_UI_example_3 reached the
+/// same shape.
+const std::vector<rollup_item>& card_items(const corp_rollups& r, int card)
+{
+    static const std::vector<rollup_item> k_no_items;
+    return (card == 0) ? r.production : (card == 1) ? r.trade
+         : (card == 2) ? r.workforce  : k_no_items;
+}
+
+/// One card's roll-up body — the Finance chart, or the other three cards' rows.
+///
+/// Extracted by BL-265 because the same content now has TWO hosts: the ledger
+/// column's in-place expansion and the full-canvas takeover, which draws all four
+/// of these top to bottom. One builder, so the two hosts cannot show different
+/// things. Returns the row index clicked this frame, or -1.
+int rollup_body(const corp_rollups& r, int card, bool drillable)
+{
+    if (card == 3)
+    {
+        if (r.budget_measured)
+        {
+            charts::bar fb[5] = {
+                {r.budget.income,      palette::positive, "Income",      false},
+                {r.budget.expenditure, palette::negative, "Inputs",      false},
+                {r.budget.maintenance, IM_COL32(190, 150, 100, 255), "Maintenance", false},
+                {r.budget.wages,       IM_COL32(150, 160, 210, 255), "Wages",       false},
+                {r.budget.interest,    IM_COL32(200, 110, 160, 255), "Interest",    false},
+            };
+            float peak = 0.0f;
+            for (const charts::bar& b : fb) peak = std::max(peak, b.value);
+            const float ceiling = charts::tight_ceil(std::max(peak, 1.0f));
+
+            // Shorter in the ledger column than on the canvas: 220 px of chart in a
+            // fold-out only a few hundred px tall would leave nothing for the three
+            // card rows below it.
+            const float  bar_h = drillable ? 220.0f : 140.0f;
+            const ImVec2 p     = ImGui::GetCursorScreenPos();
+            const float  cw    = ImGui::GetContentRegionAvail().x;
+            ImGui::Dummy({cw, bar_h});
+            charts::draw_bars(ImGui::GetWindowDrawList(), p, {p.x + cw, p.y + bar_h},
+                              fb, 5, ceiling, "%.1f");
+            ImGui::Spacing();
+            ImGui::Text("Net this quarter: %+.1f", static_cast<double>(r.budget.net()));
+        }
+        else
+        {
+            ImGui::TextWrapped("No budget breakdown has been recorded yet - "
+                               "advance time by one economy quarter.");
+        }
+        return -1;
+    }
+
+    const std::vector<rollup_item>& items = card_items(r, card);
+    if (items.empty())
+    {
+        ImGui::TextDisabled("Nothing to show here yet.");
+        return -1;
+    }
+
+    float ceiling = 0.0f;
+    for (const rollup_item& it : items)
+        ceiling = std::max(ceiling, it.value);
+    ceiling = charts::tight_ceil(std::max(ceiling, 1.0f));
+
+    const ImU32 col = (card == 0) ? IM_COL32(150, 235, 160, 255)
+                    : (card == 1) ? IM_COL32(120, 190, 255, 255)
+                                  : IM_COL32(210, 190, 120, 255);
+    const char* fmt = (card == 1) ? "%.0f" : (card == 2) ? "%.2f" : "%.1f";
+
+    int clicked = -1;
+    for (int i = 0; i < static_cast<int>(items.size()); ++i)
+        if (rollup_row(i, items[static_cast<std::size_t>(i)], ceiling, col, fmt, drillable))
+            clicked = i;
+    return clicked;
 }
 
 } // namespace
@@ -199,19 +298,31 @@ void draw_corporation_dashboard(const world& w, const recipe_registry& reg,
 
         char buf[128];
 
+        // Each card rests as one verdict line and carries the `⌄ ›` gutter. `⌄`
+        // grows the card's own chart or rows HERE, under its verdict, and several
+        // may be open at once — that is the accordion BL-265 asked for.
+        auto card = [&](int index, const char* title, ImU32 col) {
+            card_row(s, index, title, buf, col);
+            if (!is_open_in_place(s, detail_surface::corp_rollup, index))
+                return;
+            ImGui::PushID(index);
+            ImGui::Indent();
+            rollup_body(r, index, /*drillable=*/false);
+            ImGui::Unindent();
+            ImGui::PopID();
+        };
+
         std::snprintf(buf, sizeof buf, "%d making, %d idle, %.1f/qtr",
                       r.producing, r.idle, static_cast<double>(r.output_per_tick));
-        card_row(s, 0, "Production", buf,
-                 r.idle > 0 ? palette::negative : palette::positive);
+        card(0, k_card_titles[0], r.idle > 0 ? palette::negative : palette::positive);
 
         std::snprintf(buf, sizeof buf, "%d lanes, %d convoys run", r.routes, r.convoys);
-        card_row(s, 1, "Trade", buf,
-                 r.routes > 0 ? palette::positive : palette::neutral);
+        card(1, k_card_titles[1], r.routes > 0 ? palette::positive : palette::neutral);
 
         std::snprintf(buf, sizeof buf, "%.0f%% of labour demand met",
                       static_cast<double>(r.tightest_contention * 100.0f));
-        card_row(s, 2, "Workforce", buf,
-                 r.tightest_contention < 0.999f ? palette::negative : palette::positive);
+        card(2, k_card_titles[2],
+             r.tightest_contention < 0.999f ? palette::negative : palette::positive);
 
         if (r.budget_measured)
             std::snprintf(buf, sizeof buf, "%+.1f/qtr, balance %.0f",
@@ -219,27 +330,26 @@ void draw_corporation_dashboard(const world& w, const recipe_registry& reg,
         else
             std::snprintf(buf, sizeof buf, "balance %.0f (no quarter measured yet)",
                           static_cast<double>(r.balance));
-        card_row(s, 3, "Finance", buf,
-                 (r.budget_measured && r.budget.net() < 0.0f) ? palette::negative
-                                                              : palette::positive);
+        card(3, k_card_titles[3],
+             (r.budget_measured && r.budget.net() < 0.0f) ? palette::negative
+                                                          : palette::positive);
     }
     ui::foldout_end();
 
-    // ── The expanded card, full screen ──
-    // One overlay for all four: the card index is the fold key, so which card is
-    // open is already state and does not need a second flag.
-    static const char* k_titles[4] = {"Production", "Trade", "Workforce", "Finance"};
-    for (int card = 0; card < 4; ++card)
-    {
-        if (!fold_overlay_begin(s, detail_surface::corp_rollup, card, k_titles[card]))
-            continue;
+    // ── The full-canvas takeover: ALL FOUR cards, scrolled ──
+    // BL-265 change 3: "anything full screen deserves its full space." The takeover
+    // used to show only the card that was clicked and leave its three siblings
+    // folded behind it, which spent the largest rectangle in the app on a quarter of
+    // the surface. The card index survives as `expanded.key` — not to choose what is
+    // drawn, but to SCOPE the drill, which is a single index with no card of its own.
+    if (s.expanded.surface != detail_surface::corp_rollup)
+        return;
 
-        // Finance drills into its own flows rather than a per-item list, so it is
-        // the one card with no rows — build_UI_example_3 reached the same shape.
-        static const std::vector<rollup_item> k_no_items;
-        const std::vector<rollup_item>& items =
-            (card == 0) ? r.production : (card == 1) ? r.trade
-                        : (card == 2) ? r.workforce : k_no_items;
+    const int card = std::clamp(s.expanded.key, 0, 3);
+    // The corp's own name titles it: the accordion is the dashboard, not one card.
+    if (fold_overlay_begin(s, detail_surface::corp_rollup, s.expanded.key, name))
+    {
+        const std::vector<rollup_item>& items = card_items(r, card);
 
         const int drill = s.corp_rollup_drill;
         const bool have_drill = drill >= 0 && drill < static_cast<int>(items.size());
@@ -247,7 +357,7 @@ void draw_corporation_dashboard(const world& w, const recipe_registry& reg,
         if (have_drill)
         {
             const rollup_item& it = items[static_cast<std::size_t>(drill)];
-            drill_breadcrumb(s, name, k_titles[card], it.label.c_str());
+            drill_breadcrumb(s, name, k_card_titles[card], it.label.c_str());
 
             // Four drills, four shapes — the property build_UI_example_3 was built
             // to demonstrate and the one worth preserving.
@@ -297,59 +407,25 @@ void draw_corporation_dashboard(const world& w, const recipe_registry& reg,
         }
         else
         {
-            // The roll-up itself: the chart, then the drillable rows.
-            if (card == 3)
+            // The whole accordion: all four roll-ups, headed, top to bottom. The
+            // window scrolls, so a long Production list does not squeeze Finance off
+            // the bottom. Clicking a row drills, and re-scopes `expanded.key` to the
+            // card it came from — deferred to after the overlay closes so the target
+            // cannot change while its own window is still open.
+            int next_card = -1;
+            int next_drill = -1;
+            for (int c = 0; c < 4; ++c)
             {
-                if (r.budget_measured)
-                {
-                    charts::bar fb[5] = {
-                        {r.budget.income,      palette::positive, "Income",      false},
-                        {r.budget.expenditure, palette::negative, "Inputs",      false},
-                        {r.budget.maintenance, IM_COL32(190, 150, 100, 255), "Maintenance", false},
-                        {r.budget.wages,       IM_COL32(150, 160, 210, 255), "Wages",       false},
-                        {r.budget.interest,    IM_COL32(200, 110, 160, 255), "Interest",    false},
-                    };
-                    float peak = 0.0f;
-                    for (const charts::bar& b : fb) peak = std::max(peak, b.value);
-                    const float ceiling = charts::tight_ceil(std::max(peak, 1.0f));
-
-                    const ImVec2 p  = ImGui::GetCursorScreenPos();
-                    const float  cw = ImGui::GetContentRegionAvail().x;
-                    ImGui::Dummy({cw, 220.0f});
-                    charts::draw_bars(ImGui::GetWindowDrawList(), p, {p.x + cw, p.y + 220.0f},
-                                      fb, 5, ceiling, "%.1f");
-                    ImGui::Spacing();
-                    ImGui::Text("Net this quarter: %+.1f", static_cast<double>(r.budget.net()));
-                }
-                else
-                {
-                    ImGui::TextWrapped("No budget breakdown has been recorded yet - "
-                                       "advance time by one economy quarter.");
-                }
+                ImGui::PushID(c);
+                ImGui::SeparatorText(k_card_titles[c]);
+                const int clicked = rollup_body(r, c, /*drillable=*/true);
+                if (clicked >= 0) { next_card = c; next_drill = clicked; }
+                ImGui::PopID();
             }
-            else
+            if (next_drill >= 0)
             {
-                float ceiling = 0.0f;
-                for (const rollup_item& it : items)
-                    ceiling = std::max(ceiling, it.value);
-                ceiling = charts::tight_ceil(std::max(ceiling, 1.0f));
-
-                const ImU32 col = (card == 0) ? IM_COL32(150, 235, 160, 255)
-                                : (card == 1) ? IM_COL32(120, 190, 255, 255)
-                                              : IM_COL32(210, 190, 120, 255);
-                const char* fmt = (card == 1) ? "%.0f" : (card == 2) ? "%.2f" : "%.1f";
-
-                if (items.empty())
-                {
-                    ImGui::TextDisabled("Nothing to show here yet.");
-                }
-                else
-                {
-                    for (int i = 0; i < static_cast<int>(items.size()); ++i)
-                        if (rollup_row(i, items[static_cast<std::size_t>(i)], ceiling, col, fmt))
-                            s.corp_rollup_drill = i;
-                }
-
+                s.expanded.key       = next_card;
+                s.corp_rollup_drill  = next_drill;
             }
         }
 

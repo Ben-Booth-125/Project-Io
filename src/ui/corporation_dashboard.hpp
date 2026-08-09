@@ -80,7 +80,9 @@ struct corp_rollups
 corp_rollups derive_corp_rollups(const world& w, const economy_report& report, entity_id corp);
 
 /// Draw the Corporation dashboard into the shell fold-out column, plus the
-/// full-screen overlay of whichever card is expanded.
+/// full-canvas takeover when one is open. In the column each card rests as a
+/// verdict line and may be expanded in place; the takeover shows all four
+/// roll-ups scrolled (BL-265), with `expanded.key` scoping the drill.
 ///
 /// @param w      World (read-only — the dashboard reports, it does not operate).
 /// @param reg    Loaded registry; the Production drill prices the building through

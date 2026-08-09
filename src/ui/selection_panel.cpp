@@ -2,7 +2,7 @@
 
 #include "charts.hpp"
 
-#include "detail_level.hpp"   // fold_chevron — the drill-through idiom (BL-214)
+#include "detail_level.hpp"   // disclosure_controls — the drill-through idiom (BL-214/BL-265)
 #include "foldout_column.hpp" // shell fold-out column host (shared with the ledgers)
 #include "hex_render.hpp"      // draw_tile_neighbourhood — the card's zoomed tile view
 #include "icons.hpp"
@@ -735,15 +735,21 @@ void draw_tile_selection(world& w, ui_state& ui)
         page = std::clamp(page, 0, n - 1);
         const tile_metric& mp = pages[static_cast<std::size_t>(page)];
 
-        // Pager row: ‹  Metric (i/N)  ›  ⌄
+        // Pager row: [prev]  Metric (i/N)  [next]  [full canvas]
         //
         // The band rests EXPANDED-IN-PLACE (Ben, 2026-08-01): its rect is a fixed
         // 260 px that cannot shrink, so a folded one-liner here would spend ~220 px
         // on emptiness — the objection the superseded three-level design raised
-        // against Glance-everywhere. The chevron therefore does not fold this card
-        // away; it opens the same metric FULL SCREEN, where the chart has ten times
-        // the height and can carry its question log (BL-247).
-        const float aw = ImGui::GetContentRegionAvail().x;
+        // against Glance-everywhere. It therefore takes the full-canvas control
+        // alone (BL-265): there is no `⌄` state to reach, because this card is
+        // already expanded. The control opens the same metric on the CANVAS, where
+        // the chart has ten times the height.
+        //
+        // `right` is the row's true right edge, and the pager's next-page button and
+        // the disclosure control are both hung off it — so the control lands in the
+        // same column it occupies on every other surface.
+        const float aw    = ImGui::GetContentRegionAvail().x;
+        const float right = ImGui::GetCursorPosX() + aw;
         ImGui::BeginDisabled(page == 0);
         if (ImGui::ArrowButton("##res_prev", ImGuiDir_Left)) --page;
         ImGui::EndDisabled();
@@ -756,15 +762,14 @@ void draw_tile_selection(world& w, ui_state& ui)
         ImGui::SameLine(std::max(frame_h + style.ItemSpacing.x, (aw - name_w) * 0.5f));
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", hdr);
 
-        ImGui::SameLine(aw - 2.0f * frame_h - style.ItemSpacing.x);
+        ImGui::SameLine(right - 2.0f * frame_h - style.ItemSpacing.x);
         ImGui::BeginDisabled(page == n - 1);
         if (ImGui::ArrowButton("##res_next", ImGuiDir_Right)) ++page;
         ImGui::EndDisabled();
         if (ImGui::IsItemHovered() && page < n - 1)
             ImGui::SetTooltip("Next");
 
-        ImGui::SameLine(aw - frame_h);
-        fold_chevron(ui, detail_surface::selection_metric, page);
+        disclosure_controls(ui, detail_surface::selection_metric, page, /*in_place=*/false);
 
         // The current page's graph, filling the rest of the container. Deposited
         // resources are click-drillable into their time series (BL-196);
