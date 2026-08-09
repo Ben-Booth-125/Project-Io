@@ -22,8 +22,8 @@ constexpr float kRounding = 6.0f;
 // The drill-down view (BL-196): a resource time-series chart for the top stack
 // frame — the aggregate (its body's total of that resource) as columns on the left
 // axis, this tile's own series as a line on the right axis, over the shared day
-// axis. Draws its own header (back / title / close). Returns nothing; mutates the
-// stack via the back/close buttons.
+// axis. Draws its own header (back / title). Returns nothing; mutates the stack
+// via the back button.
 void draw_resource_drill(const world& w, const resource_history_view& hist, ui_state& ui)
 {
     ui_state::card_drill& frame = ui.card_stack.back(); // mutable: the scroll slider writes frame.scroll
@@ -35,9 +35,8 @@ void draw_resource_drill(const world& w, const resource_history_view& hist, ui_s
     const resource_presentation& rp =
         presentation_of(static_cast<resource_type>(tile_ok ? r : 0));
 
-    // ── Header: [◀ Back] Resource · [x, y] ................ [x] ──
-    const float bar_w = ImGui::GetContentRegionAvail().x;
-    const float btn   = ImGui::GetFrameHeight();
+    // ── Header: [◀ Back] Resource · [x, y] ──
+    const float btn = ImGui::GetFrameHeight();
     if (ImGui::Button("<", {btn, btn}))
         ui.card_stack.pop_back();            // unwind one level
     if (ImGui::IsItemHovered())
@@ -53,14 +52,7 @@ void draw_resource_drill(const world& w, const resource_history_view& hist, ui_s
         ImGui::SameLine();
         ImGui::TextDisabled("[%d, %d]", tit->second.grid_x, tit->second.grid_y);
     }
-    ImGui::SameLine(bar_w - btn);
-    if (ImGui::Button("x", {btn, btn}))          // hide the whole card
-    {
-        ui.card_stack.clear();
-        ui.selection_hidden_for = ui.selected_entity;
-    }
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Close");
+    // No close button: the band is always open (BL-266) — `<` unwinds the drill.
     ImGui::Separator();
 
     if (!tile_ok)
@@ -218,15 +210,14 @@ void draw_selection_band(world& w, const recipe_registry& reg,
                          const resource_history_view& history, ui_state& ui,
                          ImVec2 band_origin, ImVec2 band_size)
 {
-    // Open iff a valid entity is selected and this selection was not dismissed.
-    // This is the whole open/closed model — "stuck" and "selected" are one state
-    // (SELECTION.md § Click model). The band owns the gate so the content function
-    // itself never has to re-check selection_hidden_for.
-    const entity_id sel = ui.selected_entity;
-    if (sel == null_entity || sel == ui.selection_hidden_for)
-        return;
-    if (selection_kind_of(w, sel) == selection_kind::none)
-        return; // stale id — nothing to show
+    // The band is ALWAYS open (BL-266) — there is no dismissal and no hide state.
+    // It never renders selection_kind::none: with no (valid) selection it rests on
+    // the player's own corporation instead. The enumerator stays (other callers
+    // use it); ui.selected_entity itself is left null, so deselect — "stop looking
+    // at that, back to looking at yourself" — remains representable.
+    entity_id sel = ui.selected_entity;
+    if (sel == null_entity || selection_kind_of(w, sel) == selection_kind::none)
+        sel = w.player_entity; // the player corp exists before the first frame
 
     // ── Placement (BL-213) ──
     // Fixed: fills the exact rect the caller computed (bottom band, between the
@@ -258,7 +249,16 @@ void draw_selection_band(world& w, const recipe_registry& reg,
         // A non-empty drill stack shows the drilled view (a resource time-series
         // chart, BL-196) in place of the root selection content.
         if (ui.card_stack.empty())
+        {
+            // The content function draws ui.selected_entity, so the resting
+            // substitution is applied for the draw and restored after — unless the
+            // content itself re-pointed the selection (e.g. the Manage button).
+            const entity_id real_sel = ui.selected_entity;
+            ui.selected_entity       = sel;
             draw_selection_content(w, reg, report, ui);
+            if (ui.selected_entity == sel)
+                ui.selected_entity = real_sel;
+        }
         else
             draw_resource_drill(w, history, ui);
     }

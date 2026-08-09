@@ -8,7 +8,7 @@
 -- rect (clear of the shell column, header, and right chrome column).
 --
 -- Driver: direct state manipulation (select_tile / select_building /
--- dismiss_selection) — there is no click/key injection in the headless harness.
+-- clear_selection) — there is no click/key injection in the headless harness.
 --
 -- Run with: ProjectIo --verify scripts/verify/sticky_card.lua
 
@@ -18,11 +18,12 @@ verify.goto_surface("home")
 verify.select_tile(0, 0)
 verify.capture("sticky_card_00_open")
 
--- 2) Dismiss (the card's x / Esc equivalent): the card disappears.
-verify.dismiss_selection()
-verify.capture("sticky_card_01_dismissed")
+-- 2) Deselect (BL-266 — dismissal is retired): the band stays open and rests on
+--    the player's own corporation. The capture shows the corp resting state.
+verify.clear_selection()
+verify.capture("sticky_card_01_resting_corp")
 
--- 3) Re-selecting shows it again (a fresh selection always re-shows).
+-- 3) A fresh selection re-points the band from the resting state.
 verify.select_tile(0, 1)
 verify.capture("sticky_card_02_reopened")
 

@@ -658,11 +658,7 @@ void draw_tile_selection(world& w, ui_state& ui)
         ImGui::SetCursorScreenPos({hc.x + ir * 2.0f + style.ItemSpacing.x, hc.y});
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
                            "Tile [%d, %d]", tile.grid_x, tile.grid_y);
-        ImGui::SameLine(avail - frame_h);
-        if (ImGui::Button("x", {frame_h, frame_h}))
-            ui.selection_hidden_for = sel;
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Close");
+        // No close button: the band is always open (BL-266).
     }
     ImGui::Separator();
 
@@ -856,8 +852,7 @@ void draw_tile_selection(world& w, ui_state& ui)
                              glyph_gear) &&
             bld_here != null_entity)
         {
-            ui.selected_entity      = bld_here;
-            ui.selection_hidden_for = null_entity;
+            ui.selected_entity = bld_here;
         }
 
         tile_icon_button("##act_history", bsz, /*enabled=*/false,
@@ -882,8 +877,9 @@ void draw_selection_content(world& w, const recipe_registry& reg,
 {
     const selection_kind kind = selection_kind_of(w, ui.selected_entity);
 
-    // Nothing valid selected — draw nothing. (The card frame owns the open/hidden
-    // gate on selection_hidden_for; this content function only draws the entity.)
+    // Nothing valid selected — draw nothing. (The band frame never lets this
+    // happen: with no valid selection it substitutes the player corporation
+    // before calling here, BL-266. This guard covers other callers only.)
     if (kind == selection_kind::none)
         return;
 
@@ -924,20 +920,16 @@ void draw_selection_content(world& w, const recipe_registry& reg,
             ImGui::TextDisabled("%s", kname);
         }
 
-        // Right-align the two chrome buttons at the content region's right edge.
+        // Right-align the 'go to' button at the content region's right edge.
         // bar_w is the available content width (padding already excluded), so the
         // offset is measured from the content-left, no WindowPadding term needed.
+        // No close button: the band is always open (BL-266).
         const float btn = frame_h;
-        ImGui::SameLine(bar_w - 2.0f * btn - style.ItemSpacing.x);
+        ImGui::SameLine(bar_w - btn);
         if (ImGui::Button(">", {btn, btn}))
             focus_on_entity(w, ui, ui.selected_entity);
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Go to");
-        ImGui::SameLine();
-        if (ImGui::Button("x", {btn, btn}))
-            ui.selection_hidden_for = ui.selected_entity;
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Close");
     }
 
     ImGui::Separator();

@@ -58,13 +58,13 @@ void draw_building_profit(const world& w, const recipe_registry& reg,
 /// on selection_kind_of to the matching per-entity layout — a **tile** takes the
 /// BL-123 vertical stack (placeholder image, per-resource production graphs, action
 /// grid); a **player building** takes its operate-the-building layout; the remaining
-/// kinds take the action|facts split. It draws a header row: the kind icon + title,
-/// a **'go to'** button (routes through ui::focus_on_entity), and a **close** button
-/// that *hides* the selection until the next one (selection_hidden_for).
+/// kinds take the action|facts split. It draws a header row: the kind icon + title
+/// and a **'go to'** button (routes through ui::focus_on_entity). There is no
+/// close button — the Selection band is always open (BL-266).
 ///
-/// The content draws nothing when there is no valid selection. The card frame owns
-/// the open/hidden gate (it does not draw the card at all when hidden), so this
-/// function does not re-check selection_hidden_for.
+/// The content draws nothing when there is no valid selection. The band frame
+/// never lets that happen: with no valid selection it substitutes the player's
+/// own corporation (the BL-266 resting state) before calling here.
 ///
 /// For a selected **tile** the layout's "Construct Buildings" button opens the tile
 /// construction ledger (ui_state::show_build_ledger) in the shell column — the
