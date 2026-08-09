@@ -376,6 +376,68 @@ these are the recurring "do not" rules that come up while building:
 
 ---
 
+## Dependency acquisition (BL-302)
+
+SDL3, Lua, sol2 and ImGui are fetched by FetchContent at **configure** time — ~120 MB of
+tarballs. That makes a fresh configure the one build step that needs the network, and it is
+also the step nobody exercises: day-to-day work happens in an already-populated build dir
+that never downloads anything. BL-302 was filed when a fresh configure on Windows could not
+reach SDL3 at all (a schannel TLS revocation failure).
+
+`CMakeLists.txt` seeds a shared **source** cache per checkout. Sources are shared; each build
+tree keeps its own `<dep>-build`. A whole shared `FETCHCONTENT_BASE_DIR` does *not* work —
+the `<dep>-subbuild` dir carries a generator-locked cache, so `build_vs` and `build_gen`
+would break each other.
+
+**Seed the cache** (once per checkout; the location is gitignored):
+
+```sh
+cmake -S . -B /tmp/io-seed -DFETCHCONTENT_BASE_DIR="$PWD/_deps_cache"
+```
+
+After that any **new** build dir configures from the cache with no network. Already-populated
+build dirs are left alone. `IO_DEPS_CACHE` (env var) overrides the location — point a sub-agent
+worktree at the main checkout's cache and a fresh worktree configures offline:
+
+```sh
+export IO_DEPS_CACHE=/path/to/Project-Io/_deps_cache
+```
+
+Every configure prints which state it is in, so the cold case is never silent:
+
+```
+-- Deps: seeded from /path/to/_deps_cache -> sdl3;lua_src;sol2_src;imgui_src
+-- Deps: COLD -> sdl3;lua_src;sol2_src;imgui_src
+```
+
+### The from-cold check
+
+Run this deliberately — after changing a dependency version, or when a fresh-clone build is
+about to matter. It is the only thing that exercises the download path a green local build dir
+hides. Configure-only; no compile.
+
+```sh
+IO_DEPS_CACHE=/nonexistent \
+cmake -S . -B /tmp/io-coldcheck/build \
+      -DFETCHCONTENT_BASE_DIR=/tmp/io-coldcheck/deps \
+      -DCMAKE_BUILD_TYPE=Release
+```
+
+`IO_DEPS_CACHE=/nonexistent` is what forces it to be genuinely cold — without it the cache
+would seed the check and prove nothing. Expect `-- Deps: COLD -> ...` then exit 0. Measured
+2026-08-09 on Linux: **74 s, ~120 MB, succeeds** — the schannel fault is Windows-specific and
+does not reproduce here, so this check passing on Linux does *not* clear BL-302 on Windows.
+
+The complement — proves the cache alone is sufficient, with the network fully off:
+
+```sh
+cmake -S . -B /tmp/io-offlinecheck/build \
+      -DFETCHCONTENT_BASE_DIR=/tmp/io-offlinecheck/deps \
+      -DFETCHCONTENT_FULLY_DISCONNECTED=ON
+```
+
+---
+
 ## Display environment
 
 The runtime display and the verification harness do **not** render at the same size, so UI chrome
