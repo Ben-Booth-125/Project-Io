@@ -3306,7 +3306,6 @@ void app::render()
             case corp_command_result::applied:
                 m_ui.construction.last_message = "Unit raised.";
                 m_ui.selected_entity           = hired; // inspect the new unit
-                m_ui.selection_hidden_for      = null_entity;
                 break;
             case corp_command_result::rejected_funds:
                 m_ui.construction.last_message = "Can't supply it."; break;
