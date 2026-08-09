@@ -14,6 +14,12 @@ namespace ui {
 // function of the display: it is now DERIVED from the minimap height so the
 // bottom strip's top edge aligns with the minimap's. See
 // `ui::selection_band_height(disp_x, disp_y)`.
+//
+// The band's whole RECT — both flush edges as well as that height — is composed by
+// `ui::selection_band_rect(disp)` (BL-216, `shell_metrics.hpp`), which is what
+// app.cpp passes in below. Nothing else should re-derive it: the band's left edge is
+// the comms dock's right edge and its right edge is the right chrome column's left,
+// so a hand-rolled copy drifts the moment either neighbour moves.
 
 /// The Selection band (BL-213 — supersedes the BL-194/195 click-anchored card) —
 /// a FIXED bottom band, sandwiched between the shell column and the right chrome

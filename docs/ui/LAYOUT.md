@@ -13,12 +13,12 @@ The prototype UI is built with Dear ImGui (see TECH_FOUNDATIONS). Everything her
 │ Profile          │           Header            │  Time panel  │
 │ (identity tile)  │   (budget + resource strip) │ (date + bar, │
 ├─────┬────────────┤ — one top band, level tiles │  speed ctl)  │
-│ Nav │ Fold-out   ├─────────────────────────────┴──────────────┤
-│ rail│ column:    │                                            │
-│ ▢   │ ledger     │            Primary canvas                  │
-│ ▢   │            │   (Solar / Circumplanetary / Surface)      │
-│ ▢ … │ (stops at  │                                            │
-│ ▦   │ the comms  │                             ┌──────────────┤
+│ Nav │ Fold-out   ├─────────────────────────────┼──────────────┤
+│ rail│ column:    │                             │ PINNED ITEMS │
+│ ▢   │ ledger     │       Primary canvas        │ (watch list; │
+│ ▢   │            │ (Solar / Circumpl./Surface) │  the slot    │
+│ ▢ … │ (stops at  │                             │  comms left) │
+│ ▦   │ the comms  │                             ├──────────────┤
 │ ▢ … │ dock's top │                             │   Minimap    │
 │ ▢   │ edge)      │                             │  [lens bar]  │
 │     ├────────────┴──────┬──────────────────────┤              │
@@ -34,6 +34,34 @@ the fold-out column's width), the **Selection band** from the dock's right edge 
 the right chrome column, and the **minimap** in the corner. The fold-out column
 stops at the dock's top edge, so every ledger is permanently shorter by the strip's
 height — see *Selection band* and *Comms dock* below.
+
+The **right chrome column** splits two ways and elastically: the content-derived
+**time panel** on top, the ratio-locked **minimap** at the foot, and the whole
+residual middle to **pinned items** — the slot comms vacated when BL-227 moved it
+down. The minimap does not move.
+
+### One owner for the rect algebra (BL-216)
+
+The regions above are not each other's business, but their **edges** are. The right
+chrome column's left edge alone used to be re-derived by hand in five places in
+`app.cpp` — minimap, time panel, system gear, the header's right bound, the Selection
+band's right edge — and they had already drifted: BL-312 flushed the minimap to the
+screen edge and the other four did not follow.
+
+**`src/ui/shell_metrics.{hpp,cpp}`** now owns that algebra, and every call site asks
+it for a rect: `right_chrome_width` / `right_chrome_left`, `minimap_rect`,
+`time_panel_rect`, `bottom_band_budget`, `selection_band_rect`, `pinned_panel_rect`.
+It **consumes** `foldout_column.hpp`'s primitives (`shell_column_width`,
+`minimap_width`/`_height`, `selection_band_height`, `foldout_column_rect`,
+`comms_dock_rect`) rather than duplicating them — the split is primitives there,
+composed rects here. Widths round to whole pixels, so every region edge lands on a
+pixel boundary.
+
+> One live inconsistency is **recorded, not silently fixed**: the minimap is flush to
+> the screen edge (`disp.x - mm_w`, BL-312) while the column's other occupants stop a
+> `shell_margin` short of it (`right_chrome_left`). `minimap_rect` and
+> `right_chrome_left` therefore disagree by 8 px, deliberately and in one visible
+> place, instead of five invisible ones.
 
 Two layers compose the screen:
 
@@ -58,7 +86,10 @@ across resolutions rather than a magic constant. BL-122 originally **widened** t
 ledgers; **BL-213 (2026-07-28) narrowed it back down** to `[380, 460]` once Selection moved
 out to its own fixed bottom band (see *Selection band* below) and no longer needed room in
 this column at all — the freed width goes to the band instead. It now resolves to ~380 px at
-1720 wide, ~410 px at 1920. The column is reserved down the whole left edge:
+1720 wide, 384 px at 1920, ~410 px at 2048 — the 380 floor binds across almost the
+whole common range (this line used to claim "~410 px at 1920", which is arithmetically
+wrong: `0.20 · 1920 = 384`; corrected under BL-216). The column is reserved down the
+whole left edge:
 
 - The **identity tile** (profile) caps it at top, taking the full width `W`.
 - The narrow **icon nav rail** (56 px) runs down its left sub-edge, full height.
@@ -231,10 +262,44 @@ decision surface, so it gave up the prime right-edge slot under the time panel; 
 quarter-width it gives back goes to the Selection band. The icon rail keeps its full
 height past the dock — at the 1280×720 floor a shortened rail would clip two slots.
 
-It replaced the Explorer placeholder (2026-07-26) in its original right-middle home —
-pinning was never wired; **BL-216 (chat pinning)** is the open item for its return as a
-chat-adjacent affordance, not a reserved band. The diplomacy-as-communication principle
-behind the surface: `docs/ai/AI_OPPONENT.md` § 7.
+It replaced the Explorer placeholder (2026-07-26) in its original right-middle home.
+That home is not left empty: **BL-216 (shell re-plan)** gives it back to *pinned items*
+— see below. The diplomacy-as-communication principle behind the surface:
+`docs/ai/AI_OPPONENT.md` § 7.
+
+Inside the dock, **rows are the scarce axis, not width** — it is `selection_band_height`
+tall (260 px at 1280–1920) against the ~700 px right-column band it used to have. The
+log's message form, channel selector and group popup are laid out for that (BL-216); see
+`CHAT.md` § Layout in the dock.
+
+---
+
+## Pinned items — right column, middle
+**Spec: `PINS.md`**
+
+The residual middle of the right chrome column — between the time panel and the minimap
+— is the **pinned-items watch list**: a short, player-curated set of entities kept
+visible while the player works elsewhere. It is the affordance the Explorer placeholder
+originally reserved, and the slot the comms log occupied between 2026-07-26 and BL-227.
+
+- **Rect:** `ui::pinned_panel_rect(disp, time_h)` (`shell_metrics.hpp`) — exactly the
+  rect comms vacated: `right_chrome_left` across, from one margin below the time panel
+  down to one margin above the minimap. 336 × ~698 px at 1720×1080, 336 × ~338 px at
+  1280×720.
+- **The minimap does not move.** The column's split stays two-way elastic — the time
+  panel is content-derived, the minimap is ratio-locked, and pins take the whole
+  residual. Comms *left* as pins *arrive*: a swap, not a third claimant.
+- **Not a second action surface.** A pin is a watch card — kind glyph, name, and the
+  shared `entity_summary` stat block — over which single-click selects (the Selection
+  band then shows the full action content) and double-click navigates, per the click
+  model in `SELECTION.md`. Acting on a pin is one click away, by design.
+- **No nav-rail slot.** Fixed shell chrome, not a ledger — absent from
+  `close_all_panels` / `any_panel_open`, exactly like the comms dock and the Selection
+  band.
+
+> **Status.** The geometry landed with BL-216's `shell_metrics` foundation; the panel
+> itself, the pin toggle on the Selection band header, and the pin glyph land with the
+> item's pinned-items slice. `PINS.md` is that slice's spec.
 
 ---
 
@@ -342,7 +407,7 @@ these nine rather than inventing a tenth.
 
 | # | Container | Sizing | Text policy | Overflow |
 |---|---|---|---|---|
-| 1 | **Fold-out ledger column** (`foldout_begin`, `foldout_column.cpp`) | Fixed-width (`[nav_pane_width, W]`), stretches from below the identity tile to the **comms dock's top edge** (BL-227 — no longer the full column height) | Wrap to inner width | Vertical scroll |
+| 1 | **Fixed shell column / dock** — three instances: the **fold-out ledger column** (`foldout_begin`, `foldout_column.cpp`), the **comms dock** (`chat_panel.cpp`) and the **pinned items panel** | Fixed-width rect. The ledger column is `[nav_pane_width, W]`, from below the identity tile to the **comms dock's top edge** (BL-227 — no longer the full column height); the dock and the pins panel take their rects from `shell_metrics.hpp` | Wrap to inner width | Vertical scroll |
 | 2 | **On-canvas lens legend box** (draw-list, `body_surface_canvas.cpp`) | Fit-to-content — box sized from its own entries | Guaranteed-fit | None — box grows to fit |
 | 3 | **Selection band** (`draw_selection_band`, `selection_card.cpp` framing `draw_selection_content`, `selection_panel.cpp`) | Fixed rect — comms dock's right edge to the right chrome column, `selection_band_height` tall (minimap-derived) | Wrap | Vertical scroll |
 | 4 | **Header / balance strip** (`header_panel.cpp`) | Stretch-to-width, fixed height | Guaranteed-fit — segments measured, never wraps | Elide-with-tooltip, only as a last resort; never silent truncation |
@@ -352,8 +417,11 @@ these nine rather than inventing a tenth.
 | 8 | **Nav rail** | Fixed (56 px) | Icon-only; tooltips wrap (`nav_pane.cpp`, BL-174 — `PushTextWrapPos`, implementing this row's stated policy) | None (tooltip wrap absorbs it) |
 | 9 | **ImGui table** (ledgers) | Stretch columns with per-column min widths | Per-cell guaranteed-fit (clip + tooltip) for numeric/identity columns, wrap for description columns | Horizontal scroll on the table; never silent truncation of a load-bearing value |
 
-The **comms dock** (BL-227) is not a tenth kind: it is a fixed-rect docked panel obeying
-container 1's policy (wrap, vertical scroll) in the bottom strip.
+Neither surface BL-216 touches invents a tenth kind. The **comms dock** (BL-227) and the
+**pinned items panel** are both fixed-rect docked panels obeying container 1's policy
+(wrap, vertical scroll) — which is why row 1 is named for the *policy* rather than for
+the fold-out column alone. Declaring that up front means BL-215's audit inherits two
+compliant surfaces rather than two new offenders.
 
 This table is the baseline the open **BL-215 (text-wrap render audit)** consumes — an
 audit of every container's *rendered* wrap behaviour against the policy declared here —

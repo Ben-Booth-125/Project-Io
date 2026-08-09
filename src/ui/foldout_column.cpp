@@ -18,7 +18,10 @@ float shell_column_width(float disp_x)
     // Ben asked to widen the band, and the column no longer needs the extra
     // width the ledgers alone were re-tuned for at a narrower size (LAYOUT.md's
     // BL-081/111/117 legibility passes were themselves tuned against a ~244px
-    // effective content width, well inside this new range). ~380 @1720, ~410 @1920.
+    // effective content width, well inside this new range). The floor binds across
+    // the whole common range: 380 @1280..1900, 384 @1920, ~410 @2048 (BL-216 — the
+    // "~410 @1920" this comment used to claim was arithmetically wrong; 0.20*1920
+    // is 384).
     float w = 0.20f * disp_x;
     if (w < 380.0f) w = 380.0f;
     if (w > 460.0f) w = 460.0f;

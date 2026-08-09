@@ -5,6 +5,7 @@
 #include <imgui.h>
 
 #include <algorithm>
+#include <cstdio>
 
 namespace ui {
 
@@ -55,7 +56,13 @@ void draw_chat_panel(const world& w, chat_state& chat, int day,
                      float x, float y, float width, float height)
 {
     if (height <= 0.0f)
-        return; // no vertical room between the time column and the minimap
+        return; // no vertical room in the bottom strip
+    // Floor guard (BL-216). Below this the log child's `-input_h` height goes
+    // negative, ImGui clamps it to a 4px sliver and the input row is pushed out of
+    // the window entirely. Defensive only — the dock is `selection_band_height`
+    // tall, which never resolves this low at a supported display size.
+    if (height < 120.0f)
+        return;
 
     ImGui::SetNextWindowPos({x, y});
     ImGui::SetNextWindowSize({width, height});
@@ -70,24 +77,41 @@ void draw_chat_panel(const world& w, chat_state& chat, int day,
 
     ImGui::Begin("##chat_panel", nullptr, flags);
 
+    // One control row: the COMMS label, the channel selector, the "+" group-create
+    // button (BL-216). The label used to be a TextDisabled line of its own with a
+    // Separator under it — two rows of chrome above a log whose scarce axis is now
+    // VERTICAL, the dock being `selection_band_height` tall rather than the ~700px
+    // right-column band it used to occupy.
     ImGui::TextDisabled("COMMS");
-    ImGui::Separator();
+    ImGui::SameLine();
 
-    // Channel tabs: Public + created groups, then the "+" group-create popup.
-    for (int c = 0; c < static_cast<int>(chat.channels.size()); ++c)
+    // Channel SELECTOR, not a tab chain. The old SameLine chain of SmallButtons had
+    // no overflow handling at all and clipped silently once the channels ran past
+    // the panel width — a real defect the narrower dock exposes. A combo holds an
+    // unbounded channel count in one fixed row. It is a cross-cutting selector
+    // (it switches a target, it does not express an active state), so the standing
+    // toggle rule explicitly exempts it.
+    if (chat.active_channel < 0 || chat.active_channel >= static_cast<int>(chat.channels.size()))
+        chat.active_channel = 0;
+    const float plus_w = ImGui::GetFrameHeight();
+    ImGui::SetNextItemWidth(
+        std::max(60.0f, ImGui::GetContentRegionAvail().x - plus_w - ImGui::GetStyle().ItemSpacing.x));
+    if (ImGui::BeginCombo("##chat_channel", chat.channels[chat.active_channel].name.c_str()))
     {
-        if (c > 0)
-            ImGui::SameLine();
-        const bool active = (c == chat.active_channel);
-        if (active)
-            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
-        if (ImGui::SmallButton(chat.channels[c].name.c_str()))
-            chat.active_channel = c;
-        if (active)
-            ImGui::PopStyleColor();
+        for (int c = 0; c < static_cast<int>(chat.channels.size()); ++c)
+        {
+            const bool active = (c == chat.active_channel);
+            ImGui::PushID(c);
+            if (ImGui::Selectable(chat.channels[c].name.c_str(), active))
+                chat.active_channel = c;
+            if (active)
+                ImGui::SetItemDefaultFocus();
+            ImGui::PopID();
+        }
+        ImGui::EndCombo();
     }
     ImGui::SameLine();
-    if (ImGui::SmallButton("+"))
+    if (ImGui::Button("+", {plus_w, plus_w}))
     {
         // Seed the draft with every corp unticked; sorted ids for a stable order.
         chat.group_name[0] = '\0';
@@ -97,6 +121,10 @@ void draw_chat_panel(const world& w, chat_state& chat, int day,
         std::sort(chat.group_draft.begin(), chat.group_draft.end());
         ImGui::OpenPopup("new_group");
     }
+    // Size-capped (BL-216): the popup is bottom-anchored in the bottom-left corner,
+    // so an uncapped member list grows UPWARDS without bound — one row per corp,
+    // off the top of the screen at any real corp count.
+    ImGui::SetNextWindowSizeConstraints({220.0f, 0.0f}, {320.0f, 260.0f});
     if (ImGui::BeginPopup("new_group"))
     {
         ImGui::TextDisabled("NEW GROUP");
@@ -104,14 +132,18 @@ void draw_chat_panel(const world& w, chat_state& chat, int day,
         ImGui::InputTextWithHint("##group_name", "group name", chat.group_name,
                                  sizeof(chat.group_name));
         ImGui::Separator();
-        for (auto& [id, in] : chat.group_draft)
+        if (ImGui::BeginChild("##grp_members", {0.0f, 160.0f}))
         {
-            if (id == w.player_entity)
-                continue; // the creator is an implicit member
-            ImGui::PushID(static_cast<int>(id));
-            ImGui::Checkbox(corp_name(w, id), &in);
-            ImGui::PopID();
+            for (auto& [id, in] : chat.group_draft)
+            {
+                if (id == w.player_entity)
+                    continue; // the creator is an implicit member
+                ImGui::PushID(static_cast<int>(id));
+                ImGui::Checkbox(corp_name(w, id), &in);
+                ImGui::PopID();
+            }
         }
+        ImGui::EndChild();
         ImGui::Separator();
         const bool any = std::any_of(chat.group_draft.begin(), chat.group_draft.end(),
                                      [](const auto& p) { return p.second; });
@@ -149,13 +181,40 @@ void draw_chat_panel(const world& w, chat_state& chat, int day,
                 ImGui::PopStyleColor();
                 continue;
             }
+            // ONE wrapped paragraph, not the old two-line stanza (day+speaker on
+            // its own TextWrapped line, then an Indent()ed body). Rows are the
+            // scarce axis in the bottom strip and the stanza spent two of them on
+            // every message plus an indent that bought nothing; folding the body
+            // onto the speaker's line recovers roughly 40% of the log's rows.
+            const char* const who   = speaker_name(w, m.from);
+            const ImGuiStyle& style = ImGui::GetStyle();
+            const float       gap   = style.ItemSpacing.x * 0.5f;
+
+            char stamp[24];
+            std::snprintf(stamp, sizeof(stamp), "d%d", m.day);
+
+            // Keep the body on the speaker's line only while the prefix leaves it a
+            // usable run. The dock is ~243px wide across 1280..1920, so a long
+            // nation name plus the day stamp can eat most of the content width —
+            // and TextWrapped with a non-positive wrap width degrades to one
+            // character per line. Past the threshold the body takes the next row
+            // instead, which is still a row cheaper than the old indented stanza.
+            const float inner_w  = ImGui::GetContentRegionAvail().x;
+            const float prefix_w = ImGui::CalcTextSize(stamp).x + gap
+                                 + ImGui::CalcTextSize(who).x
+                                 + ImGui::CalcTextSize(":").x + gap;
+
+            ImGui::PushStyleColor(ImGuiCol_Text, palette::text_secondary);
+            ImGui::TextUnformatted(stamp);
+            ImGui::PopStyleColor();
+            ImGui::SameLine(0.0f, gap);
             ImGui::PushStyleColor(ImGuiCol_Text,
                                   speaker_colour(w, m.from, w.player_entity));
-            ImGui::TextWrapped("d%d  %s:", m.day, speaker_name(w, m.from));
+            ImGui::Text("%s:", who);
             ImGui::PopStyleColor();
-            ImGui::Indent();
+            if (prefix_w < inner_w * 0.65f)
+                ImGui::SameLine(0.0f, gap);
             ImGui::TextWrapped("%s", m.text.c_str());
-            ImGui::Unindent();
         }
         if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 4.0f)
             ImGui::SetScrollHereY(1.0f);
