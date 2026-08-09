@@ -1177,7 +1177,10 @@ void draw_building_selection(world& w, const recipe_registry& reg,
     // ── (5) How many more of this can I build here (Ben's question C). Buildings
     //    stack on a tile up to a ceiling the deposit sets — see
     //    placement_rules::stack_capacity, which the placement gate reads too, so
-    //    this readout and what construction actually permits cannot drift. ──
+    //    this readout and what construction actually permits cannot drift.
+    //    BL-193 adds the half that decides whether stacking is worth it: where in
+    //    the stack THIS site sits, and what that costs it. The player can see the
+    //    count already; what they cannot see is that site 3 earns 64 % of site 1. ──
     {
         const auto tit = w.tiles.find(b.tile);
         if (tit != w.tiles.end())
@@ -1185,6 +1188,7 @@ void draw_building_selection(world& w, const recipe_registry& reg,
             const int cap  = placement_rules::stack_capacity(tit->second, b.type, b.target_resource);
             const int here = placement_rules::buildings_on_tile(w, b.tile, b.type, b.target_resource);
             const int more = (cap > here) ? cap - here : 0;
+            const int rank = placement_rules::stack_rank(w, sel);
 
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "On this tile");
             ImGui::Text("%d of %d", here, cap);
@@ -1193,6 +1197,21 @@ void draw_building_selection(world& w, const recipe_registry& reg,
                 ImGui::TextDisabled("- room for %d more", more);
             else
                 ImGui::TextDisabled("- tile is at capacity");
+
+            // Only extraction stacks — every other type is capacity 1, so there is
+            // no position in a stack to report and the line would be noise.
+            if (b.type == building_type::extraction_site && rank > 0)
+            {
+                const float share = placement_rules::stack_output_scalar(rank) * 100.0f;
+                if (rank == 1)
+                    ImGui::TextDisabled("First site here - full rate. Each later site yields %.0f%% of the one before.",
+                                        placement_rules::k_stack_output_decay * 100.0f);
+                else
+                    ImGui::TextDisabled("Site %d of the stack - %.0f%% of a lone site's rate.",
+                                        rank, share);
+                if (here > 1)
+                    ImGui::TextDisabled("All %d share one deposit, so it runs out sooner.", here);
+            }
 
             ImGui::BeginDisabled(more <= 0);
             if (ImGui::Button("Build another here", {content_w, frame_h * 1.4f}))
@@ -1203,8 +1222,16 @@ void draw_building_selection(world& w, const recipe_registry& reg,
             }
             ImGui::EndDisabled();
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-                ImGui::SetTooltip("The stack ceiling is provisional - the rule for how "
-                                  "richness sets it is not settled yet.");
+            {
+                if (b.type == building_type::extraction_site)
+                    ImGui::SetTooltip("Sites stack on one deposit, but each one after the first\n"
+                                      "yields %.0f%% of the one before it - and they all draw real\n"
+                                      "reserve, so a full stack runs the tile dry sooner than a\n"
+                                      "single site would. The ceiling is set by richness.",
+                                      placement_rules::k_stack_output_decay * 100.0f);
+                else
+                    ImGui::SetTooltip("Only extraction sites stack. One of this per tile.");
+            }
         }
     }
 

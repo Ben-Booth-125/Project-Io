@@ -10,17 +10,77 @@ See **`docs/economy/RESOURCES.md`** for the full resource list, tier definitions
 
 An extraction building placed on a tile reads the tile's deposit for its authored target resource (`building_component.target_resource`) and credits a fractional quantity to its corporation's stockpile pool **at each economy tick**.
 
-Output rate is the product of three factors:
+Output rate is the product of four factors:
 
 | Factor | Source | Effect |
 |--------|--------|--------|
 | Deposit richness | `tile_component.resource_deposit[r]` | Linear multiplier; richer tiles produce proportionally faster. |
 | Workforce fraction | `building_component.workforce_assigned` (0–1) | Linear scalar. Zero workforce produces nothing. |
 | Hazard penalty | `tile_component.hazard_level` (0–1) | Applied as `(1 − hazard)` multiplier. High-hazard tiles cost more to operate and yield less per worker. |
+| Stack rank (BL-193) | This site's place in the tile's stack | Applied as `0.8^(k−1)`. The first site on a deposit is undiminished; each later one yields less (§ Building stacks). |
 
-i.e. `output = base_rate × richness × workforce × (1 − hazard)`, where `base_rate` is a Lua-authored economic constant.
+i.e. `output = base_rate × richness × workforce × (1 − hazard) × 0.8^(k−1)`, where `base_rate` is a Lua-authored economic constant and `k` is the site's 1-based rank in its tile's stack.
 
 Deposits **deplete** (BL-079): `resource_deposit[r]` is the fixed **richness** (the rate multiplier above), while `resource_remaining[r]` is a finite reserve — seeded at generation to richness × a reserve factor — that extraction draws down each tick. As the reserve nears empty the output **tapers**, then the building reports the deposit **exhausted** and stops. Richness sets the rate; the reserve sets how long the tile pays out — the boom-bust arc a resource-dependent corporation rides (see `docs/development/backlog.json` § BL-079).
+
+A tile can carry **several** extraction sites on one deposit. What that costs, and what it
+buys, is § Building stacks below — a fourth factor (stack rank) on the output above, and a
+depletion taper shared across the whole stack rather than computed per site.
+
+### Building stacks (BL-193, settled 2026-07-26; implemented)
+
+A tile is not a single build slot: several extraction sites may work the same deposit. Two rules
+govern the stack, and they are designed to pull against each other.
+
+**1. Diminishing per-site output.** The *k*-th site of a stack — counted in **stored order,
+oldest first** — produces
+
+```
+base_rate × richness × workforce × (1 − hazard) × d^(k−1),    d = 0.8
+```
+
+so the second site adds 0.8 of a lone site, the third 0.64, and so on:
+
+| Sites | 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|
+| That site's rate | 1.0 | 0.8 | 0.64 | 0.512 | 0.4096 |
+| Stack total | 1.0× | **1.8×** | 2.44× | 2.952× | **3.36×** |
+
+Five sites never make 5×. **There are no clamps and no fake caps under this — the curve is the
+economics.**
+
+**2. Honest shared depletion.** Every site draws **real reserve** for exactly what it extracts,
+so a full stack drains the deposit *faster than its output multiple*: five sites take 3.36× the
+goods while removing 3.36× the reserve, on a taper band sized for one. The depletion taper is
+therefore computed against the stack's **combined nominal draw**, not each site's own — every
+member sees the same taper and reports `exhausted` on the **same tick**, instead of the stack
+desynchronising and dribbling out of a spent tile one site at a time.
+
+Together these make stack-vs-spread a genuine trade-off rather than a dominant strategy:
+stacking buys throughput now at the cost of the tile's life; spreading buys life at the cost of
+transport and land.
+
+**Rank is build order.** A site's *k* is its position among the tile's sites of that type and
+target, ascending entity id — creation order. Decommissioned and still-building sites hold
+their rank (they are the same population the placement ceiling counts) but contribute nothing to
+the combined draw. The ordered walk is `placement_rules::stack_members`; reading rank off
+`world::buildings`' own unordered iteration would make the yield non-deterministic.
+
+**Capacity stays `max(1, richness / 50)`** — the 0–250 generation band maps to 1–5 sites
+(`k_richness_per_site`, `placement_rules.hpp`). Retained deliberately: with the decay curve
+carrying the economics, the ceiling is a **legibility** bound — how many markers a tile can host
+and a player can reason about — not the balance lever.
+
+**Non-extraction buildings stay capacity 1.** Whether processors stack on land, workforce or
+road tier is a separate question, **deferred** by BL-193 rather than answered by it.
+
+Implementation: the constants and the rank/curve helpers live in
+`src/world/placement_rules.{hpp,cpp}` (`k_stack_output_decay`, `stack_output_scalar`,
+`stack_members`, `stack_rank`); the combined-nominal taper is a per-tile **stack pre-pass** in
+`run_economy_step` (`src/world/economy_system.cpp`), sized before any site draws so the sites
+that run first do not taper the sites that run after them. The Selection panel's "On this tile"
+block reports the count, the ceiling, this site's rank and its share. Verified by
+`tools/verify/stack_capacity_harness.cpp`.
 
 ### Extraction buildings
 
