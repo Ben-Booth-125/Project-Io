@@ -8,6 +8,7 @@
 #include "icons.hpp"
 #include "presentation.hpp"
 #include "selection.hpp"
+#include "text_fit.hpp"
 #include "view_nav.hpp"
 
 #include "world/budget_system.hpp"    // compute_building_opex / body_mean_habitability (BL-162 estimate)
@@ -715,7 +716,7 @@ void draw_tile_selection(world& w, ui_state& ui)
 
         char hdr[64];
         std::snprintf(hdr, sizeof hdr, "%s  (%d/%d)", mp.label.c_str(), page + 1, n);
-        const float name_w = ImGui::CalcTextSize(hdr).x;
+        const float name_w = ui::fit_width(hdr); // BL-215: measured through the shared module
         ImGui::SameLine(std::max(frame_h + style.ItemSpacing.x, (aw - name_w) * 0.5f));
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", hdr);
 

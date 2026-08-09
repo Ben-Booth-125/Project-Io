@@ -1,5 +1,30 @@
 # Project Io — REFINED (active worklist)
 
+## Render-precision audit (promoted from BL-215) — **COMPLETE**
+
+Requirements: requirements.json § text-wrap-render-audit (R1–R6)
+
+- **[3] A — `src/ui/text_fit.{hpp,cpp}`: the shared fit/wrap module + overflow recorder;
+  delete profile_panel.cpp's private helpers.** Files: `src/ui/text_fit.hpp`,
+  `src/ui/text_fit.cpp`, `src/ui/profile_panel.cpp`. Deps: foundation. Satisfies: R1, R2.
+- **[1] B — display floor: SDL_SetWindowMinimumSize scaled by UI scale; settings floor
+  1280x720; DEVELOPMENT_PRACTICES § Display environment.** Files: `src/core/app.cpp`,
+  `docs/development/DEVELOPMENT_PRACTICES.md`. Deps: independent. Satisfies: R3.
+- **[3] C — charts.cpp measure-first rework (legend_width, measure_chart, legend_place,
+  measured gutters, threshold ladder, two-line titles) + generation_charts wiring.**
+  Files: `src/ui/charts.{hpp,cpp}`, `src/ui/generation_charts.cpp`. Deps: A. Satisfies: R4.
+- **[2] D — remaining sites: tile_inspector question wrap, chat tab-strip line breaks,
+  selection pager fit_width, header figures fit_text, canvas key measures.** Files:
+  `src/ui/tile_inspector.cpp`, `src/ui/chat_panel.cpp`, `src/ui/selection_panel.cpp`,
+  `src/ui/header_panel.cpp`, `src/ui/body_surface_canvas.cpp`. Deps: A. Satisfies: R6.
+- **[2] E — verify bindings (clipping / expect_no_clipping), overflow-frame naming,
+  `scripts/verify/text_overflow_floor.lua`, LAYOUT.md container amendments.** Files:
+  `src/core/app.cpp`, `scripts/verify/text_overflow_floor.lua`, `docs/ui/LAYOUT.md`.
+  Deps: A. Satisfies: R5, R6.
+
+Parallelisation note: A is the foundation; B independent; C/D/E all need A's header.
+Run in one session, sequential A → B → C → D → E (shared files app.cpp and charts).
+
 ## Header chrome tightening (promoted from BL-312, BL-313)
 
 Requirements: requirements.json § header-chrome-tightening (R1–R5)
@@ -320,4 +345,4 @@ later waves. After each wave the integrator wires hooks, **builds, and verifies*
 wave. Verify retroactively — do not assume an agent's self-reported success.
 
 ---
-
+

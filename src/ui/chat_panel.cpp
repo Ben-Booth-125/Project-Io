@@ -1,6 +1,7 @@
 #include "chat_panel.hpp"
 
 #include "presentation.hpp"
+#include "text_fit.hpp"
 
 #include <imgui.h>
 
@@ -74,10 +75,19 @@ void draw_chat_panel(const world& w, chat_state& chat, int day,
     ImGui::Separator();
 
     // Channel tabs: Public + created groups, then the "+" group-create popup.
+    // The strip breaks to a new line when the next tab's measured width would
+    // run past the dock edge — a straight SameLine chain clipped it (BL-215).
+    const float tab_pad = ImGui::GetStyle().FramePadding.x * 2.0f;
     for (int c = 0; c < static_cast<int>(chat.channels.size()); ++c)
     {
         if (c > 0)
-            ImGui::SameLine();
+        {
+            const float w = fit_width(chat.channels[c].name.c_str()) + tab_pad;
+            if (ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x
+                    + ImGui::GetStyle().ItemSpacing.x + w
+                <= ImGui::GetWindowContentRegionMax().x)
+                ImGui::SameLine();
+        }
         const bool active = (c == chat.active_channel);
         if (active)
             ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
@@ -86,7 +96,10 @@ void draw_chat_panel(const world& w, chat_state& chat, int day,
         if (active)
             ImGui::PopStyleColor();
     }
-    ImGui::SameLine();
+    if (ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x
+            + ImGui::GetStyle().ItemSpacing.x + fit_width("+") + tab_pad
+        <= ImGui::GetWindowContentRegionMax().x)
+        ImGui::SameLine();
     if (ImGui::SmallButton("+"))
     {
         // Seed the draft with every corp unticked; sorted ids for a stable order.

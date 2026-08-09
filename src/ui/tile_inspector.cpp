@@ -1,4 +1,5 @@
 #include "tile_inspector.hpp"
+#include "text_fit.hpp"
 
 #include "foldout_column.hpp"    // shell fold-out column host (BL-122/BL-144)
 #include "format.hpp"            // campaign_epoch_year, cross-checked below (BL-220)
@@ -209,7 +210,11 @@ void draw_tile_inspector(const world& w, ui_state& s,
         nav_button("Legacy", 2, round);
 
         const ui::chain_round& cr = ui::chain_round_at(round);
-        ImGui::TextDisabled("%s", cr.question);
+        // Wrapping container (1): the round question clipped mid-word (BL-215).
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
+        ui::wrap_text(ui::text_box::foldout_column, "tile_inspector.round_question",
+                      cr.question, ImGui::GetContentRegionAvail().x);
+        ImGui::PopStyleColor();
         ImGui::Separator();
 
         // Rebuilt per frame from the report: a handful of pointers, no copies of the

@@ -50,6 +50,32 @@ struct bar
     bool        hollow = false; ///< Draw as an outline — used for "before" / reference values.
 };
 
+/// Where a chart's swatch legend sits (BL-215). The narrow-host mode is a CALLER
+/// opt-in, never a width test inside draw_bars — an internal test would move the
+/// goldened tile-selection graphs (host width ~238 px at 1280).
+enum class legend_place : std::uint8_t { beside, below, none };
+
+/// Width the swatch legend needs: 16 (swatch + gap) + the widest "label value" + 8.
+/// Replaces the file-local `constexpr float legend_w = 190.0f`, which was a guess
+/// unreconciled with the `lx` the legend actually draws at (BL-215).
+float legend_width(const bar* bars, std::size_t count, const char* fmt);
+
+/// Everything a chart row's geometry needs, answered from the box width the host
+/// already knows — so the reserve and the draw cannot disagree (BL-215).
+struct chart_metrics
+{
+    float        chart_h     = 0.0f;
+    int          title_lines = 1;                    ///< 1 or 2; beyond 2 the title elides.
+    int          legend_rows = 0;                    ///< 0 when the legend sits beside.
+    legend_place place       = legend_place::beside;
+};
+
+/// Measure a chart row against @p box_w: how many lines the title wraps to, and
+/// whether the legend fits beside the plot or must reflow below it.
+chart_metrics measure_chart(float box_w, const char* title,
+                            const bar* bars, std::size_t count,
+                            const char* fmt, float chart_h);
+
 /// Draw a clustered bar chart inside [@p mn, @p mx].
 ///
 /// Generalises selection_panel.cpp's two-column tile-vs-benchmark graph to N
@@ -62,9 +88,12 @@ struct bar
 ///                the plot, which is what a wide chart wants. The tile-selection
 ///                graphs pass 34.0f explicitly because their width is fixed by
 ///                the mockup they were drawn from.
+/// @param place   Caller opt-in (from measure_chart): below reflows the legend
+///                under the plot and frees the whole width for the columns.
 void draw_bars(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
                const bar* bars, std::size_t count,
-               float ceiling, const char* fmt = "%.1f", float bar_cap = 0.0f);
+               float ceiling, const char* fmt = "%.1f", float bar_cap = 0.0f,
+               legend_place place = legend_place::beside);
 
 /// One horizontal magnitude bar inside [@p mn, @p mx], for a narrow list where a
 /// clustered vertical chart cannot fit (draw_bars reserves gutter + a 190px legend,
@@ -81,12 +110,24 @@ void draw_value_bar(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
 /// A horizontal threshold marker across the plot, with a right-aligned caption.
 /// Used to show a gate on the same axis as the values it judges — the retention
 /// shoreline, the mobile-lid band, the combustion floor.
+///
+/// @param legend_reserve The resolved legend reserve the host's draw_bars used
+///        (legend_width(...) when beside, 0 when below/none), so caption and
+///        column band cannot disagree by construction (BL-215). Degrades:
+///        right-aligned within the band → left-aligned below the line →
+///        elide-with-record at the plot width.
 void threshold_line(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
-                    float value, float ceiling, ImU32 colour, const char* caption);
+                    float value, float ceiling, ImU32 colour, const char* caption,
+                    float legend_reserve);
 
 /// Height of one chart row: a bordered child holding a single-line header plus a
 /// @p chart_h -tall plot. Matches the tile-graph row metric exactly.
+/// Kept VERBATIM — the tile-selection golden depends on it (BL-215).
 float chart_row_height(float chart_h);
+
+/// Measured-row overload: adds the extra title lines and the below-plot legend
+/// rows measure_chart resolved for the host's width (BL-215).
+float chart_row_height(const chart_metrics& m);
 
 // ---------------------------------------------------------------------------
 // Dual-axis time-series chart (BL-197)

@@ -2,6 +2,7 @@
 
 #include "format.hpp"
 #include "presentation.hpp"
+#include "text_fit.hpp"
 
 #include <imgui.h>
 
@@ -187,8 +188,13 @@ void draw_header_panel(const world& w,
     ImGui::TextDisabled("BALANCE");
     ImGui::SameLine();
     {
+        // The figures draw through fit_text (BL-215): the drop ladder above runs
+        // first, so elision is the genuine last resort container 4 permits.
         const ImU32 col = in_debt ? palette::negative : palette::positive;
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(col), "%s", fmt::credits(balance).c_str());
+        ImGui::PushStyleColor(ImGuiCol_Text, col);
+        fit_text(text_box::header_strip, "header.balance", fmt::credits(balance).c_str(),
+                 ImGui::GetContentRegionAvail().x);
+        ImGui::PopStyleColor();
     }
 
     // BL-073: explicit in-debt affordance — a negative balance is now self-
@@ -211,7 +217,8 @@ void draw_header_panel(const world& w,
     ImGui::SameLine();
     ImGui::TextDisabled("   |   STOCKPILE");
     ImGui::SameLine();
-    ImGui::Text("%s", fmt::credits(valuation).c_str());
+    fit_text(text_box::header_strip, "header.stockpile", fmt::credits(valuation).c_str(),
+             ImGui::GetContentRegionAvail().x);
 
     // --- Last-tick net + a sparkline of recent balances ---
     ImGui::SameLine();
@@ -219,7 +226,10 @@ void draw_header_panel(const world& w,
     ImGui::SameLine();
     {
         const ImU32 col = value_colour(fmt::sign_of(net));
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(col), "%s", fmt::rate(net, "qtr").c_str());
+        ImGui::PushStyleColor(ImGuiCol_Text, col);
+        fit_text(text_box::header_strip, "header.net", fmt::rate(net, "qtr").c_str(),
+                 ImGui::GetContentRegionAvail().x);
+        ImGui::PopStyleColor();
     }
     // NET carries the runway when there was no room to draw it (see the fit
     // resolution above), so the fact is never simply lost.

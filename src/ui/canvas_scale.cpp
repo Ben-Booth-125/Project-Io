@@ -57,7 +57,7 @@ void draw_scale_zoom_overlay(const char* id_suffix, ImVec2 origin, ImVec2 size,
     char bar_label[32];
     std::snprintf(bar_label, sizeof(bar_label), "%.2f AU", bar_au);
     const ImVec2 lsz = ImGui::CalcTextSize(bar_label);
-    wdl->AddText({bar_origin.x + (bar_px - lsz.x) * 0.5f, bar_origin.y}, bar_col, bar_label);
+    wdl->AddText({bar_origin.x + (bar_px - lsz.x) * 0.5f, bar_origin.y}, bar_col, bar_label); // fit-exempt: label centred over its own measured bar
 
     // --- Zoom slider: the zoom factor itself, logarithmic so the range feels
     // even across the track. Left end is zoom_min (zoomed out), right end is

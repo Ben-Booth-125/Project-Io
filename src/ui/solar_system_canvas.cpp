@@ -261,7 +261,7 @@ void draw_solar_system_canvas(const world& w, ui_state& state, ImVec2 origin, Im
                     std::snprintf(prog, sizeof prog, "%d/%d", body.survey.regions_done, body.survey.regions_total);
                 else
                     std::snprintf(prog, sizeof prog, "...");
-                dl->AddText({ badge_pos.x + br + 2.0f, badge_pos.y - 6.0f },
+                dl->AddText({ badge_pos.x + br + 2.0f, badge_pos.y - 6.0f }, // fit-exempt: on-canvas marker label, no containing box
                             IM_COL32(120, 215, 255, 230), prog);
             }
         }
@@ -301,7 +301,7 @@ void draw_solar_system_canvas(const world& w, ui_state& state, ImVec2 origin, Im
                 // Dim the label to match the body's activity-fog brightness (BL-150),
                 // so an un-networked body's name recedes with it rather than reading
                 // full-bright over a shadowed dot.
-                dl->AddText(label_pos, palette::dim_rgb(IM_COL32(255, 255, 255, 255), fog_bright),
+                dl->AddText(label_pos, palette::dim_rgb(IM_COL32(255, 255, 255, 255), fog_bright), // fit-exempt: on-canvas marker label, no containing box
                             body.name.c_str());
             }
         }

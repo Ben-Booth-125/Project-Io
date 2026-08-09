@@ -333,26 +333,27 @@ need not rediscover them:
 
 ## Container vocabulary (BL-141)
 
-A closed set of **nine** container kinds recur across the shell and canvases. Each
+A closed set of **ten** container kinds recur across the shell and canvases. Each
 combines a sizing rule with exactly one text policy — **wrap** (`PushTextWrapPos` +
 `TextWrapped`, reflowing to the box) or **guaranteed-fit** (`CalcTextSize` measured first,
 the box sized to the text — the pattern the market-legend key established) — plus an
 overflow rule for when content still exceeds the box. New UI work should land in one of
-these nine rather than inventing a tenth.
+these ten rather than inventing an eleventh.
 
 | # | Container | Sizing | Text policy | Overflow |
 |---|---|---|---|---|
 | 1 | **Fold-out ledger column** (`foldout_begin`, `foldout_column.cpp`) | Fixed-width (`[nav_pane_width, W]`), stretches from below the identity tile to the **comms dock's top edge** (BL-227 — no longer the full column height) | Wrap to inner width | Vertical scroll |
 | 2 | **On-canvas lens legend box** (draw-list, `body_surface_canvas.cpp`) | Fit-to-content — box sized from its own entries | Guaranteed-fit | None — box grows to fit |
 | 3 | **Selection band** (`draw_selection_band`, `selection_card.cpp` framing `draw_selection_content`, `selection_panel.cpp`) | Fixed rect — comms dock's right edge to the right chrome column, `selection_band_height` tall (minimap-derived) | Wrap | Vertical scroll |
-| 4 | **Header / balance strip** (`header_panel.cpp`) | Stretch-to-width, fixed height | Guaranteed-fit — segments measured, never wraps | Elide-with-tooltip, only as a last resort; never silent truncation |
+| 4 | **Header / balance strip** (`header_panel.cpp`) **and the identity tile** (`profile_panel.cpp`) | Stretch-to-width (strip) / fixed card (tile), fixed height | Guaranteed-fit — segments measured, never wraps | Elide-with-tooltip, only as a last resort; never silent truncation |
 | 5 | **Time panel** (`app.cpp`) | Fixed width (shares the minimap's), content-derived height (BL-097) | Guaranteed-fit — authored to fit | None |
 | 6 | **Hover card** (`draw_hover_card`, `hover_card.cpp`) | Fit-to-content, capped at 200 px max width, auto height | Wrap at the max width | Grows vertically |
 | 7 | **Minimap lens bar** | Fixed strip | Icon-only / guaranteed-fit labels | None |
 | 8 | **Nav rail** | Fixed (56 px) | Icon-only; tooltips wrap (`nav_pane.cpp`, BL-174 — `PushTextWrapPos`, implementing this row's stated policy) | None (tooltip wrap absorbs it) |
 | 9 | **ImGui table** (ledgers) | Stretch columns with per-column min widths | Per-cell guaranteed-fit (clip + tooltip) for numeric/identity columns, wrap for description columns | Horizontal scroll on the table; never silent truncation of a load-bearing value |
+| 10 | **Hand-drawn chart plot** (draw-list, `charts.cpp`) | Host-supplied screen-space box, measured before it is reserved | Guaranteed-fit, **reflowing** — labels measured, the plot's own geometry yields to them | Legend reflows below the plot, then elide-with-record; never silent truncation of a plotted value |
 
-The **comms dock** (BL-227) is not a tenth kind: it is a fixed-rect docked panel obeying
+The **comms dock** (BL-227) is not an eleventh kind: it is a fixed-rect docked panel obeying
 container 1's policy (wrap, vertical scroll) in the bottom strip.
 
 This table is the baseline the open **BL-215 (text-wrap render audit)** consumes — an
@@ -373,6 +374,9 @@ A few cross-cutting notes:
 - These are prototype-tuned concrete behaviours (BL-122's `foldout_column`, the market
   legend's measure-then-size pattern), not a general layout engine — see
   `docs/tech/TECH_FOUNDATIONS.md` for why a retained-mode framework is out of scope.
+- Amending this set is a deliberate act, recorded here. Inventing a tenth ad hoc is what
+  BL-215 was filed to clean up. Every text draw names its container through `ui::text_fit`;
+  a draw that names none is caught by the coverage grep in `verifier-visual`.
 
 ---
 

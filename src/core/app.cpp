@@ -35,6 +35,7 @@
 #include "ui/solar_system_canvas.hpp"
 #include "ui/star_map_view.hpp"
 #include "ui/tech_tree_panel.hpp"
+#include "ui/text_fit.hpp" // overflow ledger + verify.clipping bindings (BL-215)
 #include "ui/tile_inspector.hpp"
 #include "ui/view_nav.hpp"
 #include "world/budget_system.hpp"
@@ -239,6 +240,13 @@ app::app()
 
     m_window   = SDL_CreateWindow("Project Io", window_w, window_h, SDL_WINDOW_RESIZABLE);
 
+    // BL-215 display contract: the smallest supported display is 1280x720 at UI
+    // scale 1.0x (DEVELOPMENT_PRACTICES.md § Display environment). Below it the
+    // shell fails soft (zero-width Selection band, header early-out), so the OS
+    // is told not to go there. apply_ui_scale re-applies this scaled by the
+    // active UI-scale step.
+    SDL_SetWindowMinimumSize(m_window, 1280, 720);
+
     // Dev-machine preference (2026-07-06): Ben runs a two-monitor setup and wants
     // the game on the secondary display, keeping the primary free. Pick the first
     // enumerated display that is NOT the primary (SDL_WINDOWPOS_CENTERED_DISPLAY
@@ -294,6 +302,12 @@ app::app()
     // fractional positions moving bodies produce. The renderer backend uploads
     // the atlas on the first NewFrame.
     ui::load_ui_font();
+
+#ifndef NDEBUG
+    // BL-215: the text-overflow ledger records in Debug builds (and always under
+    // --verify, armed in run_verify); off in Release interactive.
+    ui::set_overflow_recording(true);
+#endif
 }
 
 namespace {
@@ -305,6 +319,14 @@ void app::apply_ui_scale()
     const int step = std::clamp(m_settings.ui_scale_step, 0, static_cast<int>(k_ui_scale_px.size()) - 1);
     ui::reload_ui_font(k_ui_scale_px[static_cast<std::size_t>(step)]);
     ImGui_ImplSDLRenderer3_DestroyFontsTexture();
+
+    // The display floor scales with the font (BL-215): BL-063 grows the atlas
+    // without ScaleAllSizes, so the hard-coded px chrome stays at 1.0x while
+    // text grows — at 1.5x the same layout honestly needs 1920x1080.
+    const float s = k_ui_scale_px[static_cast<std::size_t>(step)] / k_ui_scale_px[0];
+    SDL_SetWindowMinimumSize(m_window,
+                             static_cast<int>(1280.0f * s),
+                             static_cast<int>(720.0f * s));
 }
 
 app::~app()
@@ -903,6 +925,11 @@ int app::run_verify(const std::string& script_path, bool bless)
     // screen. A menu-verification script re-enters the menu with verify.show_menu.
     m_screen = app_screen::in_game;
 
+    // BL-215: the text-overflow ledger records unconditionally under --verify,
+    // whatever the build configuration.
+    ui::set_overflow_recording(true);
+    ui::clear_overflows();
+
     // Force the fixed verify capture size (verify_w × verify_h), decoupled from the
     // interactive window default (window_w × window_h) which is now larger. This
     // keeps captures + committed goldens at the 1280×720 standard regardless of the
@@ -1247,6 +1274,34 @@ int app::run_verify(const std::string& script_path, bool bless)
         if (!ok) ++m_verify_failures;
         SDL_Log("verify.expect %s: %s", ok ? "PASS" : "FAIL",
                 msg ? msg->c_str() : "");
+    });
+
+    // BL-215 text-overflow ledger. clipping() reads the running FAIL count
+    // (clipped + unfittable); expect_no_clipping(label) logs every FAIL record,
+    // adds them to m_verify_failures, and writes screenshots/text_overflow.txt.
+    // Sanctioned elide-with-tooltip records stay WARN-only.
+    v.set_function("clipping", [this]() -> int {
+        return static_cast<int>(ui::overflow_failures());
+    });
+    v.set_function("expect_no_clipping", [this](sol::optional<std::string> label) -> int {
+        const std::size_t fails = ui::overflow_failures();
+        for (const ui::text_overflow& r : ui::overflows())
+        {
+            if (r.sev == ui::overflow_severity::elided)
+                continue;
+            SDL_Log("verify.expect_no_clipping FAIL [%s] %s: \"%s\" "
+                    "(needed %.0fpx, available %.0fpx, frame %s)",
+                    label ? label->c_str() : "", r.site, r.text.c_str(),
+                    static_cast<double>(r.needed), static_cast<double>(r.available),
+                    r.frame.empty() ? "-" : r.frame.c_str());
+            ++m_verify_failures;
+        }
+        std::error_code ec;
+        std::filesystem::create_directories("screenshots", ec);
+        ui::write_overflow_report("screenshots/text_overflow.txt");
+        SDL_Log("verify.expect_no_clipping %s: %zu failure(s), %zu record(s) total",
+                fails == 0 ? "PASS" : "FAIL", fails, ui::overflows().size());
+        return static_cast<int>(fails);
     });
 
     // === BL-113 interactive-flow acceptance primitives ======================
@@ -1926,6 +1981,7 @@ void app::capture_frame(const std::string& name)
 {
     m_capture_name      = name;
     m_capture_requested = true;
+    ui::set_overflow_frame(name); // BL-215: overflow records name the capture they happened in
     render(); // composits the frame, then save_screenshot() runs before present
 }
 
@@ -2354,11 +2410,11 @@ void app::draw_generation_screen()
 
             // The atlas carries a single size, so the title is scaled through the
             // draw list rather than by swapping fonts (there is no second font).
-            dl->AddText(ImGui::GetFont(), big, p, col_bright, wr.name);
+            dl->AddText(ImGui::GetFont(), big, p, col_bright, wr.name); // fit-exempt: chrome strip authored to fit at the 1280x720 floor
 
             std::snprintf(buf, sizeof buf, "Round %d of %d", m_wiz_round + 1, wizard_round_count);
             const ImVec2 ts = ImGui::CalcTextSize(buf);
-            dl->AddText({p.x + avail - ts.x, p.y + (big - ts.y) * 0.5f}, col_dim, buf);
+            dl->AddText({p.x + avail - ts.x, p.y + (big - ts.y) * 0.5f}, col_dim, buf); // fit-exempt: chrome strip authored to fit at the 1280x720 floor
 
             ImGui::Dummy({avail, big + 2.0f});
         }
@@ -2681,7 +2737,7 @@ void app::render()
 
         // Title bar.
         bdl->AddRectFilled(mm_origin, {mm_origin.x + mm_w, mm_origin.y + title_h}, IM_COL32(28, 30, 40, 255));
-        bdl->AddText({mm_origin.x + 5.0f, mm_origin.y + 3.0f}, IM_COL32(220, 225, 235, 255), mm_title);
+        bdl->AddText({mm_origin.x + 5.0f, mm_origin.y + 3.0f}, IM_COL32(220, 225, 235, 255), mm_title); // fit-exempt: chrome strip authored to fit at the 1280x720 floor
 
         // Lens mode bar along the bottom of the minimap box (BL-093). The bar fill
         // is chrome (drawn here); the interactive seven-glyph row is an ImGui window
@@ -3370,9 +3426,11 @@ void app::load_settings()
         catch (const std::exception&) { /* skip malformed value */ }
     }
 
-    // Clamp to a sane floor so a corrupt file can't produce an unusable window.
-    m_settings.window_w = std::max(640, m_settings.window_w);
-    m_settings.window_h = std::max(480, m_settings.window_h);
+    // Clamp to the supported display floor (BL-215: 1280x720 @ 1.0x is the
+    // smallest supported display) so a corrupt or stale file can't open the
+    // shell below the size it is authored against.
+    m_settings.window_w = std::max(1280, m_settings.window_w);
+    m_settings.window_h = std::max(720, m_settings.window_h);
     m_settings.ui_scale_step = std::clamp(m_settings.ui_scale_step, 0, 2);
 }
 

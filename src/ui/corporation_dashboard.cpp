@@ -67,7 +67,7 @@ bool rollup_row(int index, const rollup_item& it, float ceiling, ImU32 colour, c
     // Label left, bar right: the name is the identity and must not be squeezed by
     // the bar, so the bar takes a fixed right-hand share (the BL-081 pattern).
     const float bar_w = std::min(220.0f, (mx.x - mn.x) * 0.45f);
-    dl->AddText({mn.x + 4.0f, mn.y + (h - ImGui::GetTextLineHeight()) * 0.5f},
+    dl->AddText({mn.x + 4.0f, mn.y + (h - ImGui::GetTextLineHeight()) * 0.5f}, // fit-exempt: row label in a measured value-bar row
                 it.flagged ? palette::negative : palette::text_secondary, it.label.c_str());
     charts::draw_value_bar(dl, {mx.x - bar_w, mn.y + 3.0f}, {mx.x, mx.y - 3.0f},
                            it.value, ceiling, colour, fmt);

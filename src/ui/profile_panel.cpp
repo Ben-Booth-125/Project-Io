@@ -2,45 +2,13 @@
 #include "foldout_column.hpp"
 #include "icons.hpp"
 #include "presentation.hpp"
+#include "text_fit.hpp"
 
 #include <imgui.h>
 
 #include <string>
 
 namespace ui {
-
-namespace {
-
-/// Truncate @p text with a trailing ellipsis so it fits within @p max_w pixels at
-/// the current font (BL-091: the fixed-width identity card clipped long corp / nation
-/// names). Returns the text unchanged when it already fits. ASCII-oriented (the
-/// prototype's generated names), so it trims by byte — adequate for the name banks.
-std::string fit_ellipsis(const char* text, float max_w)
-{
-    if (max_w <= 0.0f || ImGui::CalcTextSize(text).x <= max_w)
-        return text;
-    const float dots = ImGui::CalcTextSize("...").x;
-    std::string s = text;
-    while (!s.empty() && ImGui::CalcTextSize(s.c_str()).x + dots > max_w)
-        s.pop_back();
-    return s + "...";
-}
-
-/// Draw @p text ellipsized to @p max_w (BL-091). When the line was truncated the
-/// full string is exposed as a hover tooltip, so long generated names stay
-/// readable without disturbing the fixed card geometry the header/nav key off.
-void text_ellipsized(const char* text, float max_w, bool disabled)
-{
-    const std::string fitted = fit_ellipsis(text, max_w);
-    if (disabled)
-        ImGui::TextDisabled("%s", fitted.c_str());
-    else
-        ImGui::TextUnformatted(fitted.c_str());
-    if (fitted != text)
-        ImGui::SetItemTooltip("%s", text);
-}
-
-} // namespace
 
 void draw_profile_panel(const world& w)
 {
@@ -101,8 +69,9 @@ void draw_profile_panel(const world& w)
     // generated names never spill past the fixed card edge; a truncated line
     // carries the full text as a hover tooltip (BL-091).
     const float avail = ImGui::GetContentRegionAvail().x;
-    text_ellipsized(corp_name, avail, false);
-    text_ellipsized((std::string("Parent: ") + parent_name).c_str(), avail, true);
+    fit_text(text_box::header_strip, "profile.corp_name", corp_name, avail);
+    fit_text(text_box::header_strip, "profile.parent",
+             (std::string("Parent: ") + parent_name).c_str(), avail, true);
     // BL-145: focus readout hidden blanket (industrial_focus stays a data-model
     // field for world-gen/economy, just not surfaced in UI).
     ImGui::EndGroup();
