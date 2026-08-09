@@ -46,6 +46,29 @@ recipes = {
         inputs  = { water = 1.5, steel = 0.5 },
         outputs = { agricultural_produce = 1.0 },
     },
+
+    -- id 4 — Chemical Plant, ATMOSPHERE route (BL-308, Era 0). PRODUCTION.md
+    -- § Chemical Plant: on a body with an atmosphere the plant separates its own
+    -- liquid oxygen cryogenically from the local air, so the oxidiser costs no
+    -- stockpiled input (energy only, abstracted into the rate). Refined fuel is
+    -- therefore the whole authored input. Liquid oxygen is folded into the
+    -- recipe rather than given a resource_type — nothing else would ever hold it.
+    {
+        name    = "propellant_atmospheric",
+        inputs  = { refined_fuel = 2.0 },
+        outputs = { propellant = 1.0 },
+    },
+
+    -- id 5 — Chemical Plant, AIRLESS route (BL-308, Era 1). No atmosphere to
+    -- separate, so the oxidiser comes from water electrolysis; the fuel half is
+    -- shipped in or synthesised locally. This is the in-situ propellant loop
+    -- PRODUCTION.md names as the defining Era 1 logistical problem: it costs
+    -- water the body has, plus refined fuel it usually does not.
+    {
+        name    = "propellant_electrolysis",
+        inputs  = { water = 3.0, refined_fuel = 1.0 },
+        outputs = { propellant = 1.0 },
+    },
 }
 
 print(string.format("[Lua] recipes.lua loaded  recipe_count=%d", #recipes))

@@ -69,7 +69,25 @@ enum class resource_type : uint8_t
     iron_blooms           = 28, ///< Bloomery-refined iron intermediate — distinct from raw iron/iron-nickel ore.
     bullion               = 29, ///< Minted precious-metal specie; local purchase medium (BL-290, not yet implemented).
     trade_goods_misc      = 30, ///< Placeholder endemic-luxury-class good; a specific luxury name is a later design step.
-    count                 = 31
+    // --- Tier 2: propellant (BL-308, 2026-08-09) ---
+    //
+    // The good a Launchpad burns to put a convoy into space. Two authored
+    // routes (scripts/recipes.lua, PRODUCTION.md § Chemical Plant): the Era 0
+    // atmosphere route (refined fuel + oxygen separated from the local
+    // atmosphere, so no stockpiled oxidiser input) and the Era 1 airless route
+    // (water electrolysis supplying the oxidiser). Liquid oxygen is folded into
+    // both recipes rather than given its own enum value — nothing outside the
+    // Chemical Plant would ever hold it.
+    //
+    // SAVE-FORMAT NOTE (BL-308 / BL-107): resource_type is a serialised width
+    // and every per-resource array is sized off `count`, so APPENDING a value
+    // renumbers nothing but DOES change every array's length. There is no
+    // serialisation layer today and BL-107 (save magic + version header) has
+    // not landed, so this append is free right now. It stops being free the
+    // moment saves exist: from then on, a new resource_type value is a
+    // save-format break and needs a version bump + migration.
+    propellant            = 31, ///< Launch propellant; consumed per space-mode convoy dispatch.
+    count                 = 32
 };
 
 static constexpr std::size_t resource_count = static_cast<std::size_t>(resource_type::count);

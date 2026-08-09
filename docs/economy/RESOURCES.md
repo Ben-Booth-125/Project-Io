@@ -267,8 +267,12 @@ The full resource list above is the design target. For the prototype (Layers 3�
 | Refined fuel | 2 | — | from Petroleum |
 | Food rations | 2 | — | from Agricultural produce |
 
-The `resource_type` enum (`src/world/components.hpp`) holds **31 values** as of BL-286
-(2026-08-04; was 23 pre-BL-286) — not the full design list above. Adding a resource changes
+The `resource_type` enum (`src/world/components.hpp`) holds **32 values** as of BL-308
+(2026-08-09; 31 after BL-286, 23 before it) — not the full design list above. The thirty-second is
+**propellant**, the good a Launchpad burns per space-mode launch: made in a Chemical Plant by
+either the Era 0 atmosphere route or the Era 1 water-electrolysis route, and deliberately **not**
+priced in `kepler_base_price` (it is produced and burned inside a corp's own pool, not traded).
+See `docs/economy/PRODUCTION.md` § Chemical Plant / § Launchpad. Adding a resource changes
 `resource_count` and with it the width of every serialised `std::array<float, resource_count>` —
 tile deposits and reserves, market supply/demand/price/base-price, stockpiles, nation abundance
 and substrate capacity. **Extending the enum IS a save-format retrofit**, but every one of those
@@ -279,14 +283,14 @@ above still have no enum value; they cannot be held, priced, or traded until a f
 adds them.
 
 The full design list including ambient and habitability goods is approximately **35–40 entries**
-— a design target. The shipped count is 31 (23 pre-BL-286 + 8 logistics goods), frozen for the
-prototype pending further items.
+— a design target. The shipped count is 32 (23 pre-BL-286 + 8 logistics goods + propellant),
+frozen for the prototype pending further items.
 
 ---
 
 ## What actually trades (recorded 2026-07-31; updated 2026-08-04 for BL-286)
 
-The load-bearing fact for any market work: of the 31 enum values, only a fraction carry a
+The load-bearing fact for any market work: of the 32 enum values, only a fraction carry a
 non-zero `base_price`, and `resolve_price` / the clearing pass ignore everything else
 (`docs/economy/MARKETS.md`). The tradeable set is:
 

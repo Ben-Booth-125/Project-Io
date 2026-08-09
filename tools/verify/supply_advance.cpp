@@ -166,6 +166,18 @@ static void test_dispatch_and_gate()
     }
     w.corporations[corp_id].assets.push_back(asset_id);
 
+    // --- BL-308 gate: a pad with NO propellant is as shut as no pad at all ---
+    dispatch_convoys(w, reg,
+                     reg.logistics_cost(convoy_mode::land),
+                     reg.logistics_cost(convoy_mode::space));
+    check(w.convoys.empty(), "R6: no convoy from an UNFUELLED launchpad (BL-308)");
+    check(near(w.corporations.at(corp_id).balance, 500.0f),
+          "R6: balance unchanged without propellant",
+          w.corporations.at(corp_id).balance, 500.0f);
+
+    // Fuel the pad. 3 units of propellant on the source body; a launch burns 1.
+    w.pool_for(corp_id, src_body).quantities[ri(resource_type::propellant)] = 3.0f;
+
     // Also add a source market (needed by credit_arrived_convoys).
     entity_id src_mkt = w.create_entity();
     {
@@ -199,6 +211,12 @@ static void test_dispatch_and_gate()
         const float src_qty = w.pool_for(corp_id, src_body).quantities[ri(resource_type::iron_ore)];
         check(near(src_qty, 100.0f - 50.0f), "R5: source pool debited",
               src_qty, 100.0f - 50.0f);
+
+        // BL-308: the launch burned exactly one unit of propellant — per LAUNCH,
+        // not per unit of cargo and not per AU.
+        const float prop_left = w.pool_for(corp_id, src_body).quantities[ri(resource_type::propellant)];
+        check(near(prop_left, 3.0f - 1.0f), "R6: one launch burns one propellant (BL-308)",
+              prop_left, 2.0f);
     }
 }
 

@@ -1492,6 +1492,7 @@ planetology_state run_planetology(const body_inputs& in,
         at(resource_type::steel)        = 0.0f;
         at(resource_type::refined_fuel) = 0.0f;
         at(resource_type::food_rations) = 0.0f;
+        at(resource_type::propellant)   = 0.0f; // BL-308: made in a Chemical Plant, never mined.
     }
 
     // =======================================================================

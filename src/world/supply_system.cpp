@@ -77,21 +77,37 @@ void credit_arrived_convoys(world& w, int tick)
                 // already visible via world.hpp (this file already includes it
                 // via supply_system.hpp), so no new translation-unit dependency
                 // for the existing tools/verify/README.md hand-written recipes
-                // that link supply_system.cpp. The struct carries one body tag;
-                // dest_body is used (the pool credited this tick), and both
-                // endpoints are named in the narration so neither is lost.
+                // that link supply_system.cpp.
+                //
+                // BL-282 (Ben, NR-030, 2026-08-03): a new route is a TWO-body
+                // event but world_history_entry carries one body tag, so tagging
+                // only the destination made a body-scoped "what happened at X"
+                // filter miss the route from its source side. Push TWO entries
+                // instead — same narration, one tagged per endpoint. This keeps
+                // the struct's one-body invariant and every existing reader
+                // correct, where widening it with a `body_b` would change a
+                // struct four other call sites depend on and leave every other
+                // topic carrying a field it never sets.
+                //
+                // Order is fixed src-then-dest, not iteration-dependent, so the
+                // log stays byte-identical across replays.
                 const auto src_it  = w.bodies.find(src_body);
                 const auto dest_it = w.bodies.find(dest_body);
-                world_history_entry e;
-                e.timestamp = tick;
-                e.topic     = history_topic::trade_route;
-                e.body      = dest_body;
-                e.corp      = convoy.corp;
-                e.event     = std::string("New trade route established: ") +
-                              (src_it != w.bodies.end() ? src_it->second.name : "?") +
-                              " <-> " +
-                              (dest_it != w.bodies.end() ? dest_it->second.name : "?");
-                w.history_log.push_back(std::move(e));
+                const std::string narration =
+                    std::string("New trade route established: ") +
+                    (src_it != w.bodies.end() ? src_it->second.name : "?") +
+                    " <-> " +
+                    (dest_it != w.bodies.end() ? dest_it->second.name : "?");
+                for (const entity_id tagged : { src_body, dest_body })
+                {
+                    world_history_entry e;
+                    e.timestamp = tick;
+                    e.topic     = history_topic::trade_route;
+                    e.body      = tagged;
+                    e.corp      = convoy.corp;
+                    e.event     = narration;
+                    w.history_log.push_back(std::move(e));
+                }
             }
             else
             {
@@ -157,6 +173,29 @@ bool corp_has_launchpad_on(const world& w, const corporation_component& corp, en
             return true;
     }
     return false;
+}
+
+/// Propellant burned by one space-mode convoy launch (BL-308). PRODUCTION.md
+/// § Launchpad specifies the cost *per launch*, not per tonne or per AU — the
+/// pad is the thing being fuelled, so a launch costs the same whatever it
+/// carries. One authored round unit, in the same magnitude family as the recipe
+/// batches (scripts/recipes.lua): two batches of the atmosphere route, or three
+/// of the airless one, buys a launch.
+constexpr float propellant_per_launch = 1.0f;
+
+/// Propellant the corp can actually burn launching `cargo` units of `ri` off
+/// `body` — its on-body stockpile, minus the cargo itself when the cargo IS
+/// propellant (a launch cannot burn the propellant it is exporting).
+float launch_propellant_available(const world& w, entity_id corp, entity_id body,
+                                  std::size_t ri, float cargo_qty)
+{
+    const auto pit = w.corp_body_pools.find({corp, body});
+    if (pit == w.corp_body_pools.end())
+        return 0.0f;
+    float avail = pit->second.quantities[static_cast<std::size_t>(resource_type::propellant)];
+    if (ri == static_cast<std::size_t>(resource_type::propellant))
+        avail -= cargo_qty;
+    return avail;
 }
 
 /// Tile of the corp's lowest-id building on `body` — its production anchor, used as the
@@ -314,8 +353,15 @@ void dispatch_convoys(world& w, const recipe_registry& reg,
                     }
                     else
                     {
-                        // Inter-body: straight-line space lane, launchpad-gated (unchanged).
+                        // Inter-body: straight-line space lane, launchpad-gated.
                         if (!corp_has_launchpad_on(w, corp, src_body))
+                            continue;
+                        // BL-308: the pad also has to be FUELLED. A launch burns
+                        // propellant_per_launch from the corp's stockpile on the
+                        // source body; without it the lane is shut exactly as if
+                        // no pad existed. Deterministic — a pure read of the pool.
+                        if (launch_propellant_available(w, corp_id, src_body, ri, qty)
+                            < propellant_per_launch)
                             continue;
                         mode      = convoy_mode::space;
                         dist      = body_distance_au(w, src_body, dest_body);
@@ -341,6 +387,14 @@ void dispatch_convoys(world& w, const recipe_registry& reg,
                 // Debit cost and source pool; create the convoy.
                 corp.balance -= best_cost;
                 w.pool_for(corp_id, best_src_body).quantities[ri] -= best_qty;
+
+                // BL-308: burn the launch's propellant. Charged once per launch
+                // (not per unit, not per AU) and only on the space lane; the
+                // availability gate above already ran against this same pool, so
+                // this cannot drive it negative.
+                if (best_mode == convoy_mode::space)
+                    w.pool_for(corp_id, best_src_body).quantities[
+                        static_cast<std::size_t>(resource_type::propellant)] -= propellant_per_launch;
 
                 // Speed: 1 / distance in AU gives roughly 1 tick per AU. Clamp to > 0.
                 const float dist = body_distance_au(w, best_src_body, dest_body);

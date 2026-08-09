@@ -110,6 +110,8 @@ Coal is consumed as a process fuel and reagent but does not appear as a separate
 | Atmospheric air (no stockpiled input) | Liquid oxygen | 0 |
 | Water | Liquid oxygen | 1 |
 
+> **Implemented (BL-308).** The two propellant routes are `scripts/recipes.lua` id 4 (`propellant_atmospheric` — 2.0 refined fuel → 1.0 propellant; the oxidiser is separated from the local air, so it costs no stockpiled input) and id 5 (`propellant_electrolysis` — 3.0 water + 1.0 refined fuel → 1.0 propellant). The liquid-oxygen rows above stay *design* prose: LOX has no `resource_type` and is folded into each recipe.
+
 On a body with an atmosphere, liquid oxygen is produced in Era 0 by cryogenic air separation — the Chemical Plant draws oxygen from the local atmosphere and consumes no stockpiled input (energy cost only, abstracted into the recipe rate). Propellant is therefore an Era 0 capability anywhere refined fuel is available. On airless bodies there is no atmosphere to separate, so the Era 1 water-electrolysis recipe is the only liquid-oxygen route off-world; closing the in-situ propellant loop there (water → liquid oxygen, refined fuel shipped or synthesised) is the defining Era 1 logistical problem.
 
 #### Electronics Lab
@@ -199,7 +201,13 @@ Infrastructure buildings affect logistical or economic capacity rather than extr
 
 > **Implemented (BL-149, v0.1.1).** The **Inland Logistics Hub** is live as `building_type::inland_logistics_hub`: a placeable non-producing building whose tile joins the population-centre set that discounts intra-body haul cost (`dispatch_convoys`). Placement, cost (`economy.buildings.inland_logistics_hub`), the build-front-door affordance, and the hexagon marker glyph all landed; the discount reuses the BL-148 node scan.
 
-The Launchpad is the physical gate to space: a corp must hold one on the source body before any inter-body convoy can depart (`corp_has_launchpad_on`, `src/world/supply_system.cpp`) — and today that presence check is the *whole* gate; per-launch propellant consumption is design intent with no code backing (propellant has no `resource_type` value). See **`docs/economy/ERAS.md`** for the designed Era 0→1 transition conditions and their implementation status.
+The Launchpad is the physical gate to space: a corp must hold one on the source body before any inter-body convoy can depart (`corp_has_launchpad_on`, `src/world/supply_system.cpp`). See **`docs/economy/ERAS.md`** for the designed Era 0→1 transition conditions and their implementation status.
+
+> **Implemented (BL-308, v0.1.1).** Propellant is a real resource — `resource_type::propellant` — and the pad must be **fuelled** as well as present. `dispatch_convoys` gates the space lane on the corp's propellant stockpile on the *source* body and burns **1.0 unit per launch** (`propellant_per_launch`, `src/world/supply_system.cpp`): per launch, not per unit of cargo and not per AU — the pad is the thing being fuelled. An unfuelled pad is exactly as shut as no pad at all. A convoy exporting propellant itself cannot burn the cargo it carries; the gate subtracts the cargo first.
+>
+> Both Chemical Plant routes below are authored in `scripts/recipes.lua` (ids 4 and 5). Liquid oxygen is folded into each recipe rather than given its own `resource_type` — nothing outside the Chemical Plant would ever hold it. Propellant is deliberately **left out of the Kepler starting market's base-price table**, so it is made and burned within a corp's own pool rather than traded; pricing it is a separate balance call.
+>
+> *Save-format note.* Appending a `resource_type` value renumbers nothing but changes the length of every per-resource array. There is no serialisation layer today and **BL-107** (save magic + version header) has not landed, so this append was free. It stops being free the moment saves exist: from then on a new resource value is a save-format break needing a version bump and a migration.
 
 ---
 
