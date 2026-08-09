@@ -235,26 +235,40 @@ regardless of ideology.
 
 ### Pass 5 — Naming
 
-Each nation receives a generated name from a seeded template bank, combining a structural form
-(adjective + noun, compound noun, etc.) with a phoneme table. No human-authored list of specific
-names is required.
+**There is no name bank** (BL-290, landed 2026-08-09). A nation is named in the **tongue of the
+culture that settled the province its seed grew from** — the same phoneme inventory the creeds pass
+(BL-235) coined that culture's own name and its gods from. Naming *consumes* the phonology the
+generation chain already produces; it does not roll a second one.
 
-> **⚠ "culture-flavoured" overstates it, and the bank breaks the naming rule — filed 2026-08-04 as
-> BL-290 (naming banks read Earth-European).** Two problems, both at
-> `nation_generation.cpp:577-608`:
->
-> - **The bank is global, not per-culture.** It does not read the per-culture phonology
->   `creeds.cpp:64-82` already rolls, so a nation's gods and its own name come from unrelated sound
->   systems. Seeded, yes; culture-derived, no.
-> - **Its tables read Latin/European** — codas `"ia" "us" "is" "or"`, nouns `"Republic"
->   "Commonwealth" "Principality" "Protectorate"`, adjectives `"Free" "United" "Sacred"`. That is
->   trap #1 in `GENERATION_STRATEGY.md` § Real history in, invented names out: "culture-flavoured"
->   must not mean "Earth-culture-flavoured".
->
-> The fix is not a less Roman-sounding syllable list — that only moves the accent. Naming should
-> *consume* the phonology the chain already produces, so a culture's names, gods and places share
-> one sound system as a consequence rather than a coincidence. `city_names.cpp` has the same
-> problem in milder form (`"ton" "ford" "haven" "burg"`).
+The plumbing:
+
+- `world/tongue.{hpp,cpp}` owns the `tongue` (onset / vowel / coda inventory), the word builder,
+  and `coin_lexicon`. `creeds.cpp` rolls the tongue through the same code it always did — the roll
+  is unchanged — and now **retains** it on `culture::speech`.
+- `hard_coded_world.cpp` carries each province's tongue across into `nation_params::seed_tongues`,
+  parallel to the `seed_tiles` anchors the settlement pass supplies.
+- Pass 5 gives each surviving nation the speech of the **lowest-indexed seed still inside it** (a
+  seed absorbed by the Pass 2c merge contributes nothing — the surviving core names the realm), then
+  builds the name with one of three structural forms: bare name, epithet + name, name + realm word.
+
+**The structural words are native too.** "Republic", "Commonwealth", "Free", "United" are gone:
+`coin_lexicon` coins each tongue its *own* morphemes for *realm*, *town* and *standing epithet*,
+from that tongue's own sounds. The lexicon is a **pure function of the tongue** (its stream is
+seeded by hashing the inventory, not by a caller's RNG), so one culture coins the same words
+wherever it is consumed — nation names in one pass, city names in another — without those passes
+having to share a stream. Two nations of one culture therefore read as kin in both the sounds and
+the scaffolding, and no generated name carries an English or Latin morpheme.
+
+A body with no culture layer (no settlement pass, or a caller supplying bare seed tiles) falls back
+to **one** tongue rolled in Pass 5 for the whole body, not a per-nation re-roll: an unwritten history
+is still a shared one.
+
+**City names** follow the same rule. `generate_city_name` takes a tongue and suffixes the culture's
+own coined settlement morpheme — the `-ton` / `-ford` / `-haven` / `-burg` bank is removed. Because
+population centres are placed *before* the creeds exist, they are first named from a tongue rolled
+for the body, then re-named per-province by `name_population_centres` (`world/city_names.cpp`) once
+the settlement record exists, using the **nearest province's** culture — the same "whose gods" rule
+the settlement pass uses.
 
 ### Pass 6 — Substrate density (BL-050 saturated substrate)
 
@@ -284,7 +298,8 @@ runs on Kepler *before* the ladder and the nation pass. It places 20–40 centre
 1000, clamped) on valid tiles (`placement_rules::can_place_population_centre`), one at a time
 with a 3× weighting for tiles adjacent to an existing centre, so agglomeration is progressive.
 Each centre draws a **scale** 1–5 from a weighted distribution (40/30/20/8/2%) mapping to
-10k–5M population, and is named from an independent seeded stream (`generate_city_name`) so
+10k–5M population, and is named from an independent seeded stream (`generate_city_name`, in a
+tongue rolled for the body, replaced later by `name_population_centres` — see Pass 5) so
 naming never perturbs placement.
 
 **Market carving** — after nations exist, `hard_coded_world.cpp` seeds Kepler's markets from

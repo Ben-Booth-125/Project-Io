@@ -1,5 +1,7 @@
 #include "nation_generation.hpp"
 
+#include "tongue.hpp"
+
 #include <algorithm>
 #include <array>
 #include <cstdint>
@@ -569,97 +571,41 @@ void assign_political_character(nation_component& nc, std::mt19937& rng)
 // Pass 5 — procedural naming
 // ---------------------------------------------------------------------------
 
-// The name bank is entirely self-contained. Names are constructed from a
-// randomly chosen structural template filled with syllables drawn from three
-// independent pools (onset, nucleus, coda). This produces names that feel
-// vaguely alien without requiring a fixed human-authored list.
+// There is NO name bank (BL-290). A nation is named in the tongue of the
+// culture that settled the province its seed grew from — the same phoneme
+// inventory the creeds pass coined that culture's own name and its gods from
+// (world/tongue.hpp). The structural words go with it: the "realm" noun and
+// the standing epithet are morphemes the culture coined for itself, so the
+// name carries no English or Latin morpheme at all, and two nations of one
+// culture read as kin because they share both the sounds AND the scaffolding.
 
-static const char* const k_onsets[] = {
-    "Ar", "Bel", "Cal", "Dor", "El", "Far", "Gar", "Hel", "Ir", "Jal",
-    "Kor", "Lun", "Mel", "Nor", "Or", "Par", "Qel", "Ros", "Sel", "Tar",
-    "Ul", "Vel", "Wor", "Xen", "Yar", "Zan", "Ceth", "Drath", "Eln", "Fyr",
-};
-static constexpr int k_onset_count = 30;
-
-static const char* const k_nuclei[] = {
-    "a", "e", "i", "o", "u", "an", "en", "on", "al", "el",
-    "ir", "ur", "ath", "eth", "ith",
-};
-static constexpr int k_nucleus_count = 15;
-
-static const char* const k_codas[] = {
-    "ia", "ar", "on", "us", "is", "an", "or", "ath", "el", "yn",
-    "era", "ix", "ael", "oran", "ast",
-};
-static constexpr int k_coda_count = 15;
-
-// Structural adjective pool for compound forms ("Free Lands of ...")
-static const char* const k_adjectives[] = {
-    "Free", "United", "Grand", "High", "Old", "New", "Sacred", "Iron",
-    "Silver", "Northern", "Southern", "Eastern", "Western", "Central",
-};
-static constexpr int k_adj_count = 14;
-
-// Structural noun pool for compound forms
-static const char* const k_nouns[] = {
-    "Reach", "March", "Expanse", "Dominion", "Federation", "Commonwealth",
-    "Compact", "Alliance", "Protectorate", "Principality", "Republic", "Conclave",
-};
-static constexpr int k_noun_count = 12;
-
-/// Build a single phoneme-derived word (two to three syllable clusters).
-std::string make_phoneme_word(std::mt19937& rng)
+/// Generate a procedural nation name in @p t, using one of three structural
+/// templates chosen uniformly. @p lex is @p t's own coined vocabulary.
+/// Templates:
+///   0 — bare name                          e.g. "Kanureth"
+///   1 — coined epithet + name              e.g. "Sela Kanureth"
+///   2 — name + coined realm word           e.g. "Kanureth Valin"
+std::string make_nation_name(std::mt19937& rng, const tongue& t, const tongue_lexicon& lex)
 {
-    std::uniform_int_distribution<int> pick_onset(0, k_onset_count - 1);
-    std::uniform_int_distribution<int> pick_nuc(0, k_nucleus_count - 1);
-    std::uniform_int_distribution<int> pick_coda(0, k_coda_count - 1);
-    std::uniform_int_distribution<int> pick_syl(2, 3); // syllable count
+    mt_picker pick(rng);
 
-    std::string word;
-    const int syllables = pick_syl(rng);
-    for (int s = 0; s < syllables; ++s)
-    {
-        if (s == 0)
-            word += k_onsets[static_cast<std::size_t>(pick_onset(rng))];
-        else
-            word += k_onsets[static_cast<std::size_t>(pick_onset(rng))];
+    const int form = std::uniform_int_distribution<int>(0, 2)(rng);
+    // Two to three syllables — the same length the old bank produced, so the
+    // political map's labels keep their weight.
+    std::string name = tongue_word(pick, t, 2 + pick.pick(2));
 
-        word += k_nuclei[static_cast<std::size_t>(pick_nuc(rng))];
-    }
-    word += k_codas[static_cast<std::size_t>(pick_coda(rng))];
-    return word;
-}
-
-/// Generate a procedural nation name using one of three structural templates,
-/// chosen uniformly. Templates:
-///   0 — single phoneme word                  e.g. "Arenarath"
-///   1 — adjective + phoneme word             e.g. "Free Belonor"
-///   2 — phoneme word + noun                  e.g. "Kalorath Dominion"
-std::string make_nation_name(std::mt19937& rng)
-{
-    std::uniform_int_distribution<int> tmpl(0, 2);
-    std::uniform_int_distribution<int> pick_adj(0, k_adj_count - 1);
-    std::uniform_int_distribution<int> pick_noun(0, k_noun_count - 1);
-
-    const int form = tmpl(rng);
     switch (form)
     {
         case 0:
-            return make_phoneme_word(rng);
+            return name;
         case 1:
-        {
-            std::string name = k_adjectives[static_cast<std::size_t>(pick_adj(rng))];
-            name += ' ';
-            name += make_phoneme_word(rng);
-            return name;
-        }
+            if (lex.qualifier.empty()) return name;
+            return lex.qualifier[static_cast<std::size_t>(pick.pick(
+                       static_cast<int>(lex.qualifier.size())))] + " " + name;
         default: // 2
-        {
-            std::string name = make_phoneme_word(rng);
-            name += ' ';
-            name += k_nouns[static_cast<std::size_t>(pick_noun(rng))];
-            return name;
-        }
+            if (lex.polity.empty()) return name;
+            return name + " " + lex.polity[static_cast<std::size_t>(pick.pick(
+                       static_cast<int>(lex.polity.size())))];
     }
 }
 
@@ -728,16 +674,25 @@ std::vector<entity_id> generate_nations(
     // *later* pass's stream identical to the random-placement path.
     std::mt19937 seed_rng(seed_seeds);
     std::vector<int> seeds;
+    // Parallel to `seeds`: the tongue each surviving seed brought with it, so
+    // Pass 5 can name a nation in the speech of the people who settled its
+    // core. Empty entries (or the random-placement path) fall back to a rolled
+    // tongue there.
+    std::vector<tongue> seed_speech;
     if (!params.seed_tiles.empty())
     {
         std::vector<bool> taken(static_cast<std::size_t>(total), false);
-        for (int idx : params.seed_tiles)
+        for (std::size_t si = 0; si < params.seed_tiles.size(); ++si)
         {
+            const int idx = params.seed_tiles[si];
             if (idx < 0 || idx >= total) continue;
             if (is_ocean[static_cast<std::size_t>(idx)]) continue;
             if (taken[static_cast<std::size_t>(idx)]) continue;
             taken[static_cast<std::size_t>(idx)] = true;
             seeds.push_back(idx);
+            seed_speech.push_back(si < params.seed_tongues.size()
+                                      ? params.seed_tongues[si]
+                                      : tongue{});
         }
     }
     if (seeds.empty())
@@ -808,9 +763,39 @@ std::vector<entity_id> generate_nations(
         assign_political_character(nation_data[static_cast<std::size_t>(ni)], pol_rng);
 
     // --- Pass 5: naming ---
+    // A nation speaks the tongue of the province its seed grew from: walk the
+    // seeds in order and give each surviving nation the speech of the LOWEST-
+    // indexed seed still inside it (a seed absorbed by Pass 2c contributes
+    // nothing — the surviving core names the realm). Ties broken on the lowest
+    // index, the same rule every other selection in the layer uses.
     std::mt19937 name_rng(seed_name);
+    std::vector<tongue> nation_speech(static_cast<std::size_t>(nation_count));
+    for (std::size_t si = 0; si < seeds.size(); ++si)
+    {
+        const int ni = owner_map[static_cast<std::size_t>(seeds[si])];
+        if (ni < 0 || ni >= nation_count) continue;
+        if (si >= seed_speech.size() || !seed_speech[si].usable()) continue;
+        if (!nation_speech[static_cast<std::size_t>(ni)].usable())
+            nation_speech[static_cast<std::size_t>(ni)] = seed_speech[si];
+    }
+
+    // A body with no culture layer (no settlement pass, or a caller that
+    // supplied bare seed tiles) still gets ONE coherent tongue rather than a
+    // per-nation re-roll — an unwritten history is still a shared one.
+    tongue fallback;
+    {
+        mt_picker pick(name_rng);
+        fallback = roll_tongue(pick);
+    }
+
     for (int ni = 0; ni < nation_count; ++ni)
-        nation_data[static_cast<std::size_t>(ni)].name = make_nation_name(name_rng);
+    {
+        const tongue& t = nation_speech[static_cast<std::size_t>(ni)].usable()
+                              ? nation_speech[static_cast<std::size_t>(ni)]
+                              : fallback;
+        nation_data[static_cast<std::size_t>(ni)].name =
+            make_nation_name(name_rng, t, coin_lexicon(t));
+    }
 
     // --- Register nations in the world and write ownership maps ---
     std::vector<entity_id> nation_ids;

@@ -1,53 +1,81 @@
 #include "city_names.hpp"
 
-#include <iterator> // std::size
+#include "settlement.hpp"
+
+#include <algorithm>
 
 namespace {
 
-// Capitalised consonant onsets (single + clusters) — the name's first sound.
-const char* const k_onset[] = {
-    "B","Br","C","Cl","D","Dr","F","Fl","G","Gr","H","K","Kr","L","M","N","P","Pr",
-    "R","S","Sh","Sk","St","T","Th","Tr","V","W","Wr","Bl","Gl"
-};
-// Vowel nuclei (some diphthongs) — the root's vowel.
-const char* const k_vowel[] = { "a","e","i","o","u","ae","ea","ei","ou","ai","au" };
-// Optional medial consonant(s) closing the root before the suffix.
-const char* const k_medial[] = { "","","l","r","n","m","d","th","st","nd","rk","ll","sh","rn" };
-// English-ish place suffixes — the "settlement" morpheme.
-const char* const k_suffix[] = {
-    "ton","ford","haven","burg","moor","gate","wick","dale","bury","field",
-    "port","stead","holm","march","mere","by","ham","cross","reach","bridge"
-};
-// Occasional directional / quality prefix (with a trailing space).
-const char* const k_prefix[] = { "North ","South ","East ","West ","New ","Old ","High ","Little " };
-
-template <std::size_t N>
-const char* pick(const char* const (&arr)[N], std::mt19937& rng)
+/// A city root: one or two syllables of the tongue. Shorter than a nation
+/// name on purpose — a settlement wears a name people say every day.
+std::string city_root(mt_picker& pick, const tongue& t)
 {
-    std::uniform_int_distribution<std::size_t> d(0, N - 1);
-    return arr[d(rng)];
+    return tongue_word(pick, t, 1 + pick.pick(2));
 }
 
 } // namespace
 
-std::string generate_city_name(std::mt19937& rng)
+std::string generate_city_name(std::mt19937& rng, const tongue& t)
 {
-    // Root = onset + vowel, occasionally a second onset+vowel for length, then a single
-    // medial consonant before the suffix. The medial goes last (not between the two
-    // syllables) so a second root does not create a mid-word consonant pile-up.
-    std::string root = pick(k_onset, rng);
-    root += pick(k_vowel, rng);
-    if (std::uniform_int_distribution<int>(0, 2)(rng) == 0) // ~1 in 3: longer root
-    {
-        root += pick(k_onset, rng);
-        root += pick(k_vowel, rng);
-    }
-    root += pick(k_medial, rng);
+    if (!t.usable())
+        return {};
 
-    std::string name = root + pick(k_suffix, rng);
+    mt_picker pick(rng);
+    const tongue_lexicon lex = coin_lexicon(t);
 
-    if (std::uniform_int_distribution<int>(0, 5)(rng) == 0) // ~1 in 6: directional prefix
-        name = std::string(pick(k_prefix, rng)) + name;
+    // Root + the culture's own settlement morpheme, suffixed. The morpheme is
+    // coined from the same inventory, so it reads as part of the word rather
+    // than as a borrowed "-ton".
+    std::string name = city_root(pick, t);
+    if (!lex.settlement.empty())
+        name += lex.settlement[static_cast<std::size_t>(
+            pick.pick(static_cast<int>(lex.settlement.size())))];
+
+    // ~1 in 6: a standing epithet in front, the tongue's own equivalent of a
+    // "North"/"New" prefix.
+    if (!lex.qualifier.empty() && pick.pick(6) == 0)
+        name = lex.qualifier[static_cast<std::size_t>(
+                   pick.pick(static_cast<int>(lex.qualifier.size())))] + " " + name;
 
     return name;
+}
+
+void name_population_centres(world& w, entity_id body_id, int gw,
+                             const settlement_state& ss, const creed_state& cs,
+                             uint32_t seed)
+{
+    if (ss.provinces.empty() || cs.cultures.empty() || gw <= 0)
+        return;
+
+    // Sorted-id order over this body's centres, from an independent stream —
+    // the same discipline generate_population_centres names under, so renaming
+    // cannot perturb any other pass.
+    std::vector<entity_id> ids;
+    for (const auto& [cid, tid] : w.population_centre_tile)
+    {
+        const auto tit = w.tiles.find(tid);
+        if (tit != w.tiles.end() && tit->second.body == body_id)
+            ids.push_back(cid);
+    }
+    std::sort(ids.begin(), ids.end());
+
+    std::mt19937 name_rng(seed ^ 0xC17910E6u);
+    for (const entity_id cid : ids)
+    {
+        const auto tit = w.tiles.find(w.population_centre_tile[cid]);
+        if (tit == w.tiles.end()) continue;
+
+        // WHOSE GROUND. The nearest province owns the settlement's speech, the
+        // same rule that gave the province its own culture from the nearest
+        // cradle — so a city, its province and its gods share one tongue.
+        const int pi = nearest_province(ss, tit->second.grid_x, tit->second.grid_y, gw);
+        if (pi < 0) continue;
+        const int ci = ss.provinces[static_cast<std::size_t>(pi)].culture;
+        if (ci < 0 || ci >= static_cast<int>(cs.cultures.size())) continue;
+
+        const tongue& t = cs.cultures[static_cast<std::size_t>(ci)].speech;
+        std::string name = generate_city_name(name_rng, t);
+        if (!name.empty())
+            w.population_centre_name[cid] = std::move(name);
+    }
 }
