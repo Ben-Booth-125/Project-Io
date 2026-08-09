@@ -89,7 +89,18 @@ it against a committed golden image:
 ./build/ProjectIo --verify scripts/verify/corporation_lens.lua
 ```
 
-## Latest releases — v0.1.1, v0.1.2, v0.1.8 and v0.1.9
+## Latest releases — v0.1.1, v0.1.2, v0.1.8, v0.1.9 and v0.1.10
+
+**v0.1.10 — generation & content: what the world is called and what it is made of.** Every
+generated proper noun is now coined from its own culture's phonology, and the kinship between names
+is *emergent* rather than authored — cultures that share a realm word or a settlement morpheme do so
+because the word-coiner is a pure function of the tongue. Body identity stops being a display string
+across twelve sites, and the system catalogue is generated. Corporations anchor in their **home
+province**, so where a company is says something about where it came from. Wetland exists again
+(12 tiles → 159) once elevation was given a say in composition. Territorial fragmentation is
+**measured and attributed**, settling a claim the world generator's architecture was bought on. Plus
+propellant as a real resource with per-launch consumption, and an econ tick roughly halved.
+
 
 **v0.1.9 — shell & legibility: the standing UI set, finished.** The always-on canvas layers become
 decodable (roads name their tier on selection, and dim with the commercial-reach fog like everything

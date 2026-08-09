@@ -14,6 +14,60 @@ authoritative version-history record. A local-only snapshot of `src/` is also ke
 
 _Nothing yet._
 
+## [0.1.10] — 2026-08-09
+
+**Generation & content — what the world is called and what it is made of.** Eight items. Three of
+them found the filed diagnosis wrong and corrected it by measurement rather than quietly patching
+around it, which is the through-line of the minor.
+
+### Changed
+- **Names are coined from each culture's own phonology** (BL-290), not from a global Latin/European
+  bank. The generator already produced a per-culture sound system and naming simply never consumed
+  it. Now it does — and the kinship is **emergent, not authored**: *Rerekua Tekua* and
+  *Kuamreiteik Tekua* share a realm word, *Duagual* / *Shualgual* / *Vegual* a settlement morpheme,
+  because the word-coiner is a pure function of the tongue and two passes reach the same morphemes
+  without sharing a stream.
+- **Body identity is an entity id, not a display string** (BL-257) — across **twelve** sites, eight
+  more than the item listed, including a cache key that was the body *name*. Shipping generated
+  names without this would have been a silent correctness bug rather than a cosmetic change. All 28
+  verify scripts now address bodies by role, so a generated catalogue cannot break a check again.
+- **Corporations anchor in their home province** (BL-283) rather than anywhere in their nation.
+  Holdings moved off dead ground onto settled ground — barren 6→3, grassland 3→7 — because
+  provinces sit where people settled. The home-province window succeeds first-try 89% of the time;
+  every fallback was a corp with no home province at all.
+- **The econ tick is roughly halved** (BL-347): 8×256 min 2.045 ms → **0.87 ms**, better than the
+  pre-regression baseline. None of the three suspected causes dominated — the sort flagged as
+  O(n log n) was 3% of it, and the real cost was map-node allocation per tick in worlds containing
+  no stack at all.
+- **The pre-build profit estimate accounts for the stack it would join** (BL-346) — it was over by
+  25% at rank 2, 56% at rank 3, and 213% where decay and taper compounded.
+
+### Added
+- **Wetland exists again** (BL-338) — 12 tiles → 159. Wetland is a *drainage* feature, and it is the
+  one composition the climate table cannot express, because a marsh is defined by where water fails
+  to leave. Elevation now has a say, measured as a percentile of land above the body's own sea level
+  so the slice exists on every seed.
+- **Territorial fragmentation is measured and attributed** (BL-284) — 60 emergent exclaves against
+  136 from orphan-island cleanup, printed as both a component count and a tile count because they
+  tell different stories (31% vs 49%). This settles a claim the world generator's architecture was
+  bought on, and it pays.
+- **Propellant is a real resource** (BL-308) with two authored recipes and per-launch consumption:
+  an unfuelled launchpad is exactly as shut as no launchpad.
+- **Trade routes log both endpoints** (BL-282), so a body-scoped filter finds a route from either
+  side. Measured cost: 18 → 36 entries across a 1500-tick run, bounded by body-pair count rather
+  than by traffic.
+
+### Known gaps
+- The **generation globe** (BL-256) is not in this cut — it is the one item that wants a human
+  watching while it is built. Moved to v0.1.11 with deed history lines (BL-309, designed, unbuilt).
+- **Visual goldens are stale wherever a body name renders.** Confirmed by eye as a pure text delta.
+  Visual goldens are Windows-authoritative, so the re-bless belongs on that machine.
+- `region_word` still supplies English province words (Reach, Coast), so province names now read
+  *half*-native — more visible after BL-290, not less. Filed as BL-348.
+- `settlement_harness` S7d asserts a diversity floor the generator explicitly calls a preference,
+  and flips on unrelated parameters. It had a quiet vote in BL-338's tuning, visible only because
+  the implementer volunteered it. Filed as BL-349.
+
 ## [0.1.9] — 2026-08-09
 
 **Shell & legibility — the standing UI set, finished.** Eight items closing the follow-through that
@@ -485,7 +539,8 @@ Layer 2 finalisation.
 
 Initial prototype snapshot — application shell, canvases, and the hard-coded world.
 
-[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.9...HEAD
+[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.10...HEAD
+[0.1.10]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.1...v0.1.8
 [0.1.2]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.0...v0.1.2

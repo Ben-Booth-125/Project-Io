@@ -10,7 +10,78 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — Cut v0.1.9: five worktree agents, and three of them branched from a base that had already moved (2026-08-09, latest)
+## Session — Cut v0.1.10: three items whose own diagnosis was wrong, and a green gate that lied (2026-08-10, latest)
+
+Full mode, Batch Delivery + release — the fifth cut of the session, spanning midnight. Ben:
+*"cut v0.1.10 next."* Six worktree sub-agents; a machine crash mid-flight; integration, every
+conflict resolution and the investigation in the main session.
+
+**THE THROUGH-LINE: three items were wrong about their own cause, and measurement caught all
+three.** That is worth stating as the finding rather than as trivia, because in each case the
+plausible story would have produced a plausible fix.
+
+1. **BL-338 (wetland)** blamed the 2026-08-04 relief commits. **Refuted empirically** — the agent
+   rebuilt `world_audit` at `802421c^` and got a byte-identical census. The real cause is
+   conceptual and better: wetland is the ONE composition the `(band, moisture)` table cannot
+   express, because a marsh is defined by *where water fails to leave* — an elevation question —
+   and elevation had no say in composition at all. 12 tiles → 159.
+2. **BL-347 (econ tick)** named three suspects. **None dominated.** The sort flagged as O(n log n)
+   was 3% of the added cost; the real cost was `std::map` node allocation the restructure
+   introduced incidentally, per tick, in worlds containing no stack at all. 8×256 min 2.045 ms →
+   **0.87 ms**, better than the pre-regression baseline.
+3. **BL-346 (profit estimator)** — my own filed claim that BL-079's loss-streak reflex acted on an
+   inflated number was **wrong and is retracted**. `estimate_building_profit` reads *realised*
+   credit. The real site was `estimate_prospective_profit` (+213% at mid-band reserve), and BL-181
+   was inflated via its own inline model instead.
+
+**BL-284 answered the question it was filed to ask.** BL-218 bought the expensive settlement-sim
+path on the argument that fragmentation would fall out for free. It pays: **60 emergent exclaves
+against 136 from orphan-island cleanup — 31% by component count but 49% by tile count.** The
+attribution is *exact, not heuristic* (the settlement BFS is water-blocked, so cleanup can only
+fire on a seedless landmass), and the audit prints both numbers because quoting the raw count would
+overstate the sim's contribution twofold.
+
+**BL-290 produced kinship nobody authored.** Names are now coined from each culture's own
+phonology, and because the word-coiner is a pure function of the tongue, two passes reach the same
+morphemes without sharing a stream: *Rerekua Tekua* / *Kuamreiteik Tekua* share a realm word,
+*Duagual* / *Shualgual* / *Vegual* a settlement morpheme. Generation as consequence, not lookup.
+
+**A GREEN GATE THAT LIED, and the reason to record it.** `logistics_reach_harness` failed 3 of 27
+assertions on a hand-built fixture — "five plains steps cost 5.0" — which looked exactly like a
+real regression, and passed at v0.1.9. It was not code. The trace:
+
+- `logistics.cpp` and the harness source were **byte-identical to v0.1.9**.
+- Suspected the new `propellant` enum widening `tile_component`; tested it by adding a dummy 32nd
+  resource *to v0.1.9* — still passed, so that hypothesis died cleanly.
+- Bisected the six merges: failed at the BL-257 merge (36 conflicts) — **but that commit PASSED in
+  a clean worktree.** Same commit, same sources, different result.
+- Compared object files: every world object byte-identical, only the harness's own `.o` different,
+  from a source whose md5 matched exactly.
+
+Deleting that one object and rebuilding: ALL PASS. A conflict-heavy merge left ninja holding a
+stale object it would not rebuild, because git's checkout churn set mtimes such that the object
+looked current — and `touch`-ing all of `src/world/` did not fix it, since the harness's own source
+had not changed. **A green gate from a stale tree is worse than a red one.** This is the second
+stale-build incident of the session, after the morning's missed build. Standing lesson: run
+`cmake --build build_linux --clean-first` before cutting after a messy merge, and if a harness
+fails suspiciously, build the same commit in a throwaway worktree before believing it.
+
+**Goldens re-blessed a second time in two days**, and the direction is the mirror image: UP, where
+2026-08-09's was down. BL-283 moved holdings off dead ground onto settled ground, BL-338 restored a
+habitable composition, BL-346/347 moved the workforce dial. Seed 4's survival fell 0.71 → 0.29
+while its net worth trebled; the band was loosened to admit it but the number is flagged as a
+**hypothesis, not a measurement** — winners winning harder is plausible, and if a later session sees
+rivals dying across many seeds the band should tighten rather than stretch again.
+
+**The crash.** Three agents were mid-flight when the machine went down; none had committed. Two had
+salvageable worktrees and were resumed from their transcripts; the third had nothing and was
+relaunched with an explicit *commit as soon as something works* instruction, which it followed.
+
+**Gate:** 55 tests. **Runtime:** not tracked; spanned a crash and a midnight rollover.
+
+---
+
+## Session — Cut v0.1.9: five worktree agents, and three of them branched from a base that had already moved (2026-08-09)
 
 Full mode, Batch Delivery + release — the fourth cut of the session. Ben: *"cut v0.1.9 next."*
 Five worktree sub-agents (roads; History+Economy; stacks; shell; disclosure), integration and every

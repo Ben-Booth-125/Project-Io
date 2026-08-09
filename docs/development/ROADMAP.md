@@ -513,7 +513,54 @@ added by Ben 2026-08-04).
 
   **Cut 2026-08-09.** Gate: 53 tests, 2 failures, both known, filed and named above —
   `world_audit`'s biome balance (BL-338) and `econ_stability`'s absolute bound (BL-347).
-- **v0.1.10 — Generation & content.** *Theme: what the world is called and what it is made of.*
+- **v0.1.10 — Generation & content — CUT 2026-08-09.** *Theme: what the world is called and what
+  it is made of.* Eight items. Notable for how often the **item's own diagnosis was wrong and the
+  measurement corrected it** — three times, each recorded rather than quietly fixed:
+
+  - **BL-338 (wetland)** blamed the relief commits. Refuted *empirically*: rebuilding `world_audit`
+    at `802421c^` gave a byte-identical census. The real cause is conceptual — wetland is the one
+    composition the `(band, moisture)` table cannot express, because a marsh is defined by where
+    water *fails to leave*, which is elevation, and elevation had no say in composition at all.
+    12 tiles → 159, and the gate's last failing assertion passes.
+  - **BL-347 (econ tick)** named three suspects. **None dominated.** The sort flagged as
+    O(n log n) was 3% of the added cost; the real cost was `std::map` node allocation the
+    restructure introduced incidentally, per tick, in worlds containing no stack at all.
+    8×256 min 2.045 ms → **0.87 ms**, better than the pre-BL-193 baseline.
+  - **BL-346 (profit estimator)** — the claim that BL-079's loss-streak reflex acted on an inflated
+    number was **retracted**: `estimate_building_profit` reads *realised* credit. The real site was
+    `estimate_prospective_profit` (+213% at mid-band reserve), and BL-181 was inflated via its own
+    inline model instead.
+
+  **What landed.** Names are coined from each culture's own phonology (**BL-290**) with the kinship
+  emergent rather than authored; body identity stops being a display string across **twelve** sites,
+  eight more than the item listed, and the catalogue is generated (**BL-257**); corps anchor in
+  their home province (**BL-283**); fragmentation is measured and attributed (**BL-284**); wetland
+  is generated again (**BL-338**); the econ tick and the prospective estimator are fixed
+  (**BL-347**, **BL-346**); propellant is a real resource with per-launch consumption (**BL-308**);
+  and trade routes log both endpoints (**BL-282**).
+
+  **BL-284 answered the question it was filed to ask.** BL-218 bought the expensive settlement-sim
+  path on the argument that fragmentation would fall out for free. **It pays** — 60 emergent
+  exclaves against 136 from orphan-island cleanup: 31% by component count but **49% by tile count**.
+  The sim's exclaves are the large ones. The audit prints both, because quoting the raw count would
+  overstate the sim's contribution twofold.
+
+  **Done-definition — v0.1.10.** v0.1.10 is cut when:
+
+  - **No generated proper noun is Earth-derived**, and names within a culture share a sound system
+    *as a consequence of the chain* rather than by coincidence.
+  - **Identity is an entity id**, never a display string — the precondition for generated names
+    being a cosmetic change rather than a silent correctness bug.
+  - **Where a corporation is says something** about where it came from.
+  - **A claim the architecture was bought on is measured**, not assumed (**BL-284**).
+  - **The tick budget holds**, and the estimators agree with what the tick actually credits.
+  - Excluded by scope, filed rather than dropped: the generation globe (**BL-256**) and deed
+    history lines (**BL-309**, designed but unbuilt) — both v0.1.11.
+
+  **Cut 2026-08-10.** Gate: **55 tests, 0 failures** — the first fully green gate of the arc,
+  reached only after a clean rebuild exposed a stale object that had been failing a harness from
+  correct sources.
+- **v0.1.10 — the theme, as originally filed.**
   Led by **BL-290** (priority A): the nation and city name banks read Latin/European, in direct
   breach of the standing no-real-names rule — every generated name must be sci-fi/fantasy from the
   seeded banks. With it: generated body names (**BL-257**) and the generation-globe preview
