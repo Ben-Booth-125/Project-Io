@@ -14,6 +14,69 @@ authoritative version-history record. A local-only snapshot of `src/` is also ke
 
 _Nothing yet._
 
+## [0.1.9] — 2026-08-09
+
+**Shell & legibility — the standing UI set, finished.** Eight items closing the follow-through that
+had been accumulating since v0.1.1: the always-on canvas layers become decodable, stacking becomes
+a decision rather than a dominant strategy, screen geometry gets one owner, and disclosure stops
+being a single all-or-nothing control.
+
+### Added
+- **A contextual road-tier legend** (BL-184). Three tiers had been drawn by line weight and
+  brightness alone with no key anywhere. Selecting or hovering a road-carrying tile now names its
+  tier, with the thin→thick ladder in a tooltip. Contextual rather than a persistent chip: roads
+  render always-on like terrain, not as a lens, so the per-lens legend drawer could never have
+  carried them.
+- **Building stacks are a real trade-off** (BL-193). Site *k* on a tile now produces `0.8^(k-1)` of
+  a lone site's rate — 2 sites yield 1.8×, 5 yield 3.36×, never 5× — while every site draws real
+  reserve, so a full stack drains the deposit faster than its output multiple. Depletion tapers
+  against the stack's **combined** nominal, so members exhaust together instead of desynchronising.
+  The construction ledger states where a site sits in its stack and what that costs it.
+- **The UI justification store** (BL-260) — `docs/ui/question_log.json`, 16 surfaces each declaring
+  the question it answers, why it earns its space, and the backlog item that demanded it. A two-way
+  provenance index: surface → item, and item → surface.
+- **The Economy panel has a door** (BL-292). It was drawn every frame while nothing in the nav rail
+  could open it — reachable only by the verify harness. It now holds rail slot 3 and has an
+  `ACTIONS.json` entry, so a human reading the rail and an agent reading the dictionary can both
+  find it.
+
+### Changed
+- **Roads dim with the commercial-reach fog** (BL-185). A road on an unreached tile had rendered
+  identically to one on a tile the player actively operates. Both the lens fill and the road spans
+  now pass through one `fog_dim`, so the fog is literally a single wash. Per-edge vision takes the
+  **max** of the two tiles: a span is drawn as two halves meeting at a shared midpoint, and max is
+  the only cheap combiner under which both halves agree.
+- **Disclosure is two controls** (BL-265) — *expand in place*, or *take the canvas*. Full screen now
+  bounds itself to the canvas rather than the window, so the header, clock, comms dock, Selection
+  band and minimap survive it. A full-screened accordion shows **all** of itself, scrolled — the
+  whole round of chain stages, all four dashboard roll-ups. Controls are right-aligned in one
+  column everywhere, and every glyph is **drawn** through the draw list rather than typed, which is
+  the missing-codepoint defect BL-234 already fixed once.
+- **Screen geometry has one owner** (BL-216). `shell_metrics.{hpp,cpp}` now owns the shell's
+  composed rect algebra, and the five places in `app.cpp` that each re-derived the right chrome
+  column's left edge by hand were migrated onto it.
+- **The comms channel strip became a selector.** A wrapping tab chain spends vertical rows, and the
+  docked comms panel is 260 px tall; a combo holds any number of channels in one row.
+
+### Removed
+- **The History ledger's Tiles view** (BL-281) — a current-state readout inside a ledger about the
+  past. Renaming it would have fixed the label and kept the defect. Its content already had homes:
+  buildings on the canvas and in the Selection element, market data in the market surfaces. Story,
+  Chain and Ages remain.
+
+### Known gaps
+- **The econ tick roughly doubled** (BL-347, priority A). Measured against the parent commit on the
+  same machine: the largest sweep rung's `min` went 0.958 ms → 2.045 ms, with the cost present at
+  every rung including the smallest. **Prototype scale is unaffected** — 0.20 ms mean, 5× headroom —
+  so this is lost growth headroom rather than a live frame-rate problem.
+- `building_profit` still estimates a lone site, so a stacked building over-reports revenue and
+  remaining life (BL-346). Not display-only: the loss-streak reflex and the workforce solver both
+  act on that number.
+- The building-selection element still does not follow the tile element's three-column format
+  (BL-229) — deliberately deferred, as the item reserves that layout for Ben to design.
+- 13 of the justification store's 16 entries are `drafted`, awaiting Ben's wording. Writing the
+  pair *is* the design check, so they are drafted rather than shipped as settled.
+
 ## [0.1.8] — 2026-08-09
 
 **Build health — the gate stops lying.** No player-facing content: this is the minor where the
@@ -422,7 +485,8 @@ Layer 2 finalisation.
 
 Initial prototype snapshot — application shell, canvases, and the hard-coded world.
 
-[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.8...HEAD
+[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.9...HEAD
+[0.1.9]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.1...v0.1.8
 [0.1.2]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.0...v0.1.2
 [0.1.1]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.2...v0.1.1

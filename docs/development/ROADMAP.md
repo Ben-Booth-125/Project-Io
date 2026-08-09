@@ -459,12 +459,60 @@ added by Ben 2026-08-04).
 
   **Cut 2026-08-09.** Gate: 53 tests, **1 failure**, down from 10 — and that one is `world_audit`'s
   biome balance, a genuine world-generation finding rather than an instrument defect.
-- **v0.1.9 — Shell & legibility follow-through.** *Theme: the standing UI set, finished.* The road
-  tier legend (**BL-184**) and road/fog dimming (**BL-185**), building stack capacity (**BL-193**),
-  the comms-log re-plan (**BL-216**), the building-selection tile format (**BL-229**), the
-  UI-justification store pairing every readout with the question it answers (**BL-260**), the
-  disclosure-controls revision (**BL-265**), retiring the History ledger's Tiles view (**BL-281**),
-  and the orphaned Economy panel (**BL-292**).
+- **v0.1.9 — Shell & legibility follow-through — CUT 2026-08-09.** *Theme: the standing UI set,
+  finished.* Eight items. Ben ruled four open design questions at the batch's start rather than
+  letting them stall it: the road-tier legend goes **contextual** (Selection/hover, not a
+  persistent chip — the lens drawer was never available, being keyed to `overlay_mode` while roads
+  render always-on like terrain); roads **do** dim with the commercial-reach fog; the Economy panel
+  **gets a door** rather than being retired; and **BL-229** (building-selection tile format) moved
+  to v0.1.10 because the item reserves that layout for Ben to design.
+
+  Landed: the road tier legend (**BL-184**) and road/fog dimming (**BL-185**), building stack
+  capacity (**BL-193**), the shell rect-algebra foundation (**BL-216**, partial — see below), the
+  UI-justification store (**BL-260**), the disclosure-controls revision (**BL-265**), retiring the
+  History ledger's Tiles view (**BL-281**), and the Economy panel's door (**BL-292**).
+
+  **Three things the batch found that no item had predicted.**
+
+  - **BL-216 is superseded in part by a *later, complete* item.** Its sections 1–3 specify a comms
+    geometry that **BL-227** already replaced on Ben's own 2026-07-30 call — dock at
+    `nav_pane_width` rather than `shell_column_width` (measured: at 1280×720 a shortened nav rail
+    clips two of its nine slots), the fold-out column shortening to clear it, and
+    `selection_band_height` derived rather than fixed at 340. Under *newest-dated wins* those
+    sections were left unimplemented rather than reverting a landed item. What did land is the half
+    that mattered: `shell_metrics.{hpp,cpp}` and the migration of all **five** `app.cpp` sites that
+    each re-derived `disp.x - margin - mm_w` by hand. It also surfaced a live **8 px drift** —
+    BL-312 flushed the minimap to the screen edge and the other four sites did not follow — now
+    expressed once instead of invisibly five times. *Ben's call whether to close it.*
+  - **BL-193 roughly doubled the econ tick** (**BL-347**, priority A, filed). Measured, not
+    inferred: the harness was rebuilt at the parent commit and both run on the same machine.
+    Largest sweep rung `min` 0.958 ms → 2.045 ms, with the cost present at *every* rung including
+    the 1×8 baseline (1.71×) — the signature of fixed per-tick work, not a scaling term. **The
+    prototype is unaffected** (0.20 ms mean, 5× headroom); what is lost is growth headroom, the
+    same category as BL-253.
+  - **BL-260's codegen has nothing to feed.** BL-247's in-UI question log and the `why_note` seam
+    the item planned to generate into were removed 2026-08-02 (NR-018). The store is therefore a
+    documentation artifact, which is the stronger reading of Ben's *"the docs are the audit"* — and
+    13 of its 16 entries are marked `drafted`, because writing the pair **is** the design check and
+    an implementer may draft it but must not ship it as settled.
+
+  **Done-definition — v0.1.9.** v0.1.9 is cut when:
+
+  - **The always-on canvas layers are legible** — a visual code the player cannot decode has a key
+    at the moment of interest, and the fog reads as **one** wash rather than several treatments
+    that resemble each other.
+  - **Stacking is a decision, not a dominant strategy** — later sites pay less, every site draws
+    real reserve, and the player can see both.
+  - **Screen geometry has one owner.** No region re-derives another's edge by hand.
+  - **Disclosure is two controls, not one** — expand in place, or take the canvas — placed in one
+    column, drawn rather than typed, and a full-screened accordion shows all of itself.
+  - **Every surface has a door and states its question.**
+  - Excluded by scope, filed rather than dropped: the building-selection layout (**BL-229**,
+    Ben's to design), the stack-aware profit estimator (**BL-346**), the econ-tick regression
+    (**BL-347**), and the Windows from-cold check (**BL-341**) — all v0.1.10.
+
+  **Cut 2026-08-09.** Gate: 53 tests, 2 failures, both known, filed and named above —
+  `world_audit`'s biome balance (BL-338) and `econ_stability`'s absolute bound (BL-347).
 - **v0.1.10 — Generation & content.** *Theme: what the world is called and what it is made of.*
   Led by **BL-290** (priority A): the nation and city name banks read Latin/European, in direct
   breach of the standing no-real-names rule — every generated name must be sci-fi/fantasy from the

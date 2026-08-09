@@ -222,13 +222,23 @@ struct ui_state
     float tech_tree_pan_y = 0.0f;
     float tech_tree_zoom  = 1.0f;
 
-    // --- drill-through disclosure (BL-214 / BL-247) ---
-    // The one idiom every dense surface obeys: folded (a verdict line + a chevron)
-    // or expanded (a full-screen overlay showing everything at once). Because
-    // expanded IS an overlay, only one thing can be expanded at a time, so this is a
-    // single target rather than a level per surface. VIEW state — not serialised,
-    // and deliberately not remembered: which card was last open is a display
-    // preference, not something to restore. See ui/detail_level.hpp.
+    // --- drill-through disclosure (BL-214, revised BL-265) ---
+    // The one idiom every dense surface obeys. BL-214's model was BINARY — folded, or
+    // a full-WINDOW overlay — and this comment used to reason from it: because expanded
+    // IS an overlay, only one thing can be expanded, so a single target suffices.
+    //
+    // BL-265 split that into TWO controls and the reasoning no longer holds as one rule:
+    //   * the TAKEOVER is still single-target, and for the original reason — it owns one
+    //     rectangle (now the CANVAS, not the window), so opening a second replaces the
+    //     first. That is what this member tracks.
+    //   * IN-PLACE expansion is a SET, not a target (fold_state::in_place). A surface
+    //     that grows where it sits does not displace its siblings, and a single-target
+    //     in-place expander would make an accordion unbuildable.
+    // A canvas-bounded takeover may therefore coexist with an open ledger column, which
+    // is intended rather than a leak.
+    //
+    // VIEW state — not serialised, and deliberately not remembered: which card was last
+    // open is a display preference, not something to restore. See ui/detail_level.hpp.
     fold_state expanded{};
 
     /// Which row of the expanded Corporation-dashboard roll-up is drilled into

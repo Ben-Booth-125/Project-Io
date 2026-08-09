@@ -10,7 +10,80 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — Cut v0.1.8: ten test failures, one real defect, and a tool that had been lying since it was written (2026-08-09, latest)
+## Session — Cut v0.1.9: five worktree agents, and three of them branched from a base that had already moved (2026-08-09, latest)
+
+Full mode, Batch Delivery + release — the fourth cut of the session. Ben: *"cut v0.1.9 next."*
+Five worktree sub-agents (roads; History+Economy; stacks; shell; disclosure), integration and every
+conflict resolution in the main session.
+
+**Four rulings taken up front rather than letting them stall the batch.** Nine items, four of which
+carried open design questions, so they were batched into one Q&A before any code was written: the
+road-tier legend goes **contextual** (Selection/hover); roads **do** dim with the fog; the Economy
+panel **gets a door** rather than being retired; and **BL-229** moves to v0.1.10 because the item
+says in as many words *"DESIGN OWED — do not guess the layout. Ben designs this one."* Asking cost
+one round trip; guessing would have cost the item.
+
+**THE LESSON OF THIS BATCH: three of five agents branched from a base that had already moved, and
+every one of them produced code that would not merge cleanly.** Worktrees isolate writes, which is
+what they are for — they do not isolate you from the *history* moving underneath. The three cases,
+because the shape repeats:
+
+1. **Roads agent** reintroduced `ui_state::selection_hidden_for`, deleted hours earlier by BL-266
+   (Selection always open). Its hunk restored a close button on a band that no longer closes.
+2. **History agent** dropped the **Ages** view along with Tiles. BL-281 does say "drops to two
+   views" — but it was designed 2026-08-03 and Ages landed 2026-08-05. *The design predates the
+   feature rather than judging it.* Ages kept; only Tiles retired. That renumbered Ages from view 3
+   to 2, so `history_ages.lua` was re-pointed — without which the Ages check would have driven a
+   stale index and silently captured Story.
+3. **Disclosure agent** paired Story with Tiles and referenced `detail_surface::history_tiles`,
+   removed by the History agent *in the same batch*. It would not have compiled.
+
+None of these is an agent failing at its task; each did its own job well. They are the cost of
+parallelism over a moving `main`, and the mitigation is that integration reads every hunk rather
+than trusting a clean auto-merge.
+
+**A fourth agent got it right in the way that matters most.** The shell agent found that BL-216's
+sections 1–3 are **superseded by BL-227**, a *complete* item that landed a different, later geometry
+on Ben's own 2026-07-30 call — and refused to implement its brief, because doing so would have
+reverted a landed decision. Newest-dated wins. It shipped the half that was still true: the
+`shell_metrics` module and the migration of all five `app.cpp` sites that each re-derived the same
+rect by hand. It also surfaced a live **8 px drift** (BL-312 flushed the minimap to the screen edge;
+four siblings did not follow), now expressed once instead of invisibly five times.
+
+**The measurement that nearly got waved away.** `econ_stability` began failing after the stacks work
+merged. It is a `bench`-labelled test — the label *this session added* precisely so a failure there
+reads as "re-run it idle" — and load was 2.35, so the easy conclusion was available and wrong.
+Rebuilding the harness at the parent commit and running both on the same machine:
+
+| bodies × corps | pre-BL-193 min | post min | factor |
+|---|---|---|---|
+| 1 × 8   | 0.0106 ms | 0.0181 ms | 1.71× |
+| 8 × 256 | **0.9581 ms** | **2.0449 ms** | 2.13× |
+
+`min` is the load-insensitive statistic, and the cost appears at **every** rung including the
+smallest — the signature of fixed per-tick work, not a scaling term. Filed as **BL-347** (priority
+A) with the table and a fix direction. **Prototype scale is unaffected** (0.20 ms mean, 5× headroom),
+so it is lost growth headroom, the same category BL-250 filed BL-253 for. The `bench` label did its
+job — it stopped the failure being read as a regression *automatically* — but it must not become a
+reason to stop looking.
+
+**BL-260's codegen has nothing to feed.** Ben ruled codegen-at-build-time the same day; on
+implementation, BL-247's in-UI question log and the `why_note` seam it would generate into turn out
+to have been removed 2026-08-02 (NR-018). No call sites exist. Codegen whose output nothing includes
+is machinery for its own sake — which is what *"the docs are the audit"* rules out — so the store
+ships as documentation and the ruling is recorded in its own `_note` for whenever a consumer
+returns. 13 of 16 entries are `drafted`, because writing the pair **is** the design check.
+
+**Gate:** 54 tests, **2 failures**, both known, filed and named in the changelog —
+`world_audit`'s biome balance (BL-338) and `econ_stability`'s absolute bound (BL-347). Visual
+inspection by eye per the Linux policy (goldens are Windows-authoritative): shell renders correctly
+post-merge, roads read with tier-varying brightness, fogged regions dimmer than the lit centre.
+
+**Runtime:** not tracked.
+
+---
+
+## Session — Cut v0.1.8: ten test failures, one real defect, and a tool that had been lying since it was written (2026-08-09)
 
 Full mode, Batch Delivery + release — the third cut of the session. Ben: *"move BL-288 and cut
 v0.1.8."* Two worktree sub-agents (next_id.js; the SDL3 posture), the entangled harness/golden

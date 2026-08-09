@@ -89,7 +89,17 @@ it against a committed golden image:
 ./build/ProjectIo --verify scripts/verify/corporation_lens.lua
 ```
 
-## Latest releases — v0.1.1, v0.1.2 and v0.1.8
+## Latest releases — v0.1.1, v0.1.2, v0.1.8 and v0.1.9
+
+**v0.1.9 — shell & legibility: the standing UI set, finished.** The always-on canvas layers become
+decodable (roads name their tier on selection, and dim with the commercial-reach fog like everything
+else); **building stacks become a decision** rather than a dominant strategy — site *k* yields
+`0.8^(k-1)` of a lone site while still drawing real reserve, so a full stack drains the deposit
+faster than its output multiple; screen geometry gets **one owner** instead of five hand-derived
+copies; and disclosure splits into **two controls** — expand in place, or take the canvas — so a
+full-screen no longer costs you the header, the clock and your selection. Also retires the History
+ledger's Tiles view and gives the orphaned Economy panel a door.
+
 
 **v0.1.8 — build health: the gate stops lying.** No player-facing content. `ctest` had been
 reporting **ten failures of which exactly one was a real failing assertion**; the rest were
