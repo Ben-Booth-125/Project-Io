@@ -89,7 +89,17 @@ it against a committed golden image:
 ./build/ProjectIo --verify scripts/verify/corporation_lens.lua
 ```
 
-## Latest release — v0.1.0
+## Latest release — v0.1.2
+
+**Buildings rework — remoteness stops being free.** Placement now enforces a **logistical maximum
+range** from a supply anchor, so siting is a trade-off rather than a lookup of the richest tile on
+the map; **build time scales with the site** (landform, distance from an anchor, established
+stack); and **construction reads as a process** on the canvas with its remaining time legible. Also
+widens extraction from 4 to 15 targets, groups the construction ledger, and warns that a build will
+starve *before* you commit. The processing half of the roster is deliberately out of scope
+(BL-340). Full history in [`CHANGELOG.md`](CHANGELOG.md).
+
+## Previous release — v0.1.0
 
 **The prototype cut.** The economy loop, validated and playable end-to-end: construction,
 population-grounded workforce, spatial price divergence via supply convoys, gated discovery

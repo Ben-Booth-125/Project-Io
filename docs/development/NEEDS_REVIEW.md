@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*107 entries — 12 open, 95 resolved.*
+*108 entries — 13 open, 95 resolved.*
 
 ---
 
@@ -74,11 +74,6 @@ ROADMAP.md writes done-definitions for exactly two versions: v0.1.0 (the prototy
 
 Two things for your eye. (1) Goldens: sticky_card_00/02-05, new sticky_card_01_resting_corp (old sticky_card_01_dismissed.png orphaned - delete), continents_lens_kepler_key, and every golden showing the Selection band header (selection_band_*, selection_bar_*, selection_building_manage, selection_tile_*, walk_04_selection, v009_emblem_selection_and_markers) need re-blessing - the [x] dismiss control is gone and [>] moved. Not re-blessed this session: on the Linux box ALL goldens diff 20-35% even on untouched captures, so a bless here would be blind. (2) Layout call: the Continent lens key permanently overlaps the always-open band corner (see continents_lens_kepler_key capture) - does the key want a new home?
 
-### NR-104 — archive_designs.js reformats the whole of backlog.json: it writes 2-space indent, the file is stored at 1
-*observation · raised 2026-08-09 · from v0.1.2 cut, 2026-08-09 - archiving BL-323's design prose*
-
-tools/session/archive_designs.js:41 writes `JSON.stringify(data, null, 2)`, but docs/development/backlog.json is committed with a 1-space indent. So archiving ANY item silently reformats all ~7,500 lines: the run for BL-323 produced a 7531-insertion / 7502-deletion diff, and the file GREW from 895.6 KB to 907.1 KB even though 11.3 KB of prose had just moved out to the cold store. The tool's own summary line misreports this as '-1% smaller' (it prints a negated delta: '--11.4 KB'). Two consequences: the real change becomes unreviewable inside a whole-file diff, and it is a near-certain merge conflict for any concurrent session touching the backlog - which is exactly the situation this cut ran into. Worked around by rewriting backlog.json at indent=1 afterwards, which brought the diff back to 32 insertions / 3 deletions. FIX: change the indent to 1 for backlog.json (the cold archive files ARE 2-space, so the constant cannot simply be shared), and correct the sign on the size-delta message. Small item; not filed as a backlog entry because it is a two-line fix, but it will bite again on the next landing if left.
-
 ### NR-107 — BL-215 (render audit): tick labels abbreviate only from 1000 up, not always
 *decision taken on your behalf · raised 2026-08-09 · from BL-215 design § 5 — 'labels format through fmt::abbreviate instead of %g'*
 
@@ -88,6 +83,16 @@ fmt::abbreviate floors sub-1000 values to whole numbers, so a 2.5 gridline would
 *observation · raised 2026-08-09 · from BL-215 design decisions 7 and 8 pull in opposite directions*
 
 The legend_place opt-in keeps any width TEST out of draw_bars as specified, but two mandated fixes still move pixels everywhere draw_bars runs, tile graphs included: the measured legend reserve (was constexpr 190, band grows so capped bars can widen from ~25 to their 34 cap) and the top tick's y-clamp into the box. Goldens are disposable by standing practice; re-bless on the next Windows run. Linux golden diffs are uninformative (all Windows-blessed goldens fail ~25-55% here on font rasterisation alone).
+
+### NR-109 — archive_designs.js reformats the whole of backlog.json: it writes 2-space indent, the file is stored at 1
+*observation · raised 2026-08-09 · from v0.1.2 cut, 2026-08-09 - archiving BL-323's design prose*
+
+tools/session/archive_designs.js:41 writes `JSON.stringify(data, null, 2)`, but docs/development/backlog.json is committed with a 1-space indent. So archiving ANY item silently reformats all ~7,500 lines: the run for BL-323 produced a 7531-insertion / 7502-deletion diff, and the file GREW from 895.6 KB to 907.1 KB even though 11.3 KB of prose had just moved out to the cold store. The tool's own summary line misreports this as '-1% smaller' (it prints a negated delta: '--11.4 KB'). Two consequences: the real change becomes unreviewable inside a whole-file diff, and it is a near-certain merge conflict for any concurrent session touching the backlog - which is exactly the situation this cut ran into. Worked around by rewriting backlog.json at indent=1 afterwards, which brought the diff back to 32 insertions / 3 deletions. FIX: change the indent to 1 for backlog.json (the cold archive files ARE 2-space, so the constant cannot simply be shared), and correct the sign on the size-delta message. Small item; not filed as a backlog entry because it is a two-line fix, but it will bite again on the next landing if left. (Filed as NR-104 initially; renumbered to NR-109 the same session after a concurrent session independently claimed NR-104 — see NR-110.)
+
+### NR-110 — Two Claude sessions ran on this repo at once: colliding NR ids, and each sweeping the other's files into its commits
+*observation · raised 2026-08-09 · from v0.1.2 cut, 2026-08-09*
+
+During the v0.1.2 cut a second session was working the same tree and committing to main. Three concrete effects, all observed rather than theorised. (1) ID COLLISION: both sessions filed an NR-104 within minutes -- mine on the archive_designs.js reformat bug, theirs on the BL-266 golden re-bless -- the same hazard CLAUDE.md already documents for BL ids, but NR ids have no next_id.js equivalent to allocate from. Mine renumbered to NR-109. (2) CROSS-SWEEPING: commit 7c423fa ('Batch close-out: BL-215, BL-266, BL-294, BL-295, BL-339 complete') swept up this session's backlog.json edits (BL-323 -> complete, BL-340 filed) and NEEDS_REVIEW entries NR-097..NR-104, so cut bookkeeping is recorded under an unrelated commit message. Nothing was lost, but the history now misattributes it. (3) MOVING TARGET: main advanced four times mid-cut (711b666, 94b2950, a297d4a, 7c423fa), and an in-flight edit to DEVLOG.md failed because the file changed underneath it. SUGGESTION: either a lightweight lock convention for main-session work, or route concurrent sessions through worktree branches the way sub-agents already are -- the worktree model exists precisely for this and the second session was using it for its agents but not for its own main-tree commits. Also worth giving NR ids the same next_id.js treatment BL ids have.
 
 ---
 

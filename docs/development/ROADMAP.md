@@ -258,7 +258,7 @@ added by Ben 2026-08-04).
   deed-gated keystones (BL-309, see v0.3.0 below). **Build health:** a fresh CMake configure
   can't fetch SDL3 on at least one machine — a TLS revocation failure a populated `_deps` cache
   hides (BL-302).
-- **v0.1.2 — Buildings rework** (**BL-323**). *(Added by Ben, 2026-08-07: "we need to pad out the
+- **v0.1.2 — Buildings rework — CUT 2026-08-09** (**BL-323**, complete). *(Added by Ben, 2026-08-07: "we need to pad out the
   number of available buildings, and start enforcing placement rules. Especially for logistical
   max building range… We need to put a lot of work into this before any simulated games can
   occur.")* The band's second concrete build minor, and the one the simulated-play arc waits on.
@@ -280,6 +280,26 @@ added by Ben 2026-08-04).
   Politics), which follow it here. None of them depends on this work and it depends on none of
   them, so the old order delayed the concrete blocker behind four design passes for no technical
   reason.
+
+  **Done-definition — v0.1.2.** *Written at the cut, 2026-08-09, as the first of the per-minor
+  done-definitions NR-103 asks for; v0.1.0's list above is the model.* v0.1.2 is cut when:
+
+  - **Siting carries a trade-off.** A building cannot be placed at unbounded distance from a
+    supply anchor, and the budget is authored data rather than a constant in code. *(BL-323 S2.)*
+  - **The rule teaches rather than merely refuses** — build surfaces stop offering tiles the gate
+    will reject, and a body with no anchor still has a legal first move. *(S2b + bootstrap.)*
+  - **Build time depends on where you build**, not only on what you build. *(S3.)*
+  - **Construction reads as a process** on the canvas, with its remaining time legible. *(S4,
+    BL-327.)*
+  - The build is **green** and the rework's harnesses pass. *(12/12 and 26/26.)*
+  - Excluded by scope, and filed rather than dropped: the processing-chain roster, which needs new
+    resource types and a save-format change (**BL-340**).
+
+  **Cut 2026-08-09.** All six items terminal — the rework itself (BL-323) plus construction-ledger
+  grouping (BL-326), the under-construction glyph (BL-327), the pre-commitment supply warning
+  (BL-328), the reach-circle retirement (BL-329) and the building-selection click-model fix
+  (BL-330). Tagged ahead of `v0.1.1`, whose theme is cut separately; pre-1.0 numbering is
+  advisory, and each tag documents its own theme.
 - **v0.1.3 — Laws** (**BL-155** law/policy surface design, **BL-186** laws ledger UI, **BL-280**
   negotiated tax rate). First pass at the law / policy surface — what a law *is* as a data
   object, how it gates or modifies economic (and later political) behaviour, and its ledger

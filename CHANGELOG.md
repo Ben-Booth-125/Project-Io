@@ -14,6 +14,62 @@ authoritative version-history record. A local-only snapshot of `src/` is also ke
 
 _Nothing yet._
 
+## [0.1.2] — 2026-08-09
+
+**Buildings rework — remoteness stops being free.** The minor that the simulated-play arc was
+waiting on. Siting a building is now a decision with a trade-off rather than a lookup of the
+richest tile on the map, and construction reads as a process on the canvas instead of a silent
+timer.
+
+> **Cut order.** This tag lands before `v0.1.1`, whose word-interface theme is cut separately
+> from earlier work. Pre-1.0, minor numbering is advisory (see the header note); each tag
+> documents its own theme rather than a strict chronology.
+
+### Added
+- **A logistical maximum range on placement** (BL-323) — the rule that had no code at all. A site
+  must sit within a bounded logistics cost of a supply anchor (city, port, or inland logistics
+  hub), computed as a multi-source Dijkstra reach field over the terrain-weighted cost function
+  logistics already provided, cached per body and invalidated on every mutation that can move an
+  anchor. The budget is authored in `economy.lua`, not hard-coded: at the shipped value, 77.4% of
+  Kepler's land is placeable, no land tile is unreachable, and all 20 generation-placed buildings
+  already sit inside it — so generation and the rule agree without retuning either.
+- **A first-anchor bootstrap** — a body with no anchor refuses everything *except* an anchor, so
+  working a virgin moon begins by planting a logistics hub. Deliberate mechanic, not a side effect.
+- **Site-dependent build time** (BL-323) — `build_duration_ticks` becomes a per-type *base*,
+  scaled by landform, by distance from the nearest supply anchor, and discounted where a tile
+  already carries an established stack. A remote mountain site is now a considered commitment.
+- **Construction as a visible process** (BL-323, BL-327) — a dedicated under-construction glyph on
+  the Planetary canvas replaces the old dimmed-marker treatment, with remaining ticks on the
+  hover card.
+- **Eleven more extraction targets** (BL-323) — `k_extractable` widens from 4 to 15, covering every
+  resource tile generation already deposits but no building could reach, plus the Smelter's
+  iron/nickel → steel recipe.
+- **Pre-commitment supply warning** (BL-328) — the construction ledger says a build will starve
+  *before* you commit to it, rather than after it stalls.
+- **Expandable building groups** in the construction ledger, two-tier alphabetically sorted
+  (BL-326).
+
+### Changed
+- **Clicking a building fills the Selection element again** (BL-330) — it had been skipping
+  straight to management, contradicting the settled single-click-selects / double-click-navigates
+  click model.
+- Placement surfaces stop offering tiles the gate will refuse — the rule is applied wherever a
+  tile is *offered*, not only where a build is committed, so an offered-then-rejected tile no
+  longer reads as a broken build.
+
+### Removed
+- **The corp-building reach circle** (BL-329) — the fog and the new reach rule now carry that
+  information between them.
+
+### Verification
+- `buildings_rework_harness` 12/12 PASS; `logistics_reach_harness` 26/26 PASS.
+
+### Known gaps
+- The **processing half** of the roster (Chemical Plant, Electronics Lab, Fabricator, Assembly
+  Plant, most Refinery outputs) is **not** in this cut. It needs new `resource_type` values with
+  market, price and serialisation wiring — a save-format change rather than Lua authoring — and is
+  filed as BL-340 (processing-chain roster) so closing the rework did not silently drop it.
+
 ## [0.1.0] — 2026-08-03
 
 **The prototype cut.** The economy loop, validated and playable end-to-end — construction,
@@ -260,7 +316,8 @@ Layer 2 finalisation.
 
 Initial prototype snapshot — application shell, canvases, and the hard-coded world.
 
-[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.0...v0.1.2
 [0.1.0]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.0.9...v0.1.0
 [0.0.9]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.0.8...v0.0.9
 [0.0.8]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.0.7...v0.0.8

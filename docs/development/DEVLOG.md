@@ -10,7 +10,63 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — Build-heavy v0.1.1 batch: BL-215, BL-266, and the XS sweep, three worktree agents (2026-08-09, latest)
+## Session — Cut v0.1.2: the buildings rework ships, and the roadmap gets its first per-minor done-definition (2026-08-09, latest)
+
+Full mode, release. Ben, after a roadmap gap review: *"cut as many versions as we can now, rather
+than working on the lofty, conceptual stuff"* — then, on the plan: *"cut v0.1.2 first, then
+v0.1.1."*
+
+**What the review found.** 119 commits since the `v0.1.0` tag and not one version cut, with
+`CHANGELOG.md`'s `[Unreleased]` still reading *"Nothing yet"* — so the changelog was not merely
+un-stamped, it was not accruing. In the same window the roadmap kept extending *forward* (v1.0.0
+named, the Era −1 arc folded into v0.3.0, stub minors re-sequenced). The root cause, filed as
+**NR-103**: the roadmap writes done-definitions for exactly two versions, v0.1.0 and v1.0.0, and
+those are the only two ever cut or scheduled. A theme with no done-definition has no test for
+*finished*, so it absorbs items indefinitely — which is precisely what v0.1.1 did, taking on 26
+retrofitted items after its own three legs had shipped. Seven findings filed, **NR-097**–**NR-103**.
+
+**The cut.** v0.1.2 was the cheapest available: six items, all terminal, the work landed and
+verified 2026-08-07/08. Closing it needed bookkeeping rather than code —
+
+- **BL-340** (processing-chain roster) filed, because BL-323's own completion note scoped out the
+  processing half of S1 in as many words (new `resource_type` values with market/price/
+  serialisation wiring — a save-format change, not Lua authoring) and no item carried it. Closing
+  BL-323 without it would have silently dropped the work.
+- **BL-323** flipped to `complete` with a resolution covering all four strands, and its 11.3 KB of
+  design prose archived to the Q3 cold store.
+- **A done-definition written for v0.1.2** — six bullets on the v0.1.0 model, the first of the
+  per-minor definitions NR-103 asks for.
+
+**Gate.** Full rebuild green (150/150, app + every harness); the app smoke-launched clean; CTest
+**45/55**, and the ten failures are exactly the pre-existing baseline set recorded in
+`LastTestsFailed.log` on 2026-08-08 — `ai_skill_harness`, `earthlike_lean_trace`,
+`earthlike_tile_census`, `econ_stability`, `history_sim_harness`, `history_sweep`,
+`home_surface_bench`, `mediterranean_sweep`, `notable_worlds`, `world_audit`. No new failure
+introduced. Six of the ten are 60-second timeouts, which is most of the suite's 573-second runtime.
+
+**Three things the cut surfaced that the gate would otherwise have missed.**
+
+1. **`main` did not compile.** The BL-266 merge (Selection always open) retired
+   `ui_state::selection_hidden_for` but left the hire-unit path in `app.cpp` assigning to it. Found
+   by running the release build; fixed at `711b666` while this session was in flight. Worth noting
+   for what it says about the gate: there is no CI, so a broken `main` stays invisible until
+   somebody builds it.
+2. **`archive_designs.js` reformats the entire backlog.** It writes `JSON.stringify(data, null, 2)`
+   while `backlog.json` is stored at 1-space indent, so archiving one item produced a
+   7531-insertion / 7502-deletion diff and *grew* the file by 11.5 KB while reporting
+   *"-1% smaller"* (the size delta prints negated). Normalised back to indent=1 by hand, which
+   returned the diff to 32/3. Filed as **NR-109** — a two-line fix that will bite on the next
+   landing if left.
+3. **Two sessions were writing this repo at once**, and it showed: a duplicated NR-104, cut
+   bookkeeping swept into an unrelated commit (`7c423fa`), and `main` advancing four times
+   mid-cut. Filed as **NR-110**, with the suggestion that concurrent main-tree sessions use
+   worktree branches the way sub-agents already do.
+
+**Runtime:** not tracked.
+
+---
+
+## Session — Build-heavy v0.1.1 batch: BL-215, BL-266, and the XS sweep, three worktree agents (2026-08-09)
 
 Full mode, Batch Delivery, first all-Linux delivery session (no PowerShell — status read via
 `backlog_query.js`; builds via `build_linux/` Ninja). Three concurrent worktree agents, merged
