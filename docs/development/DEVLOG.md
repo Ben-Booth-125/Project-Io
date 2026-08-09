@@ -10,7 +10,52 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — Cut v0.1.2: the buildings rework ships, and the roadmap gets its first per-minor done-definition (2026-08-09, latest)
+## Session — Cut v0.1.1: the word interface ships, and the retrofit that made it uncuttable is undone (2026-08-09, latest)
+
+Full mode, release — the second cut of the same session, immediately after v0.1.2. Ben:
+*"cut v0.1.2 first, then v0.1.1."*
+
+**The diagnosis, restated because it is the whole point.** v0.1.1's theme — the word interface —
+had been complete since 2026-08-03: blackboard export (BL-206), action dictionary (BL-270) and Io
+MCP server (BL-278) all landed. The minor stayed open anyway because three later waves of
+unrelated work were hung on it after the fact, 26 items at the peak. `ROADMAP.md` recorded this
+in its own words — *"Retrofitted 2026-08-08 — still open"* — without registering it as a problem.
+It is the concrete instance of NR-103: **a theme with no done-definition has no test for
+*finished*, so it absorbs work indefinitely.**
+
+**The cut.** 28 items terminal. Beyond the three theme legs the minor genuinely carried a lot —
+the sticky-card family (BL-194–BL-198, BL-214, BL-247), the corporation dashboard (BL-248), the
+commercial-activity fog (BL-150–BL-154), hover freeze and glance-then-stick (BL-228, BL-230), the
+radial tech-tree viewer (BL-310), the minimap/header reflow (BL-312, BL-313), the wizard's
+real-tile preview (BL-319), the Mediterranean rift sea (BL-276) and the GPU/multicore pass
+(BL-267). A done-definition was written at the cut, on the v0.1.0 model.
+
+**The narrowing, stated rather than papered over.** The write leg is partial: `place_sell_order`,
+`remove_sell_order` and `set_workforce_auto` are in the dictionary but have no `corp_verb`. The
+cause is structural, not three missing verbs — sell orders live in `ui_state`, the world holds no
+order book to mutate, and no serialisation path touches them (BL-293's own 2026-08-07 scope
+correction). `ACTIONS.json`'s note already says so explicitly, so the dictionary does not
+overclaim. BL-293 moves to v0.2.0, where a text-driven player is what needs it.
+
+**The re-homing (NR-111, decision-taken).** The 24 items still open went to three coherent new
+minors — **v0.1.8** build health, **v0.1.9** shell & legibility, **v0.1.10** generation & content —
+with BL-293 and BL-262 (standing) to **v0.2.0**. None cancelled; all kept their priority. The
+judgement call worth checking is the *numbering*: they were appended rather than inserted at
+v0.1.3, so no existing minor had to be renumbered — at the cost of their number understating
+their priority, since all three are buildable now while v0.1.3–v0.1.6 are design-forward stubs.
+The roadmap states plainly that number is not sequence here.
+
+**Gate.** Rebuilt after the concurrent session's `src/` changes (21 files, BL-215/BL-266 work) —
+green. The CTest baseline established earlier in the session stands: 45/55, ten failures identical
+to the 2026-08-08 set.
+
+**Two versions cut in one session**, against a six-day stretch where 119 commits produced none.
+
+**Runtime:** not tracked.
+
+---
+
+## Session — Cut v0.1.2: the buildings rework ships, and the roadmap gets its first per-minor done-definition (2026-08-09)
 
 Full mode, release. Ben, after a roadmap gap review: *"cut as many versions as we can now, rather
 than working on the lofty, conceptual stuff"* — then, on the plan: *"cut v0.1.2 first, then

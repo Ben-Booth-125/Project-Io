@@ -70,6 +70,58 @@ timer.
   market, price and serialisation wiring — a save-format change rather than Lua authoring — and is
   filed as BL-340 (processing-chain roster) so closing the rework did not silently drop it.
 
+## [0.1.1] — 2026-08-09
+
+**The word interface.** The route from documentation to a text-driven player, and the groundwork
+the v0.2.0 AI opponent is built on: an agent can now read the world state, look up what every
+control *means*, and drive the game over a socket — with no HTTP client, no API key and no cloud
+dependency anywhere in the engine. Ships alongside the shell work that ran in the same band.
+
+> **Cut order.** Tagged after `v0.1.2`, whose buildings theme was finished first. Pre-1.0 numbering
+> is advisory (see the header note); entries are ordered by version, not by tag date.
+
+### Added — the word interface (the theme)
+- **Blackboard export** (BL-206) — world state an agent reads through a stable export instead of
+  scraping the UI.
+- **The action dictionary** (BL-270) — all 115 controls as `{press, typed args, preconditions,
+  expected output, reason to select}`, across five families. The gameplay family is *transcribed*
+  from `corp_command.hpp` rather than authored beside it, so the seam cannot drift from its own
+  description. `ACTIONS.json` is canonical; `ACTIONS.md` and a compact `ACTIONS_INDEX.json` are
+  generated.
+- **The Io MCP server** (BL-278) — `ProjectIo --serve` plus `tools/mcp/`, making both of the above
+  drivable by any agent runtime. Touches no simulation code.
+
+### Added — shell, canvases & legibility
+- **The sticky detail card family** (BL-194–BL-198) — card frame, the Selection element moved
+  wholesale into it, recursive bounded drill-down, a titled dual-axis chart container, and the
+  resource time-series store behind it. **Drill-through** becomes one shared progressive-disclosure
+  idiom (BL-214), and every chart declares the question it answers (BL-247).
+- **Corporation dashboard** (BL-248) as roll-up cards.
+- **Commercial-activity fog** (BL-150–BL-154) — the unlit map as a dim shadow, intra-body reach on
+  the Planetary canvas, and convoy vision beams with moving head/tail corridors.
+- **Radial tech-tree viewer** (BL-310, F9) — the Era 0/1 quest trees as a constellation.
+- **New World wizard** split to 1/3 controls + 2/3 preview, with a real-tile globe (BL-319).
+- **Mediterranean rift sea** (BL-276) — a continental rift basin floods into an enclosed sea.
+
+### Changed
+- **Hover behaviour** — a card freezes until the cursor leaves its bounds, retiring the dwell
+  timer (BL-228), and hover settles into glance-then-stick (BL-230).
+- **Comms dock** moves bottom-left at the Selection band height (BL-227); the **minimap** wraps
+  flush to the canvas edges (BL-312); the **time controls** reflow into the header's own height
+  (BL-313).
+- **GPU utilisation and multicore threading** for the growing generation/render load (BL-267).
+
+### Known gaps
+- **The write leg is partial.** `place_sell_order`, `remove_sell_order` and `set_workforce_auto`
+  appear in the dictionary but have no `corp_verb`, so an agent can read the order book and be told
+  what the press means without being able to place a standing sell order. The cause is structural
+  rather than three missing verbs: sell orders live in UI state, the world holds no order book to
+  mutate, and no serialisation path touches them. `ACTIONS.json`'s note states the narrowing
+  explicitly. Carried by BL-293, moved to v0.2.0.
+- 22 further items that had been retrofitted onto this minor after its theme completed were
+  **re-homed, not cancelled** — into v0.1.8 (build health), v0.1.9 (shell & legibility) and
+  v0.1.10 (generation & content).
+
 ## [0.1.0] — 2026-08-03
 
 **The prototype cut.** The economy loop, validated and playable end-to-end — construction,
@@ -318,6 +370,7 @@ Initial prototype snapshot — application shell, canvases, and the hard-coded w
 
 [Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.2...HEAD
 [0.1.2]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.0...v0.1.2
+[0.1.1]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.2...v0.1.1
 [0.1.0]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.0.9...v0.1.0
 [0.0.9]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.0.8...v0.0.9
 [0.0.8]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.0.7...v0.0.8

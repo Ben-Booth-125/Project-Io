@@ -214,7 +214,7 @@ added by Ben 2026-08-04).
 > cost, or a technology can only unlock a building, it is being designed for the corporate
 > player we are pivoting away from. See BL-094 (player-identity pivot) § 2026-08-03.
 
-- **v0.1.1 — The word interface, plus shell & legibility follow-through.** *(Re-themed
+- **v0.1.1 — The word interface — CUT 2026-08-09.** *(Re-themed
   2026-07-31 for roads; **re-themed again 2026-08-03**, NR-034 — Ben named the word interface as
   this minor's theme.)* Two threads, and it stays the concrete build minor.
 
@@ -258,6 +258,39 @@ added by Ben 2026-08-04).
   deed-gated keystones (BL-309, see v0.3.0 below). **Build health:** a fresh CMake configure
   can't fetch SDL3 on at least one machine — a TLS revocation failure a populated `_deps` cache
   hides (BL-302).
+
+  **The retrofit was the mistake, and it is undone (2026-08-09, at the cut).** Everything in the
+  paragraph above was assigned to a minor whose own theme had *already shipped* — the three legs
+  landed by 2026-08-03, and three later waves were then hung on the same tag. That is what made
+  v0.1.1 uncuttable for six days, and it is the concrete instance of the root cause NR-103 names:
+  a theme with no done-definition has no test for *finished*, so it absorbs work indefinitely. The
+  24 items still open at the cut were **re-homed into three coherent minors** — v0.1.8 (build
+  health), v0.1.9 (shell & legibility), v0.1.10 (generation & content) — with BL-293 (order-book
+  verbs) and BL-262 (standing) moved to **v0.2.0**, where a text-driven player and legible rivals
+  are what they actually serve. None was cancelled; all kept their priority.
+
+  **Done-definition — v0.1.1.** *Written at the cut, 2026-08-09.* v0.1.1 is cut when:
+
+  - **An agent can read the world state** through a stable export rather than by scraping the UI.
+    *(BL-206, blackboard export.)*
+  - **Every control has a stated meaning** — typed arguments, preconditions, expected output —
+    in a machine-consumable dictionary transcribed from the command seam, not authored beside it.
+    *(BL-270, action dictionary.)*
+  - **Both are reachable by any agent runtime** over a socket the engine ships without an HTTP
+    client, an API key, or a cloud dependency. *(BL-278, `ProjectIo --serve` + `tools/mcp/`.)*
+  - The build is **green** and the loop still verifies.
+  - **Narrowed, honestly:** the write leg is partial. Three order-book presses have no
+    `corp_command` verb, so an agent can read the book and be told what the press means but cannot
+    place a standing sell order — the world has no order book to mutate, and no serialisation path
+    for one. `ACTIONS.md`'s "full word interface" claim is corrected to say so. Carried by
+    **BL-293** in v0.2.0 (NR-099).
+
+  **Cut 2026-08-09.** 28 items terminal. Beyond the three theme legs, the minor also carried the
+  sticky-card family (BL-194–BL-198, BL-214, BL-247), the corporation dashboard (BL-248), the
+  comms-dock re-plan (BL-227), hover freeze / glance-then-stick (BL-228, BL-230), the
+  commercial-activity fog work (BL-150–BL-154), the radial tech-tree viewer (BL-310), the
+  minimap and header reflow (BL-312, BL-313), the New World wizard's real-tile preview (BL-319),
+  the Mediterranean rift sea (BL-276), and the GPU/multicore performance pass (BL-267).
 - **v0.1.2 — Buildings rework — CUT 2026-08-09** (**BL-323**, complete). *(Added by Ben, 2026-08-07: "we need to pad out the
   number of available buildings, and start enforcing placement rules. Especially for logistical
   max building range… We need to put a lot of work into this before any simulated games can
@@ -342,6 +375,37 @@ added by Ben 2026-08-04).
   user-story review) is the vehicle, retargeted here from v0.1.1; it consumes
   `user_stories.json` and closes the loop between the band's new systems and the surfaces that
   serve them.
+
+> **v0.1.8–v0.1.10 are concrete, and numbered last only to avoid churn (2026-08-09).** They carry
+> the 22 items re-homed out of v0.1.1 at its cut. Their **numbers are not their sequence**: all
+> three are buildable now, while v0.1.3–v0.1.6 are design-forward stubs, and Ben's standing steer
+> is to cut concrete minors ahead of conceptual ones ("cut as many versions as we can now, rather
+> than working on the lofty, conceptual stuff", 2026-08-09; the same call NR-084 made when
+> buildings jumped the stub queue). They were appended rather than inserted at v0.1.3 purely so no
+> existing minor had to be renumbered — pre-1.0 numbering is advisory, and v0.1.2 was already cut
+> before v0.1.1. Each earns its done-definition at promotion, per NR-103.
+
+- **v0.1.8 — Build health.** *Theme: the project's own tooling stops lying.* Four items, and the
+  smallest cut available. `world_audit` fails, so `TILES.md`'s tile census cannot be re-measured
+  (**BL-291**); `next_id.js` scans zero refs, so its cross-branch collision defence is inert —
+  which is exactly how BL-326..BL-333 each landed twice (**BL-322**); a fresh CMake configure
+  can't fetch SDL3 on at least one machine, hidden by a populated `_deps` cache (**BL-302**); and
+  the GCC golden set needs re-blessing so the platform split reads coherently (**BL-285**). None
+  ships player-facing content; all four cost time on every session that trips them.
+- **v0.1.9 — Shell & legibility follow-through.** *Theme: the standing UI set, finished.* The road
+  tier legend (**BL-184**) and road/fog dimming (**BL-185**), building stack capacity (**BL-193**),
+  the comms-log re-plan (**BL-216**), the building-selection tile format (**BL-229**), the
+  UI-justification store pairing every readout with the question it answers (**BL-260**), the
+  disclosure-controls revision (**BL-265**), retiring the History ledger's Tiles view (**BL-281**),
+  and the orphaned Economy panel (**BL-292**).
+- **v0.1.10 — Generation & content.** *Theme: what the world is called and what it is made of.*
+  Led by **BL-290** (priority A): the nation and city name banks read Latin/European, in direct
+  breach of the standing no-real-names rule — every generated name must be sci-fi/fantasy from the
+  seeded banks. With it: generated body names (**BL-257**) and the generation-globe preview
+  (**BL-256**), corp placement constrained to the home province (**BL-283**), exclave measurement
+  (**BL-284**), dual-endpoint trade-route log entries (**BL-282**), propellant as a real resource
+  (**BL-308**), deed history-log lines (**BL-309**), and the Kepler wetland re-base (**BL-338**).
+
 ### v0.2.0 — The AI opponent
 
 *Versioned theme: the AI opponent.* The backlog's live v0.2.0 set is the corp-AI arc: stage A

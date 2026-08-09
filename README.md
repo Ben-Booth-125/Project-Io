@@ -89,9 +89,17 @@ it against a committed golden image:
 ./build/ProjectIo --verify scripts/verify/corporation_lens.lua
 ```
 
-## Latest release — v0.1.2
+## Latest releases — v0.1.1 and v0.1.2
 
-**Buildings rework — remoteness stops being free.** Placement now enforces a **logistical maximum
+**v0.1.1 — the word interface.** An agent can read the world state (blackboard export), look up
+what every one of the 115 controls *means* (the action dictionary, transcribed from the command
+seam rather than authored beside it), and drive the game over a socket — `ProjectIo --serve` plus
+`tools/mcp/`. No HTTP client, no API key, no cloud dependency in the engine. Ships with the sticky
+detail-card family, the corporation dashboard, commercial-activity fog, and the radial tech-tree
+viewer. The write leg is deliberately partial — standing sell orders are not yet issuable by
+command (BL-293).
+
+**v0.1.2 — buildings rework: remoteness stops being free.** Placement now enforces a **logistical maximum
 range** from a supply anchor, so siting is a trade-off rather than a lookup of the richest tile on
 the map; **build time scales with the site** (landform, distance from an anchor, established
 stack); and **construction reads as a process** on the canvas with its remaining time legible. Also
