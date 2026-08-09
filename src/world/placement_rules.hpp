@@ -3,6 +3,8 @@
 #include "world/components.hpp"
 #include "world/entity.hpp"
 
+#include <vector>
+
 struct world; // forward declaration for can_place_in_world / is_coastal
 
 /// Reusable, screen-independent building-placement validity rules.
@@ -193,31 +195,91 @@ placement_result can_place_in_world(const world& w, entity_id tile_id,
 
 // ---------------------------------------------------------------------------
 // Building stacks (Ben's 2026-07-22 call: "buildings can be stacked, so you can
-// build up to a max defined by resource richness")
+// build up to a max defined by resource richness"; rule settled 2026-07-26, BL-193)
 // ---------------------------------------------------------------------------
 // A tile is not a single build slot. Several extraction sites may work the same
 // deposit, up to a ceiling the deposit itself sets — a rich seam supports a
 // bigger operation than a thin one.
 //
-// PROVISIONAL RULE. The shape ("richness sets the ceiling") is settled; the
-// constant below is not, and the wider question this hangs off — whether stacked
-// sites split one nominal output or each draw their own, and how depletion
-// behaves across a stack — is an open design item. Both the placement gate and
-// the building panel's "how many more" readout call `stack_capacity`, so
-// settling the rule means changing this one function.
+// Two rules govern the stack, and they pull against each other on purpose
+// (docs/economy/PRODUCTION.md § Building stacks):
+//
+//   * **Output diminishes per site.** The k-th site of a stack — counted in
+//     stored order, oldest first — yields `k_stack_output_decay^(k-1)` of what it
+//     would yield alone. Two sites make 1.8x, five make 3.36x, never 5x.
+//   * **Depletion is honest and shared.** Every site draws REAL reserve for what
+//     it extracts, so a full stack drains the deposit faster than its output
+//     multiple, and the whole stack tapers and exhausts together (the stack
+//     pre-pass in economy_system.cpp § run_extraction).
+//
+// So stacking buys throughput now at the cost of the tile's life; spreading buys
+// life at the cost of transport and land. Neither dominates. There are no clamps
+// and no fake caps under this — the curve IS the economics.
+
+/// Deposit richness that buys one additional extraction site. Deposits generate in
+/// the 0-250 band (tile_generation.cpp § generate_deposits), so this puts a thin
+/// seam at 1 site and the richest tiles at 5.
+///
+/// SETTLED (BL-193, 2026-07-26). Kept at 50 deliberately: with the decay curve
+/// above carrying the economics, the ceiling is a **legibility** bound — how many
+/// markers a tile can host and a player can reason about — not the balance lever.
+inline constexpr float k_richness_per_site = 50.0f;
+
+/// Per-site output decay across a stack (BL-193). The k-th site yields
+/// `k_stack_output_decay^(k-1)` of a lone site's rate: 1, 0.8, 0.64, 0.512, 0.4096,
+/// summing to 1.0 / 1.8 / 2.44 / 2.952 / 3.3616 for stacks of 1-5.
+inline constexpr float k_stack_output_decay = 0.8f;
+
+/// Output multiplier for the @p rank-th site of a stack — `k_stack_output_decay`
+/// raised to `rank - 1`, by repeated multiplication rather than `std::pow` so the
+/// figure is bit-identical everywhere the simulation runs.
+///
+/// @param rank 1-based position in the tile's stack (stored order, oldest first).
+///             Anything at or below 1 reads as rank 1 — a lone site is never
+///             diminished for want of a stack entry.
+/// @return     The scalar on this site's nominal output (0 < s <= 1).
+float stack_output_scalar(int rank);
 
 /// Sites of @p type (and @p target, for extraction) that @p tc can carry at once.
 ///
 /// Extraction scales with the target resource's deposit richness — one site per
 /// `k_richness_per_site` of deposit, at least one wherever a deposit exists at
-/// all. Every other building type returns 1: richness says nothing about how many
-/// refineries a tile can host, so stacking them is not yet a rule.
+/// all. Every other building type returns 1: whether processors stack on land,
+/// workforce or road tier is a separate question, deferred by BL-193 rather than
+/// answered by it.
 ///
 /// @param tc     The candidate tile.
 /// @param type   Building type.
 /// @param target Extraction target (ignored for non-extraction types).
 /// @return       Maximum simultaneous buildings of that kind on the tile (>= 1).
 int stack_capacity(const tile_component& tc, building_type type, resource_type target);
+
+/// The tile's stack of @p type / @p target buildings in **stored order, oldest
+/// first** — ascending entity id, which is creation order because ids are handed
+/// out monotonically (`world::create_entity`).
+///
+/// The order is load-bearing, not cosmetic: it fixes which site is rank 1 and so
+/// which site takes the undiminished yield. It must therefore never be read off
+/// `world::buildings`' own (unordered) iteration order.
+///
+/// Counts every standing site, including decommissioned and still-building ones —
+/// the same population `buildings_on_tile` counts against `stack_capacity`, so a
+/// site's rank is simply its place in the tile's build order.
+///
+/// @param w       Read-only world state.
+/// @param tile_id Tile to walk.
+/// @param type    Building type to match.
+/// @param target  Extraction target to match (ignored for non-extraction types).
+/// @return        Matching building ids, ascending.
+std::vector<entity_id> stack_members(const world& w, entity_id tile_id,
+                                     building_type type, resource_type target);
+
+/// 1-based rank of @p building_id within its own tile's stack (see stack_members).
+///
+/// @param w           Read-only world state.
+/// @param building_id The building to locate.
+/// @return            Its rank, or 0 if the building no longer exists.
+int stack_rank(const world& w, entity_id building_id);
 
 /// Count buildings of @p type (and @p target, for extraction) already standing on
 /// @p tile_id. The current occupancy that `stack_capacity` is the ceiling for.

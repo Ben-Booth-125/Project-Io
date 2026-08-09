@@ -321,6 +321,46 @@ void draw_selected_section(world& w, const recipe_registry& reg,
     else
         ImGui::TextDisabled("Single method");
 
+    // --- Where this site sits in its tile's stack (BL-193) ---------------------
+    // Sites stack on one tile up to a ceiling the deposit's richness sets, which the
+    // placement gate already enforces. BL-193 adds the half that decides whether
+    // stacking is worth DOING: where in the stack this site sits, and what that costs
+    // it. Without the line the decay is invisible — the player sees a second site
+    // produce less than the first and has nothing telling them that is the rule
+    // rather than a fault.
+    //
+    // Homed here rather than in the Selection element: the rich building card that
+    // used to carry it was deleted by BL-339 (it had been parked and unreachable), and
+    // Manage routes to this tab (NR-093). A readout in a dead function is not a readout.
+    if (const auto tit = w.tiles.find(b.tile); tit != w.tiles.end())
+    {
+        const int cap  = placement_rules::stack_capacity(tit->second, b.type, b.target_resource);
+        const int here = placement_rules::buildings_on_tile(w, b.tile, b.type, b.target_resource);
+        const int rank = placement_rules::stack_rank(w, state.selected_entity);
+
+        ImGui::SeparatorText("On this tile");
+        ImGui::TextDisabled("%d of %d site%s", here, cap, cap == 1 ? "" : "s");
+        if (here < cap)
+        {
+            ImGui::SameLine();
+            ImGui::TextDisabled("- room for %d more", cap - here);
+        }
+
+        // Extraction only: every other type is capacity 1, so there is no position in
+        // a stack to report and the line would be noise.
+        if (b.type == building_type::extraction_site && rank > 0)
+        {
+            if (rank == 1)
+                ImGui::TextDisabled("First site here - full rate. Each later site yields %.0f%% of the one before.",
+                                    placement_rules::k_stack_output_decay * 100.0f);
+            else
+                ImGui::TextDisabled("Site %d of the stack - %.0f%% of a lone site's rate.",
+                                    rank, placement_rules::stack_output_scalar(rank) * 100.0f);
+            if (here > 1)
+                ImGui::TextDisabled("All %d share one deposit, so it runs out sooner.", here);
+        }
+    }
+
     // --- Profit + Workforce graphs (PLACEHOLDER deterministic series until real
     // per-building history is recorded; the profit line anchors to the live estimate). ---
     const building_profit prof    = estimate_building_profit(w, reg, report, state.selected_entity);

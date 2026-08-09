@@ -3,6 +3,8 @@
 #include "world/logistics.hpp"
 #include "world/world.hpp"
 
+#include <algorithm>
+
 namespace placement_rules {
 
 const char* placement_reason_text(placement_reason r)
@@ -257,13 +259,17 @@ placement_result can_place_in_world(const world& w, entity_id tile_id,
     return placement_reason::ok;
 }
 
-// --- Building stacks (see the header for the provisional-rule note) -----------
+// --- Building stacks (BL-193; the rule and both constants live in the header) --
 
-/// Deposit richness that buys one additional extraction site. Deposits generate in
-/// the 0-250 band (tile_generation.cpp § generate_deposits), so this puts a thin
-/// seam at 1 site and the richest tiles at 4-5. PROVISIONAL — the value is a
-/// placeholder for a settled rule, not a tuned figure.
-constexpr float k_richness_per_site = 50.0f;
+float stack_output_scalar(int rank)
+{
+    // Repeated multiplication, not std::pow: the same product in the same order on
+    // every platform, so a stacked site's yield cannot drift a save out of sync.
+    float s = 1.0f;
+    for (int k = 1; k < rank; ++k)
+        s *= k_stack_output_decay;
+    return s;
+}
 
 int stack_capacity(const tile_component& tc, building_type type, resource_type target)
 {
@@ -290,6 +296,40 @@ int buildings_on_tile(const world& w, entity_id tile_id,
         ++n;
     }
     return n;
+}
+
+std::vector<entity_id> stack_members(const world& w, entity_id tile_id,
+                                     building_type type, resource_type target)
+{
+    std::vector<entity_id> members;
+    for (const auto& [bid, bc] : w.buildings)
+    {
+        if (bc.tile != tile_id || bc.type != type)
+            continue;
+        // Per-target, exactly as buildings_on_tile counts: three iron sites and one
+        // petroleum site on one tile are two stacks against two deposits.
+        if (type == building_type::extraction_site && bc.target_resource != target)
+            continue;
+        members.push_back(bid);
+    }
+    // world::buildings is an unordered_map — sorting is what makes "stored order"
+    // mean anything at all, and it is the only thing standing between the decay
+    // curve and a non-deterministic answer.
+    std::sort(members.begin(), members.end());
+    return members;
+}
+
+int stack_rank(const world& w, entity_id building_id)
+{
+    const auto it = w.buildings.find(building_id);
+    if (it == w.buildings.end())
+        return 0;
+    const building_component&    b       = it->second;
+    const std::vector<entity_id> members = stack_members(w, b.tile, b.type, b.target_resource);
+    for (std::size_t i = 0; i < members.size(); ++i)
+        if (members[i] == building_id)
+            return static_cast<int>(i) + 1;
+    return 0;
 }
 
 } // namespace placement_rules
