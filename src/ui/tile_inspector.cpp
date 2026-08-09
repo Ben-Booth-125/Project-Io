@@ -68,40 +68,41 @@ void draw_tile_inspector(const world& w, ui_state& s,
             selected_body = body_ids.front();
     }
 
-    // --- Top-level view strip (BL-211) ---
-    // Three questions, one per tab: what happened here (Story), how the chain got
-    // there (Chain), and what it left on the ground (Tiles). Two levels rather than
-    // five tabs on one row because the shell column cannot fit five labels — and
-    // because the Chain's own sub-strip is the wizard's round grouping, which the
-    // player has already been taught once at generation.
-    enum view_id { view_story = 0, view_chain, view_tiles };
+    // --- Top-level view strip (BL-211, narrowed by BL-281) ---
+    // Two questions, one per tab, sharing one premise — how this world came to be:
+    // what happened here (Story) and how the chain got there (Chain). The third tab,
+    // Tiles, was RETIRED 2026-08-03 (Ben, NEEDS_REVIEW NR-020 option 2): it was a
+    // current-state readout inside a ledger about the past, and renaming it would
+    // have fixed the label while keeping the defect.
+    enum view_id { view_story = 0, view_chain };
     int& view = s.history_view; // in ui_state so a verify script can park a view
+
+    // Clamp: a script (or a stale saved index) can still hand us the retired third
+    // view, and neither branch below would then draw anything.
+    if (view < view_story || view > view_chain)
+        view = view_story;
 
     nav_button("Story", view_story, view, p_open);
     ImGui::SameLine();
     nav_button("Chain", view_chain, view, p_open);
-    ImGui::SameLine();
-    nav_button("Tiles", view_tiles, view, p_open);
 
-    // The view-level fold control (BL-214). Story and Tiles are single blocks, so
-    // the chevron gives the whole view the screen — which is the honest fix for the
-    // Tiles table, whose 29 columns have always overflowed a 380 px column. Chain
-    // does NOT take one: its stages carry their own, and a second control governing
-    // all four at once would re-merge what the per-stage fold separates.
-    if (view != view_chain)
+    // The view-level fold control (BL-214). Story is a single block, so the chevron
+    // gives the whole view the screen. Chain does NOT take one: its stages carry
+    // their own, and a second control governing all four at once would re-merge what
+    // the per-stage fold separates.
+    if (view == view_story)
     {
         ImGui::SameLine(ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX()
                         - ImGui::GetFrameHeight());
-        fold_chevron(s, (view == view_story) ? detail_surface::history_story
-                                             : detail_surface::history_tiles, 0);
+        fold_chevron(s, detail_surface::history_story, 0);
     }
     ImGui::Separator();
 
     const body_component& sel_body = w.bodies.at(selected_body);
 
     // The Chain view charts every body side by side — that comparison IS the view —
-    // so the per-body selector belongs to the two views that are about one body.
-    if (view != view_chain && ImGui::BeginCombo("Body", sel_body.name.c_str()))
+    // so the per-body selector belongs to Story, the view that is about one body.
+    if (view == view_story && ImGui::BeginCombo("Body", sel_body.name.c_str()))
     {
         for (entity_id id : body_ids)
         {
@@ -116,7 +117,7 @@ void draw_tile_inspector(const world& w, ui_state& s,
     }
 
     // Body summary line
-    if (view != view_chain)
+    if (view == view_story)
     {
         ImGui::SameLine();
         ImGui::TextDisabled("%s  |  %.2f AU  |  %dx%d tiles",
@@ -241,109 +242,7 @@ void draw_tile_inspector(const world& w, ui_state& s,
                                 detail_surface::history_chain);
 
         ui::foldout_end();
-        return;
     }
-
-    // --- What the chain left on the ground ---
-    //
-    // The per-tile table that used to open this view was REMOVED 2026-08-01 (Ben,
-    // NEEDS_REVIEW NR-014): "I'm actually not a massive fan of the tiles table. This
-    // is because it can be seen by looking at the canvas." It listed x, y,
-    // composition, landform, hazard, habitability and all 23 deposits for every tile
-    // on the body — 29 columns that never fitted the 380 px ledger, and every one of
-    // which the Planetary canvas already shows spatially, where position is the point.
-    // Recover it from git if it is ever wanted as a debug view; it is not a UI.
-    //
-    // Expanding (BL-214) still opens the overlay HERE so everything below draws into
-    // the full screen without being restated.
-    const bool tiles_full =
-        ui::fold_overlay_begin(s, detail_surface::history_tiles, 0, sel_body.name.c_str());
-
-    // --- Buildings on this body ---
-    ImGui::Spacing();
-    ImGui::SeparatorText("Buildings");
-
-    bool any_buildings = false;
-    for (const auto& [id, bld] : w.buildings)
-    {
-        // Resolve the building's tile to check body ownership.
-        auto tile_it = w.tiles.find(bld.tile);
-        if (tile_it == w.tiles.end() || tile_it->second.body != selected_body)
-            continue;
-
-        any_buildings = true;
-        const tile_component& t = tile_it->second;
-        ImGui::BulletText("%s  at [%d,%d]  workforce %.0f%%",
-            building_type_name(bld.type),
-            t.grid_x, t.grid_y,
-            bld.workforce_assigned * 100.0f);
-    }
-    if (!any_buildings)
-        ImGui::TextDisabled("None");
-
-    // --- Market state for this body ---
-    ImGui::Spacing();
-    ImGui::SeparatorText("Market");
-
-    bool any_market = false;
-    for (const auto& [id, mkt] : w.markets)
-    {
-        if (mkt.body != selected_body)
-            continue;
-
-        any_market = true;
-
-        // Section comment: columns mirror market_component arrays so this
-        // panel is the functional specification for the production market ledger.
-        if (ImGui::BeginTable("market", 5,
-            ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersInnerV |
-            ImGuiTableFlags_RowBg        | ImGuiTableFlags_SizingFixedFit))
-        {
-            ImGui::TableSetupColumn("Resource",   ImGuiTableColumnFlags_WidthFixed, 100.0f);
-            ImGui::TableSetupColumn("Supply",     ImGuiTableColumnFlags_WidthFixed,  70.0f);
-            ImGui::TableSetupColumn("Demand",     ImGuiTableColumnFlags_WidthFixed,  70.0f);
-            ImGui::TableSetupColumn("Price",      ImGuiTableColumnFlags_WidthFixed,  60.0f);
-            ImGui::TableSetupColumn("Base Price", ImGuiTableColumnFlags_WidthFixed,  80.0f);
-            ImGui::TableHeadersRow();
-
-            for (std::size_t r = 0; r < resource_count; ++r)
-            {
-                const resource_presentation& rp = presentation_of(static_cast<resource_type>(r));
-                ImGui::TableNextRow();
-
-                // Resource: identity colour swatch + name, drawn from the shared
-                // presentation metadata so the colour reads the same everywhere.
-                ImGui::TableSetColumnIndex(0);
-                const float    sw   = ImGui::GetTextLineHeight();
-                const ImVec2   swp  = ImGui::GetCursorScreenPos();
-                ImGui::GetWindowDrawList()->AddRectFilled(swp, {swp.x + sw, swp.y + sw}, rp.colour);
-                ImGui::Dummy({sw, sw});
-                ImGui::SameLine();
-                ImGui::TextUnformatted(rp.name);
-
-                ImGui::TableSetColumnIndex(1); ImGui::Text("%.1f", mkt.supply[r]);
-                ImGui::TableSetColumnIndex(2); ImGui::Text("%.1f", mkt.demand[r]);
-
-                // Price coloured by its move against the base: above base reads as
-                // a gain (sold dear), below as a loss. Neutral until the first
-                // economy tick moves prices off base_price.
-                ImGui::TableSetColumnIndex(3);
-                const float move = mkt.price[r] - mkt.base_price[r];
-                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(value_colour(move)),
-                                   "%.2f", mkt.price[r]);
-
-                ImGui::TableSetColumnIndex(4); ImGui::Text("%.2f", mkt.base_price[r]);
-            }
-            ImGui::EndTable();
-        }
-        break; // one market per body
-    }
-    if (!any_market)
-        ImGui::TextDisabled("No market.");
-
-    if (tiles_full)
-        ui::fold_overlay_end(s);
-    ui::foldout_end();
 }
 
 } // namespace ui

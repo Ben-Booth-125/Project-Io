@@ -1114,7 +1114,6 @@ int app::run_verify(const std::string& script_path, bool bless)
         if      (n == "selection_metric") s = detail_surface::selection_metric;
         else if (n == "history_story")    s = detail_surface::history_story;
         else if (n == "history_chain")    s = detail_surface::history_chain;
-        else if (n == "history_tiles")    s = detail_surface::history_tiles;
         else if (n == "generation_stage") s = detail_surface::generation_stage;
         else if (n == "corp_rollup")      s = detail_surface::corp_rollup;
         if (s == detail_surface::none) ui::fold(m_ui);

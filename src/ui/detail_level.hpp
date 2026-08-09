@@ -46,7 +46,6 @@ enum class detail_surface : std::uint8_t
     selection_metric,  ///< The tile Selection band's metric card (key = page index).
     history_story,     ///< History ledger, Story view.
     history_chain,     ///< History ledger, Chain view (key = chain_stage).
-    history_tiles,     ///< History ledger, Tiles view.
     generation_stage,  ///< The New World wizard's chain stages (key = chain_stage).
     corp_rollup,       ///< The Corporation dashboard's roll-up cards (key = card index, BL-248).
 };
