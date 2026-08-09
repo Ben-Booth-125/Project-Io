@@ -6202,13 +6202,13 @@
       "requires": [
         "BL-219"
       ],
-      "resolution": null,
+      "resolution": "Landed 2026-08-09 (v0.1.10), implementing Ben's NR-035 option (a) as chosen -- the stronger behaviour, not the cheaper rewording. Pass 3's anchor search now runs over a HOME-PROVINCE window: the nation's tiles whose `nearest_province` is the corp's home province. Provinces are anchor points rather than stored tile sets, so nearest-anchor IS membership -- no new data structure was needed. The post-anchor neighbourhood walk deliberately stays nation-wide, so a small province spills next door rather than leaving the corp short. FALLBACK LADDER, each rung deterministic, and a rung that finds nothing consumes no RNG so widening is free in stream terms: (1) home province alone; (2) home province plus the 3 nearest same-nation provinces (column-wrapped anchor distance, ties to lower index); (3) whole nation, the old behaviour. HOW OFTEN IT FIRES, measured over 64 corps across 8 generations (seeds 0-5) rather than assumed: rung 1 89%, rung 2 0%, rung 3 11%. Every single rung-3 case was a corp with NO HOME PROVINCE AT ALL -- a nation the settlement pass never reached, which already falls back to national character for its focus. Where a home province exists it has never yet failed to host an anchor. Rung 2 is an unfired guard, kept because the cost is one sort and the failure it covers is real. TERRAIN MOVEMENT (seed 0, 18 holdings): barren 6->3, icy 5->3, grassland 3->7, forest 1->2, wetland 0->1. Holdings moved off dead ground onto settled ground, which is the causal read the item wanted -- provinces sit where people settled, so anchoring inside one pulls the corp onto habitable land. Cluster spread unchanged (mean max separation 1.2 tiles); 1.25 provinces per corp, 6 of 8 single-province. corp_terrain_matrix: exit 0, tier-1 FAILs 0, tier-2 WARNs 0. Only movement is body-wide free-tile counts (6084->6082, ports 1267->1265) and the player corp's richest reachable resource shifting iron_ore -> agricultural_produce, both downstream of holdings relocating. determinism_harness, world_determinism and settlement_harness byte-identical.",
       "id": "BL-283",
       "short_name": "CORP_PLACEMENT_HOME_PROVINCE",
       "category": "Generation",
       "title": "Constrain corp asset placement to the home province, so the province decides WHERE a corporation is and not only WHAT it is",
-      "status": "designed",
-      "glyph": "✓",
+      "status": "complete",
+      "glyph": "✔",
       "priority": "B",
       "difficulty": 3,
       "version_goal": "v0.1.10",
@@ -6228,13 +6228,13 @@
       "requires": [
         "BL-218"
       ],
-      "resolution": null,
+      "resolution": "Landed 2026-08-09 (v0.1.10). world_audit now counts each nation's non-contiguous territorial components over a 6-seed sweep and attributes each one. ATTRIBUTION IS EXACT, NOT HEURISTIC, which is what makes the answer trustworthy. Pass 2's BFS is water-blocked, so it only claims tiles on a landmass that already holds a seed, and there it runs to exhaustion -- therefore Pass 2b can only ever fire on a SEEDLESS landmass. So: exclave on a seeded landmass = emergent; on a seedless landmass = Pass 2b. No classifier, no threshold, no judgement call. THE ANSWER: 196 exclaves across the sweep -- 60 emergent, 136 Pass 2b. Emergent is 31% by COMPONENT COUNT but 49% by TILE COUNT (940 of 1930). Every seed produced emergent exclaves (6-17 each); roughly half of all nations hold at least one. THE VERDICT ON BL-218's PROMISE -- the reason this item exists. BL-218 bought the expensive settlement-sim path over a cheap alternative, and the single best argument for that choice was that fragmentation would fall out of it for free. IT PAYS, with a caveat about which number is quoted. The sim genuinely produces stalled fronts and rival cut-offs on every seed tested, and those are the LARGE exclaves. But Pass 2b's long tail of tiny orphan islands dominates the raw component count, so quoting '196 exclaves' would overstate the sim's contribution more than two-fold. THE TILE SHARE IS THE HONEST HEADLINE, and the audit prints both so the distinction cannot be lost. Nothing was tuned to make the answer nicer. The assertion is a deliberately wide bar (>= 6 emergent across the sweep, against 60 observed), to be tightened once the distribution has been watched rather than pinned to a first measurement. NATION_GENERATION.md gains a Territorial fragmentation, measured section, and its stale Pass 2c claim that fragmentation 'remains an open item' is corrected.",
       "id": "BL-284",
       "short_name": "EXCLAVE_MEASUREMENT",
       "category": "Generation",
       "title": "Territorial fragmentation, measured — reopened from BL-054: assert exclaves actually emerge rather than trusting the argument that chose the expensive path",
-      "status": "designed",
-      "glyph": "✓",
+      "status": "complete",
+      "glyph": "✔",
       "priority": "B",
       "difficulty": 3,
       "version_goal": "v0.1.10",
