@@ -157,8 +157,36 @@ geography leaves standing. The result amplifies the size spread (rich-get-richer
 **irregular, non-convex borders** — a nation may be the union of a core and an absorbed
 neighbour. Tie-breaks are fully deterministic (smallest by tile count then lowest index;
 absorbing neighbour by tile count then lowest index; an island with no land neighbour is absorbed
-into the globally largest nation). This is *not* historical fragmentation (exclaves, disputed
-zones) — that remains an open item.
+into the globally largest nation). This pass is *not* itself a source of fragmentation — it only
+ever merges a nation into a neighbour it already touches, so it cannot cut one in two.
+
+### Territorial fragmentation, measured (BL-284, landed 2026-08-09)
+
+BL-218 bought the settlement-sim path largely on the claim that **fragmentation would fall out of
+it for free** — a growth front that crosses a strait and stalls, or a nation cut off by a rival's
+expansion, leaves an exclave nobody authored. Nothing counted them, so the claim was untested.
+`tools/verify/world_audit.cpp` now counts each nation's **non-contiguous territorial components**
+across a six-seed sweep and attributes every exclave to one of two producers.
+
+The attribution is exact rather than heuristic, and it turns on Pass 2 being water-blocked:
+
+* Pass 2 can only claim tiles on a landmass that already holds a seed, and on such a landmass it
+  runs to exhaustion — so every land tile there is claimed by the BFS.
+* Pass 2b therefore only ever fires on a **seedless** landmass, and hands the whole thing to one
+  nation in a single act.
+
+So an exclave on a **seeded** landmass (one holding at least one province anchor) is **emergent** —
+produced by the sim, whether by a stalled front, a rival cutting it off, or a Pass 4b rupture
+redrawing the border. An exclave on a **seedless** landmass is **Pass 2b** cleanup and is not
+evidence for BL-218's claim.
+
+**What the measurement says** (seeds 0–5, 2026-08-09): 196 exclaves, **60 emergent** and 136 from
+Pass 2b — 31 % of exclaves by count, but **49 % of exclave tiles** (940 of 1930). Every swept seed
+produced emergent exclaves (6–17 each), and roughly half of all nations hold at least one. The
+promise pays: fragmentation is real and sim-produced, but Pass 2b's long tail of tiny orphan
+islands dominates the raw *count*, so the honest headline is the tile share, not the component
+share. The audit asserts only a wide bar — at least 6 emergent exclaves across the sweep — to be
+tightened once the distribution has been watched.
 
 ### Pass 3 — Resource profile derivation
 

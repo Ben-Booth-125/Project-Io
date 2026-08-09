@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdio>
+#include <cstdlib>
 #include <map>
 #include <set>
 #include <utility>
@@ -28,9 +29,191 @@
 
 static std::size_t ri(resource_type r) { return static_cast<std::size_t>(r); }
 
+// ---------------------------------------------------------------------------
+// BL-284 — territorial fragmentation, measured and ATTRIBUTED
+// ---------------------------------------------------------------------------
+//
+// BL-218 bought the expensive settlement-sim path largely on the argument that
+// fragmentation would fall out of it for free: a growth front that crosses a
+// strait and stalls, or a nation cut in half by a rival's expansion, leaves an
+// exclave nobody authored. Nothing counted them, so the argument was never
+// tested. This block counts each nation's non-contiguous territorial components
+// and attributes every exclave to one of two producers.
+//
+// The attribution rule, and why it is exact rather than a heuristic:
+//
+//   * Pass 2 (the Voronoi BFS) is WATER-BLOCKED. It can therefore only claim
+//     tiles on a landmass that already contains a seed — and on such a landmass
+//     it runs to exhaustion, so every land tile there ends up claimed by it.
+//   * Pass 2b (orphan-island assignment) consequently only ever fires on a
+//     landmass containing NO seed, and when it does it hands the whole landmass
+//     to one nation in a single act.
+//
+// So: an exclave sitting on a SEEDED landmass (one holding at least one province
+// anchor) is emergent — the sim itself produced it, either by a front stalling
+// or by a rival cutting it off, plus whatever the ruptures later redrew. An
+// exclave on a SEEDLESS landmass was authored by Pass 2b's cleanup and is not
+// evidence for BL-218's argument.
+struct frag_stats
+{
+    int nations              = 0;
+    int nations_with_exclave = 0;
+    int exclaves_emergent    = 0;
+    int exclaves_pass2b      = 0;
+    int tiles_emergent       = 0;
+    int tiles_pass2b         = 0;
+    int landmasses           = 0;
+    int landmasses_seedless  = 0;
+};
+
+static frag_stats measure_fragmentation(const world& w, const generation_report& rep)
+{
+    frag_stats fs;
+
+    const entity_id body = w.home_body;
+    const auto      bit  = w.bodies.find(body);
+    if (bit == w.bodies.end())
+        return fs;
+    const int gw    = bit->second.grid_width;
+    const int gh    = bit->second.grid_height;
+    const int total = gw * gh;
+    if (total <= 0)
+        return fs;
+
+    // Raster views of the home body: land flag and owning-nation entity id.
+    std::vector<char>      is_land(static_cast<std::size_t>(total), 0);
+    std::vector<entity_id> owner(static_cast<std::size_t>(total), null_entity);
+    for (const auto& [tid, tc] : w.tiles)
+    {
+        if (tc.body != body) continue;
+        if (tc.composition == terrain_composition::ocean) continue;
+        const int idx = tc.grid_y * gw + tc.grid_x;
+        if (idx < 0 || idx >= total) continue;
+        is_land[static_cast<std::size_t>(idx)] = 1;
+        const auto nit = w.tile_to_nation.find(tid);
+        if (nit != w.tile_to_nation.end())
+            owner[static_cast<std::size_t>(idx)] = nit->second;
+    }
+
+    // Cardinal neighbours, column-wrapped, rows not wrapped — the same adjacency
+    // the BFS and the orphan pass use, so the components line up with theirs.
+    auto neighbours = [gw, gh](int idx, int out[4]) {
+        const int col = idx % gw;
+        const int row = idx / gw;
+        int n = 0;
+        out[n++] = row * gw + ((col + 1) % gw);
+        out[n++] = row * gw + ((col - 1 + gw) % gw);
+        if (row > 0)      out[n++] = (row - 1) * gw + col;
+        if (row < gh - 1) out[n++] = (row + 1) * gw + col;
+        return n;
+    };
+
+    // --- landmasses (ownership-blind), and which of them the sim seeded -------
+    std::vector<int> landmass(static_cast<std::size_t>(total), -1);
+    int              lm_count = 0;
+    for (int start = 0; start < total; ++start)
+    {
+        if (!is_land[static_cast<std::size_t>(start)]) continue;
+        if (landmass[static_cast<std::size_t>(start)] >= 0) continue;
+        const int id = lm_count++;
+        std::vector<int> stack{ start };
+        landmass[static_cast<std::size_t>(start)] = id;
+        while (!stack.empty())
+        {
+            const int idx = stack.back();
+            stack.pop_back();
+            int nb[4];
+            const int n = neighbours(idx, nb);
+            for (int i = 0; i < n; ++i)
+            {
+                if (!is_land[static_cast<std::size_t>(nb[i])]) continue;
+                if (landmass[static_cast<std::size_t>(nb[i])] >= 0) continue;
+                landmass[static_cast<std::size_t>(nb[i])] = id;
+                stack.push_back(nb[i]);
+            }
+        }
+    }
+    fs.landmasses = lm_count;
+
+    std::vector<char> lm_seeded(static_cast<std::size_t>(lm_count), 0);
+    const generation_report::body_entry* home_entry = nullptr;
+    for (const auto& be : rep.bodies)
+        if (be.name == bit->second.name) { home_entry = &be; break; }
+    if (home_entry)
+    {
+        for (const province& p : home_entry->settlement.provinces)
+        {
+            if (p.anchor < 0 || p.anchor >= total) continue;
+            const int lm = landmass[static_cast<std::size_t>(p.anchor)];
+            if (lm >= 0) lm_seeded[static_cast<std::size_t>(lm)] = 1;
+        }
+    }
+    for (int i = 0; i < lm_count; ++i)
+        if (!lm_seeded[static_cast<std::size_t>(i)]) ++fs.landmasses_seedless;
+
+    // --- per-nation territorial components -----------------------------------
+    std::vector<int> comp(static_cast<std::size_t>(total), -1);
+    struct comp_rec { entity_id nation; int size; int landmass; };
+    std::vector<comp_rec> comps;
+    for (int start = 0; start < total; ++start)
+    {
+        if (owner[static_cast<std::size_t>(start)] == null_entity) continue;
+        if (comp[static_cast<std::size_t>(start)] >= 0) continue;
+        const entity_id nid = owner[static_cast<std::size_t>(start)];
+        const int       id  = static_cast<int>(comps.size());
+        comps.push_back({ nid, 0, landmass[static_cast<std::size_t>(start)] });
+        std::vector<int> stack{ start };
+        comp[static_cast<std::size_t>(start)] = id;
+        while (!stack.empty())
+        {
+            const int idx = stack.back();
+            stack.pop_back();
+            ++comps[static_cast<std::size_t>(id)].size;
+            int nb[4];
+            const int n = neighbours(idx, nb);
+            for (int i = 0; i < n; ++i)
+            {
+                if (owner[static_cast<std::size_t>(nb[i])] != nid) continue;
+                if (comp[static_cast<std::size_t>(nb[i])] >= 0) continue;
+                comp[static_cast<std::size_t>(nb[i])] = id;
+                stack.push_back(nb[i]);
+            }
+        }
+    }
+
+    // The largest component is the mainland; every other one is an exclave.
+    std::map<entity_id, std::vector<int>> by_nation;
+    for (int i = 0; i < static_cast<int>(comps.size()); ++i)
+        by_nation[comps[static_cast<std::size_t>(i)].nation].push_back(i);
+
+    fs.nations = static_cast<int>(by_nation.size());
+    for (const auto& [nid, ids] : by_nation)
+    {
+        (void)nid;
+        int mainland = ids.front();
+        for (int i : ids)
+            if (comps[static_cast<std::size_t>(i)].size
+                > comps[static_cast<std::size_t>(mainland)].size)
+                mainland = i;
+        if (ids.size() > 1) ++fs.nations_with_exclave;
+        for (int i : ids)
+        {
+            if (i == mainland) continue;
+            const comp_rec& c = comps[static_cast<std::size_t>(i)];
+            const bool seeded = c.landmass >= 0
+                             && lm_seeded[static_cast<std::size_t>(c.landmass)] != 0;
+            if (seeded) { ++fs.exclaves_emergent; fs.tiles_emergent += c.size; }
+            else        { ++fs.exclaves_pass2b;   fs.tiles_pass2b   += c.size; }
+        }
+    }
+
+    return fs;
+}
+
 int main()
 {
-    world w = make_hard_coded_world();
+    generation_report report;
+    world w = make_hard_coded_world({}, &report);
 
     // --- S2: Kepler composition histogram ---
     const entity_id kepler = w.home_body;
@@ -755,10 +938,129 @@ int main()
     std::printf("  BL-182 R2 HQ designation identical across two generations (%d mismatched): %s\n",
                 hq_det_bad, hq_det_bad == 0 ? "PASS" : "FAIL");
 
+    // --- BL-283 (corp assets anchor in the home province): the spatial spread of
+    // corporate holdings, as the province window sees it. Reported, not asserted —
+    // a corp legitimately spills into a neighbouring province when its own has no
+    // room, so the number to watch is the DISTRIBUTION, not a bound. ---
+    {
+        const auto  kbit = w.bodies.find(kepler);
+        const int   kgw  = (kbit != w.bodies.end()) ? kbit->second.grid_width : 0;
+        const generation_report::body_entry* kentry = nullptr;
+        for (const auto& be : report.bodies)
+            if (kbit != w.bodies.end() && be.name == kbit->second.name) { kentry = &be; break; }
+
+        int corps_measured = 0, holdings_total = 0, provinces_spanned_total = 0;
+        int single_province_corps = 0;
+        long long spread_sum = 0; // summed max grid separation within a corp's holdings
+        std::map<terrain_composition, int> holding_comp;
+        for (const auto& [cid, corp] : w.corporations)
+        {
+            std::set<int> provs;
+            std::vector<std::pair<int,int>> pts;
+            for (entity_id aid : corp.assets)
+            {
+                const auto b = w.buildings.find(aid);
+                if (b == w.buildings.end()) continue;
+                const auto t = w.tiles.find(b->second.tile);
+                if (t == w.tiles.end() || t->second.body != kepler) continue;
+                ++holdings_total;
+                holding_comp[t->second.composition]++;
+                pts.emplace_back(t->second.grid_x, t->second.grid_y);
+                if (kentry && kgw > 0)
+                {
+                    const int pi = nearest_province(kentry->settlement,
+                                                    t->second.grid_x, t->second.grid_y, kgw);
+                    if (pi >= 0) provs.insert(pi);
+                }
+            }
+            if (pts.empty()) continue;
+            ++corps_measured;
+            provinces_spanned_total += static_cast<int>(provs.size());
+            if (provs.size() <= 1) ++single_province_corps;
+            long long worst = 0;
+            for (std::size_t i = 0; i < pts.size(); ++i)
+                for (std::size_t j = i + 1; j < pts.size(); ++j)
+                {
+                    int dc = std::abs(pts[i].first - pts[j].first);
+                    if (kgw > 0 && dc > kgw / 2) dc = kgw - dc;
+                    const int dr = std::abs(pts[i].second - pts[j].second);
+                    worst = std::max<long long>(worst, dc + dr);
+                }
+            spread_sum += worst;
+            (void)cid;
+        }
+        std::printf("Corp holdings spatial spread: %d corps, %d holdings, "
+                    "%.2f provinces/corp (%d of %d single-province), "
+                    "mean max separation %.1f tiles\n",
+                    corps_measured, holdings_total,
+                    corps_measured ? static_cast<double>(provinces_spanned_total) / corps_measured : 0.0,
+                    single_province_corps, corps_measured,
+                    corps_measured ? static_cast<double>(spread_sum) / corps_measured : 0.0);
+        std::printf("  holdings by terrain composition:");
+        for (const auto& [c, n] : holding_comp)
+            std::printf(" %d=%d", static_cast<int>(c), n);
+        std::printf("\n");
+    }
+
+    // --- BL-284 (territorial fragmentation, measured): exclaves per nation across
+    // a seed sweep, each attributed to the settlement sim (emergent) or to Pass 2b's
+    // orphan-island cleanup (authored). The emergent share is the headline — it is
+    // the number BL-218's argument for the expensive path predicted. ---
+    frag_stats frag_total;
+    {
+        std::printf("Territorial fragmentation (BL-284) — exclaves by producer:\n");
+        constexpr uint32_t sweep_seeds[] = { 0u, 1u, 2u, 3u, 4u, 5u };
+        for (uint32_t s : sweep_seeds)
+        {
+            frag_stats fs;
+            if (s == 0)
+            {
+                fs = measure_fragmentation(w, report);
+            }
+            else
+            {
+                world_params      wp; wp.seed = s;
+                generation_report rp;
+                const world       sw = make_hard_coded_world(wp, &rp);
+                fs = measure_fragmentation(sw, rp);
+            }
+            std::printf("  seed %u: %d nations, %d with an exclave | emergent %d (%d tiles), "
+                        "Pass 2b %d (%d tiles) | %d landmasses, %d seedless\n",
+                        s, fs.nations, fs.nations_with_exclave,
+                        fs.exclaves_emergent, fs.tiles_emergent,
+                        fs.exclaves_pass2b, fs.tiles_pass2b,
+                        fs.landmasses, fs.landmasses_seedless);
+            frag_total.nations              += fs.nations;
+            frag_total.nations_with_exclave += fs.nations_with_exclave;
+            frag_total.exclaves_emergent    += fs.exclaves_emergent;
+            frag_total.exclaves_pass2b      += fs.exclaves_pass2b;
+            frag_total.tiles_emergent       += fs.tiles_emergent;
+            frag_total.tiles_pass2b         += fs.tiles_pass2b;
+            frag_total.landmasses           += fs.landmasses;
+            frag_total.landmasses_seedless  += fs.landmasses_seedless;
+        }
+        const int total_exclaves = frag_total.exclaves_emergent + frag_total.exclaves_pass2b;
+        const double emergent_share = total_exclaves
+            ? 100.0 * frag_total.exclaves_emergent / total_exclaves : 0.0;
+        std::printf("  sweep total: %d exclaves — %d emergent, %d Pass 2b "
+                    "(emergent share %.1f%% of exclaves, %d of %d tiles)\n",
+                    total_exclaves, frag_total.exclaves_emergent, frag_total.exclaves_pass2b,
+                    emergent_share, frag_total.tiles_emergent,
+                    frag_total.tiles_emergent + frag_total.tiles_pass2b);
+    }
+    // Wide bars, deliberately (BL-284): the assertion is that the settlement sim
+    // produces fragmentation AT ALL, on at least half the swept seeds. Tighten once
+    // the real distribution has been watched for a while.
+    const bool frag_ok = frag_total.exclaves_emergent >= 6;
+    std::printf("  BL-284 R1 the settlement sim produces emergent exclaves "
+                "(>= 6 across the 6-seed sweep, saw %d): %s\n",
+                frag_total.exclaves_emergent, frag_ok ? "PASS" : "FAIL");
+
     return (fw_frac >= 3.0f && bad == 0 && seed_bad == 0 && seam_bad == 0
             && unclaimed_land == 0 && holdings_bad == 0 && stockpile_ok
             && absent == 0 && ordering_ok
             && floor_ok && variance_ok && count_ok
             && market_count_ok && cross_nation_ok && market_determinism_ok
-            && hq_bad == 0 && hq_det_bad == 0 && landform_absent == 0) ? 0 : 1;
+            && hq_bad == 0 && hq_det_bad == 0 && landform_absent == 0
+            && frag_ok) ? 0 : 1;
 }

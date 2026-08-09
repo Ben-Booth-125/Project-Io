@@ -7,6 +7,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <limits>
 #include <random>
 #include <string>
@@ -353,34 +354,46 @@ entity_id author_building(world& w,
 /// carrying a matching extractable deposit) — tiles that fail are skipped, so a
 /// deposit-poor anchor neighbourhood simply yields fewer extraction sites.
 ///
+/// BL-283 constrains the ANCHOR search to the corporation's home province via
+/// @p anchor_window; the neighbourhood the remaining slots walk stays national, so
+/// a corp whose own province is small spills into the ground next door rather than
+/// opening short. The window is a *subset of `home_nation.tiles` in the same order*,
+/// so nothing about the search's determinism changes.
+///
 /// @param w              World to write the new entities into.
 /// @param home_nation    The nation_component of the home nation.
 /// @param focus          Corporate industrial focus (determines the asset mix and tile preference).
 /// @param occupied_tiles Tiles already taken by another building; never reused.
 /// @param rng            Seeded RNG for the anchor weighted draw and holdings count.
-/// @return               Entity ids of every building placed (may be empty for a
-///                       degenerate nation with no usable land).
+/// @param anchor_window  Tiles the anchor may sit on; null/empty means the whole nation.
+/// @return               Entity ids of every building placed (may be empty when the
+///                       window holds no tile that can host the anchor type — the
+///                       caller's cue to widen a rung).
 std::vector<entity_id> place_starting_assets(world& w,
                                              const nation_component& home_nation,
                                              industrial_focus focus,
                                              std::unordered_set<entity_id>& occupied_tiles,
-                                             std::mt19937& rng)
+                                             std::mt19937& rng,
+                                             const std::vector<entity_id>* anchor_window = nullptr)
 {
     std::vector<entity_id> placed;
     if (home_nation.tiles.empty())
         return placed;
 
+    const std::vector<entity_id>& anchor_pool =
+        (anchor_window && !anchor_window->empty()) ? *anchor_window : home_nation.tiles;
+
     const std::vector<building_type>& pattern = focus_asset_pattern(focus);
     const building_type anchor_type = pattern.front();
 
     // --- choose the anchor tile (weighted by anchor-type score) ---------------
-    // Candidates are the nation's non-ocean, unoccupied tiles that can validly host
-    // the anchor type. The nation's `tiles` vector is stored in a stable order, so
-    // building the candidate list by iterating it is deterministic.
+    // Candidates are the window's non-ocean, unoccupied tiles that can validly host
+    // the anchor type. The nation's `tiles` vector is stored in a stable order and the
+    // window preserves it, so building the candidate list by iterating is deterministic.
     struct candidate { entity_id tid; float score; };
     std::vector<candidate> anchors;
-    anchors.reserve(home_nation.tiles.size());
-    for (entity_id tid : home_nation.tiles)
+    anchors.reserve(anchor_pool.size());
+    for (entity_id tid : anchor_pool)
     {
         if (occupied_tiles.count(tid))
             continue;
@@ -397,7 +410,10 @@ std::vector<entity_id> place_starting_assets(world& w,
         anchors.push_back({ tid, tile_score_for(tc, anchor_type) });
     }
     if (anchors.empty())
-        return placed; // no valid anchor in this nation — corp opens asset-light
+        return placed; // nothing anchorable in this window — the caller widens, or the
+                       // corp opens asset-light once the nation rung is also empty.
+                       // No RNG has been consumed on this path, so a widened retry is
+                       // indistinguishable from having started at the wider rung.
 
     float total_w = 0.0f;
     for (const auto& c : anchors)
@@ -480,6 +496,87 @@ std::vector<entity_id> place_starting_assets(world& w,
     }
 
     return placed;
+}
+
+/// The grid width of the body a nation's territory sits on, or 0 when it has no
+/// resolvable tiles. Needed because `nearest_province` works in raster space and
+/// the column axis wraps.
+int nation_grid_width(const world& w, const nation_component& home_nation)
+{
+    for (entity_id tid : home_nation.tiles)
+    {
+        const auto t = w.tiles.find(tid);
+        if (t == w.tiles.end()) continue;
+        const auto b = w.bodies.find(t->second.body);
+        if (b == w.bodies.end()) continue;
+        return b->second.grid_width;
+    }
+    return 0;
+}
+
+/// The nation's tiles that fall inside any of @p accepted, in the nation's own
+/// stored order. "Inside a province" is `nearest_province` — provinces are anchor
+/// points, not stored tile sets, so the nearest anchor IS the province a tile
+/// belongs to (the same rule the settlement pass itself reads by).
+std::vector<entity_id> province_window(const world& w,
+                                       const nation_component& home_nation,
+                                       const settlement_state& ss,
+                                       const std::vector<int>& accepted,
+                                       int gw)
+{
+    std::vector<entity_id> window;
+    if (gw <= 0 || accepted.empty())
+        return window;
+    window.reserve(home_nation.tiles.size() / 4 + 1);
+    for (entity_id tid : home_nation.tiles)
+    {
+        const auto t = w.tiles.find(tid);
+        if (t == w.tiles.end()) continue;
+        const int pi = nearest_province(ss, t->second.grid_x, t->second.grid_y, gw);
+        if (pi < 0) continue;
+        if (std::find(accepted.begin(), accepted.end(), pi) != accepted.end())
+            window.push_back(tid);
+    }
+    return window;
+}
+
+/// The @p k provinces of the same nation whose anchors lie nearest @p home_pi,
+/// @p home_pi itself first. The second rung of BL-283's fallback ladder: a corp
+/// whose own province cannot host its anchor looks next door before it gives up
+/// on the province meaning anything at all. Column-wrapped distance; ties break on
+/// the lower province index, so the result is a pure function of the settlement
+/// record.
+std::vector<int> home_and_nearest_provinces(const settlement_state& ss,
+                                            int home_pi,
+                                            int nation_idx,
+                                            int gw,
+                                            int k)
+{
+    std::vector<int> out{ home_pi };
+    if (home_pi < 0 || home_pi >= static_cast<int>(ss.provinces.size()) || gw <= 0)
+        return out;
+
+    const province& home = ss.provinces[static_cast<std::size_t>(home_pi)];
+
+    struct near { long long d2; int pi; };
+    std::vector<near> others;
+    for (std::size_t i = 0; i < ss.provinces.size(); ++i)
+    {
+        if (static_cast<int>(i) == home_pi) continue;
+        const province& p = ss.provinces[i];
+        if (p.nation != nation_idx) continue;
+        long long dc = std::abs(p.col - home.col);
+        if (dc > gw / 2) dc = gw - dc;
+        const long long dr = p.row - home.row;
+        others.push_back({ dc * dc + dr * dr, static_cast<int>(i) });
+    }
+    std::sort(others.begin(), others.end(), [](const near& a, const near& b) {
+        if (a.d2 != b.d2) return a.d2 < b.d2;
+        return a.pi < b.pi;
+    });
+    for (int i = 0; i < k && i < static_cast<int>(others.size()); ++i)
+        out.push_back(others[static_cast<std::size_t>(i)].pi);
+    return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -938,11 +1035,56 @@ std::vector<entity_id> generate_corporations(
         if (it == w.nations.end())
             continue;
 
-        corp_assets[static_cast<std::size_t>(c)] = place_starting_assets(
-            w, it->second,
-            corp_focuses[static_cast<std::size_t>(c)],
-            occupied_tiles,
-            asset_rng);
+        // BL-283 — the anchor is searched inside the corp's HOME PROVINCE, not
+        // across its whole nation. The province already decides what the corp is
+        // (Pass 2); this makes it decide where it is, so holdings cluster where the
+        // corp's history says it came from instead of scattering nation-wide.
+        //
+        // The fallback ladder, in order, each rung deterministic:
+        //   1. the home province alone;
+        //   2. the home province plus the three nearest same-nation provinces —
+        //      a small province that cannot host the anchor type looks next door;
+        //   3. the whole nation, the pre-BL-283 behaviour.
+        // A rung that finds no anchorable tile consumes no randomness, so widening
+        // costs nothing in stream terms. Rung 3 is reached only when the corp's own
+        // corner of the map is unusable for its focus; it is the honest floor, not a
+        // silent abandonment of the province.
+        const int home_pi = home_province_idx[static_cast<std::size_t>(c)];
+
+        std::vector<entity_id> assets;
+        if (settle && home_pi >= 0)
+        {
+            const int gw = nation_grid_width(w, it->second);
+
+            const std::vector<int> rung1{ home_pi };
+            const std::vector<int> rung2 = home_and_nearest_provinces(
+                *settle, home_pi, home_nation_idx[static_cast<std::size_t>(c)], gw, 3);
+
+            for (const std::vector<int>* accepted : { &rung1, &rung2 })
+            {
+                const std::vector<entity_id> window =
+                    province_window(w, it->second, *settle, *accepted, gw);
+                if (window.empty())
+                    continue;
+                assets = place_starting_assets(
+                    w, it->second,
+                    corp_focuses[static_cast<std::size_t>(c)],
+                    occupied_tiles, asset_rng, &window);
+                if (!assets.empty())
+                    break;
+            }
+        }
+
+        if (assets.empty())
+        {
+            assets = place_starting_assets(
+                w, it->second,
+                corp_focuses[static_cast<std::size_t>(c)],
+                occupied_tiles,
+                asset_rng);
+        }
+
+        corp_assets[static_cast<std::size_t>(c)] = std::move(assets);
     }
 
     // ---------------------------------------------------------------------------
