@@ -385,13 +385,51 @@ added by Ben 2026-08-04).
 > existing minor had to be renumbered — pre-1.0 numbering is advisory, and v0.1.2 was already cut
 > before v0.1.1. Each earns its done-definition at promotion, per NR-103.
 
-- **v0.1.8 — Build health.** *Theme: the project's own tooling stops lying.* Four items, and the
-  smallest cut available. `world_audit` fails, so `TILES.md`'s tile census cannot be re-measured
-  (**BL-291**); `next_id.js` scans zero refs, so its cross-branch collision defence is inert —
-  which is exactly how BL-326..BL-333 each landed twice (**BL-322**); a fresh CMake configure
-  can't fetch SDL3 on at least one machine, hidden by a populated `_deps` cache (**BL-302**); and
-  the GCC golden set needs re-blessing so the platform split reads coherently (**BL-285**). None
-  ships player-facing content; all four cost time on every session that trips them.
+- **v0.1.8 — Build health — CUT 2026-08-09.** *Theme: the project's own tooling stops lying.*
+  Five items (BL-288 moved here from v0.1.3, where a priority-A build item was sitting behind the
+  Laws design stub). None ships player-facing content; all five cost time on every session that
+  tripped them.
+
+  **What it actually found.** The premise of every item in this minor was that things were
+  *broken*. Measurement said the tooling was mostly **misreporting**, which is worse, because a
+  red suite that is mostly noise trains you to ignore it:
+
+  - **The suite reported ten failures; exactly one was a failing assertion** (**BL-288**). Four
+    harnesses pass but take longer than the flat 60 s bound (`earthlike_lean_trace` 121 s,
+    `notable_worlds` 105 s, `mediterranean_sweep` 87 s, `earthlike_tile_census` 58 s — passing by
+    luck). Two are open-ended research sweeps that never finish on any bound. Two assert absolute
+    wall-clock times and failed only because a concurrent build was loading the machine. Now three
+    tiers plus a `sweep` label excluded from the gate and a `bench` label that says "re-run idle".
+  - **`world_audit` was never broken** (**BL-291**) — it exits non-zero on 1 assertion of 26, the
+    S2 biome balance, which is a world-generation finding (carried by **BL-338**) rather than a
+    broken instrument. The item's own three-day "stale and blocked" banner on `TILES.md` was the
+    cost of reading an exit code as a verdict.
+  - **`next_id.js` failed for a reason nobody would have guessed** (**BL-322**): `execSync` runs
+    through `dash`, which aborts on the unquoted `(` in `--format=%(refname)` before `git` runs —
+    so it worked on the Windows box where it was written and failed silently everywhere else. It
+    was handing out ids **25 below the true ceiling**, the direct mechanical account of how
+    BL-326..BL-333 each landed twice. Refs scanned went 0 → 53.
+  - **The dependency posture's preferred option was disproved by measuring it** (**BL-302**): a
+    shared `FETCHCONTENT_BASE_DIR` hard-fails across build trees on a generator-locked subbuild
+    cache. Per-dependency `FETCHCONTENT_SOURCE_DIR_<dep>` works and is what landed.
+  - **One real defect** (**BL-285**): `ai_skill_harness`'s GCC goldens, stale since 2026-08-01 —
+    which had sat unnoticed among nine false positives.
+
+  **Done-definition — v0.1.8.** v0.1.8 is cut when:
+
+  - **A red test is a real failure.** No harness is reported failed for exceeding a bound it was
+    never sized against, and research sweeps are not gate tests.
+  - **A load-sensitive failure is legible as one** — absolute-time assertions are labelled, so
+    they are re-run rather than mistaken for a regression.
+  - **The id allocator defends what it claims to defend**, and fails loudly rather than open.
+  - **A from-cold configure is visible** rather than hidden by a populated cache.
+  - **Goldens describe the platform they run on**, and a stale set says so in place.
+  - Excluded by scope, filed rather than dropped: verifying the from-cold check on the Windows
+    machine, where the original TLS failure actually occurs (**BL-341**, v0.1.9) — it does not
+    reproduce on Linux, so the fix is untested against its own symptom.
+
+  **Cut 2026-08-09.** Gate: 53 tests, **1 failure**, down from 10 — and that one is `world_audit`'s
+  biome balance, a genuine world-generation finding rather than an instrument defect.
 - **v0.1.9 — Shell & legibility follow-through.** *Theme: the standing UI set, finished.* The road
   tier legend (**BL-184**) and road/fog dimming (**BL-185**), building stack capacity (**BL-193**),
   the comms-log re-plan (**BL-216**), the building-selection tile format (**BL-229**), the

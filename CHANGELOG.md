@@ -14,6 +14,60 @@ authoritative version-history record. A local-only snapshot of `src/` is also ke
 
 _Nothing yet._
 
+## [0.1.8] — 2026-08-09
+
+**Build health — the gate stops lying.** No player-facing content: this is the minor where the
+project's own tooling stopped costing time on every session that tripped it. The headline number
+is that `ctest` reported **ten failures of which exactly one was a failing assertion**, and the
+other nine were the suite misreporting itself.
+
+> **Cut order.** Numbered v0.1.8 to avoid renumbering the design-forward stubs at v0.1.3–v0.1.6,
+> but cut ahead of them deliberately — number is not sequence in this band.
+
+### Changed
+- **Three test tiers instead of one flat 60-second bound** (BL-288). Four harnesses pass but
+  exceed it (`earthlike_lean_trace` 121 s, `notable_worlds` 105 s, `mediterranean_sweep` 87 s,
+  `earthlike_tile_census` 58 s) and were being reported as failures; the long tier rises to 240 s
+  and covers them. Two open-ended research sweeps get a `sweep` label, no timeout, and are out of
+  the routine gate — they answer design questions over many worlds and will outgrow any bound.
+  Two harnesses that assert *absolute* wall-clock times get a `bench` label, so a failure reads as
+  "re-run on an idle machine" rather than as a regression. The gate is now
+  `ctest --test-dir build_linux -LE sweep --output-on-failure`.
+- **`next_id.js` fails loudly instead of silently defending nothing** (BL-322). It reported zero
+  refs because `execSync` runs through `dash`, which aborts on the unquoted `(` in
+  `--format=%(refname)` before `git` ever runs — so the tool worked on the Windows box where it
+  was written and failed silently everywhere else. It was issuing ids **25 below the true
+  ceiling**, which is the mechanical account of how BL-326..BL-333 each landed twice. Now uses
+  `execFileSync` with argv arrays, cross-checks with `git show-ref`, and exits non-zero when it
+  cannot prove it ran. Refs scanned: 0 → 53.
+- **GCC goldens re-blessed** (BL-285) — the one real defect in the ten. Stale since 2026-08-01;
+  the divergence is downward and explained by the v0.1.2 reach rule (siting is now bounded) plus
+  unit hiring (a new cash outflow), and that reasoning is recorded in the harness rather than
+  assumed. The MSVC set is now stale for the same reason and is flagged in place.
+- **Ladder lines carry a `ladder_rung` tag** (BL-285), so the history-ladder check filters
+  structurally instead of pattern-matching biography prose — rewording a line can no longer
+  silently change what the check asserts over.
+
+### Added
+- **Seeded FetchContent cache** (BL-302) — per-dependency `FETCHCONTENT_SOURCE_DIR_<dep>` from a
+  shared `_deps_cache`, so fresh worktrees configure offline. The item's own preferred option, a
+  shared `FETCHCONTENT_BASE_DIR`, was tested and **hard-fails** across build trees on a
+  generator-locked subbuild cache. Every configure now states its mode, and a deliberate from-cold
+  check is documented.
+
+### Fixed
+- `world_audit` was **never broken** (BL-291) — it exits non-zero on 1 assertion of 26. The
+  measured landform census stands, and `TILES.md`'s last "needs re-measuring" note is re-measured:
+  Kepler's 0.0% valley is a real wet-body property, not a stale artifact.
+
+### Known gaps
+- The from-cold check has **not** been run on Windows, where the original schannel TLS revocation
+  failure actually occurs — it does not reproduce on Linux, so the fix is untested against its own
+  symptom. Filed as BL-341.
+- The gate's one remaining failure is `world_audit`'s biome-balance assertion (forest+wetland
+  2.41% against a 3% target). That is a world-generation finding carried by BL-338, not an
+  instrument defect — the gate reporting it is the gate working.
+
 ## [0.1.2] — 2026-08-09
 
 **Buildings rework — remoteness stops being free.** The minor that the simulated-play arc was
@@ -368,7 +422,8 @@ Layer 2 finalisation.
 
 Initial prototype snapshot — application shell, canvases, and the hard-coded world.
 
-[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.8...HEAD
+[0.1.8]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.1...v0.1.8
 [0.1.2]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.0...v0.1.2
 [0.1.1]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.2...v0.1.1
 [0.1.0]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.0.9...v0.1.0

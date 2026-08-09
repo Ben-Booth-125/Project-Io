@@ -10,7 +10,72 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — Cut v0.1.1: the word interface ships, and the retrofit that made it uncuttable is undone (2026-08-09, latest)
+## Session — Cut v0.1.8: ten test failures, one real defect, and a tool that had been lying since it was written (2026-08-09, latest)
+
+Full mode, Batch Delivery + release — the third cut of the session. Ben: *"move BL-288 and cut
+v0.1.8."* Two worktree sub-agents (next_id.js; the SDL3 posture), the entangled harness/golden
+core in the main session.
+
+**BL-288 moved from v0.1.3 first.** A priority-A build-health item had been sitting inside the
+Laws design stub, where it blocked a minor it had nothing to do with.
+
+**The finding that reframed the whole minor.** Every item here was filed on the premise that
+something was *broken*. Measurement said the tooling was mostly **misreporting**, which is worse.
+`build_linux/` is already Ninja + Release, so BL-288's "the default tree is Debug" premise was
+already obsolete on Linux — and a full Release run reported **ten failures of which exactly one
+was a failing assertion**. Running each harness alone on an idle machine sorted them:
+
+- **Four pass but exceed the flat 60 s bound** — `earthlike_lean_trace` 121 s, `notable_worlds`
+  105 s, `mediterranean_sweep` 87 s, `earthlike_tile_census` 58 s (passing by *luck*, 2 s under).
+- **Two never finish** — `history_sim_harness` and `history_sweep` both ran past 400 s. They are
+  open-ended research sweeps, not regression checks; their cost is the point.
+- **Two are load artifacts** — `econ_stability` and `home_surface_bench` assert *absolute*
+  wall-clock times, pass standalone, and failed only because a concurrent session's build was
+  loading the box.
+- **One is a world-generation finding** — `world_audit`, 1 failing assertion of 26 (BL-291).
+- **One was real** — `ai_skill_harness`'s stale GCC goldens, which had sat unnoticed among nine
+  false positives for days. *That* is the cost of a noisy gate, stated as a measurement rather
+  than as a principle.
+
+Fix: three tiers (default 60 s, long 240 s widened to the four measured slow ones), a `sweep`
+label with no timeout excluded from the gate, and a `bench` label so a wall-clock failure reads as
+"re-run idle". Gate went **10 failures → 1**, the survivor being `world_audit`'s biome balance —
+carried by BL-338, and the gate reporting it is the gate working.
+
+**BL-322 — the root cause nobody would have guessed.** `execSync` runs through `/bin/sh`, which is
+`dash` here, and the unquoted `(` in `--format=%(refname)` made dash abort with a syntax error
+*before git ran*. `stdio: ['ignore']` discarded the message and `catch { return [] }` turned total
+failure into "this repo has no branches". Platform-dependent, so it worked on the Windows box where
+it was written and failed silently everywhere it was needed. It had been issuing ids **25 below the
+true ceiling** — the direct mechanical account of how BL-326..BL-333 each landed twice. Refs
+scanned 0 → 53. A second latent silent failure was caught in passing: `backlog.json` at 832 KB
+against node's 1 MB default `maxBuffer`, 79% of the way to throwing ENOBUFS into the same
+swallowing `catch`.
+
+**BL-302 — the item's own preferred option was disproved by testing it.** A shared
+`FETCHCONTENT_BASE_DIR` *hard-fails* across build trees, because each `<dep>-subbuild` carries a
+generator-locked cache and this checkout has four trees side by side. Per-dependency
+`FETCHCONTENT_SOURCE_DIR_<dep>` works and landed. Honest limit recorded rather than papered over:
+a from-cold configure **succeeds** on Linux in ~74 s, so the Windows schannel fault does not
+reproduce here and the fix is untested against its own symptom — filed as **BL-341**, and moved to
+v0.1.9 rather than left open inside the minor being cut, which is the exact trap v0.1.1 fell into.
+
+**BL-285 — the judgement call worth Ben's eye.** The GCC re-bless moves **downward**, unlike the
+MSVC re-bless of 2026-08-02 which was uniformly upward: seed 1 fell 81% and went from highest of
+the five to lowest, while seed 4 fell only 25%. Constraining siting (v0.1.2's reach rule) and
+adding a cash outflow (unit hiring, 21 per seed) should cost net worth, and a *per-seed reshuffle*
+is what a placement constraint would produce, so the shape matches the cause; survival held in
+band on all five, so corps are poorer rather than dying. Recorded in the harness rather than waved
+through, because "the AI got poorer" is also what a genuine skill regression looks like. Also
+flagged in place: the **MSVC set is now stale for the identical reason** and will fail on the next
+Windows run. Task 2 landed too — ladder lines carry a `ladder_rung` tag, so H4 filters structurally
+instead of matching the prose "granary"/"Charter Act"/"Great Accord".
+
+**Runtime:** not tracked. Gate takes ~9.5 minutes, which is itself worth an item.
+
+---
+
+## Session — Cut v0.1.1: the word interface ships, and the retrofit that made it uncuttable is undone (2026-08-09)
 
 Full mode, release — the second cut of the same session, immediately after v0.1.2. Ben:
 *"cut v0.1.2 first, then v0.1.1."*

@@ -89,7 +89,17 @@ it against a committed golden image:
 ./build/ProjectIo --verify scripts/verify/corporation_lens.lua
 ```
 
-## Latest releases — v0.1.1 and v0.1.2
+## Latest releases — v0.1.1, v0.1.2 and v0.1.8
+
+**v0.1.8 — build health: the gate stops lying.** No player-facing content. `ctest` had been
+reporting **ten failures of which exactly one was a real failing assertion**; the rest were
+harnesses exceeding a bound they were never sized against, open-ended research sweeps that never
+finish, and wall-clock benchmarks failing under machine load. Three test tiers plus `sweep` and
+`bench` labels fix that. Also: `next_id.js` stopped silently defending nothing (it was issuing
+backlog ids 25 below the true ceiling — the account of how eight items each landed twice), the
+GCC goldens were re-blessed, and a seeded FetchContent cache lets fresh worktrees configure
+offline.
+
 
 **v0.1.1 — the word interface.** An agent can read the world state (blackboard export), look up
 what every one of the 115 controls *means* (the action dictionary, transcribed from the command
