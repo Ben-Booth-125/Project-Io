@@ -113,10 +113,47 @@ The per-tile loop is **culled and cached**, not all-tiles-per-frame:
   any built/owner/lens work.
 
 Measured (pan_perf, 1720×1080, 60 Hz vsync): play-zoom pan went 11.3 → 5.0 ms
-work/frame in Release and 41.2 → 6.7 ms in Debug. The remaining heavy case is
+work/frame in Release and 41.2 → 6.7 ms in Debug. The remaining heavy case was
 the whole-grid view (all 15,120 hexes genuinely visible, ~155k vertices): 12.1 ms
-Release — vertex-emission-bound, owned by the zoomed-out LOD/draw-cache follow-on
-(BL-269), not by this loop.
+Release — vertex-emission-bound, and closed by the fill LOD below (BL-269).
+
+### Fill level-of-detail at far zoom (BL-269, 2026-08-09)
+
+Below **`draw_r ≤ 7 px`** the terrain fill is an `AddRectFilled` instead of a
+6-gon: ~4 vertices against ~10 once anti-aliasing's fringe is counted, and no
+fringe to rasterise.
+
+**The bound is derived, not chosen.** A hexagon differs from its inscribed rect by
+the corner cut, `draw_r × (1 − √3⁄2)` = `draw_r × 0.134`, which falls under one
+pixel at `draw_r < 7.46`. At the 7 px bound the cut is 0.94 px, and the per-tile
+landform icons (drawn at `0.42 × draw_r`) are already unreadable.
+
+The rect is sized to the **grid step**, not the hex radius. Rows step by
+`1.5 × hex_size` while a hex is `2 × hex_size` tall, so consecutive rows overlap; a
+radius-sized rect is shorter than the row pitch and the terrain renders as
+horizontal stripes. At `col_step × row_step` the rects brick-lay — odd rows are
+already offset half a column — and tile the plane exactly.
+
+| whole-grid view | before | after |
+|---|---|---|
+| vertices | 157,084 | **63,004** |
+| submit | 14.25 ms | **4.25 ms** |
+
+Zoomed-in phases are unchanged to the vertex (6,172 at z1.1; 23,620 at z3), so the
+LOD provably does not fire where detail is readable. **Terrain colour, relief
+shading, the survey mask and the fog wash are untouched** — they are colour, not
+geometry — so the analytic read this view exists for is unchanged. The visible
+difference is that the far-zoom grid texture is brick-laid rather than hex-dotted.
+
+> **Panning is not the cost, and the measurement is the reason to say so.** The
+> static and panning phases at the same zoom measured identically (157,084 vs
+> 158,407 vertices). Pan is `pan += io.MouseDelta` — 1:1 with the cursor and
+> correct — so a frame that takes 3× as long applies 3× the accumulated delta at
+> once: the right destination by a jumpy route. "Sharp jumps while panning" is a
+> frame-cost symptom, and input-side damping would add latency without touching it.
+
+`build_ms` (~9 ms, ImGui draw-list construction) is untouched and is the next thing
+to look at if this view is still short of budget on low-spec hardware.
 
 ## Cell sizing and coordinate mapping
 

@@ -1437,6 +1437,43 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     const float draw_r = hex_size * zoom - 1.0f;
     const float hit_r  = hex_size * zoom;
 
+    // --- Fill level-of-detail (BL-269) ------------------------------------------
+    // MEASURED 2026-08-09, pan_perf on the real renderer, Kepler (15,120 tiles):
+    //
+    //   zoom            vertices   submit ms
+    //   0.9 whole grid   157,084      14.25
+    //   1.1                6,172       0.47
+    //   3.0               23,620       1.95
+    //
+    // A 25x vertex cliff at the whole-grid view, and submit alone blows the 8 ms
+    // frame budget there. Panning is NOT the cost -- the static and panning phases
+    // measured identically (157,084 vs 158,407) -- which is why this is a draw-cost
+    // fix and not an input fix. Panning only makes the hitches visible, because a
+    // frame that takes 3x as long applies 3x the accumulated MouseDelta at once:
+    // the right destination by a jumpy route.
+    //
+    // The cause is `AddConvexPolyFilled(verts, 6, ...)`: with anti-aliasing on, a
+    // 6-gon costs ~10 vertices once the AA fringe is counted, times every tile.
+    // `AddRectFilled` with no rounding costs 4 and emits no fringe.
+    //
+    // The threshold is DERIVED, not picked. A hexagon differs from its inscribed
+    // rect by the corner cut, `draw_r * (1 - sqrt(3)/2)` = `draw_r * 0.134`. That
+    // difference stops being drawable when it falls under one pixel, i.e. at
+    // draw_r < 1 / 0.134 = 7.46 px. Round down to 7: at that radius the corner cut
+    // is 0.94 px, and the per-tile landform icons (drawn at 0.42 * draw_r, so ~3 px)
+    // are already unreadable.
+    //
+    // The first attempt used 5 px and did not fire at all — at a 1080-tall window
+    // the whole-grid view sits at draw_r ~5.1-5.7, just the wrong side of it. Worth
+    // recording, because it is the argument for deriving the bound from the geometry
+    // rather than eyeballing a constant that happens to work at one window size.
+    //
+    // Terrain colour, relief shading, the survey mask and the fog wash are all
+    // UNAFFECTED — they are colour, not geometry — so the analytic read the
+    // whole-grid view exists for is exactly as legible.
+    constexpr float k_lod_radius_px = 7.0f;
+    const bool      coarse_fill     = draw_r <= k_lod_radius_px;
+
     // --- Infinite horizontal scroll ---
     // The grid is a cylinder: column gw wraps onto column 0. In screen space the
     // grid repeats every `period_px = gw * col_step * zoom`. Each tile is drawn
@@ -1693,9 +1730,34 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             const float cx = sc.x + static_cast<float>(k) * period_px;
             const float cy = sc.y;
 
+            // The vertices are still needed below — hover and selection outline this
+            // hex, and those read as hexes at any zoom. Computing them is arithmetic;
+            // it is EMITTING them as a filled 6-gon that costs.
             ImVec2 verts[6];
             hex_vertices(verts, cx, cy, draw_r);
-            dl->AddConvexPolyFilled(verts, 6, fill);
+
+            // Coarse fill below the LOD threshold (BL-269): a rect instead of a
+            // 6-gon, ~4 vertices against ~10 and no AA fringe.
+            //
+            // SIZED TO THE GRID STEP, not to the hex radius. Rows step by
+            // 1.5 * hex_size while a hex is 2 * hex_size tall — consecutive rows
+            // OVERLAP. A rect built from the radius is shorter than the row pitch and
+            // the terrain renders as horizontal stripes, which is exactly what the
+            // first attempt did. Because odd rows are offset by half a column, rects
+            // of (col_step x row_step) brick-lay and tile the plane exactly.
+            //
+            // `hex_size * zoom` is recovered as `draw_r + 1` (draw_r is that minus the
+            // 1 px border shrink), and the same 1 px is taken back off each axis so the
+            // background still shows through as the grid texture the hexes give.
+            if (coarse_fill)
+            {
+                const float step = draw_r + 1.0f; // hex_size * zoom
+                const float hw   = kSqrt3 * step * 0.5f - 0.5f;
+                const float hh   = 1.5f   * step * 0.5f - 0.5f;
+                dl->AddRectFilled({ cx - hw, cy - hh }, { cx + hw, cy + hh }, fill);
+            }
+            else
+                dl->AddConvexPolyFilled(verts, 6, fill);
 
             // Masked region: locked fill only — no borders, markers, selection, or
             // hit-testing for this copy. This single gate also *is* the rival-marker
