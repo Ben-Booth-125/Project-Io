@@ -329,6 +329,83 @@ int main()
               "SO.3 pool debited by the order", ws.pool_for(corp, b).quantities[ri(resource_type::steel)], 0.0f);
     }
 
+    // --- BL-351: duplicate sell orders cannot over-commit the pool ---
+    // Two identical orders (qty 10, floor 6) against a pool of 10 steel: the
+    // second lists only the running remainder (0), so at most the pool clears,
+    // the pool floors at 0, and income prices only the cleared quantity.
+    // Price as SO.1: no demand -> ref 5.0, clearing = max(5, 6) = 6.
+    {
+        world ws;
+        const entity_id b = ws.create_entity(); ws.bodies[b] = body_component{};
+        const entity_id m = ws.create_entity();
+        market_component mc{}; mc.body = b;
+        mc.base_price[ri(resource_type::steel)] = 8.0f;
+        mc.price = mc.base_price;
+        ws.markets[m] = mc;
+        const entity_id corp = ws.create_entity();
+        { corporation_component cc; cc.balance = 0.0f; ws.corporations[corp] = cc; }
+        ws.pool_for(corp, b).quantities[ri(resource_type::steel)] = 10.0f;
+
+        std::vector<sell_order> orders;
+        sell_order o; o.corp = corp; o.body = b; o.resource = resource_type::steel;
+        o.quantity = 10.0f; o.floor_price = 6.0f;
+        orders.push_back(o);
+        orders.push_back(o);
+
+        economy_report empty;
+        auto f = clear_markets(ws, reg, empty, orders);
+        const float pool_after = ws.pool_for(corp, b).quantities[ri(resource_type::steel)];
+        const float cleared    = 10.0f - pool_after;
+        check(cleared <= 10.0f + 1e-3f && near(cleared, 10.0f),
+              "BL351.1 duplicate orders clear at most the pool (10 total)", cleared, 10.0f);
+        check(pool_after >= 0.0f && near(pool_after, 0.0f),
+              "BL351.2 pool floors at zero (never negative)", pool_after, 0.0f);
+        check(near(f[corp].income, cleared * 6.0f),
+              "BL351.3 income == cleared quantity x clearing price (10*6)", f[corp].income, cleared * 6.0f);
+    }
+
+    // --- BL-351: a multi-order seller's unmatched remainder clears per order ---
+    // One seller lists two orders of 5 (floor 2); one buyer takes 5. The matched 5
+    // drains one order; the OTHER order's own remainder (5) auto-clears at
+    // max(ref, floor) — the old per-seller aggregate zeroed both orders' remainder.
+    // Ref price: S=10 D=5 base 8 -> target 8*sqrt(0.5)=5.657, EMA -> 6.828.
+    // Income = 5*2 (matched at ask) + 5*6.828 (auto-clear) = 44.142.
+    {
+        world ws;
+        const entity_id b = ws.create_entity(); ws.bodies[b] = body_component{};
+        const entity_id m = ws.create_entity();
+        market_component mc{}; mc.body = b;
+        mc.base_price[ri(resource_type::steel)] = 8.0f;
+        mc.price = mc.base_price;
+        ws.markets[m] = mc;
+        const entity_id seller = ws.create_entity();
+        { corporation_component cc; cc.balance = 0.0f; ws.corporations[seller] = cc; }
+        const entity_id buyer = ws.create_entity();
+        { corporation_component cc; cc.balance = 0.0f; ws.corporations[buyer] = cc; }
+        ws.pool_for(seller, b).quantities[ri(resource_type::steel)] = 10.0f;
+
+        std::vector<sell_order> sells;
+        sell_order so; so.corp = seller; so.body = b; so.resource = resource_type::steel;
+        so.quantity = 5.0f; so.floor_price = 2.0f;
+        sells.push_back(so);
+        sells.push_back(so);
+        std::vector<buy_order> buys;
+        buy_order bo; bo.corp = buyer; bo.body = b; bo.resource = resource_type::steel;
+        bo.quantity = 5.0f; bo.max_price = 10.0f;
+        buys.push_back(bo);
+
+        economy_report empty;
+        auto f = clear_markets(ws, reg, empty, sells, buys);
+        check(near(f[seller].income, 5.0f * 2.0f + 5.0f * 6.828427f),
+              "BL351.4 multi-order seller: matched order + other order's auto-clear",
+              f[seller].income, 44.142f);
+        check(near(ws.pool_for(seller, b).quantities[ri(resource_type::steel)], 0.0f),
+              "BL351.5 pool debited by both orders' full listed quantity",
+              ws.pool_for(seller, b).quantities[ri(resource_type::steel)], 0.0f);
+        check(near(f[buyer].expenditure, 5.0f * 2.0f),
+              "BL351.6 buyer pays the matched quantity at the ask", f[buyer].expenditure, 10.0f);
+    }
+
     // --- Multiple markets per body: nearest-centre catchment routing ---
     // A body carries two markets centred on tiles 100 columns apart. A tile near
     // each centre resolves (market_for_tile) to that centre's market, and a corp
