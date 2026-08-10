@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*118 entries — 21 open, 97 resolved.*
+*118 entries — 20 open, 98 resolved.*
 
 ---
 
@@ -178,21 +178,6 @@ corporation_generation.cpp rerolls corp home provinces up to six times trying to
 > **Recommendation:** Option 1 or 3. Option 2 buys a guarantee by letting a corp anchor outside its own nation, which fights BL-219's whole argument that a corp's focus is a consequence of the province it anchors to.
 
 *Files: `src/world/corporation_generation.cpp`, `tools/verify/settlement_harness.cpp`*
-
-### NR-120 — Large refocus (Ben, 2026-08-10): the player is a national private militia that contracts private companies for space equipment
-*decision taken on your behalf · raised 2026-08-10 · from Session 2026-08-10, during the sprint-map render*
-
-Ben, verbatim, in two steps. First: "In current version, the player is a national entity for sure."
-Then: "In fact let's do a large refocus. Let's place the player as a national private militia, which uses private companies to build equipment for space. So the flavour of trading is initially coloured directly with military use, and space equipment."
-
-This NARROWS BL-094 (player-identity pivot), which since 2026-08-03 has said 'governing body' and reads as a whole state apparatus with law/policy/science as its levers. A national private militia is a smaller, sharper actor: armed, national in allegiance, but not the government. It does not legislate; it procures.
-
-Three consequences that are not restatements of BL-094:
-1. THE CORPORATION'S ROLE CHANGES CATEGORY. BL-094 has the chartered corp as the player's own economic arm on a shared treasury — the player's alter ego. Under the refocus, companies are SUPPLIERS the militia contracts with. That is an arm's-length relationship with a price, a counterparty and a possible refusal, not a second wallet. The 'tight/shared treasury (prototype-of-1)' call in BL-094 does not survive the refocus unamended.
-2. TRADE IS COLOURED FROM TICK ONE. Ben's word is 'initially' — this is not an endgame layer. The goods the player cares about are military materiel and space hardware, which means the processing/roster work (BL-340) and the resource tiers (RESOURCES.md) are load-bearing for the PREMISE now, not just for economic depth.
-3. 'FOR SPACE' RE-ANCHORS THE ERA LADDER. The militia's procurement target is space equipment, so the Era 0 -> Era 1 gate (ERAS.md: rocketry + launchpad + propellant) stops being a distant unlock and becomes the thing the player is buying toward from the start.
-
-**Why it matters.** v0.3.0 carries 22 open items — the largest single block on the board — and every one of them was specified against 'governing body'. BL-315 (governing-body conflict spine) is design-owed and names the superseded framing in its own title. Planning five sprints without settling this would sequence work against an actor that no longer exists.
 
 ---
 
@@ -1670,4 +1655,19 @@ After reconciling the 20 items ROADMAP.md already assigned in prose, 14 items of
 > **RESOLVED.** Ben, 2026-08-10: "keep v0.1.12 and v0.1.13 as named". Option 1 taken -- the two minors stand as filed, and v0.1.11's reshaped roster stands with them.  So the naming stops being a delegated default and becomes a decision: v0.1.12 Logistics modes (BL-153, BL-173, BL-188, BL-175) and v0.1.13 Markets & materials (BL-263, BL-340, BL-130, BL-132, BL-107, BL-192). Neither merges into the other and neither is renumbered against the uncut v0.1.5-v0.1.7.  WHAT STAYS OPEN, because ruling on the names did not rule on the content: neither minor carries a done-definition yet, and that is deliberate rather than outstanding. The band's rule is that a minor earns its done-definition AT PROMOTION -- NR-103's finding was that a theme with no done-definition absorbs items indefinitely, and writing one now, for work nobody has started, would be inventing a test for finished before knowing what finishing looks like. The two entries in ROADMAP.md say so in as many words.
 
 *Files: `docs/development/ROADMAP.md`, `docs/development/backlog.json`*
+
+### NR-120 — Large refocus (Ben, 2026-08-10): the player is a national private militia that contracts private companies for space equipment
+*decision taken on your behalf · raised 2026-08-10 · from Session 2026-08-10, during the sprint-map render*
+
+Ben, verbatim, in two steps. First: "In current version, the player is a national entity for sure."
+Then: "In fact let's do a large refocus. Let's place the player as a national private militia, which uses private companies to build equipment for space. So the flavour of trading is initially coloured directly with military use, and space equipment."
+
+This NARROWS BL-094 (player-identity pivot), which since 2026-08-03 has said 'governing body' and reads as a whole state apparatus with law/policy/science as its levers. A national private militia is a smaller, sharper actor: armed, national in allegiance, but not the government. It does not legislate; it procures.
+
+Three consequences that are not restatements of BL-094:
+1. THE CORPORATION'S ROLE CHANGES CATEGORY. BL-094 has the chartered corp as the player's own economic arm on a shared treasury — the player's alter ego. Under the refocus, companies are SUPPLIERS the militia contracts with. That is an arm's-length relationship with a price, a counterparty and a possible refusal, not a second wallet. The 'tight/shared treasury (prototype-of-1)' call in BL-094 does not survive the refocus unamended.
+2. TRADE IS COLOURED FROM TICK ONE. Ben's word is 'initially' — this is not an endgame layer. The goods the player cares about are military materiel and space hardware, which means the processing/roster work (BL-340) and the resource tiers (RESOURCES.md) are load-bearing for the PREMISE now, not just for economic depth.
+3. 'FOR SPACE' RE-ANCHORS THE ERA LADDER. The militia's procurement target is space equipment, so the Era 0 -> Era 1 gate (ERAS.md: rocketry + launchpad + propellant) stops being a distant unlock and becomes the thing the player is buying toward from the start.
+
+**Why it matters.** v0.3.0 carries 22 open items — the largest single block on the board — and every one of them was specified against 'governing body'. BL-315 (governing-body conflict spine) is design-owed and names the superseded framing in its own title. Planning five sprints without settling this would sequence work against an actor that no longer exists.
 

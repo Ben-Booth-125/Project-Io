@@ -2,17 +2,19 @@
 
 ## Player — identity
 ### Player identity
-The player controls a **corporation** today, and the prototype is built on it. The stated aim is to play a **governing body** — BL-094 (governing-body pivot), raised to priority A on 2026-08-03. The corp stays the economic actor underneath.
+The player controls a **corporation** today, and the prototype is built on it. The stated aim is to play a **national private militia** — BL-094 (player-identity pivot, rewritten 2026-08-10 per NR-120), armed and national in allegiance but not the state. It does not legislate; it **procures**: it raises and fields force, buying its equipment from private companies that are counterparties, not its own economic arm.
 
-The reason is the pivot's whole point (Ben, 2026-08-03): a corporation's levers are all economic, so law, policy and science stay flavour on an economy. A governing body *wields* them, and can point them at force. That is Conflict's route to being load-bearing.
+> **Corrected 2026-08-10 (dated note, not a rewrite — authority time-slice, DELIVERY.md § Design state).** This section read "governing body" from 2026-08-04 to 2026-08-10. That framing is **superseded**, not extended — Ben's ruling was explicit that the militia replaces it rather than reading as an early form of it. Full propagation into this doc's own voice waits for BL-094 to land; this note exists so the doc does not actively mislead in the meantime.
 
-It follows that every system in the v0.1.x stub band answers one design test: **does this reach military as well as economic outcomes?** A system that can only ever change a cost or a price is being designed for the player we are pivoting away from.
+The reason for the pivot still holds, restated for the militia (Ben's original point, 2026-08-03, re-read 2026-08-10): a corporation's levers are all economic, so law, policy and science stay flavour on an economy. The militia's levers are narrower than a governing body's would have been — it does not wield law or research — but they reach force directly: what it can **field**, bought from suppliers, pointed at Conflict. That is still Conflict's route to being load-bearing, by a shorter path than "wields law and science" implied.
 
-The pivot has not landed, and carries no version goal yet — that question is open (NR-045). Its design lives in `backlog.json` until the work lands.
+It follows that every system in the v0.1.x stub band answers a **replaced** design test (BL-094 § 2026-08-10): **does this change what the militia can FIELD, or what it must ANSWER TO?** A system that only ever changes a cost or a price, touching neither procurement nor accountability, is being designed for the player we pivoted away from twice — first the corporation, now the governing body.
+
+The pivot's rewrite carries version goal **v0.3.0** (Ben, 2026-08-04, unaffected by the 2026-08-10 refocus). Its design lives in `backlog.json` until the work lands.
 ### Asset-based existence
 The player persists as long as they hold any asset. Owning a single building keeps the corporation alive; the parent nation must also be destroyed for total elimination.
 ### Development through ages
-Early game involves buying land, building industrial chains, and raising forces before space becomes viable. Private forces are the Era 0 corporate reading; a governing body raises standing ones.
+Early game involves buying land, building industrial chains, and raising forces before space becomes viable. *(Corrected 2026-08-10, NR-120: "private forces are the Era 0 corporate reading; a governing body raises standing ones" is superseded — the player IS the private force throughout, procuring rather than internally building its own materiel. The Era 0 → Era 1 gate, ERAS.md's rocketry + launchpad + propellant set, is what the militia is equipping toward from the opening tick, per the refocus's "space equipment" framing.)*
 
 ## Trade — economy
 ### Dynamic pricing
@@ -28,13 +30,13 @@ All non-player factions operate under the same ruleset as the player, or a delib
 ### Solar to galactic scope
 The map starts as a solar system but can expand to multiple-systems. The player-parameter generation is now concrete: the New World wizard walks player-set parameters through a staged chain — planetology, continents and plates, tiles, population centres, the institutional history ladder, nations, roads, corporations. Each stage is a deterministic consequence of the one above it. `docs/generation/GENERATION_STRATEGY.md` maps the chain; `PLANETOLOGY.md` owns its head.
 ### Modular tech trees
-Technology is organised into discrete trees, each unlocked by meeting a known precondition. This keeps progression legible and goal-oriented without requiring a single monolithic research path. Research is owned at the **governing-body** tier and must reach weapons and logistics, not only factories (BL-094).
+Technology is organised into discrete trees, each unlocked by meeting a known precondition. This keeps progression legible and goal-oriented without requiring a single monolithic research path. *(Corrected 2026-08-10, NR-120: research is no longer "owned at the governing-body tier" — a militia does not run laboratories. It reaches weapons and logistics by buying the OUTPUT of research, through the same procurement seam as any other equipment, BL-350. Whether any research capability sits with the militia itself, rather than entirely with its suppliers and its home nation, is Sprint 8's open question and not settled here.)*
 ### Sentiment-based diplomacy
 Each faction maintains a sentiment value toward every other known faction, shaped by a small set of contributing factors such as trade history, territorial conflict, and ideological alignment. *Designed, not built* — no sentiment layer exists in code.
 
 ## Combat — conflict
 
-Conflict is the least-designed of the three pillars. The **governing body** is the actor that commands force — BL-094's stated route to making this pillar load-bearing rather than logistics-adjacent. A battle resolver ships (BL-272, `src/world/combat.cpp`), used by the Era −1 history sim; nothing in the campaign layer commands it yet.
+Conflict is the least-designed of the three pillars. *(Corrected 2026-08-10, NR-120: was "the governing body is the actor that commands force" — now the **national private militia** commands it, having procured it. BL-315, the conflict spine, is Sprint 8's route to making this pillar load-bearing.)* A battle resolver ships (BL-272, `src/world/combat.cpp`), used by the Era −1 history sim; nothing in the campaign layer commands it yet.
 
 ### Concurrent with trade
 Combat and the economy run simultaneously. Freighters and supply routes are live targets.

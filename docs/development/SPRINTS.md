@@ -127,6 +127,48 @@ and no open item still names an actor that does not exist.
 sprawling, the fallback is to timebox BL-094 + BL-315 and let the v0.3.0 reconciliation run as a
 background sweep.
 
+**Retro (closed 2026-08-10, same day).**
+
+- **BL-094 — rewritten in full.** Title, short_name (`PLAYER_MILITIA_PIVOT`) and summary replaced;
+  a dated `## 2026-08-10 — REWRITE` section added to `design`, kept alongside (not deleting) the
+  2026-07-04/2026-08-03–07 history so the record of *how* the pivot was reached survives. All
+  three of NR-120's open questions resolved: the militia is **attached to** one of the ~43 nations,
+  not itself one of them; the shared treasury is **retracted** — companies are counterparties on
+  their own market, not a linked wallet; the retired design test is replaced by **"does this
+  change what the militia can FIELD, or what it must ANSWER TO?"**. `status` held at `designed` —
+  it already was, and the rewrite does not reopen the design-owed question, it replaces the answer.
+- **BL-315 — rephrased, deliberately NOT flipped to `designed`.** Title and summary drop the
+  superseded framing; the law→military-reach strand is reversed in direction (the militia is
+  *subject* to conscription/embargo/basing rights, not the body that enacts them). But real design
+  work — the actual force-command verbs, the procurement→field pipeline once BL-350 exists — is
+  still owed, same as before the refocus. Flipping it to `designed` here would have been the
+  bookkeeping error Sprint 2a's retro warned against (items reading `landed` when they weren't).
+  Stays `design-owed`, priority A.
+- **BL-350 filed — the procurement/contract seam.** New item, `design-owed`, priority A, requires
+  BL-094, version goal **v0.1.14**. Counterparty / price / lead time / refusal, read alongside
+  BL-280 (negotiated tax rate) as the same bargaining shape pointed at a different counterparty.
+  Four concrete open questions recorded on the item rather than guessed at (does the treasury debit
+  on order or delivery; is refusal a hard block or a penalty; does reputation persist; how this
+  reads against BL-037's preferred-seller routing).
+- **v0.3.0 roster reconciled — cheaper than planned.** Grepped all 21 remaining open items for
+  stale "governing" language rather than reading each one cold. Only **two** needed touching:
+  **BL-333** (nuclear arc, one sentence redirected to the militia's home nation) and **BL-182**
+  (corporate borders, a cross-reference note to BL-350 — this item turned out to be about the *same
+  companies* the militia now contracts with, so it survives the refocus and gets more relevant, not
+  less). The other 19 — the whole Era −1 sandbox tail plus BL-087 and BL-314 — were already
+  actor-agnostic: background-nation history, a generic tech-gate model, a generic unit-verb family.
+  The map artifact's forecast ("good news for design") held.
+- **The three authority docs corrected as dated notes, not rewritten.** CONCEPT.md (4 notes),
+  SYSTEMS.md (7 notes, the densest of the three — it carried the sharpest governing-body
+  statements, including the "budget is the converter" framing that needed no change and the
+  "shared treasury" assumption that did), GLOSSARY.md (Corporation repointed; **Governing body**
+  entry replaced outright by **Militia**, kept dated so the supersession is legible rather than
+  silently vanished).
+- **Feedback: the sprint's own risk did not land.** The fallback (timebox BL-094+BL-315, leave the
+  roster as a background sweep) was never needed — grepping for the stale term before reading each
+  item cold turned a feared 22-item slog into a 20-minute check. Worth remembering next time a
+  "reconcile the roster" task looks large: search first, read only what the search flags.
+
 ## Sprint 9 — The militia takes the field (cut v0.1.5)
 
 **Goal.** The first buildable consequence of the refocus, and the band's next tag.
