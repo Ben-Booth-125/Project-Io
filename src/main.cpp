@@ -252,6 +252,13 @@ int run_blackboard_export(const std::string& which, const std::string& out_dir, 
                                + std::to_string(ticks) + ".jsonl";
         std::ofstream f(path, std::ios::binary); // binary: byte-stable across platforms
         to_jsonl(bb, f);
+        f.flush();
+        if (!f) // BL-363: an unwritable path (missing dir, permissions) is a failure, not "wrote"
+        {
+            std::fprintf(stderr, "ProjectIo: --export-blackboard: failed to write %s\n",
+                         path.c_str());
+            return 1;
+        }
         std::printf("wrote %s (%zu facts)\n", path.c_str(), bb.facts.size());
     }
     return 0;

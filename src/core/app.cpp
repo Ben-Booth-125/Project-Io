@@ -308,7 +308,16 @@ void app::start_new_game()
     // constructing a fresh sim_loop rebases its internal timer to the current wall
     // clock. Speed comes from the Lua config loaded by init.lua in run().
     {
-        sol::table cfg = m_lua.state()["config"];
+        // A user-edited init.lua that omits or renames `config` must fail with a
+        // clean message (BL-110 / BL-363), not an unchecked nil->table conversion.
+        sol::object cfg_obj = m_lua.state()["config"];
+        if (cfg_obj.get_type() != sol::type::table)
+            throw std::runtime_error(
+                "scripts/init.lua: expected a global table named 'config' "
+                "(e.g. config = { default_speed = 2 }); found "
+                + std::string(cfg_obj.get_type() == sol::type::lua_nil
+                              ? "nothing" : "a non-table value"));
+        sol::table cfg = cfg_obj;
         m_sim_loop = sim_loop();
         m_sim_loop.set_speed(cfg.get_or("default_speed", 2));
     }
