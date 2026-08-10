@@ -1,6 +1,7 @@
 #include "supply_system.hpp"
 
 #include "logistics.hpp"
+#include "orbital_system.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -134,9 +135,12 @@ void credit_arrived_convoys(world& w, int tick)
 
 namespace {
 
-/// Euclidean distance (AU) between two body entities using their current
-/// orbital positions. Moons are approximated at their parent's position.
-float body_distance_au(const world& w, entity_id a, entity_id b)
+/// Euclidean distance (AU) between two body entities at the given day tick.
+/// Uses the tick-pure angle (orbital_angle_at_tick), never the frame-advanced
+/// orbital_angle_rad — this feeds source selection, dispatch pricing and convoy
+/// speed inside the econ tick, which must not depend on frame rate (BL-354).
+/// Moons are approximated at their parent's position.
+float body_distance_au(const world& w, entity_id a, entity_id b, int day_tick)
 {
     if (a == b)
         return 0.0f;
@@ -147,7 +151,7 @@ float body_distance_au(const world& w, entity_id a, entity_id b)
             return {0.0f, 0.0f};
         const body_component& bc = it->second;
         const float r = bc.orbital_radius_au;
-        const float theta = bc.orbital_angle_rad;
+        const float theta = orbital_angle_at_tick(bc, day_tick);
         return { r * std::cos(theta), r * std::sin(theta) };
     };
 
@@ -297,6 +301,11 @@ void dispatch_convoys(world& w, const recipe_registry& reg,
     const logistics_nodes  nodes = collect_logistics_nodes(w);
     const logistics_node_params& node_params = reg.logistics_nodes();
 
+    // BL-354: inter-body distances are evaluated at this day tick via the tick-pure
+    // angle, so sourcing, pricing and convoy speed are a pure function of tick.
+    // current_day_tick is set by every tick path (app + main) before dispatch runs.
+    const int day_tick = w.current_day_tick;
+
     for (auto& [corp_id, corp] : w.corporations)
     {
         // Iterate markets (not corp pools) so we catch shortfalls even on bodies
@@ -364,7 +373,7 @@ void dispatch_convoys(world& w, const recipe_registry& reg,
                             < propellant_per_launch)
                             continue;
                         mode      = convoy_mode::space;
-                        dist      = body_distance_au(w, src_body, dest_body);
+                        dist      = body_distance_au(w, src_body, dest_body, day_tick);
                         unit_cost = logistics_cost_space;
                     }
 
@@ -397,7 +406,7 @@ void dispatch_convoys(world& w, const recipe_registry& reg,
                         static_cast<std::size_t>(resource_type::propellant)] -= propellant_per_launch;
 
                 // Speed: 1 / distance in AU gives roughly 1 tick per AU. Clamp to > 0.
-                const float dist = body_distance_au(w, best_src_body, dest_body);
+                const float dist = body_distance_au(w, best_src_body, dest_body, day_tick);
                 const float speed = (dist > 0.0f) ? (1.0f / dist) : 1.0f;
 
                 convoy_component c;

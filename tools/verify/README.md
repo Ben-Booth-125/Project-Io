@@ -91,9 +91,11 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\construction_harness.cpp ^
 
 :: Supply layer — advance_convoys (R1), logistics constants (R4), dispatch_convoys
 :: gate check + balance debit + pool debit (R5, R6), credit_arrived_convoys pool +
-:: market supply injection (R7, R8). BL-039 / BL-038 / BL-045.
+:: market supply injection (R7, R8), econ-tick orbital purity (BL-354).
+:: BL-039 / BL-038 / BL-045 / BL-354.
 cl /nologo /std:c++20 /EHsc /I src tools\verify\supply_advance.cpp ^
    src\world\world.cpp src\world\supply_system.cpp ^
+   src\world\orbital_system.cpp ^
    /Fo:build_gen\verify\supply_advance\ /Fe:build_gen\verify\supply_advance.exe
 .\build_gen\verify\supply_advance.exe
 

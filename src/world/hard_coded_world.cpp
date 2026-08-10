@@ -814,6 +814,12 @@ world make_hard_coded_world(world_params params, generation_report* report,
             params.seed ^ a.seed, deposit_scalar, &ast_pl, nullptr, &ast_bias);
     }
 
+    // Freeze each body's authored phase as its epoch angle, so the econ tick can
+    // reconstruct positions purely from the day tick (orbital_angle_at_tick) while
+    // orbital_angle_rad itself keeps advancing per frame for rendering.
+    for (auto& [body_id, body] : w.bodies)
+        body.orbital_epoch_angle_rad = body.orbital_angle_rad;
+
     // ---------------------------------------------------------------------
     // Per-stage system summary for the generation screen. Counts across the
     // bodies the chain just ran, so each revealed stage says what it actually

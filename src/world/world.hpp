@@ -402,11 +402,12 @@ activity_vis body_activity_visibility(const world& w, entity_id body, int now_ti
 // ---------------------------------------------------------------------------
 // The third illumination geometry over the activity fog (after endpoints + corridors):
 // a body a player convoy merely passes NEAR (not an endpoint) on a completed lane gets a
-// faint, decaying glimpse. Deterministic by sample-and-store — body positions are mutated
-// state (orbital_angle_rad advances per frame), NOT a pure function of tick, so they
-// cannot be reconstructed at a later read; instead the closest-approach set is sampled
-// once at the discrete completion tick and the glimpse tick is stored. No per-frame
-// proximity test, no orbital-drift flicker, no RNG.
+// faint, decaying glimpse. Deterministic by sample-and-store — the live orbital_angle_rad
+// is render-only state (advanced per frame from wall-clock time; the econ money loop
+// instead reads the tick-pure orbital_angle_at_tick, orbital_system.hpp — BL-354), so
+// live positions cannot be reconstructed at a later read; instead the closest-approach
+// set is sampled once at the discrete completion tick and the glimpse tick is stored.
+// No per-frame proximity test, no orbital-drift flicker, no RNG.
 
 /// Closest approach (AU) of `body`'s current position to the lane's endpoint->endpoint
 /// line segment, using the flat orbital-plane projection the sim uses (r*cos(theta),

@@ -25,3 +25,17 @@ void advance_orbits(world& w, double delta_days);
 /// @param orbital_radius_au Distance from the star in AU. Must be positive.
 /// @return Angular velocity in radians per in-game day.
 float kepler_angular_velocity(float orbital_radius_au);
+
+/// A body's orbital angle as a pure function of the day tick.
+///
+/// Reconstructs epoch phase + angular velocity × elapsed days, wrapped into
+/// [0, 2*pi), reading only authored fields — never the frame-advanced
+/// `orbital_angle_rad`, whose value depends on wall-clock frame timing. This is
+/// the angle the econ tick must use (convoy sourcing/pricing, supply_system.cpp)
+/// so two runs of the same seed agree regardless of frame rate; the render path
+/// keeps its smooth wall-clock angles.
+///
+/// @param body     Body whose position is queried.
+/// @param day_tick Current sim day tick (one day per tick).
+/// @return Orbital angle in radians, wrapped into [0, 2*pi).
+float orbital_angle_at_tick(const body_component& body, int day_tick);
