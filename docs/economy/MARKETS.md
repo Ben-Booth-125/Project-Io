@@ -49,7 +49,10 @@ minable-but-unsellable asymmetry of the BL-040 raws are catalogued in
    reservation** (the inputs its own processors need for a full run next tick) for sale. A
    resource under a standing player sell order is exempted — the manual order governs.
 4. **Player sell orders** — quantity capped by the pool, entered into both market supply and
-   the explicit sell book with their `floor_price`.
+   the explicit sell book with their `floor_price`. Multiple orders against one
+   `(corp, body, resource)` share a **running remainder** (BL-351): total listed quantity never
+   exceeds the pool, each order's matched/auto-cleared quantity is tracked per order, and pool
+   debits clamp at zero.
 5. **Auto-demand** — processor input shortfalls and construction material draws
    (`report.purchases`) enter market demand.
 6. **Player buy orders** — entered into demand and the explicit buy book (`max_price`,
@@ -89,7 +92,9 @@ of it. Untradeable resources (`base_price ≤ 0`) keep their prior price.
 
 There is no abstract price coupling between bodies — **the convoy is the coupling**
 (`docs/economy/SUPPLY.md`). `dispatch_convoys` reads last tick's cleared shortfalls
-(demand − supply per market) and hauls from the cheapest reachable corp pool; an arriving
+(demand − supply per market) and hauls from the cheapest reachable corp pool — distances and
+haul prices read **tick-pure orbital angles** (`orbital_angle_at_tick`, BL-354), so dispatch is
+identical at any frame rate; the smoothly-advancing render angles are display-only. An arriving
 convoy credits the destination pool **and** injects its cargo into the destination market's
 supply, repricing it at the next clear. Since only Kepler has markets, a marketless body's
 processors fall back to the two-threshold pool model (PRODUCTION.md § Processing), and goods

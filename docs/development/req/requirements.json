@@ -9550,8 +9550,8 @@
    "title": "Duplicate sell orders over-commit the stockpile pool",
    "difficulty": 2,
    "importance": "S",
-   "evaluated_difficulty": null,
-   "status": "pending",
+   "evaluated_difficulty": 2,
+   "status": "complete",
    "requirements": [
     {
      "id": "R1",
@@ -9560,8 +9560,8 @@
       "headless: econ_harness (extended)",
       "build"
      ],
-     "status": "pending",
-     "result_metric": "",
+     "status": "complete",
+     "result_metric": "econ_harness ALL PASS: BL351.1 duplicate orders clear at most the pool; BL351.2 pool floors at zero; BL351.3 income == cleared x price",
      "notes": ""
     },
     {
@@ -9570,19 +9570,21 @@
      "verification": [
       "headless: econ_harness (extended)"
      ],
-     "status": "pending",
-     "result_metric": "",
+     "status": "complete",
+     "result_metric": "econ_harness BL351.4-6: multi-order seller matched per order; sibling order auto-clears its own remainder",
      "notes": ""
     }
-   ]
+   ],
+   "resolved": "2026-08-10",
+   "resolution": "Fixed in market_clearing.cpp: running per-(corp,body,resource) remainder at listing, per-order matched bookkeeping (ob_sell_entry.rem replaces the aggregate matched_sell map), zero-clamped debits. econ_harness 33/33 incl. BL351.1-6."
   },
   {
    "brief": "hire-gate-live-store",
    "title": "Hire-unit gate and debit read the live corp_body_pools store",
    "difficulty": 2,
    "importance": "S",
-   "evaluated_difficulty": null,
-   "status": "pending",
+   "evaluated_difficulty": 2,
+   "status": "complete",
    "requirements": [
     {
      "id": "R1",
@@ -9591,8 +9593,8 @@
       "headless: ai_skill_harness or BL-324 harness (extended)",
       "build"
      ],
-     "status": "pending",
-     "result_metric": "",
+     "status": "complete",
+     "result_metric": "corp_ai_harness R4: pooled goods hire + drain by exactly the cost; empty pools refused; ungated row free of debit",
      "notes": ""
     },
     {
@@ -9602,19 +9604,21 @@
       "headless",
       "code"
      ],
-     "status": "pending",
-     "result_metric": "",
+     "status": "complete",
+     "result_metric": "corp_ai_harness R4: drain asserted home-body-first (ascending id, 3+4 -> 0+2); gate never reads cash",
      "notes": ""
     }
-   ]
+   ],
+   "resolved": "2026-08-10",
+   "resolution": "corp_stockpile_total (unit_roster.cpp) and debit_from_corp (corp_command.cpp) retargeted to w.corp_body_pools via a lower_bound run in ascending body-id order; diagnosis (no crediting path to w.stockpiles) confirmed by repo-wide grep. corp_ai_harness ALL PASS incl. the 6 new BL-352 R4 labels (integration fix: scenarios plant the BL-325 S2 muster base the slice base predated)."
   },
   {
    "brief": "persona-eval-guard",
    "title": "Per-tick persona counsel errors disable counsel instead of aborting",
    "difficulty": 1,
    "importance": "A",
-   "evaluated_difficulty": null,
-   "status": "pending",
+   "evaluated_difficulty": 1,
+   "status": "complete",
    "requirements": [
     {
      "id": "R1",
@@ -9624,19 +9628,21 @@
       "code: try/catch routing to the load-failure disable path",
       "review"
      ],
-     "status": "pending",
-     "result_metric": "",
+     "status": "complete",
+     "result_metric": "build green; code: try/catch routes to m_persona_bench.clear() mirroring the load guard; verifier-review pass confirmed no iterator invalidation",
      "notes": ""
     }
-   ]
+   ],
+   "resolved": "2026-08-10",
+   "resolution": "app.cpp step_economy counsel loop wrapped in try/catch; on throw the bench is cleared (the load-guard disable path), a stderr line + one Counsel chat post record it, and the tick completes."
   },
   {
    "brief": "econ-tick-orbital-purity",
    "title": "Econ-tick consumers read tick-pure orbital angles",
    "difficulty": 3,
    "importance": "A",
-   "evaluated_difficulty": null,
-   "status": "pending",
+   "evaluated_difficulty": 3,
+   "status": "complete",
    "requirements": [
     {
      "id": "R1",
@@ -9645,8 +9651,8 @@
       "headless: supply_advance (extended)",
       "build"
      ],
-     "status": "pending",
-     "result_metric": "",
+     "status": "complete",
+     "result_metric": "supply_advance: identical dispatches/costs/arrivals with live angles scribbled to garbage between ticks",
      "notes": ""
     },
     {
@@ -9656,19 +9662,21 @@
       "code",
       "review"
      ],
-     "status": "pending",
-     "result_metric": "",
+     "status": "complete",
+     "result_metric": "code: pure function of tick; app.cpp unmodified; world.hpp comment now scopes the impurity to rendering",
      "notes": ""
     }
-   ]
+   ],
+   "resolved": "2026-08-10",
+   "resolution": "orbital_system gains orbital_angle_at_tick(body, day_tick) (epoch angle stamped at world creation + angular rate x day); body_distance_au takes day_tick and dispatch passes w.current_day_tick. Render path untouched. supply_advance ALL PASS incl. the BL-354 section; the agent red-checked the test (reverting the theta line yields 9 failures incl. a flipped source choice)."
   },
   {
    "brief": "enum-switch-warning-sweep",
    "title": "Enum-growth switch gaps and confirmed warning fixes",
    "difficulty": 2,
    "importance": "B",
-   "evaluated_difficulty": null,
-   "status": "pending",
+   "evaluated_difficulty": 2,
+   "status": "complete",
    "requirements": [
     {
      "id": "R1",
@@ -9677,8 +9685,8 @@
       "build",
       "code"
      ],
-     "status": "pending",
-     "result_metric": "",
+     "status": "complete",
+     "result_metric": "agent syntax passes -Wall -Wextra zero warnings on all touched files; integrating ninja build green; ACTIONS.md/ACTIONS_INDEX.json regenerated (117 entries)",
      "notes": ""
     },
     {
@@ -9688,19 +9696,21 @@
       "headless: population_mvp",
       "headless: corp_terrain_matrix"
      ],
-     "status": "pending",
-     "result_metric": "",
+     "status": "complete",
+     "result_metric": "population_mvp 14 assertions ALL PASS incl. the new scale-1 baseline; corp_terrain_matrix names all rosters (13 resources filled incl. propellant beyond the brief)",
      "notes": ""
     }
-   ]
+   ],
+   "resolved": "2026-08-10",
+   "resolution": "hired handled in severity_of + statement switch; construction_result::tech_locked maps to new corp_command_result::rejected_tech_locked (ACTIONS.json updated, mirror regenerated); corporation_generation explicit neutral cases (NR-126 holds the design question); 4 file-local IMGUI_DEFINE_MATH_OPERATORS dropped; unused/format fixes across src + tools. All touched files pass -Wall -Wextra clean per-slice; integrating build green."
   },
   {
    "brief": "body-market-index",
    "title": "Cached body-to-markets index behind market_for_tile",
    "difficulty": 3,
    "importance": "A",
-   "evaluated_difficulty": null,
-   "status": "pending",
+   "evaluated_difficulty": 3,
+   "status": "complete",
    "requirements": [
     {
      "id": "R1",
@@ -9710,8 +9720,8 @@
       "headless: econ_harness",
       "build"
      ],
-     "status": "pending",
-     "result_metric": "",
+     "status": "complete",
+     "result_metric": "determinism_harness OK, world_determinism ALL PASS, econ_harness 33/33 — outcomes unchanged; per-call construction gone (code)",
      "notes": ""
     },
     {
@@ -9721,19 +9731,21 @@
       "headless",
       "code"
      ],
-     "status": "pending",
-     "result_metric": "",
+     "status": "complete",
+     "result_metric": "stamp catches every creation (count + max id); reviewer verified no market erasure or re-bodying exists",
      "notes": ""
     }
-   ]
+   ],
+   "resolved": "2026-08-10",
+   "resolution": "world.hpp gains mutable body_market_index + count/max-id stamp (markets are created, never destroyed — verified); markets_by_body returns the cached ref; market_for_tile/clear_markets allocation-free on the hot path, signature unchanged."
   },
   {
    "brief": "pop-growth-market-aggregate",
    "title": "Population growth aggregates the whole body basket",
    "difficulty": 2,
    "importance": "A",
-   "evaluated_difficulty": null,
-   "status": "pending",
+   "evaluated_difficulty": 2,
+   "status": "complete",
    "requirements": [
     {
      "id": "R1",
@@ -9742,8 +9754,8 @@
       "headless: population_demand_harness (extended)",
       "build"
      ],
-     "status": "pending",
-     "result_metric": "",
+     "status": "complete",
+     "result_metric": "population_mvp: centre grows when the aggregate basket is met (A alone starves it); does not grow when unmet; population_demand_harness 4/4",
      "notes": ""
     },
     {
@@ -9753,19 +9765,21 @@
       "headless",
       "review"
      ],
-     "status": "pending",
-     "result_metric": "",
+     "status": "complete",
+     "result_metric": "no existing assertion encoded the single-market read — nothing rewritten; harness suite green end to end",
      "notes": ""
     }
-   ]
+   ],
+   "resolved": "2026-08-10",
+   "resolution": "economy_system.cpp aggregates the supply/demand basket across a body's markets, id-sorted; single-market bodies byte-identical to before. population_mvp gains test_multi_market_growth_aggregate."
   },
   {
    "brief": "determinism-iteration-sweep",
    "title": "Sorted iteration at the named sites; state hash covers depletion and units",
    "difficulty": 2,
    "importance": "B",
-   "evaluated_difficulty": null,
-   "status": "pending",
+   "evaluated_difficulty": 2,
+   "status": "complete",
    "requirements": [
     {
      "id": "R1",
@@ -9775,8 +9789,8 @@
       "headless: world_determinism",
       "code"
      ],
-     "status": "pending",
-     "result_metric": "",
+     "status": "complete",
+     "result_metric": "determinism_harness + world_determinism green; code: named sites iterate sorted ids",
      "notes": ""
     },
     {
@@ -9786,19 +9800,21 @@
       "headless",
       "code"
      ],
-     "status": "pending",
-     "result_metric": "",
+     "status": "complete",
+     "result_metric": "code: state_hash hashes resource_remaining + units id-sorted (world.cpp); no golden hash values exist, cross-run equality via ai_skill_harness PASS. No direct sensitivity assertion added — noted as acceptable (hash is inspection-verifiable).",
      "notes": ""
     }
-   ]
+   ],
+   "resolved": "2026-08-10",
+   "resolution": "dispatch_convoys + order-book passes + centre walks id-sorted; market_for_body picks lowest id (was first hash hit — feeds convoy.source_market and the serialised trade-route record); state_hash extended with tile resource_remaining and w.units; two flagged econ sites verified order-independent and documented instead of sorted; stale hard_coded_world comment fixed."
   },
   {
    "brief": "construction-panel-deferred-demolish",
    "title": "Construction panel routes demolish through the pending seam",
    "difficulty": 1,
    "importance": "B",
-   "evaluated_difficulty": null,
-   "status": "pending",
+   "evaluated_difficulty": 1,
+   "status": "complete",
    "requirements": [
     {
      "id": "R1",
@@ -9808,19 +9824,21 @@
       "code",
       "manual"
      ],
-     "status": "pending",
-     "result_metric": "",
+     "status": "complete",
+     "result_metric": "build green; code: no demolish_building call inside the panel draw; executor at app.cpp consumes pending_demolish. Manual smoke deferred (headless session) — the executor path is the selection panel's already-shipped seam.",
      "notes": ""
     }
-   ]
+   ],
+   "resolved": "2026-08-10",
+   "resolution": "Dismantle routes through ui_state pending_demolish (the selection-panel seam); bonus real fix: the old call passed selected_entity, which in the tile-fallback path is the TILE id, so tile-selected dismantles silently failed — now resolves found_id. Reopen/Close bool flips stay direct with an exemption comment."
   },
   {
    "brief": "hot-path-spatial-scans",
    "title": "is_coastal via the raster index; building-profit lookup indexed",
    "difficulty": 2,
    "importance": "B",
-   "evaluated_difficulty": null,
-   "status": "pending",
+   "evaluated_difficulty": 2,
+   "status": "complete",
    "requirements": [
     {
      "id": "R1",
@@ -9831,11 +9849,13 @@
       "headless: determinism_harness",
       "build"
      ],
-     "status": "pending",
-     "result_metric": "",
+     "status": "complete",
+     "result_metric": "world_audit PASS, corp_ai_harness ALL PASS, determinism_harness OK — outcomes identical; index chosen over sorting to keep UI row order stable",
      "notes": ""
     }
-   ]
+   ],
+   "resolved": "2026-08-10",
+   "resolution": "is_coastal resolves neighbours through body_tile_index (guarded, with the old scan as fallback for hand-built harness worlds; stale hot-loop comment replaced); economy_report gains building_row (id->row, filled once after Pass 5) and estimate_building_profit uses it with a fallback scan."
   }
  ]
 }

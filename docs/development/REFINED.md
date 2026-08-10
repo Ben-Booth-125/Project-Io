@@ -26,47 +26,14 @@
 > field (§ S1 landed), and requirements.json § military-base-s1 (R1–R5). **Not closed**: BL-325's
 > S2 (hire moves onto the base) and S3 (out-of-supply decay) stay `designed`, next slices ready.
 
-## Hygiene batch 2026-08-10 (promoted from BL-351..BL-360) — **IN FLIGHT**
-
-Ten fix items from the 2026-08-10 code-hygiene audit, run as one Batch Delivery across seven
-worktree agents. Requirements: requirements.json § sell-order-pool-overcommit,
-§ hire-gate-live-store, § persona-eval-guard, § econ-tick-orbital-purity,
-§ enum-switch-warning-sweep, § body-market-index, § pop-growth-market-aggregate,
-§ determinism-iteration-sweep, § construction-panel-deferred-demolish, § hot-path-spatial-scans.
-
-Agent slices (worktree = agent; a slice owns its items end-to-end; BL-355 and BL-358 are split
-across slices by file, marked ⊂):
-
-- **[2] A — market clearing.** BL-351 (sell-order over-commit), BL-356 (body→market index),
-  ⊂BL-358 (order-book sorted iteration). Files: `src/world/market_clearing.{cpp,hpp}`,
-  `src/world/world.hpp`, `tools/verify/econ_harness.cpp`. Satisfies: sell-order R1–R2,
-  body-market R1–R2, determinism R1 (order-book leg).
-- **[2] B — econ determinism.** BL-357 (pop-growth aggregate), ⊂BL-358 (economy_system sorted
-  accumulation, state_hash coverage, stale comment). Files: `src/world/economy_system.cpp`,
-  `src/world/world.cpp`, `src/world/hard_coded_world.cpp`,
-  `tools/verify/population_demand_harness.cpp`. Satisfies: pop-growth R1–R2, determinism R1–R2.
-- **[3] C — supply/orbital.** BL-354 (tick-pure angles), ⊂BL-358 (dispatch_convoys sorted
-  iteration). Files: `src/world/orbital_system.{hpp,cpp}`, `src/world/supply_system.cpp`,
-  `tools/verify/supply_advance.cpp`. Satisfies: orbital R1–R2, determinism R1 (supply leg).
-- **[2] D — hire gate.** BL-352 (retarget to corp_body_pools; verify diagnosis first). Files:
-  `src/world/unit_roster.cpp`, `src/world/corp_command.cpp`, the BL-324 harness. Satisfies:
-  hire-gate R1–R2.
-- **[2] E — app/UI fixes.** BL-353 (persona eval guard), ⊂BL-355 (src-side switch gaps, macro
-  redefines, unused vars; ACTIONS.json if the seam surface changes), BL-359 (deferred demolish).
-  Files: `src/core/app.cpp`, `src/world/corp_command.cpp`, `src/world/corporation_generation.cpp`,
-  `src/ui/{overlay,solar_system_canvas,circumplanetary_canvas,body_surface_canvas,construction_panel,generation_charts}.cpp`,
-  `docs/ai/ACTIONS.json`. Satisfies: persona R1, enum-sweep R1, construction-panel R1.
-- **[1] F — harness warnings.** ⊂BL-355 (tools side: population_mvp missing assertion,
-  corp_terrain_matrix name tables, econ_stability buffer, corp_ai_predictive unused,
-  data_creep comment). Files: `tools/verify/*.cpp`. Satisfies: enum-sweep R2.
-- **[1] G — hot-path scans.** BL-360 (is_coastal via body_tile_index; building-profit report
-  index). Files: `src/world/placement_rules.cpp`, `src/world/building_profit.cpp`. Satisfies:
-  hot-path R1.
-
-Parallelisation note: all seven slices are independent roots (worktree isolation; the known file
-overlaps — corp_command.cpp D∩E, world.hpp A∩C-avoided — are in different functions). Integration,
-the merged build, harness runs and per-branch merge commits stay in the main session. Merge order:
-D, F, G, B, C, E, A (smallest surface first; A last as the widest market_clearing owner).
+> Drained 2026-08-10: hygiene batch (BL-351 sell-order over-commit, BL-352 hire-gate live store,
+> BL-353 persona eval guard, BL-354 orbital tick purity, BL-355 warning sweep, BL-356 body→market
+> index, BL-357 pop-growth aggregate, BL-358 determinism sweep, BL-359 deferred demolish, BL-360
+> hot-path scans) — all seven agent slices COMPLETE, merged, harness suite green — removed per the
+> retain-one policy. Record lives in DEVLOG.md (2026-08-10 hygiene entry), the ten backlog.json
+> `resolution` fields, and requirements.json § sell-order-pool-overcommit through
+> § hot-path-spatial-scans. BL-361 (app.cpp split), BL-362 (UI frame caches), BL-363 (misc
+> sweep) were filed, not delivered.
 
 ## Nation/corp generation visibility (promoted from BL-305) — **PAUSED, no tasks started**
 

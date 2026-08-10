@@ -10,7 +10,55 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — Cut v0.1.3 and v0.1.4: one small predicate turned two design documents into two releases (2026-08-10, latest)
+## Session — The hygiene audit that became a batch: four reviewers, thirteen items, ten landed (2026-08-10, latest)
+
+Full mode, Batch Delivery — seven worktree agent slices, integrated and verified in the main
+session. Runtime: not tracked (timer.js not started); the batch ran from audit to green suite
+inside one session.
+
+**The session began as a question, not a work order** — "does the codebase have any major
+faults?" Four parallel reviewers (world/sim, UI/app, cross-cutting, a `-Wall -Wextra` sweep
+build) answered with three genuine simulation bugs, one determinism leak into the money loop,
+and a family of per-frame full-world scans. Ben then asked for the findings to be filed and
+delivered. Thirteen items filed (BL-351–BL-363); ten delivered as one batch; three held
+(BL-361 app.cpp split, BL-362 UI frame caches, BL-363 misc sweep).
+
+**The three bugs were real and none was subtle in hindsight.** BL-351 (sell-order over-commit):
+duplicate sell orders each validated against the same un-decremented pool snapshot — a
+player-exploitable money mint, now a running remainder with per-order matched bookkeeping.
+BL-352 (hire-gate live store): the hire gate summed per-building `w.stockpiles`, which nothing
+has ever credited — every gated roster row was unbuyable and ungated rows hired free; it now
+reads `corp_body_pools`, so rival hiring genuinely changes (NR-127). BL-354 (orbital tick
+purity): convoy dispatch priced hauls off frame-advanced orbital angles, so the same seed
+diverged by frame rate — dispatch now reads `orbital_angle_at_tick`, and the harness was
+red-checked (reverting the fix yields 9 failures including a flipped source choice).
+
+**The recurring lesson recurred: worktree bases go stale mid-day.** The slices were cut hours
+after Sprint 9 landed BL-325 S2 (hires require a completed muster base), and slice D's new
+harness scenarios — written and passing on its older base — failed on the integrated tree
+until the main session planted the base. Same class as the 2026-08-09 v0.1.9 session's
+branched-from-a-moved-base finding; the integrating harness run caught it, as designed.
+
+Also in the batch: BL-353 (a throwing persona pack no longer kills the session), BL-355 (enum
+growth from the militia work had outrun five switches — a hire could post an *empty* nation
+chat statement; tech-locked builds mis-reported as malformed; now `rejected_tech_locked`, with
+ACTIONS.json updated), BL-356 (the body→market index — the single highest-leverage perf fix,
+removing a per-call map rebuild from both the tick and the lens draw path), BL-357 (population
+growth now reads the body's whole id-sorted market basket instead of one hash-arbitrary
+market), BL-358 (sorted-iteration leftovers; `state_hash` now covers tile depletion and
+units), BL-359 (the construction panel's mid-draw demolish routed through the pending seam —
+uncovering that tile-selected dismantles had silently never worked), BL-360 (`is_coastal` via
+the raster index; building-profit lookup de-quadratified).
+
+Verification: verifier-review over the integrated diff (GO COMPILE, zero criticals), then the
+integrating build (230 targets) and a 17-harness sweep — all green after the one integration
+fix. Review-log entries NR-123–NR-129 carry the delegated calls (version-goal mapping, the
+orbital approach, the hire-gate retarget) and the open questions (dead buy-order book, terrain
+preferences for the new building types, the AI's tech-locked candidate churn). Housekeeping
+noticed in passing: `/tmp` is 100% full on this machine (builds now point TMPDIR at
+`build_linux/gcc_tmp`), and BL-266's stale requirement group was closed per lint.
+
+## Session — Cut v0.1.3 and v0.1.4: one small predicate turned two design documents into two releases (2026-08-10)
 
 Full mode, Delivery — three items, built sequentially in the main session rather than fanned out.
 Runtime: **not tracked** — `tools/session/timer.js` was never started, so the only hard number

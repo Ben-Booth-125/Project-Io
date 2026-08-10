@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*125 entries — 27 open, 98 resolved.*
+*127 entries — 29 open, 98 resolved.*
 
 ---
 
@@ -229,6 +229,16 @@ The three newest building types fall through tile_score_for to a neutral 1.0, sc
 *decision taken on your behalf · raised 2026-08-10 · from BL-352 (hire-gate live store)*
 
 BL-324's design says hires are gated on the corp's own stockpile/market access and are a real spend. The code read the per-building stockpile_component store, which nothing credits (world.hpp:190 calls it unused in L3) -- so the gate was inert and ungated rows were free. The fix reads/debits w.corp_body_pools, the store the live economy actually writes. This makes gated rows genuinely purchasable for the first time -- rival hiring behaviour will change (they can now afford gated units when their pools allow).
+
+### NR-128 — Two frame-dependence / over-debit residuals the batch deliberately left
+*observation · raised 2026-08-10 · from Hygiene batch delivery (BL-351 sell orders, BL-354 orbital purity); verifier-review suggestion*
+
+Left standing, both harmless today: (1) record_proximity_glimpses still samples live render angles inside the econ tick, so body_last_glimpse_tick (activity fog only, never money) can differ across frame rates — the world.hpp comment says so honestly; fold into a later BL-354 follow-up if fog determinism ever matters. (2) Auto-surplus listing and player sell orders snapshot the same corp pool independently; the new zero-clamps make joint over-debit safe rather than impossible — a joint-remainder harness assertion under the BL-351 group is the cheap hardening.
+
+### NR-129 — Corp AI burns a candidate slot per eval on tech-locked military bases
+*observation · raised 2026-08-10 · from verifier-review of the hygiene batch (corp_ai.cpp)*
+
+The AI treats any non-applied corp_command_result generically, so before E0-ML-01 is earned a military-base candidate scores, wins, is rejected as rejected_tech_locked, and the slot is spent — legal, deterministic, just churn. A precondition filter (skip candidates whose tech gate is unearned) is the clean fix; belongs with BL-332 (military points and research) sequencing.
 
 ---
 
