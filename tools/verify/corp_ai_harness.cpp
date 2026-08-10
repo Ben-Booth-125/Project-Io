@@ -466,11 +466,24 @@ int main()
             return apply_corp_command(s.w, reg, cmd);
         };
 
+        // BL-325 S2: a hire must land on the corp's own COMPLETED military
+        // base, so every applied-path scenario plants one on t_rich first.
+        auto add_muster_base = [&](scene& s) {
+            const entity_id b = s.w.create_entity();
+            building_component bc{};
+            bc.tile           = s.t_rich;
+            bc.type           = building_type::military_base;
+            bc.ticks_remaining = 0;
+            s.w.buildings[b] = bc;
+            s.w.corporations[s.ai_corp].assets.push_back(b);
+        };
+
         // Goods in the live pools unlock the gated row, and the hire drains
         // them across bodies in ascending id order (home before hidden) by
         // exactly the flat axis cost (5, corp_command.cpp's hire_axis_cost).
         {
             scene s = make_scene(1000.0f);
+            add_muster_base(s);
             s.w.pool_for(s.ai_corp, s.body).quantities[ri(resource_type::steel)]   = 3.0f;
             s.w.pool_for(s.ai_corp, s.hidden).quantities[ri(resource_type::steel)] = 4.0f;
             const auto r = hire(s, iron_foot);
@@ -494,6 +507,7 @@ int main()
         // debit refuses as unaffordable and leaves the pool untouched.
         {
             scene s = make_scene(1000.0f);
+            add_muster_base(s);
             s.w.pool_for(s.ai_corp, s.body).quantities[ri(resource_type::steel)] = 3.0f;
             const auto r = hire(s, iron_foot);
             check(r == corp_command_result::rejected_funds && s.w.units.empty() &&
@@ -504,6 +518,7 @@ int main()
         // An ungated row hires with no resource debit at all.
         {
             scene s = make_scene(1000.0f);
+            add_muster_base(s);
             s.w.pool_for(s.ai_corp, s.body).quantities[ri(resource_type::steel)] = 7.0f;
             const auto r = hire(s, levy);
             check(r == corp_command_result::applied && s.w.units.size() == 1 &&
