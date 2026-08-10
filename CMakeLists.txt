@@ -181,6 +181,11 @@ if(NOT sol2_src_POPULATED)
     FetchContent_Populate(sol2_src)
 endif()
 
+# BL-363: unchecked sol2 conversions must throw a catchable sol::error, not UB.
+# Directory scope so every sol2-including TU (ProjectIo + the Lua-linked
+# harnesses declared below) gets it; no-op for TUs that never include sol.
+add_compile_definitions(SOL_ALL_SAFETIES_ON=1)
+
 # ---------------------------------------------------------------------------
 # Dear ImGui  (SDL3 + SDLRenderer3 backends)
 # ---------------------------------------------------------------------------
