@@ -849,6 +849,12 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
         }
     }
 
+    // Index the report rows once (BL-360): estimate_building_profit resolves its
+    // row through building_row rather than scanning `buildings` per call.
+    report.building_row.reserve(report.buildings.size());
+    for (std::size_t i = 0; i < report.buildings.size(); ++i)
+        report.building_row.emplace(report.buildings[i].building, i);
+
     // Population food demand (BL-190) is injected by inject_population_demand,
     // called from clear_markets AFTER its per-tick demand reset — injected here
     // it was erased by that reset the same tick and never reached price
