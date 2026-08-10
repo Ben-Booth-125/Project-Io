@@ -511,8 +511,16 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
     // weight = centre scale; cap = min(1, mean_hab / 0.6); default 1.0 (uncapped) when no centres.
     std::map<entity_id, float> hab_weighted_sum;
     std::map<entity_id, float> hab_weight_total;
-    for (const auto& [cid, pcc] : w.population_centres)
+    // Ascending centre id: these are float accumulations, so the summation order
+    // must not be read off population_centres' unordered layout.
+    std::vector<entity_id> centre_ids;
+    centre_ids.reserve(w.population_centres.size());
+    for (const auto& kv : w.population_centres)
+        centre_ids.push_back(kv.first);
+    std::sort(centre_ids.begin(), centre_ids.end());
+    for (const entity_id cid : centre_ids)
     {
+        const population_centre_component& pcc = w.population_centres.at(cid);
         const auto tile_it = w.population_centre_tile.find(cid);
         if (tile_it == w.population_centre_tile.end())
             continue;
@@ -534,7 +542,8 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
         const float mean_hab = hab_weighted_sum.at(body) / wit->second;
         return std::min(1.0f, mean_hab / 0.6f);
     };
-    // Building counts per (corp, body) for apportionment.
+    // Building counts per (corp, body) for apportionment. Integer counts commute
+    // exactly, so the unordered corporations walk is safe here.
     std::map<std::pair<entity_id, entity_id>, int> bldg_count_by_corp_body;
     std::map<entity_id, int>                        bldg_count_by_body;
     for (const auto& [corp, cc] : w.corporations)
@@ -858,8 +867,10 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
     // tile habitability, where weight = population centre scale.
     {
         std::map<entity_id, std::pair<float, float>> hab_sum; // body → (weighted_sum, weight)
-        for (const auto& [cid, pcc] : w.population_centres)
+        // centre_ids (sorted above): float accumulation, fixed summation order.
+        for (const entity_id cid : centre_ids)
         {
+            const population_centre_component& pcc = w.population_centres.at(cid);
             const auto tile_it = w.population_centre_tile.find(cid);
             if (tile_it == w.population_centre_tile.end())
                 continue;

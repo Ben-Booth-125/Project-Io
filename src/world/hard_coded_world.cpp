@@ -687,8 +687,9 @@ world make_hard_coded_world(world_params params, generation_report* report,
             {
                 const std::size_t ri = static_cast<std::size_t>(e.good);
 
-                // Where it actually grows. Gathered once per good, in ascending
-                // tile id, so the scan order is deterministic.
+                // Where it actually grows. Gathered once per good from w.tiles'
+                // unordered walk — safe, because the only consumer below takes a
+                // min over the set, which is order-independent.
                 std::vector<std::pair<int, int>> sources;
                 for (const auto& [tid, tc] : w.tiles)
                     if (tc.body == kepler && tc.resource_deposit[ri] > 0.0f)
