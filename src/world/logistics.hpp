@@ -43,7 +43,12 @@ const std::vector<entity_id>& body_tile_grid(world& w, entity_id body);
 /// road discount; caches on world.astar_cost_cache under a canonicalised endpoint key
 /// (edge cost is the average of the two tiles' costs, so the path is symmetric). Returns
 /// {reachable=false} if either tile is unknown or not on `body`.
-logistics_path intra_body_path(world& w, entity_id body, entity_id src_tile, entity_id dst_tile);
+///
+/// Returns a reference into the cache (BL-362: a cache hit used to copy the whole tile
+/// vector). Valid until invalidate_logistics_caches clears the map — read or copy it
+/// before any call that can invalidate; never mutate it through a cast.
+const logistics_path& intra_body_path(world& w, entity_id body, entity_id src_tile,
+                                      entity_id dst_tile);
 
 // ---------------------------------------------------------------------------
 // Logistics reach (BL-323 S2 — the placement-side "breadth must cost something")

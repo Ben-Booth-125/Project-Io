@@ -342,7 +342,7 @@ void dispatch_convoys(world& w, const recipe_registry& reg,
                         const entity_id dest_centre = dest_market.centre_tile;
                         if (origin == null_entity || dest_centre == null_entity)
                             continue; // no production anchor / unanchored market: cannot route
-                        const logistics_path path = intra_body_path(w, src_body, origin, dest_centre);
+                        const logistics_path& path = intra_body_path(w, src_body, origin, dest_centre);
                         if (!path.reachable)
                             continue;
                         mode      = path.crosses_ocean ? convoy_mode::sea : convoy_mode::land;

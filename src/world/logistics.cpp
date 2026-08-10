@@ -94,7 +94,8 @@ const std::vector<entity_id>& body_tile_grid(world& w, entity_id body)
     return ins.first->second;
 }
 
-logistics_path intra_body_path(world& w, entity_id body, entity_id src_tile, entity_id dst_tile)
+const logistics_path& intra_body_path(world& w, entity_id body, entity_id src_tile,
+                                      entity_id dst_tile)
 {
     logistics_path res;
 
@@ -112,18 +113,15 @@ logistics_path intra_body_path(world& w, entity_id body, entity_id src_tile, ent
     if (bit == w.bodies.end() || sit == w.tiles.end() || dit == w.tiles.end()
         || sit->second.body != body || dit->second.body != body)
     {
-        w.astar_cost_cache.emplace(key, res); // unreachable / unknown endpoints
-        return res;
+        // unreachable / unknown endpoints
+        return w.astar_cost_cache.emplace(key, std::move(res)).first->second;
     }
 
     const int gw = bit->second.grid_width;
     const int gh = bit->second.grid_height;
     const std::vector<entity_id>& grid = body_tile_grid(w, body);
     if (gw <= 0 || gh <= 0 || grid.empty())
-    {
-        w.astar_cost_cache.emplace(key, res);
-        return res;
-    }
+        return w.astar_cost_cache.emplace(key, std::move(res)).first->second;
 
     if (src_tile == dst_tile)
     {
@@ -131,8 +129,7 @@ logistics_path intra_body_path(world& w, entity_id body, entity_id src_tile, ent
         res.cost          = 0.0f;
         res.crosses_ocean = (sit->second.composition == terrain_composition::ocean);
         res.tiles         = { src_tile };
-        w.astar_cost_cache.emplace(key, res);
-        return res;
+        return w.astar_cost_cache.emplace(key, std::move(res)).first->second;
     }
 
     const int total = gw * gh;
@@ -238,8 +235,7 @@ logistics_path intra_body_path(world& w, entity_id body, entity_id src_tile, ent
             std::reverse(seq.begin(), seq.end());
         res.tiles = std::move(seq);
     }
-    w.astar_cost_cache.emplace(key, res);
-    return res;
+    return w.astar_cost_cache.emplace(key, std::move(res)).first->second;
 }
 
 // ---------------------------------------------------------------------------
