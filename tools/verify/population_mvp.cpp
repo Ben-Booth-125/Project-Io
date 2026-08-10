@@ -432,12 +432,111 @@ static void test_population_growth()
 }
 
 // ---------------------------------------------------------------------------
+// BL-357: the growth gate aggregates the body's WHOLE market basket. A body may
+// host several resource-carved markets (BL-096); the old read took whichever
+// market an unordered walk found first and ignored the rest. Two markets on one
+// body: A alone starves the centre (0 supplied of 10 demanded) but A+B together
+// meet the 0.5 met threshold (10 of 20). Market state is set by hand each tick
+// (no clear_markets — the growth step reads supply/demand as the previous
+// clearing left them).
+// ---------------------------------------------------------------------------
+static void test_multi_market_growth_aggregate()
+{
+    std::printf("--- BL-357: growth gate aggregates across a body's markets ---\n");
+
+    world w;
+
+    const entity_id body = w.create_entity();
+    {
+        body_component bc{};
+        bc.name        = "TwoMkt";
+        bc.grid_width  = 10;
+        bc.grid_height = 4;
+        w.bodies[body] = bc;
+    }
+
+    const entity_id tile = w.create_entity();
+    {
+        tile_component tc{};
+        tc.body  = body;
+        tc.grid_x = 0;
+        tc.grid_y = 0;
+        w.tiles[tile] = tc;
+    }
+
+    const entity_id mkt_a = w.create_entity();
+    {
+        market_component mc{};
+        mc.body = body;
+        w.markets[mkt_a] = mc;
+    }
+    const entity_id mkt_b = w.create_entity();
+    {
+        market_component mc{};
+        mc.body = body;
+        w.markets[mkt_b] = mc;
+    }
+
+    const entity_id pop = w.create_entity();
+    {
+        population_centre_component pcc{};
+        pcc.scale        = 1;
+        pcc.population   = 10;
+        pcc.habitability = 0.9f;
+        w.population_centres[pop]     = pcc;
+        w.population_centre_tile[pop] = tile;
+    }
+
+    // Non-empty basket so the met-supply gate actually bites (threshold 0.5).
+    recipe_registry reg;
+    substrate_params sp{};
+    sp.demand_basket[ri(resource_type::agricultural_produce)] = 1.0f;
+    reg.set_substrate(sp);
+
+    const std::size_t food = ri(resource_type::agricultural_produce);
+
+    // Run 1: A starved (0/10), B met (10/10) -> aggregate 10/20 = 0.5, grows.
+    for (int t = 0; t < 210; ++t)
+    {
+        market_component& a = w.markets.at(mkt_a);
+        market_component& b = w.markets.at(mkt_b);
+        a.demand[food] = 10.0f; a.supply[food] = 0.0f;
+        b.demand[food] = 10.0f; b.supply[food] = 10.0f;
+        run_economy_step(w, reg);
+    }
+    const int scale_met = w.population_centres.at(pop).scale;
+    std::printf("  scale after 210 ticks (A starved, A+B met): %d\n", scale_met);
+    check(scale_met >= 2,
+          "centre grows when the body's aggregate basket is met (A alone would starve it)");
+
+    // Run 2 (guard): both markets starved -> aggregate 0, no growth.
+    {
+        population_centre_component& pcc = w.population_centres.at(pop);
+        pcc.scale              = 1;
+        pcc.growth_accumulator = 0;
+    }
+    for (int t = 0; t < 210; ++t)
+    {
+        market_component& a = w.markets.at(mkt_a);
+        market_component& b = w.markets.at(mkt_b);
+        a.demand[food] = 10.0f; a.supply[food] = 0.0f;
+        b.demand[food] = 10.0f; b.supply[food] = 0.0f;
+        run_economy_step(w, reg);
+    }
+    const int scale_starved = w.population_centres.at(pop).scale;
+    std::printf("  scale after 210 starved ticks: %d\n", scale_starved);
+    check(scale_starved == 1,
+          "centre does not grow when the aggregate basket is unmet");
+}
+
+// ---------------------------------------------------------------------------
 int main()
 {
     test_population_on_kepler();
     test_agglomeration_and_pool();
     test_habitability_scalar();
     test_population_growth();
+    test_multi_market_growth_aggregate();
 
     if (g_failures == 0)
         std::printf("\nALL PASS (%d assertions)\n", g_passes);
