@@ -368,3 +368,85 @@ medium (BL-205) are the scaffolding it needs to stand on, which is why it lands 
 **Not yet in scope.** Actually promoting Sprint 3 into REFINED.md task groups + `requirements.json`
 — that collision-mapping step happens at the start of Sprint 3 itself (DELIVERY.md: built fresh at
 promotion, not frozen ahead of time), not in this planning pass.
+
+---
+
+## Sprint 6 — the release sprint (2026-08-09 → 08-10)
+
+**No goal was stated at the start**, which is itself the first finding: the sprint rhythm had
+lapsed, and this session's direction came from a live steer rather than from a written goal.
+Ben, opening: *"cut as many versions as we can now, rather than working on the lofty, conceptual
+stuff."* The retro below compares what landed against that steer.
+
+### What the diagnosis found, before any work
+
+119 commits since the `v0.1.0` tag and **not one version cut**, with `CHANGELOG.md`'s
+`[Unreleased]` still reading *"Nothing yet"* — so the changelog was not merely un-stamped, it was
+not accruing. In the same window the roadmap kept extending *forward*: v1.0.0 named, the Era −1 arc
+folded into v0.3.0, stub minors re-sequenced.
+
+The root cause (**NR-103**): the roadmap wrote done-definitions for exactly **two** versions,
+v0.1.0 and v1.0.0 — and those were the only two ever cut or scheduled. **A theme with no
+done-definition has no test for *finished*, so it absorbs items indefinitely.** v0.1.1 was the
+proof: its three theme legs shipped on 2026-08-03, and 26 unrelated items were then retrofitted
+onto the same tag over the following week.
+
+### What landed
+
+**Five versions tagged** — `v0.1.1` (the word interface), `v0.1.2` (buildings rework), `v0.1.8`
+(build health), `v0.1.9` (shell & legibility), `v0.1.10` (generation & content) — against zero in
+the preceding six days.
+
+- **24 backlog items closed**; open items 97 → 77 despite **13 new items filed**.
+- **Every cut minor now carries a done-definition**, written at its cut. That was the structural
+  fix, not the tags.
+- **The gate went from lying to green.** It had been reporting ten failures of which exactly one
+  was a failing assertion; v0.1.8 re-tiered it, and v0.1.10 closed with **55 tests, 0 failures** —
+  the first fully green gate of the arc.
+- **Four stub minors stopped being design-only.** BL-342–345 turn v0.1.3/v0.1.4/v0.1.6 into
+  buildable work, on the finding that BL-155 and BL-156 had *both* settled on the same
+  `condition_set` object and neither built it.
+
+### What this sprint is actually worth remembering for
+
+**Measurement overturned the stated cause four times**, and each time the plausible story would
+have produced a plausible fix:
+
+| Item | The story | What measurement said |
+|---|---|---|
+| BL-338 wetland | the relief commits displaced it | refuted by rebuilding the audit at `802421c^` — identical census. Wetland is a *drainage* feature and elevation had no vote in composition |
+| BL-347 econ tick | an O(n log n) sort | the sort was **3%**; the cost was `std::map` allocation in worlds with no stacks |
+| BL-346 estimator | BL-079's reflex reads an inflated number | **retracted** — that function reads *realised* credit; the real site was the pre-build estimator |
+| pan "lag" | needs a 200 ms input delay | panning costs **nothing**; static and panning measured identically. It was 157k vertices at whole-grid zoom |
+
+**And a green gate can lie.** `logistics_reach_harness` failed three assertions from *byte-identical
+sources*: a conflict-heavy merge left ninja holding a stale object that `touch` would not dislodge.
+Standing lesson recorded: `--clean-first` before cutting after a messy merge, and if a harness fails
+suspiciously, build the same commit in a throwaway worktree before believing it.
+
+### Where the method held, and where it did not
+
+**Held.** Worktree sub-agents did the bulk of the work and several outperformed their briefs —
+one refused its own instructions because BL-216 §1–3 was superseded by a *complete* item and
+implementing it would have reverted a landed decision. Another volunteered that a knife-edge test
+had influenced its parameter choice (**BL-349**), which is the kind of thing that is invisible
+unless someone says it.
+
+**Did not.** Three of five agents in the v0.1.9 batch branched from a base that had already moved,
+and every one produced code that would not merge cleanly — worktrees isolate *writes*, not
+*history*. The v0.1.10 batch was worse: one agent's commit swallowed a whole fast-forward (328
+files) and cost 36 conflicts to integrate. **Integration read every hunk rather than trusting a
+clean auto-merge, and that is why the Ages view and the disclosure controls survived.**
+
+### Left for another session
+
+- **v0.1.11** is open with four items: the generation globe (**BL-256**, the one item that wants a
+  human watching while it is built), deed history lines (**BL-309**, designed), and this sprint's
+  own fallout — **BL-348** (province names read half-native since BL-290) and **BL-349**.
+- **v0.1.3–v0.1.7 remain uncut**, and are now the *next* thing in sequence: v0.1.3 and v0.1.4 are
+  buildable the moment `condition_set` (BL-342) lands.
+- **42 items still sit at `post-v0.1.0`** — NR-101's finding, untouched. That is a third of the open
+  backlog with no minor, and it is the next structural job after the stub minors.
+- **Windows work is owed**: visual goldens are stale wherever a body name renders, the MSVC skill
+  goldens are stale for two separate reasons, and **BL-341** (the from-cold configure check) is
+  parked until someone is at that machine.
