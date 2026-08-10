@@ -2094,7 +2094,7 @@
    "title": "Three new minors were named to absorb the post-v0.1.0 residue — v0.1.11 reshaped, v0.1.12 and v0.1.13 invented",
    "raised": "2026-08-10",
    "kind": "decision-taken",
-   "status": "open",
+   "status": "resolved",
    "source": "NR-101 (the post-v0.1.0 sweep)",
    "what": "After reconciling the 20 items ROADMAP.md already assigned in prose, 14 items of real prototype work were left with no theme to belong to. Rather than leave them on post-v0.1.0 (which is what the finding was about) they were given themes: v0.1.12 \"Logistics modes\" (BL-153 convoy distance pricing, BL-173 rail, BL-188 sea trade, BL-175 supply-lens flow) and v0.1.13 \"Markets & materials\" (BL-263 runtime market emergence, BL-340 processing roster, BL-130 real inventory, BL-132 co-generation, BL-107 save-format version, BL-192 opening-economy measurement). Four more were folded into the existing v0.1.11, whose theme was written down for the first time: the levers stubbed across v0.1.3-v0.1.6 get the surfaces they were promised.",
    "why_it_matters": "Naming a minor is a roadmap-shape call and the roadmap is yours. The sweep itself was authorised by NR-101 in as many words (\"sweep post-v0.1.0 into real minors\"), but the specific themes, the split into two rather than one or three, and the numbering are mine. None of it is expensive to undo -- a version_goal is one field and the roadmap entries are three paragraphs -- but it should be a decision rather than a default.",
@@ -2108,7 +2108,7 @@
     "docs/development/ROADMAP.md",
     "docs/development/backlog.json"
    ],
-   "resolution": null
+   "resolution": "Ben, 2026-08-10: \"keep v0.1.12 and v0.1.13 as named\". Option 1 taken -- the two minors stand as filed, and v0.1.11's reshaped roster stands with them.  So the naming stops being a delegated default and becomes a decision: v0.1.12 Logistics modes (BL-153, BL-173, BL-188, BL-175) and v0.1.13 Markets & materials (BL-263, BL-340, BL-130, BL-132, BL-107, BL-192). Neither merges into the other and neither is renumbered against the uncut v0.1.5-v0.1.7.  WHAT STAYS OPEN, because ruling on the names did not rule on the content: neither minor carries a done-definition yet, and that is deliberate rather than outstanding. The band's rule is that a minor earns its done-definition AT PROMOTION -- NR-103's finding was that a theme with no done-definition absorbs items indefinitely, and writing one now, for work nobody has started, would be inventing a test for finished before knowing what finishing looks like. The two entries in ROADMAP.md say so in as many words."
   }
  ]
 }

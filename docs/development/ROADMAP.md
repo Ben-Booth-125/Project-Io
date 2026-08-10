@@ -629,9 +629,13 @@ concrete, and the tail was named when `post-v0.1.0` was swept (NR-101, below).
 > The roadmap and the backlog disagreed, and the disagreement was invisible unless you read both.
 > Every open item now names a minor. The reconciliation was mechanical wherever the prose already
 > said something; the three minors below are the residue — a cluster of real prototype work that
-> had no theme to belong to, so it was given one. **Each earns its done-definition at promotion**,
-> per the rule this band already follows; naming them now is about making the queue legible, not
-> about committing to their content.
+> had no theme to belong to, so it was given one. **Confirmed by Ben, 2026-08-10** — *"keep v0.1.12
+> and v0.1.13 as named"* (NR-119) — so the two are settled minors rather than a working label:
+> neither merges into the other, and neither is renumbered against the still-uncut v0.1.5–v0.1.7.
+> **Each earns its done-definition at promotion**, per the rule this band already follows: NR-103's
+> finding was that a theme with no done-definition absorbs items indefinitely, and writing one for
+> work nobody has started would be inventing a test for *finished* before knowing what finishing
+> looks like.
 
 - **v0.1.11 — Policy surfaces, and the band's own leftovers.** *Theme: the levers stubbed across
   v0.1.3–v0.1.6 get the surfaces they were promised.* v0.1.3 and v0.1.4 shipped one working law
