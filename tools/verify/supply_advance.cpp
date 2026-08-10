@@ -1,19 +1,23 @@
-// Headless harness for the supply layer (BL-039 / BL-038 / BL-045).
-// Verifies requirements R1, R4, R5, R6, R7, R8 without SDL / Lua / ImGui.
+// Headless harness for the supply layer (BL-039 / BL-038 / BL-045 / BL-354).
+// Verifies requirements R1, R4, R5, R6, R7, R8 and econ-tick orbital purity
+// without SDL / Lua / ImGui.
 //
 // Build (from repo root, after sourcing vcvars64):
 //   cl /nologo /std:c++20 /EHsc /I src tools\verify\supply_advance.cpp ^
 //      src\world\world.cpp src\world\supply_system.cpp ^
-//      src\world\market_clearing.cpp ^
+//      src\world\market_clearing.cpp src\world\orbital_system.cpp ^
 //      /Fo:build_gen\verify\supply_advance\ /Fe:build_gen\verify\supply_advance.exe
 // Run:
 //   .\build_gen\verify\supply_advance.exe
 
 #include "world/components.hpp"
 #include "world/market_clearing.hpp"
+#include "world/orbital_system.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/supply_system.hpp"
 #include "world/world.hpp"
+
+#include <vector>
 
 #include <cmath>
 #include <cstdio>
@@ -362,6 +366,196 @@ static void test_price_convergence()
 }
 
 // ---------------------------------------------------------------------------
+// BL-354: econ-tick orbital purity — dispatch is a pure function of tick.
+//
+// Two candidate source bodies on moving orbits compete to fill a shortfall on a
+// third. Run the same authored world twice over three econ ticks; in run B,
+// scribble garbage into every body's live orbital_angle_rad before each dispatch
+// (simulating arbitrary frame-rate drift). Source choice, dispatch cost, convoy
+// speed and arrival step count must be identical — dispatch may read only the
+// tick-pure orbital_angle_at_tick.
+// ---------------------------------------------------------------------------
+
+struct purity_trace
+{
+    std::vector<float>     costs;         ///< Balance debited per dispatch.
+    std::vector<float>     speeds;        ///< Convoy speed (1 / distance AU).
+    std::vector<float>     qtys;          ///< Cargo quantity per dispatch.
+    std::vector<entity_id> sources;       ///< Chosen source market per dispatch.
+    std::vector<int>       arrival_steps; ///< advance_convoys calls until arrival.
+};
+
+static purity_trace run_purity_world(bool perturb_angles)
+{
+    world w;
+    recipe_registry reg;
+
+    entity_id corp_id = w.create_entity();
+    entity_id src_a   = w.create_entity();
+    entity_id src_b   = w.create_entity();
+    entity_id dest    = w.create_entity();
+
+    auto author_body = [&](entity_id id, const char* name, float radius,
+                           float epoch, float omega) {
+        body_component bc{};
+        bc.name = name;
+        bc.type = body_type::planet;
+        bc.orbital_radius_au                    = radius;
+        bc.orbital_angle_rad                    = epoch;
+        bc.orbital_epoch_angle_rad              = epoch;
+        bc.orbital_angular_velocity_rad_per_day = omega;
+        bc.grid_width = bc.grid_height = 4;
+        w.bodies[id] = bc;
+    };
+    author_body(src_a, "SrcA", 1.0f, 0.3f, 0.05f);
+    author_body(src_b, "SrcB", 3.0f, 4.0f, 0.02f);
+    author_body(dest,  "Dest", 2.0f, 1.0f, 0.01f);
+
+    corporation_component corp;
+    corp.balance = 100000.0f;
+    w.corporations[corp_id] = corp;
+
+    // A market on every body (sources need one so the convoy records its origin).
+    entity_id dest_mkt = null_entity;
+    for (entity_id body : { src_a, src_b, dest })
+    {
+        entity_id mkt = w.create_entity();
+        market_component mc{};
+        mc.body = body;
+        w.markets[mkt] = mc;
+        if (body == dest)
+            dest_mkt = mkt;
+    }
+
+    // Fuelled launchpad on both source bodies.
+    for (entity_id body : { src_a, src_b })
+    {
+        entity_id tile = w.create_entity();
+        {
+            tile_component tc{};
+            tc.body = body;
+            w.tiles[tile] = tc;
+        }
+        entity_id pad = w.create_entity();
+        {
+            building_component bc{};
+            bc.tile = tile;
+            bc.type = building_type::launchpad;
+            w.buildings[pad] = bc;
+        }
+        w.corporations[corp_id].assets.push_back(pad);
+    }
+
+    purity_trace trace;
+    for (const int tick : { 90, 180, 270 })
+    {
+        // Fresh shortfall + surpluses each econ tick.
+        w.markets.at(dest_mkt).demand[ri(resource_type::iron_ore)] = 50.0f;
+        w.markets.at(dest_mkt).supply[ri(resource_type::iron_ore)] = 0.0f;
+        for (entity_id body : { src_a, src_b })
+        {
+            w.pool_for(corp_id, body).quantities[ri(resource_type::iron_ore)]   = 100.0f;
+            w.pool_for(corp_id, body).quantities[ri(resource_type::propellant)] = 5.0f;
+        }
+
+        w.current_day_tick = tick;
+
+        // Run B: the live angles carry arbitrary frame-drift garbage. Dispatch
+        // must not notice.
+        if (perturb_angles)
+            for (auto& [id, body] : w.bodies)
+                body.orbital_angle_rad = 5.777f + 0.13f * static_cast<float>(id + tick);
+
+        const float balance_before = w.corporations.at(corp_id).balance;
+        dispatch_convoys(w, reg,
+                         reg.logistics_cost(convoy_mode::land),
+                         reg.logistics_cost(convoy_mode::space));
+
+        trace.costs.push_back(balance_before - w.corporations.at(corp_id).balance);
+        if (w.convoys.size() == 1)
+        {
+            trace.speeds.push_back(w.convoys[0].speed);
+            trace.qtys.push_back(w.convoys[0].cargo_qty);
+            trace.sources.push_back(w.convoys[0].source_market);
+        }
+        else
+        {
+            trace.speeds.push_back(-1.0f);
+            trace.qtys.push_back(-1.0f);
+            trace.sources.push_back(null_entity);
+        }
+
+        int steps = 0;
+        while (!w.convoys.empty() && !w.convoys[0].arrived && steps < 10000)
+        {
+            advance_convoys(w);
+            ++steps;
+        }
+        trace.arrival_steps.push_back(steps);
+        credit_arrived_convoys(w, tick);
+    }
+    return trace;
+}
+
+static void test_orbital_purity()
+{
+    std::printf("--- BL-354: econ-tick orbital purity ---\n");
+
+    // The tick-pure angle reads only authored fields: scribbling the live angle
+    // changes nothing, and the same tick always reproduces the same angle.
+    {
+        body_component bc{};
+        bc.orbital_radius_au                    = 1.0f;
+        bc.orbital_epoch_angle_rad              = 0.7f;
+        bc.orbital_angular_velocity_rad_per_day = 0.02f;
+        const float before = orbital_angle_at_tick(bc, 500);
+        bc.orbital_angle_rad = 9.9f; // garbage live angle
+        const float after   = orbital_angle_at_tick(bc, 500);
+        check(before == after, "orbital_angle_at_tick ignores live orbital_angle_rad",
+              after, before);
+        check(orbital_angle_at_tick(bc, 500) == before,
+              "orbital_angle_at_tick reproducible from tick alone",
+              orbital_angle_at_tick(bc, 500), before);
+        check(orbital_angle_at_tick(bc, 501) != before,
+              "orbital_angle_at_tick advances with the tick",
+              orbital_angle_at_tick(bc, 501), before);
+    }
+
+    const purity_trace clean     = run_purity_world(false);
+    const purity_trace perturbed = run_purity_world(true);
+
+    bool convoys_each_tick = true;
+    for (const float s : clean.speeds)
+        if (s <= 0.0f)
+            convoys_each_tick = false;
+    check(convoys_each_tick, "one convoy dispatched every econ tick");
+
+    for (std::size_t i = 0; i < clean.costs.size(); ++i)
+    {
+        std::printf("  INFO  tick %zu: cost=%.4f speed=%.4f steps=%d src=%u\n",
+                    i, clean.costs[i], clean.speeds[i], clean.arrival_steps[i],
+                    clean.sources[i]);
+        check(clean.costs[i] == perturbed.costs[i],
+              "dispatch cost identical under angle perturbation",
+              perturbed.costs[i], clean.costs[i]);
+        check(clean.speeds[i] == perturbed.speeds[i],
+              "convoy speed identical under angle perturbation",
+              perturbed.speeds[i], clean.speeds[i]);
+        check(clean.qtys[i] == perturbed.qtys[i],
+              "cargo qty identical under angle perturbation",
+              perturbed.qtys[i], clean.qtys[i]);
+        check(clean.sources[i] == perturbed.sources[i],
+              "source choice identical under angle perturbation",
+              static_cast<float>(perturbed.sources[i]),
+              static_cast<float>(clean.sources[i]));
+        check(clean.arrival_steps[i] == perturbed.arrival_steps[i],
+              "arrival step count identical under angle perturbation",
+              static_cast<float>(perturbed.arrival_steps[i]),
+              static_cast<float>(clean.arrival_steps[i]));
+    }
+}
+
+// ---------------------------------------------------------------------------
 
 int main()
 {
@@ -371,6 +565,7 @@ int main()
     test_dispatch_and_gate();
     test_credit_arrived();
     test_price_convergence();
+    test_orbital_purity();
 
     std::printf("\n%s  (%d failure%s)\n",
                 g_failures == 0 ? "ALL PASS" : "SOME FAILURES",
