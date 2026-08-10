@@ -1,7 +1,7 @@
 #pragma once
 
 #include "detail_level.hpp"     // fold_state — the drill-through disclosure target (BL-214)
-#include "world/components.hpp" // building_type / resource_type / sell_order
+#include "world/components.hpp" // building_type / resource_type
 #include "world/entity.hpp"
 
 #include <imgui.h>
@@ -150,7 +150,6 @@ struct construction_state
 struct ui_state
 {
     entity_id    active_body   = null_entity;         ///< Navigation anchor: drives the lower rungs (circumplanetary anchor and surface). Changed by *navigation* (double-click / focus), not by selection. null_entity = no anchor.
-    entity_id    active_tile   = null_entity;         ///< Navigation anchor for the surface rung; set by a tile navigation. Distinct from the selection.
     entity_id    selected_entity = null_entity;       ///< The entity the player single-clicked to inspect — drives the Selection info element. Distinct from the active_* anchors: selecting never moves the canvas. null_entity = nothing selected. See SELECTION.md, ui/selection.hpp.
     canvas_level primary_level = canvas_level::solar; ///< Which canvas rung fills the window.
     overlay_mode overlay       = overlay_mode::none; ///< Active canvas overlay lens; toggled by the bottom overlay control strip. Defaults to none — the plain canvas — at campaign start (reverses BL-013's Corporation-default): a click never re-skins the canvas, so it opens unskinned. Single-select with a null state (re-clicking clears to none).
@@ -302,12 +301,6 @@ struct ui_state
     /// mirroring the construction request seam. Keeps the survey mutation in app while
     /// the UI surfaces hold a const world. null_entity = nothing pending.
     entity_id pending_survey_dispatch = null_entity;
-
-    /// Player-authored standing sell orders (the manual market side). Re-evaluated
-    /// every economy tick — passed to `clear_markets` by `app::step_economy`. Held
-    /// here as player game-intent; authored from the construction / building-
-    /// management panel. See sell_order, docs/SYSTEMS.md § Trade.
-    std::vector<sell_order> sell_orders;
 
     /// BL-323 S2b: the logistics-reach budget the UI must filter on, mirrored here
     /// from `recipe_registry::construction().max_logistics_reach` at load time.

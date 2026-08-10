@@ -387,9 +387,9 @@ struct market_component
 /// economy tick the order lists up to `quantity` of `resource` from the (corp,
 /// body) pool for sale at no less than `floor_price` (the order clears at
 /// `max(resolved_price, floor_price)`; an unmet floor simply means less or nothing
-/// sells that tick). Held in `ui_state.sell_orders` and passed to `clear_markets`.
-/// Defined here (rather than in market_clearing.hpp) so both the UI state and the
-/// clearing system can name it without an include cycle.
+/// sells that tick). Held in `world::sell_orders` (BL-363) and passed to
+/// `clear_markets`. Defined here (rather than in market_clearing.hpp) so both the
+/// UI and the clearing system can name it without an include cycle.
 struct sell_order
 {
     entity_id     corp        = null_entity;
