@@ -192,7 +192,7 @@ std::string stage_verdict(const generation_chart_source& src, chain_stage s)
 }
 
 void draw_stage_charts(const generation_chart_source& src, chain_stage s, bool heading,
-                       ui_state* log_ui)
+                       ui_state* /*log_ui*/)
 {
     if (src.bodies == nullptr || src.count == 0)
         return;

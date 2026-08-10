@@ -672,6 +672,7 @@ void app::step_economy()
             case agency_event::kind::built:             return 3;
             case agency_event::kind::recipe_switch:     return 2;
             case agency_event::kind::resumed:           return 2;
+            case agency_event::kind::hired:             return 3;
             case agency_event::kind::road_placed:       return 1;
             case agency_event::kind::workforce_set:     return 1;
             case agency_event::kind::survey_dispatched: return 1;
@@ -728,6 +729,9 @@ void app::step_economy()
                 break;
             case agency_event::kind::survey_dispatched:
                 text = "We confirm new exploratory activity within our claims.";
+                break;
+            case agency_event::kind::hired:
+                text = "We acknowledge the mustering of a private security formation on our soil.";
                 break;
             }
             ui::chat_post(m_chat, static_cast<int>(m_sim_loop.day_tick()), nid, 0, std::move(text));

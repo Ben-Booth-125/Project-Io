@@ -290,7 +290,12 @@ float tile_score_for(const tile_component& tc, building_type btype)
             score = total_deposit(tc) * 0.5f + 1.0f;
             break;
         case building_type::port:
+        case building_type::launchpad:
+        case building_type::inland_logistics_hub:
+        case building_type::military_base:
         case building_type::none:
+            // Deliberately neutral; a real siting preference for the non-port
+            // infrastructure types is an open design question (NR-126).
             score = 1.0f;
             break;
     }

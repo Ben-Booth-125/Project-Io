@@ -1,4 +1,3 @@
-#define IMGUI_DEFINE_MATH_OPERATORS
 #include "body_surface_canvas.hpp"
 #include "text_fit.hpp"
 

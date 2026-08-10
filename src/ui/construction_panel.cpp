@@ -270,8 +270,7 @@ void draw_selected_section(world& w, const recipe_registry& reg,
     // The plate is a SQUARE beside the text rather than a full-width banner: Menu Space
     // is 380 px at its floor, and a banner at 34% of that spends 130 px of vertical
     // budget on decoration in a column whose scarce axis is height.
-    ImDrawList*  dl        = ImGui::GetWindowDrawList();
-    const float  content_w = ImGui::GetContentRegionAvail().x;
+    ImDrawList*  dl = ImGui::GetWindowDrawList();
     {
         const float  plate = ImGui::GetFrameHeight() * 2.6f;
         const ImVec2 p     = ImGui::GetCursorScreenPos();
