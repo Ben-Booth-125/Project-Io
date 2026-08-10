@@ -242,8 +242,11 @@ static void test_agglomeration_and_pool()
     const auto key_high = std::make_pair(corp, body_high);
     const auto i1l = r1.workforce_contention.find(key_low);
     const auto i1h = r1.workforce_contention.find(key_high);
+    const float c1l = (i1l != r1.workforce_contention.end()) ? i1l->second : 1.0f;
     const float c1h = (i1h != r1.workforce_contention.end()) ? i1h->second : 1.0f;
-    std::printf("  Pass 1: scale-4 contention=%.4f\n", c1h);
+    std::printf("  Pass 1: scale-1=%.4f  scale-4=%.4f\n", c1l, c1h);
+    check(std::fabs(c1l - 1.0f) < 1e-3f,
+          "scale-1 body starts uncontended with 1 building (supply 1.0 == demand 1)");
     check(std::fabs(c1h - 1.0f) < 1e-3f,
           "scale-4 body is uncontended with 1 building (supply 30 >> demand 1)");
 

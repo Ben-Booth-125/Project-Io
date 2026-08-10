@@ -69,6 +69,8 @@ const char* building_name(building_type t)
         case building_type::processing_facility: return "processing_facility";
         case building_type::port:                return "port";
         case building_type::launchpad:           return "launchpad";
+        case building_type::inland_logistics_hub: return "inland_logistics_hub";
+        case building_type::military_base:       return "military_base";
     }
     return "?";
 }
@@ -93,9 +95,22 @@ const char* resource_name(resource_type r)
         case resource_type::sand:                  return "sand";
         case resource_type::clay:                  return "clay";
         case resource_type::peat:                  return "peat";
+        case resource_type::tobacco:               return "tobacco";
+        case resource_type::spices:                return "spices";
+        case resource_type::coffee:                return "coffee";
+        case resource_type::furs:                  return "furs";
         case resource_type::steel:                 return "steel";
         case resource_type::refined_fuel:          return "refined_fuel";
         case resource_type::food_rations:          return "food_rations";
+        case resource_type::grain:                 return "grain";
+        case resource_type::fodder:                return "fodder";
+        case resource_type::salt:                  return "salt";
+        case resource_type::transport_capacity:    return "transport_capacity";
+        case resource_type::charcoal:              return "charcoal";
+        case resource_type::iron_blooms:           return "iron_blooms";
+        case resource_type::bullion:               return "bullion";
+        case resource_type::trade_goods_misc:      return "trade_goods_misc";
+        case resource_type::propellant:            return "propellant";
         case resource_type::count:                 return "count";
     }
     return "?";
