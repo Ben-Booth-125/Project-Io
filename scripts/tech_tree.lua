@@ -141,9 +141,9 @@ tech_tree = {
           capstone = "", opens = {}, status = "stub" },
 
         { id = "L-MIL", name = "Military", era = 0, type = "standing",
-          thread = "",
-          thesis = "Reserved — not enumerated until the combat system is mapped.",
-          capstone = "", opens = {}, status = "reserved" },
+          thread = "Military",
+          thesis = "Largely reserved until the combat system is mapped — but it carries the prototype's one EARNABLE tech (E0-ML-01, BL-344), because the first thing a technology should be able to unlock is not another factory.",
+          capstone = "", opens = {}, status = "stub" },
     },
 
     techs = {
@@ -417,6 +417,24 @@ tech_tree = {
         { id = "E0-EC-04", name = "Information Economy", quest = "E0-ELEC",
           kind = "capstone", prereqs = { "E0-EC-02" }, cost = "XL", payoff = "gate",
           condition = "market", unlocks = "Quest goal: compute cheap enough to industrialise research", status = "stub" },
+
+        -- ---------------------------------------------------- L-MIL (BL-344, 1)
+        -- THE ONE LIVE GATE. Every other node in this file is authored data the
+        -- F9 viewer draws; this one is actually earnable and actually unlocks
+        -- content (building_type::military_base, BL-325). Its PREDICATE is NOT
+        -- authored here -- src/world/tech_gate.cpp owns it, because the gate has
+        -- to be linkable from the Lua-free world superset that construction.cpp
+        -- lives in, and one predicate in two files is one predicate too many.
+        -- `condition` below stays the descriptive label it has always been.
+        --
+        -- Military rather than economic on purpose (BL-094's design test, quoted
+        -- in BL-344): a technology that can only unlock a building is being
+        -- designed for the corporate player the governing-body pivot is moving
+        -- away from.
+        { id = "E0-ML-01", name = "Standing Garrison Doctrine", short_name = "Garrison",
+          quest = "L-MIL",
+          kind = "invention", prereqs = {}, cost = "M", payoff = "building",
+          condition = "structure", unlocks = "Military Base", status = "stub" },
 
         -- ------------------------------------------------ E0-ROCKET (stub, 5)
         { id = "E0-RK-01", name = "Guided Rocketry", quest = "E0-ROCKET",

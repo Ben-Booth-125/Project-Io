@@ -42,6 +42,7 @@
 #include "ui/view_nav.hpp"
 #include "world/budget_system.hpp"
 #include "world/construction.hpp"
+#include "world/tech_gate.hpp" // BL-344: gating_tech_for (refusal names the missing tech)
 #include "world/corp_ai.hpp"
 #include "world/history_log.hpp"
 #include "world/placement_rules.hpp"
@@ -640,7 +641,14 @@ void app::step_economy()
     m_last_econ_report = run_economy_step(m_world, m_registry);
     auto flows = clear_markets(m_world, m_registry, m_last_econ_report, m_ui.sell_orders);
     apply_budget(m_world, m_registry, flows, m_last_econ_report.workforce_contention,
-                 &m_last_econ_report.budgets);
+                 &m_last_econ_report.budgets,
+                 &m_last_econ_report.buildings); // BL-343: law enforcement seam
+    // BL-344: evaluate the tech gates once per economy tick, after the money loop
+    // has moved balances (a `surplus` gate should read this quarter's balance, not
+    // last quarter's). Monotonic and deterministic; a no-op once everything
+    // earnable is earned.
+    advance_tech_gates(m_world);
+
     // BL-262 first slice: cache this tick's standing profile for the Corporations panel
     // (transient runtime cache, not serialised — same treatment as m_last_econ_report).
     m_last_corp_standings = compute_corp_standings(m_world, flows);
@@ -1332,7 +1340,8 @@ int app::run_verify(const std::string& script_path, bool bless)
                 r == construction_result::no_corp                ? "no_corp" :
                 r == construction_result::no_tile                ? "no_tile" :
                 r == construction_result::slot_occupied          ? "slot_occupied" :
-                r == construction_result::insufficient_materials ? "insufficient_materials" : "failed";
+                r == construction_result::insufficient_materials ? "insufficient_materials" :
+                r == construction_result::tech_locked            ? "tech_locked" : "failed";
             if (r == construction_result::placed)
                 m_ui.selected_entity = built;
             SDL_Log("verify.build_first_valid: %s at tile (%d,%d)", name, tc.grid_x, tc.grid_y);
@@ -1366,7 +1375,8 @@ int app::run_verify(const std::string& script_path, bool bless)
                 r == construction_result::no_corp                ? "no_corp" :
                 r == construction_result::no_tile                ? "no_tile" :
                 r == construction_result::slot_occupied          ? "slot_occupied" :
-                r == construction_result::insufficient_materials ? "insufficient_materials" : "failed";
+                r == construction_result::insufficient_materials ? "insufficient_materials" :
+                r == construction_result::tech_locked            ? "tech_locked" : "failed";
             if (r == construction_result::placed)
                 m_ui.selected_entity = built;
             SDL_Log("verify.build_at: %s at tile (%d,%d)", name, col, row);
@@ -3349,6 +3359,12 @@ void app::render()
                 m_ui.construction.last_message = "Already placed on this body."; break;
             case construction_result::insufficient_materials:
                 m_ui.construction.last_message = "Not enough materials."; break;
+            case construction_result::tech_locked:
+                // BL-344: name the missing technology rather than just refusing —
+                // BL-071's teach-the-player-why rule, applied to the tech gate.
+                m_ui.construction.last_message =
+                    "Not researched yet: " +
+                    gating_tech_for(m_ui.construction.pending_type) + "."; break;
             default:
                 m_ui.construction.last_message = "Construction failed."; break;
         }
@@ -3427,6 +3443,22 @@ void app::render()
             m_ui.construction.last_message = "Couldn't demolish that.";
         }
         m_ui.construction.pending_demolish = null_entity; // consume the request
+    }
+
+    // Execute a law enact/repeal queued this frame by the Budget ledger (BL-343).
+    // The flip takes effect on the NEXT economy tick, not retroactively on the one
+    // already accounted — apply_budget resolves the enacted set once per tick.
+    if (m_ui.construction.pending_law_toggle >= 0)
+    {
+        const std::size_t idx = static_cast<std::size_t>(m_ui.construction.pending_law_toggle);
+        if (idx < m_world.laws.size())
+        {
+            law& l = m_world.laws[idx];
+            l.enacted = !l.enacted;
+            m_ui.construction.last_message =
+                l.name + (l.enacted ? " enacted." : " repealed.");
+        }
+        m_ui.construction.pending_law_toggle = -1; // consume the request
     }
 
     // Execute any survey dispatch queued this frame by the Selection-panel Survey
@@ -3563,7 +3595,8 @@ void app::render()
     // F9 mock tech-tree viewer (BL-087), also reachable from nav rail slot 4
     // (BL-310). Read-only design aid over scripts/tech_tree.lua; no simulation
     // coupling.
-    ui::draw_tech_tree_panel(m_tech_tree, m_ui.show_tech_tree, m_ui.tech_tree_view,
+    ui::draw_tech_tree_panel(m_tech_tree, m_world, m_world.player_entity,
+                             m_ui.show_tech_tree, m_ui.tech_tree_view,
                               m_ui.tech_tree_pan_x, m_ui.tech_tree_pan_y, m_ui.tech_tree_zoom);
 
     // F11 frame-budget HUD (BL-249) — the v0.1.0 audit instrument. Drawn last so it

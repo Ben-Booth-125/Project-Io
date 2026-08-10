@@ -1,6 +1,7 @@
 #include "world/placement_rules.hpp"
 
 #include "world/logistics.hpp"
+#include "world/tech_gate.hpp" // BL-344: structure_unlocked
 #include "world/world.hpp"
 
 #include <algorithm>
@@ -24,6 +25,7 @@ const char* placement_reason_text(placement_reason r)
         case placement_reason::already_road:      return "This tile already has an equal or better road";
         case placement_reason::deposit_present:   return "This terrain already supports a Farm — no Hydroponics Bay needed here";
         case placement_reason::out_of_logistics_range: return "Too far from a city, port or logistics hub to be supplied";
+        case placement_reason::tech_locked: return "Locked - the technology that permits this has not been researched";
     }
     return "Cannot build here";
 }
@@ -181,7 +183,7 @@ bool is_coastal(const world& w, entity_id tile_id)
 
 placement_result can_place_in_world(const world& w, entity_id tile_id,
                                     building_type type, resource_type target,
-                                    float max_reach)
+                                    float max_reach, entity_id corp)
 {
     const auto tc_it = w.tiles.find(tile_id);
     if (tc_it == w.tiles.end())
@@ -189,6 +191,13 @@ placement_result can_place_in_world(const world& w, entity_id tile_id,
     // Tile-level terrain/deposit check first — propagate its specific reason.
     if (const placement_result tile_ok = can_place(tc_it->second, type, target); !tile_ok)
         return tile_ok;
+
+    // BL-344 tech gate. Ahead of the world-level terrain checks on purpose: a
+    // locked building type is locked everywhere, so "you have not researched
+    // this" is the truer refusal than "that tile is not coastal". Skipped
+    // entirely when the caller named no corp (see the header).
+    if (!structure_unlocked(w, corp, type))
+        return placement_reason::tech_locked;
 
     if (type == building_type::port)
     {

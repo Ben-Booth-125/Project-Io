@@ -1168,8 +1168,12 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
     for (candidate& c : cands)
     {
         const building_economics& econ = reg.economics(c.type);
+        // BL-344: the player's own corp is named, so a tech-gated type reads as
+        // "Locked - not researched" in the ledger rather than offering a Build
+        // button that construct_building would then refuse.
         c.pr = placement_rules::can_place_in_world(w, tile_id, c.type, c.target,
-                                                  ui.max_logistics_reach);
+                                                  ui.max_logistics_reach,
+                                                  w.player_entity);
         c.material_rate = construction_rate(w, reg, c.type, tile_id); // BL-328 pre-commit warning
 
         // Capex is the figure construction.cpp actually gates on: build cost PLUS the

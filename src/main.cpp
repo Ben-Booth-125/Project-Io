@@ -8,6 +8,7 @@
 #include "world/market_clearing.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/supply_system.hpp"
+#include "world/tech_gate.hpp"
 
 #include <algorithm>
 #include <cstdio>
@@ -104,7 +105,9 @@ int run_serve(int ticks)
         advance_convoys(w);
         economy_report report = run_economy_step(w, reg);
         auto flows = clear_markets(w, reg, report);
-        apply_budget(w, reg, flows, report.workforce_contention, &report.budgets);
+        apply_budget(w, reg, flows, report.workforce_contention, &report.budgets,
+                     &report.buildings); // BL-343: law enforcement seam
+        advance_tech_gates(w); // BL-344: earn techs whose gate is now satisfied
         credit_arrived_convoys(w, t);
     }
 
@@ -129,7 +132,9 @@ int run_serve(int ticks)
             advance_convoys(w);
             economy_report report = run_economy_step(w, reg);
             auto flows = clear_markets(w, reg, report);
-            apply_budget(w, reg, flows, report.workforce_contention, &report.budgets);
+            apply_budget(w, reg, flows, report.workforce_contention, &report.budgets,
+                         &report.buildings); // BL-343: law enforcement seam
+            advance_tech_gates(w); // BL-344: earn techs whose gate is now satisfied
             credit_arrived_convoys(w, tick);
             std::cout << "OK tick=" << tick << std::endl;
         }
@@ -221,7 +226,9 @@ int run_blackboard_export(const std::string& which, const std::string& out_dir, 
         advance_convoys(w);
         economy_report report = run_economy_step(w, reg);
         auto flows = clear_markets(w, reg, report);
-        apply_budget(w, reg, flows, report.workforce_contention, &report.budgets);
+        apply_budget(w, reg, flows, report.workforce_contention, &report.budgets,
+                     &report.buildings); // BL-343: law enforcement seam
+        advance_tech_gates(w); // BL-344: earn techs whose gate is now satisfied
         credit_arrived_convoys(w, t);
     }
 

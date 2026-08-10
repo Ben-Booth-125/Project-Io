@@ -1,5 +1,7 @@
 #include "tech_tree.hpp"
 
+#include "tech_gate.hpp" // BL-344: the one authority for what a gate requires
+
 #include "scripting/lua_state.hpp"
 
 #include <sol/sol.hpp>
@@ -81,9 +83,20 @@ void tech_tree_registry::load_from_lua(lua_state& lua)
             tn.tier      = t->get_or("tier", 0);
             tn.cost      = t->get_or<std::string>("cost", "M");
             tn.payoff    = t->get_or<std::string>("payoff", "");
-            tn.condition = t->get_or<std::string>("condition", "research");
+            tn.condition_label = t->get_or<std::string>("condition", "research");
             tn.unlocks   = t->get_or<std::string>("unlocks", "");
             tn.status    = t->get_or<std::string>("status", "stub");
+
+            // BL-344: the REAL gate comes from the Lua-free gate table, not from
+            // this file. The Lua entry authors identity, topology and prose; the
+            // predicate has exactly one home (tech_gate.cpp) so the viewer cannot
+            // show a requirement the simulation does not enforce.
+            if (const tech_gate* g = find_tech_gate(tn.id))
+            {
+                tn.condition = g->condition;
+                tn.earnable  = true;
+            }
+
             sol::optional<sol::table> prereqs = (*t)["prereqs"];
             tn.prereqs = read_string_list(prereqs);
             m_techs.push_back(std::move(tn));

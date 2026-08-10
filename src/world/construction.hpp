@@ -16,6 +16,7 @@ enum class construction_result : uint8_t
     no_tile,             ///< The tile entity does not exist.
     slot_occupied,       ///< The body's per-type cap is full (Launchpad: max 1 per body).
     insufficient_materials, ///< Unreachable since BL-095-lite folded material cost into credits (kept for switch compat).
+    tech_locked,         ///< BL-344: the corporation has not earned the tech that unlocks this type.
 };
 
 /// Attempt to construct a building of `type` (targeting `target` for an extraction

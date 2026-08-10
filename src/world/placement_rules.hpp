@@ -44,6 +44,7 @@ enum class placement_reason : uint8_t
     already_road,      ///< Road placement onto a tile that already carries a road (BL-147).
     deposit_present,   ///< Hydroponics Bay (BL-166): tile already carries the terrain deposit a Farm would use.
     out_of_logistics_range, ///< BL-323 S2: too far from any city / port / logistics hub to be supplied.
+    tech_locked,       ///< BL-344: the corporation has not earned the tech that unlocks this type.
 };
 
 /// Human-readable one-line explanation for a placement reason, for surfacing on
@@ -189,9 +190,16 @@ bool is_coastal(const world& w, entity_id tile_id);
 ///                   `body_reach_field()` to have been built for the tile's body; when
 ///                   it has not, the rule is skipped rather than guessed at (see
 ///                   `tile_reach_cost`'s -1 contract).
+/// @param corp       BL-344 tech gate: the corporation asking. `null_entity`
+///                   (the default) disables the check, so every pre-existing
+///                   call site keeps its old meaning — a check that only
+///                   describes a TILE has no corp to ask about, while a check
+///                   that gates an ACTION does. When set, a type gated behind an
+///                   unearned tech is refused with `tech_locked`.
 placement_result can_place_in_world(const world& w, entity_id tile_id,
                                     building_type type, resource_type target,
-                                    float max_reach = -1.0f);
+                                    float max_reach = -1.0f,
+                                    entity_id corp = null_entity);
 
 // ---------------------------------------------------------------------------
 // Building stacks (Ben's 2026-07-22 call: "buildings can be stacked, so you can

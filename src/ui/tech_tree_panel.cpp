@@ -1,6 +1,7 @@
 #include "tech_tree_panel.hpp"
 
 #include "foldout_column.hpp"
+#include "presentation.hpp" // BL-344: resource_name / building_type_name for condition_text
 
 #include <imgui.h>
 
@@ -234,7 +235,7 @@ void era_icon_button(const char* tooltip, int id, int& view, bool* close,
 
 /// Draws one era's gate quests as a radial web. Returns true if it drew
 /// something (false ⇒ caller shows the "no quests authored" placeholder).
-bool draw_constellation(const tech_tree_registry& tree, int era,
+bool draw_constellation(const tech_tree_registry& tree, const world& w, entity_id corp, int era,
                          float& pan_x, float& pan_y, float& zoom, bool is_history)
 {
     std::vector<const tech_quest*> quests;
@@ -438,9 +439,30 @@ bool draw_constellation(const tech_tree_registry& tree, int era,
         if (hovered)
         {
             std::string tip = nl.node->name + "\n[" + kind_label(*nl.node) + ", " + nl.node->cost
-                             + ", " + nl.node->condition + "]";
+                             + ", " + nl.node->condition_label + "]";
             if (!nl.node->unlocks.empty())
                 tip += "\n" + nl.node->unlocks;
+
+            // BL-344: say honestly whether this node is EARNABLE, and whether it
+            // is earned. Before this, every node looked alike and none of them
+            // could be earned at all — a picture of a system rather than the
+            // system. A node with no authored gate says so rather than reading
+            // as unlocked (an empty condition_set would be TRUE by definition).
+            if (!nl.node->earnable)
+            {
+                tip += "\nNo gate authored - not yet earnable.";
+            }
+            else if (w.has_tech(corp, nl.node->id))
+            {
+                tip += "\nEARNED.";
+            }
+            else
+            {
+                tip += "\nLOCKED. Requires:";
+                for (const condition& c : nl.node->condition.all)
+                    tip += "\n  - " + condition_text(c, resource_name, building_type_name)
+                         + (evaluate_condition(c, w, corp) ? "  (met)" : "");
+            }
             ImGui::SetTooltip("%s", tip.c_str());
         }
     }
@@ -502,7 +524,8 @@ void draw_tech_tree_menu(const tech_tree_registry& tree, ui_state& s)
     ui::foldout_end();
 }
 
-void draw_tech_tree_panel(const tech_tree_registry& tree, bool& open, int& view,
+void draw_tech_tree_panel(const tech_tree_registry& tree, const world& w, entity_id corp,
+                          bool& open, int& view,
                            float& pan_x, float& pan_y, float& zoom)
 {
     if (!open)
@@ -535,13 +558,13 @@ void draw_tech_tree_panel(const tech_tree_registry& tree, bool& open, int& view,
         // even just as a history"). Read-only — nothing here is ever chosen,
         // only derived (BL-274's endowment/diffusion mechanism); the history
         // palette (draw_constellation's is_history branch) marks that.
-        if (!draw_constellation(tree, -1, pan_x, pan_y, zoom, /*is_history=*/true))
+        if (!draw_constellation(tree, w, corp, -1, pan_x, pan_y, zoom, /*is_history=*/true))
             ImGui::TextDisabled("Placeholder — no quests authored for this era yet.");
     }
     else if (view == 1 || view == 2)
     {
         const int era = view - 1;
-        if (!draw_constellation(tree, era, pan_x, pan_y, zoom, /*is_history=*/false))
+        if (!draw_constellation(tree, w, corp, era, pan_x, pan_y, zoom, /*is_history=*/false))
             ImGui::TextDisabled("Placeholder — no quests authored for this era yet.");
     }
     else
