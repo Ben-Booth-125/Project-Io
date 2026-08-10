@@ -246,6 +246,16 @@ struct world
     /// for the whole visible grid at once, so a per-query search would be the wrong shape.
     std::unordered_map<entity_id, std::vector<float>> body_reach_cost;
 
+    /// Per-body market index (BL-356): body -> its markets in ascending id order.
+    /// A derived cache like body_tile_index, serving market_for_tile / clear_markets
+    /// (market_clearing.cpp) so the hot read path stops rebuilding the grouping per
+    /// call. Rebuilt when the stamp below stops matching the market set — markets
+    /// are created at runtime but never destroyed, so count + max id catches every
+    /// mutation. Mutable so the const read path (market_for_tile) can refresh it.
+    mutable std::unordered_map<entity_id, std::vector<entity_id>> body_market_index;
+    mutable std::size_t body_market_index_count  = 0;           ///< markets.size() at build.
+    mutable entity_id   body_market_index_max_id = null_entity; ///< Max market id at build.
+
     /// Strategic AI decision log (BL-202): a fixed 256-entry ring of the most
     /// recent corp commands + score rationale, in deterministic application
     /// order. Derived observability (the chat feed / harness read it), not

@@ -72,15 +72,28 @@ struct matched_trade
 };
 
 /// Markets present on each body, in ascending market-id order (deterministic).
-std::unordered_map<entity_id, std::vector<entity_id>> markets_by_body(const world& w)
+/// Served from world::body_market_index (BL-356), rebuilt when the count + max-id
+/// stamp stops matching the market set (markets are created, never destroyed).
+const std::unordered_map<entity_id, std::vector<entity_id>>& markets_by_body(const world& w)
 {
-    std::unordered_map<entity_id, std::vector<entity_id>> map;
-    map.reserve(w.markets.size());
+    entity_id max_id = null_entity;
     for (const auto& [mid, mc] : w.markets)
-        map[mc.body].push_back(mid);
-    for (auto& [body, ids] : map)
-        std::sort(ids.begin(), ids.end());
-    return map;
+        max_id = std::max(max_id, mid);
+
+    if (w.body_market_index_count != w.markets.size() ||
+        w.body_market_index_max_id != max_id)
+    {
+        auto& map = w.body_market_index;
+        map.clear();
+        map.reserve(w.markets.size());
+        for (const auto& [mid, mc] : w.markets)
+            map[mc.body].push_back(mid);
+        for (auto& [body, ids] : map)
+            std::sort(ids.begin(), ids.end());
+        w.body_market_index_count  = w.markets.size();
+        w.body_market_index_max_id = max_id;
+    }
+    return w.body_market_index;
 }
 
 /// Pick, from a body's markets, the one whose centre tile is nearest `tile`.
@@ -206,7 +219,7 @@ entity_id market_for_tile(const world& w, entity_id tile)
     const auto tit = w.tiles.find(tile);
     if (tit == w.tiles.end())
         return null_entity;
-    const auto by_body = markets_by_body(w);
+    const auto& by_body = markets_by_body(w);
     const auto it = by_body.find(tit->second.body);
     if (it == by_body.end())
         return null_entity;
@@ -244,7 +257,7 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     const std::vector<buy_order>&  player_buy_orders)
 {
     std::unordered_map<entity_id, corp_cash_flow> flows;
-    const auto by_body = markets_by_body(w);
+    const auto& by_body = markets_by_body(w);
 
     for (auto& [mid, mc] : w.markets)
     {
