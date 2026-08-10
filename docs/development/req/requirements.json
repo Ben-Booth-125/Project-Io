@@ -9856,6 +9856,138 @@
    ],
    "resolved": "2026-08-10",
    "resolution": "is_coastal resolves neighbours through body_tile_index (guarded, with the old scan as fallback for hand-built harness worlds; stale hot-loop comment replaced); economy_report gains building_row (id->row, filled once after Pass 5) and estimate_building_profit uses it with a fallback scan."
+  },
+  {
+   "brief": "app-cpp-decomposition",
+   "title": "app.cpp sheds four separable concerns into dedicated files",
+   "difficulty": 4,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "requirements": [
+    {
+     "id": "R1",
+     "requirement": "BL-361 (item-spanning): the verify Lua API + capture, the startup screens, the time panel, and the post-econ-step session-history recorders each live in their own file; app.cpp shrinks accordingly; behaviour unchanged (build green, harness suite green, visual suite unchanged).",
+     "verification": [
+      "build",
+      "headless: full harness sweep",
+      "visual: suite unchanged",
+      "review"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "BL-361: each extraction is its own commit so the mechanical move stays reviewable.",
+     "verification": [
+      "review"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "ui-frame-recompute-caches",
+   "title": "Per-frame recomputation of per-tick state is cached or event-driven",
+   "difficulty": 4,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "requirements": [
+    {
+     "id": "R1",
+     "requirement": "BL-362 (item-spanning): selection tile metrics, body vision, the per-frame building maps, the industry lens pre-pass, lens-key chrome and the tech-tree ring layout no longer recompute per frame; rendered output identical (visual suite stable).",
+     "verification": [
+      "build",
+      "visual: suite unchanged",
+      "review"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "BL-362: interactive hover delays are wall-clock seconds (refresh-rate independent); the verify harness frames(n) unit still drives deterministic captures.",
+     "verification": [
+      "code",
+      "visual"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "requirement": "BL-362: sim outcomes untouched (UI-side change only) - determinism harness green.",
+     "verification": [
+      "headless: determinism_harness"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "misc-hygiene-sweep",
+   "title": "Small-hygiene sweep: sol2 safeties, state homes, single-source hex table, seeded names",
+   "difficulty": 3,
+   "importance": "C",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "requirements": [
+    {
+     "id": "R1",
+     "requirement": "BL-363 (item-spanning): SOL_ALL_SAFETIES_ON is defined project-wide, the unchecked sol2 shape conversions are checked, init.lua config absence fails cleanly, and the blackboard export reports write failure; build + harness suite green.",
+     "verification": [
+      "build",
+      "headless: full harness sweep",
+      "code"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "BL-363: player standing sell orders live on world (player intent), the econ tick no longer reads ui_state, and the market ledger form state is per-market.",
+     "verification": [
+      "build",
+      "code",
+      "headless: econ_harness"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "requirement": "BL-363: settlement labels derive from the seeded naming system (no hard-coded Earth-flavoured bank); any golden the name change moves is re-blessed in the same commit.",
+     "verification": [
+      "visual",
+      "code"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R4",
+     "requirement": "BL-363: the odd-r hex neighbour offset table is single-sourced; active_tile dead state removed. The dead buy-order book is deliberately NOT touched (NR-125 open).",
+     "verification": [
+      "code",
+      "build"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    }
+   ]
   }
  ]
 }
