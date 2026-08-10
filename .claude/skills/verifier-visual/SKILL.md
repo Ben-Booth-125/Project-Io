@@ -43,6 +43,13 @@ the "authorising a new check = naming it" convention:
   heightmap is biased by the Continents/Drift sibling pass instead of pure noise. Captures
   plain terrain (landmass shape) and the Country lens (nation borders over it) at a
   full-planet zoom. Driver: `verify.goto_surface`, `verify.set_zoom`, `verify.set_overlay`.
+- **`settlement_labels.lua`** (BL-363) — City+ conurbation labels come from the seeded
+  naming system (`world::population_centre_name`, the BL-290 tongue banks), not a
+  hard-coded bank; guards the standing no-Earth-names rule at the canvas. It locates the
+  largest population centre via `verify.population_centres()` and frames *that*, rather
+  than hard-coding a tile — the pattern to copy for any check over generated content,
+  since `pop_markers.lua`'s fixed `(66, 6)` now frames empty terrain after the BL-257 /
+  BL-348 generation changes moved the world under it.
 - **`history_ledger_and_comms.lua`** (BL-211 + BL-212) — the History nav-rail slot's three
   views: **Story** (the oral-history biography, including Continents/Drift's merged lines),
   **Chain** (the wizard's generation stage charts redrawn from the persisted report, captured

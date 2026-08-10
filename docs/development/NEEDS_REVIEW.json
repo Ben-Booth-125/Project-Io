@@ -2266,6 +2266,33 @@
    "status": "open",
    "source": "verifier-review of the hygiene batch (corp_ai.cpp)",
    "what": "The AI treats any non-applied corp_command_result generically, so before E0-ML-01 is earned a military-base candidate scores, wins, is rejected as rejected_tech_locked, and the slot is spent — legal, deterministic, just churn. A precondition filter (skip candidates whose tech gate is unearned) is the clean fix; belongs with BL-332 (military points and research) sequencing."
+  },
+  {
+   "id": "NR-130",
+   "title": "The committed visual goldens are stale by ~119 commits of world drift — a re-bless pass is owed",
+   "raised": "2026-08-10",
+   "kind": "observation",
+   "status": "open",
+   "source": "Hygiene wave 2 verification (BL-362/BL-363); hover_freeze golden vs live capture",
+   "what": "hover_freeze's goldens were last blessed 2026-08-06 (9ecbbcf). Between then and this batch, 119 commits landed, including BL-257 (generated body names — the home body is no longer \"Kepler\" but \"Huhaidar\"), BL-348/349 (province tongues — nation names all changed) and BL-308. Live captures now diff ~11.5% against those goldens on WORLD CONTENT (nation names, nation count 21 -> 17, terrain, balances), not on any UI change. I did NOT mass re-bless: that would bury 119 commits of unreviewed world change under a UI commit, which is exactly what BL-259 (golden staleness) says not to do. Verification for this batch was done instead by blessing control goldens from the pre-wave-2 build and diffing the wave-2 build against them — all five checks render-identical. The owed work is a deliberate world-content re-bless pass (BL-285 procedure, as 63b5ea6 did for v0.1.10), reviewed against the changes that moved the world."
+  },
+  {
+   "id": "NR-131",
+   "title": "pop_markers.lua frames a hard-coded tile that world drift left empty",
+   "raised": "2026-08-10",
+   "kind": "observation",
+   "status": "open",
+   "source": "Hygiene wave 2; scripts/verify/pop_markers.lua",
+   "what": "pop_markers.lua frames tile (66, 6) to show City+ settlement labels, but after the BL-257/BL-348 generation changes that tile is empty terrain — the check still \"passes\" its own goldens while capturing none of the markers it exists to verify. The new settlement_labels.lua (BL-363) shows the fix: locate the subject via verify.population_centres() and frame whatever the world actually generated. Worth sweeping the other scripts for hard-coded coordinates over generated content during the NR-130 re-bless pass."
+  },
+  {
+   "id": "NR-132",
+   "title": "A City+ centre with no persisted name now draws no label at all",
+   "raised": "2026-08-10",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-363 settlement labels (slice M)",
+   "what": "Labels now read world::population_centre_name rather than indexing a hard-coded bank, so a centre whose generated name is empty draws nothing where it previously always got a bank name. That path needs generate_city_name to have returned empty (an unusable tongue), so it should be unreachable in a normal campaign — but it is a real behaviour change from \"always labelled\" and would show as a silently unlabelled city rather than a visible fault. Accepted as the honest failure mode (a made-up Earth name was worse); flagging in case a fallback is wanted."
   }
  ]
 }
