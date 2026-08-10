@@ -347,6 +347,33 @@ added by Ben 2026-08-04).
   object — "a flat AND-list of atomic conditions" — and neither built it, because each was scoped
   design-only. One small pure evaluator was all that stood between two design-forward minors and
   two shippable ones. BL-342 lands here because Laws is its first consumer.
+
+  **Done-definition — v0.1.3.** v0.1.3 is cut when:
+
+  - **A predicate exists that a law can be read through.** Not a label naming what a gate would be
+    about — an object that resolves true or false against the world, purely and deterministically,
+    with an empty set meaning *always* because that is the common case for a law.
+  - **The predicate can ask a military question.** BL-094's test applied at the foundation rather
+    than promised for later: a subject enum that enumerates only economic quantities is the exact
+    failure the governing-body pivot exists to avoid, and it is far cheaper to avoid now than to
+    unpick.
+  - **One law is enacted, enforced and visible.** Not the ten-law list; one law the player can
+    switch on, whose effect lands on a number they already read. A law the player cannot see
+    working is indistinguishable from an unimplemented one.
+  - **The enforcement seam is settled on that one law.** A law is a modifier *over* the market,
+    never an override *of* it — so the levy applies where the flow is accounted, not where the
+    price is resolved, and the market stays the only thing that sets prices.
+  - **Enacting nothing changes nothing.** The shipped default is inert and bit-identical to a world
+    with no laws at all, and repeal returns to that baseline exactly.
+  - Excluded by scope, filed rather than dropped: the other nine laws and the other three effect
+    families (**BL-155**), the laws ledger and enactment politics (**BL-186**), and the negotiated
+    tax rate (**BL-280**) — all re-targeted to **v0.1.11**, since what remains of them is a *policy
+    surface*, and the seam they would surface now exists.
+
+  **Cut 2026-08-10.** Both enablers terminal — **BL-342** (condition_set evaluator, 40 assertions)
+  and **BL-343** (laws MVP, 21 assertions). Gate: 58 tests, 0 failures. Three new harnesses;
+  no existing economy harness changed, because `apply_budget`'s new `production` argument defaults
+  to null and therefore charges nothing for every caller that does not opt in.
 - **v0.1.4 — Techs** (**BL-156**). Early design toward the tech / quest system — the condition-set
   gate model (gate = quest = tech) that BL-087 reframed and the v0.4.0 filter system formalises.
   Design only; precursor to BL-087. **Overtaken in practice, 2026-08-04/05:** BL-087 itself —
@@ -364,6 +391,27 @@ added by Ben 2026-08-04).
   designed for the corporate player we are pivoting away from, and gating the base costs the same
   as gating a smelter. Also a cheap window — no save format exists yet (BL-107 is open), so
   changing a stored field is a compile-time change today and a migration later.
+
+  **Done-definition — v0.1.4.** v0.1.4 is cut when:
+
+  - **A tech can be earned.** The gate is a real predicate rather than a descriptive string, and
+    the tree stops being a picture of a system and becomes the system.
+  - **Earning it is per-corporation.** Research is not a world fact; a rival's discovery does not
+    open the player's door.
+  - **The unlock reaches a military outcome.** A technology that can only unlock a building is
+    being designed for the corporate player the pivot is moving away from — so the first thing
+    ever gated is the Military Base, not a smelter.
+  - **The refusal teaches.** A locked type says which technology is missing, at the same call site
+    that would otherwise offer the build — never a generic "can't build there".
+  - **"Not yet authored" is distinguishable from "unconditional".** An empty predicate is *true*;
+    a tech with no gate must therefore say so rather than read as unlocked.
+  - Excluded by scope, filed rather than dropped: research points and their economy (**BL-332**),
+    the rest of BL-156's early design pass (**BL-156**) — both re-targeted to **v0.1.11** — and the
+    constellation grain and deeds (**BL-087**, v0.3.0).
+
+  **Cut 2026-08-10.** **BL-344** terminal (33 assertions). Gate: 58 tests, 0 failures. One
+  knock-on, taken deliberately: `buildings_rework_harness` now grants the tech in its BL-325 setup
+  block, because that block tests placement and staffing rules rather than the gate.
 - **v0.1.5 — Military systems** (**BL-157**). The Conflict dimension's first data-model footing —
   units, forces, and the seams they need in the world model. Stub, not mechanics (Conflict proper
   stays post-cut scope). **Firmed up substantially by the 2026-08-07 military design session**

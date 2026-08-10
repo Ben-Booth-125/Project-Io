@@ -10,7 +10,122 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — Cut v0.1.10: three items whose own diagnosis was wrong, and a green gate that lied (2026-08-10, latest)
+## Session — Cut v0.1.3 and v0.1.4: one small predicate turned two design documents into two releases (2026-08-10, latest)
+
+Full mode, Delivery — three items, built sequentially in the main session rather than fanned out.
+Runtime: ~2h (Full, delivery + release).
+
+**The whole session is one argument: BL-342 was the load-bearing item, and it is thirty lines of
+switch statement.** Two minors had been sitting design-forward for weeks, and last session's
+diagnosis found why — BL-155 (laws) and BL-156 (techs) had *independently* settled on the same
+object, *"a flat AND-list of atomic conditions"*, and neither built it, because each was scoped
+design-only. Nobody owned the thing they both needed. Building it once made both minors shippable
+inside a single session, which is the strongest evidence yet for the shape of that diagnosis:
+**the blocker was not effort, it was ownership.**
+
+### What landed
+
+**BL-342 — `condition_set`.** An atomic condition is `<subject> <comparator> <operand>` plus the
+qualifier its subject reads; a set is a flat AND-list; `evaluate` is pure. Three properties are
+load-bearing and all three are asserted (40 assertions):
+
+- **Deterministic.** Only one subject (`market`) sums floats over an unordered container, and it
+  sums in ascending entity-id order. The harness asserts two structurally-identical worlds measure
+  bit-identically.
+- **An empty set is true**, and true by *falling out of the loop* rather than by a special case in
+  front of it — because BL-155's common case is that a law is unconditional once enacted.
+- **A subject may be military.** `military_units` and `military_strength` ship beside the six
+  promoted economic labels. Not needed by the prototype; shipped because a shape is only proven by
+  an instance, and the harness asserts a mixed economic-AND-military predicate resolves.
+
+Three calls taken on Ben's behalf, all in NEEDS_REVIEW (**NR-112/113/114**): `evaluate` carries a
+subject corp the sketch did not (every consumer is per-corp, so a world-only predicate could not
+have answered either question); `era` measures launchpad ownership, because ERAS.md is
+designed-not-implemented and that is the only space gate the code actually has; `market` measures
+the mean price across all markets.
+
+**BL-343 — the laws MVP.** The item's one real open design question was *where enforcement hooks
+into the economy without breaking determinism*, and it is now settled on one rule:
+
+> **A law is a modifier OVER the market, never an override OF it.**
+
+That is the same principle that vetoed price clamps on 2026-07-11 — a clamp fights price
+resolution instead of shifting a flow's cost. So the levy applies where the flow is **accounted**
+(`apply_budget`) and never where the price is **resolved** (`clear_markets`). Two consequences
+worth naming: the market stays the only thing that sets prices, and the player sees the tax as its
+own number rather than as an unexplained worse price.
+
+The design predicted the legibility would be free, and it was — a sixth **Levies** bar on the
+Finance card, no new surface. The one deliberate placement choice: the enact checkbox went into the
+Budget ledger *directly beneath the two policy-tier stubs*, so the difference between a drawn lever
+and a working one is visible in one glance rather than in a tooltip.
+
+`apply_budget`'s new `production` argument defaults to null and charges nothing, which is why
+**not one existing economy harness changed** — the whole feature is invisible to any caller that
+does not opt in, and `L1c` asserts a world with the law seeded is bit-identical to a world with no
+laws at all.
+
+**BL-344 — the techs MVP.** `tech_tree.hpp:49` stored the gate as a descriptive **string**, so no
+tech had ever been earned and the F9 constellation viewer was a picture of a system rather than the
+system. Promoted to `condition_set`, with one live gate: `E0-ML-01` "Standing Garrison Doctrine"
+unlocks the Military Base on two extraction sites plus Cr 2,000.
+
+**The unlock is military on purpose**, and that is BL-094's test rather than flavour: *a technology
+that can only unlock a building is being designed for the corporate player we are pivoting away
+from*. Gating the base cost exactly what gating a smelter would have.
+
+Two things the promotion forced, both worth recording because neither was in the design:
+
+1. **`earnable` had to be a separate flag.** An empty `condition_set` is *true* by BL-342's own
+   property 2 — so the ~130 nodes with no authored gate would have earned themselves on the first
+   tick. Absence has to be modelled by absence from the gate table, never by an empty predicate.
+   This is the first place where two of the session's own decisions collided, and the collision was
+   caught by writing the harness assertion (`T1c`) before trusting the default.
+2. **The predicate could not live in Lua.** `tech_tree.cpp` pulls in sol2 and is excluded from
+   `IO_WORLD_SOURCES`, so a gate that gates `construction.cpp` could neither be linked nor tested
+   headlessly from there. It lives in the Lua-free `tech_gate.cpp`; `scripts/tech_tree.lua` authors
+   identity, topology and prose and reads the predicate *back* by id, so the viewer cannot display a
+   requirement the simulation does not enforce (**NR-116**).
+
+### The one honest regression, and what it was worth
+
+`buildings_rework_harness` broke — `construct_building` refused a military base it had placed
+happily the day before. That is the gate working, not a defect: the harness tests BL-325's
+placement and staffing rules, so it now grants the tech in its setup rather than manufacturing the
+industrial base the predicate wants. Worth noting because it is the *only* thing in the gate that
+moved: three new systems, ~14 apply_budget call sites, a widened placement signature, and one
+test needed a two-line change.
+
+### The retro's two lessons, applied
+
+Both cost real time last session, and both were cheap to honour here:
+
+- **A green gate can lie.** No messy merge this session (everything landed on `main` in one
+  sequence), so `--clean-first` was not needed — but the two *bench* failures at `-j 4` were
+  re-run idle before being believed, and both passed, exactly as the v0.1.9 retro predicted they
+  would. 58 tests, 0 failures.
+- **Worktree agents isolate writes, not history.** Avoided entirely: the three items are one
+  dependency chain (BL-343 and BL-344 both consume BL-342's header), and two ~2-file slices are
+  not worth an integration pass. Stated as a call rather than a default.
+
+### Left open
+
+- **NR-115** is the one thing genuinely for Ben: generation still places starting military bases
+  through the tile-only check, so a corp can begin the campaign with a base it has not researched.
+  Defensible as fiction (inherited, not researched) and it keeps BL-331 working unchanged, but it
+  is a real asymmetry with a one-line fix either way.
+- **v0.1.3 and v0.1.4 both cut with leftovers re-targeted, not dropped** — BL-155, BL-186, BL-280,
+  BL-156 and BL-332 moved to v0.1.11. Both done-definitions were written **at** the cut, per NR-103,
+  and both name their exclusions explicitly.
+- **42 items still sit at `post-v0.1.0`** (NR-101), untouched again. That is now the largest
+  structural job left in the backlog, and it is the same class of problem the done-definitions
+  fixed.
+
+**Gate:** 58 tests, 0 failures (55 → 58; three new harnesses). Tags `v0.1.3`, `v0.1.4`.
+
+---
+
+## Session — Cut v0.1.10: three items whose own diagnosis was wrong, and a green gate that lied (2026-08-10)
 
 Full mode, Batch Delivery + release — the fifth cut of the session, spanning midnight. Ben:
 *"cut v0.1.10 next."* Six worktree sub-agents; a machine crash mid-flight; integration, every

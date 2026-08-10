@@ -10,7 +10,7 @@ word interface to play through.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*116 entries — 11 gameplay · 24 canvas · 15 lens · 37 ledger · 29 chrome.*
+*117 entries — 11 gameplay · 24 canvas · 15 lens · 38 ledger · 29 chrome.*
 
 ---
 
@@ -31,6 +31,7 @@ word interface to play through.
 - The acting corporation exists (rejected_no_corp otherwise).
 - The tile entity exists (rejected_invalid otherwise).
 - placement_rules::can_place_in_world accepts (type, target) on this tile — ocean, missing deposit, a port off the coast, or a full per-body slot cap (Launchpad: max 1 per body) all refuse (rejected_placement).
+- The building type is UNLOCKED for the acting corporation (BL-344). Today exactly one type is gated: military_base requires the tech E0-ML-01 "Standing Garrison Doctrine", earned automatically once the corp owns at least 2 extraction sites AND holds a balance of at least Cr 2,000. A locked row shows "Locked - the technology that permits this has not been researched" in place of the Build button, and construct_building refuses with tech_locked.
 - The corporation's balance covers the full capex: registry build_cost plus the material costs priced at the tile's local market (rejected_funds). The UI shows this one credit total and disables Build with 'Can't afford' when short.
 
 **Expected output.** The press enqueues a construction request; the app's mutable pass executes construct_building the same frame. On success a building entity exists immediately — staffed at 50% workforce (0 for a port), a processing facility seeded with the pressed row's recipe — and the capex is debited up front. Construction is then DURATIVE and material-gated: each economy tick (one quarter) it advances at a rate in [0,1] set by how much of its per-tick material need the local market can supply; scarce materials stretch the ETA and total shortage shows 'Paused - market can't supply materials'. Management controls unlock only when construction completes. A rejected attempt mutates nothing; the reason string appears at the top of the ledger (construction.last_message), and invalid rows already show reason-coded text in place of the Build button ('Cannot build on water', 'A port must sit on the coast', ...).
@@ -786,6 +787,22 @@ word interface to play through.
 **Expected output.** The displayed tier changes and highlights. HONESTLY: a stub with NO economic effect yet (BL-155); distinct from the per-building workforce target, which is a real, separate control owned elsewhere.
 
 **Reason to select.** Will eventually set corporate wage policy; today it is display-only.
+
+### `ledger.law_enact_toggle` — Balance Ledger (Budget), 'Laws' section beneath the two policy-tier stubs
+
+**Press.** Click the checkbox beside a law's name to enact it, or click it again to repeal it (the standing toggle rule)
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `law_index` | `int index into world::laws` | Which law on the books to flip. The prototype ships one: Extraction Levy. |
+
+**Valid when:**
+- Balance Ledger is open
+- At least one law is on the books (seed_prototype_laws appends the Extraction Levy at world setup, un-enacted)
+
+**Expected output.** The law's enacted flag flips on the next mutable pass, and a toast names it ('Extraction Levy enacted.' / '... repealed.'). It takes effect from the NEXT economy tick, never retroactively on the quarter already accounted. While enacted, every unit of RAW output the corporation extracts is charged rate x units and the total appears on the Levies bar of the Corporations dashboard's Finance card. Prices do not move: a law is a modifier over the market, never an override of it, so the levy is a separate accounted cost rather than a worse sale price. Repeal restores the previous arithmetic exactly. Unlike ledger.budget_tax_tier and ledger.budget_wage_tier, this control is NOT a stub.
+
+**Reason to select.** The only law lever that does anything today, and the one press that demonstrates the governing-body seam end to end. For a corporation SUBJECT to the levy it is pure cost, so a corp-side agent has no reason to enact it; it is here because the pivot's legislator needs the instrument to exist and to be observable before it can be negotiated (BL-280) or politicked over (BL-186, BL-345).
 
 ### `ledger.build_ledger_close` — Tile construction ledger (the 'Construct · [x, y]' fold-out, BL-162), header
 
