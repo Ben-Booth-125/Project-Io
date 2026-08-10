@@ -25,6 +25,7 @@
 #include <imgui.h>
 
 #include <algorithm> // std::min/clamp (build rate), std::nth_element (top-decile production)
+#include <array>     // tile-metric cache (per-resource p90 slots)
 #include <cmath>     // std::ceil (construction ETA), std::pow/log10/floor (nice_ceil axis)
 #include <cstddef>   // std::ptrdiff_t (nth_element iterator offset)
 #include <cstdio>    // std::snprintf (tile coord caption + chart labels)
@@ -79,6 +80,46 @@ float top_decile_production(const world& w, std::size_t r)
     const std::size_t k = static_cast<std::size_t>(0.90f * static_cast<float>(vals.size() - 1));
     std::nth_element(vals.begin(), vals.begin() + static_cast<std::ptrdiff_t>(k), vals.end());
     return vals[k];
+}
+
+// Tick-stamped cache over tile_metrics' derived inputs (BL-362). The p90s and
+// the body hab/hazard averages scan every tile, yet only move on a sim tick —
+// and the HQ tile is auto-selected at campaign start, so the scan ran every
+// frame from frame one. Same stamp-checked idiom as BL-268's raster caches;
+// read-only over `w`, so it lives file-local rather than on the world.
+// tiles.size() guards world identity: a regenerated world resets the tick.
+struct tile_metric_cache
+{
+    int         tick    = -1;
+    std::size_t n_tiles = 0;
+    std::array<float, resource_count> p90{};
+    std::array<bool,  resource_count> p90_valid{};
+    entity_id   avg_body   = null_entity;
+    float       avg_hab    = 0.0f;
+    float       avg_haz    = 0.0f;
+};
+
+tile_metric_cache& metric_cache_for(const world& w)
+{
+    static tile_metric_cache cache;
+    if (cache.tick != w.current_day_tick || cache.n_tiles != w.tiles.size())
+    {
+        cache = {};
+        cache.tick    = w.current_day_tick;
+        cache.n_tiles = w.tiles.size();
+    }
+    return cache;
+}
+
+float cached_top_decile(const world& w, std::size_t r)
+{
+    tile_metric_cache& c = metric_cache_for(w);
+    if (!c.p90_valid[r])
+    {
+        c.p90[r]       = top_decile_production(w, r);
+        c.p90_valid[r] = true;
+    }
+    return c.p90[r];
 }
 
 // One resource's chart inside [mn, mx]: a left gutter of tick labels (0 / ceiling, plus
@@ -347,7 +388,7 @@ std::vector<tile_metric> tile_metrics(const world& w, entity_id tile_id)
         if (tile.resource_deposit[r] <= 0.0f)
             continue;
         const float a   = tile_production(tile, r);
-        const float p90 = top_decile_production(w, r);
+        const float p90 = cached_top_decile(w, r);
         const resource_presentation& rp = presentation_of(static_cast<resource_type>(r));
         pages.push_back({ rp.name, a, p90, "Top 10%",
                           nice_ceil(std::max(a, p90) > 0.0f ? std::max(a, p90) : 1.0f),
@@ -355,15 +396,20 @@ std::vector<tile_metric> tile_metrics(const world& w, entity_id tile_id)
     }
 
     // Then the tile's own scalars against the body average, so a barren tile still
-    // has something to page through.
-    float sum_hab = 0.0f, sum_haz = 0.0f;
-    int   n = 0;
-    for (const auto& [id, t] : w.tiles)
-        if (t.body == tile.body) { sum_hab += t.habitability; sum_haz += t.hazard_level; ++n; }
-    const float avg_hab = n > 0 ? sum_hab / static_cast<float>(n) : 0.0f;
-    const float avg_haz = n > 0 ? sum_haz / static_cast<float>(n) : 0.0f;
-    pages.push_back({ "Habitability", tile.habitability, avg_hab, "Body avg", 1.0f, -1 });
-    pages.push_back({ "Hazard",       tile.hazard_level, avg_haz, "Body avg", 1.0f, -1 });
+    // has something to page through. Cached per body on the same tick stamp.
+    tile_metric_cache& c = metric_cache_for(w);
+    if (c.avg_body != tile.body)
+    {
+        float sum_hab = 0.0f, sum_haz = 0.0f;
+        int   n = 0;
+        for (const auto& [id, t] : w.tiles)
+            if (t.body == tile.body) { sum_hab += t.habitability; sum_haz += t.hazard_level; ++n; }
+        c.avg_hab  = n > 0 ? sum_hab / static_cast<float>(n) : 0.0f;
+        c.avg_haz  = n > 0 ? sum_haz / static_cast<float>(n) : 0.0f;
+        c.avg_body = tile.body;
+    }
+    pages.push_back({ "Habitability", tile.habitability, c.avg_hab, "Body avg", 1.0f, -1 });
+    pages.push_back({ "Hazard",       tile.hazard_level, c.avg_haz, "Body avg", 1.0f, -1 });
 
     return pages;
 }

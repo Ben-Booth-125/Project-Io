@@ -113,6 +113,60 @@ struct node_layout
 };
 
 // ---------------------------------------------------------------------------
+// Cached constellation geometry (BL-362). The ring layout — string-keyed maps
+// plus the memoised compute_ring DFS — is a pure function of (tree, era): pan
+// and zoom apply per frame in to_screen, and the layout is canvas-space, so
+// window size never enters it either. Recomputing it every frame the takeover
+// is open was pure waste; each era's geometry builds once and is looked up
+// thereafter.
+//
+// The cache holds LAYOUT ONLY. Everything that depends on the live world —
+// BL-344's earned / locked / no-gate-authored states and its per-condition
+// itemising — reads `w` and `corp` in the draw path, per frame, and is
+// deliberately not cached: those answers change as the campaign runs. The
+// tech_node pointers are safe to retain because the registry is startup-loaded
+// and read-only (tech_tree.hpp), and the stamp below drops everything if it is
+// ever swapped or reloaded.
+// ---------------------------------------------------------------------------
+
+struct wedge_info { const tech_quest* quest; float centre_angle; float max_radius; };
+
+struct constellation_geometry
+{
+    std::vector<node_layout> layout;
+    std::unordered_map<std::string, ImVec2> pos_by_id; ///< Canvas-space, for edge lookup.
+    std::vector<wedge_info> wedges;
+    float wedge_width = 0.0f;
+    /// Keystone exclusion marks: canvas-space endpoints of each clean binary
+    /// fork (id suffix A/B off a capstone prereq), derived here so the draw
+    /// loop needs no per-frame by_id map at all.
+    std::vector<std::pair<ImVec2, ImVec2>> branch_pairs;
+};
+
+struct tech_geometry_cache
+{
+    const tech_tree_registry* tree = nullptr;
+    std::size_t n_techs  = 0;
+    std::size_t n_quests = 0;
+    std::unordered_map<int, constellation_geometry> by_era;
+    std::unordered_map<int, std::vector<ImVec2>>    icons_by_era;
+};
+
+tech_geometry_cache& geometry_cache_for(const tech_tree_registry& tree)
+{
+    static tech_geometry_cache cache;
+    if (cache.tree != &tree || cache.n_techs != tree.techs().size() ||
+        cache.n_quests != tree.quests().size())
+    {
+        cache = {};
+        cache.tree     = &tree;
+        cache.n_techs  = tree.techs().size();
+        cache.n_quests = tree.quests().size();
+    }
+    return cache;
+}
+
+// ---------------------------------------------------------------------------
 // Era-tab icons (BL-310 round 3, Ben 2026-08-06: "make the icons bigger,
 // with small icons of the map (no labels)"). Deliberately real data, not a
 // hand-drawn stand-in glyph: each icon is that era's actual node positions,
@@ -125,7 +179,7 @@ struct node_layout
 /// Normalised (roughly [-1, 1]) node positions for one era's gate quests, for
 /// icon-scale rendering only. Empty for an era with no authored quests (Era 2
 /// today) — the caller draws a placeholder ring instead.
-std::vector<ImVec2> compute_icon_positions(const tech_tree_registry& tree, int era)
+std::vector<ImVec2> compute_icon_positions_uncached(const tech_tree_registry& tree, int era)
 {
     std::vector<const tech_quest*> quests;
     for (const tech_quest& q : tree.quests())
@@ -181,7 +235,13 @@ std::vector<ImVec2> compute_icon_positions(const tech_tree_registry& tree, int e
 void draw_era_icon(ImDrawList* dl, ImVec2 centre, float radius,
                     const tech_tree_registry& tree, int era, ImU32 dot_colour)
 {
-    const std::vector<ImVec2> positions = compute_icon_positions(tree, era);
+    // Stamp-checked (BL-362): four of these draw every frame the fold-out menu
+    // is open, and each rebuild walked every tech per quest.
+    tech_geometry_cache& cache = geometry_cache_for(tree);
+    auto it = cache.icons_by_era.find(era);
+    if (it == cache.icons_by_era.end())
+        it = cache.icons_by_era.emplace(era, compute_icon_positions_uncached(tree, era)).first;
+    const std::vector<ImVec2>& positions = it->second;
     if (positions.empty())
     {
         // No authored quests (Era 2) — a dashed ring, so the placeholder
@@ -233,38 +293,35 @@ void era_icon_button(const char* tooltip, int id, int& view, bool* close,
     ImGui::PopID();
 }
 
-/// Draws one era's gate quests as a radial web. Returns true if it drew
-/// something (false ⇒ caller shows the "no quests authored" placeholder).
-bool draw_constellation(const tech_tree_registry& tree, const world& w, entity_id corp, int era,
-                         float& pan_x, float& pan_y, float& zoom, bool is_history)
+/// Builds one era's radial layout: one wedge per quest, techs placed by
+/// (ring, index-within-ring). Pure function of (tree, era) — the cached half
+/// of draw_constellation (BL-362). Carries no world-derived state.
+constellation_geometry build_constellation(const tech_tree_registry& tree, int era)
 {
+    constellation_geometry geo;
+
     std::vector<const tech_quest*> quests;
     for (const tech_quest& q : tree.quests())
         if (q.type == "gate" && q.era == era)
             quests.push_back(&q);
     if (quests.empty())
-        return false;
+        return geo;
 
     std::unordered_map<std::string, const tech_node*> by_id;
     for (const tech_node& t : tree.techs())
         by_id[t.id] = &t;
 
-    // Layout: one wedge per quest, techs placed by (ring, index-within-ring).
-    std::vector<node_layout> layout;
-    std::unordered_map<std::string, ImVec2> pos_by_id; // canvas-space, for edge lookup
     std::unordered_map<std::string, int> ring_memo;
     std::vector<std::string> in_progress;
 
-    const float wedge_width = 6.28318530718f / static_cast<float>(quests.size());
-    struct wedge_info { const tech_quest* quest; float centre_angle; float max_radius; };
-    std::vector<wedge_info> wedges;
+    geo.wedge_width = 6.28318530718f / static_cast<float>(quests.size());
 
     for (std::size_t qi = 0; qi < quests.size(); ++qi)
     {
         const tech_quest* q = quests[qi];
-        const float wedge_start  = -1.57079632679f + static_cast<float>(qi) * wedge_width;
-        const float wedge_centre = wedge_start + wedge_width * 0.5f;
-        const float margin       = wedge_width * 0.12f;
+        const float wedge_start  = -1.57079632679f + static_cast<float>(qi) * geo.wedge_width;
+        const float wedge_centre = wedge_start + geo.wedge_width * 0.5f;
+        const float margin       = geo.wedge_width * 0.12f;
 
         // Group this quest's techs by ring.
         std::unordered_map<int, std::vector<const tech_node*>> by_ring;
@@ -286,15 +343,61 @@ bool draw_constellation(const tech_tree_registry& tree, const world& w, entity_i
                 const float t_frac = nodes.size() == 1
                     ? 0.5f
                     : static_cast<float>(i) / static_cast<float>(nodes.size() - 1);
-                const float angle = wedge_start + margin + (wedge_width - 2.0f * margin) * t_frac;
+                const float angle = wedge_start + margin + (geo.wedge_width - 2.0f * margin) * t_frac;
                 const ImVec2 cpos{ radius * std::cos(angle), radius * std::sin(angle) };
-                layout.push_back({ nodes[i], cpos });
-                pos_by_id[nodes[i]->id] = cpos;
+                geo.layout.push_back({ nodes[i], cpos });
+                geo.pos_by_id[nodes[i]->id] = cpos;
             }
         }
 
-        wedges.push_back({ q, wedge_centre, kBaseRadius + static_cast<float>(max_ring - 1) * kRingSpacing });
+        geo.wedges.push_back({ q, wedge_centre, kBaseRadius + static_cast<float>(max_ring - 1) * kRingSpacing });
     }
+
+    // Keystone exclusion pairs — a keystone's direct branch children (id
+    // suffix A/B). Only a clean binary fork gets a pair; anything else draws
+    // its plain prereq edges alone.
+    std::unordered_map<std::string, std::vector<const tech_node*>> branches_by_keystone;
+    for (const node_layout& nl : geo.layout)
+    {
+        if (!is_branch_suffix(nl.node->id))
+            continue;
+        for (const std::string& p : nl.node->prereqs)
+        {
+            auto kit = by_id.find(p);
+            if (kit != by_id.end() && kit->second->kind == "capstone")
+                branches_by_keystone[p].push_back(nl.node);
+        }
+    }
+    for (auto& [keystone_id, branch_nodes] : branches_by_keystone)
+    {
+        if (branch_nodes.size() != 2)
+            continue;
+        geo.branch_pairs.emplace_back(geo.pos_by_id[branch_nodes[0]->id],
+                                      geo.pos_by_id[branch_nodes[1]->id]);
+    }
+
+    return geo;
+}
+
+/// Draws one era's gate quests as a radial web. Returns true if it drew
+/// something (false ⇒ caller shows the "no quests authored" placeholder).
+/// Layout comes from the per-era geometry cache; the node/tooltip pass — and
+/// with it every BL-344 world read — still runs per frame.
+bool draw_constellation(const tech_tree_registry& tree, const world& w, entity_id corp, int era,
+                         float& pan_x, float& pan_y, float& zoom, bool is_history)
+{
+    tech_geometry_cache& cache = geometry_cache_for(tree);
+    auto git = cache.by_era.find(era);
+    if (git == cache.by_era.end())
+        git = cache.by_era.emplace(era, build_constellation(tree, era)).first;
+    const constellation_geometry& geo = git->second;
+    if (geo.wedges.empty())
+        return false;
+
+    const std::vector<node_layout>& layout = geo.layout;
+    const std::unordered_map<std::string, ImVec2>& pos_by_id = geo.pos_by_id;
+    const std::vector<wedge_info>& wedges = geo.wedges;
+    const float wedge_width = geo.wedge_width;
 
     // Canvas.
     ImGui::BeginChild("##tt_canvas", ImVec2{0, 0}, false,
@@ -360,25 +463,12 @@ bool draw_constellation(const tech_tree_registry& tree, const world& w, entity_i
 
     // Keystone exclusion marks — a keystone's direct branch children (id
     // suffix A/B) get a warm connecting line + a "><" exclusion glyph at
-    // their midpoint, drawn OVER the plain prereq edges above.
-    std::unordered_map<std::string, std::vector<const tech_node*>> branches_by_keystone;
-    for (const node_layout& nl : layout)
+    // their midpoint, drawn OVER the plain prereq edges above. Pairs come
+    // precomputed with the cached geometry.
+    for (const auto& [pa, pb] : geo.branch_pairs)
     {
-        if (!is_branch_suffix(nl.node->id))
-            continue;
-        for (const std::string& p : nl.node->prereqs)
-        {
-            auto kit = by_id.find(p);
-            if (kit != by_id.end() && kit->second->kind == "capstone")
-                branches_by_keystone[p].push_back(nl.node);
-        }
-    }
-    for (auto& [keystone_id, branch_nodes] : branches_by_keystone)
-    {
-        if (branch_nodes.size() != 2)
-            continue; // not a clean binary fork — draw nothing extra, plain edges still show
-        const ImVec2 a = to_screen(pos_by_id[branch_nodes[0]->id]);
-        const ImVec2 b = to_screen(pos_by_id[branch_nodes[1]->id]);
+        const ImVec2 a = to_screen(pa);
+        const ImVec2 b = to_screen(pb);
         dl->AddLine(a, b, IM_COL32(200, 120, 60, 160), 1.5f);
         const ImVec2 mid{ (a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f };
         const ImVec2 text_size = ImGui::CalcTextSize("excludes");
