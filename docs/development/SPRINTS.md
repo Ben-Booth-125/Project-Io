@@ -40,18 +40,168 @@ and/or a version goal (v0.1.1 etc.).
 | 2b | BL-210 oral-history pivot (nations/corps rewrite) | **Closed** — all four rungs built (BL-217, BL-208, BL-218, BL-219) |
 | 3 | Corp AI stage B + skill harness | **Closed** — BL-203, BL-204 both landed |
 | 4 | Communication surface (BL-205 chat log) | **Mostly landed** — slice 1 (window, channels, agency feed) complete 2026-07-26/28; only the C-route remainder (§7 Stage C) stays open, unstaffed |
-| 5 | Era −1 history sim, 0–2000 CE (BL-271–275) | **In progress** — foundation wave (BL-272, BL-273) landed 2026-08-02; wave 2 (BL-274) ready to promote. Now versioned v0.3.0 with the rest of the Era −1 arc (NR-101) |
+| 5 | Era −1 history sim, 0–2000 CE (BL-271–275) | **Closed 2026-08-10** — four of five landed (BL-271/272/273/275); BL-274 (era-keyed rosters) and BL-317 (prehistory timelapse) carried to v0.3.0 |
 | 6 | The release sprint | **Closed** — five versions tagged (v0.1.1, v0.1.2, v0.1.8, v0.1.9, v0.1.10); every cut minor now carries a done-definition |
 | 7 | The stub minors become releases | **Closed** — v0.1.3 and v0.1.4 cut; `post-v0.1.0` swept, every open item names a minor |
+| 8–12 | The next five, planned 2026-08-10 | **Planned** — see § Sprints 8–12 below |
 
-**Next up (2026-08-10).** The stub minors are no longer the bottleneck: v0.1.3 and v0.1.4 are cut,
-and BL-155/BL-156's remainders moved to **v0.1.11**, which now carries ten items and is the largest
-open minor in the band — the natural next sprint if the aim is to keep cutting. Two alternatives
-are equally live and are a different kind of work: **v0.1.7** (generation visibility, four items,
-the last minor before the refocus) or the first real slice of **v0.2.0 / v0.3.0**, now that the
-sweep has made both queryable. **NR-102 (sequencing decoupling)** is the standing structural item —
-every open item names a minor, but nothing says in what order to build them, and that is the gap
-NR-101's fix leaves behind.
+**Next up (2026-08-10).** Sprint 5 is closed on Ben's call — *"I am happy with the generation
+progress we made"* — and the board went momentarily to zero goaled sprints. The plan for
+**Sprints 8–12** is written below, and it is sequenced against the **2026-08-10 refocus**
+(NR-120): the player is a **national private militia** that contracts private companies to build
+its space equipment. That narrows BL-094 (player-identity pivot), and it changes what the v0.1.x
+tail is *for* — military and space-hardware trade stop being a later layer and become the flavour
+the remaining minors are supposed to carry. **NR-102 (sequencing decoupling)** is the standing
+structural item this plan is the first answer to: every open item names a minor, but until now
+nothing said in what order to build them.
+
+---
+
+# Sprints 8–12 — the plan (written 2026-08-10)
+
+Five sprints, planned in one pass at Ben's direction, because Sprint 5 closed and nothing was
+goaled. They are sequenced against one thing: **the 2026-08-10 refocus** (NR-120).
+
+## The refocus, and the three rulings that shape this plan
+
+Ben, 2026-08-10: *"Let's place the player as a national private militia, which uses private
+companies to build equipment for space. So the flavour of trading is initially coloured directly
+with military use, and space equipment."*
+
+Three calls were put to him before planning, because each one changes the sequence:
+
+1. **The militia REPLACES the governing body.** Not an Era 0 reading of it, not a client of it.
+   BL-094 (player-identity pivot) gets **rewritten**, not amended, and the design test the v0.1.x
+   band has carried since 2026-08-03 — *"does this reach military as well as economic
+   outcomes?"* — is **retired with it**. That test was derived from the governing-body reason
+   (law, policy and science as the player's levers). A militia does not legislate. It procures.
+2. **Sprint 8 is a design sprint.** No `src/`, no tag. The refocus lands on paper before anything
+   is built against it.
+3. **BL-340 (processing chain roster) is pulled forward** out of v0.1.13. Ben's word was
+   *"initially"* — if trade is coloured by military and space hardware from the first tick, those
+   goods have to exist, or the colour is an assertion rather than a mechanic.
+
+### What ruling 1 costs, stated plainly
+
+**Two already-cut minors were built for the previous actor.** v0.1.3 (Laws) and v0.1.4 (Techs)
+were cut on 2026-08-10 — hours before the refocus — and both were justified by the governing-body
+reason. This is not a call to unpick them: `condition_set` (BL-342) is a generic
+predicate object and one enacted law (BL-343) plus one earned tech (BL-344) are working machinery
+that does not care who the player is. What changes is **who enacts**. Under a militia, laws are
+something the player is *subject to* and lobbies against, not something it passes — which makes
+the laws surface an **input** to the player's problem rather than an output of their agency.
+Sprint 8 owns that re-read; Sprint 11 owns the surface consequence. **v0.1.11's BL-155 / BL-156 /
+BL-186 (laws & tech surfaces) are the most exposed items on the board** and should not be built
+before Sprint 8 rules on them.
+
+---
+
+## Sprint 8 — Who the player is (design only, no tag)
+
+**Goal.** Turn the refocus from a steer into a specified actor, so the four sprints after it are
+sequenced against something real. Nothing in `src/`.
+
+**Planned.**
+- **BL-094 — rewrite.** Retitle off "governing body". Settle the three questions NR-120 records:
+  is the militia one of the ~43 generated nations or an entity attached to one; does the
+  shared-treasury call survive companies becoming counterparties (it probably does not — an
+  arm's-length supplier with a price and a possible refusal is not a second wallet); and what
+  replaces the retired design test.
+- **BL-315 — design.** Currently `design-owed`, priority A, and its title still names the
+  superseded framing. The conflict spine is the militia's *whole reason to exist*, so this stops
+  being a follow-on and becomes the item.
+- **File the procurement seam.** The genuinely new mechanic the refocus invents: the militia
+  contracts a private company to build equipment. Counterparty, price, lead time, refusal. Nothing
+  in the backlog covers it — the closest is BL-280 (negotiated tax rate), which is the same
+  *bargaining* shape pointed at a different object and should be read alongside it.
+- **Reconcile the v0.3.0 roster.** 22 open items, every one specified against the old actor. Cut,
+  re-goal or re-read each. This is the bulk of the sprint's labour and the reason it needs one.
+- **Propagate the three opened docs.** CONCEPT.md, SYSTEMS.md and GLOSSARY.md were opened to the
+  governing-body framing on 2026-08-04 (NR-053) ahead of the work, on Ben's instruction. They now
+  state something superseded. Correct them **as dated notes**, not a rewrite.
+
+**Done when** BL-094 reads as the militia, BL-315 is `designed`, the procurement seam is filed,
+and no open item still names an actor that does not exist.
+
+**Risk.** A design sprint with no tag, immediately after a sprint that cut seven. If it starts
+sprawling, the fallback is to timebox BL-094 + BL-315 and let the v0.3.0 reconciliation run as a
+background sweep.
+
+## Sprint 9 — The militia takes the field (cut v0.1.5)
+
+**Goal.** The first buildable consequence of the refocus, and the band's next tag.
+
+**Planned.** **BL-325** (military bases: a muster building, hire moved onto it, unit supply read
+off it) and **BL-331** (player starts with a base and one unit) — both `designed`, both buildable
+today, and both literally the militia's first surface. **BL-332** (military points + a research
+building) moves here from v0.1.11: it is `design-owed`, it answers *how does the militia get
+better*, and it belongs with the military minor rather than the laws one.
+
+**Why this before procurement.** The militia has to exist on the map before there is any point
+modelling what it buys.
+
+## Sprint 10 — Procurement, and the goods it is about (new minor)
+
+**Goal.** The refocus's actual mechanic, plus the resource tiers that make "space equipment" a
+thing rather than a label.
+
+**Planned.** Sprint 8's filed procurement items, and **BL-340** (the processing half of the
+buildings roster — new resource types with market, price and recipe) pulled forward per ruling 3.
+Needs a minor of its own; **v0.1.14 "Procurement"** is the obvious name, to be confirmed at the
+cut. v0.1.13 keeps markets and the save-format header without its keystone, which is fine — those
+five items stand on their own.
+
+**Dependency note.** BL-340 is difficulty 4 and `design-owed`. It is the single largest unknown in
+this plan and the most likely thing to spill into Sprint 11.
+
+## Sprint 11 — v0.1.11 reconciled (cut v0.1.11)
+
+**Goal.** The fattest open minor, built against the actor Sprint 8 defined rather than the one it
+was written for.
+
+**Planned.** The laws and tech surfaces (**BL-155**, **BL-156**, **BL-186**) *as reframed* —
+under a militia these are constraints the player operates inside, which is a different surface
+from an enactment ledger. Then the items the refocus does not touch: **BL-211** (history ledger),
+**BL-212** (nation-voiced comms), **BL-309** (deed lines), **BL-264** (wizard layout after fold),
+**BL-341** (the parked Windows cold-configure check). **BL-280** (negotiated tax rate,
+`design-owed`, difficulty 5) is the one to watch — Sprint 8 will likely have merged its bargaining
+model into the procurement seam, in which case it shrinks or dissolves.
+
+## Sprint 12 — Generation visibility, and the owed timelapse (cut v0.1.7)
+
+**Goal.** Close the generation arc Ben declared himself happy with, including the one piece he
+named as still owed.
+
+**Planned.** **BL-303** (Generation Ledger), **BL-304** (field-overlay lenses), **BL-305**
+(political-step visibility), and **BL-098** (the UX review walking the whole band against
+`user_stories.json`) — which is the right last act, since by then five sprints of surfaces will
+have accumulated. Plus **BL-317** (the New World wizard's prehistory timelapse), pulled back from
+v0.3.0: it is the history time-lapse Ben named at Sprint 5's close, and it is a
+generation-visibility item by nature rather than an Era −1 one.
+
+**One sequencing option worth taking.** BL-317 pairs naturally with **BL-264** (wizard layout
+after per-stage folding) — both are New World wizard stages. If Sprint 11 is building BL-264
+anyway, riding BL-317 alongside it gets the timelapse three sprints earlier for very little extra,
+and Sprint 12 loses nothing it needs.
+
+---
+
+## What this plan deliberately does not carry
+
+- **v0.2.0 (the AI opponent), 12 items.** It is the thing that makes Io a game rather than a
+  simulation, and it is *not* in the next five sprints. That is a real cost, accepted because the
+  opponent should be built against a settled player identity, not re-fitted to one. It is the
+  obvious Sprint 13.
+- **v0.1.12 (logistics modes), 4 items** — rail, ports, convoy distance pricing, supply-lens
+  flow. Unblocked and uncontroversial; a good filler if any sprint above finishes short.
+- **v0.4.0, 9 items.** Politics, and the history-ladder tail. Downstream of everything here.
+
+**A standing caution from Sprint 6, applied to this plan.** Sprint 6's retro found that
+*measurement overturned the stated cause four times*, and that three of five worktree agents
+branched from a base that had already moved. Both lessons bear on a five-sprint plan written in
+advance: **it will be wrong somewhere, and the honest move is to amend it when the goal changes,
+not at the retro** — which is the exact failure Sprint 1's retro named and this file has now
+committed twice.
 
 ---
 
@@ -88,7 +238,7 @@ surface finished, terrain's combat consequence in, the tooltip text rendering cl
 
 ---
 
-## Sprint 5 — Era −1 history sim (opened 2026-08-02)
+## Sprint 5 — Era −1 history sim (opened 2026-08-02, closed 2026-08-10)
 
 **Goal.** Build the 0–2000 CE settlement/mil-sim sandbox (BL-271–275) that proves out the nation
 AI and mil-sim architecture, and tunes the campaign's non-hegemony premise against measured
@@ -111,6 +261,30 @@ three. BL-275 (the seed sweep) needs BL-271.
 different item, BL-205's C-route (in-character LLM chat) — it went as far as a full in-process
 API-call design before Ben clarified that wasn't the intent (human-in-the-loop play via
 computer-use, not a shipped API integration). Reverted cleanly; see NEEDS_REVIEW.json NR-039/NR-040.
+
+**Retro** (closed 2026-08-10 on Ben's call — *"I am happy with the generation progress we made"*).
+
+- **Landed: four of five.** BL-272 (unit/doctrine combat model), BL-273 (province demography +
+  manpower), BL-271 (the year-tick sim loop) and BL-275 (the seed-spread sweep) are all
+  `complete`. The stated goal — a bot-only 0–2000 CE sandbox that tunes the non-hegemony premise
+  against *measured distributions rather than lore* — was met, and BL-275 is the item that met
+  it: the sweep is the measurement.
+- **Carried, not slipped: two.** **BL-274** (era-keyed unit rosters) and **BL-317** (the New World
+  wizard's prehistory timelapse) are both still `designed`, and both now carry **v0.3.0** — they
+  moved with the rest of the Era −1 arc when NR-101 swept `post-v0.1.0`. BL-317 is the "history
+  time-lapse still to do" Ben named at close; it is a *presentation* of a sim that already runs,
+  not a hole in the sim.
+- **The closing call is a scope judgement, not a completion claim.** Sprint 5 is closed with its
+  architecture proven and its presentation owed. That is the right trade — the timelapse's whole
+  value is showing a player the history, and there is no player-facing wizard stage to show it in
+  until the v0.3.0 arc is underway.
+- **Runtime:** not summed; the timer gap carried from Sprint 1 was never fixed and is now three
+  sprints stale. Either fix it or stop naming it in the format block.
+- **Feedback: this sprint proved the pattern the release sprint later exploited.** The foundation
+  wave (BL-272 + BL-273) was picked *because* the two items had no unmet dependencies and touched
+  disjoint files, and it landed same-day in parallel. Sprint 6's worktree fan-out is the same move
+  at larger scale — and its failure mode (three of five agents branching from a moved base) is
+  what happens when the dependency read is skipped rather than done. The read is the cheap part.
 
 ---
 
