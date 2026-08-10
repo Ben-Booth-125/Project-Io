@@ -414,10 +414,29 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // last resort at max(ref_price, floor)), so supply always clears.
     std::vector<matched_trade> trades;
 
-    for (auto& [mid, sell_by_r] : sell_books)
+    // The books are unordered maps and trade order feeds float accumulation into
+    // flows, so iterate them in sorted key order (the markets_by_body idiom).
+    std::vector<entity_id> book_mids;
+    book_mids.reserve(sell_books.size());
+    for (const auto& [mid, sell_by_r] : sell_books)
+        book_mids.push_back(mid);
+    std::sort(book_mids.begin(), book_mids.end());
+
+    auto sorted_resources = [](const auto& by_r) {
+        std::vector<std::size_t> rs;
+        rs.reserve(by_r.size());
+        for (const auto& [r, entries] : by_r)
+            rs.push_back(r);
+        std::sort(rs.begin(), rs.end());
+        return rs;
+    };
+
+    for (const entity_id mid : book_mids)
     {
-        for (auto& [r, sellers] : sell_by_r)
+        auto& sell_by_r = sell_books[mid];
+        for (const std::size_t r : sorted_resources(sell_by_r))
         {
+            std::vector<ob_sell_entry>& sellers = sell_by_r[r];
             auto& buyers_map = buy_books[mid];
             auto  bit        = buyers_map.find(r);
 
@@ -520,14 +539,15 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // The market is a buyer of last resort at max(ref_price, floor). Each order's
     // own `rem` (left by the matching pass) clears — not a per-seller aggregate,
     // which would subtract the seller's whole matched total from every one of that
-    // seller's orders (BL-351).
-    for (const auto& [mid, sell_by_r] : sell_books)
+    // seller's orders (BL-351). Sorted key order again: income accumulation.
+    for (const entity_id mid : book_mids)
     {
+        const auto& sell_by_r = sell_books[mid];
         const entity_id body = w.markets.at(mid).body;
-        for (const auto& [r, sellers] : sell_by_r)
+        for (const std::size_t r : sorted_resources(sell_by_r))
         {
             const float rp = ref_price[mid][r];
-            for (const ob_sell_entry& se : sellers)
+            for (const ob_sell_entry& se : sell_by_r.at(r))
             {
                 if (se.rem <= 0.0f)
                     continue;
