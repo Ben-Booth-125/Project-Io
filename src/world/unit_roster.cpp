@@ -114,15 +114,14 @@ bool corp_owns_port(const world& w, entity_id corp)
 
 float corp_stockpile_total(const world& w, entity_id corp, resource_type res)
 {
-    const auto cit = w.corporations.find(corp);
-    if (cit == w.corporations.end()) return 0.0f;
+    // Reads the live (corp, body) pool store — the per-building
+    // stockpile_component is authored empty and never credited in L3
+    // (world.hpp § corp_body_pools). The map is keyed (corp, body), so the
+    // corp's pools sit in one contiguous ascending-body run.
     float total = 0.0f;
-    for (const entity_id asset : cit->second.assets)
-    {
-        const auto sit = w.stockpiles.find(asset);
-        if (sit != w.stockpiles.end())
-            total += sit->second.quantities[static_cast<std::size_t>(res)];
-    }
+    for (auto it = w.corp_body_pools.lower_bound({corp, entity_id{0}});
+         it != w.corp_body_pools.end() && it->first.first == corp; ++it)
+        total += it->second.quantities[static_cast<std::size_t>(res)];
     return total;
 }
 
