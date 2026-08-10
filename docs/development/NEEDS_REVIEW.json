@@ -1889,9 +1889,10 @@
    "title": "45 of 97 open items have no minor: 'post-v0.1.0' is being used as a synonym for someday",
    "raised": "2026-08-09",
    "kind": "observation",
-   "status": "open",
+   "status": "resolved",
    "source": "Roadmap gap review, 2026-08-09 session",
-   "what": "backlog_query over open items: 42 carry version_goal 'post-v0.1.0' and 3 carry none at all (BL-107 save-format version, BL-130 real market inventory, BL-132 market cogeneration). That is 45 of 97 - nearly half the open backlog with no minor to be cut in. 'post-v0.1.0' predates the arc being mapped out to v1.0.0 and is now stale: ROADMAP.md's v0.4.0 section, for instance, names seven of them (BL-239, BL-222, BL-223, BL-224, BL-238, BL-240, BL-311) as the political-layer substrate in PROSE, but their version_goal was never updated, so no query can see it. Effect: the roadmap and the backlog disagree about what is in which version, and the disagreement is invisible unless you read both. Cheap fix: sweep post-v0.1.0 into real minors, starting with the seven the roadmap already assigns in prose. Related to the sequencing decoupling in NR-102."
+   "what": "backlog_query over open items: 42 carry version_goal 'post-v0.1.0' and 3 carry none at all (BL-107 save-format version, BL-130 real market inventory, BL-132 market cogeneration). That is 45 of 97 - nearly half the open backlog with no minor to be cut in. 'post-v0.1.0' predates the arc being mapped out to v1.0.0 and is now stale: ROADMAP.md's v0.4.0 section, for instance, names seven of them (BL-239, BL-222, BL-223, BL-224, BL-238, BL-240, BL-311) as the political-layer substrate in PROSE, but their version_goal was never updated, so no query can see it. Effect: the roadmap and the backlog disagree about what is in which version, and the disagreement is invisible unless you read both. Cheap fix: sweep post-v0.1.0 into real minors, starting with the seven the roadmap already assigns in prose. Related to the sequencing decoupling in NR-102.",
+   "resolution": "Swept 2026-08-10. Every open item now names a minor: 46 assignments, and a re-query confirms zero items left on post-v0.1.0 or on no version at all.  THE SWEEP WAS MOSTLY RECONCILIATION, not judgement. Twenty of the 45 were already assigned by ROADMAP.md IN PROSE -- the v0.4.0 politics substrate (BL-222, BL-223, BL-224, BL-238, BL-239, BL-240, BL-311) and most of the v0.3.0 Era -1 arc (BL-274, BL-277, BL-296, BL-297, BL-298, BL-300, BL-209, BL-289, BL-301) -- and the backlog simply never heard. That was the finding's real substance: the two documents disagreed and the disagreement was invisible unless you read both. It is now visible to a query.  RESULTING DISTRIBUTION over 71 open items: v0.1.5 (2), v0.1.6 (2), v0.1.7 (4), v0.1.11 (10), v0.1.12 (4), v0.1.13 (6), v0.2.0 (12), v0.3.0 (22), v0.4.0 (9).  THREE NEW MINORS WERE NAMED, and that is the one part of this that was invention rather than reconciliation -- recorded separately as NR-119 so it can be renumbered or reshaped without archaeology. The residue after reconciliation was 14 items of real prototype work with no theme to belong to, and it clustered cleanly: v0.1.12 Logistics modes (distance costs something, in more than one way, and the player can see it), v0.1.13 Markets & materials (the market stops being fixed at world-gen, the goods get deeper, and the save format learns to say no), and four more folded into the existing v0.1.11. None of the three carries a done-definition yet, deliberately -- the band's own rule is that a minor earns its done-definition at promotion, and naming them now is about making the queue legible rather than committing to their content.  FOUR ITEMS MOVED ON THEIR CONTENT RATHER THAN ON PROSE, and each is worth naming because the reasoning is not obvious from the title. BL-253 (strategic-scan tile cost) went to v0.2.0 rather than to a performance bucket: it is run_corp_strategic_step's O(corps x tiles) rescan, i.e. the OPPONENT's scaling term. BL-314 (unit verb family) went to v0.3.0 rather than staying with v0.1.5's stub, because it waits on a seam that only BL-315's conflict spine creates. BL-182 (corporate borders) went to v0.3.0 because its real content is an operate-gate -- a permission over where a corporation may act, which under BL-094 is a thing a governing body grants rather than a thing a corporation has. BL-212 (nation-voiced public comms) stayed in the PROTOTYPE band rather than moving to v0.3.0 with the nation actor, because its own settlement says it does not wait on BL-218 and works against today's data.  NOT ADDRESSED HERE: NR-102's sequencing decoupling, which this finding names as related. A minor per item is not the same as an order to build them in. DELIBERATELY LEFT ALONE: 21 COMPLETE items still carry post-v0.1.0 (BL-166 through BL-307). They landed before the arc was mapped past v0.1.0, so there is no minor they actually shipped in, and back-filling one would be fabricating history rather than recording it. The finding was about open items and the queue they form; a landed item's version_goal is a record of the intent it was worked under. So `--version post-v0.1.0` still returns rows, and that is correct rather than residue -- do not re-file it."
   },
   {
    "id": "NR-102",
@@ -2085,6 +2086,27 @@
    "files": [
     "src/world/corporation_generation.cpp",
     "tools/verify/settlement_harness.cpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-119",
+   "title": "Three new minors were named to absorb the post-v0.1.0 residue — v0.1.11 reshaped, v0.1.12 and v0.1.13 invented",
+   "raised": "2026-08-10",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "NR-101 (the post-v0.1.0 sweep)",
+   "what": "After reconciling the 20 items ROADMAP.md already assigned in prose, 14 items of real prototype work were left with no theme to belong to. Rather than leave them on post-v0.1.0 (which is what the finding was about) they were given themes: v0.1.12 \"Logistics modes\" (BL-153 convoy distance pricing, BL-173 rail, BL-188 sea trade, BL-175 supply-lens flow) and v0.1.13 \"Markets & materials\" (BL-263 runtime market emergence, BL-340 processing roster, BL-130 real inventory, BL-132 co-generation, BL-107 save-format version, BL-192 opening-economy measurement). Four more were folded into the existing v0.1.11, whose theme was written down for the first time: the levers stubbed across v0.1.3-v0.1.6 get the surfaces they were promised.",
+   "why_it_matters": "Naming a minor is a roadmap-shape call and the roadmap is yours. The sweep itself was authorised by NR-101 in as many words (\"sweep post-v0.1.0 into real minors\"), but the specific themes, the split into two rather than one or three, and the numbering are mine. None of it is expensive to undo -- a version_goal is one field and the roadmap entries are three paragraphs -- but it should be a decision rather than a default.",
+   "options": [
+    "Keep as named. The two themes are each internally coherent and neither invents work.",
+    "Merge v0.1.12 and v0.1.13 into one \"expanded economy\" minor. Ten items is large for a minor, but the two are genuinely adjacent (sea trade wants ports; ports want markets).",
+    "Renumber or re-order them against v0.1.5-v0.1.7, which are still uncut and sit earlier in the sequence."
+   ],
+   "recommendation": "Keep. The band has already established that numbering is advisory and each tag documents its own theme (v0.1.8-v0.1.10 were appended rather than inserted for exactly this reason), so a later renumber costs nothing.",
+   "files": [
+    "docs/development/ROADMAP.md",
+    "docs/development/backlog.json"
    ],
    "resolution": null
   }

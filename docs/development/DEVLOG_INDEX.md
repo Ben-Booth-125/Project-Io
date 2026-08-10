@@ -10,7 +10,7 @@ the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
-| 2026-08-10 | [Cut v0.1.3 and v0.1.4: one small predicate turned two design documents into two releases](DEVLOG.md) | BL-094 BL-155 BL-156 BL-186 BL-280 BL-325 BL-331 BL-332 BL-342 BL-343 BL-344 | DEVLOG.md |
+| 2026-08-10 | [Cut v0.1.3 and v0.1.4: one small predicate turned two design documents into two releases](DEVLOG.md) | BL-094 BL-155 BL-156 BL-182 BL-186 BL-212 BL-218 BL-253 BL-280 BL-314 BL-315 BL-325 BL-331 BL-332 BL-342 BL-343 BL-344 | DEVLOG.md |
 | 2026-08-10 | [Cut v0.1.10: three items whose own diagnosis was wrong, and a green gate that lied](DEVLOG.md) | BL-079 BL-181 BL-218 BL-257 BL-283 BL-284 BL-290 BL-338 BL-346 BL-347 | DEVLOG.md |
 | 2026-08-09 | [Cut v0.1.9: five worktree agents, and three of them branched from a base that had already moved](DEVLOG.md) | BL-193 BL-216 BL-227 BL-229 BL-247 BL-250 BL-253 BL-260 BL-266 BL-281 BL-312 BL-338 BL-347 | DEVLOG.md |
 | 2026-08-09 | [Cut v0.1.8: ten test failures, one real defect, and a tool that had been lying since it was written](DEVLOG.md) | BL-285 BL-288 BL-291 BL-302 BL-322 BL-326 BL-333 BL-338 BL-341 | DEVLOG.md |

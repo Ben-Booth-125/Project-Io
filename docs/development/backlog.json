@@ -1951,7 +1951,8 @@
    "files": [],
    "authority_doc": "docs/tech/TECH_FOUNDATIONS.md",
    "summary": "2026-07-05 sweep #7 + completeness critic: the flat-binary save model is a load-bearing invariant that will evolve, but it is unversioned by design (a schema handshake is deferred to multiplayer per MULTIPLAYER_PRINCIPLES.md). The moment save/load lands and a struct layout changes between two dev builds, an old save silently misreads as UB garbage with no version guard to reject it.",
-   "design": "**Status:** designed but BLOCKED — settled from the 2026-07-05 health sweep (quick-win #7).\n\n**Design:** reserve a fixed leading header on every flat-binary snapshot — a **magic uint32** (e.g. 'IOSV') plus a monotonically-incremented **format-version uint32** — written first and checked on load. A mismatched magic or version fails the load with a clear error rather than reading a struct-layout mismatch as garbage. Bump the version whenever a serialised struct's layout changes.\n\n**BLOCKED:** no flat-binary serialiser exists in `world/*` yet (grep finds only PNG `fwrite` in `core/*`), so there is nothing to version. This item is the FIRST thing to add the moment serialisation is implemented.\n\n**Shipped now under the 2026-07-05 batch:** the doc-truthfulness fix only — softening TECH_FOUNDATIONS' present-tense 'is serialised' / 'are written and read' claims to future tense so the invariant is not stated as already built.\n\n**Note:** the serialisation implementation itself is not yet a backlog item — file one before promoting this.\n\n**Shipped 2026-07-05 (health-sweep batch):** the doc-truthfulness half only — TECH_FOUNDATIONS § Save model / Serialisation softened from present tense ('is serialised' / 'are written and read') to future, with a forward-reference to this item's magic+version header. The item PROPER (the header) stays `designed` + blocked on the serialiser landing. **Authority:** docs/tech/TECH_FOUNDATIONS.md."
+   "design": "**Status:** designed but BLOCKED — settled from the 2026-07-05 health sweep (quick-win #7).\n\n**Design:** reserve a fixed leading header on every flat-binary snapshot — a **magic uint32** (e.g. 'IOSV') plus a monotonically-incremented **format-version uint32** — written first and checked on load. A mismatched magic or version fails the load with a clear error rather than reading a struct-layout mismatch as garbage. Bump the version whenever a serialised struct's layout changes.\n\n**BLOCKED:** no flat-binary serialiser exists in `world/*` yet (grep finds only PNG `fwrite` in `core/*`), so there is nothing to version. This item is the FIRST thing to add the moment serialisation is implemented.\n\n**Shipped now under the 2026-07-05 batch:** the doc-truthfulness fix only — softening TECH_FOUNDATIONS' present-tense 'is serialised' / 'are written and read' claims to future tense so the invariant is not stated as already built.\n\n**Note:** the serialisation implementation itself is not yet a backlog item — file one before promoting this.\n\n**Shipped 2026-07-05 (health-sweep batch):** the doc-truthfulness half only — TECH_FOUNDATIONS § Save model / Serialisation softened from present tense ('is serialised' / 'are written and read') to future, with a forward-reference to this item's magic+version header. The item PROPER (the header) stays `designed` + blocked on the serialiser landing. **Authority:** docs/tech/TECH_FOUNDATIONS.md.",
+   "version_goal": "v0.1.13"
   },
   {
    "id": "BL-108",
@@ -2502,7 +2503,8 @@
    ],
    "authority_doc": "docs/economy/PRODUCTION.md",
    "summary": "Filed 2026-07-07 from the economy design session. BL-095 settled on DERIVED-from-supply market stock (a rolling throughput figure) for calculation simplicity, deferring a real persistent per-resource inventory. Ben: revisit once we have had a moment to work on optimisation and efficiency of the program. A real inventory is the cleaner substrate for competition and for a future RUNTIME market split/merge, at the cost of a serialized field on the flat-binary seam + tick accounting. SETTLED 2026-08-02: YES to a real persistent per-resource inventory. BL-263 (markets become runtime simulation state) both weakened the objection — the flat-binary seam is already being opened for markets that did not exist at generation — and strengthened the case, since an outpost market clearing against remote demand has stock in transit vs on hand, which a derived-from-supply figure cannot represent, and dormancy is inventory nobody clears rather than zero supply. The optimization gate stands but is a TIMING gate, not a decision gate. Now sequenced after BL-263.",
-   "design": "Post-optimization revisit of the BL-095 stock model. Decide whether markets should hold a **real persistent per-resource inventory** (fills from production + nation capacity, drains to consumption + construction) rather than a derived-from-recent-supply figure. Trade-off: a real inventory is the cleanest substrate for \"greedy actors compete for stock\" and for runtime market split/merge (BL-132), but adds a serialized array to the flat-binary seam and deterministic tick accounting. Gate: only worth doing after a general optimization/efficiency pass. `requires` BL-095. Authority → PRODUCTION.md on landing.\n\n## SETTLED 2026-08-02 — yes, a real inventory. The gate is about TIMING, not the decision.\n\n**Decision: markets hold a real persistent per-resource inventory.** The item framed this as an\nopen trade-off; BL-263 (settled the same day) has largely resolved it.\n\n**The main objection weakened.** \"Adds a serialised array to the flat-binary seam\" was the cost\nagainst. BL-263 makes markets *runtime simulation state* — created mid-campaign, persisted,\ngoing dormant — so the save format is already gaining a count-prefixed run of markets that did\nnot exist at generation. Adding inventory to a record already being opened is a much smaller\nchange than adding it to a fixed generation artifact.\n\n**The case for got stronger.** A real inventory is the substrate for \"greedy actors compete for\nstock\", and BL-263's outpost markets need exactly that: a market clearing against remote demand\nhas stock in transit and stock on hand, which a derived-from-recent-supply figure cannot\nrepresent. A derived figure also cannot express dormancy honestly — a dormant market has\ninventory nobody is clearing, not zero supply.\n\n**The gate stands, but it is a timing gate.** \"Only worth doing after a general\noptimization/efficiency pass\" remains true — this adds per-tick accounting on a hot path. What\nis settled is *which way it goes* when the gate opens, so the question is not re-litigated.\n\n**Sequence after BL-263**, not before: building inventory into a fixed generation-time market\nset, then reworking it when markets become runtime state, is doing it twice.\n\n**Determinism.** Inventory accounting is fixed-point, and fills/drains within a tick must\ncombine order-independently — the same summed-rate rule BL-155 settled for law margin\nmodifiers, for the same reason."
+   "design": "Post-optimization revisit of the BL-095 stock model. Decide whether markets should hold a **real persistent per-resource inventory** (fills from production + nation capacity, drains to consumption + construction) rather than a derived-from-recent-supply figure. Trade-off: a real inventory is the cleanest substrate for \"greedy actors compete for stock\" and for runtime market split/merge (BL-132), but adds a serialized array to the flat-binary seam and deterministic tick accounting. Gate: only worth doing after a general optimization/efficiency pass. `requires` BL-095. Authority → PRODUCTION.md on landing.\n\n## SETTLED 2026-08-02 — yes, a real inventory. The gate is about TIMING, not the decision.\n\n**Decision: markets hold a real persistent per-resource inventory.** The item framed this as an\nopen trade-off; BL-263 (settled the same day) has largely resolved it.\n\n**The main objection weakened.** \"Adds a serialised array to the flat-binary seam\" was the cost\nagainst. BL-263 makes markets *runtime simulation state* — created mid-campaign, persisted,\ngoing dormant — so the save format is already gaining a count-prefixed run of markets that did\nnot exist at generation. Adding inventory to a record already being opened is a much smaller\nchange than adding it to a fixed generation artifact.\n\n**The case for got stronger.** A real inventory is the substrate for \"greedy actors compete for\nstock\", and BL-263's outpost markets need exactly that: a market clearing against remote demand\nhas stock in transit and stock on hand, which a derived-from-recent-supply figure cannot\nrepresent. A derived figure also cannot express dormancy honestly — a dormant market has\ninventory nobody is clearing, not zero supply.\n\n**The gate stands, but it is a timing gate.** \"Only worth doing after a general\noptimization/efficiency pass\" remains true — this adds per-tick accounting on a hot path. What\nis settled is *which way it goes* when the gate opens, so the question is not re-litigated.\n\n**Sequence after BL-263**, not before: building inventory into a fixed generation-time market\nset, then reworking it when markets become runtime state, is doing it twice.\n\n**Determinism.** Inventory accounting is fixed-point, and fills/drains within a tick must\ncombine order-independently — the same summed-rate rule BL-155 settled for law margin\nmodifiers, for the same reason.",
+   "version_goal": "v0.1.13"
   },
   {
    "id": "BL-131",
@@ -2548,7 +2550,8 @@
    ],
    "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
    "summary": "Filed 2026-07-07 from the economy design session. BL-096's first cut keeps population placement as-is and carves markets by nation territory. Ben's fuller ideal: population spawns near rich resources, and markets are centred on rich trade routes, with corps (not just nations) carving resource clusters. Settled 2026-07-21 (Sprint 1 procgen review): BL-096 (its blocker) has since shipped and the three-change sequencing is now fixed — promote-ready.",
-   "design": "The fuller co-generation vision deferred from BL-096. Three coupled changes: (1) **population spawns near rich resources** — make generate_population_centres resource-aware; (2) **markets centred on rich trade-route proxies** — since live routes do not exist at gen-time, derive a static resource↔population trade-flow proxy and centre markets on it; (3) **corp-level carving** — place corps before markets (a generation reorder) so competing corporations, not just nations, carve resource clusters. Larger rewrite touching hard_coded_world / nation_generation / market seeding; determinism-sensitive. `requires` BL-096. Authority → GENERATION_STRATEGY.md on landing.\n\n### Settled 2026-07-21 (Sprint 1 procgen review)\n**Blocker cleared.** BL-096 (resource-driven market generation) has since shipped — this item's stated dependency is satisfied.\n\n**Sequencing fixed: (1) → (2) → (3), in that order — no reorder.** Population-resource-awareness lands first (a self-contained change to `generate_population_centres`, no reorder of the wider pipeline). The trade-flow proxy lands second, since it reads the now-resource-aware population placement. Corp-level carving lands last, since it's the one genuine generation **reorder** (corps before markets) and should not be entangled with the other two while they're still landing.\n\n**Layer relationship to this sprint's sibling-pass decision (BL-051).** This item operates one layer above tile generation — it's world-seeding order (population → markets → corps), not a tile-generation pass — so the sibling-pass convention doesn't directly apply here; no conflict, just a different extension point. Flipped `design-owed` → `designed`: scope was already well-specified, the blocker is cleared, and sequencing is now fixed."
+   "design": "The fuller co-generation vision deferred from BL-096. Three coupled changes: (1) **population spawns near rich resources** — make generate_population_centres resource-aware; (2) **markets centred on rich trade-route proxies** — since live routes do not exist at gen-time, derive a static resource↔population trade-flow proxy and centre markets on it; (3) **corp-level carving** — place corps before markets (a generation reorder) so competing corporations, not just nations, carve resource clusters. Larger rewrite touching hard_coded_world / nation_generation / market seeding; determinism-sensitive. `requires` BL-096. Authority → GENERATION_STRATEGY.md on landing.\n\n### Settled 2026-07-21 (Sprint 1 procgen review)\n**Blocker cleared.** BL-096 (resource-driven market generation) has since shipped — this item's stated dependency is satisfied.\n\n**Sequencing fixed: (1) → (2) → (3), in that order — no reorder.** Population-resource-awareness lands first (a self-contained change to `generate_population_centres`, no reorder of the wider pipeline). The trade-flow proxy lands second, since it reads the now-resource-aware population placement. Corp-level carving lands last, since it's the one genuine generation **reorder** (corps before markets) and should not be entangled with the other two while they're still landing.\n\n**Layer relationship to this sprint's sibling-pass decision (BL-051).** This item operates one layer above tile generation — it's world-seeding order (population → markets → corps), not a tile-generation pass — so the sibling-pass convention doesn't directly apply here; no conflict, just a different extension point. Flipped `design-owed` → `designed`: scope was already well-specified, the blocker is cleared, and sequencing is now fixed.",
+   "version_goal": "v0.1.13"
   },
   {
    "id": "BL-133",
@@ -3040,7 +3043,7 @@
    "requires": [],
    "blocked_on": [],
    "written": "2026-07-09",
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.1.12",
    "files": [
     "src/world/supply_system.cpp",
     "src/world/market_clearing.cpp"
@@ -3530,7 +3533,7 @@
    "status": "designed",
    "glyph": "✓",
    "priority": "C",
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.1.12",
    "parked": false,
    "requires": [
     "BL-172"
@@ -3580,7 +3583,7 @@
    "glyph": "✓",
    "priority": "B",
    "difficulty": 3,
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.1.12",
    "parked": false,
    "requires": [
     "BL-088"
@@ -3726,7 +3729,7 @@
    "glyph": "✓",
    "priority": "F",
    "difficulty": 5,
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.3.0",
    "parked": true,
    "requires": [],
    "blocked_on": [],
@@ -3851,7 +3854,7 @@
    "glyph": "✓",
    "priority": "C",
    "difficulty": 4,
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.1.12",
    "parked": false,
    "requires": [
     "BL-168"
@@ -3949,7 +3952,7 @@
    "glyph": "✓",
    "priority": "C",
    "difficulty": 3,
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.1.13",
    "parked": false,
    "requires": [],
    "blocked_on": [],
@@ -4418,7 +4421,7 @@
    "glyph": "✓",
    "priority": "C",
    "difficulty": 5,
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.3.0",
    "requires": [
     "BL-167",
     "BL-208"
@@ -4447,7 +4450,7 @@
    "priority": "C",
    "difficulty": 2,
    "parked": false,
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.4.0",
    "requires": [
     "BL-167",
     "BL-217",
@@ -4523,7 +4526,7 @@
    "priority": "C",
    "difficulty": 4,
    "parked": false,
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.1.11",
    "requires": [
     "BL-210"
    ],
@@ -4558,7 +4561,7 @@
    "priority": "C",
    "difficulty": 3,
    "parked": false,
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.1.11",
    "requires": [],
    "blocked_on": [],
    "written": "2026-07-28",
@@ -4670,7 +4673,7 @@
    "priority": "B",
    "difficulty": 5,
    "parked": false,
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.4.0",
    "requires": [
     "BL-208",
     "BL-209",
@@ -4702,7 +4705,7 @@
    "priority": "B",
    "difficulty": 5,
    "parked": false,
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.4.0",
    "requires": [
     "BL-208",
     "BL-210",
@@ -4733,7 +4736,7 @@
    "priority": "B",
    "difficulty": 4,
    "parked": false,
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.4.0",
    "requires": [
     "BL-238",
     "BL-239"
@@ -4985,7 +4988,7 @@
    "priority": "B",
    "difficulty": 4,
    "parked": false,
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.4.0",
    "requires": [
     "BL-238",
     "BL-239",
@@ -5016,7 +5019,7 @@
    "priority": "B",
    "difficulty": 4,
    "parked": false,
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.4.0",
    "requires": [
     "BL-221",
     "BL-222"
@@ -5043,7 +5046,7 @@
    "priority": "B",
    "difficulty": 3,
    "parked": false,
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.4.0",
    "requires": [
     "BL-239",
     "BL-221"
@@ -5071,7 +5074,7 @@
    "priority": "F",
    "difficulty": 3,
    "parked": true,
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.4.0",
    "requires": [
     "BL-094",
     "BL-155",
@@ -5451,7 +5454,7 @@
    "id": "BL-253",
    "short_name": "STRATEGIC_SCAN_TILE_COST",
    "difficulty": 3,
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.2.0",
    "title": "run_corp_strategic_step rescans every tile per due corp — an O(corps x tiles) term that dominates the tick at scale",
    "authority_doc": "docs/development/AI_OPPONENT.md",
    "files": [
@@ -5673,7 +5676,7 @@
    "requires": [],
    "blocked_on": [],
    "written": "2026-08-01",
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.1.13",
    "priority": "B",
    "category": "Economy",
    "id": "BL-263",
@@ -5701,7 +5704,7 @@
    ],
    "blocked_on": [],
    "written": "2026-08-02",
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.1.11",
    "priority": "C",
    "category": "UI",
    "id": "BL-264",
@@ -5974,7 +5977,7 @@
    "priority": "B",
    "difficulty": 3,
    "parked": false,
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.3.0",
    "requires": [
     "BL-272"
    ],
@@ -6050,7 +6053,7 @@
    "priority": "B",
    "difficulty": 4,
    "parked": false,
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.3.0",
    "requires": [
     "BL-271",
     "BL-272",
@@ -6343,7 +6346,7 @@
    "status": "design-owed",
    "priority": "C",
    "difficulty": "M",
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.3.0",
    "created": "2026-08-04",
    "touches": [
     "src/world/planetology.cpp",
@@ -6477,7 +6480,7 @@
    "status": "designed",
    "priority": "B",
    "difficulty": "M",
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.3.0",
    "created": "2026-08-04",
    "authority_doc": "docs/lore/HISTORY.md",
    "touches": [
@@ -6499,7 +6502,7 @@
    "glyph": "✓",
    "priority": "B",
    "difficulty": 3,
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.2.0",
    "requires": [],
    "files": [
     "Project-Rival/tools/harness/ (new)",
@@ -6521,7 +6524,7 @@
    "glyph": "✓",
    "priority": "B",
    "difficulty": 4,
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.3.0",
    "requires": [
     "BL-271",
     "BL-277"
@@ -6546,7 +6549,7 @@
    "glyph": "✓",
    "priority": "B",
    "difficulty": 3,
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.3.0",
    "requires": [
     "BL-297"
    ],
@@ -6570,7 +6573,7 @@
    "glyph": "✓",
    "priority": "B",
    "difficulty": 3,
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.3.0",
    "requires": [
     "BL-218"
    ],
@@ -6593,7 +6596,7 @@
    "glyph": "~",
    "priority": "B",
    "difficulty": 4,
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.3.0",
    "requires": [
     "BL-218"
    ],
@@ -6617,7 +6620,7 @@
    "glyph": "~",
    "priority": "C",
    "difficulty": 3,
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.3.0",
    "requires": [],
    "files": [
     "src/world/planetology.cpp",
@@ -6832,7 +6835,7 @@
    "parked": false,
    "priority": "C",
    "difficulty": 3,
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.4.0",
    "requires": [
     "BL-296"
    ],
@@ -6911,7 +6914,7 @@
    "title": "Unit verb family for the action dictionary — levy/march/garrison/scout at unit grain, design-owed until a unit_command seam exists to transcribe from",
    "priority": "B",
    "difficulty": 3,
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.3.0",
    "requires": [
     "BL-157",
     "BL-274"
@@ -6963,7 +6966,7 @@
    "priority": "A",
    "difficulty": 3,
    "parked": true,
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.3.0",
    "requires": [],
    "blocked_on": [],
    "written": "2026-08-04",
@@ -6987,7 +6990,7 @@
    "priority": "B",
    "difficulty": 4,
    "parked": true,
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.3.0",
    "requires": [
     "BL-271",
     "BL-316"
@@ -7017,7 +7020,7 @@
    "priority": "A",
    "difficulty": 3,
    "parked": true,
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.3.0",
    "requires": [],
    "blocked_on": [],
    "written": "2026-08-07",
@@ -7067,7 +7070,7 @@
    "priority": "B",
    "difficulty": 2,
    "parked": true,
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.3.0",
    "requires": [],
    "blocked_on": [],
    "written": "2026-08-04",
@@ -7089,7 +7092,7 @@
    "priority": "A",
    "difficulty": 3,
    "parked": false,
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.3.0",
    "requires": [
     "BL-271",
     "BL-316"
@@ -7401,7 +7404,7 @@
    "priority": "B",
    "difficulty": 4,
    "parked": false,
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.2.0",
    "requires": [
     "BL-278"
    ],
@@ -7426,7 +7429,7 @@
    "priority": "C",
    "difficulty": 1,
    "parked": false,
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.2.0",
    "requires": [
     "BL-278"
    ],
@@ -7449,7 +7452,7 @@
    "priority": "C",
    "difficulty": 3,
    "parked": true,
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.2.0",
    "requires": [],
    "blocked_on": [
     "observed evidence of step-wise myopia in corp_ai.cpp's own play"
@@ -7475,7 +7478,7 @@
    "parked": false,
    "blocked_on": [],
    "written": "2026-08-09",
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.3.0",
    "requires": [
     "BL-271"
    ],
@@ -7544,7 +7547,7 @@
    "parked": false,
    "blocked_on": [],
    "written": "2026-08-09",
-   "version_goal": "post-v0.1.0",
+   "version_goal": "v0.1.13",
    "requires": [
     "BL-323"
    ],
@@ -7574,7 +7577,7 @@
     "access to the Windows development machine"
    ],
    "written": "2026-08-09",
-   "version_goal": "",
+   "version_goal": "v0.1.11",
    "requires": [
     "BL-302"
    ],

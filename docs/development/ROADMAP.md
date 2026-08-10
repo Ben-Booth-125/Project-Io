@@ -199,10 +199,11 @@ assertion holds.
 no committed systems yet.* Past the cut, the v0.1.x band is where the game's next dimensions get
 their first shape: enough design and stubbing that the v0.3.0 refocus and the v0.4.0 political
 layer land on positioned ground rather than a greenfield. v0.1.1 is a concrete build minor; the
-stub minors (v0.1.3–v0.1.6) are deliberately design-forward — each now has a placeholder
-`design-owed` item that firms into real design as it is reached — and the band closes with
-**v0.1.6**, a second concrete build minor (generation visibility + the UI-alignment review,
-added by Ben 2026-08-04).
+stub minors (v0.1.3–v0.1.6) were deliberately design-forward — each carried a placeholder
+`design-owed` item that firmed into real design as it was reached. **That framing has been
+overtaken (2026-08-09/10):** BL-342–345 turned the stubs into buildable work, v0.1.3 and v0.1.4
+were cut on 2026-08-10, and the band now runs to **v0.1.13** — the design-forward minors became
+concrete, and the tail was named when `post-v0.1.0` was swept (NR-101, below).
 
 > **What this band is FOR (Ben, 2026-08-03).** Until now the band was themed by what it stubs,
 > not by what the stubs serve. Ben's steer supplies the missing answer: the aim is to play as a
@@ -622,6 +623,46 @@ added by Ben 2026-08-04).
   (**BL-284**), dual-endpoint trade-route log entries (**BL-282**), propellant as a real resource
   (**BL-308**), deed history-log lines (**BL-309**), and the Kepler wetland re-base (**BL-338**).
 
+> **The band's tail was named 2026-08-10, sweeping `post-v0.1.0` (NR-101).** 45 of 97 open items
+> carried no minor, and `post-v0.1.0` had become a synonym for *someday* — while this document was
+> already assigning twenty of them to v0.3.0 and v0.4.0 **in prose**, where no query could see it.
+> The roadmap and the backlog disagreed, and the disagreement was invisible unless you read both.
+> Every open item now names a minor. The reconciliation was mechanical wherever the prose already
+> said something; the three minors below are the residue — a cluster of real prototype work that
+> had no theme to belong to, so it was given one. **Each earns its done-definition at promotion**,
+> per the rule this band already follows; naming them now is about making the queue legible, not
+> about committing to their content.
+
+- **v0.1.11 — Policy surfaces, and the band's own leftovers.** *Theme: the levers stubbed across
+  v0.1.3–v0.1.6 get the surfaces they were promised.* v0.1.3 and v0.1.4 shipped one working law
+  and one earnable tech and deliberately excluded the surfaces around them, so this is where those
+  land: the laws ledger and enactment politics (**BL-186**), the negotiated tax rate (**BL-280**),
+  what remains of the law and tech design passes (**BL-155**, **BL-156**), and military points and
+  research (**BL-332**). With them, four items the earlier cuts filed rather than dropped — deed
+  history lines (**BL-309**), the player-facing history ledger (**BL-211**), the New World wizard's
+  post-fold layout (**BL-264**), and nation-voiced public comms (**BL-212**, settled and explicitly
+  *not* gated on BL-218). Plus **BL-341**, which is parked on a machine rather than on a theme: the
+  from-cold configure check has to run on Windows, where the TLS failure actually happens.
+- **v0.1.12 — Logistics modes.** *Theme: distance costs something, in more than one way, and the
+  player can see it.* Four items that are all the same subject and were scattered across three
+  categories: convoy payout weighted by haul distance rather than destination price alone
+  (**BL-153**), rail as a mode distinct from the road tiers rather than a cheaper road
+  (**BL-173**), coastal ports and sea trade as a mode distinct from land (**BL-188**), and the
+  Planetary Supply lens reading as *flow* rather than a uniform arrow field on every hex
+  (**BL-175**). The first three add ways for distance to matter; the fourth is what stops that
+  being invisible, which is why it belongs here rather than in a UI minor.
+- **v0.1.13 — Markets & materials.** *Theme: the market stops being fixed at world-gen, the goods
+  it trades get deeper, and the save format learns to say no.* Markets emerging at runtime when
+  colonisation or exploration reaches a body (**BL-263**) — today every market seeds at world-gen,
+  which is why a generated world can never record an inter-body trade route. The processing half of
+  the buildings roster (**BL-340**), which v0.1.2 excluded in as many words because it needs new
+  resource types. Real market inventory versus derived-from-supply stock (**BL-130**) and full
+  market/population co-generation (**BL-132**), both waiting on exactly this. And the two that
+  follow from the rest: the save-format magic and version header (**BL-107**), because adding
+  resource types is the struct-layout change it exists to reject, and the opening-economy question
+  (**BL-192**) — whether a fresh campaign can afford and site a processor early, which its own
+  settlement reframed from a generation guarantee into a measurement.
+
 ### v0.2.0 — The AI opponent
 
 *Versioned theme: the AI opponent.* The backlog's live v0.2.0 set is the corp-AI arc: stage A
@@ -643,6 +684,16 @@ generate the training corpus. **BL-279** (AI trace corpus + the fine-tuning pipe
 that here; its prerequisite **BL-278** (Io MCP server) **landed 2026-08-03** in **v0.1.1**, where
 NR-044 placed it. Both sit *above* the deterministic utility core, not in place of it — the small
 local model is a macro layer over BL-202/203, never the whole opponent.
+
+*Roster reconciled 2026-08-10 (NR-101).* Five items that were sitting on `post-v0.1.0` are this
+minor's work and now say so: **BL-334** (Stage C — the conditioned dialogue layer over the
+`corp_decision` intent stream, the shape Ben ruled in NR-094), **BL-335** (measure the real
+per-decision token cost through the landed MCP server, replacing a ~300-token *assumption*),
+**BL-336** (a goal layer for step-wise myopia — filed **parked**, explicitly contingent on
+observing the failure mode first), **BL-306** (the text-only Rival harness, driving 0 A.D. through
+its official RL seam instead of computer-use), and **BL-253** — `run_corp_strategic_step`'s
+O(corps × tiles) rescan, which belongs here because it is the *opponent's* scaling term, not a
+general performance item.
 
 ### v0.3.0 — The governing body (the refocus)
 
@@ -715,6 +766,24 @@ industrial neighbourhood" — are worked at that grain as of 2026-08-05. v0.1.4'
 early stub pass; BL-087 is the real system, and the two are converging rather than strictly
 sequencing.
 
+*Roster reconciled 2026-08-10 (NR-101).* The Era −1 arc was described here in prose while its
+items sat on `post-v0.1.0`, so a query of the backlog could not see the minor this section had
+already assigned them to. Now explicit — the six named above (**BL-274**, **BL-277**, **BL-296**,
+**BL-297**, **BL-298**, **BL-300**) plus the rest of the sandbox: logistics with real terrain and
+a supply burden that grows with the empire (**BL-316**), the shared-currency scorer that unstalled
+the incommensurable-verb problem (**BL-318**), the works roster — the pre-history building noun
+that was simply missing (**BL-321**), the sim's own runtime budget (**BL-320**), the
+two-great-powers sandbox seed (**BL-299**), and the calibration of the judgement-set voice and unit
+numbers against sweep evidence (**BL-337**). Three more join them on their content rather than on
+this section's prose: **BL-317** (the wizard's prehistory timelapse, which *consumes* BL-271's sim
+rather than duplicating it), **BL-314** (the unit verb family, which belongs with BL-315's conflict
+spine — it was filed against v0.1.5's stub and waits on a seam that exists only here), and
+**BL-182** (corporate borders, whose real content is an *operate-gate*: a permission over where a
+corporation may act, which is a thing a governing body grants rather than a thing a corporation
+has). The generation-flavour tail this section already flags as cut candidates — **BL-209**,
+**BL-289**, **BL-300**, **BL-301** — is versioned here too, so that Ben's ruling cuts items with a
+home rather than items with none.
+
 **Three scope calls stay open** (NR-076, still unresolved as of this pass): cutting BL-160 and
 letting BL-161 (counterparty allow/deny) stand alone; cutting or parking BL-207 (persona counsel
 packs) behind BL-279's local-model evidence; cutting the generation-flavour tail (BL-209, BL-289)
@@ -734,7 +803,12 @@ while keeping BL-300/BL-301 as notes only. All three are Ben's to rule on.
   chain that sets industrialisation timing (**BL-238**), the cross-pipeline sweep tuning
   (**BL-240**), and a State-Arsenal charter gate touching BL-094 directly (**BL-311**,
   design-owed). None of these ship campaign content on their own; they generate the political
-  character this layer promotes into something real.
+  character this layer promotes into something real. *(Sequenced 2026-08-10, NR-101: all seven now
+  carry `version_goal: v0.4.0` in the backlog, so this paragraph and a query finally agree. Two
+  more join them — **BL-225**, asset seizure costing the seizing nation in sentiment and credit
+  access, which is the one runtime mechanic `HISTORY.md` asks for and lands squarely on this
+  layer's relationships; and **BL-210**, the oral-history generation umbrella that BL-238 and
+  BL-240 are already working inside.)*
 - **The filter system (Era → Filter).** Rename and reframe **Era** as **Filter**: the world-state
   gate governing what content is available when (**BL-087**'s catastrophic-event / quest-tree model
   re-read as a *filter* over the world). A terminology change with reach — `ERAS.md`,

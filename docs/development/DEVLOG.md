@@ -117,11 +117,47 @@ Both cost real time last session, and both were cheap to honour here:
 - **v0.1.3 and v0.1.4 both cut with leftovers re-targeted, not dropped** — BL-155, BL-186, BL-280,
   BL-156 and BL-332 moved to v0.1.11. Both done-definitions were written **at** the cut, per NR-103,
   and both name their exclusions explicitly.
-- **42 items still sit at `post-v0.1.0`** (NR-101), untouched again. That is now the largest
-  structural job left in the backlog, and it is the same class of problem the done-definitions
-  fixed.
-
 **Gate:** 58 tests, 0 failures (55 → 58; three new harnesses). Tags `v0.1.3`, `v0.1.4`.
+
+### Then: the `post-v0.1.0` sweep (NR-101)
+
+Ben, same session: *"now tackle the 42 post-v0.1.0 items."* It was the largest structural job left
+in the backlog and the same class of problem the done-definitions had just fixed — a label doing
+duty as a decision.
+
+**Most of it was reconciliation, not judgement, and that is the finding.** Twenty of the 45 were
+*already assigned* by ROADMAP.md **in prose** — the whole v0.4.0 politics substrate, most of the
+v0.3.0 Era −1 arc — while their `version_goal` still read `post-v0.1.0`. So the roadmap and the
+backlog disagreed about what was in which version, and **the disagreement was invisible unless you
+read both**: the prose was not queryable and the query did not read prose. Fixing that needed no
+decisions at all, only a script.
+
+The residue after reconciliation was 14 items of real prototype work with no theme to belong to,
+and it clustered more cleanly than expected — **v0.1.12 Logistics modes** (convoy distance pricing,
+rail, sea trade, and the supply lens that makes any of it visible) and **v0.1.13 Markets &
+materials** (runtime market emergence, the processing roster, real inventory, co-generation, and
+the save-format version header that adding resource types is precisely the case for). Four more
+folded into v0.1.11, whose theme got written down for the first time.
+
+Four items moved on their **content** rather than on prose, and the reasoning is not obvious from
+their titles, so it is recorded: BL-253 is the *opponent's* scaling term (`run_corp_strategic_step`,
+O(corps × tiles)) and belongs to v0.2.0, not to a performance bucket; BL-314 waits on a seam only
+BL-315's conflict spine creates; BL-182's real content is an **operate-gate**, a permission over
+where a corporation may act, which under BL-094 is a thing a governing body grants; and BL-212
+stayed in the prototype band because its own settlement says it does not wait on BL-218.
+
+Result: **every open item names a minor.** 71 open across v0.1.5 (2), v0.1.6 (2), v0.1.7 (4),
+v0.1.11 (10), v0.1.12 (4), v0.1.13 (6), v0.2.0 (12), v0.3.0 (22), v0.4.0 (9).
+
+Two things deliberately *not* done. The 21 **complete** items still carrying `post-v0.1.0` were
+left alone — they landed before the arc was mapped, so back-filling a minor would fabricate history
+rather than record it. And naming two new minors is a roadmap-shape call that is Ben's, so it is
+filed as **NR-119** with the alternatives (merge them; renumber against the uncut v0.1.5–v0.1.7)
+rather than left as a silent default. Neither costs anything to reverse: a `version_goal` is one
+field, and the band already treats numbering as advisory.
+
+**Still open after this:** NR-102's sequencing decoupling. A minor per item is not an order to
+build them in.
 
 ---
 
