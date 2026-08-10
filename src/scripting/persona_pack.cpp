@@ -176,6 +176,9 @@ pack::pack(const std::string& lua_path)
         throw std::runtime_error("persona pack '" + lua_path + "': " + err.what());
     }
 
+    // .valid() only proves no error was raised; the return shape is unproven.
+    if (result.get_type() != sol::type::table)
+        throw std::runtime_error("persona pack '" + lua_path + "': script must return a table");
     sol::table t = result;
     m_id                = require_string(t, "id", lua_path.c_str());
     m_bench             = require_string(t, "bench", lua_path.c_str());
@@ -241,6 +244,8 @@ std::vector<opinion_record> pack::evaluate(const corp_blackboard& bb) const
         sol::error err = extract_res;
         throw std::runtime_error("persona pack '" + m_id + "'.extract: " + err.what());
     }
+    if (extract_res.get_type() != sol::type::table)
+        throw std::runtime_error("persona pack '" + m_id + "'.extract: must return a table");
     sol::table findings = extract_res;
 
     sol::protected_function_result policy_res = m_impl->policy_fn(findings);
@@ -249,13 +254,21 @@ std::vector<opinion_record> pack::evaluate(const corp_blackboard& bb) const
         sol::error err = policy_res;
         throw std::runtime_error("persona pack '" + m_id + "'.policy: " + err.what());
     }
+    if (policy_res.get_type() != sol::type::table)
+        throw std::runtime_error("persona pack '" + m_id + "'.policy: must return a table");
     sol::table opinions = policy_res;
 
     std::vector<opinion_record> out;
     const std::size_t count = opinions.size();
     out.reserve(count);
     for (std::size_t i = 1; i <= count; ++i)
-        out.push_back(table_to_opinion(opinions.get<sol::table>(i)));
+    {
+        sol::optional<sol::table> row = opinions.get<sol::optional<sol::table>>(i);
+        if (!row)
+            throw std::runtime_error("persona pack '" + m_id + "'.policy: opinion "
+                                     + std::to_string(i) + " is not a table");
+        out.push_back(table_to_opinion(*row));
+    }
     return out;
 }
 
@@ -268,7 +281,10 @@ std::string pack::phrase_for(const opinion_record& op) const
         sol::error err = res;
         throw std::runtime_error("persona pack '" + m_id + "'.phrase: " + err.what());
     }
-    return res.get<std::string>();
+    sol::optional<std::string> phrase = res.get<sol::optional<std::string>>();
+    if (!phrase)
+        throw std::runtime_error("persona pack '" + m_id + "'.phrase: must return a string");
+    return *phrase;
 }
 
 std::vector<verdict_record> pack::aggregate(const std::vector<opinion_record>& opinions) const
@@ -287,13 +303,21 @@ std::vector<verdict_record> pack::aggregate(const std::vector<opinion_record>& o
         sol::error err = res;
         throw std::runtime_error("persona pack '" + m_id + "'.aggregate: " + err.what());
     }
+    if (res.get_type() != sol::type::table)
+        throw std::runtime_error("persona pack '" + m_id + "'.aggregate: must return a table");
     sol::table verdicts = res;
 
     std::vector<verdict_record> out;
     const std::size_t count = verdicts.size();
     out.reserve(count);
     for (std::size_t i = 1; i <= count; ++i)
-        out.push_back(table_to_verdict(verdicts.get<sol::table>(i)));
+    {
+        sol::optional<sol::table> row = verdicts.get<sol::optional<sol::table>>(i);
+        if (!row)
+            throw std::runtime_error("persona pack '" + m_id + "'.aggregate: verdict "
+                                     + std::to_string(i) + " is not a table");
+        out.push_back(table_to_verdict(*row));
+    }
     return out;
 }
 
