@@ -896,6 +896,32 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
     // Tier thresholds (ticks to grow): scale 1→2: 200, 2→3: 500, 3→4: 1500, 4→5: 5000.
     static constexpr int growth_threshold[6] = { 0, 200, 500, 1500, 5000, 0 };
     const substrate_params& growth_sp = reg.substrate();
+
+    // Per-body market basket, summed over ALL the body's markets (BL-357). A body
+    // hosts several resource-carved markets (BL-096), and reading whichever one an
+    // unordered walk found first let hash layout pick which market gated a centre's
+    // growth — and ignored the rest of the body's supply. Market ids ascending so
+    // the float accumulation order is fixed.
+    std::map<entity_id, std::array<float, resource_count>> basket_supply, basket_demand;
+    {
+        std::vector<entity_id> market_ids;
+        market_ids.reserve(w.markets.size());
+        for (const auto& kv : w.markets)
+            market_ids.push_back(kv.first);
+        std::sort(market_ids.begin(), market_ids.end());
+        for (const entity_id mid : market_ids)
+        {
+            const market_component& mc = w.markets.at(mid);
+            auto& sup = basket_supply[mc.body];
+            auto& dem = basket_demand[mc.body];
+            for (std::size_t r = 0; r < resource_count; ++r)
+            {
+                sup[r] += mc.supply[r];
+                dem[r] += mc.demand[r];
+            }
+        }
+    }
+
     for (auto& [cid, pcc] : w.population_centres)
     {
         if (pcc.scale >= 5)
@@ -915,25 +941,24 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
             continue;
 
         // Met-supply ratio across the whole demand basket (BL-078): a basket-weighted
-        // mean of supply/demand over the body's market, so a centre grows only when
-        // its population's consumption is broadly met and plateaus when it is not.
+        // mean of supply/demand over the body's aggregated markets (BL-357), so a
+        // centre grows only when its population's consumption is broadly met and
+        // plateaus when it is not.
         float met_ratio = 1.0f;
-        for (const auto& [mid, mc] : w.markets)
+        if (const auto dit = basket_demand.find(body); dit != basket_demand.end())
         {
-            if (mc.body != body)
-                continue;
+            const auto& sup = basket_supply.at(body);
             float met_acc = 0.0f, met_weight = 0.0f;
             for (std::size_t r = 0; r < resource_count; ++r)
             {
-                const float b = growth_sp.demand_basket[r];
-                if (b <= 0.0f || mc.demand[r] <= 0.0f)
+                const float bw = growth_sp.demand_basket[r];
+                if (bw <= 0.0f || dit->second[r] <= 0.0f)
                     continue;
-                met_acc    += b * std::min(1.0f, mc.supply[r] / mc.demand[r]);
-                met_weight += b;
+                met_acc    += bw * std::min(1.0f, sup[r] / dit->second[r]);
+                met_weight += bw;
             }
             if (met_weight > 0.0f)
                 met_ratio = met_acc / met_weight;
-            break;
         }
         if (met_ratio < growth_sp.growth_met_threshold)
             continue;
