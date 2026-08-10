@@ -5,22 +5,31 @@
 
 namespace ui {
 
-/// Frames of stable hover before the card first APPEARS — a "glance" that still
-/// tracks the live cursor (BL-230). Assumes a 60 Hz frame, matching the
-/// existing frame-count convention (verify.frames() steps presentation frames
-/// deterministically rather than real wall time). 30 frames @ 60 Hz = 0.5 s.
-inline constexpr int kHoverAppearDelay = 30;
+/// Seconds of stable hover before the card first APPEARS — a "glance" that
+/// still tracks the live cursor (BL-230). Seconds, not frames (BL-362): the
+/// frame-count form was 0.5 s at 60 Hz but 0.2 s at 144 Hz, so the dwell the
+/// player felt depended on their monitor. Under `--verify` the caller advances
+/// this clock by a fixed 1/60 s per presentation frame, so verify.frames(30)
+/// still lands exactly on the appear threshold and captures stay deterministic.
+inline constexpr float kHoverAppearDelaySec = 0.5f;
 
-/// Total frames of stable hover (from the SAME start as kHoverAppearDelay)
+/// Total seconds of stable hover (from the SAME start as kHoverAppearDelaySec)
 /// before the card STICKS — freezes in place and starts the leave-to-dismiss
-/// rule below. 150 frames @ 60 Hz = 2.5 s total, i.e. 2 s after it appears.
-inline constexpr int kHoverStickDelay = 150;
+/// rule below. 2.5 s total, i.e. 2 s after it appears.
+inline constexpr float kHoverStickDelaySec = 2.5f;
+
+/// The fixed presentation-frame step used in place of wall-clock delta under
+/// `--verify` (ui_state::fixed_frame_clock). Golden captures are driven by
+/// frame COUNT, and verify frames run on a vsynced wall clock with real jitter,
+/// so accumulating io.DeltaTime there would put the thresholds inside the
+/// jitter band and flake the hover goldens.
+inline constexpr float kVerifyFrameSeconds = 1.0f / 60.0f;
 
 /// How far outside the card's own rect the pointer may stray before the STUCK
 /// card is dismissed (BL-228/230). The card is drawn *above* the cursor with a
 /// gap, so the cursor that froze it starts outside the rect; this pad spans
 /// that gap and leaves a forgiving margin for the trip up into the card.
-/// Only applies once the card is stuck — see kHoverStickDelay.
+/// Only applies once the card is stuck — see kHoverStickDelaySec.
 inline constexpr float kHoverCardExitPadPx = 26.0f;
 
 /// Render the floating hover card at `anchor` and report the rect it occupied.
@@ -29,10 +38,10 @@ inline constexpr float kHoverCardExitPadPx = 26.0f;
 /// width 200 px) positioned just above `anchor`. `content` is called inside the
 /// window to render the body.
 ///
-/// **Two phases (BL-230).** Between `kHoverAppearDelay` and `kHoverStickDelay`
+/// **Two phases (BL-230).** Between `kHoverAppearDelaySec` and `kHoverStickDelaySec`
 /// the card is a GLANCE: the caller re-passes the live cursor position each
 /// frame, so it tracks the pointer like an ordinary tooltip and does not yet
-/// block dismissal-by-distance. Past `kHoverStickDelay` the caller freezes
+/// block dismissal-by-distance. Past `kHoverStickDelaySec` the caller freezes
 /// `anchor` at the position it stuck at and the card becomes read-stable —
 /// it stops tracking the cursor and is dismissed only once the pointer leaves
 /// the reported rect inflated by `kHoverCardExitPadPx`, so a long line can be

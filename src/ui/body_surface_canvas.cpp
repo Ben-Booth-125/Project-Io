@@ -2574,7 +2574,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // Hover-card (BL-060, BL-020). Resolve the hovered entity in marker-priority
     // order (building > market_centre > tile — mirroring click priority). Track
     // stable hover ticks and show the lens-contextual "why not what" card after
-    // kHoverDelay frames of rest on the same entity.
+    // kHoverAppearDelaySec of rest on the same entity.
     {
         // Resolve the highest-priority entity under the cursor (shared with the
         // click path below — resolve_marker_hit, BL-362).
@@ -2600,11 +2600,13 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         if (hover_eid != state.hovered_entity)
         {
             state.hovered_entity = hover_eid;
-            state.hover_ticks    = 0;
+            state.hover_seconds  = 0.0f;
         }
         else if (hover_eid != null_entity)
         {
-            ++state.hover_ticks;
+            state.hover_seconds += state.fixed_frame_clock
+                                       ? kVerifyFrameSeconds
+                                       : ImGui::GetIO().DeltaTime;
         }
 
         // Glance-then-stick hover (BL-228/230, retires BL-200's dwell-to-open).
@@ -2612,9 +2614,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // Hovering no longer OPENS the Selection band. Opening is the click's job
         // alone — one gesture, one meaning.
         //
-        // What hover does now, in two phases: past kHoverAppearDelay the card
+        // What hover does now, in two phases: past kHoverAppearDelaySec the card
         // appears as a GLANCE and tracks the live cursor like an ordinary
-        // tooltip, so it does not yet own the pointer. Past kHoverStickDelay it
+        // tooltip, so it does not yet own the pointer. Past kHoverStickDelaySec it
         // STICKS — freezes at its current position, stops following the cursor,
         // and stays up until the pointer leaves its bounds. That makes a long
         // line readable (it cannot slide away mid-read) while still letting a
@@ -2651,7 +2653,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         if (state.hover_card_entity == null_entity &&
             hover_eid != null_entity &&
             !state.construction.active &&
-            state.hover_ticks >= kHoverAppearDelay)
+            state.hover_seconds >= kHoverAppearDelaySec)
         {
             state.hover_card_entity = hover_eid;
             state.hover_card_stuck  = false;
@@ -2661,7 +2663,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // card at its current (live-cursor) position.
         if (state.hover_card_entity != null_entity &&
             !state.hover_card_stuck &&
-            state.hover_ticks >= kHoverStickDelay)
+            state.hover_seconds >= kHoverStickDelaySec)
         {
             state.hover_card_stuck  = true;
             state.hover_card_anchor = { mouse.x, mouse.y };

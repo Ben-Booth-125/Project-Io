@@ -90,7 +90,7 @@ verify.capture("landform_span_canyon_run")
 -- glyphs had no label anywhere short of clicking through to the Selection panel.
 -- Hovering the mountain run should now name it AND give its real consequence.
 -- capture() composits a single frame, and the hover card is gated on
--- kHoverAppearDelay = 30 frames (BL-230's glance-then-stick), so the cursor must sit
+-- kHoverAppearDelaySec = 30 frames (BL-230's glance-then-stick), so the cursor must sit
 -- still for a while before the card exists. verify.frames (BL-228) is what makes that
 -- reachable from a script; without it the capture shows only the hover ring.
 verify.hover_tile(89, 10)

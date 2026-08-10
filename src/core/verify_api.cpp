@@ -165,6 +165,12 @@ int app::run_verify(const std::string& script_path, bool bless)
     ui::set_overflow_recording(true);
     ui::clear_overflows();
 
+    // BL-362: dwell clocks step a fixed 1/60 s per presentation frame here.
+    // Scripts drive dwell by frame COUNT (verify.frames), and verify frames run
+    // on the vsynced wall clock, so real deltas would put a seconds-based
+    // threshold inside the jitter band and flake the hover goldens.
+    m_ui.fixed_frame_clock = true;
+
     // Force the fixed verify capture size (verify_w × verify_h), decoupled from the
     // interactive window default (window_w × window_h) which is now larger. This
     // keeps captures + committed goldens at the 1280×720 standard regardless of the
@@ -221,8 +227,8 @@ int app::run_verify(const std::string& script_path, bool bless)
     });
     v.set_function("capture", [this](const std::string& name) { capture_frame(name); });
     // Render N frames WITHOUT capturing (BL-228). capture() composits exactly one
-    // frame, so any UI gated on elapsed frames — the hover-card delays
-    // (kHoverAppearDelay = 30, kHoverStickDelay = 150), and anything animated —
+    // frame, so any UI gated on elapsed dwell — the hover-card delays
+    // (0.5 s / 2.5 s, i.e. 30 / 150 frames at the fixed verify step), and anything animated —
     // could never be reached from a script, which is why hover behaviour had no
     // saved check at all. Deterministic: the sim stays paused, so these are pure
     // presentation frames.

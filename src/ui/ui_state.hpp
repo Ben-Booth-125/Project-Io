@@ -354,12 +354,18 @@ struct ui_state
 
     // --- hover-card state (BL-060) ---
     entity_id hovered_entity = null_entity; ///< Entity the cursor rested on last frame; used to detect stable hover.
-    int       hover_ticks    = 0;           ///< Consecutive frames of stable hover over hovered_entity; resets on entity change. Governs the transient glance (draw_hover_card).
+    float     hover_seconds  = 0.0f;        ///< Seconds of stable hover over hovered_entity; resets on entity change. Governs the transient glance (draw_hover_card).
+
+    /// Advance hover (and any future dwell clock) by a fixed 1/60 s per frame
+    /// instead of the wall-clock delta. Set only by `--verify`, whose golden
+    /// captures step whole presentation frames: real deltas there carry vsync
+    /// jitter, which would make a seconds-based threshold land nondeterministically.
+    bool fixed_frame_clock = false;
 
     // --- hover card (BL-228/230, retires BL-200 dwell-to-open) ---
     // Hovering no longer OPENS anything. The card has two phases: a GLANCE that
-    // appears after kHoverAppearDelay and still tracks the live cursor, then a
-    // STUCK freeze after kHoverStickDelay that stops following the pointer and
+    // appears after kHoverAppearDelaySec and still tracks the live cursor, then a
+    // STUCK freeze after kHoverStickDelaySec that stops following the pointer and
     // stays put until the cursor leaves its bounds — so the player can read a
     // long line to its end without the card sliding away. Opening the
     // Selection band is the click's job alone — one gesture, one meaning.

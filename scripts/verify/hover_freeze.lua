@@ -5,10 +5,10 @@
 -- when initially open, and take 1/2 a second before they appear, then 2
 -- seconds before they stick. From cursor pov they are behind tiles until they
 -- stick, but from a rendering pov they are always in front." So, two phases:
---   1. Hovering an entity for kHoverAppearDelay (30 frames @ 60 Hz = 0.5 s)
+--   1. Hovering an entity for kHoverAppearDelaySec (30 frames @ 60 Hz = 0.5 s)
 --      summons the card as a GLANCE - it tracks the live cursor like an
 --      ordinary tooltip and does not yet own the pointer.
---   2. Past kHoverStickDelay (150 frames total = 2.5 s, i.e. 2 s after it
+--   2. Past kHoverStickDelaySec (150 frames total = 2.5 s, i.e. 2 s after it
 --      appeared) the card STICKS - freezes at its current position, stops
 --      following the cursor, and is dismissed only once the pointer leaves
 --      its bounds (+ the exit pad spanning the gap to the anchor).
