@@ -1,17 +1,17 @@
 #include "river_generation.hpp"
 
+#include "hex_neighbors.hpp"
+
 #include <algorithm>
 #include <queue>
 #include <random>
 
 namespace {
 
-// Odd-r offset hex neighbour tables, direction order E, NE, NW, W, SW, SE — mirrors
-// placement_rules.cpp's is_coastal tables. Tabulated independently here to keep this
-// pass a self-contained sibling (BL-051 convention) rather than reaching into
-// placement_rules for a shared constant.
-constexpr int even_off[6][2] = { {+1, 0}, {0, -1}, {-1, -1}, {-1, 0}, {-1, +1}, {0, +1} };
-constexpr int odd_off[6][2]  = { {+1, 0}, {+1, -1}, {0, -1}, {-1, 0}, {0, +1}, {+1, +1} };
+// Odd-r offset hex neighbour tables, direction order E, NE, NW, W, SW, SE —
+// the canonical shared tabulation (hex_neighbors.hpp, BL-363).
+using hex_neighbors::even_off;
+using hex_neighbors::odd_off;
 
 inline int raster_idx(int col, int row, int gw)
 {
