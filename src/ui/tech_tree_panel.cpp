@@ -146,8 +146,7 @@ struct constellation_geometry
 struct tech_geometry_cache
 {
     const tech_tree_registry* tree = nullptr;
-    std::size_t n_techs  = 0;
-    std::size_t n_quests = 0;
+    std::uint32_t generation = 0;
     std::unordered_map<int, constellation_geometry> by_era;
     std::unordered_map<int, std::vector<ImVec2>>    icons_by_era;
 };
@@ -155,13 +154,15 @@ struct tech_geometry_cache
 tech_geometry_cache& geometry_cache_for(const tech_tree_registry& tree)
 {
     static tech_geometry_cache cache;
-    if (cache.tree != &tree || cache.n_techs != tree.techs().size() ||
-        cache.n_quests != tree.quests().size())
+    // Stamp on the registry's reload generation, NOT its address or entry counts:
+    // verify.new_world reloads the same tech_tree.lua into the same app member, so
+    // both are unchanged across a reload that destroys every node this cache's
+    // `const tech_node*` values point into.
+    if (cache.tree != &tree || cache.generation != tree.generation())
     {
         cache = {};
-        cache.tree     = &tree;
-        cache.n_techs  = tree.techs().size();
-        cache.n_quests = tree.quests().size();
+        cache.tree       = &tree;
+        cache.generation = tree.generation();
     }
     return cache;
 }

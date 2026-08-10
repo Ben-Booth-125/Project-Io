@@ -35,7 +35,7 @@ Proposal, not currently wired — the panel does not arm any lens today.
 **Live world state today:**
 - **Build arming + cost** — fully live: `recipe_registry::economics()` gives `build_cost` and `resource_build_cost[]`; `placement_rules::k_extractable` drives the target list.
 - **Manage** — fully live against `world::buildings`: `workforce_target`, `active_recipe_index`/`recipe`, `decommissioned` all read and **write back** to the component.
-- **Sell Orders** — live against `state.sell_orders` and the body's `market_component`.
+- **Sell Orders** — live against `world::sell_orders` and the body's `market_component`.
 
 **Maps to mock `buildings.csv`:** `type`, `output`, `active`, `exhausted`, `corp`/`body` — enough to mock a **built-inventory / Manage roster** table (filter to player corp = 30310 Genom Systems). Note the CSV rows are the *built* estate, not a queue.
 

@@ -291,7 +291,16 @@ int app::run_verify(const std::string& script_path, bool bless)
     v.set_function("econ_step", [this](sol::optional<int> n) {
         const int steps = n.value_or(1);
         for (int i = 0; i < steps; ++i)
+        {
+            // Advance the day tick with the step. The interactive loop maintains
+            // this from sim_loop (app.cpp), but --verify drives step_economy
+            // directly with the sim paused, so without this the field stays 0 for
+            // the whole session — and anything stamped on it (the BL-362 caches,
+            // economy_system's own per-tick bookkeeping) silently never
+            // invalidates, freezing derived values across every capture.
+            ++m_world.current_day_tick;
             step_economy();
+        }
         m_ui.show_economy_panel = true;
     });
 

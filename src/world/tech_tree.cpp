@@ -40,6 +40,7 @@ void tech_tree_registry::load_from_lua(lua_state& lua)
 
     m_quests.clear();
     m_techs.clear();
+    ++m_generation; // invalidates every cache retaining a node pointer (see generation())
 
     sol::optional<sol::table> quests = (*root)["quests"];
     if (quests)

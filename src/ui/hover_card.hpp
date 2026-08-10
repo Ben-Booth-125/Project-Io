@@ -25,6 +25,23 @@ inline constexpr float kHoverStickDelaySec = 2.5f;
 /// jitter band and flake the hover goldens.
 inline constexpr float kVerifyFrameSeconds = 1.0f / 60.0f;
 
+/// Largest per-frame delta the interactive dwell clock will accept. A stall
+/// (world generation, alt-tab, a hitch) otherwise contributes its whole
+/// wall-clock length in one frame and snaps a card straight to stuck.
+inline constexpr float kHoverMaxFrameSeconds = 1.0f / 30.0f;
+
+/// Half a verify frame, subtracted when testing a dwell threshold.
+///
+/// Accumulating `1/60` in float32 does not reach the threshold on the frame the
+/// integer count would: after 150 additions the sum is 2.49999833, just under
+/// 2.5, so the card stuck at frame 151 where the old integer counter fired at
+/// 150 — and the appear threshold cleared by barely one ulp, so any change in
+/// accumulation order or FP contraction could have moved it too. Comparing
+/// against `threshold - kHoverThresholdEpsilon` restores the exact frame the
+/// verify scripts and their goldens were authored against, with half a frame of
+/// margin on either side rather than an ulp.
+inline constexpr float kHoverThresholdEpsilon = kVerifyFrameSeconds * 0.5f;
+
 /// How far outside the card's own rect the pointer may stray before the STUCK
 /// card is dismissed (BL-228/230). The card is drawn *above* the cursor with a
 /// gap, so the cursor that froze it starts outside the rect; this pad spans

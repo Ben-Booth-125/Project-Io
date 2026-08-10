@@ -113,7 +113,7 @@ extracted there enter the economy only by convoy to a Kepler market.
   BL-040 raws minable but unsellable (RESOURCES.md § What actually trades) — the standing
   market-inertness residue.
 - **The buy-order book is engine-only.** `clear_markets` implements it, and harnesses exercise
-  it, but the live app passes only `ui_state.sell_orders` — no UI path submits a buy order yet,
+  it, but the live app passes only `world::sell_orders` — no UI path submits a buy order yet,
   so preferred-seller routing is dormant in play. *Decided 2026-07-31:* the wiring waits for
   BL-160 (auto-exchange policy, v0.2.0), whose buy band is the intended player buy surface and
   whose `derive_exchange_orders` is the first live emitter — no interim manual buy tab. See the

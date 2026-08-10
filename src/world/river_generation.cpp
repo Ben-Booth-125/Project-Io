@@ -1,6 +1,6 @@
 #include "river_generation.hpp"
 
-#include "hex_neighbors.hpp"
+#include "world/hex_neighbors.hpp"
 
 #include <algorithm>
 #include <queue>

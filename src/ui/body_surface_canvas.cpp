@@ -2604,9 +2604,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         }
         else if (hover_eid != null_entity)
         {
+            // Interactive deltas are clamped: one long stall (world gen, alt-tab)
+            // would otherwise dump seconds into the accumulator in a single frame
+            // and snap a card straight to stuck.
             state.hover_seconds += state.fixed_frame_clock
                                        ? kVerifyFrameSeconds
-                                       : ImGui::GetIO().DeltaTime;
+                                       : std::min(ImGui::GetIO().DeltaTime, kHoverMaxFrameSeconds);
         }
 
         // Glance-then-stick hover (BL-228/230, retires BL-200's dwell-to-open).
@@ -2653,7 +2656,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         if (state.hover_card_entity == null_entity &&
             hover_eid != null_entity &&
             !state.construction.active &&
-            state.hover_seconds >= kHoverAppearDelaySec)
+            state.hover_seconds >= kHoverAppearDelaySec - kHoverThresholdEpsilon)
         {
             state.hover_card_entity = hover_eid;
             state.hover_card_stuck  = false;
@@ -2663,7 +2666,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // card at its current (live-cursor) position.
         if (state.hover_card_entity != null_entity &&
             !state.hover_card_stuck &&
-            state.hover_seconds >= kHoverStickDelaySec)
+            state.hover_seconds >= kHoverStickDelaySec - kHoverThresholdEpsilon)
         {
             state.hover_card_stuck  = true;
             state.hover_card_anchor = { mouse.x, mouse.y };

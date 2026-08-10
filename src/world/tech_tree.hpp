@@ -109,7 +109,14 @@ public:
     /// All techs, in authored order (the viewer filters by quest id).
     const std::vector<tech_node>& techs() const { return m_techs; }
 
+    /// Bumped by every `load_from_lua`. A UI cache that retains `const tech_node*`
+    /// into `m_techs` must stamp on THIS, not on the registry address or the entry
+    /// counts: `verify.new_world` reloads the same file into the same member, so
+    /// address and counts are both unchanged while every pointer is dangling.
+    std::uint32_t generation() const { return m_generation; }
+
 private:
     std::vector<tech_quest> m_quests;
     std::vector<tech_node>  m_techs;
+    std::uint32_t           m_generation = 0;
 };
