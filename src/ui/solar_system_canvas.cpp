@@ -1,4 +1,3 @@
-#define IMGUI_DEFINE_MATH_OPERATORS
 #include "solar_system_canvas.hpp"
 
 #include "canvas_scale.hpp"

@@ -672,6 +672,7 @@ void app::step_economy()
             case agency_event::kind::built:             return 3;
             case agency_event::kind::recipe_switch:     return 2;
             case agency_event::kind::resumed:           return 2;
+            case agency_event::kind::hired:             return 3;
             case agency_event::kind::road_placed:       return 1;
             case agency_event::kind::workforce_set:     return 1;
             case agency_event::kind::survey_dispatched: return 1;
@@ -729,6 +730,9 @@ void app::step_economy()
             case agency_event::kind::survey_dispatched:
                 text = "We confirm new exploratory activity within our claims.";
                 break;
+            case agency_event::kind::hired:
+                text = "We acknowledge the mustering of a private security formation on our soil.";
+                break;
             }
             ui::chat_post(m_chat, static_cast<int>(m_sim_loop.day_tick()), nid, 0, std::move(text));
         }
@@ -768,19 +772,35 @@ void app::step_economy()
                 m_counsel_channel[corp] = channel;
             }
 
-            for (const persona::pack& p : m_persona_bench)
+            try
             {
-                if (p.is_verdict_bench())
-                    continue; // slice 1: renders the hunting benches' reads, not aggregated verdicts yet
-                const std::vector<persona::opinion_record> ops = p.evaluate(bb);
-                if (ops.empty())
-                    continue;
-                // Bound the chat to one line per pack per eval: the heaviest opinion.
-                const persona::opinion_record* top = &ops.front();
-                for (const auto& op : ops)
-                    if (op.w > top->w) top = &op;
+                for (const persona::pack& p : m_persona_bench)
+                {
+                    if (p.is_verdict_bench())
+                        continue; // slice 1: renders the hunting benches' reads, not aggregated verdicts yet
+                    const std::vector<persona::opinion_record> ops = p.evaluate(bb);
+                    if (ops.empty())
+                        continue;
+                    // Bound the chat to one line per pack per eval: the heaviest opinion.
+                    const persona::opinion_record* top = &ops.front();
+                    for (const auto& op : ops)
+                        if (op.w > top->w) top = &op;
+                    ui::chat_post(m_chat, tick, corp, channel,
+                                 p.id() + ": " + p.phrase_for(*top));
+                }
+            }
+            catch (const std::exception& e)
+            {
+                // BL-353: same policy as the load-time guard in load_economy — a
+                // pack that loads clean but throws on live data (sol2 errors
+                // surface as std::runtime_error) disables counsel rather than
+                // killing the session mid-tick. One visible line in the counsel
+                // channel; the detail goes to stderr like the load failure does.
+                std::fprintf(stderr, "ProjectIo: persona counsel packs disabled: %s\n", e.what());
                 ui::chat_post(m_chat, tick, corp, channel,
-                             p.id() + ": " + p.phrase_for(*top));
+                              "The counsel bench has been dismissed: an advisory pack failed.");
+                m_persona_bench.clear();
+                break; // bench gone; nothing left to evaluate for the remaining corps
             }
         }
     }

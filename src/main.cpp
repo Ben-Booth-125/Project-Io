@@ -59,6 +59,7 @@ const char* corp_command_result_name(corp_command_result r)
         case corp_command_result::rejected_placement: return "rejected_placement";
         case corp_command_result::rejected_funds:    return "rejected_funds";
         case corp_command_result::rejected_state:    return "rejected_state";
+        case corp_command_result::rejected_tech_locked: return "rejected_tech_locked";
     }
     return "rejected_invalid";
 }

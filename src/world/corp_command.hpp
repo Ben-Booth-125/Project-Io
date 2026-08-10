@@ -69,6 +69,7 @@ enum class corp_command_result : uint8_t
     rejected_placement,     ///< construct_building / place_road refused the tile.
     rejected_funds,         ///< Solvency check inside the seam refused the spend.
     rejected_state,         ///< No-op in current state (already idle, survey in progress, ...).
+    rejected_tech_locked,   ///< BL-344: the corp has not earned the tech that unlocks this type.
 };
 
 /// Apply one command through the player-grade seams. Deterministic; a rejected

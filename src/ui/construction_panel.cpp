@@ -235,9 +235,13 @@ resource_type primary_output_resource(const recipe& r)
 void draw_selected_section(world& w, const recipe_registry& reg,
                            const economy_report& report, ui_state& state)
 {
-    building_component* found = nullptr;
+    building_component* found    = nullptr;
+    entity_id           found_id = null_entity; // the building's own id (Dismantle needs it)
     if (const auto bit = w.buildings.find(state.selected_entity); bit != w.buildings.end())
-        found = &bit->second;
+    {
+        found    = &bit->second;
+        found_id = bit->first;
+    }
     else
     {
         // Fall back to tile-match for the normal "select a tile, see its building" case.
@@ -245,7 +249,8 @@ void draw_selected_section(world& w, const recipe_registry& reg,
         {
             if (bld.tile == state.selected_entity)
             {
-                found = &bld;
+                found    = &bld;
+                found_id = id;
                 break;
             }
         }
@@ -270,8 +275,7 @@ void draw_selected_section(world& w, const recipe_registry& reg,
     // The plate is a SQUARE beside the text rather than a full-width banner: Menu Space
     // is 380 px at its floor, and a banner at 34% of that spends 130 px of vertical
     // budget on decoration in a column whose scarce axis is height.
-    ImDrawList*  dl        = ImGui::GetWindowDrawList();
-    const float  content_w = ImGui::GetContentRegionAvail().x;
+    ImDrawList*  dl = ImGui::GetWindowDrawList();
     {
         const float  plate = ImGui::GetFrameHeight() * 2.6f;
         const ImVec2 p     = ImGui::GetCursorScreenPos();
@@ -531,6 +535,9 @@ void draw_selected_section(world& w, const recipe_registry& reg,
                                    construction_status(rate, b.ticks_remaining).c_str());
             }
 
+            // Reopen/Close stay DIRECT: flipping a bool field in place invalidates
+            // nothing, unlike the erase Dismantle needs (routed through
+            // pending_demolish below for exactly that reason).
             if (b.decommissioned)
             {
                 if (ImGui::Button("Reopen"))
@@ -568,12 +575,13 @@ void draw_selected_section(world& w, const recipe_registry& reg,
                 ImGui::Separator();
                 if (ImGui::Button("Dismantle"))
                 {
-                    // Through the same seam an agent uses, so the two cannot diverge.
-                    demolish_building(w, w.player_entity, state.selected_entity);
-                    state.selected_entity = null_entity;
+                    // Deferred through pending_demolish, exactly like the building
+                    // Selection element: erasing from w.buildings inside the draw
+                    // pass would leave `b` dangling. app::render executes the
+                    // demolition (via demolish_building — the same seam an agent
+                    // uses) after the UI pass. See ui_state.hpp § pending_demolish.
+                    state.construction.pending_demolish = found_id;
                     ImGui::CloseCurrentPopup();
-                    ImGui::EndPopup();
-                    return; // `b` dangles past this point — the building is gone.
                 }
                 ImGui::SameLine();
                 if (ImGui::Button("Keep"))
