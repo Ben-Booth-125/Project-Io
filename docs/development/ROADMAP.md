@@ -34,10 +34,30 @@ where one is likely.
 
 ---
 
-## Where we are — v0.1.0 shipped; v0.1.1 in progress
+## Where we are — eight minors cut; the player is being redefined
 
-*Latest tag `v0.1.0`, cut 2026-08-03 (`49c7fbf`; CHANGELOG `[0.1.0] — 2026-08-03`). **The prototype
-cut has happened** — the done-definition below was met and the tag exists. Status 2026-08-04.*
+*Status 2026-08-10. Latest tag `v0.1.4`. **Eight minors are cut**: v0.1.0 (2026-08-03), then
+v0.1.1, v0.1.2, v0.1.8, v0.1.9 (all 2026-08-09) and v0.1.10, v0.1.3, v0.1.4 (all 2026-08-10) —
+seven of them in the two days of the release sprint, against zero in the six days before it. Six
+minors remain uncut in the band: **v0.1.5, v0.1.6, v0.1.7, v0.1.11, v0.1.12, v0.1.13**, plus the
+**v0.1.14** procurement minor named below. **71 open items of 311**, and since NR-101's sweep
+**none of them is unversioned**.*
+
+**Two structural facts about this map, both established 2026-08-09/10.** First, **every cut minor
+now carries a done-definition written at the cut** — before the release sprint only v0.1.0 and
+v1.0.0 had one, and those were the only two ever cut or scheduled, because *a theme with no
+done-definition has no test for finished and absorbs items indefinitely* (NR-103). Second, the
+numbering is **not the cut order**: v0.1.8/9/10 were cut before v0.1.5/6/7 because build health and
+legibility were ready and the stub minors were not. Read the band as a set of named themes, not a
+queue.
+
+**The player is being redefined (NR-120, 2026-08-10).** Ben: *"Let's place the player as a
+**national private militia**, which uses private companies to build equipment for space. So the
+flavour of trading is initially coloured directly with military use, and space equipment."* This
+**replaces** the governing-body framing that has themed the band since 2026-08-03 — it is not an
+early reading of it. The consequences are worked through in § v0.1.x and § v0.3.0 below, and the
+five-sprint sequence that acts on them is [`SPRINTS.md`](SPRINTS.md) § Sprints 8–12.
+
 The interactive economy loop is mechanically complete, legible, and discovery-gated:
 
 - **Layer 0–2** — SDL3 + fixed-timestep simulation + economy tick + sol2; the core data
@@ -94,7 +114,8 @@ construction-panel legibility bugs (BL-081/082), the corp-emblem glyph family (B
 hover-card activity line (one of the two BL-089 activity-fog deferrals). Per-item record in
 `DEVLOG.md`.
 
-**v0.1.0 — in progress (status 2026-07-31).** Landed on `main` since the tag: **roads &
+**v0.1.0 — the road to the cut (historical, status 2026-07-31; the tag exists as of 2026-08-03).**
+Landed on `main` since the tag: **roads &
 planetary logistics** (BL-146–149, complete 2026-07-10 — the generated per-nation lattice with
 three road tiers, cities as free logistics hubs, the inland logistics-hub building; built ahead
 of the cut rather than waiting for the v0.1.1 slot first planned for it); the **2026-07-08
@@ -111,11 +132,37 @@ work that landed early). What remains toward the cut is named under § v0.1.0 be
 
 The map no longer ends at the prototype cut. Ben's **2026-07-09 refocus** extends it: **v0.1.0**
 still cuts the economy-loop prototype; then the **v0.1.x** band lays groundwork for an *expanded
-prototype*, **v0.2.0** carries the AI opponent, **v0.3.0** the governing-body refocus (versioned
+prototype*, **v0.2.0** carries the AI opponent, **v0.3.0** the player-identity refocus (versioned
 as its own minor — Ben, 2026-08-04, resolving NR-045), and **v0.4.0** brings the political layer
 and the filter system online — then **v1.0.0** (Ben, 2026-08-08) names the point where all four
 cohere into one playable game. The v0.0.x themes have all shipped; the roll-up is § Where we are,
 the per-item record `DEVLOG.md`.
+
+**What v0.3.0 carries changed on 2026-08-10.** It was "the governing body"; it is now **the
+national private militia** (NR-120). The *sequence* is unaffected — the identity minor still sits
+after the AI opponent and before politics, for the reasons NR-045 settled — but what lands in it,
+and what the v0.1.x band is stubbing *for*, both change. See § v0.3.0.
+
+### The near sequence — which sprint cuts which minor
+
+Planned in one pass on 2026-08-10 and owned by [`SPRINTS.md`](SPRINTS.md) § Sprints 8–12; named
+here only so the roadmap's themes and the live sequence do not drift apart again, which is the
+failure NR-102 (sequencing decoupling) records. **This table is the plan, not a commitment** —
+amend it when a goal changes, not at the retro.
+
+| Sprint | Cuts | Theme |
+|---|---|---|
+| 8 | *(no tag)* | **Who the player is.** Design only. Rewrite BL-094 as the militia, design BL-315, file the procurement seam, reconcile v0.3.0's roster. |
+| 9 | **v0.1.5** | **The militia takes the field** — military bases & supply, a starting base and unit, military points + research. |
+| 10 | **v0.1.14** | **Procurement & its goods** — the contract seam, plus BL-340's resource tiers pulled forward. |
+| 11 | **v0.1.11** | **Reconciled** — laws and tech surfaces reframed for an actor that is subject to law rather than the source of it, plus the minor's untouched remainder. |
+| 12 | **v0.1.7** | **Generation visibility** — the Generation Ledger, field-overlay lenses, the UX review, and BL-317's owed prehistory timelapse. |
+
+**Deliberately not in the five: v0.2.0 (the AI opponent).** It is the thing that makes Io a game
+rather than a simulation, and holding it is a real cost — accepted so the opponent is built
+against a settled player identity instead of re-fitted to one. **v0.1.12** (logistics modes) and
+**v0.1.13** (markets & materials, less BL-340) are unblocked and uncontroversial; either is a good
+filler if a sprint above finishes short.
 
 ### v0.1.0 — Quality audit + legibility polish + cut
 
@@ -205,15 +252,29 @@ overtaken (2026-08-09/10):** BL-342–345 turned the stubs into buildable work, 
 were cut on 2026-08-10, and the band now runs to **v0.1.13** — the design-forward minors became
 concrete, and the tail was named when `post-v0.1.0` was swept (NR-101, below).
 
-> **What this band is FOR (Ben, 2026-08-03).** Until now the band was themed by what it stubs,
-> not by what the stubs serve. Ben's steer supplies the missing answer: the aim is to play as a
-> **governing body**, *"because it allows law, policy and science to use military might — not
-> just economic."* Laws (v0.1.3), techs (v0.1.4), military (v0.1.5) and politics (v0.1.6) are
-> therefore **the governing body's levers**, and each carries a design test it did not have:
+> **What this band is FOR — REWRITTEN 2026-08-10 (NR-120).** The band's answer used to be: the
+> player is a **governing body**, so laws (v0.1.3), techs (v0.1.4), military (v0.1.5) and politics
+> (v0.1.6) are *its levers*, tested by **"does this system reach military as well as economic
+> outcomes?"**
 >
-> **Does this system reach military as well as economic outcomes?** If a law can only change a
-> cost, or a technology can only unlock a building, it is being designed for the corporate
-> player we are pivoting away from. See BL-094 (player-identity pivot) § 2026-08-03.
+> **That test is retired**, along with the framing that produced it. The player is a **national
+> private militia** that contracts private companies to build its space equipment. A militia does
+> not legislate — **it procures**. Law, policy and science are therefore not the player's
+> instruments; they are the **conditions it operates inside**, and its agency runs through what it
+> buys, from whom, and what it can field.
+>
+> The replacement test is Sprint 8's to author (NR-120 § still_open). Until it exists, the
+> question to hold each stub against is the blunt one: **whose agency does this surface express?**
+> If the answer is "the player enacts it", check that against an actor who has no legislature.
+>
+> **What this costs, stated plainly.** v0.1.3 (Laws) and v0.1.4 (Techs) were cut on 2026-08-10,
+> *hours* before the refocus, and both were justified by the retired reason. This is **not** a call
+> to unpick them: `condition_set` (BL-342) is a generic predicate object, and one enacted law
+> (BL-343) plus one earned tech (BL-344) are working machinery that does not care who the player
+> is. What changes is **who enacts** — which makes the laws surface an *input* to the player's
+> problem rather than an output of their agency. **BL-155, BL-156 and BL-186** (v0.1.11's laws and
+> tech surfaces) are the most exposed open items on the board and must not be built before Sprint 8
+> rules on them.
 
 - **v0.1.1 — The word interface — CUT 2026-08-09.** *(Re-themed
   2026-07-31 for roads; **re-themed again 2026-08-03**, NR-034 — Ben named the word interface as
@@ -356,8 +417,10 @@ concrete, and the tail was named when `post-v0.1.0` was swept (NR-101, below).
     with an empty set meaning *always* because that is the common case for a law.
   - **The predicate can ask a military question.** BL-094's test applied at the foundation rather
     than promised for later: a subject enum that enumerates only economic quantities is the exact
-    failure the governing-body pivot exists to avoid, and it is far cheaper to avoid now than to
-    unpick.
+    failure the identity pivot exists to avoid, and it is far cheaper to avoid now than to
+    unpick. *(2026-08-10: this survives the refocus intact and is the reason v0.1.3 does not need
+    unpicking — a predicate that can ask a military question is exactly as useful when the player
+    is the one **subject** to the law as when it passes it.)*
   - **One law is enacted, enforced and visible.** Not the ten-law list; one law the player can
     switch on, whose effect lands on a number they already read. A law the player cannot see
     working is indistinguishable from an unimplemented one.
@@ -413,7 +476,13 @@ concrete, and the tail was named when `post-v0.1.0` was swept (NR-101, below).
   **Cut 2026-08-10.** **BL-344** terminal (33 assertions). Gate: 58 tests, 0 failures. One
   knock-on, taken deliberately: `buildings_rework_harness` now grants the tech in its BL-325 setup
   block, because that block tests placement and staffing rules rather than the gate.
-- **v0.1.5 — Military systems** (**BL-157**). The Conflict dimension's first data-model footing —
+- **v0.1.5 — Military systems** (**BL-157**). *Cut by **Sprint 9**, the first buildable consequence
+  of the refocus — the militia has to exist on the map before there is any point modelling what it
+  buys.* The live set is **BL-325** (military bases: a muster building, hire moved onto it, unit
+  supply read off it), **BL-331** (the player starts with a base and one unit) and **BL-332**
+  (military points + a dedicated research building), the last moved here from v0.1.11 on
+  2026-08-10: it answers *how does the militia get better*, which belongs with the military minor
+  rather than the laws one. The Conflict dimension's first data-model footing —
   units, forces, and the seams they need in the world model. Stub, not mechanics (Conflict proper
   stays post-cut scope). **Firmed up substantially by the 2026-08-07 military design session**
   (NR-077, six rulings filed in total — the rest fall under BL-315 below): unit-grain verbs
@@ -424,7 +493,7 @@ concrete, and the tail was named when `post-v0.1.0` was swept (NR-101, below).
   play; the Era −1 sandbox (v0.3.0, below) is where the same architecture gets proven under real
   simulated wars first.
 - **v0.1.6 — Politics (stub)** (**BL-158**). A data-model stub only — enough political layer for
-  the v0.3.0 governing actor to have something to own, deferring the working system to v0.4.0.
+  the v0.3.0 player actor to have something to stand in, deferring the working system to v0.4.0.
 
   **No longer design-only (2026-08-09).** **BL-345** (politics MVP) makes it cuttable, and it is
   smaller than the minor looks: BL-158's own 2026-08-02 settlement records that most of the stub
@@ -667,6 +736,29 @@ concrete, and the tail was named when `post-v0.1.0` was swept (NR-101, below).
   (**BL-192**) — whether a fresh campaign can afford and site a processor early, which its own
   settlement reframed from a generation guarantee into a measurement.
 
+  > **BL-340 has left this minor (2026-08-10, NR-120 ruling 3).** The processing roster moves to
+  > **v0.1.14** below. The refocus says trade is coloured by military use and space hardware
+  > *"initially"* — and if those goods do not exist, the colour is an assertion rather than a
+  > mechanic. The five items left here stand on their own; what they lose is a keystone, not their
+  > coherence.
+
+- **v0.1.14 — Procurement.** *(Named 2026-08-10, NR-120.)* *Theme: the militia does not build its
+  equipment — it buys it, from someone who can refuse.* The minor that carries the mechanic the
+  refocus invents, and the first place the new player identity is playable rather than specified.
+  Two halves. **The contract seam** — a counterparty, a price, a lead time, and a refusal — filed
+  in Sprint 8 because nothing in the backlog covers it today; the closest existing item is
+  **BL-280** (negotiated tax rate), which is the same *bargaining* shape pointed at a different
+  object and should be designed alongside it rather than after it. And **the goods worth
+  contracting for** — **BL-340**'s processing roster, pulled forward from v0.1.13, supplying the
+  military and space-hardware resource types that make "space equipment" a thing on the market
+  rather than a label on the premise.
+
+  **The dependency that decides this minor's size.** BL-340 is difficulty 4 and still
+  `design-owed`. It is the largest unknown in the near sequence, and the most likely thing to spill
+  a sprint. **Where this minor sits in the numbering is a convenience, not a claim** — it is
+  sequenced *ninth to tenth in build order* (Sprint 10), well ahead of v0.1.11–v0.1.13, and follows
+  the band's established habit of numbering by naming date rather than cut order.
+
 ### v0.2.0 — The AI opponent
 
 *Versioned theme: the AI opponent.* The backlog's live v0.2.0 set is the corp-AI arc: stage A
@@ -699,36 +791,57 @@ its official RL seam instead of computer-use), and **BL-253** — `run_corp_stra
 O(corps × tiles) rescan, which belongs here because it is the *opponent's* scaling term, not a
 general performance item.
 
-### v0.3.0 — The governing body (the refocus)
+### v0.3.0 — The national private militia (the refocus)
 
 *Theme: change who the player is.* **Versioned 2026-08-04** — Ben's answer to the sequencing
 question open since 2026-07-31 (NR-045): the pivot takes **its own minor**, not a share of
 v0.2.0. Sequence rationale: v0.2.0's AI opponent proves the game plays before the pivot changes
-who plays it, and the political layer (v0.4.0) needs the governing actor to exist first.
+who plays it, and the political layer (v0.4.0) needs the new actor to exist first. **That
+sequencing survives the 2026-08-10 refocus unchanged; the actor does not.**
 
-The player pivots from **corporation** to **governing body** as the strategic actor — owning
-research, military, and intelligence — while the corporation stays the **economic** actor,
-prototyped as a single chartered corp (= today's player corp) so the v0.0.x economy loop
-survives intact underneath and the governing layer is thin above it (**BL-094**, settled
-2026-07-04, **elevated and unparked 2026-08-03**, versioned v0.3.0 2026-08-04). This is the
-hinge from *economy sandbox* toward *grand strategy*: the laws / techs / military / politics
-stubbed across v0.1.x hang off an actor that can own them.
+> **REFRAMED 2026-08-10 (NR-120).** This minor was "the governing body" from 2026-08-03 to
+> 2026-08-10. Ben: *"Let's place the player as a **national private militia**, which uses private
+> companies to build equipment for space."* The militia **replaces** the governing body — Ben's
+> explicit ruling, taken against the alternatives of *an early reading of it* and *a contractor
+> to it*. Everything below is being re-specified against the militia in **Sprint 8**, and the
+> prose in this section still carries governing-body assumptions wherever it has not been marked.
 
-**Why it is the aim, in Ben's words:** *"it allows law, policy and science to use military might
-— not just economic."* A corporation's levers are all economic, so a corporate player can be
-given laws and research and both stay flavour on an economy. A governing body wields them, and
-can point them at force. That is also **Conflict's route to being load-bearing** — under a
-corporate player, laws and techs could only ever feed Trade, which is why Conflict has stayed
-the least-designed pillar.
+**What the militia is, and what it is not.** A national private militia is armed and national in
+allegiance, but it is **not the state**. It has no legislature and no ministry of science. Its
+agency is **procurement and force**: what it can buy, from whom, at what price — and what it can
+field with what it bought. The private companies are **counterparties**, not the player: an
+arm's-length supplier with a price and a possible refusal. That is a different object from
+BL-094's settled *shared treasury / prototype-of-1* call, in which the chartered corp was the
+player's own economic arm — **that call does not survive the refocus unamended**, and Sprint 8
+owns replacing it.
+
+**What this changes about the hinge.** The old framing made this the hinge from *economy sandbox*
+to *grand strategy*, on the argument that law, policy and science become instruments the player
+wields. The militia does not wield them. The hinge is narrower and more concrete: from *economy
+sandbox* to **an actor with a mission it must equip itself for**, where the economy is the supply
+market it negotiates in and Conflict is what the equipment is for. **Conflict is still the pillar
+this minor makes load-bearing** — arguably more directly than before, since force is now the
+player's *purpose* rather than one of several levers it acquires.
+
+**Three questions Sprint 8 must answer** (NR-120 § still_open), each of which changes what lands
+here: is the militia **one of the ~43 generated nations** or an entity attached to one (nation
+generation has no militia concept today); **what replaces the shared treasury** once companies are
+counterparties, since the player needs money the companies do not have; and **what replaces the
+retired design test** as the band's litmus.
 
 **The conflict spine (BL-315, filed 2026-08-07).** BL-094's own promotion cost named a "new
 conflict/military design item" as owed; the 2026-08-07 military design session filed it —
-design-owed, priority A, gated behind BL-094's sequence. It is what a governing body *commands*:
-force raised from the shared treasury, materiel drawn from the chartered corp's production,
-supply lines as live targets (CONCEPT.md § Combat) — the item that turns `resolve_battle`
-(BL-272, already shipped) from an Era −1 research tool into a campaign mechanic.
+design-owed, priority A. **Its title still names the superseded actor**, and it is promoted by the
+refocus from a follow-on to *the* item: the conflict spine is the militia's whole reason to exist,
+not a subsystem it acquires. It is what the militia *commands*: force raised and paid for,
+materiel **bought rather than internally drawn**, supply lines as live targets (CONCEPT.md §
+Combat) — the item that turns `resolve_battle` (BL-272, already shipped) from an Era −1 research
+tool into a campaign mechanic. Sprint 8 designs it.
 
-**Basic AI rivals graduate from corp-level to nation-level here.** v0.2.0's scored-utility AI
+**Basic AI rivals graduate from corp-level to nation-level here.** *(Written against the
+governing-body framing; the symmetry argument holds under the militia, but "the same
+governing-body layer" needs re-reading as "the same layer the player runs" — Sprint 8.)*
+v0.2.0's scored-utility AI
 (BL-202/203) contests Trade alone, one corp at a time. The old container for this, **BL-054**
 (nation behaviour), was closed 2026-08-07 (NR-075 cut audit) and its parts redistributed — tax/
 licences to BL-155, sentiment to BL-158, territorial fragmentation to BL-218/BL-284 — leaving one
@@ -783,8 +896,9 @@ this section's prose: **BL-317** (the wizard's prehistory timelapse, which *cons
 rather than duplicating it), **BL-314** (the unit verb family, which belongs with BL-315's conflict
 spine — it was filed against v0.1.5's stub and waits on a seam that exists only here), and
 **BL-182** (corporate borders, whose real content is an *operate-gate*: a permission over where a
-corporation may act, which is a thing a governing body grants rather than a thing a corporation
-has). The generation-flavour tail this section already flags as cut candidates — **BL-209**,
+corporation may act, which is a thing **granted** rather than a thing a corporation has — under
+the refocus the grantor is the nation the militia serves, and an operate-gate the player must
+obtain is a sharper object than one it issues). The generation-flavour tail this section already flags as cut candidates — **BL-209**,
 **BL-289**, **BL-300**, **BL-301** — is versioned here too, so that Ben's ruling cuts items with a
 home rather than items with none.
 
@@ -828,10 +942,10 @@ whole. **Not a fifth pile of new systems** — Ben's framing on naming it: reach
 current steps," i.e. it is what v0.1.x through v0.4.0 *add up to* once each lands, not a new arc
 invented on top. Its own done-definition is below, mirroring v0.1.0's.
 
-The bar, in one line: a **governing body**, contesting **both Trade and Conflict**, against **AI
-rivals doing the same** — corp-level (v0.2.0) and nation-level (v0.3.0) — with **law, policy and
-science** actually reaching military outcomes rather than staying economic flavour (BL-094's own
-design test, § v0.3.0 above).
+The bar, in one line *(restated 2026-08-10, NR-120)*: a **national private militia**, contesting
+**both Trade and Conflict**, against **AI rivals doing the same** — corp-level (v0.2.0) and
+nation-level (v0.3.0) — where the player's **procurement of force from private suppliers** is the
+mechanism that couples the two pillars, rather than trade and war running as separate games.
 
 ---
 
@@ -881,21 +995,33 @@ v0.4.0, reached by the arc already mapped above rather than by inventing new sco
 like the rest of the arc past v0.1.0 (direction, not committed line-items) but concrete enough to
 test against, the way the v0.1.0 list above is. v1.0.0 is cut when all of the following hold:
 
-- The player plays as a **governing body** — research, military and intelligence owned at the
-  nation tier — with a chartered corporation as its economic arm, not the strategic actor itself.
-  *(BL-094, v0.3.0.)*
+- The player plays as a **national private militia** — armed, national in allegiance, and *not*
+  the state — whose agency is **procurement and force**: what it can buy, from whom, at what
+  price, and what it can field with it. Private companies are **counterparties with a price and a
+  refusal**, not the player's own economic arm. *(BL-094 as rewritten in Sprint 8, v0.3.0.)*
+  **Amended 2026-08-10 (NR-120)** — the previous bar read "a governing body … with a chartered
+  corporation as its economic arm", which the refocus replaces.
+- **Procurement is a real negotiation, and space is what it is for.** The militia contracts for
+  military materiel and space hardware, on a market where a supplier can decline; the Era 0 → Era 1
+  gate (rocketry + launchpad + propellant) is the thing it is equipping toward from the opening
+  tick, not a distant unlock. *(v0.1.14; BL-340's resource tiers; ERAS.md.)*
 - **AI rivals contest both pillars.** The corp-level scored-utility AI (v0.2.0) still runs Trade;
-  nation-level AI — the runtime-actor behaviour BL-094 specifies fresh for the governing body,
-  the residual of the now-closed BL-054 — now runs Conflict too, through the same conflict spine
-  the player commands (BL-315) and the combat engine proven in the Era −1 sandbox (BL-272).
+  nation-level AI — the runtime-actor behaviour BL-094 specifies fresh, the residual of the
+  now-closed BL-054 — now runs Conflict too, through the same conflict spine the player commands
+  (BL-315) and the combat engine proven in the Era −1 sandbox (BL-272).
   Rivals are **beatable and legible** — the standing `AI_OPPONENT.md` goal — not merely present.
-- **Law, policy and science reach military outcomes**, not only economic ones — BL-094's own
-  design test — satisfied once the v0.1.3–v0.1.6 stubs (laws BL-155/186, tech BL-156/BL-087,
-  military BL-157/BL-314/BL-315, politics BL-158) have graduated into the real systems above
-  rather than stayed placeholders.
+- **Law, policy and science bear on the militia as conditions it operates inside** — an embargo it
+  must route around, a licence it must hold, a technology it can buy the output of — rather than as
+  levers it pulls. *(Amended 2026-08-10: the previous clause read "law, policy and science reach
+  military outcomes", BL-094's design test, which retired with the governing-body framing.
+  Sprint 8 authors the replacement test; until it exists this clause states the direction, not the
+  test.)* Satisfied once the v0.1.3–v0.1.6 stubs (laws BL-155/186, tech BL-156/BL-087, military
+  BL-157/BL-314/BL-315, politics BL-158) have graduated into real systems rather than stayed
+  placeholders.
 - **The political layer is real** (v0.4.0) — nations carry working political character and
   relationships generated from actual settlement/culture history, not a random draw, and the
-  player-as-governing-body has levers that pull it.
+  player has standing within it — for a militia, the relationships that decide who will sell to it,
+  who will contract it, and who will move against it.
 - **The filter system is live** (v0.4.0, Era → Filter) — content gating reads as one coherent
   model end to end, not a leftover Era enum beside a newer quest-gate concept.
 - **The player can tell whether they are winning** — a standing, not a verdict (CONCEPT.md
@@ -933,3 +1059,12 @@ Live sequencing no longer belongs in the roadmap. The weekly goal/retro rhythm i
 [`SPRINTS.md`](SPRINTS.md), the active worklist is [`REFINED.md`](REFINED.md), and the method
 (Batch Delivery, collision maps, worktrees) is [`DELIVERY.md`](DELIVERY.md). This document
 stays theme-level.
+
+**Amended 2026-08-10 — one table, and why it is here.** § The arc from here now carries a
+sprint → minor table. That is a partial walk-back of the rule above, taken deliberately and
+bounded: **NR-102 (sequencing decoupling)** records the gap NR-101's sweep left behind — every open
+item names a minor, but nothing said in what order to build them — and a roadmap that names themes
+while the sprint log names order lets the two drift until a retro notices. Sprint 1's retro caught
+exactly that drift, and this file has now committed it twice. The bound is that the table names
+**which sprint cuts which minor and nothing finer**; items, tasks and collision maps stay in
+SPRINTS.md and REFINED.md, and the table is amended when a goal changes rather than at the retro.

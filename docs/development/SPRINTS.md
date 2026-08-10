@@ -640,7 +640,8 @@ line from the format so it stops reading as data that was collected.
   Defensible as fiction (inherited, not researched); a one-line fix either way.
 - **NR-102 — sequencing decoupling** is now the standing structural item, and it is the honest
   successor to NR-101: a minor per item is not an order to build them in.
-- **v0.1.5, v0.1.6 and v0.1.7 remain uncut**, and v0.1.11 now carries ten items — the largest open
+- **v0.1.5, v0.1.6 and v0.1.7 remain uncut**, and v0.1.11 now carries ten items *(nine from
+  2026-08-10, when BL-332 moved to v0.1.5)* — the largest open
   minor in the band.
 - **Windows work still owed**, unchanged from last sprint: visual goldens stale wherever a body
   name renders, MSVC skill goldens stale for two separate reasons, and BL-341 parked until someone
