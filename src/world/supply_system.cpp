@@ -10,6 +10,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
+#include <vector>
 
 void advance_convoys(world& w)
 {
@@ -227,13 +228,16 @@ entity_id corp_representative_tile(const world& w, const corporation_component& 
     return best_tile;
 }
 
-/// Find the market entity for a given body. Returns null_entity if none exists.
+/// Find the market entity for a given body — the lowest-id one, so the pick is
+/// stable when a body hosts several markets (w.markets is an unordered_map; the
+/// first hit would inherit hash layout). Returns null_entity if none exists.
 entity_id market_for_body(const world& w, entity_id body)
 {
+    entity_id best = null_entity;
     for (const auto& [mid, mc] : w.markets)
-        if (mc.body == body)
-            return mid;
-    return null_entity;
+        if (mc.body == body && (best == null_entity || mid < best))
+            best = mid;
+    return best;
 }
 
 /// BL-148/149 logistics-node lookups, built once per dispatch pass. `pop_tile_scale`
@@ -306,12 +310,31 @@ void dispatch_convoys(world& w, const recipe_registry& reg,
     // current_day_tick is set by every tick path (app + main) before dispatch runs.
     const int day_tick = w.current_day_tick;
 
-    for (auto& [corp_id, corp] : w.corporations)
+    // Sorted id walks (the standing.hpp convention): corporations and markets are
+    // unordered_maps, and convoy insertion order — hence trade-route creation order
+    // and the serialised history_log trade_route entries — would otherwise inherit
+    // hash layout.
+    std::vector<entity_id> corp_ids;
+    corp_ids.reserve(w.corporations.size());
+    for (const auto& [id, corp] : w.corporations)
+        corp_ids.push_back(id);
+    std::sort(corp_ids.begin(), corp_ids.end());
+
+    std::vector<entity_id> market_ids;
+    market_ids.reserve(w.markets.size());
+    for (const auto& [id, market] : w.markets)
+        market_ids.push_back(id);
+    std::sort(market_ids.begin(), market_ids.end());
+
+    for (const entity_id corp_id : corp_ids)
     {
+        corporation_component& corp = w.corporations.at(corp_id);
+
         // Iterate markets (not corp pools) so we catch shortfalls even on bodies
         // where the corp has no existing pool entry.
-        for (const auto& [dest_market_id, dest_market] : w.markets)
+        for (const entity_id dest_market_id : market_ids)
         {
+            const market_component& dest_market = w.markets.at(dest_market_id);
             const entity_id dest_body = dest_market.body;
 
             for (std::size_t ri = 0; ri < resource_count; ++ri)
