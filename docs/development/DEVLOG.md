@@ -13,7 +13,9 @@ sessions can be scoped and paced with less waste.
 ## Session — Cut v0.1.3 and v0.1.4: one small predicate turned two design documents into two releases (2026-08-10, latest)
 
 Full mode, Delivery — three items, built sequentially in the main session rather than fanned out.
-Runtime: ~2h (Full, delivery + release).
+Runtime: **not tracked** — `tools/session/timer.js` was never started, so the only hard number
+is the commit span (09:24–09:53), which measures the landing, not the work. Full mode
+throughout: delivery, release, then a backlog-structure pass.
 
 **The whole session is one argument: BL-342 was the load-bearing item, and it is thirty lines of
 switch statement.** Two minors had been sitting design-forward for weeks, and last session's

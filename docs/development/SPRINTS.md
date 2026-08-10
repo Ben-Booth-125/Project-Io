@@ -31,7 +31,7 @@ and/or a version goal (v0.1.1 etc.).
 
 ---
 
-## Where things stand (2026-08-02)
+## Where things stand (updated 2026-08-10)
 
 | Sprint | Theme | State |
 |---|---|---|
@@ -40,16 +40,18 @@ and/or a version goal (v0.1.1 etc.).
 | 2b | BL-210 oral-history pivot (nations/corps rewrite) | **Closed** — all four rungs built (BL-217, BL-208, BL-218, BL-219) |
 | 3 | Corp AI stage B + skill harness | **Closed** — BL-203, BL-204 both landed |
 | 4 | Communication surface (BL-205 chat log) | **Mostly landed** — slice 1 (window, channels, agency feed) complete 2026-07-26/28; only the C-route remainder (§7 Stage C) stays open, unstaffed |
-| 5 | Era −1 history sim, 0–2000 CE (BL-271–275) | **In progress** — foundation wave (BL-272, BL-273) landed 2026-08-02; wave 2 (BL-274) ready to promote |
+| 5 | Era −1 history sim, 0–2000 CE (BL-271–275) | **In progress** — foundation wave (BL-272, BL-273) landed 2026-08-02; wave 2 (BL-274) ready to promote. Now versioned v0.3.0 with the rest of the Era −1 arc (NR-101) |
+| 6 | The release sprint | **Closed** — five versions tagged (v0.1.1, v0.1.2, v0.1.8, v0.1.9, v0.1.10); every cut minor now carries a done-definition |
+| 7 | The stub minors become releases | **Closed** — v0.1.3 and v0.1.4 cut; `post-v0.1.0` swept, every open item names a minor |
 
-**Next up:** Sprint 2b is closed — BL-218 (nations settlement rewrite) and BL-219 (corporations
-history rewrite) both landed 2026-08-02. What remains of BL-210's umbrella is its batch-sweep
-extension and TILE_GENERATION.md's share of the propagation. The natural successors are
-**BL-223 (averted rupture)**, which now has real settlement history to define the diplomacy origin
-against, and the four v0.1.2–v0.1.5 stubs (BL-155/156/157/158) that were sequenced *behind* this
-rewrite precisely so they would not be designed against Voronoi blobs — nations now have the
-history to hang policy, military and politics off. Unplanned v0.1.1 work (BL-270, the action
-dictionary) still wants a sprint of its own rather than riding on 2b.
+**Next up (2026-08-10).** The stub minors are no longer the bottleneck: v0.1.3 and v0.1.4 are cut,
+and BL-155/BL-156's remainders moved to **v0.1.11**, which now carries ten items and is the largest
+open minor in the band — the natural next sprint if the aim is to keep cutting. Two alternatives
+are equally live and are a different kind of work: **v0.1.7** (generation visibility, four items,
+the last minor before the refocus) or the first real slice of **v0.2.0 / v0.3.0**, now that the
+sweep has made both queryable. **NR-102 (sequencing decoupling)** is the standing structural item —
+every open item names a minor, but nothing says in what order to build them, and that is the gap
+NR-101's fix leaves behind.
 
 ---
 
@@ -368,6 +370,107 @@ medium (BL-205) are the scaffolding it needs to stand on, which is why it lands 
 **Not yet in scope.** Actually promoting Sprint 3 into REFINED.md task groups + `requirements.json`
 — that collision-mapping step happens at the start of Sprint 3 itself (DELIVERY.md: built fresh at
 promotion, not frozen ahead of time), not in this planning pass.
+
+---
+
+## Sprint 7 — the stub minors become releases (2026-08-10)
+
+**A goal was stated this time**, which is the first thing worth recording, because Sprint 6's
+opening finding was that the rhythm had lapsed and its direction came from a live steer rather
+than a written goal. Ben's brief named the outcome, the *sequence*, and the two standing lessons
+to apply: *"THE JOB THIS SESSION — v0.1.3 and v0.1.4, in that order."* BL-342 first, because both
+minors consume it. The retro below compares what landed against that.
+
+**Planned.** BL-342 (condition_set evaluator) → BL-343 (laws MVP) → BL-344 (techs MVP), then a
+done-definition written **at** each cut. Optional if there was room: BL-348 (province names read
+half-native) and BL-349 (a harness that over-asserts). Named as the next structural job, not as
+this sprint's: the 42 items on `post-v0.1.0` (NR-101).
+
+### What landed
+
+**Everything planned, plus both optionals, plus the structural job.**
+
+- **Two versions tagged** — `v0.1.3` (Laws) and `v0.1.4` (Techs), each with a done-definition
+  written at the cut and each naming its exclusions rather than dropping them (BL-155, BL-186,
+  BL-280, BL-156, BL-332 re-targeted to v0.1.11).
+- **Five items closed** — BL-342, BL-343, BL-344, BL-348, BL-349. Open items 76 → 71.
+- **The gate went 55 → 58 tests, 0 failures**, holding the green it first reached last sprint.
+  Three new harnesses (94 assertions between them); one existing harness needed a two-line change.
+- **NR-101 swept.** 46 assignments; every open item now names a minor.
+- **Eight review entries filed as the work happened** (NR-112–119), one of which Ben ruled the
+  same session (NR-119 — v0.1.12 and v0.1.13 stand as named).
+
+### What this sprint is actually worth remembering for
+
+**Twice, the expensive-looking job turned out to be a bookkeeping job — and the two were the same
+shape at different scales.**
+
+1. **BL-342 is about thirty lines of switch statement**, and it unblocked two minors that had been
+   design-forward for weeks. BL-155 and BL-156 had *independently* settled on the same object — "a
+   flat AND-list of atomic conditions" — and neither built it, because each was scoped design-only.
+   **The blocker was ownership, not effort.** Nobody owned the thing they both needed.
+2. **NR-101 was the same finding at document level.** Twenty of the 45 unversioned items were
+   *already assigned* by ROADMAP.md **in prose** — the whole v0.4.0 politics substrate, most of the
+   v0.3.0 Era −1 arc. The roadmap and the backlog disagreed, and the disagreement was invisible
+   because the prose was not queryable and the query did not read prose. Most of the "work" was
+   making the two documents agree.
+
+Sprint 6's lesson was *measure before you fix*. Sprint 7's is adjacent and worth having beside it:
+**before estimating a blocked thing, check whether anything is actually blocking it.** In both
+cases the answer was no — the item was unowned, or already decided somewhere unqueryable.
+
+**The design test earned its keep, concretely.** BL-094 asks *"does this system reach military as
+well as economic outcomes?"* It changed two decisions this sprint at no extra cost: `condition_set`
+shipped `military_units` / `military_strength` alongside the six economic subjects, and the tech
+gate went on the **Military Base** rather than a smelter. A design test that changes nothing is
+decoration; this one changed two things, and the second is the instance that proves the pillar the
+pivot cares about.
+
+**Two collisions between the sprint's own decisions, both caught by writing the assertion first.**
+BL-342 established that an empty `condition_set` is *true* (the common case for a law). BL-344 then
+needed the opposite for a tech — ~130 authored nodes with no gate would have earned themselves on
+the first tick. The fix is a separate `earnable` flag: **absence has to be modelled by absence, not
+by an empty predicate.** The second collision was structural — the predicate could not live in
+`tech_tree.cpp`, because that TU pulls in sol2 and is excluded from the world superset a harness
+links. Neither was in the design; both surfaced from writing the check before trusting the default.
+
+### Where the method held, and where it did not
+
+**Held — by not doing the thing.** Sprint 6's worst cost was worktree agents branching from a moved
+base (36 conflicts to integrate one commit). This sprint's three items were one dependency chain
+across ~2 files each, so they were built sequentially in the main session. That was stated as a
+call rather than defaulted into, which is what the method asks.
+
+**Held — the bench prediction paid off exactly.** `econ_stability` and `home_surface_bench` failed
+at `-j 4` and passed re-run idle, precisely as the v0.1.9 retro said they would. They assert
+absolute wall-clock, so they measure the machine. No time was lost to it because the retro had
+already said what to do.
+
+**Did not — the JSON stores got corrupted three times.** Long resolution prose is full of backticks
+(`condition_set`, `apply_budget`, `earnable`), and inside a shell heredoc those are command
+substitution: the shell silently deletes the word and the mangled text lands in the canonical store
+looking almost right. Three repair passes. Fixed durably by writing edit scripts to a file and
+running them, and saved to memory rather than re-learned next month.
+
+**Did not — the pacing signal is not being collected.** This is the *third consecutive* entry whose
+Runtime line reads "not tracked": `tools/session/timer.js` exists, the SPRINTS format block asks
+for the number explicitly, and nobody starts it. The commit span (09:24–09:53) measures the
+landing, not the work, so it is not a substitute. **Ben asked for this signal and it has quietly
+stopped existing** — either start the timer at session open as a standing step, or drop the Runtime
+line from the format so it stops reading as data that was collected.
+
+### Left for another session
+
+- **NR-115** is the one genuinely for Ben: world generation still places starting military bases
+  through the tile-only check, so a corp can begin a campaign with a base it has not researched.
+  Defensible as fiction (inherited, not researched); a one-line fix either way.
+- **NR-102 — sequencing decoupling** is now the standing structural item, and it is the honest
+  successor to NR-101: a minor per item is not an order to build them in.
+- **v0.1.5, v0.1.6 and v0.1.7 remain uncut**, and v0.1.11 now carries ten items — the largest open
+  minor in the band.
+- **Windows work still owed**, unchanged from last sprint: visual goldens stale wherever a body
+  name renders, MSVC skill goldens stale for two separate reasons, and BL-341 parked until someone
+  is at that machine.
 
 ---
 
