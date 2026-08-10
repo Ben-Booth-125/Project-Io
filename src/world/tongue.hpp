@@ -44,6 +44,15 @@ struct tongue_lexicon
     std::vector<std::string> polity;     ///< "realm" words, following a nation name.
     std::vector<std::string> settlement; ///< "town" morphemes, suffixed to a city root.
     std::vector<std::string> qualifier;  ///< Standing epithets, preceding a name.
+
+    /// Region words a province name takes ("<People> <Region>"), BL-348. NINE,
+    /// because `settlement.cpp`'s positional mapping selects from a 5-band
+    /// (north→south) axis and a 4-sector (dawnward→outer) axis: indices 0-4 are
+    /// the bands, 5-8 the sectors. Sized to that mapping deliberately, so the
+    /// name keeps carrying a FACT ABOUT THE GROUND rather than becoming
+    /// decorative — a coastal province and an interior one still read
+    /// differently, they just read differently in their own language.
+    std::vector<std::string> region;
 };
 
 /// Roll one tongue. Draws a deterministic subset of each pool with an

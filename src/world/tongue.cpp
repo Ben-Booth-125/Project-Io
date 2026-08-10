@@ -64,6 +64,12 @@ tongue_lexicon coin_lexicon(const tongue& t)
     for (int i = 0; i < 3; ++i) lex.polity.push_back(tongue_word(r, t, 2));
     for (int i = 0; i < 3; ++i) lex.settlement.push_back(tongue_lower(tongue_word(r, t, 1)));
     for (int i = 0; i < 3; ++i) lex.qualifier.push_back(tongue_word(r, t, 1 + r.pick(2)));
+
+    // BL-348: nine region words, drawn LAST so the three vocabularies above keep
+    // their exact draws — every nation and city name generated before this
+    // change is byte-identical after it. Two syllables, the length a standalone
+    // noun wears (a settlement morpheme is a suffix and runs shorter).
+    for (int i = 0; i < 9; ++i) lex.region.push_back(tongue_word(r, t, 2));
     return lex;
 }
 

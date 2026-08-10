@@ -12,7 +12,19 @@ authoritative version-history record. A local-only snapshot of `src/` is also ke
 
 ## [Unreleased]
 
-_Nothing yet._
+### Changed
+- **Province names are wholly native** (BL-348). `"<People> <Region>"` had a coined culture half and
+  an English region half since BL-290 — *Reach*, *Coast*, *inland* — which read as a bug rather than
+  a style, because the two naming systems sat side by side in one string. Each tongue now coins its
+  own nine region words, sized to the existing 5-band / 4-sector positional mapping so the name
+  still carries a fact about the ground. Drawn last in `coin_lexicon`, so every nation and city name
+  is byte-identical to before.
+- **A knife-edge test stopped voting on generation parameters** (BL-349). `settlement_harness` S7d
+  asserted a corporate-diversity floor the generator explicitly declines to guarantee, and its
+  verdict moved with `lowland_share` — so BL-338's tuning pick was simultaneously defensible on
+  drainage grounds and the green value. S7d now asserts the property that does not depend on
+  province ownership (the corporation set is not a monoculture) and *reports* the three-way split
+  instead of asserting it. Verified by the sweep the item specified: 0.15 / 0.20 / 0.25 now agree.
 
 ## [0.1.4] — 2026-08-10
 

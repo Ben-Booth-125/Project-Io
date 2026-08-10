@@ -1,5 +1,7 @@
 #include "settlement.hpp"
 
+#include "tongue.hpp" // BL-348: province region words are coined, not borrowed
+
 #include <algorithm>
 #include <array>
 #include <cstdlib>
@@ -231,14 +233,42 @@ bool creed_holds(const creed_state& cs, int culture, const char* domain)
     return false;
 }
 
-const char* region_word(int col, int row, int gw, int gh)
+/// Which of the nine region slots this anchor falls in: 0-4 are the north→south
+/// bands, 5-8 the dawnward→outer sectors. Split out from the word lookup so the
+/// POSITIONAL rule and the LANGUAGE it is spoken in stay independent — BL-348
+/// changed the second and deliberately left the first alone, because the point
+/// of naming a province for where it sits is that the name carries a fact about
+/// the ground.
+int region_slot(int col, int row, int gw, int gh)
 {
     const int band = (row * 5) / std::max(1, gh);
     const int sect = (col * 4) / std::max(1, gw);
-    static const char* bands[5] = { "northern", "upper", "middle", "lower", "southern" };
-    static const char* sects[4] = { "dawnward", "inland", "duskward", "outer" };
-    // One word from each axis; the pair is stable for a given anchor.
-    return ((band + sect) & 1) ? bands[clampi(band, 0, 4)] : sects[clampi(sect, 0, 3)];
+    // One axis or the other; the choice is stable for a given anchor.
+    return ((band + sect) & 1) ? clampi(band, 0, 4) : 5 + clampi(sect, 0, 3);
+}
+
+/// The region half of a province name, in the province's OWN tongue (BL-348).
+///
+/// Before BL-290 the whole name was Earth-flavoured, which was at least
+/// consistent. After it, the culture half was coined from the province's own
+/// phonology and this half was still English — "MelethWorirUlael Reach" put two
+/// naming systems side by side in one string, which reads as a bug rather than
+/// a style. This is consumption again, not a new mechanism: `coin_lexicon` is a
+/// pure function of the tongue, so a culture's region words are the same
+/// wherever they are asked for, without any pass sharing a stream.
+///
+/// The English table survives ONLY as the unusable-tongue fallback — a culture
+/// with no phoneme inventory cannot coin anything, and a province with no name
+/// at all would be worse than one with an out-of-register name.
+std::string region_word(const tongue_lexicon& lex, int col, int row, int gw, int gh)
+{
+    const int slot = region_slot(col, row, gw, gh);
+    if (static_cast<std::size_t>(slot) < lex.region.size())
+        return lex.region[static_cast<std::size_t>(slot)];
+
+    static const char* fallback[9] = { "northern", "upper", "middle", "lower", "southern",
+                                       "dawnward", "inland", "duskward", "outer" };
+    return fallback[clampi(slot, 0, 8)];
 }
 
 } // namespace
@@ -263,6 +293,22 @@ settlement_state run_settlement(const planetology_state& pl,
 
     const int total = gw * gh;
     rng r(seed, tag_settle);
+
+    // BL-348: each culture's region words, coined once and reused. `coin_lexicon`
+    // is a pure function of the tongue, so calling it per province would give the
+    // same answer — this only avoids re-hashing an inventory per province. An
+    // out-of-range or unusable culture yields an empty lexicon, which is exactly
+    // what `region_word`'s fallback branch is written for.
+    std::unordered_map<int, tongue_lexicon> lex_cache;
+    const auto lexicon_for = [&](int culture) -> const tongue_lexicon& {
+        const auto it = lex_cache.find(culture);
+        if (it != lex_cache.end())
+            return it->second;
+        tongue_lexicon lex;
+        if (culture >= 0 && culture < static_cast<int>(cs.cultures.size()))
+            lex = coin_lexicon(cs.cultures[static_cast<std::size_t>(culture)].speech);
+        return lex_cache.emplace(culture, std::move(lex)).first->second;
+    };
 
     // --- Score every tile once, in raster order --------------------------------
     std::vector<int> score(static_cast<std::size_t>(total), 0);
@@ -332,7 +378,7 @@ settlement_state run_settlement(const planetology_state& pl,
         const std::string people = best_c >= 0
             ? cs.cultures[static_cast<std::size_t>(best_c)].name
             : std::string("nameless");
-        p.name = people + " " + region_word(col, row, gw, gh);
+        p.name = people + " " + region_word(lexicon_for(best_c), col, row, gw, gh);
 
         out.provinces.push_back(std::move(p));
     }

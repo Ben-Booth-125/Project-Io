@@ -313,14 +313,39 @@ int main()
         check(focus_from_province(port_never, median) == industrial_focus::trade,
               "S7c  a harbour province with no furnaces reads as trade");
 
-        // The world-level diversity floor: with a settlement record supplied,
-        // no focus class should end up wholly unrepresented.
+        // The world-level diversity floor (BL-349, softened 2026-08-10).
+        //
+        // THIS USED TO ASSERT ALL THREE CLASSES REPRESENTED, and that asserted
+        // something corporation_generation.cpp explicitly declines to promise:
+        // "the last attempt's emergent set stands rather than being patched — an
+        // unmet floor is HONEST". The reroll only re-picks provinces inside a
+        // corp's own home nation, so the floor is simply unmeetable when no
+        // corp's nation holds a processing-capable province — which is a fact
+        // about who owns what after an unrelated generation change, not about
+        // corporations at all.
+        //
+        // The cost was not a red suite. It was that a knife-edge test acquired a
+        // silent vote over parameters it was never meant to constrain: at
+        // lowland_share 0.15 it passed and at 0.20/0.25 it failed, so BL-338's
+        // pick was simultaneously defensible on drainage grounds AND the green
+        // value. The implementer volunteered that, which is the only reason it
+        // was ever visible.
+        //
+        // What is asserted now is the property that does NOT depend on province
+        // ownership: the corporation set is not a MONOCULTURE. An all-one-focus
+        // world is a real defect in the derivation; a world missing one of three
+        // classes is the generator being honest about the ground it was given.
+        // The three-class split is REPORTED rather than asserted, so a genuine
+        // regression is still visible to a reader.
         std::vector<int> counts(3, 0);
         for (const auto& kv : w1.corporations)
             ++counts[static_cast<std::size_t>(kv.second.focus)];
         const int corps = static_cast<int>(w1.corporations.size());
-        check(corps < 3 || (counts[0] > 0 && counts[1] > 0 && counts[2] > 0),
-              "S7d  the world-level diversity floor holds across the corporation set");
+        const int classes_present = (counts[0] > 0) + (counts[1] > 0) + (counts[2] > 0);
+        std::printf("      (focus split: extraction %d, processing %d, trade %d, of %d corps)\n",
+                    counts[0], counts[1], counts[2], corps);
+        check(corps < 2 || classes_present >= 2,
+              "S7d  the corporation set is not a focus monoculture");
         std::printf("      (corp focus split: %d extraction / %d processing / %d trade)\n",
                     counts[0], counts[1], counts[2]);
     }

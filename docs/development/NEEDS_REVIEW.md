@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*115 entries — 20 open, 95 resolved.*
+*116 entries — 21 open, 95 resolved.*
 
 ---
 
@@ -168,6 +168,21 @@ apply_budget charges the levy on building_report rows of type extraction_site on
 > **Recommendation:** Keep both. When family (a) grows to the other three margin laws, revisit whether a levy on refined output is a separate law rather than a wider scope on this one.
 
 *Files: `src/world/budget_system.cpp`, `src/world/law.cpp`*
+
+### NR-118 — Is corporate focus diversity a guarantee, or a preference the generator states honestly?
+*question · raised 2026-08-10 · from BL-349 (S7d over-asserts), which offered this as its option 2*
+
+corporation_generation.cpp rerolls corp home provinces up to six times trying to represent all three focus classes, but only re-picks provinces INSIDE each corp's home nation -- so the floor is unmeetable when no corp's nation holds a processing-capable province. The code calls the unmet floor honest and lets the emergent set stand. BL-349 softened the test to match (option 1). Option 2 was to widen the reroll so the floor becomes meetable and keep the hard assertion.
+
+**Why it matters.** It is a design claim, not a test question: does a generated world PROMISE the player at least one rival of each focus, or does it promise only that focus follows from the ground each corp sits on? On the default seed, processing corps go 1 -> 0 as lowland_share moves, so a world with no processing rival is reachable today and nothing tells the player that is intentional.
+
+- Leave as is -- focus follows the ground, and an absent class is the ground speaking. Cheapest, and consistent with the specialists premise.
+- Widen the reroll beyond the home nation so the floor is meetable, then restore the hard assertion. Changes generated worlds.
+- Keep it emergent but SURFACE it -- if no rival of a class exists, say so somewhere the player reads, rather than leaving it silent.
+
+> **Recommendation:** Option 1 or 3. Option 2 buys a guarantee by letting a corp anchor outside its own nation, which fights BL-219's whole argument that a corp's focus is a consequence of the province it anchors to.
+
+*Files: `src/world/corporation_generation.cpp`, `tools/verify/settlement_harness.cpp`*
 
 ---
 
