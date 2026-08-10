@@ -82,7 +82,7 @@ A screen that the player navigates to inform decision making and understand what
 An overlay mode a canvas draws over its base render, selected from the canvas control strip — one active at a time (`overlay_mode`, `src/ui/ui_state.hpp`). Current roster: Supply, Market, Country, Corporation, Resource, Population, Opportunity, Production, Scarcity, Industry, Reach, Continent, and Supply-routes. See `docs/ui/LENSES.md` for each lens's surface and key.
 
 **Active (state)**
-The navigation **anchor** — the body or tile the canvas zoom ladder is currently framed around. Persists until the player navigates. Distinct from Selection: selecting an entity does not change what is Active. Backed by `ui_state.active_body` / `active_tile`. See `docs/ui/SELECTION.md`.
+The navigation **anchor** — the body or tile the canvas zoom ladder is currently framed around. Persists until the player navigates. Distinct from Selection: selecting an entity does not change what is Active. Backed by `ui_state.active_body` (a per-tile anchor proved dead and was removed, BL-363). See `docs/ui/SELECTION.md`.
 
 **Focus (state)**
 The entity **under the pointer** in the current frame — the transient hover target that drives the tooltip / hover card. Distinct from both Active and Selection. See `docs/ui/SELECTION.md`.

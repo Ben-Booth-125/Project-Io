@@ -115,8 +115,8 @@ showing the game name rather than a canvas.
 
 The shared struct is `ui_state` in `src/ui/ui_state.hpp` — the code is the
 reference; no snippet is mirrored here (an earlier copy drifted badly). The
-load-bearing members for the canvases: the `active_body` / `active_tile`
-navigation anchors, `selected_entity` (the Selection state, SELECTION.md),
+load-bearing members for the canvases: the `active_body`
+navigation anchor, `selected_entity` (the Selection state, SELECTION.md),
 `primary_level` (`canvas_level` — which rung fills the window), `overlay`
 (`overlay_mode` — **fourteen** values: `none` plus thirteen lenses, LENSES.md;
 the early `faction` mode was renamed **`country`**), and per-canvas pan/zoom.

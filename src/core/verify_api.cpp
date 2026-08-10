@@ -632,8 +632,8 @@ int app::run_verify(const std::string& script_path, bool bless)
     });
 
     // --- US-008: standing sell-order placement ------------------------------
-    // Place a standing sell order through the SAME path the construction panel's
-    // "Add sell order" button uses: push a sell_order onto m_ui.sell_orders, the
+    // Place a standing sell order through the SAME path the market ledger's
+    // "Add sell order" button uses: push a sell_order onto m_world.sell_orders, the
     // vector step_economy() feeds to clear_markets. Body resolves to the player's
     // home body. Returns the resulting sell_orders count so a script can assert the
     // order registered. Realises the placement half of US-008.
@@ -645,10 +645,10 @@ int app::run_verify(const std::string& script_path, bool bless)
             o.resource    = resource_from_name(res);
             o.quantity    = static_cast<float>(qty);
             o.floor_price = static_cast<float>(floor);
-            m_ui.sell_orders.push_back(o);
+            m_world.sell_orders.push_back(o);
             SDL_Log("verify.place_sell_order: %s x%.0f >= %.1f (n=%zu)",
-                    res.c_str(), qty, floor, m_ui.sell_orders.size());
-            return static_cast<int>(m_ui.sell_orders.size());
+                    res.c_str(), qty, floor, m_world.sell_orders.size());
+            return static_cast<int>(m_world.sell_orders.size());
         });
 
     // Read the resolved market price of `res` on the player's home body — lets a

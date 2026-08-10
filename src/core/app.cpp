@@ -412,7 +412,7 @@ void app::step_economy()
                      m_registry.logistics_cost(convoy_mode::space));
     advance_convoys(m_world);
     m_last_econ_report = run_economy_step(m_world, m_registry);
-    auto flows = clear_markets(m_world, m_registry, m_last_econ_report, m_ui.sell_orders);
+    auto flows = clear_markets(m_world, m_registry, m_last_econ_report, m_world.sell_orders);
     apply_budget(m_world, m_registry, flows, m_last_econ_report.workforce_contention,
                  &m_last_econ_report.budgets,
                  &m_last_econ_report.buildings); // BL-343: law enforcement seam
@@ -990,7 +990,8 @@ void app::render()
     // Construction panel — an ordinary fold-out tab in the shell column (BL-122),
     // one of the mutually-exclusive column occupants (ledgers + Selection).
     ui::draw_construction_panel(m_world, m_registry, m_last_econ_report, m_ui, &m_ui.show_construction_panel);
-    ui::draw_market_ledger(m_world, m_ui, m_market_history, m_ui.show_market_ledger);
+    ui::draw_market_ledger(m_world, m_ui, m_world.sell_orders, m_market_history,
+                           m_ui.show_market_ledger);
     {
         // Budget ledger (BL-171): profit chart reads the income/expenditure series;
         // the rank table's change column reads the ranking from ~4 econ ticks back.

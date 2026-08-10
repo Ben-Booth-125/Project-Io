@@ -62,15 +62,15 @@ namespace {
 // I make?" is a market question, so it now lives on the market surface rather
 // than the building surface). Columns/actions carried over faithfully from the
 // old draw_sell_orders_section (construction_panel.cpp, pre-BL-159).
-void draw_sell_orders_tab(const world& w, ui_state& state, entity_id body,
-                          const market_component* market)
+void draw_sell_orders_tab(const world& w, std::vector<sell_order>& orders,
+                          entity_id body, const market_component* market)
 {
     const entity_id corp = w.player_entity;
 
     bool any = false;
-    for (std::size_t i = 0; i < state.sell_orders.size(); ++i)
+    for (std::size_t i = 0; i < orders.size(); ++i)
     {
-        const sell_order& o = state.sell_orders[i];
+        const sell_order& o = orders[i];
         if (o.corp != corp || o.body != body)
             continue;
         any = true;
@@ -80,7 +80,7 @@ void draw_sell_orders_tab(const world& w, ui_state& state, entity_id body,
         ImGui::SameLine();
         if (ImGui::SmallButton("Remove"))
         {
-            state.sell_orders.erase(state.sell_orders.begin() + static_cast<long>(i));
+            orders.erase(orders.begin() + static_cast<long>(i));
             ImGui::PopID();
             break;
         }
@@ -99,6 +99,17 @@ void draw_sell_orders_tab(const world& w, ui_state& state, entity_id body,
     static int   add_resource = -1;
     static float add_quantity = 10.0f;
     static float add_floor    = 0.0f;
+
+    // Reset the add-order form when the selected market's body changes — the
+    // statics otherwise carry one market's resource/quantity onto another.
+    static entity_id form_body = null_entity;
+    if (form_body != body)
+    {
+        form_body    = body;
+        add_resource = -1;
+        add_quantity = 10.0f;
+        add_floor    = 0.0f;
+    }
 
     if (add_resource < 0 || market->base_price[static_cast<std::size_t>(add_resource)] <= 0.0f)
     {
@@ -134,7 +145,7 @@ void draw_sell_orders_tab(const world& w, ui_state& state, entity_id body,
         o.resource    = static_cast<resource_type>(add_resource);
         o.quantity    = add_quantity;
         o.floor_price = add_floor;
-        state.sell_orders.push_back(o);
+        orders.push_back(o);
     }
     ImGui::EndDisabled();
 }
@@ -142,6 +153,7 @@ void draw_sell_orders_tab(const world& w, ui_state& state, entity_id body,
 } // namespace
 
 void draw_market_ledger(const world& w, ui_state& s,
+                        std::vector<sell_order>& sell_orders,
                         const market_plot_history& history, bool& open)
 {
     if (!open)
@@ -265,7 +277,7 @@ void draw_market_ledger(const world& w, ui_state& s,
 
     if (s.market_ledger_view == 1)
     {
-        draw_sell_orders_tab(w, s, selected_body, &mc);
+        draw_sell_orders_tab(w, sell_orders, selected_body, &mc);
         ui::foldout_end();
         return;
     }

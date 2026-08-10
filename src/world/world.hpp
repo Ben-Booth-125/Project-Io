@@ -207,6 +207,13 @@ struct world
     /// written, and only when a lane is FIRST established.
     std::vector<trade_route> trade_routes;
 
+    /// Player-authored standing sell orders (the manual market side) — re-evaluated
+    /// every economy tick by `clear_markets` (BL-363: moved here from `ui_state`,
+    /// where real game intent sat invisible to any future save seam). Authored from
+    /// the Market Ledger's sell-orders tab; a std::vector in authoring order, stable
+    /// between ticks, so clearing consumes orders deterministically.
+    std::vector<sell_order> sell_orders;
+
     /// The append-only world history log (BL-208) — see the `history_topic` /
     /// `world_history_entry` doc comments above for the four sources and the
     /// per-topic timestamp convention. THIS is the project's first flat-binary

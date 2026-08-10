@@ -67,7 +67,6 @@ void focus_on_tile(const world& w, ui_state& ui, entity_id tile)
         return;
 
     focus_on_surface(w, ui, it->second.body);
-    ui.active_tile = tile;
 }
 
 void focus_on_entity(const world& w, ui_state& ui, entity_id entity)

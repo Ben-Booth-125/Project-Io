@@ -1,7 +1,7 @@
 -- Standing sell-order acceptance (BL-113, US-008).
 -- Proves a player can GOVERN how stock is released through the real commit path:
--- place a standing sell order (the SAME push onto ui.sell_orders the construction
--- panel's "Add sell order" button performs), tick the sim, and assert the order's
+-- place a standing sell order (the SAME push onto world.sell_orders the market
+-- ledger's "Add sell order" button performs), tick the sim, and assert the order's
 -- floor is HONOURED ahead of the anonymous auto-sell path — stock is not dumped
 -- below the floor. This is the coverage the trade flow lacked: no check placed an
 -- order through the interactive path and asserted floor precedence over auto-sell.

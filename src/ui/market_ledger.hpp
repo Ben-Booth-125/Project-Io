@@ -15,9 +15,13 @@ namespace ui {
 ///                given market and opens Sell Orders.
 /// @param history Per-market, per-resource price / supply / demand time series for
 ///                trend plots (BL-063). Empty series render as "(no data yet)".
+/// @param sell_orders The player's standing sell orders (`world::sell_orders`,
+///                BL-363) — passed mutably alongside the const world so the
+///                Sell Orders tab can add/remove entries.
 /// @param open    Open/closed flag; cleared by the close button.
 void draw_market_ledger(const world& w,
                         ui_state& s,
+                        std::vector<sell_order>& sell_orders,
                         const market_plot_history& history,
                         bool& open);
 
