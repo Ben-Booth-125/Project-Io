@@ -36,8 +36,9 @@
 //
 // Build (Linux, from repo root):
 //   SRCS=$(ls src/world/*.cpp | grep -v -E 'recipe_registry|tech_tree|world_gen_config')
-//   g++ -std=c++20 -O2 -I src tools/verify/data_creep_harness.cpp $SRCS \
+//   g++ -std=c++20 -O2 -I src tools/verify/data_creep_harness.cpp $SRCS
 //       -o build_gen/verify/data_creep_harness && ./build_gen/verify/data_creep_harness
+//   (one shell line — continuation elided so the comment stays -Wcomment-clean)
 // On Windows via CMake: the tools/verify/*.cpp glob at the foot of CMakeLists.txt
 // picks it up — `cmake --build build --target data_creep_harness`.
 

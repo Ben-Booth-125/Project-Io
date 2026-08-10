@@ -416,7 +416,7 @@ int main()
         for (const auto& [cid, corp] : sw.corporations)
             if (!finite_ok(corp.balance)) pt.finite = false;
 
-        char growth[32] = "  --  baseline";
+        char growth[48] = "  --  baseline";
         // Guard the denominator: a fast rung whose min measures exactly 0.0 (clock
         // granularity) would make growth inf and fail R6 for a measurement artefact.
         if (!sweep.empty() && sweep.back().min_ms > 0.0)
