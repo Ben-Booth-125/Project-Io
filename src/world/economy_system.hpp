@@ -63,8 +63,15 @@ struct corp_budget
     float wages       = 0.0f;
     float interest    = 0.0f; ///< BL-073: charged only while balance < 0.
 
+    /// BL-343: levies charged by enacted laws this tick — today, the extraction
+    /// levy (a per-unit charge on raw output). Zero unless a law is enacted that
+    /// reaches this corp, which is the shipped default. This is the line that
+    /// makes a law OBSERVABLE: a law the player cannot see working is
+    /// indistinguishable from an unimplemented one.
+    float levies      = 0.0f;
+
     /// The per-tick balance delta: income less every outflow.
-    float net() const { return income - expenditure - maintenance - wages - interest; }
+    float net() const { return income - expenditure - maintenance - wages - interest - levies; }
 };
 
 /// One background-corp agency action taken this tick (the BL-079 reflexes). Pure

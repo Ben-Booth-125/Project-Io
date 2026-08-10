@@ -258,6 +258,49 @@ void draw_balance_ledger(const world& w, const recipe_registry& reg,
     ImGui::TextDisabled("Policy levers - not yet wired (BL-155)");
     ImGui::Spacing();
 
+    // --- Laws in force (BL-343). ---
+    // The first law that is not a stub sits directly under the two that are, so
+    // the difference between a drawn lever and a working one is visible in one
+    // glance. A checkbox, not an enactment flow: the politics of how a law gets
+    // passed is BL-186 (laws ledger) and BL-345 (relationship axis).
+    ImGui::SeparatorText("Laws");
+    if (w.laws.empty())
+    {
+        ImGui::TextDisabled("No laws on the books.");
+    }
+    else
+    {
+        for (std::size_t i = 0; i < w.laws.size(); ++i)
+        {
+            const law& l = w.laws[i];
+            ImGui::PushID(static_cast<int>(i));
+            bool on = l.enacted;
+            if (ImGui::Checkbox(l.name.c_str(), &on))
+                ui.construction.pending_law_toggle = static_cast<int>(i);
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::BeginTooltip();
+                ImGui::Text("Cr %.2f per unit of raw output extracted, charged on the "
+                            "Levies line of the Finance card.",
+                            static_cast<double>(l.rate));
+                ImGui::TextDisabled("A law is a modifier over the market, never an "
+                                    "override of it - the price you sell at does not move.");
+                if (l.conditions.always())
+                    ImGui::TextDisabled("Unconditional once enacted.");
+                else
+                    for (const condition& c : l.conditions.all)
+                        ImGui::TextDisabled("Requires: %s",
+                                            condition_text(c, resource_name,
+                                                           building_type_name).c_str());
+                ImGui::EndTooltip();
+            }
+            ImGui::SameLine();
+            ImGui::TextDisabled("Cr %.2f / unit", static_cast<double>(l.rate));
+            ImGui::PopID();
+        }
+    }
+    ImGui::Spacing();
+
     // --- Assets. ---
     ImGui::SeparatorText("Assets");
     ImGui::Text("Buildings Owned : %d", static_cast<int>(cc.assets.size()));

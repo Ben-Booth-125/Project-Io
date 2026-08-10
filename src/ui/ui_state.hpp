@@ -104,6 +104,17 @@ struct construction_state
     /// draw pass is iterating it would invalidate the iteration.
     entity_id     pending_demolish = null_entity;
 
+    /// Pending law enact/repeal request (BL-343) — the index into `world::laws`
+    /// whose `enacted` flag the Budget ledger's law list asked to flip, or -1 for
+    /// none. Takes the same deferred path as `pending_tile` for the same reason
+    /// (UI surfaces hold only `const world&`), and is executed by `app::render`.
+    ///
+    /// This is the DEBUG TOGGLE BL-343 scopes in, deliberately not an enactment
+    /// UI: a law you cannot turn on is indistinguishable from an unimplemented
+    /// one, but the politics of *how* a law gets enacted is BL-186 (laws ledger)
+    /// and BL-345 (the relationship axis), not this item.
+    int           pending_law_toggle = -1;
+
     /// Last construction outcome, set by app after executing a request — a short
     /// human string shown by the build UI ("Built.", "Can't afford it.", …).
     std::string   last_message;

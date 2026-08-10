@@ -6,6 +6,7 @@
 #include "corporation_generation.hpp"
 #include "creeds.hpp"
 #include "history_ladder.hpp"
+#include "law.hpp" // BL-343: seed_prototype_laws
 #include "nation_generation.hpp"
 #include "orbital_system.hpp"
 #include "population_generation.hpp"
@@ -887,6 +888,10 @@ world make_hard_coded_world(world_params params, generation_report* report,
             static_cast<double>(pp.drawdown * 100.0f));
         report->stage_lines.emplace_back(buf);
     }
+
+    // BL-343: the prototype's one law, seeded UN-ENACTED so the shipped economy
+    // is unchanged until the player (or a harness) enacts it. See law.hpp.
+    seed_prototype_laws(w);
 
     return w;
 }

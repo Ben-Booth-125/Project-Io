@@ -152,12 +152,18 @@ int rollup_body(const corp_rollups& r, int card, bool drillable)
     {
         if (r.budget_measured)
         {
-            charts::bar fb[5] = {
+            // Six flows, not five: BL-343 added Levies — what enacted law took
+            // out of this quarter. It sits as its OWN bar rather than folded into
+            // maintenance, because the whole argument for the enforcement seam is
+            // that the player sees the tax as a number instead of as an
+            // unexplained worse price (law.hpp § the enforcement seam).
+            charts::bar fb[6] = {
                 {r.budget.income,      palette::positive, "Income",      false},
                 {r.budget.expenditure, palette::negative, "Inputs",      false},
                 {r.budget.maintenance, IM_COL32(190, 150, 100, 255), "Maintenance", false},
                 {r.budget.wages,       IM_COL32(150, 160, 210, 255), "Wages",       false},
                 {r.budget.interest,    IM_COL32(200, 110, 160, 255), "Interest",    false},
+                {r.budget.levies,      IM_COL32(210, 175, 90, 255),  "Levies",      false},
             };
             float peak = 0.0f;
             for (const charts::bar& b : fb) peak = std::max(peak, b.value);
@@ -171,7 +177,7 @@ int rollup_body(const corp_rollups& r, int card, bool drillable)
             const float  cw    = ImGui::GetContentRegionAvail().x;
             ImGui::Dummy({cw, bar_h});
             charts::draw_bars(ImGui::GetWindowDrawList(), p, {p.x + cw, p.y + bar_h},
-                              fb, 5, ceiling, "%.1f");
+                              fb, 6, ceiling, "%.1f");
             ImGui::Spacing();
             ImGui::Text("Net this quarter: %+.1f", static_cast<double>(r.budget.net()));
         }

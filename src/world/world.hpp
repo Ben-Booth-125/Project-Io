@@ -2,9 +2,12 @@
 
 #include "components.hpp"
 #include "corp_command.hpp" // corp_decision_ring (BL-202 strategic decision log)
+#include "law.hpp"          // law (BL-343 enacted-law list, below)
 
 #include <cstdint>
 #include <map>
+#include <set>
+#include <string>
 #include <tuple>
 #include <unordered_map>
 #include <utility>
@@ -245,6 +248,33 @@ struct world
     /// asks this question for every tile under the cursor, and the armed-build tint asks it
     /// for the whole visible grid at once, so a per-query search would be the wrong shape.
     std::unordered_map<entity_id, std::vector<float>> body_reach_cost;
+
+    /// Techs each corporation has EARNED, by tech id (BL-344). Per-corp, never
+    /// global: two corporations research independently, and a gate that read a
+    /// world-wide set would unlock a rival's content for the player. `std::map`
+    /// + `std::set` for deterministic iteration (the `corp_body_pools`
+    /// rationale). Empty at world setup — nothing is earned until a tech's
+    /// `condition_set` is satisfied and `advance_tech_gates` records it.
+    std::map<entity_id, std::set<std::string>> earned_techs;
+
+    /// Enacted and un-enacted laws (BL-343). A world-level list rather than a
+    /// per-corp one: a law is enacted over the world and charged to whoever it
+    /// applies to, which is what makes it a governing-body instrument rather
+    /// than a corporate setting (BL-094). A `std::vector` in authored order;
+    /// evaluation order is therefore fixed and the money loop is deterministic.
+    std::vector<law> laws;
+
+    /// True iff `corp` has earned `tech_id`. The single read point for the tech
+    /// gate and for `condition_subject::research`, so the two cannot disagree.
+    ///
+    /// @param corp    Corporation entity id.
+    /// @param tech_id Tech id as authored in scripts/tech_tree.lua.
+    /// @return        Whether that corporation has earned that tech.
+    bool has_tech(entity_id corp, const std::string& tech_id) const
+    {
+        const auto it = earned_techs.find(corp);
+        return it != earned_techs.end() && it->second.count(tech_id) != 0;
+    }
 
     /// Strategic AI decision log (BL-202): a fixed 256-entry ring of the most
     /// recent corp commands + score rationale, in deterministic application
