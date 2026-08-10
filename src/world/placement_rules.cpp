@@ -147,8 +147,19 @@ bool is_coastal(const world& w, entity_id tile_id)
     const int gw = body_it->second.grid_width;
     const int gh = body_it->second.grid_height;
 
-    // Build a tile lookup: flat_index → entity_id for this body.
-    // (Only for the body's tiles — most calls are short-circuit on first ocean hit.)
+    // Neighbour resolution goes through the per-body raster index when it is built
+    // (world.body_tile_index, the BL-077 derived cache) — O(1) per neighbour. This
+    // stopped being a cold player-action path once corp_ai began calling the
+    // placement family per candidate tile per evaluation (BL-360). This function
+    // holds const world& so it cannot build the index itself; a world where it is
+    // absent (hand-built harness fixtures, pre-index calls) falls back to the old
+    // per-body linear scan, which resolves the same neighbour.
+    const std::vector<entity_id>* raster = nullptr;
+    if (const auto rit = w.body_tile_index.find(body);
+        rit != w.body_tile_index.end()
+        && rit->second.size() == static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh))
+        raster = &rit->second;
+
     // Odd-r offset neighbours (pointy-top hexes).
     static const int even_off[6][2] = {{+1,0},{0,-1},{-1,-1},{-1,0},{-1,+1},{0,+1}};
     static const int odd_off[6][2]  = {{+1,0},{+1,-1},{0,-1},{-1,0},{0,+1},{+1,+1}};
@@ -164,8 +175,20 @@ bool is_coastal(const world& w, entity_id tile_id)
         if (ncol < 0) ncol += gw;
         else if (ncol >= gw) ncol -= gw;
 
-        // Find the neighbour tile by scanning tiles on this body.
-        // Linear scan is acceptable — this is a player-action path, not a hot loop.
+        if (raster != nullptr)
+        {
+            const entity_id nid = (*raster)[static_cast<std::size_t>(nrow)
+                                                * static_cast<std::size_t>(gw)
+                                            + static_cast<std::size_t>(ncol)];
+            if (nid == null_entity)
+                continue;
+            const auto nit = w.tiles.find(nid);
+            if (nit != w.tiles.end() && is_ocean_tile(nit->second.composition))
+                return true;
+            continue;
+        }
+
+        // Fallback: find the neighbour by scanning tiles on this body.
         for (const auto& [nid, ntc] : w.tiles)
         {
             if (ntc.body == body && ntc.grid_x == ncol && ntc.grid_y == nrow)

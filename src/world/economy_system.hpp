@@ -6,6 +6,7 @@
 
 #include <array>
 #include <map>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -101,6 +102,13 @@ struct agency_event
 struct economy_report
 {
     std::vector<building_report> buildings;
+
+    /// Building id → index into `buildings`, filled once by run_economy_step after
+    /// the production pass (BL-360). estimate_building_profit resolves its row here
+    /// rather than scanning `buildings` — that scan was O(B²) per tick under the
+    /// BL-079 reflex loop and the BL-202 strategic step. Empty on a hand-built
+    /// report; readers then fall back to the scan.
+    std::unordered_map<entity_id, std::size_t> building_row;
 
     /// Background-corp agency actions taken this tick (BL-079), in the
     /// deterministic order they were applied. See agency_event.
