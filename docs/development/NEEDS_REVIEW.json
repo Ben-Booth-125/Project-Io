@@ -2161,6 +2161,48 @@
     "v0.3.0 roster (21 open items) reconciled: grepped every item for stale 'governing' language. Only BL-333 (nuclear arc) and BL-182 (corporate borders) needed touching — both patched with dated notes. The other 19 (mostly the Era -1 sandbox: BL-274/277/296/297/298/299/300/301/289/209/316/318/320/321/337, plus BL-087/314) were already actor-agnostic and needed nothing.",
     "CONCEPT.md, SYSTEMS.md, GLOSSARY.md corrected as dated notes per the authority time-slice (DELIVERY.md § Design state) — not a silent rewrite. GLOSSARY.md's 'Governing body' entry replaced by 'Militia (national private militia)', with 'Corporation' repointed."
    ]
+  },
+  {
+   "id": "NR-121",
+   "title": "BL-325 S2's hire path was never positively observed firing for a rival corp — construction can stall indefinitely on steel-poor tiles",
+   "raised": "2026-08-10",
+   "kind": "observation",
+   "status": "open",
+   "source": "Sprint 9 (cut v0.1.5) — debugging why ai_skill_harness's hire_unit tally stayed at 0 after adding corp_ai's military_base build candidate",
+   "what": "BL-325 S2 makes hire_unit require a target tile carrying the corp's own COMPLETED military_base. Landing this exposed that corp_ai's build-candidate loop never proposed military_base at all (only extraction_site/processing_facility), so no rival corp could ever satisfy the new precondition. Fixed by adding a muster-base build candidate, gated on BL-344's tech (E0-ML-01) and competing on merit in the nice_to_have bucket.\n\nThat fix compiles, is tech-gate-aware, and does not corrupt any golden band's correctness (net-worth/solvency bands unchanged; survival_fraction and build-thrash re-blessed with a documented reason). BUT: instrumented tracing across ai_skill_harness's five frozen seeds (300 ticks each) found ticks_remaining on the built military_base NEVER reaches zero for any corp observed - construction_progress stays at 0.000 for the whole traced window.\n\nRoot cause: BL-095's pay-as-you-build model rates construction progress by the LOCAL MARKET's recent steel supply (economy_system.cpp's run_construction). If the tile the muster candidate picks (nearest can_place-valid tile to the corp's HQ) sits in a market catchment with no steel throughput, the build's rate is permanently 0 and it never completes - not a crash, not a rejection, just an indefinitely-stalled building sitting in the corp's asset list.\n\nThis is NOT new to military_base - extraction_site and processing_facility candidates carry the exact same resource_build_cost[steel] risk. It has simply never been exercised in this harness before, because the pre-change baseline ran ZERO build actions across all five seeds (the generated world starts already built out; corp_ai only ever dialled existing buildings, never built new ones through its own candidate loop). BL-325 S2 is the first thing to actually exercise corp_ai's OWN build-to-completion path in this specific harness.",
+   "why_it_matters": "BL-325's own done-definition (v0.1.5, ROADMAP.md) states hire_unit was not positively verified firing end-to-end for a rival corp in the harness. The muster/hire SURFACE is real and correct by inspection (S1 through S2's precondition, the candidate generation, the tech gate) but the END-TO-END rival-corp behavior — build a base, have it complete, then hire — was not observed within five seeds x 300 ticks. Player-corp hiring is unaffected (BL-331 seeds the player's base pre-built, bypassing construction entirely via author_building).",
+   "asks": [
+    "Should the muster-base candidate's tile search prefer a tile whose local market already carries steel supply, rather than purely nearest-to-HQ? This would fix the observed stall but adds market-awareness to a candidate that was deliberately kept simple (no glut forecasting) per BL-325's own scope.",
+    "Is a stalled-forever construction an acceptable steady state for ANY building type, or does BL-095's model need a floor/timeout that this finding is the first real evidence for? This is bigger than BL-325 if true.",
+    "Should ai_skill_harness's 300-tick window be extended, or is 'construction can permanently stall on a resource-poor site' simply the correct, intended behavior the golden should reflect (i.e., not every corp gets to muster, by design)?"
+   ],
+   "affects": [
+    "BL-325",
+    "src/world/corp_ai.cpp",
+    "src/world/economy_system.cpp",
+    "tools/verify/ai_skill_harness.cpp"
+   ]
+  },
+  {
+   "id": "NR-122",
+   "title": "Full CTest gate is not green on main — 3 pre-existing failures found while verifying Sprint 9, confirmed unrelated by baseline re-run",
+   "raised": "2026-08-10",
+   "kind": "observation",
+   "status": "open",
+   "source": "Sprint 9 (cut v0.1.5) — running the full local suite (60 tests) before committing",
+   "what": "Running `ctest --test-dir build_linux` on this machine surfaces 3 failing tests: `econ_stability` (R6, the largest swept-world tick-time bound), `home_surface_bench` (worst preview under the 1s ceiling — observed 1169.7ms), and `history_sim_harness` (6 sub-failures: R7 the ~2.1s run-time budget, plus R3a/R3a2/R3a3/R3b/R5 — the far-campaign objective, supply stall and winter-campaign checks in the Era -1 sim's BL-277 scorer).\n\nNone of these three touch any file this sprint changed (corp_ai.cpp, corp_command.cpp, selection_panel.cpp, world_audit.cpp, ai_skill_harness.cpp) — economy_system.cpp, generation_preview.cpp and the settlement/combat/diplomacy sim files are untouched.\n\nConfirmed pre-existing rather than assumed: git-stashed every Sprint 9 source change, rebuilt, and reran `history_sim_harness` (the largest/most substantive of the three) in isolation on the clean b039098 baseline. IDENTICAL 6 failures, same labels, same run stats (82 provinces -> 1755, 267 battles, 165737ms). Stash popped and Sprint 9's changes restored before this entry was written.\n\nThe two timing-threshold failures (econ_stability, home_surface_bench) were not independently re-verified against baseline the same way — they are absolute-millisecond ceilings on a shared/loaded machine, the same class of flake the project has already documented once (BL-258: 'a build-configuration artefact rather than a regression... the Windows tree is deliberately Debug'). Judged low-risk to leave unverified given zero file overlap with this sprint, but that is an inference, not a second confirmed isolation.",
+   "why_it_matters": "CLAUDE.md/DEVELOPMENT_PRACTICES treat a green CTest gate as the normal bar before a Full-mode commit. This session's gate is red for reasons unrelated to its own work, confirmed for the largest failure by baseline re-run (Sprint 6's own standing lesson: 'a green gate can lie... build the same commit in a throwaway worktree' — the inverse check, a RED gate on baseline, is the same discipline). Sprint 9's commit proceeds on that evidence rather than blocking on an unrelated pre-existing gap, but the gap itself is real and un-owned as of this entry.",
+   "asks": [
+    "Is history_sim_harness's R7 (the ~2.1s run-time budget) the same class of issue as BL-320 (named directly in the FAIL label — 'R7 a full 0->1960 run fits the ~2.1s measured budget (BL-320)')? If BL-320 already owns this, this entry can resolve by pointing at it rather than duplicating.",
+    "Are R3a/R3a2/R3a3/R3b/R5 (the far-campaign and winter-campaign checks) a real regression in the Era -1 scorer, or themselves an environment-timing artifact given they sit in the same harness as the R7 timing failure? Needs someone to read the actual assertions, not just note they fail.",
+    "Should econ_stability and home_surface_bench get the same baseline-isolation treatment this entry gave history_sim_harness, to close the inference gap noted above?"
+   ],
+   "affects": [
+    "tools/verify/history_sim_harness.cpp",
+    "tools/verify/econ_stability_harness.cpp",
+    "tools/verify/home_surface_bench.cpp",
+    "BL-320"
+   ]
   }
  ]
 }

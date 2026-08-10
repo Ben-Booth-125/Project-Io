@@ -949,6 +949,43 @@ mechanism that couples the two pillars, rather than trade and war running as sep
 
 ---
 
+## Done-definition — v0.1.5 (military systems, cut by Sprint 9)
+
+*Written at the cut, per NR-103's fix — a theme with no done-definition has no test for finished.*
+
+v0.1.5 is **the militia's first buildable surface**, not campaign-scale Conflict (BL-315 stays
+post-cut scope). Cut when all of the following hold:
+
+- **A muster building exists and gates hiring.** `military_base` (BL-325 S1) places like any
+  building; hiring a unit (BL-324) requires a target tile carrying the corp's own COMPLETED base —
+  hire-anywhere is retired (BL-325 S2).
+- **The player starts equipped.** Generation seeds the player corp with one base and one unit on a
+  home-province tile, deterministically (BL-331 — found already landed under a mislabeled commit,
+  `2eb8654`, and verified rather than rebuilt this sprint; see `tools/verify/world_audit.cpp`'s
+  new BL-331 PASS/FAIL check).
+- **Rival corps can reach the same surface.** `corp_ai` proposes a `military_base` build the
+  moment a rival corp holds none — gated on BL-344's tech (E0-ML-01), competing on merit in the
+  same nice_to_have bucket as extraction/processing — so a background corp is not permanently
+  locked out of hiring the way it was before this sprint (a real gap the S2 precondition exposed:
+  the existing build-candidate loop never proposed `military_base` at all).
+- **Out-of-supply decay is designed but not required for the cut.** BL-325 S3 (unit strength
+  decay beyond the logistics reach field) stays open — the muster/hire surface is complete without
+  it, and S3 is independent of S1/S2 by the item's own sequencing.
+- **Military points and the research building are designed, not built.** BL-332 answers the
+  resource-vs-rate, points-vs-deeds and who-else-accumulates questions Ben raised at filing, but
+  its actual build re-versions to **v0.1.14** (Sprint 10) alongside BL-340 — both are new
+  stockpiled-quantity plumbing, cheaper landed together than duplicated.
+
+**What this cut does NOT claim.** `hire_unit` was not positively observed firing end-to-end for a
+rival corp within `ai_skill_harness`'s five-seed, 300-tick window — construction on the tiles the
+new candidate picks can stall indefinitely if the local market carries no steel (BL-095's
+pay-as-you-build model, a pre-existing property this sprint is the first thing to actually
+exercise via `corp_ai`'s own build path in this harness). Recorded as an open finding rather than
+forced to pass by tuning a score; see `ai_skill_harness`'s 2026-08-10 golden-band comment and
+NEEDS_REVIEW.json.
+
+---
+
 ## Done-definition — v0.1.0 (the prototype cut)
 
 v0.1.0 is the **economy loop, validated and playable end-to-end** — not the full game. It remains

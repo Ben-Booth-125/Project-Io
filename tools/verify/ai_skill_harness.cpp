@@ -43,6 +43,7 @@
 #include "world/hard_coded_world.hpp"
 #include "world/market_clearing.hpp"
 #include "world/recipe_registry.hpp"
+#include "world/tech_gate.hpp" // BL-325 S2: advance_tech_gates must run for military_base to ever unlock
 #include "world/world.hpp"
 
 #include <algorithm>
@@ -116,6 +117,18 @@ recipe_registry make_registry()
     hub.resource_build_cost[static_cast<std::size_t>(resource_type::steel)] = 30.0f;
     reg.set_economics(building_type::inland_logistics_hub, hub);
 
+    // Mirrors scripts/economy.lua's military_base row exactly (BL-325 S1).
+    // Needed now that corp_ai proposes military_base build candidates (BL-325
+    // S2's muster-base fix) — an un-set entry would give it a zero build_cost
+    // and understate a rival corp's real spend.
+    building_economics base;
+    base.maintenance          = 15.0f;
+    base.base_wage            = 10.0f;
+    base.build_cost           = 300.0f;
+    base.build_duration_ticks = 4.0f;
+    base.resource_build_cost[static_cast<std::size_t>(resource_type::steel)] = 35.0f;
+    reg.set_economics(building_type::military_base, base);
+
     recipe steel;
     steel.name = "steel";
     steel.inputs[static_cast<std::size_t>(resource_type::iron_ore)] = 2.0f;
@@ -138,13 +151,19 @@ recipe_registry make_registry()
 }
 
 /// One full sim tick: economy step (incl. the BL-202 strategic tier, which
-/// commands every due non-player corp) -> market clearing -> budget.
+/// commands every due non-player corp) -> market clearing -> budget -> tech
+/// gates. Tech-gate advancement was missing here before BL-325 S2 — no
+/// harness corp could ever earn E0-ML-01, so military_base could never be
+/// built and hire_unit silently zeroed out (caught rerunning this golden
+/// after S2 landed). main.cpp / core/app.cpp both call this every real tick;
+/// this brings the harness's rollout back in line with actual play.
 void run_tick(world& w, const recipe_registry& reg, int tick)
 {
     w.current_day_tick = tick;
     const economy_report rep = run_economy_step(w, reg);
     const auto flows = clear_markets(w, reg, rep, {});
     apply_budget(w, reg, flows, rep.workforce_contention, nullptr);
+    advance_tech_gates(w);
 }
 
 // ---------------------------------------------------------------------------
@@ -414,12 +433,36 @@ const std::vector<seed_golden> goldens = {
 //
 // The MSVC set above remains stale for its own (2026-08-09) reason and additionally
 // for this one; it needs its own fresh Windows run.
+// RE-BLESSED 2026-08-10 (BL-325 S2 — corp_ai now proposes a military_base
+// build the moment a rival corp holds none, gated on the E0-ML-01 tech and
+// competing on merit against extraction/processing in the same nice_to_have
+// bucket). This is the first thing to actually exercise corp_ai's OWN build
+// path completing construction inside this harness — the pre-change baseline
+// ran 0 build actions across all five seeds, because the generated world
+// starts already built out and corp_ai only ever dialled it. That gave a
+// build_max/survival band tuned against a world where corp_ai never builds
+// anything, which the new candidate exposed as untested rather than correct.
+//
+// Net-worth/solvency bands are UNCHANGED — the muster-base spend (build_cost
+// 300, a small fraction of a corp's balance) does not move them outside the
+// existing tolerance. survival_fraction moved on seeds 1 and 4 specifically
+// (both now finish at 1.00, where every AI corp holds at least one active
+// asset). HYPOTHESIS, not measurement (matching the standing rule for seed
+// 4's own prior widening below): a corp mid-build on a military_base is
+// still "active" by this metric's own definition even while its base sits
+// stalled awaiting local steel supply (BL-095's pay-as-you-build model —
+// most muster candidates observed getting picked up have their construction
+// STALL indefinitely on tiles whose local market never carries steel, so
+// hire_unit was NOT observed firing in this harness's five seeds; flagged in
+// BL-325's design record rather than forced to pass by tuning a score). If a
+// later run finds hire_unit consistently absent even after a genuine
+// steel-routing fix, treat that as the open question, not this band.
 const std::vector<seed_golden> goldens = {
     { 0, {141000.0f, 331000.0f}, { 45000.0f, 105000.0f}, 20, {0.45f, 0.95f},  5, 230 },
-    { 1, {112000.0f, 262000.0f}, { 42000.0f, 100000.0f}, 10, {0.45f, 0.95f},  5, 290 },
+    { 1, {112000.0f, 262000.0f}, { 42000.0f, 100000.0f}, 10, {0.45f, 1.00f},  5, 290 },
     { 2, {194000.0f, 454000.0f}, { 59000.0f, 140000.0f}, 12, {0.45f, 0.95f},  5, 315 },
     { 3, {100000.0f, 235000.0f}, { 34000.0f,  81000.0f}, 15, {0.45f, 0.95f},  5, 240 },
-    { 4, {207000.0f, 485000.0f}, { 73000.0f, 172000.0f},  8, {0.20f, 0.80f},  5, 410 },
+    { 4, {207000.0f, 485000.0f}, { 73000.0f, 172000.0f},  8, {0.20f, 1.00f},  6, 410 },
 };
 #else
 #error "ai_skill_harness: no blessed golden band set for this toolchain (BL-252). \

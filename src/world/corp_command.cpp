@@ -254,6 +254,27 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             if (w.tiles.find(cmd.tile) == w.tiles.end())
                 return corp_command_result::rejected_invalid;
 
+            // BL-325 S2: hire moves onto the base. cmd.tile must carry the corp's
+            // own COMPLETED military_base — supersedes hire-anywhere (BL-324). A
+            // base under construction (ticks_remaining > 0) or a decommissioned
+            // one does not qualify, mirroring the completed-hub idiom
+            // (supply_system.cpp's inland_logistics_hub check).
+            {
+                bool has_muster_base = false;
+                for (const auto& [bid, bc] : w.buildings)
+                {
+                    if (bc.tile == cmd.tile && bc.type == building_type::military_base
+                        && bc.ticks_remaining <= 0 && !bc.decommissioned
+                        && owns(w, cmd.corp, bid))
+                    {
+                        has_muster_base = true;
+                        break;
+                    }
+                }
+                if (!has_muster_base)
+                    return corp_command_result::rejected_placement;
+            }
+
             if (!debit_hire_cost(w, cmd.corp, row))
                 return corp_command_result::rejected_funds;
 

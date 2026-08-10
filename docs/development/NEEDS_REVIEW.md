@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*118 entries — 20 open, 98 resolved.*
+*120 entries — 22 open, 98 resolved.*
 
 ---
 
@@ -178,6 +178,32 @@ corporation_generation.cpp rerolls corp home provinces up to six times trying to
 > **Recommendation:** Option 1 or 3. Option 2 buys a guarantee by letting a corp anchor outside its own nation, which fights BL-219's whole argument that a corp's focus is a consequence of the province it anchors to.
 
 *Files: `src/world/corporation_generation.cpp`, `tools/verify/settlement_harness.cpp`*
+
+### NR-121 — BL-325 S2's hire path was never positively observed firing for a rival corp — construction can stall indefinitely on steel-poor tiles
+*observation · raised 2026-08-10 · from Sprint 9 (cut v0.1.5) — debugging why ai_skill_harness's hire_unit tally stayed at 0 after adding corp_ai's military_base build candidate*
+
+BL-325 S2 makes hire_unit require a target tile carrying the corp's own COMPLETED military_base. Landing this exposed that corp_ai's build-candidate loop never proposed military_base at all (only extraction_site/processing_facility), so no rival corp could ever satisfy the new precondition. Fixed by adding a muster-base build candidate, gated on BL-344's tech (E0-ML-01) and competing on merit in the nice_to_have bucket.
+
+That fix compiles, is tech-gate-aware, and does not corrupt any golden band's correctness (net-worth/solvency bands unchanged; survival_fraction and build-thrash re-blessed with a documented reason). BUT: instrumented tracing across ai_skill_harness's five frozen seeds (300 ticks each) found ticks_remaining on the built military_base NEVER reaches zero for any corp observed - construction_progress stays at 0.000 for the whole traced window.
+
+Root cause: BL-095's pay-as-you-build model rates construction progress by the LOCAL MARKET's recent steel supply (economy_system.cpp's run_construction). If the tile the muster candidate picks (nearest can_place-valid tile to the corp's HQ) sits in a market catchment with no steel throughput, the build's rate is permanently 0 and it never completes - not a crash, not a rejection, just an indefinitely-stalled building sitting in the corp's asset list.
+
+This is NOT new to military_base - extraction_site and processing_facility candidates carry the exact same resource_build_cost[steel] risk. It has simply never been exercised in this harness before, because the pre-change baseline ran ZERO build actions across all five seeds (the generated world starts already built out; corp_ai only ever dialled existing buildings, never built new ones through its own candidate loop). BL-325 S2 is the first thing to actually exercise corp_ai's OWN build-to-completion path in this specific harness.
+
+**Why it matters.** BL-325's own done-definition (v0.1.5, ROADMAP.md) states hire_unit was not positively verified firing end-to-end for a rival corp in the harness. The muster/hire SURFACE is real and correct by inspection (S1 through S2's precondition, the candidate generation, the tech gate) but the END-TO-END rival-corp behavior — build a base, have it complete, then hire — was not observed within five seeds x 300 ticks. Player-corp hiring is unaffected (BL-331 seeds the player's base pre-built, bypassing construction entirely via author_building).
+
+### NR-122 — Full CTest gate is not green on main — 3 pre-existing failures found while verifying Sprint 9, confirmed unrelated by baseline re-run
+*observation · raised 2026-08-10 · from Sprint 9 (cut v0.1.5) — running the full local suite (60 tests) before committing*
+
+Running `ctest --test-dir build_linux` on this machine surfaces 3 failing tests: `econ_stability` (R6, the largest swept-world tick-time bound), `home_surface_bench` (worst preview under the 1s ceiling — observed 1169.7ms), and `history_sim_harness` (6 sub-failures: R7 the ~2.1s run-time budget, plus R3a/R3a2/R3a3/R3b/R5 — the far-campaign objective, supply stall and winter-campaign checks in the Era -1 sim's BL-277 scorer).
+
+None of these three touch any file this sprint changed (corp_ai.cpp, corp_command.cpp, selection_panel.cpp, world_audit.cpp, ai_skill_harness.cpp) — economy_system.cpp, generation_preview.cpp and the settlement/combat/diplomacy sim files are untouched.
+
+Confirmed pre-existing rather than assumed: git-stashed every Sprint 9 source change, rebuilt, and reran `history_sim_harness` (the largest/most substantive of the three) in isolation on the clean b039098 baseline. IDENTICAL 6 failures, same labels, same run stats (82 provinces -> 1755, 267 battles, 165737ms). Stash popped and Sprint 9's changes restored before this entry was written.
+
+The two timing-threshold failures (econ_stability, home_surface_bench) were not independently re-verified against baseline the same way — they are absolute-millisecond ceilings on a shared/loaded machine, the same class of flake the project has already documented once (BL-258: 'a build-configuration artefact rather than a regression... the Windows tree is deliberately Debug'). Judged low-risk to leave unverified given zero file overlap with this sprint, but that is an inference, not a second confirmed isolation.
+
+**Why it matters.** CLAUDE.md/DEVELOPMENT_PRACTICES treat a green CTest gate as the normal bar before a Full-mode commit. This session's gate is red for reasons unrelated to its own work, confirmed for the largest failure by baseline re-run (Sprint 6's own standing lesson: 'a green gate can lie... build the same commit in a throwaway worktree' — the inverse check, a RED gate on baseline, is the same discipline). Sprint 9's commit proceeds on that evidence rather than blocking on an unrelated pre-existing gap, but the gap itself is real and un-owned as of this entry.
 
 ---
 

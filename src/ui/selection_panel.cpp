@@ -1366,14 +1366,33 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
     if (category_open)
         ImGui::TreePop();
 
-    // Hire (BL-324) — the campaign roster gated on the player corp's OWN
-    // stockpile/market access (unit_roster.hpp), not this tile's deposit or
-    // placement rules; the tile is only where the raised unit is sited. Beside
-    // Build rather than folded into it: hiring never touches building slots or
-    // terrain validity, so it does not belong in the candidate loop above.
+    // Hire (BL-324, moved onto the base by BL-325 S2) — the campaign roster
+    // gated on the player corp's OWN stockpile/market access (unit_roster.hpp),
+    // not this tile's deposit or placement rules; the tile now ALSO has to
+    // carry the corp's own completed military_base (S2: hire is no longer
+    // hire-anywhere). Beside Build rather than folded into it: hiring never
+    // touches building slots or terrain validity, so it does not belong in the
+    // candidate loop above.
     {
+        bool has_muster_base = false;
+        for (const auto& [bid, bc] : w.buildings)
+        {
+            if (bc.tile == tile_id && bc.type == building_type::military_base
+                && bc.ticks_remaining <= 0 && !bc.decommissioned)
+            {
+                const auto cit = w.corporations.find(w.player_entity);
+                if (cit != w.corporations.end()
+                    && std::find(cit->second.assets.begin(), cit->second.assets.end(), bid)
+                           != cit->second.assets.end())
+                {
+                    has_muster_base = true;
+                }
+                break;
+            }
+        }
         const auto& table = unit_roster_table();
-        const auto  avail = available_rows(w, w.player_entity, campaign_roster_band);
+        const auto  avail = has_muster_base ? available_rows(w, w.player_entity, campaign_roster_band)
+                                             : std::vector<const roster_row*>{};
         if (!avail.empty())
         {
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Hire");

@@ -182,6 +182,56 @@ better*, and it belongs with the military minor rather than the laws one.
 **Why this before procurement.** The militia has to exist on the map before there is any point
 modelling what it buys.
 
+**Retro (closed 2026-08-10, same session).**
+
+- **BL-331 was already built — under the WRONG commit id.** File survey found the exact seeding
+  this item specifies already landed in `corporation_generation.cpp`, committed as
+  `2eb8654 "Player starts with a military base and one unit (BL-330)"` — BL-330 is a real,
+  unrelated, already-`complete` item (a Selection-panel bug). Verified rather than rebuilt: no
+  harness had ever asserted the seeding happened, so a PASS/FAIL check was added to
+  `tools/verify/world_audit.cpp` (`base=yes unit=yes : PASS`). Flipped `complete`.
+- **BL-325 S2 (hire moves onto the base) — built and correct, with one real gap found and fixed
+  along the way.** `corp_command.cpp`'s `hire_unit` now requires the target tile to carry the
+  corp's own completed `military_base`; `selection_panel.cpp`'s Hire section only renders on such
+  a tile. Landing the precondition exposed that `corp_ai.cpp`'s build-candidate loop never
+  proposed `military_base` at all — only extraction/processing — so no rival corp could ever
+  satisfy the new gate. Fixed: a muster-base candidate, tech-gate-aware (BL-344's E0-ML-01), one
+  per corp, competing on merit in the same nice_to_have bucket as everything else.
+- **Two real bugs caught and fixed in the same candidate, not shipped blind.** First cut allowed a
+  fresh candidate on a NEW tile every eval for a corp's whole in-flight base (had_base checked only
+  *completed*, not *in-flight*) — collapsed `ai_skill_harness` to 100+ builds/seed and net worth
+  cratered negative. Fixed by gating on any base, complete or building. Second: the candidate's
+  `can_place_in_world` call omitted the corp argument, so a corp that could never earn E0-ML-01
+  re-proposed a doomed build every single eval forever (982 wasted attempts traced across the
+  golden set). Fixed by passing `corp` so the tech gate applies at generation time, not just apply
+  time. Both caught by actually running the harness after each change, not by inspection.
+- **`ai_skill_harness` golden bands re-blessed, with the reasoning recorded in the file.** Net
+  worth and solvency held; `survival_fraction` moved on seeds 1 and 4 (both now finish at 1.00) and
+  `build_max` needed +1 on seed 4. Documented as a hypothesis, matching the standing style the
+  file already uses for seed 4's prior widening — not asserted as measured fact.
+- **What did NOT get verified, and is not being hidden.** `hire_unit` was never observed firing for
+  a rival corp across the harness's five seeds. Traced to a genuine, pre-existing property of
+  BL-095's pay-as-you-build model: construction stalls indefinitely if the picked tile's local
+  market carries no steel, and this sprint's candidate is the first thing to actually exercise
+  `corp_ai`'s own build-to-completion path in this harness (the baseline ran zero build actions
+  across all five seeds). Recorded as **NR-121**, not force-fixed by tuning a score to make hire
+  "appear" — that would have been gaming the check rather than answering it.
+- **BL-332 — designed, not built, and re-versioned.** Answered Ben's four filing questions
+  (resource not rate; two buildings not one; points buy bands, deeds open keystones; rivals
+  accumulate symmetrically, the nation layer does not). On working the actual shape, both new
+  buildings are resource-tier plumbing — the same kind of change BL-340 already owns — so the
+  BUILD moves to **v0.1.14** (Sprint 10) rather than landing twice. v0.1.5 needed none of this
+  machinery for its own cut.
+- **v0.1.5's done-definition written at the cut** (ROADMAP.md), including the one thing it does
+  NOT claim (hire observed end-to-end for a rival corp) rather than overstating it.
+- **Feedback: two design assumptions in BL-325's own filing text turned out false, and both were
+  caught only by running the harness, not by reading the code.** "The scorer prices [a muster base]
+  via the existing build-candidate machinery" (BL-325's design) assumed that machinery covered
+  every building type; it covered exactly two. Sprint 5's retro named the same pattern for the
+  worktree-agent failure mode — "the read is the cheap part" — and it held again here: each of the
+  three bugs (missing candidate type, in-flight re-proposal, tech-gate blindness) was a five-minute
+  fix once found, and each was invisible until a real 300-tick rollout was run against it.
+
 ## Sprint 10 — Procurement, and the goods it is about (new minor)
 
 **Goal.** The refocus's actual mechanic, plus the resource tiers that make "space equipment" a
