@@ -10,6 +10,10 @@
 //   R3 — the state export (corp_blackboard) is visibility-honest against
 //        ground truth: own facts full; rival internals absent; unsurveyed tile
 //        facts absent; deterministic ordering.
+//   R4 — the hire gate + debit (BL-324/BL-352) read the LIVE (corp, body)
+//        pools: goods in pools unlock a gated row and are drained by exactly
+//        the hire cost (ascending body id); a corp without them is refused;
+//        an ungated row hires with no resource debit.
 // Hand-builds a minimal world (no Lua / SDL / ImGui); kept outside src/ so the
 // CMake glob ignores it. Follows the corp_agency_harness.cpp pattern.
 
@@ -20,6 +24,7 @@
 #include "world/economy_system.hpp"
 #include "world/market_clearing.hpp"
 #include "world/recipe_registry.hpp"
+#include "world/unit_roster.hpp"
 #include "world/world.hpp"
 
 #include <cstdio>
@@ -435,6 +440,91 @@ int main()
         const corp_blackboard bb2 = export_corp_blackboard(s.w, s.ai_corp, 5);
         check(serialise_bb(bb) == serialise_bb(bb2),
               "BL-202 R3: the export is deterministically ordered (byte-identical)");
+    }
+
+    // =====================================================================
+    // R4 — hire gate + debit read the live (corp, body) pools (BL-324/BL-352)
+    // =====================================================================
+    {
+        const recipe_registry reg = make_registry();
+
+        // Row indices by name — cmd.unit_type indexes unit_roster_table().
+        const auto& table = unit_roster_table();
+        std::size_t levy = table.size(), iron_foot = table.size();
+        for (std::size_t i = 0; i < table.size(); ++i)
+        {
+            if (std::strcmp(table[i].name, "Levy Spear") == 0) levy = i;
+            if (std::strcmp(table[i].name, "Iron Foot") == 0)  iron_foot = i;
+        }
+        check(levy < table.size() && iron_foot < table.size(),
+              "BL-352 R4: the probe rows (ungated Levy Spear, ore-gated Iron Foot) exist");
+
+        auto hire = [&](scene& s, std::size_t row) {
+            corp_command cmd{};
+            cmd.tick = 1; cmd.corp = s.ai_corp; cmd.verb = corp_verb::hire_unit;
+            cmd.tile = s.t_rich; cmd.unit_type = static_cast<uint16_t>(row);
+            return apply_corp_command(s.w, reg, cmd);
+        };
+
+        // BL-325 S2: a hire must land on the corp's own COMPLETED military
+        // base, so every applied-path scenario plants one on t_rich first.
+        auto add_muster_base = [&](scene& s) {
+            const entity_id b = s.w.create_entity();
+            building_component bc{};
+            bc.tile           = s.t_rich;
+            bc.type           = building_type::military_base;
+            bc.ticks_remaining = 0;
+            s.w.buildings[b] = bc;
+            s.w.corporations[s.ai_corp].assets.push_back(b);
+        };
+
+        // Goods in the live pools unlock the gated row, and the hire drains
+        // them across bodies in ascending id order (home before hidden) by
+        // exactly the flat axis cost (5, corp_command.cpp's hire_axis_cost).
+        {
+            scene s = make_scene(1000.0f);
+            add_muster_base(s);
+            s.w.pool_for(s.ai_corp, s.body).quantities[ri(resource_type::steel)]   = 3.0f;
+            s.w.pool_for(s.ai_corp, s.hidden).quantities[ri(resource_type::steel)] = 4.0f;
+            const auto r = hire(s, iron_foot);
+            check(r == corp_command_result::applied && s.w.units.size() == 1,
+                  "BL-352 R4: pooled goods make the gated row hireable through the seam");
+            check(s.w.pool_for(s.ai_corp, s.body).quantities[ri(resource_type::steel)] == 0.0f &&
+                  s.w.pool_for(s.ai_corp, s.hidden).quantities[ri(resource_type::steel)] == 2.0f,
+                  "BL-352 R4: the debit drains pools in ascending body order by exactly the cost");
+        }
+
+        // No goods anywhere: the gate refuses the row (availability re-check),
+        // and nothing is created or drained.
+        {
+            scene s = make_scene(1000.0f);
+            const auto r = hire(s, iron_foot);
+            check(r == corp_command_result::rejected_invalid && s.w.units.empty(),
+                  "BL-352 R4: a corp with empty pools is refused the gated row");
+        }
+
+        // Gate open (any steel > 0) but under the axis cost: the two-phase
+        // debit refuses as unaffordable and leaves the pool untouched.
+        {
+            scene s = make_scene(1000.0f);
+            add_muster_base(s);
+            s.w.pool_for(s.ai_corp, s.body).quantities[ri(resource_type::steel)] = 3.0f;
+            const auto r = hire(s, iron_foot);
+            check(r == corp_command_result::rejected_funds && s.w.units.empty() &&
+                  s.w.pool_for(s.ai_corp, s.body).quantities[ri(resource_type::steel)] == 3.0f,
+                  "BL-352 R4: an unaffordable hire is refused whole — no partial debit");
+        }
+
+        // An ungated row hires with no resource debit at all.
+        {
+            scene s = make_scene(1000.0f);
+            add_muster_base(s);
+            s.w.pool_for(s.ai_corp, s.body).quantities[ri(resource_type::steel)] = 7.0f;
+            const auto r = hire(s, levy);
+            check(r == corp_command_result::applied && s.w.units.size() == 1 &&
+                  s.w.pool_for(s.ai_corp, s.body).quantities[ri(resource_type::steel)] == 7.0f,
+                  "BL-352 R4: an ungated row hires without touching the pools");
+        }
     }
 
     std::printf("\n%s (%d failure%s)\n", g_failures == 0 ? "ALL PASS" : "FAILURES",

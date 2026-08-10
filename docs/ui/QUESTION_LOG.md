@@ -24,9 +24,9 @@ alphabetical order.
 
 **Answers:** Where is my money going, and how long do I have?
 
-**Because:** apply_budget nets five flows into one number; a single balance tells the player they are losing without telling them what to change. Itemising income, expenditure, maintenance, wages and interest is what makes bankruptcy something to act on rather than discover.
+**Because:** apply_budget nets six flows into one number; a single balance tells the player they are losing without telling them what to change. Itemising income, expenditure, maintenance, wages, interest and levies is what makes bankruptcy something to act on rather than discover. BL-343 added the Laws section beneath the policy levers: the first law that is not a stub sits directly under the two that are, so the difference between a drawn lever and a working one is visible in one glance.
 
-*Demanded by BL-074, BL-112, BL-122 · `src/ui/balance_ledger.cpp` · id `balance_ledger`*
+*Demanded by BL-074, BL-112, BL-122, BL-343 · `src/ui/balance_ledger.cpp` · id `balance_ledger`*
 
 ### Comms dock
 
@@ -112,9 +112,9 @@ alphabetical order.
 
 **Answers:** What can I unlock, and what stands between me and it?
 
-**Because:** A constellation of gates is only a decision if the player can see which are reachable. Note this surface currently reads an unevaluable string condition (BL-344 promotes it), so today it answers the first half of its question and not the second.
+**Because:** A constellation of gates is only a decision if the player can see which are reachable. BL-344 made that second half real: each node now reports EARNED, LOCKED with its unmet conditions itemised, or -- honestly -- "no gate authored", instead of showing an unevaluable string condition that could never resolve.
 
-*Demanded by BL-087, BL-126 · `src/ui/tech_tree_panel.cpp` · id `tech_tree_panel`*
+*Demanded by BL-087, BL-126, BL-344 · `src/ui/tech_tree_panel.cpp` · id `tech_tree_panel`*
 
 ### Tile inspector
 
@@ -132,9 +132,9 @@ alphabetical order.
 
 **Answers:** How is my corporation doing overall?
 
-**Because:** Roll-up cards over holdings, balance and production, so the player has a whole-corp read without assembling it from four ledgers. Pairs existed on these cards before BL-247's log was removed.
+**Because:** Roll-up cards over holdings, balance and production, so the player has a whole-corp read without assembling it from four ledgers. Pairs existed on these cards before BL-247's log was removed. BL-343 added the sixth Finance bar, Levies: a law the player cannot see working is indistinguishable from an unimplemented one, so the levy is its own number rather than folded into maintenance.
 
-*Demanded by BL-081, BL-214 · `src/ui/corporation_dashboard.cpp` · id `corporation_dashboard`*
+*Demanded by BL-081, BL-214, BL-343 · `src/ui/corporation_dashboard.cpp` · id `corporation_dashboard`*
 
 ### Generation charts
 

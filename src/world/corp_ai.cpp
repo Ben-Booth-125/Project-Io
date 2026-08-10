@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <limits>
 #include <ostream>
 #include <string>
 #include <utility>
@@ -616,6 +617,111 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             }
         }
 
+        // ---- Muster-base build candidate: BL-325 S2 made hire depend on a ---
+        // completed military_base, but the ordinary build-candidate loop above
+        // only ever proposes extraction_site/processing_facility — it never
+        // proposed military_base, so no rival corp could ever satisfy the new
+        // hire precondition (caught by ai_skill_harness: hire_unit dropped
+        // from 21/seed to 0 the moment S2 landed without this). One flat,
+        // deliberately simple candidate — no market/glut forecasting, since
+        // the base produces nothing and has no market footprint — that fires
+        // only while the corp holds no completed base of its own, so it never
+        // competes with real economic builds once satisfied.
+        {
+            // Gate on ANY base — complete or still under construction — not
+            // just a completed one. The first cut of this check required
+            // ticks_remaining<=0 and re-fired a fresh candidate on a NEW tile
+            // every eval for the whole build_duration_ticks window, since a
+            // corp's one in-flight base never counted as "having" one; caught
+            // by this same golden collapsing to hundreds of builds/seed.
+            bool has_or_building_base = false;
+            for (const entity_id bid : cc.assets)
+            {
+                const auto bit = w.buildings.find(bid);
+                if (bit != w.buildings.end() && bit->second.type == building_type::military_base
+                    && !bit->second.decommissioned)
+                {
+                    has_or_building_base = true;
+                    break;
+                }
+            }
+            if (!has_or_building_base)
+            {
+                entity_id hq_tile = null_entity;
+                const auto hqb = w.buildings.find(cc.hq_building);
+                if (hqb != w.buildings.end())
+                    hq_tile = hqb->second.tile;
+
+                const auto nation_it = w.nations.find(cc.home_nation);
+                entity_id  best_tile = null_entity;
+                long long  best_dist2 = std::numeric_limits<long long>::max();
+                if (nation_it != w.nations.end())
+                {
+                    long long anchor_x = 0, anchor_y = 0;
+                    bool have_anchor = false;
+                    if (hq_tile != null_entity)
+                    {
+                        const auto hit = w.tiles.find(hq_tile);
+                        if (hit != w.tiles.end())
+                        {
+                            anchor_x = hit->second.grid_x;
+                            anchor_y = hit->second.grid_y;
+                            have_anchor = true;
+                        }
+                    }
+                    for (const entity_id tid : nation_it->second.tiles)
+                    {
+                        // Pass `corp` (unlike the un-owned tile-only checks
+                        // elsewhere in this file) so BL-344's tech gate is
+                        // live here: a corp that has not earned E0-ML-01 gets
+                        // NO candidate rather than one that is re-proposed and
+                        // rejected every single eval for as long as the gate
+                        // stays unmet (the ai_skill_harness debug trace showed
+                        // most corps in the golden seeds never earning the
+                        // gate's 2-extraction-sites/Cr2000 condition at all).
+                        if (!placement_rules::can_place_in_world(w, tid, building_type::military_base,
+                                                                  resource_type::iron_ore, -1.0f, corp))
+                            continue;
+                        if (!have_anchor)
+                        {
+                            best_tile = tid;
+                            break;
+                        }
+                        const auto tit = w.tiles.find(tid);
+                        if (tit == w.tiles.end())
+                            continue;
+                        const long long dx = tit->second.grid_x - anchor_x;
+                        const long long dy = tit->second.grid_y - anchor_y;
+                        const long long d2 = dx * dx + dy * dy;
+                        if (d2 < best_dist2 || (d2 == best_dist2 && tid < best_tile))
+                        {
+                            best_dist2 = d2;
+                            best_tile  = tid;
+                        }
+                    }
+                }
+                if (best_tile != null_entity)
+                {
+                    const building_economics& mex = reg.economics(building_type::military_base);
+                    candidate c;
+                    c.cmd.tick   = tick;
+                    c.cmd.corp   = corp;
+                    c.cmd.verb   = corp_verb::build;
+                    c.cmd.tile   = best_tile;
+                    c.cmd.type   = building_type::military_base;
+                    // Flat, modest score: real enough to win an otherwise-quiet
+                    // eval, never enough to out-bid a genuine extraction/processing
+                    // net-positive candidate (those score net/payback, typically
+                    // well above 1.0 for a viable site).
+                    c.score  = 0.35f * jitter;
+                    c.spend  = std::max(1.0f, mex.build_cost);
+                    c.reason = corp_decision_reason::best_build;
+                    c.bucket = bucket_for_reason(c.reason);
+                    cands.push_back(c);
+                }
+            }
+        }
+
         // ---- Hire candidates: campaign roster, gated on the corp's OWN ------
         // stockpile/market access (unit_roster.hpp), never on cash — the
         // solvency gate below still applies (spend stays 0.0f: the cost is a
@@ -624,18 +730,18 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // (2026-08-08, recorded in io-standing-rules.md) — rival corps raise
         // units through the exact seam the player uses, no special case.
         {
+            // BL-325 S2: hire moves onto the base. A corp with no COMPLETED
+            // military_base of its own has no muster tile at all — it must
+            // build one first, which the existing build-candidate machinery
+            // above already prices (military_base is an ordinary buildable
+            // type, no special-casing needed here beyond finding it).
             const entity_id muster_tile = [&]() -> entity_id
             {
-                if (cc.hq_building != null_entity)
-                {
-                    const auto hb = w.buildings.find(cc.hq_building);
-                    if (hb != w.buildings.end())
-                        return hb->second.tile;
-                }
                 for (const entity_id bid : cc.assets)
                 {
                     const auto bit = w.buildings.find(bid);
-                    if (bit != w.buildings.end())
+                    if (bit != w.buildings.end() && bit->second.type == building_type::military_base
+                        && bit->second.ticks_remaining <= 0 && !bit->second.decommissioned)
                         return bit->second.tile;
                 }
                 return null_entity;

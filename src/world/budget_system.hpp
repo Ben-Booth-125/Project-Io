@@ -9,6 +9,7 @@
 #include <map>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 /// Debt interest charged per economy tick on a negative balance (BL-073). An
 /// economy tick is one quarter (k_ticks_per_year = 4), so this is the per-quarter
@@ -61,8 +62,18 @@ float body_mean_habitability(const world& w, entity_id body);
 ///                   plus the BL-073 interest line) whose net() equals the delta
 ///                   applied to that corp's balance. Null for the headless harnesses,
 ///                   which only need the balance mutation.
+/// @param production Optional (BL-343): this tick's per-building reports, from
+///                   `economy_report::buildings`. The LAW ENFORCEMENT SEAM — the
+///                   extraction levy is a per-unit charge on raw output, so it is
+///                   charged where the flow is ACCOUNTED (here) rather than where
+///                   the price is RESOLVED (clear_markets): a law is a modifier
+///                   over the market, never an override of it (law.hpp). Null
+///                   means no levy is charged, which is exactly what the
+///                   pre-BL-343 arithmetic did — so every existing caller that
+///                   omits it keeps a bit-identical balance.
 void apply_budget(world& w,
                   const recipe_registry& reg,
                   const std::unordered_map<entity_id, corp_cash_flow>& flows,
                   const std::map<std::pair<entity_id, entity_id>, float>& contention,
-                  std::map<entity_id, corp_budget>* breakdown = nullptr);
+                  std::map<entity_id, corp_budget>* breakdown = nullptr,
+                  const std::vector<building_report>* production = nullptr);

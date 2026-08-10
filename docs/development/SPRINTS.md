@@ -31,7 +31,7 @@ and/or a version goal (v0.1.1 etc.).
 
 ---
 
-## Where things stand (2026-08-02)
+## Where things stand (updated 2026-08-10)
 
 | Sprint | Theme | State |
 |---|---|---|
@@ -40,16 +40,260 @@ and/or a version goal (v0.1.1 etc.).
 | 2b | BL-210 oral-history pivot (nations/corps rewrite) | **Closed** — all four rungs built (BL-217, BL-208, BL-218, BL-219) |
 | 3 | Corp AI stage B + skill harness | **Closed** — BL-203, BL-204 both landed |
 | 4 | Communication surface (BL-205 chat log) | **Mostly landed** — slice 1 (window, channels, agency feed) complete 2026-07-26/28; only the C-route remainder (§7 Stage C) stays open, unstaffed |
-| 5 | Era −1 history sim, 0–2000 CE (BL-271–275) | **In progress** — foundation wave (BL-272, BL-273) landed 2026-08-02; wave 2 (BL-274) ready to promote |
+| 5 | Era −1 history sim, 0–2000 CE (BL-271–275) | **Closed 2026-08-10** — four of five landed (BL-271/272/273/275); BL-274 (era-keyed rosters) and BL-317 (prehistory timelapse) carried to v0.3.0 |
+| 6 | The release sprint | **Closed** — five versions tagged (v0.1.1, v0.1.2, v0.1.8, v0.1.9, v0.1.10); every cut minor now carries a done-definition |
+| 7 | The stub minors become releases | **Closed** — v0.1.3 and v0.1.4 cut; `post-v0.1.0` swept, every open item names a minor |
+| 8–12 | The next five, planned 2026-08-10 | **Planned** — see § Sprints 8–12 below |
 
-**Next up:** Sprint 2b is closed — BL-218 (nations settlement rewrite) and BL-219 (corporations
-history rewrite) both landed 2026-08-02. What remains of BL-210's umbrella is its batch-sweep
-extension and TILE_GENERATION.md's share of the propagation. The natural successors are
-**BL-223 (averted rupture)**, which now has real settlement history to define the diplomacy origin
-against, and the four v0.1.2–v0.1.5 stubs (BL-155/156/157/158) that were sequenced *behind* this
-rewrite precisely so they would not be designed against Voronoi blobs — nations now have the
-history to hang policy, military and politics off. Unplanned v0.1.1 work (BL-270, the action
-dictionary) still wants a sprint of its own rather than riding on 2b.
+**Next up (2026-08-10).** Sprint 5 is closed on Ben's call — *"I am happy with the generation
+progress we made"* — and the board went momentarily to zero goaled sprints. The plan for
+**Sprints 8–12** is written below, and it is sequenced against the **2026-08-10 refocus**
+(NR-120): the player is a **national private militia** that contracts private companies to build
+its space equipment. That narrows BL-094 (player-identity pivot), and it changes what the v0.1.x
+tail is *for* — military and space-hardware trade stop being a later layer and become the flavour
+the remaining minors are supposed to carry. **NR-102 (sequencing decoupling)** is the standing
+structural item this plan is the first answer to: every open item names a minor, but until now
+nothing said in what order to build them.
+
+---
+
+# Sprints 8–12 — the plan (written 2026-08-10)
+
+Five sprints, planned in one pass at Ben's direction, because Sprint 5 closed and nothing was
+goaled. They are sequenced against one thing: **the 2026-08-10 refocus** (NR-120).
+
+## The refocus, and the three rulings that shape this plan
+
+Ben, 2026-08-10: *"Let's place the player as a national private militia, which uses private
+companies to build equipment for space. So the flavour of trading is initially coloured directly
+with military use, and space equipment."*
+
+Three calls were put to him before planning, because each one changes the sequence:
+
+1. **The militia REPLACES the governing body.** Not an Era 0 reading of it, not a client of it.
+   BL-094 (player-identity pivot) gets **rewritten**, not amended, and the design test the v0.1.x
+   band has carried since 2026-08-03 — *"does this reach military as well as economic
+   outcomes?"* — is **retired with it**. That test was derived from the governing-body reason
+   (law, policy and science as the player's levers). A militia does not legislate. It procures.
+2. **Sprint 8 is a design sprint.** No `src/`, no tag. The refocus lands on paper before anything
+   is built against it.
+3. **BL-340 (processing chain roster) is pulled forward** out of v0.1.13. Ben's word was
+   *"initially"* — if trade is coloured by military and space hardware from the first tick, those
+   goods have to exist, or the colour is an assertion rather than a mechanic.
+
+### What ruling 1 costs, stated plainly
+
+**Two already-cut minors were built for the previous actor.** v0.1.3 (Laws) and v0.1.4 (Techs)
+were cut on 2026-08-10 — hours before the refocus — and both were justified by the governing-body
+reason. This is not a call to unpick them: `condition_set` (BL-342) is a generic
+predicate object and one enacted law (BL-343) plus one earned tech (BL-344) are working machinery
+that does not care who the player is. What changes is **who enacts**. Under a militia, laws are
+something the player is *subject to* and lobbies against, not something it passes — which makes
+the laws surface an **input** to the player's problem rather than an output of their agency.
+Sprint 8 owns that re-read; Sprint 11 owns the surface consequence. **v0.1.11's BL-155 / BL-156 /
+BL-186 (laws & tech surfaces) are the most exposed items on the board** and should not be built
+before Sprint 8 rules on them.
+
+---
+
+## Sprint 8 — Who the player is (design only, no tag)
+
+**Goal.** Turn the refocus from a steer into a specified actor, so the four sprints after it are
+sequenced against something real. Nothing in `src/`.
+
+**Planned.**
+- **BL-094 — rewrite.** Retitle off "governing body". Settle the three questions NR-120 records:
+  is the militia one of the ~43 generated nations or an entity attached to one; does the
+  shared-treasury call survive companies becoming counterparties (it probably does not — an
+  arm's-length supplier with a price and a possible refusal is not a second wallet); and what
+  replaces the retired design test.
+- **BL-315 — design.** Currently `design-owed`, priority A, and its title still names the
+  superseded framing. The conflict spine is the militia's *whole reason to exist*, so this stops
+  being a follow-on and becomes the item.
+- **File the procurement seam.** The genuinely new mechanic the refocus invents: the militia
+  contracts a private company to build equipment. Counterparty, price, lead time, refusal. Nothing
+  in the backlog covers it — the closest is BL-280 (negotiated tax rate), which is the same
+  *bargaining* shape pointed at a different object and should be read alongside it.
+- **Reconcile the v0.3.0 roster.** 22 open items, every one specified against the old actor. Cut,
+  re-goal or re-read each. This is the bulk of the sprint's labour and the reason it needs one.
+- **Propagate the three opened docs.** CONCEPT.md, SYSTEMS.md and GLOSSARY.md were opened to the
+  governing-body framing on 2026-08-04 (NR-053) ahead of the work, on Ben's instruction. They now
+  state something superseded. Correct them **as dated notes**, not a rewrite.
+
+**Done when** BL-094 reads as the militia, BL-315 is `designed`, the procurement seam is filed,
+and no open item still names an actor that does not exist.
+
+**Risk.** A design sprint with no tag, immediately after a sprint that cut seven. If it starts
+sprawling, the fallback is to timebox BL-094 + BL-315 and let the v0.3.0 reconciliation run as a
+background sweep.
+
+**Retro (closed 2026-08-10, same day).**
+
+- **BL-094 — rewritten in full.** Title, short_name (`PLAYER_MILITIA_PIVOT`) and summary replaced;
+  a dated `## 2026-08-10 — REWRITE` section added to `design`, kept alongside (not deleting) the
+  2026-07-04/2026-08-03–07 history so the record of *how* the pivot was reached survives. All
+  three of NR-120's open questions resolved: the militia is **attached to** one of the ~43 nations,
+  not itself one of them; the shared treasury is **retracted** — companies are counterparties on
+  their own market, not a linked wallet; the retired design test is replaced by **"does this
+  change what the militia can FIELD, or what it must ANSWER TO?"**. `status` held at `designed` —
+  it already was, and the rewrite does not reopen the design-owed question, it replaces the answer.
+- **BL-315 — rephrased, deliberately NOT flipped to `designed`.** Title and summary drop the
+  superseded framing; the law→military-reach strand is reversed in direction (the militia is
+  *subject* to conscription/embargo/basing rights, not the body that enacts them). But real design
+  work — the actual force-command verbs, the procurement→field pipeline once BL-350 exists — is
+  still owed, same as before the refocus. Flipping it to `designed` here would have been the
+  bookkeeping error Sprint 2a's retro warned against (items reading `landed` when they weren't).
+  Stays `design-owed`, priority A.
+- **BL-350 filed — the procurement/contract seam.** New item, `design-owed`, priority A, requires
+  BL-094, version goal **v0.1.14**. Counterparty / price / lead time / refusal, read alongside
+  BL-280 (negotiated tax rate) as the same bargaining shape pointed at a different counterparty.
+  Four concrete open questions recorded on the item rather than guessed at (does the treasury debit
+  on order or delivery; is refusal a hard block or a penalty; does reputation persist; how this
+  reads against BL-037's preferred-seller routing).
+- **v0.3.0 roster reconciled — cheaper than planned.** Grepped all 21 remaining open items for
+  stale "governing" language rather than reading each one cold. Only **two** needed touching:
+  **BL-333** (nuclear arc, one sentence redirected to the militia's home nation) and **BL-182**
+  (corporate borders, a cross-reference note to BL-350 — this item turned out to be about the *same
+  companies* the militia now contracts with, so it survives the refocus and gets more relevant, not
+  less). The other 19 — the whole Era −1 sandbox tail plus BL-087 and BL-314 — were already
+  actor-agnostic: background-nation history, a generic tech-gate model, a generic unit-verb family.
+  The map artifact's forecast ("good news for design") held.
+- **The three authority docs corrected as dated notes, not rewritten.** CONCEPT.md (4 notes),
+  SYSTEMS.md (7 notes, the densest of the three — it carried the sharpest governing-body
+  statements, including the "budget is the converter" framing that needed no change and the
+  "shared treasury" assumption that did), GLOSSARY.md (Corporation repointed; **Governing body**
+  entry replaced outright by **Militia**, kept dated so the supersession is legible rather than
+  silently vanished).
+- **Feedback: the sprint's own risk did not land.** The fallback (timebox BL-094+BL-315, leave the
+  roster as a background sweep) was never needed — grepping for the stale term before reading each
+  item cold turned a feared 22-item slog into a 20-minute check. Worth remembering next time a
+  "reconcile the roster" task looks large: search first, read only what the search flags.
+
+## Sprint 9 — The militia takes the field (cut v0.1.5)
+
+**Goal.** The first buildable consequence of the refocus, and the band's next tag.
+
+**Planned.** **BL-325** (military bases: a muster building, hire moved onto it, unit supply read
+off it) and **BL-331** (player starts with a base and one unit) — both `designed`, both buildable
+today, and both literally the militia's first surface. **BL-332** (military points + a research
+building) moves here from v0.1.11: it is `design-owed`, it answers *how does the militia get
+better*, and it belongs with the military minor rather than the laws one.
+
+**Why this before procurement.** The militia has to exist on the map before there is any point
+modelling what it buys.
+
+**Retro (closed 2026-08-10, same session).**
+
+- **BL-331 was already built — under the WRONG commit id.** File survey found the exact seeding
+  this item specifies already landed in `corporation_generation.cpp`, committed as
+  `2eb8654 "Player starts with a military base and one unit (BL-330)"` — BL-330 is a real,
+  unrelated, already-`complete` item (a Selection-panel bug). Verified rather than rebuilt: no
+  harness had ever asserted the seeding happened, so a PASS/FAIL check was added to
+  `tools/verify/world_audit.cpp` (`base=yes unit=yes : PASS`). Flipped `complete`.
+- **BL-325 S2 (hire moves onto the base) — built and correct, with one real gap found and fixed
+  along the way.** `corp_command.cpp`'s `hire_unit` now requires the target tile to carry the
+  corp's own completed `military_base`; `selection_panel.cpp`'s Hire section only renders on such
+  a tile. Landing the precondition exposed that `corp_ai.cpp`'s build-candidate loop never
+  proposed `military_base` at all — only extraction/processing — so no rival corp could ever
+  satisfy the new gate. Fixed: a muster-base candidate, tech-gate-aware (BL-344's E0-ML-01), one
+  per corp, competing on merit in the same nice_to_have bucket as everything else.
+- **Two real bugs caught and fixed in the same candidate, not shipped blind.** First cut allowed a
+  fresh candidate on a NEW tile every eval for a corp's whole in-flight base (had_base checked only
+  *completed*, not *in-flight*) — collapsed `ai_skill_harness` to 100+ builds/seed and net worth
+  cratered negative. Fixed by gating on any base, complete or building. Second: the candidate's
+  `can_place_in_world` call omitted the corp argument, so a corp that could never earn E0-ML-01
+  re-proposed a doomed build every single eval forever (982 wasted attempts traced across the
+  golden set). Fixed by passing `corp` so the tech gate applies at generation time, not just apply
+  time. Both caught by actually running the harness after each change, not by inspection.
+- **`ai_skill_harness` golden bands re-blessed, with the reasoning recorded in the file.** Net
+  worth and solvency held; `survival_fraction` moved on seeds 1 and 4 (both now finish at 1.00) and
+  `build_max` needed +1 on seed 4. Documented as a hypothesis, matching the standing style the
+  file already uses for seed 4's prior widening — not asserted as measured fact.
+- **What did NOT get verified, and is not being hidden.** `hire_unit` was never observed firing for
+  a rival corp across the harness's five seeds. Traced to a genuine, pre-existing property of
+  BL-095's pay-as-you-build model: construction stalls indefinitely if the picked tile's local
+  market carries no steel, and this sprint's candidate is the first thing to actually exercise
+  `corp_ai`'s own build-to-completion path in this harness (the baseline ran zero build actions
+  across all five seeds). Recorded as **NR-121**, not force-fixed by tuning a score to make hire
+  "appear" — that would have been gaming the check rather than answering it.
+- **BL-332 — designed, not built, and re-versioned.** Answered Ben's four filing questions
+  (resource not rate; two buildings not one; points buy bands, deeds open keystones; rivals
+  accumulate symmetrically, the nation layer does not). On working the actual shape, both new
+  buildings are resource-tier plumbing — the same kind of change BL-340 already owns — so the
+  BUILD moves to **v0.1.14** (Sprint 10) rather than landing twice. v0.1.5 needed none of this
+  machinery for its own cut.
+- **v0.1.5's done-definition written at the cut** (ROADMAP.md), including the one thing it does
+  NOT claim (hire observed end-to-end for a rival corp) rather than overstating it.
+- **Feedback: two design assumptions in BL-325's own filing text turned out false, and both were
+  caught only by running the harness, not by reading the code.** "The scorer prices [a muster base]
+  via the existing build-candidate machinery" (BL-325's design) assumed that machinery covered
+  every building type; it covered exactly two. Sprint 5's retro named the same pattern for the
+  worktree-agent failure mode — "the read is the cheap part" — and it held again here: each of the
+  three bugs (missing candidate type, in-flight re-proposal, tech-gate blindness) was a five-minute
+  fix once found, and each was invisible until a real 300-tick rollout was run against it.
+
+## Sprint 10 — Procurement, and the goods it is about (new minor)
+
+**Goal.** The refocus's actual mechanic, plus the resource tiers that make "space equipment" a
+thing rather than a label.
+
+**Planned.** Sprint 8's filed procurement items, and **BL-340** (the processing half of the
+buildings roster — new resource types with market, price and recipe) pulled forward per ruling 3.
+Needs a minor of its own; **v0.1.14 "Procurement"** is the obvious name, to be confirmed at the
+cut. v0.1.13 keeps markets and the save-format header without its keystone, which is fine — those
+five items stand on their own.
+
+**Dependency note.** BL-340 is difficulty 4 and `design-owed`. It is the single largest unknown in
+this plan and the most likely thing to spill into Sprint 11.
+
+## Sprint 11 — v0.1.11 reconciled (cut v0.1.11)
+
+**Goal.** The fattest open minor, built against the actor Sprint 8 defined rather than the one it
+was written for.
+
+**Planned.** The laws and tech surfaces (**BL-155**, **BL-156**, **BL-186**) *as reframed* —
+under a militia these are constraints the player operates inside, which is a different surface
+from an enactment ledger. Then the items the refocus does not touch: **BL-211** (history ledger),
+**BL-212** (nation-voiced comms), **BL-309** (deed lines), **BL-264** (wizard layout after fold),
+**BL-341** (the parked Windows cold-configure check). **BL-280** (negotiated tax rate,
+`design-owed`, difficulty 5) is the one to watch — Sprint 8 will likely have merged its bargaining
+model into the procurement seam, in which case it shrinks or dissolves.
+
+## Sprint 12 — Generation visibility, and the owed timelapse (cut v0.1.7)
+
+**Goal.** Close the generation arc Ben declared himself happy with, including the one piece he
+named as still owed.
+
+**Planned.** **BL-303** (Generation Ledger), **BL-304** (field-overlay lenses), **BL-305**
+(political-step visibility), and **BL-098** (the UX review walking the whole band against
+`user_stories.json`) — which is the right last act, since by then five sprints of surfaces will
+have accumulated. Plus **BL-317** (the New World wizard's prehistory timelapse), pulled back from
+v0.3.0: it is the history time-lapse Ben named at Sprint 5's close, and it is a
+generation-visibility item by nature rather than an Era −1 one.
+
+**One sequencing option worth taking.** BL-317 pairs naturally with **BL-264** (wizard layout
+after per-stage folding) — both are New World wizard stages. If Sprint 11 is building BL-264
+anyway, riding BL-317 alongside it gets the timelapse three sprints earlier for very little extra,
+and Sprint 12 loses nothing it needs.
+
+---
+
+## What this plan deliberately does not carry
+
+- **v0.2.0 (the AI opponent), 12 items.** It is the thing that makes Io a game rather than a
+  simulation, and it is *not* in the next five sprints. That is a real cost, accepted because the
+  opponent should be built against a settled player identity, not re-fitted to one. It is the
+  obvious Sprint 13.
+- **v0.1.12 (logistics modes), 4 items** — rail, ports, convoy distance pricing, supply-lens
+  flow. Unblocked and uncontroversial; a good filler if any sprint above finishes short.
+- **v0.4.0, 9 items.** Politics, and the history-ladder tail. Downstream of everything here.
+
+**A standing caution from Sprint 6, applied to this plan.** Sprint 6's retro found that
+*measurement overturned the stated cause four times*, and that three of five worktree agents
+branched from a base that had already moved. Both lessons bear on a five-sprint plan written in
+advance: **it will be wrong somewhere, and the honest move is to amend it when the goal changes,
+not at the retro** — which is the exact failure Sprint 1's retro named and this file has now
+committed twice.
 
 ---
 
@@ -86,7 +330,7 @@ surface finished, terrain's combat consequence in, the tooltip text rendering cl
 
 ---
 
-## Sprint 5 — Era −1 history sim (opened 2026-08-02)
+## Sprint 5 — Era −1 history sim (opened 2026-08-02, closed 2026-08-10)
 
 **Goal.** Build the 0–2000 CE settlement/mil-sim sandbox (BL-271–275) that proves out the nation
 AI and mil-sim architecture, and tunes the campaign's non-hegemony premise against measured
@@ -109,6 +353,30 @@ three. BL-275 (the seed sweep) needs BL-271.
 different item, BL-205's C-route (in-character LLM chat) — it went as far as a full in-process
 API-call design before Ben clarified that wasn't the intent (human-in-the-loop play via
 computer-use, not a shipped API integration). Reverted cleanly; see NEEDS_REVIEW.json NR-039/NR-040.
+
+**Retro** (closed 2026-08-10 on Ben's call — *"I am happy with the generation progress we made"*).
+
+- **Landed: four of five.** BL-272 (unit/doctrine combat model), BL-273 (province demography +
+  manpower), BL-271 (the year-tick sim loop) and BL-275 (the seed-spread sweep) are all
+  `complete`. The stated goal — a bot-only 0–2000 CE sandbox that tunes the non-hegemony premise
+  against *measured distributions rather than lore* — was met, and BL-275 is the item that met
+  it: the sweep is the measurement.
+- **Carried, not slipped: two.** **BL-274** (era-keyed unit rosters) and **BL-317** (the New World
+  wizard's prehistory timelapse) are both still `designed`, and both now carry **v0.3.0** — they
+  moved with the rest of the Era −1 arc when NR-101 swept `post-v0.1.0`. BL-317 is the "history
+  time-lapse still to do" Ben named at close; it is a *presentation* of a sim that already runs,
+  not a hole in the sim.
+- **The closing call is a scope judgement, not a completion claim.** Sprint 5 is closed with its
+  architecture proven and its presentation owed. That is the right trade — the timelapse's whole
+  value is showing a player the history, and there is no player-facing wizard stage to show it in
+  until the v0.3.0 arc is underway.
+- **Runtime:** not summed; the timer gap carried from Sprint 1 was never fixed and is now three
+  sprints stale. Either fix it or stop naming it in the format block.
+- **Feedback: this sprint proved the pattern the release sprint later exploited.** The foundation
+  wave (BL-272 + BL-273) was picked *because* the two items had no unmet dependencies and touched
+  disjoint files, and it landed same-day in parallel. Sprint 6's worktree fan-out is the same move
+  at larger scale — and its failure mode (three of five agents branching from a moved base) is
+  what happens when the dependency read is skipped rather than done. The read is the cheap part.
 
 ---
 
@@ -368,6 +636,108 @@ medium (BL-205) are the scaffolding it needs to stand on, which is why it lands 
 **Not yet in scope.** Actually promoting Sprint 3 into REFINED.md task groups + `requirements.json`
 — that collision-mapping step happens at the start of Sprint 3 itself (DELIVERY.md: built fresh at
 promotion, not frozen ahead of time), not in this planning pass.
+
+---
+
+## Sprint 7 — the stub minors become releases (2026-08-10)
+
+**A goal was stated this time**, which is the first thing worth recording, because Sprint 6's
+opening finding was that the rhythm had lapsed and its direction came from a live steer rather
+than a written goal. Ben's brief named the outcome, the *sequence*, and the two standing lessons
+to apply: *"THE JOB THIS SESSION — v0.1.3 and v0.1.4, in that order."* BL-342 first, because both
+minors consume it. The retro below compares what landed against that.
+
+**Planned.** BL-342 (condition_set evaluator) → BL-343 (laws MVP) → BL-344 (techs MVP), then a
+done-definition written **at** each cut. Optional if there was room: BL-348 (province names read
+half-native) and BL-349 (a harness that over-asserts). Named as the next structural job, not as
+this sprint's: the 42 items on `post-v0.1.0` (NR-101).
+
+### What landed
+
+**Everything planned, plus both optionals, plus the structural job.**
+
+- **Two versions tagged** — `v0.1.3` (Laws) and `v0.1.4` (Techs), each with a done-definition
+  written at the cut and each naming its exclusions rather than dropping them (BL-155, BL-186,
+  BL-280, BL-156, BL-332 re-targeted to v0.1.11).
+- **Five items closed** — BL-342, BL-343, BL-344, BL-348, BL-349. Open items 76 → 71.
+- **The gate went 55 → 58 tests, 0 failures**, holding the green it first reached last sprint.
+  Three new harnesses (94 assertions between them); one existing harness needed a two-line change.
+- **NR-101 swept.** 46 assignments; every open item now names a minor.
+- **Eight review entries filed as the work happened** (NR-112–119), one of which Ben ruled the
+  same session (NR-119 — v0.1.12 and v0.1.13 stand as named).
+
+### What this sprint is actually worth remembering for
+
+**Twice, the expensive-looking job turned out to be a bookkeeping job — and the two were the same
+shape at different scales.**
+
+1. **BL-342 is about thirty lines of switch statement**, and it unblocked two minors that had been
+   design-forward for weeks. BL-155 and BL-156 had *independently* settled on the same object — "a
+   flat AND-list of atomic conditions" — and neither built it, because each was scoped design-only.
+   **The blocker was ownership, not effort.** Nobody owned the thing they both needed.
+2. **NR-101 was the same finding at document level.** Twenty of the 45 unversioned items were
+   *already assigned* by ROADMAP.md **in prose** — the whole v0.4.0 politics substrate, most of the
+   v0.3.0 Era −1 arc. The roadmap and the backlog disagreed, and the disagreement was invisible
+   because the prose was not queryable and the query did not read prose. Most of the "work" was
+   making the two documents agree.
+
+Sprint 6's lesson was *measure before you fix*. Sprint 7's is adjacent and worth having beside it:
+**before estimating a blocked thing, check whether anything is actually blocking it.** In both
+cases the answer was no — the item was unowned, or already decided somewhere unqueryable.
+
+**The design test earned its keep, concretely.** BL-094 asks *"does this system reach military as
+well as economic outcomes?"* It changed two decisions this sprint at no extra cost: `condition_set`
+shipped `military_units` / `military_strength` alongside the six economic subjects, and the tech
+gate went on the **Military Base** rather than a smelter. A design test that changes nothing is
+decoration; this one changed two things, and the second is the instance that proves the pillar the
+pivot cares about.
+
+**Two collisions between the sprint's own decisions, both caught by writing the assertion first.**
+BL-342 established that an empty `condition_set` is *true* (the common case for a law). BL-344 then
+needed the opposite for a tech — ~130 authored nodes with no gate would have earned themselves on
+the first tick. The fix is a separate `earnable` flag: **absence has to be modelled by absence, not
+by an empty predicate.** The second collision was structural — the predicate could not live in
+`tech_tree.cpp`, because that TU pulls in sol2 and is excluded from the world superset a harness
+links. Neither was in the design; both surfaced from writing the check before trusting the default.
+
+### Where the method held, and where it did not
+
+**Held — by not doing the thing.** Sprint 6's worst cost was worktree agents branching from a moved
+base (36 conflicts to integrate one commit). This sprint's three items were one dependency chain
+across ~2 files each, so they were built sequentially in the main session. That was stated as a
+call rather than defaulted into, which is what the method asks.
+
+**Held — the bench prediction paid off exactly.** `econ_stability` and `home_surface_bench` failed
+at `-j 4` and passed re-run idle, precisely as the v0.1.9 retro said they would. They assert
+absolute wall-clock, so they measure the machine. No time was lost to it because the retro had
+already said what to do.
+
+**Did not — the JSON stores got corrupted three times.** Long resolution prose is full of backticks
+(`condition_set`, `apply_budget`, `earnable`), and inside a shell heredoc those are command
+substitution: the shell silently deletes the word and the mangled text lands in the canonical store
+looking almost right. Three repair passes. Fixed durably by writing edit scripts to a file and
+running them, and saved to memory rather than re-learned next month.
+
+**Did not — the pacing signal is not being collected.** This is the *third consecutive* entry whose
+Runtime line reads "not tracked": `tools/session/timer.js` exists, the SPRINTS format block asks
+for the number explicitly, and nobody starts it. The commit span (09:24–09:53) measures the
+landing, not the work, so it is not a substitute. **Ben asked for this signal and it has quietly
+stopped existing** — either start the timer at session open as a standing step, or drop the Runtime
+line from the format so it stops reading as data that was collected.
+
+### Left for another session
+
+- **NR-115** is the one genuinely for Ben: world generation still places starting military bases
+  through the tile-only check, so a corp can begin a campaign with a base it has not researched.
+  Defensible as fiction (inherited, not researched); a one-line fix either way.
+- **NR-102 — sequencing decoupling** is now the standing structural item, and it is the honest
+  successor to NR-101: a minor per item is not an order to build them in.
+- **v0.1.5, v0.1.6 and v0.1.7 remain uncut**, and v0.1.11 now carries ten items *(nine from
+  2026-08-10, when BL-332 moved to v0.1.5)* — the largest open
+  minor in the band.
+- **Windows work still owed**, unchanged from last sprint: visual goldens stale wherever a body
+  name renders, MSVC skill goldens stale for two separate reasons, and BL-341 parked until someone
+  is at that machine.
 
 ---
 

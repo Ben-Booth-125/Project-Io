@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../world/tech_tree.hpp"
+#include "../world/world.hpp" // BL-344: earned-tech state the viewer reports
 #include "ui_state.hpp"
 
 namespace ui {
@@ -33,7 +34,11 @@ void draw_tech_tree_menu(const tech_tree_registry& tree, ui_state& s);
 /// @param pan_x Radial-canvas pan offset, screen px (ui_state::tech_tree_pan_x).
 /// @param pan_y Radial-canvas pan offset, screen px (ui_state::tech_tree_pan_y).
 /// @param zoom  Radial-canvas zoom factor (ui_state::tech_tree_zoom).
-void draw_tech_tree_panel(const tech_tree_registry& tree, bool& open, int& view,
+/// @param w    Read-only world — BL-344: the viewer now reports whether a tech
+///             is EARNED, and by whom, so it stops being a picture of a system.
+/// @param corp Corporation whose earned set to read (the player's).
+void draw_tech_tree_panel(const tech_tree_registry& tree, const world& w, entity_id corp,
+                           bool& open, int& view,
                            float& pan_x, float& pan_y, float& zoom);
 
 } // namespace ui

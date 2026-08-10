@@ -21,10 +21,16 @@ building_profit estimate_building_profit(const world& w, const recipe_registry& 
         return out;
     const building_component& b = bit->second;
 
-    // Locate this building's report entry (its production this tick).
+    // Locate this building's report entry (its production this tick) — via the
+    // per-tick row index (BL-360), falling back to a scan for a hand-built report
+    // that never filled it.
     const building_report* br = nullptr;
-    for (const building_report& r : report.buildings)
-        if (r.building == building_id) { br = &r; break; }
+    if (const auto rit = report.building_row.find(building_id);
+        rit != report.building_row.end() && rit->second < report.buildings.size())
+        br = &report.buildings[rit->second];
+    else if (report.building_row.empty())
+        for (const building_report& r : report.buildings)
+            if (r.building == building_id) { br = &r; break; }
     if (br == nullptr)
         return out; // no economy tick has reported this building yet
     out.has_data = true;

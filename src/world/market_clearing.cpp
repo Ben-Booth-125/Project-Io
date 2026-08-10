@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <map>
+#include <tuple>
 #include <vector>
 
 namespace {
@@ -47,6 +49,7 @@ struct ob_sell_entry
     entity_id corp;
     float     qty;
     float     floor_price; ///< Minimum acceptable unit price (0 for auto-surplus).
+    float     rem;         ///< Unmatched remainder: matching drains it, auto-clear sells it.
 };
 
 struct ob_buy_entry
@@ -69,15 +72,28 @@ struct matched_trade
 };
 
 /// Markets present on each body, in ascending market-id order (deterministic).
-std::unordered_map<entity_id, std::vector<entity_id>> markets_by_body(const world& w)
+/// Served from world::body_market_index (BL-356), rebuilt when the count + max-id
+/// stamp stops matching the market set (markets are created, never destroyed).
+const std::unordered_map<entity_id, std::vector<entity_id>>& markets_by_body(const world& w)
 {
-    std::unordered_map<entity_id, std::vector<entity_id>> map;
-    map.reserve(w.markets.size());
+    entity_id max_id = null_entity;
     for (const auto& [mid, mc] : w.markets)
-        map[mc.body].push_back(mid);
-    for (auto& [body, ids] : map)
-        std::sort(ids.begin(), ids.end());
-    return map;
+        max_id = std::max(max_id, mid);
+
+    if (w.body_market_index_count != w.markets.size() ||
+        w.body_market_index_max_id != max_id)
+    {
+        auto& map = w.body_market_index;
+        map.clear();
+        map.reserve(w.markets.size());
+        for (const auto& [mid, mc] : w.markets)
+            map[mc.body].push_back(mid);
+        for (auto& [body, ids] : map)
+            std::sort(ids.begin(), ids.end());
+        w.body_market_index_count  = w.markets.size();
+        w.body_market_index_max_id = max_id;
+    }
+    return w.body_market_index;
 }
 
 /// Pick, from a body's markets, the one whose centre tile is nearest `tile`.
@@ -203,7 +219,7 @@ entity_id market_for_tile(const world& w, entity_id tile)
     const auto tit = w.tiles.find(tile);
     if (tit == w.tiles.end())
         return null_entity;
-    const auto by_body = markets_by_body(w);
+    const auto& by_body = markets_by_body(w);
     const auto it = by_body.find(tit->second.body);
     if (it == by_body.end())
         return null_entity;
@@ -241,7 +257,7 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     const std::vector<buy_order>&  player_buy_orders)
 {
     std::unordered_map<entity_id, corp_cash_flow> flows;
-    const auto by_body = markets_by_body(w);
+    const auto& by_body = markets_by_body(w);
 
     for (auto& [mid, mc] : w.markets)
     {
@@ -317,7 +333,11 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         }
     }
 
-    // Player sell orders: into mc.supply and the explicit sell book.
+    // Player sell orders: into mc.supply and the explicit sell book. Each order
+    // lists against a running pool remainder per (corp, body, resource), not the
+    // tick-start snapshot — several orders on the same pool cannot together list
+    // (and later clear) more than the pool holds (BL-351).
+    std::map<std::tuple<entity_id, entity_id, std::size_t>, float> pool_remaining;
     for (const sell_order& order : player_orders)
     {
         if (order.quantity <= 0.0f)
@@ -329,11 +349,14 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         const auto pkit = w.corp_body_pools.find(std::make_pair(order.corp, order.body));
         if (pkit == w.corp_body_pools.end())
             continue;
-        const float available = std::min(order.quantity, pkit->second.quantities[r]);
+        const auto rit = pool_remaining.try_emplace(
+            std::make_tuple(order.corp, order.body, r), pkit->second.quantities[r]).first;
+        const float available = std::min(order.quantity, rit->second);
         if (available <= 0.0f)
             continue;
+        rit->second -= available;
         w.markets.at(mid).supply[r] += available;
-        sell_books[mid][r].push_back({order.corp, available, order.floor_price});
+        sell_books[mid][r].push_back({order.corp, available, order.floor_price, available});
     }
 
     // Auto-demand: processor input shortfalls from the economy report.
@@ -387,7 +410,10 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         const entity_id body = w.markets.at(se.market).body;
         auto pkit = w.corp_body_pools.find(std::make_pair(se.corp, body));
         if (pkit != w.corp_body_pools.end())
-            pkit->second.quantities[se.r] -= se.qty;
+        {
+            float& q = pkit->second.quantities[se.r];
+            q = std::max(0.0f, q - se.qty); // defensive: a pool never goes negative
+        }
         flows[se.corp].income += se.qty * ref_price[se.market][se.r];
     }
 
@@ -401,10 +427,29 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // last resort at max(ref_price, floor)), so supply always clears.
     std::vector<matched_trade> trades;
 
-    for (auto& [mid, sell_by_r] : sell_books)
+    // The books are unordered maps and trade order feeds float accumulation into
+    // flows, so iterate them in sorted key order (the markets_by_body idiom).
+    std::vector<entity_id> book_mids;
+    book_mids.reserve(sell_books.size());
+    for (const auto& [mid, sell_by_r] : sell_books)
+        book_mids.push_back(mid);
+    std::sort(book_mids.begin(), book_mids.end());
+
+    auto sorted_resources = [](const auto& by_r) {
+        std::vector<std::size_t> rs;
+        rs.reserve(by_r.size());
+        for (const auto& [r, entries] : by_r)
+            rs.push_back(r);
+        std::sort(rs.begin(), rs.end());
+        return rs;
+    };
+
+    for (const entity_id mid : book_mids)
     {
-        for (auto& [r, sellers] : sell_by_r)
+        auto& sell_by_r = sell_books[mid];
+        for (const std::size_t r : sorted_resources(sell_by_r))
         {
+            std::vector<ob_sell_entry>& sellers = sell_by_r[r];
             auto& buyers_map = buy_books[mid];
             auto  bit        = buyers_map.find(r);
 
@@ -429,10 +474,9 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
                         : a.corp < b.corp;
                 });
 
-            // Working copies of remaining quantities so we can drain both sides.
-            std::vector<float> sell_rem(sellers.size());
+            // Working copies of remaining buy quantities; sellers drain their own
+            // `rem` in place, which survives into the auto-clear pass below.
             std::vector<float> buy_rem(buyers.size());
-            for (std::size_t i = 0; i < sellers.size(); ++i) sell_rem[i] = sellers[i].qty;
             for (std::size_t i = 0; i < buyers.size();  ++i) buy_rem[i]  = buyers[i].qty;
 
             // Match: highest-priority buyer draws from the cheapest compatible seller.
@@ -446,7 +490,7 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
                 float cheapest_price = -1.0f;
                 for (std::size_t si = 0; si < sellers.size(); ++si)
                 {
-                    if (sell_rem[si] <= 0.0f)
+                    if (sellers[si].rem <= 0.0f)
                         continue;
                     if (sellers[si].floor_price > buyer.max_price)
                         continue;
@@ -460,7 +504,7 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
                 {
                     for (std::size_t si = 0; si < sellers.size() && buy_rem[bi] > 0.0f; ++si)
                     {
-                        if (sell_rem[si] <= 0.0f)
+                        if (sellers[si].rem <= 0.0f)
                             continue;
 
                         const bool is_preferred =
@@ -479,9 +523,9 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
                         if (is_preferred && ask > cheapest_price * 1.10f)
                             continue;
 
-                        const float fill = std::min(buy_rem[bi], sell_rem[si]);
-                        sell_rem[si] -= fill;
-                        buy_rem[bi]  -= fill;
+                        const float fill = std::min(buy_rem[bi], sellers[si].rem);
+                        sellers[si].rem -= fill;
+                        buy_rem[bi]     -= fill;
 
                         trades.push_back({sellers[si].corp, buyer.corp, mid, r, fill, ask});
                     }
@@ -496,41 +540,38 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         const entity_id body = w.markets.at(t.market).body;
         auto pkit = w.corp_body_pools.find(std::make_pair(t.seller, body));
         if (pkit != w.corp_body_pools.end())
-            pkit->second.quantities[t.r] -= t.qty;
+        {
+            float& q = pkit->second.quantities[t.r];
+            q = std::max(0.0f, q - t.qty); // defensive: a pool never goes negative
+        }
         flows[t.seller].income     += t.qty * t.price;
         flows[t.buyer].expenditure += t.qty * t.price;
     }
 
     // --- Auto-clear unmatched player sell supply ---
-    // The market is a buyer of last resort at max(ref_price, floor). Aggregate matched
-    // sell qty per (seller, market, r) from the explicit trades, then clear the rest.
+    // The market is a buyer of last resort at max(ref_price, floor). Each order's
+    // own `rem` (left by the matching pass) clears — not a per-seller aggregate,
+    // which would subtract the seller's whole matched total from every one of that
+    // seller's orders (BL-351). Sorted key order again: income accumulation.
+    for (const entity_id mid : book_mids)
     {
-        std::map<std::tuple<entity_id, entity_id, std::size_t>, float> matched_sell;
-        for (const matched_trade& t : trades)
-            matched_sell[{t.seller, t.market, t.r}] += t.qty;
-
-        for (const auto& [mid, sell_by_r] : sell_books)
+        const auto& sell_by_r = sell_books[mid];
+        const entity_id body = w.markets.at(mid).body;
+        for (const std::size_t r : sorted_resources(sell_by_r))
         {
-            const entity_id body = w.markets.at(mid).body;
-            for (const auto& [r, sellers] : sell_by_r)
+            const float rp = ref_price[mid][r];
+            for (const ob_sell_entry& se : sell_by_r.at(r))
             {
-                const float rp = ref_price[mid][r];
-                for (const ob_sell_entry& se : sellers)
+                if (se.rem <= 0.0f)
+                    continue;
+                const float clearing = std::max(rp, se.floor_price);
+                auto pkit = w.corp_body_pools.find(std::make_pair(se.corp, body));
+                if (pkit != w.corp_body_pools.end())
                 {
-                    const float already_matched =
-                        [&]() -> float {
-                            auto it = matched_sell.find({se.corp, mid, r});
-                            return it != matched_sell.end() ? it->second : 0.0f;
-                        }();
-                    const float unmatched = se.qty - already_matched;
-                    if (unmatched <= 0.0f)
-                        continue;
-                    const float clearing = std::max(rp, se.floor_price);
-                    auto pkit = w.corp_body_pools.find(std::make_pair(se.corp, body));
-                    if (pkit != w.corp_body_pools.end())
-                        pkit->second.quantities[r] -= unmatched;
-                    flows[se.corp].income += unmatched * clearing;
+                    float& q = pkit->second.quantities[r];
+                    q = std::max(0.0f, q - se.rem); // defensive: a pool never goes negative
                 }
+                flows[se.corp].income += se.rem * clearing;
             }
         }
     }

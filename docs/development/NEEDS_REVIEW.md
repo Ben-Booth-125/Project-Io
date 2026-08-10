@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*109 entries — 14 open, 95 resolved.*
+*127 entries — 29 open, 98 resolved.*
 
 ---
 
@@ -53,11 +53,6 @@ BL-293 (priority A) says three order-book presses have no corp_command verb, so 
 *question · raised 2026-08-09 · from Roadmap gap review, 2026-08-09 session; BL-323 design field*
 
 v0.1.2 (buildings rework) has exactly one open item, BL-323, and BL-323's own design field records every slice as landed 2026-08-08: S2 + S2b (logistics reach gate), S1 partial (extractables 4 -> 15), S3 (site-dependent build time), S4 (construction legibility), plus the three-defect reach hardening - harnesses 12/12 and 26/26 PASS, requirements groups complete. The only residual is explicitly scoped OUT in the item's own words: 'the processing-chain half of S1 (Chemical Plant, Electronics Lab, Fabricator, Assembly Plant, most Refinery outputs) needs NEW resource_type values with market/price/serialisation wiring - a bigger item than Lua authoring, not attempted here.' That residual has no backlog item, so closing BL-323 would silently drop it. QUESTION: file the processing-chain item (new resource_types + market/serialisation wiring, its own version goal), flip BL-323 complete, and cut v0.1.2? On the evidence this is the cheapest available cut - the work is done and verified; only bookkeeping stands in the way.
-
-### NR-101 — 45 of 97 open items have no minor: 'post-v0.1.0' is being used as a synonym for someday
-*observation · raised 2026-08-09 · from Roadmap gap review, 2026-08-09 session*
-
-backlog_query over open items: 42 carry version_goal 'post-v0.1.0' and 3 carry none at all (BL-107 save-format version, BL-130 real market inventory, BL-132 market cogeneration). That is 45 of 97 - nearly half the open backlog with no minor to be cut in. 'post-v0.1.0' predates the arc being mapped out to v1.0.0 and is now stale: ROADMAP.md's v0.4.0 section, for instance, names seven of them (BL-239, BL-222, BL-223, BL-224, BL-238, BL-240, BL-311) as the political-layer substrate in PROSE, but their version_goal was never updated, so no query can see it. Effect: the roadmap and the backlog disagree about what is in which version, and the disagreement is invisible unless you read both. Cheap fix: sweep post-v0.1.0 into real minors, starting with the seven the roadmap already assigns in prose. Related to the sequencing decoupling in NR-102.
 
 ### NR-102 — Work order has decoupled from version order, and landed items are again sitting on non-terminal status
 *observation · raised 2026-08-09 · from Roadmap gap review, 2026-08-09 session*
@@ -98,6 +93,152 @@ During the v0.1.2 cut a second session was working the same tree and committing 
 *decision taken on your behalf · raised 2026-08-09 · from v0.1.1 cut, 2026-08-09 - acting on NR-098*
 
 To cut v0.1.1 on its actual theme, its 24 remaining open items had to leave the minor. Taken on your behalf so the cut could complete; overturn cheaply, since nothing was cancelled and every item kept its priority. THE SPLIT: v0.1.8 build health (BL-291 world_audit fails, BL-322 next_id.js scans 0 refs, BL-302 fresh-configure SDL3 fetch, BL-285 GCC golden re-bless); v0.1.9 shell & legibility (BL-184, BL-185, BL-193, BL-216, BL-229, BL-260, BL-265, BL-281, BL-292); v0.1.10 generation & content (BL-290 Earth-European name banks, BL-256, BL-257, BL-282, BL-283, BL-284, BL-308, BL-309, BL-338); and v0.2.0 for BL-293 (order-book verbs) and BL-262 (standing), both of which serve a text-driven player and legible rivals rather than the shell. THE JUDGEMENT CALL WORTH CHECKING: I numbered the three new minors 8/9/10 -- appended -- rather than inserting them at v0.1.3 and pushing the Laws/Techs/Military/Politics stubs up. Appending avoids renumbering four minors and every reference to them; the cost is that their NUMBER now understates their PRIORITY, since all three are buildable today while v0.1.3-v0.1.6 are design-forward stubs. A roadmap note states plainly that number is not sequence and that they should be cut ahead of the stubs, which matches your 2026-08-09 steer and the precedent of NR-084 (buildings jumping the stub queue) -- and of this very session, where v0.1.2 was cut before v0.1.1. If you would rather they sat at v0.1.3-v0.1.5 with the stubs pushed up, say so and it is a mechanical change to version_goal plus the roadmap headings.
+
+### NR-112 — condition_set::evaluate takes a SUBJECT CORP, which the BL-342 design sketch did not
+*decision taken on your behalf · raised 2026-08-10 · from BL-342 (condition_set evaluator)*
+
+BL-342 sketched the signature as evaluate(condition_set, const world&) -> bool. It shipped as evaluate(const condition_set&, const world&, entity_id subject_corp).
+
+**Why it matters.** Every consumer the design names is per-corporation: a levy is charged to a corp (BL-343), and an earned tech is per-corp state rather than global (BL-344, and the harness asserts it). A world-only predicate cannot answer either question, so the sketch would have had to be widened at the first consumer anyway. Purity is unaffected — the function still reads nothing but const world&.
+
+> **Recommendation:** Keep. If a genuinely world-level predicate appears later (a law conditioned on the world rather than on a subject), pass null_entity and let the subjects that need a corp measure zero, which is already the defined behaviour.
+
+*Files: `src/world/condition_set.hpp`, `src/world/condition_set.cpp`*
+
+### NR-113 — condition_subject::era measures launchpad ownership, because the Era system is designed but not implemented
+*decision taken on your behalf · raised 2026-08-10 · from BL-342 (condition_set evaluator)*
+
+tech_tree.hpp listed `era` among its six condition labels, so BL-342 promoted it with the rest. ERAS.md opens with a status banner saying the Era system is designed and NOT implemented; in code, space access is gated on launchpad presence and nothing else. So the era subject measures exactly that: a corp owning a launchpad reads Era 1, otherwise Era 0.
+
+**Why it matters.** It is the honest measure rather than an invented one, and it keeps every authored `era` condition meaning the same thing when the real Era system lands (the measure becomes a lookup; the conditions do not change). But it does mean an `era >= 1` gate today is really a `owns a launchpad` gate, and anyone authoring one should know that.
+
+> **Recommendation:** Leave as is until the Era system is implemented, then replace the measure body and re-run condition_set_harness C2h/C2l. Do not author an era condition that would read wrongly under the launchpad proxy.
+
+*Files: `src/world/condition_set.cpp`, `docs/economy/ERAS.md`*
+
+### NR-114 — condition_subject::market measures the MEAN price across every market in the world
+*decision taken on your behalf · raised 2026-08-10 · from BL-342 (condition_set evaluator)*
+
+The `market` subject needed a scope: one market, the corp's markets, or all of them. It ships as the mean resolved price across every market in the world, summed in ascending entity-id order for determinism.
+
+**Why it matters.** A law or a tech asking "is this good expensive yet?" is asking a world-level question, and a per-market scope would need a market qualifier on the condition that nothing yet authors. The mean is also less gameable than the max. But it does mean a corp trading in one expensive market cannot satisfy a market condition on its own.
+
+> **Recommendation:** Keep for the prototype. If a per-market predicate is ever wanted, add a market qualifier to `condition` rather than changing what the existing subject means.
+
+*Files: `src/world/condition_set.cpp`*
+
+### NR-115 — The tech gate applies to PLAYER CONSTRUCTION, not to generated military presence
+*decision taken on your behalf · raised 2026-08-10 · from BL-344 (techs MVP)*
+
+construct_building and can_place_in_world now refuse building_type::military_base to a corp that has not earned E0-ML-01. corporation_generation.cpp still places starting military bases through placement_rules::can_place (the tile-only check), which the gate does not touch — so a corp can begin the campaign with a base it has not researched.
+
+**Why it matters.** It is defensible as fiction (an existing installation is inherited, not researched) and it keeps BL-331 (starting military presence) working unchanged. But it is a real asymmetry, and if the answer is that a generated base should imply the tech, the fix is one line in generation: grant E0-ML-01 to any corp that generates with a base.
+
+- Leave as is — generated presence is inherited, not researched.
+- Grant E0-ML-01 at generation to any corp that starts with a military base.
+- Gate generation too, and let some corps start without one.
+
+> **Recommendation:** Option 2 reads best — a corp that fields a base plainly knows how to build one — but it changes what BL-331 generates, so it belongs to Ben rather than to this item.
+
+*Files: `src/world/corporation_generation.cpp`, `src/world/tech_gate.cpp`*
+
+### NR-116 — tech_node::condition was promoted to a predicate, but the predicate itself lives in tech_gate.cpp, not in tech_tree.lua
+*decision taken on your behalf · raised 2026-08-10 · from BL-344 (techs MVP)*
+
+BL-344 asked for tech_node::condition (a descriptive string) to become a condition_set. It did — but the VALUE is copied out of prototype_tech_gates() in the Lua-free src/world/tech_gate.cpp, keyed by tech id, rather than parsed from scripts/tech_tree.lua. The Lua file authors identity, topology and prose; it never authors a predicate. Two supporting fields were added: earnable (false for the ~130 nodes with no authored gate) and condition_label (the original descriptive word, preserved).
+
+**Why it matters.** It is forced by the build architecture, not chosen: tech_tree.cpp pulls in sol2/Lua and is excluded from the IO_WORLD_SOURCES superset, so a gate that gates construction.cpp cannot live there and could not be linked by a headless harness. The earnable flag is the other half — an empty condition_set is TRUE by BL-342 property 2, so an un-authored tech defaulting to an empty set would earn itself on the first tick. Absence has to be modelled by absence from the gate table.
+
+> **Recommendation:** Keep. If the tech system later wants predicates authored in Lua at scale, the move is to parse them in tech_tree.cpp AND mirror them into a generated Lua-free table, not to move the gate into the Lua TU.
+
+*Files: `src/world/tech_gate.cpp`, `src/world/tech_tree.hpp`, `src/world/tech_tree.cpp`, `scripts/tech_tree.lua`*
+
+### NR-117 — The extraction levy is charged on RAW output only, and stacks additively across enacted laws
+*decision taken on your behalf · raised 2026-08-10 · from BL-343 (laws MVP)*
+
+apply_budget charges the levy on building_report rows of type extraction_site only; a processing facility's output is not levied. Where two enacted laws both reach a resource, their rates add.
+
+**Why it matters.** Levying processing output too would tax the same ore twice — once as ore, once as steel — which is a compounding tax rather than the per-unit extraction levy BL-155 describes. Additive stacking is the simplest composition and the only one that keeps rate x units legible in the ledger; multiplicative stacking would make two 50% levies mean something no player would predict.
+
+> **Recommendation:** Keep both. When family (a) grows to the other three margin laws, revisit whether a levy on refined output is a separate law rather than a wider scope on this one.
+
+*Files: `src/world/budget_system.cpp`, `src/world/law.cpp`*
+
+### NR-118 — Is corporate focus diversity a guarantee, or a preference the generator states honestly?
+*question · raised 2026-08-10 · from BL-349 (S7d over-asserts), which offered this as its option 2*
+
+corporation_generation.cpp rerolls corp home provinces up to six times trying to represent all three focus classes, but only re-picks provinces INSIDE each corp's home nation -- so the floor is unmeetable when no corp's nation holds a processing-capable province. The code calls the unmet floor honest and lets the emergent set stand. BL-349 softened the test to match (option 1). Option 2 was to widen the reroll so the floor becomes meetable and keep the hard assertion.
+
+**Why it matters.** It is a design claim, not a test question: does a generated world PROMISE the player at least one rival of each focus, or does it promise only that focus follows from the ground each corp sits on? On the default seed, processing corps go 1 -> 0 as lowland_share moves, so a world with no processing rival is reachable today and nothing tells the player that is intentional.
+
+- Leave as is -- focus follows the ground, and an absent class is the ground speaking. Cheapest, and consistent with the specialists premise.
+- Widen the reroll beyond the home nation so the floor is meetable, then restore the hard assertion. Changes generated worlds.
+- Keep it emergent but SURFACE it -- if no rival of a class exists, say so somewhere the player reads, rather than leaving it silent.
+
+> **Recommendation:** Option 1 or 3. Option 2 buys a guarantee by letting a corp anchor outside its own nation, which fights BL-219's whole argument that a corp's focus is a consequence of the province it anchors to.
+
+*Files: `src/world/corporation_generation.cpp`, `tools/verify/settlement_harness.cpp`*
+
+### NR-121 — BL-325 S2's hire path was never positively observed firing for a rival corp — construction can stall indefinitely on steel-poor tiles
+*observation · raised 2026-08-10 · from Sprint 9 (cut v0.1.5) — debugging why ai_skill_harness's hire_unit tally stayed at 0 after adding corp_ai's military_base build candidate*
+
+BL-325 S2 makes hire_unit require a target tile carrying the corp's own COMPLETED military_base. Landing this exposed that corp_ai's build-candidate loop never proposed military_base at all (only extraction_site/processing_facility), so no rival corp could ever satisfy the new precondition. Fixed by adding a muster-base build candidate, gated on BL-344's tech (E0-ML-01) and competing on merit in the nice_to_have bucket.
+
+That fix compiles, is tech-gate-aware, and does not corrupt any golden band's correctness (net-worth/solvency bands unchanged; survival_fraction and build-thrash re-blessed with a documented reason). BUT: instrumented tracing across ai_skill_harness's five frozen seeds (300 ticks each) found ticks_remaining on the built military_base NEVER reaches zero for any corp observed - construction_progress stays at 0.000 for the whole traced window.
+
+Root cause: BL-095's pay-as-you-build model rates construction progress by the LOCAL MARKET's recent steel supply (economy_system.cpp's run_construction). If the tile the muster candidate picks (nearest can_place-valid tile to the corp's HQ) sits in a market catchment with no steel throughput, the build's rate is permanently 0 and it never completes - not a crash, not a rejection, just an indefinitely-stalled building sitting in the corp's asset list.
+
+This is NOT new to military_base - extraction_site and processing_facility candidates carry the exact same resource_build_cost[steel] risk. It has simply never been exercised in this harness before, because the pre-change baseline ran ZERO build actions across all five seeds (the generated world starts already built out; corp_ai only ever dialled existing buildings, never built new ones through its own candidate loop). BL-325 S2 is the first thing to actually exercise corp_ai's OWN build-to-completion path in this specific harness.
+
+**Why it matters.** BL-325's own done-definition (v0.1.5, ROADMAP.md) states hire_unit was not positively verified firing end-to-end for a rival corp in the harness. The muster/hire SURFACE is real and correct by inspection (S1 through S2's precondition, the candidate generation, the tech gate) but the END-TO-END rival-corp behavior — build a base, have it complete, then hire — was not observed within five seeds x 300 ticks. Player-corp hiring is unaffected (BL-331 seeds the player's base pre-built, bypassing construction entirely via author_building).
+
+### NR-122 — Full CTest gate is not green on main — 3 pre-existing failures found while verifying Sprint 9, confirmed unrelated by baseline re-run
+*observation · raised 2026-08-10 · from Sprint 9 (cut v0.1.5) — running the full local suite (60 tests) before committing*
+
+Running `ctest --test-dir build_linux` on this machine surfaces 3 failing tests: `econ_stability` (R6, the largest swept-world tick-time bound), `home_surface_bench` (worst preview under the 1s ceiling — observed 1169.7ms), and `history_sim_harness` (6 sub-failures: R7 the ~2.1s run-time budget, plus R3a/R3a2/R3a3/R3b/R5 — the far-campaign objective, supply stall and winter-campaign checks in the Era -1 sim's BL-277 scorer).
+
+None of these three touch any file this sprint changed (corp_ai.cpp, corp_command.cpp, selection_panel.cpp, world_audit.cpp, ai_skill_harness.cpp) — economy_system.cpp, generation_preview.cpp and the settlement/combat/diplomacy sim files are untouched.
+
+Confirmed pre-existing rather than assumed: git-stashed every Sprint 9 source change, rebuilt, and reran `history_sim_harness` (the largest/most substantive of the three) in isolation on the clean b039098 baseline. IDENTICAL 6 failures, same labels, same run stats (82 provinces -> 1755, 267 battles, 165737ms). Stash popped and Sprint 9's changes restored before this entry was written.
+
+The two timing-threshold failures (econ_stability, home_surface_bench) were not independently re-verified against baseline the same way — they are absolute-millisecond ceilings on a shared/loaded machine, the same class of flake the project has already documented once (BL-258: 'a build-configuration artefact rather than a regression... the Windows tree is deliberately Debug'). Judged low-risk to leave unverified given zero file overlap with this sprint, but that is an inference, not a second confirmed isolation.
+
+**Why it matters.** CLAUDE.md/DEVELOPMENT_PRACTICES treat a green CTest gate as the normal bar before a Full-mode commit. This session's gate is red for reasons unrelated to its own work, confirmed for the largest failure by baseline re-run (Sprint 6's own standing lesson: 'a green gate can lie... build the same commit in a throwaway worktree' — the inverse check, a RED gate on baseline, is the same discipline). Sprint 9's commit proceeds on that evidence rather than blocking on an unrelated pre-existing gap, but the gap itself is real and un-owned as of this entry.
+
+### NR-123 — Hygiene batch filed (BL-351..BL-363): version-goal mapping was a judgement call
+*decision taken on your behalf · raised 2026-08-10 · from 2026-08-10 code-hygiene audit (4 review agents over src/, tools/, warnings build)*
+
+The audit's findings were filed as 13 items. None of the uncut minors owns "engine health" (v0.1.8 did, and is cut), so version goals were assigned thematically: market/econ/determinism fixes -> v0.1.13 (markets & materials), the convoy orbital-purity fix -> v0.1.12 (logistics modes), UI-side items (BL-359 deferred demolish, BL-361 app.cpp split, BL-362 frame caches) -> v0.1.7 (UI alignment). Re-rate freely at re-sequencing.
+
+### NR-124 — Orbital purity approach: sim reads a tick-derived angle, rendering keeps wall-clock
+*decision taken on your behalf · raised 2026-08-10 · from BL-354 (econ-tick orbital purity)*
+
+The fix separates the two consumers rather than slowing rendering to tick grain: econ-tick code (convoy dispatch pricing/source choice) reads an angle computed purely from the tick counter; the canvas keeps its smooth wall-clock angle. The world.hpp:439 "positions are not a pure function of tick" note becomes true of rendering only. Alternative rejected: advancing orbital state only on tick would make planet motion visibly steppy.
+
+### NR-125 — The buy-order half of the order book is dead code (~100 lines): remove or hold?
+*question · raised 2026-08-10 · from Hygiene audit; components.hpp:404, market_clearing.cpp:359-371/:408-489*
+
+No producer anywhere constructs a buy_order (the live call passes only sell orders, app.cpp:642); the two-pass preferred-seller matching for buys has never run. Options: (a) delete it -- the exchange-policy arc (BL-160/BL-161) can re-add it designed against real requirements; (b) keep it as the landed BL-037 shape awaiting a producer. Not acted on in the hygiene batch.
+
+### NR-126 — Do military_base / launchpad / inland_logistics_hub want terrain placement preferences at generation?
+*question · raised 2026-08-10 · from Hygiene audit / -Wswitch; corporation_generation.cpp:280 (tile_score_for)*
+
+The three newest building types fall through tile_score_for to a neutral 1.0, scoring like port/none. BL-355 makes the cases explicit (still 1.0) so the compiler tracks the enum, but whether they SHOULD carry a preference (base near borders? launchpad on flat dry terrain?) is a design call not taken.
+
+### NR-127 — Hire gate retargeted to corp_body_pools (decision taken in BL-352)
+*decision taken on your behalf · raised 2026-08-10 · from BL-352 (hire-gate live store)*
+
+BL-324's design says hires are gated on the corp's own stockpile/market access and are a real spend. The code read the per-building stockpile_component store, which nothing credits (world.hpp:190 calls it unused in L3) -- so the gate was inert and ungated rows were free. The fix reads/debits w.corp_body_pools, the store the live economy actually writes. This makes gated rows genuinely purchasable for the first time -- rival hiring behaviour will change (they can now afford gated units when their pools allow).
+
+### NR-128 — Two frame-dependence / over-debit residuals the batch deliberately left
+*observation · raised 2026-08-10 · from Hygiene batch delivery (BL-351 sell orders, BL-354 orbital purity); verifier-review suggestion*
+
+Left standing, both harmless today: (1) record_proximity_glimpses still samples live render angles inside the econ tick, so body_last_glimpse_tick (activity fog only, never money) can differ across frame rates — the world.hpp comment says so honestly; fold into a later BL-354 follow-up if fog determinism ever matters. (2) Auto-surplus listing and player sell orders snapshot the same corp pool independently; the new zero-clamps make joint over-debit safe rather than impossible — a joint-remainder harness assertion under the BL-351 group is the cheap hardening.
+
+### NR-129 — Corp AI burns a candidate slot per eval on tech-locked military bases
+*observation · raised 2026-08-10 · from verifier-review of the hygiene batch (corp_ai.cpp)*
+
+The AI treats any non-applied corp_command_result generically, so before E0-ML-01 is earned a military-base candidate scores, wins, is rejected as rejected_tech_locked, and the slot is spent — legal, deterministic, just churn. A precondition filter (skip candidates whose tech gate is unearned) is the clean fix; belongs with BL-332 (military points and research) sequencing.
 
 ---
 
@@ -1551,4 +1692,43 @@ New research note docs/ai/LANGUAGE_POLICY_FEASIBILITY.md, answering the two gate
 The overflow-ledger check (scripts/verify/text_overflow_floor.lua + the AddText coverage grep) is being built this session; the design says the saved check extends .claude/skills/verifier-visual/SKILL.md. That edit is deferred pending your yes/no; until then the script runs ad hoc.
 
 > **RESOLVED.** Ben approved 2026-08-09; SKILL.md § Text-overflow floor check added the same session.
+
+### NR-101 — 45 of 97 open items have no minor: 'post-v0.1.0' is being used as a synonym for someday
+*observation · raised 2026-08-09 · from Roadmap gap review, 2026-08-09 session*
+
+backlog_query over open items: 42 carry version_goal 'post-v0.1.0' and 3 carry none at all (BL-107 save-format version, BL-130 real market inventory, BL-132 market cogeneration). That is 45 of 97 - nearly half the open backlog with no minor to be cut in. 'post-v0.1.0' predates the arc being mapped out to v1.0.0 and is now stale: ROADMAP.md's v0.4.0 section, for instance, names seven of them (BL-239, BL-222, BL-223, BL-224, BL-238, BL-240, BL-311) as the political-layer substrate in PROSE, but their version_goal was never updated, so no query can see it. Effect: the roadmap and the backlog disagree about what is in which version, and the disagreement is invisible unless you read both. Cheap fix: sweep post-v0.1.0 into real minors, starting with the seven the roadmap already assigns in prose. Related to the sequencing decoupling in NR-102.
+
+> **RESOLVED.** Swept 2026-08-10. Every open item now names a minor: 46 assignments, and a re-query confirms zero items left on post-v0.1.0 or on no version at all.  THE SWEEP WAS MOSTLY RECONCILIATION, not judgement. Twenty of the 45 were already assigned by ROADMAP.md IN PROSE -- the v0.4.0 politics substrate (BL-222, BL-223, BL-224, BL-238, BL-239, BL-240, BL-311) and most of the v0.3.0 Era -1 arc (BL-274, BL-277, BL-296, BL-297, BL-298, BL-300, BL-209, BL-289, BL-301) -- and the backlog simply never heard. That was the finding's real substance: the two documents disagreed and the disagreement was invisible unless you read both. It is now visible to a query.  RESULTING DISTRIBUTION over 71 open items: v0.1.5 (2), v0.1.6 (2), v0.1.7 (4), v0.1.11 (10), v0.1.12 (4), v0.1.13 (6), v0.2.0 (12), v0.3.0 (22), v0.4.0 (9).  THREE NEW MINORS WERE NAMED, and that is the one part of this that was invention rather than reconciliation -- recorded separately as NR-119 so it can be renumbered or reshaped without archaeology. The residue after reconciliation was 14 items of real prototype work with no theme to belong to, and it clustered cleanly: v0.1.12 Logistics modes (distance costs something, in more than one way, and the player can see it), v0.1.13 Markets & materials (the market stops being fixed at world-gen, the goods get deeper, and the save format learns to say no), and four more folded into the existing v0.1.11. None of the three carries a done-definition yet, deliberately -- the band's own rule is that a minor earns its done-definition at promotion, and naming them now is about making the queue legible rather than committing to their content.  FOUR ITEMS MOVED ON THEIR CONTENT RATHER THAN ON PROSE, and each is worth naming because the reasoning is not obvious from the title. BL-253 (strategic-scan tile cost) went to v0.2.0 rather than to a performance bucket: it is run_corp_strategic_step's O(corps x tiles) rescan, i.e. the OPPONENT's scaling term. BL-314 (unit verb family) went to v0.3.0 rather than staying with v0.1.5's stub, because it waits on a seam that only BL-315's conflict spine creates. BL-182 (corporate borders) went to v0.3.0 because its real content is an operate-gate -- a permission over where a corporation may act, which under BL-094 is a thing a governing body grants rather than a thing a corporation has. BL-212 (nation-voiced public comms) stayed in the PROTOTYPE band rather than moving to v0.3.0 with the nation actor, because its own settlement says it does not wait on BL-218 and works against today's data.  NOT ADDRESSED HERE: NR-102's sequencing decoupling, which this finding names as related. A minor per item is not the same as an order to build them in. DELIBERATELY LEFT ALONE: 21 COMPLETE items still carry post-v0.1.0 (BL-166 through BL-307). They landed before the arc was mapped past v0.1.0, so there is no minor they actually shipped in, and back-filling one would be fabricating history rather than recording it. The finding was about open items and the queue they form; a landed item's version_goal is a record of the intent it was worked under. So `--version post-v0.1.0` still returns rows, and that is correct rather than residue -- do not re-file it.
+
+### NR-119 — Three new minors were named to absorb the post-v0.1.0 residue — v0.1.11 reshaped, v0.1.12 and v0.1.13 invented
+*decision taken on your behalf · raised 2026-08-10 · from NR-101 (the post-v0.1.0 sweep)*
+
+After reconciling the 20 items ROADMAP.md already assigned in prose, 14 items of real prototype work were left with no theme to belong to. Rather than leave them on post-v0.1.0 (which is what the finding was about) they were given themes: v0.1.12 "Logistics modes" (BL-153 convoy distance pricing, BL-173 rail, BL-188 sea trade, BL-175 supply-lens flow) and v0.1.13 "Markets & materials" (BL-263 runtime market emergence, BL-340 processing roster, BL-130 real inventory, BL-132 co-generation, BL-107 save-format version, BL-192 opening-economy measurement). Four more were folded into the existing v0.1.11, whose theme was written down for the first time: the levers stubbed across v0.1.3-v0.1.6 get the surfaces they were promised.
+
+**Why it matters.** Naming a minor is a roadmap-shape call and the roadmap is yours. The sweep itself was authorised by NR-101 in as many words ("sweep post-v0.1.0 into real minors"), but the specific themes, the split into two rather than one or three, and the numbering are mine. None of it is expensive to undo -- a version_goal is one field and the roadmap entries are three paragraphs -- but it should be a decision rather than a default.
+
+- Keep as named. The two themes are each internally coherent and neither invents work.
+- Merge v0.1.12 and v0.1.13 into one "expanded economy" minor. Ten items is large for a minor, but the two are genuinely adjacent (sea trade wants ports; ports want markets).
+- Renumber or re-order them against v0.1.5-v0.1.7, which are still uncut and sit earlier in the sequence.
+
+> **Recommendation:** Keep. The band has already established that numbering is advisory and each tag documents its own theme (v0.1.8-v0.1.10 were appended rather than inserted for exactly this reason), so a later renumber costs nothing.
+
+> **RESOLVED.** Ben, 2026-08-10: "keep v0.1.12 and v0.1.13 as named". Option 1 taken -- the two minors stand as filed, and v0.1.11's reshaped roster stands with them.  So the naming stops being a delegated default and becomes a decision: v0.1.12 Logistics modes (BL-153, BL-173, BL-188, BL-175) and v0.1.13 Markets & materials (BL-263, BL-340, BL-130, BL-132, BL-107, BL-192). Neither merges into the other and neither is renumbered against the uncut v0.1.5-v0.1.7.  WHAT STAYS OPEN, because ruling on the names did not rule on the content: neither minor carries a done-definition yet, and that is deliberate rather than outstanding. The band's rule is that a minor earns its done-definition AT PROMOTION -- NR-103's finding was that a theme with no done-definition absorbs items indefinitely, and writing one now, for work nobody has started, would be inventing a test for finished before knowing what finishing looks like. The two entries in ROADMAP.md say so in as many words.
+
+*Files: `docs/development/ROADMAP.md`, `docs/development/backlog.json`*
+
+### NR-120 — Large refocus (Ben, 2026-08-10): the player is a national private militia that contracts private companies for space equipment
+*decision taken on your behalf · raised 2026-08-10 · from Session 2026-08-10, during the sprint-map render*
+
+Ben, verbatim, in two steps. First: "In current version, the player is a national entity for sure."
+Then: "In fact let's do a large refocus. Let's place the player as a national private militia, which uses private companies to build equipment for space. So the flavour of trading is initially coloured directly with military use, and space equipment."
+
+This NARROWS BL-094 (player-identity pivot), which since 2026-08-03 has said 'governing body' and reads as a whole state apparatus with law/policy/science as its levers. A national private militia is a smaller, sharper actor: armed, national in allegiance, but not the government. It does not legislate; it procures.
+
+Three consequences that are not restatements of BL-094:
+1. THE CORPORATION'S ROLE CHANGES CATEGORY. BL-094 has the chartered corp as the player's own economic arm on a shared treasury — the player's alter ego. Under the refocus, companies are SUPPLIERS the militia contracts with. That is an arm's-length relationship with a price, a counterparty and a possible refusal, not a second wallet. The 'tight/shared treasury (prototype-of-1)' call in BL-094 does not survive the refocus unamended.
+2. TRADE IS COLOURED FROM TICK ONE. Ben's word is 'initially' — this is not an endgame layer. The goods the player cares about are military materiel and space hardware, which means the processing/roster work (BL-340) and the resource tiers (RESOURCES.md) are load-bearing for the PREMISE now, not just for economic depth.
+3. 'FOR SPACE' RE-ANCHORS THE ERA LADDER. The militia's procurement target is space equipment, so the Era 0 -> Era 1 gate (ERAS.md: rocketry + launchpad + propellant) stops being a distant unlock and becomes the thing the player is buying toward from the start.
+
+**Why it matters.** v0.3.0 carries 22 open items — the largest single block on the board — and every one of them was specified against 'governing body'. BL-315 (governing-body conflict spine) is design-owed and names the superseded framing in its own title. Planning five sprints without settling this would sequence work against an actor that no longer exists.
 

@@ -291,6 +291,23 @@ A body with no culture layer (no settlement pass, or a caller supplying bare see
 to **one** tongue rolled in Pass 5 for the whole body, not a per-nation re-roll: an unwritten history
 is still a shared one.
 
+**Province names** follow it too (BL-348, landed 2026-08-10). A province is `<People> <Region>`,
+and the region half was still English — *Reach*, *Coast*, *northern*, *inland* — which was *worse*
+than before BL-290 rather than merely unfixed: with the culture half native, the two naming systems
+sat side by side in one string and read as a bug rather than a style. `coin_lexicon` now coins each
+tongue **nine** region words, and `region_word` asks the province's tongue instead of returning a
+literal.
+
+Nine, because the choice of region word is **positional** and stays that way: a 5-band
+north→south axis and a 4-sector dawnward→outer axis, so the name still carries a fact about the
+ground rather than becoming decorative. The English table survives only as the fallback for a
+culture whose tongue cannot coin at all. Sample (default seed): *Dothkua Shethdeith*, *Rekmaik
+Taikme*, *Rairuath Rairith*, *Shuahualmi Beduas*, *Kuakuam Ruatem*, *Nuathorsho Ruvor*,
+*Nuathorsho Rove*, *Tatadith Hezo*, *Kuakuam Muamem* — the kinship is emergent here as well, since
+*Nuathorsho Rove* / *Nuathorsho Ruvor* and *Kuakuam Ruatem* / *Kuakuam Muamem* draw their region
+words from one sound system. The nine words are drawn **last** in `coin_lexicon`, so every nation
+and city name generated before the change is byte-identical after it.
+
 **City names** follow the same rule. `generate_city_name` takes a tongue and suffixes the culture's
 own coined settlement morpheme — the `-ton` / `-ford` / `-haven` / `-burg` bank is removed. Because
 population centres are placed *before* the creeds exist, they are first named from a tongue rolled

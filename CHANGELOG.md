@@ -12,7 +12,79 @@ authoritative version-history record. A local-only snapshot of `src/` is also ke
 
 ## [Unreleased]
 
-_Nothing yet._
+### Changed
+- **Province names are wholly native** (BL-348). `"<People> <Region>"` had a coined culture half and
+  an English region half since BL-290 — *Reach*, *Coast*, *inland* — which read as a bug rather than
+  a style, because the two naming systems sat side by side in one string. Each tongue now coins its
+  own nine region words, sized to the existing 5-band / 4-sector positional mapping so the name
+  still carries a fact about the ground. Drawn last in `coin_lexicon`, so every nation and city name
+  is byte-identical to before.
+- **A knife-edge test stopped voting on generation parameters** (BL-349). `settlement_harness` S7d
+  asserted a corporate-diversity floor the generator explicitly declines to guarantee, and its
+  verdict moved with `lowland_share` — so BL-338's tuning pick was simultaneously defensible on
+  drainage grounds and the green value. S7d now asserts the property that does not depend on
+  province ownership (the corporation set is not a monoculture) and *reports* the three-way split
+  instead of asserting it. Verified by the sweep the item specified: 0.15 / 0.20 / 0.25 now agree.
+
+## [0.1.4] — 2026-08-10
+
+**Techs — a technology that can actually be earned, and that unlocks something other than a
+factory.** One item. A tech tree has existed since 2026-07-08 with a radial viewer on F9, but its
+gate was stored as a descriptive *string*: a label describing what the gate would be about, unable
+to resolve true or false. No tech had ever been earned, and nothing had ever been unlocked.
+
+### Added
+- **The Military Base is gated behind a technology** (BL-344) — `E0-ML-01` "Standing Garrison
+  Doctrine", earned once a corporation holds two extraction sites and Cr 2,000. Military rather than
+  economic on purpose: a technology that can only unlock a building is being designed for the
+  corporate player this project is pivoting away from, and gating the base cost exactly what gating
+  a smelter would have.
+- **Earned techs are per-corporation** (`world::earned_techs`), evaluated once per economy tick.
+  Monotonic — a tech is not un-earned by a later dip below its threshold.
+- **A locked build row says which technology is missing**, at the same call site that would
+  otherwise offer the Build button (`placement_reason::tech_locked`,
+  `construction_result::tech_locked`).
+
+### Changed
+- **`tech_node::condition` is a `condition_set`, not a string.** The F9 viewer now reports EARNED,
+  LOCKED with its unmet conditions itemised, or — honestly — "no gate authored", instead of showing
+  a label that could never resolve. "Not yet authored" needed its own flag, because an empty
+  predicate is *true* and an un-authored tech would otherwise have earned itself on the first tick.
+- The predicate lives in the Lua-free `src/world/tech_gate.cpp` rather than in
+  `scripts/tech_tree.lua`, so a gate that gates construction can be linked — and tested headlessly.
+  The Lua file authors identity, topology and prose, and reads the predicate back.
+
+**Gate:** 58 tests, 0 failures. New harness: `tech_gate_harness` (33 assertions).
+
+## [0.1.3] — 2026-08-10
+
+**Laws — one law you can turn on and see.** Two items. Not the ten-law list and not a policy
+screen: one law, enacted, changing a number the player already reads. A law the player cannot see
+working is indistinguishable from an unimplemented one, and that was the difference between this
+minor being cuttable and being another design document.
+
+### Added
+- **The Extraction Levy** (BL-343) — a per-unit charge on raw output, switched from the Budget
+  ledger's new **Laws** section and landing as its own **Levies** bar on the Finance card, beside
+  income, inputs, maintenance, wages and interest. It ships **un-enacted**: enacting nothing changes
+  nothing, and the balance is bit-identical to a world with no laws at all.
+- **`condition_set`** (BL-342) — the shared predicate laws, techs and quests all read. A flat
+  AND-list of atomic conditions, pure and deterministic, where an empty set means *always* because
+  that is the common case for a law. Two of its eight subjects are **military**: BL-094's design
+  test applied at the foundation rather than promised for later, since a predicate that can only
+  ask economic questions is the exact failure the governing-body pivot exists to avoid.
+
+### Changed
+- **The law enforcement seam is settled**: a law is a modifier **over** the market, never an
+  override **of** it — the same principle that vetoed price clamps in July. The levy applies where
+  the flow is *accounted* (`apply_budget`), never where the price is *resolved* (`clear_markets`),
+  so the market stays the only thing that sets prices and the player sees the tax as its own number
+  rather than as an unexplained worse price.
+- `apply_budget` takes an optional production argument; omitting it charges nothing, which is why
+  no existing economy harness needed to change.
+
+**Gate:** 58 tests, 0 failures. New harnesses: `condition_set_harness` (40 assertions),
+`law_harness` (21).
 
 ## [0.1.10] — 2026-08-09
 

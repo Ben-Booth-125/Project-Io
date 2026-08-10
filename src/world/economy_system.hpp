@@ -6,6 +6,7 @@
 
 #include <array>
 #include <map>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -63,8 +64,15 @@ struct corp_budget
     float wages       = 0.0f;
     float interest    = 0.0f; ///< BL-073: charged only while balance < 0.
 
+    /// BL-343: levies charged by enacted laws this tick — today, the extraction
+    /// levy (a per-unit charge on raw output). Zero unless a law is enacted that
+    /// reaches this corp, which is the shipped default. This is the line that
+    /// makes a law OBSERVABLE: a law the player cannot see working is
+    /// indistinguishable from an unimplemented one.
+    float levies      = 0.0f;
+
     /// The per-tick balance delta: income less every outflow.
-    float net() const { return income - expenditure - maintenance - wages - interest; }
+    float net() const { return income - expenditure - maintenance - wages - interest - levies; }
 };
 
 /// One background-corp agency action taken this tick (the BL-079 reflexes). Pure
@@ -101,6 +109,13 @@ struct agency_event
 struct economy_report
 {
     std::vector<building_report> buildings;
+
+    /// Building id → index into `buildings`, filled once by run_economy_step after
+    /// the production pass (BL-360). estimate_building_profit resolves its row here
+    /// rather than scanning `buildings` — that scan was O(B²) per tick under the
+    /// BL-079 reflex loop and the BL-202 strategic step. Empty on a hand-built
+    /// report; readers then fall back to the scan.
+    std::unordered_map<entity_id, std::size_t> building_row;
 
     /// Background-corp agency actions taken this tick (BL-079), in the
     /// deterministic order they were applied. See agency_event.

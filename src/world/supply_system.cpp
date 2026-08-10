@@ -1,6 +1,7 @@
 #include "supply_system.hpp"
 
 #include "logistics.hpp"
+#include "orbital_system.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -9,6 +10,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
+#include <vector>
 
 void advance_convoys(world& w)
 {
@@ -134,9 +136,12 @@ void credit_arrived_convoys(world& w, int tick)
 
 namespace {
 
-/// Euclidean distance (AU) between two body entities using their current
-/// orbital positions. Moons are approximated at their parent's position.
-float body_distance_au(const world& w, entity_id a, entity_id b)
+/// Euclidean distance (AU) between two body entities at the given day tick.
+/// Uses the tick-pure angle (orbital_angle_at_tick), never the frame-advanced
+/// orbital_angle_rad — this feeds source selection, dispatch pricing and convoy
+/// speed inside the econ tick, which must not depend on frame rate (BL-354).
+/// Moons are approximated at their parent's position.
+float body_distance_au(const world& w, entity_id a, entity_id b, int day_tick)
 {
     if (a == b)
         return 0.0f;
@@ -147,7 +152,7 @@ float body_distance_au(const world& w, entity_id a, entity_id b)
             return {0.0f, 0.0f};
         const body_component& bc = it->second;
         const float r = bc.orbital_radius_au;
-        const float theta = bc.orbital_angle_rad;
+        const float theta = orbital_angle_at_tick(bc, day_tick);
         return { r * std::cos(theta), r * std::sin(theta) };
     };
 
@@ -223,13 +228,16 @@ entity_id corp_representative_tile(const world& w, const corporation_component& 
     return best_tile;
 }
 
-/// Find the market entity for a given body. Returns null_entity if none exists.
+/// Find the market entity for a given body — the lowest-id one, so the pick is
+/// stable when a body hosts several markets (w.markets is an unordered_map; the
+/// first hit would inherit hash layout). Returns null_entity if none exists.
 entity_id market_for_body(const world& w, entity_id body)
 {
+    entity_id best = null_entity;
     for (const auto& [mid, mc] : w.markets)
-        if (mc.body == body)
-            return mid;
-    return null_entity;
+        if (mc.body == body && (best == null_entity || mid < best))
+            best = mid;
+    return best;
 }
 
 /// BL-148/149 logistics-node lookups, built once per dispatch pass. `pop_tile_scale`
@@ -297,12 +305,36 @@ void dispatch_convoys(world& w, const recipe_registry& reg,
     const logistics_nodes  nodes = collect_logistics_nodes(w);
     const logistics_node_params& node_params = reg.logistics_nodes();
 
-    for (auto& [corp_id, corp] : w.corporations)
+    // BL-354: inter-body distances are evaluated at this day tick via the tick-pure
+    // angle, so sourcing, pricing and convoy speed are a pure function of tick.
+    // current_day_tick is set by every tick path (app + main) before dispatch runs.
+    const int day_tick = w.current_day_tick;
+
+    // Sorted id walks (the standing.hpp convention): corporations and markets are
+    // unordered_maps, and convoy insertion order — hence trade-route creation order
+    // and the serialised history_log trade_route entries — would otherwise inherit
+    // hash layout.
+    std::vector<entity_id> corp_ids;
+    corp_ids.reserve(w.corporations.size());
+    for (const auto& [id, corp] : w.corporations)
+        corp_ids.push_back(id);
+    std::sort(corp_ids.begin(), corp_ids.end());
+
+    std::vector<entity_id> market_ids;
+    market_ids.reserve(w.markets.size());
+    for (const auto& [id, market] : w.markets)
+        market_ids.push_back(id);
+    std::sort(market_ids.begin(), market_ids.end());
+
+    for (const entity_id corp_id : corp_ids)
     {
+        corporation_component& corp = w.corporations.at(corp_id);
+
         // Iterate markets (not corp pools) so we catch shortfalls even on bodies
         // where the corp has no existing pool entry.
-        for (const auto& [dest_market_id, dest_market] : w.markets)
+        for (const entity_id dest_market_id : market_ids)
         {
+            const market_component& dest_market = w.markets.at(dest_market_id);
             const entity_id dest_body = dest_market.body;
 
             for (std::size_t ri = 0; ri < resource_count; ++ri)
@@ -342,7 +374,7 @@ void dispatch_convoys(world& w, const recipe_registry& reg,
                         const entity_id dest_centre = dest_market.centre_tile;
                         if (origin == null_entity || dest_centre == null_entity)
                             continue; // no production anchor / unanchored market: cannot route
-                        const logistics_path path = intra_body_path(w, src_body, origin, dest_centre);
+                        const logistics_path& path = intra_body_path(w, src_body, origin, dest_centre);
                         if (!path.reachable)
                             continue;
                         mode      = path.crosses_ocean ? convoy_mode::sea : convoy_mode::land;
@@ -364,7 +396,7 @@ void dispatch_convoys(world& w, const recipe_registry& reg,
                             < propellant_per_launch)
                             continue;
                         mode      = convoy_mode::space;
-                        dist      = body_distance_au(w, src_body, dest_body);
+                        dist      = body_distance_au(w, src_body, dest_body, day_tick);
                         unit_cost = logistics_cost_space;
                     }
 
@@ -397,7 +429,7 @@ void dispatch_convoys(world& w, const recipe_registry& reg,
                         static_cast<std::size_t>(resource_type::propellant)] -= propellant_per_launch;
 
                 // Speed: 1 / distance in AU gives roughly 1 tick per AU. Clamp to > 0.
-                const float dist = body_distance_au(w, best_src_body, dest_body);
+                const float dist = body_distance_au(w, best_src_body, dest_body, day_tick);
                 const float speed = (dist > 0.0f) ? (1.0f / dist) : 1.0f;
 
                 convoy_component c;

@@ -210,6 +210,10 @@
    "Balance Ledger (Budget), 'Wages' tier control"
   ],
   [
+   "ledger.law_enact_toggle",
+   "Balance Ledger (Budget), 'Laws' section beneath the two policy-tier stubs"
+  ],
+  [
    "ledger.build_ledger_close",
    "Tile construction ledger (the 'Construct · [x, y]' fold-out, BL-162), header"
   ],

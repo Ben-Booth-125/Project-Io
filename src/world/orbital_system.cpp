@@ -35,6 +35,19 @@ void advance_orbits(world& w, double delta_days)
     }
 }
 
+float orbital_angle_at_tick(const body_component& body, int day_tick)
+{
+    double angle = static_cast<double>(body.orbital_epoch_angle_rad)
+                 + static_cast<double>(body.orbital_angular_velocity_rad_per_day)
+                 * static_cast<double>(day_tick);
+
+    angle = std::fmod(angle, two_pi);
+    if (angle < 0.0)
+        angle += two_pi;
+
+    return static_cast<float>(angle);
+}
+
 float kepler_angular_velocity(float orbital_radius_au)
 {
     if (orbital_radius_au <= 0.0f)

@@ -96,6 +96,38 @@ uint64_t world::state_hash(int tick) const
         for (const float q : sc.quantities) fnv1a_f32(h, q);
     }
 
+    // Tiles: resource_remaining is drawn down by extraction every tick.
+    {
+        std::vector<entity_id> ids;
+        ids.reserve(tiles.size());
+        for (const auto& kv : tiles) ids.push_back(kv.first);
+        std::sort(ids.begin(), ids.end());
+        for (const entity_id id : ids)
+        {
+            const tile_component& t = tiles.at(id);
+            fnv1a_u32(h, id);
+            for (const float q : t.resource_remaining) fnv1a_f32(h, q);
+        }
+    }
+
+    // Units: hiring and combat move every field here.
+    {
+        std::vector<entity_id> ids;
+        ids.reserve(units.size());
+        for (const auto& kv : units) ids.push_back(kv.first);
+        std::sort(ids.begin(), ids.end());
+        for (const entity_id id : ids)
+        {
+            const unit_component& u = units.at(id);
+            fnv1a_u32(h, id);
+            fnv1a_u32(h, u.position);
+            fnv1a_u32(h, u.owner);
+            fnv1a_i32(h, u.count);
+            fnv1a_u32(h, u.type);
+            fnv1a_i32(h, u.strength);
+        }
+    }
+
     return h;
 }
 

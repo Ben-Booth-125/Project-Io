@@ -1,6 +1,7 @@
 #include "world/placement_rules.hpp"
 
 #include "world/logistics.hpp"
+#include "world/tech_gate.hpp" // BL-344: structure_unlocked
 #include "world/world.hpp"
 
 #include <algorithm>
@@ -24,6 +25,7 @@ const char* placement_reason_text(placement_reason r)
         case placement_reason::already_road:      return "This tile already has an equal or better road";
         case placement_reason::deposit_present:   return "This terrain already supports a Farm — no Hydroponics Bay needed here";
         case placement_reason::out_of_logistics_range: return "Too far from a city, port or logistics hub to be supplied";
+        case placement_reason::tech_locked: return "Locked - the technology that permits this has not been researched";
     }
     return "Cannot build here";
 }
@@ -147,8 +149,19 @@ bool is_coastal(const world& w, entity_id tile_id)
     const int gw = body_it->second.grid_width;
     const int gh = body_it->second.grid_height;
 
-    // Build a tile lookup: flat_index → entity_id for this body.
-    // (Only for the body's tiles — most calls are short-circuit on first ocean hit.)
+    // Neighbour resolution goes through the per-body raster index when it is built
+    // (world.body_tile_index, the BL-077 derived cache) — O(1) per neighbour. This
+    // stopped being a cold player-action path once corp_ai began calling the
+    // placement family per candidate tile per evaluation (BL-360). This function
+    // holds const world& so it cannot build the index itself; a world where it is
+    // absent (hand-built harness fixtures, pre-index calls) falls back to the old
+    // per-body linear scan, which resolves the same neighbour.
+    const std::vector<entity_id>* raster = nullptr;
+    if (const auto rit = w.body_tile_index.find(body);
+        rit != w.body_tile_index.end()
+        && rit->second.size() == static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh))
+        raster = &rit->second;
+
     // Odd-r offset neighbours (pointy-top hexes).
     static const int even_off[6][2] = {{+1,0},{0,-1},{-1,-1},{-1,0},{-1,+1},{0,+1}};
     static const int odd_off[6][2]  = {{+1,0},{+1,-1},{0,-1},{-1,0},{0,+1},{+1,+1}};
@@ -164,8 +177,20 @@ bool is_coastal(const world& w, entity_id tile_id)
         if (ncol < 0) ncol += gw;
         else if (ncol >= gw) ncol -= gw;
 
-        // Find the neighbour tile by scanning tiles on this body.
-        // Linear scan is acceptable — this is a player-action path, not a hot loop.
+        if (raster != nullptr)
+        {
+            const entity_id nid = (*raster)[static_cast<std::size_t>(nrow)
+                                                * static_cast<std::size_t>(gw)
+                                            + static_cast<std::size_t>(ncol)];
+            if (nid == null_entity)
+                continue;
+            const auto nit = w.tiles.find(nid);
+            if (nit != w.tiles.end() && is_ocean_tile(nit->second.composition))
+                return true;
+            continue;
+        }
+
+        // Fallback: find the neighbour by scanning tiles on this body.
         for (const auto& [nid, ntc] : w.tiles)
         {
             if (ntc.body == body && ntc.grid_x == ncol && ntc.grid_y == nrow)
@@ -181,7 +206,7 @@ bool is_coastal(const world& w, entity_id tile_id)
 
 placement_result can_place_in_world(const world& w, entity_id tile_id,
                                     building_type type, resource_type target,
-                                    float max_reach)
+                                    float max_reach, entity_id corp)
 {
     const auto tc_it = w.tiles.find(tile_id);
     if (tc_it == w.tiles.end())
@@ -189,6 +214,13 @@ placement_result can_place_in_world(const world& w, entity_id tile_id,
     // Tile-level terrain/deposit check first — propagate its specific reason.
     if (const placement_result tile_ok = can_place(tc_it->second, type, target); !tile_ok)
         return tile_ok;
+
+    // BL-344 tech gate. Ahead of the world-level terrain checks on purpose: a
+    // locked building type is locked everywhere, so "you have not researched
+    // this" is the truer refusal than "that tile is not coastal". Skipped
+    // entirely when the caller named no corp (see the header).
+    if (!structure_unlocked(w, corp, type))
+        return placement_reason::tech_locked;
 
     if (type == building_type::port)
     {

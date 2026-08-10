@@ -252,7 +252,8 @@ struct survey_state
 /// and `orbital_angle_rad` are interpreted relative to whichever centre applies.
 /// `orbital_angle_rad` advances each frame by `orbital_angular_velocity_rad_per_day`
 /// (see advance_orbits in orbital_system.hpp); the authored value is the phase
-/// at world construction.
+/// at world construction, frozen into `orbital_epoch_angle_rad` so the econ tick
+/// can reconstruct positions purely from the day tick (orbital_angle_at_tick).
 struct body_component
 {
     std::string name;
@@ -261,6 +262,7 @@ struct body_component
     float       orbital_radius_au;    ///< Orbital distance in AU — from the star, or from `parent` if set.
     float       orbital_angle_rad;    ///< Current angular position, radians. 0 = right, increases counter-clockwise.
     float       orbital_angular_velocity_rad_per_day = 0.0f; ///< Angular speed; advances orbital_angle_rad over time. 0 = stationary.
+    float       orbital_epoch_angle_rad = 0.0f; ///< Phase at world construction (tick 0); never advanced. Basis for orbital_angle_at_tick.
     int         grid_width;           ///< Number of tile columns.
     int         grid_height;          ///< Number of tile rows.
 

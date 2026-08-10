@@ -10,7 +10,208 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — Cut v0.1.10: three items whose own diagnosis was wrong, and a green gate that lied (2026-08-10, latest)
+## Session — The hygiene audit that became a batch: four reviewers, thirteen items, ten landed (2026-08-10, latest)
+
+Full mode, Batch Delivery — seven worktree agent slices, integrated and verified in the main
+session. Runtime: not tracked (timer.js not started); the batch ran from audit to green suite
+inside one session.
+
+**The session began as a question, not a work order** — "does the codebase have any major
+faults?" Four parallel reviewers (world/sim, UI/app, cross-cutting, a `-Wall -Wextra` sweep
+build) answered with three genuine simulation bugs, one determinism leak into the money loop,
+and a family of per-frame full-world scans. Ben then asked for the findings to be filed and
+delivered. Thirteen items filed (BL-351–BL-363); ten delivered as one batch; three held
+(BL-361 app.cpp split, BL-362 UI frame caches, BL-363 misc sweep).
+
+**The three bugs were real and none was subtle in hindsight.** BL-351 (sell-order over-commit):
+duplicate sell orders each validated against the same un-decremented pool snapshot — a
+player-exploitable money mint, now a running remainder with per-order matched bookkeeping.
+BL-352 (hire-gate live store): the hire gate summed per-building `w.stockpiles`, which nothing
+has ever credited — every gated roster row was unbuyable and ungated rows hired free; it now
+reads `corp_body_pools`, so rival hiring genuinely changes (NR-127). BL-354 (orbital tick
+purity): convoy dispatch priced hauls off frame-advanced orbital angles, so the same seed
+diverged by frame rate — dispatch now reads `orbital_angle_at_tick`, and the harness was
+red-checked (reverting the fix yields 9 failures including a flipped source choice).
+
+**The recurring lesson recurred: worktree bases go stale mid-day.** The slices were cut hours
+after Sprint 9 landed BL-325 S2 (hires require a completed muster base), and slice D's new
+harness scenarios — written and passing on its older base — failed on the integrated tree
+until the main session planted the base. Same class as the 2026-08-09 v0.1.9 session's
+branched-from-a-moved-base finding; the integrating harness run caught it, as designed.
+
+Also in the batch: BL-353 (a throwing persona pack no longer kills the session), BL-355 (enum
+growth from the militia work had outrun five switches — a hire could post an *empty* nation
+chat statement; tech-locked builds mis-reported as malformed; now `rejected_tech_locked`, with
+ACTIONS.json updated), BL-356 (the body→market index — the single highest-leverage perf fix,
+removing a per-call map rebuild from both the tick and the lens draw path), BL-357 (population
+growth now reads the body's whole id-sorted market basket instead of one hash-arbitrary
+market), BL-358 (sorted-iteration leftovers; `state_hash` now covers tile depletion and
+units), BL-359 (the construction panel's mid-draw demolish routed through the pending seam —
+uncovering that tile-selected dismantles had silently never worked), BL-360 (`is_coastal` via
+the raster index; building-profit lookup de-quadratified).
+
+Verification: verifier-review over the integrated diff (GO COMPILE, zero criticals), then the
+integrating build (230 targets) and a 17-harness sweep — all green after the one integration
+fix. Review-log entries NR-123–NR-129 carry the delegated calls (version-goal mapping, the
+orbital approach, the hire-gate retarget) and the open questions (dead buy-order book, terrain
+preferences for the new building types, the AI's tech-locked candidate churn). Housekeeping
+noticed in passing: `/tmp` is 100% full on this machine (builds now point TMPDIR at
+`build_linux/gcc_tmp`), and BL-266's stale requirement group was closed per lint.
+
+## Session — Cut v0.1.3 and v0.1.4: one small predicate turned two design documents into two releases (2026-08-10)
+
+Full mode, Delivery — three items, built sequentially in the main session rather than fanned out.
+Runtime: **not tracked** — `tools/session/timer.js` was never started, so the only hard number
+is the commit span (09:24–09:53), which measures the landing, not the work. Full mode
+throughout: delivery, release, then a backlog-structure pass.
+
+**The whole session is one argument: BL-342 was the load-bearing item, and it is thirty lines of
+switch statement.** Two minors had been sitting design-forward for weeks, and last session's
+diagnosis found why — BL-155 (laws) and BL-156 (techs) had *independently* settled on the same
+object, *"a flat AND-list of atomic conditions"*, and neither built it, because each was scoped
+design-only. Nobody owned the thing they both needed. Building it once made both minors shippable
+inside a single session, which is the strongest evidence yet for the shape of that diagnosis:
+**the blocker was not effort, it was ownership.**
+
+### What landed
+
+**BL-342 — `condition_set`.** An atomic condition is `<subject> <comparator> <operand>` plus the
+qualifier its subject reads; a set is a flat AND-list; `evaluate` is pure. Three properties are
+load-bearing and all three are asserted (40 assertions):
+
+- **Deterministic.** Only one subject (`market`) sums floats over an unordered container, and it
+  sums in ascending entity-id order. The harness asserts two structurally-identical worlds measure
+  bit-identically.
+- **An empty set is true**, and true by *falling out of the loop* rather than by a special case in
+  front of it — because BL-155's common case is that a law is unconditional once enacted.
+- **A subject may be military.** `military_units` and `military_strength` ship beside the six
+  promoted economic labels. Not needed by the prototype; shipped because a shape is only proven by
+  an instance, and the harness asserts a mixed economic-AND-military predicate resolves.
+
+Three calls taken on Ben's behalf, all in NEEDS_REVIEW (**NR-112/113/114**): `evaluate` carries a
+subject corp the sketch did not (every consumer is per-corp, so a world-only predicate could not
+have answered either question); `era` measures launchpad ownership, because ERAS.md is
+designed-not-implemented and that is the only space gate the code actually has; `market` measures
+the mean price across all markets.
+
+**BL-343 — the laws MVP.** The item's one real open design question was *where enforcement hooks
+into the economy without breaking determinism*, and it is now settled on one rule:
+
+> **A law is a modifier OVER the market, never an override OF it.**
+
+That is the same principle that vetoed price clamps on 2026-07-11 — a clamp fights price
+resolution instead of shifting a flow's cost. So the levy applies where the flow is **accounted**
+(`apply_budget`) and never where the price is **resolved** (`clear_markets`). Two consequences
+worth naming: the market stays the only thing that sets prices, and the player sees the tax as its
+own number rather than as an unexplained worse price.
+
+The design predicted the legibility would be free, and it was — a sixth **Levies** bar on the
+Finance card, no new surface. The one deliberate placement choice: the enact checkbox went into the
+Budget ledger *directly beneath the two policy-tier stubs*, so the difference between a drawn lever
+and a working one is visible in one glance rather than in a tooltip.
+
+`apply_budget`'s new `production` argument defaults to null and charges nothing, which is why
+**not one existing economy harness changed** — the whole feature is invisible to any caller that
+does not opt in, and `L1c` asserts a world with the law seeded is bit-identical to a world with no
+laws at all.
+
+**BL-344 — the techs MVP.** `tech_tree.hpp:49` stored the gate as a descriptive **string**, so no
+tech had ever been earned and the F9 constellation viewer was a picture of a system rather than the
+system. Promoted to `condition_set`, with one live gate: `E0-ML-01` "Standing Garrison Doctrine"
+unlocks the Military Base on two extraction sites plus Cr 2,000.
+
+**The unlock is military on purpose**, and that is BL-094's test rather than flavour: *a technology
+that can only unlock a building is being designed for the corporate player we are pivoting away
+from*. Gating the base cost exactly what gating a smelter would have.
+
+Two things the promotion forced, both worth recording because neither was in the design:
+
+1. **`earnable` had to be a separate flag.** An empty `condition_set` is *true* by BL-342's own
+   property 2 — so the ~130 nodes with no authored gate would have earned themselves on the first
+   tick. Absence has to be modelled by absence from the gate table, never by an empty predicate.
+   This is the first place where two of the session's own decisions collided, and the collision was
+   caught by writing the harness assertion (`T1c`) before trusting the default.
+2. **The predicate could not live in Lua.** `tech_tree.cpp` pulls in sol2 and is excluded from
+   `IO_WORLD_SOURCES`, so a gate that gates `construction.cpp` could neither be linked nor tested
+   headlessly from there. It lives in the Lua-free `tech_gate.cpp`; `scripts/tech_tree.lua` authors
+   identity, topology and prose and reads the predicate *back* by id, so the viewer cannot display a
+   requirement the simulation does not enforce (**NR-116**).
+
+### The one honest regression, and what it was worth
+
+`buildings_rework_harness` broke — `construct_building` refused a military base it had placed
+happily the day before. That is the gate working, not a defect: the harness tests BL-325's
+placement and staffing rules, so it now grants the tech in its setup rather than manufacturing the
+industrial base the predicate wants. Worth noting because it is the *only* thing in the gate that
+moved: three new systems, ~14 apply_budget call sites, a widened placement signature, and one
+test needed a two-line change.
+
+### The retro's two lessons, applied
+
+Both cost real time last session, and both were cheap to honour here:
+
+- **A green gate can lie.** No messy merge this session (everything landed on `main` in one
+  sequence), so `--clean-first` was not needed — but the two *bench* failures at `-j 4` were
+  re-run idle before being believed, and both passed, exactly as the v0.1.9 retro predicted they
+  would. 58 tests, 0 failures.
+- **Worktree agents isolate writes, not history.** Avoided entirely: the three items are one
+  dependency chain (BL-343 and BL-344 both consume BL-342's header), and two ~2-file slices are
+  not worth an integration pass. Stated as a call rather than a default.
+
+### Left open
+
+- **NR-115** is the one thing genuinely for Ben: generation still places starting military bases
+  through the tile-only check, so a corp can begin the campaign with a base it has not researched.
+  Defensible as fiction (inherited, not researched) and it keeps BL-331 working unchanged, but it
+  is a real asymmetry with a one-line fix either way.
+- **v0.1.3 and v0.1.4 both cut with leftovers re-targeted, not dropped** — BL-155, BL-186, BL-280,
+  BL-156 and BL-332 moved to v0.1.11. Both done-definitions were written **at** the cut, per NR-103,
+  and both name their exclusions explicitly.
+**Gate:** 58 tests, 0 failures (55 → 58; three new harnesses). Tags `v0.1.3`, `v0.1.4`.
+
+### Then: the `post-v0.1.0` sweep (NR-101)
+
+Ben, same session: *"now tackle the 42 post-v0.1.0 items."* It was the largest structural job left
+in the backlog and the same class of problem the done-definitions had just fixed — a label doing
+duty as a decision.
+
+**Most of it was reconciliation, not judgement, and that is the finding.** Twenty of the 45 were
+*already assigned* by ROADMAP.md **in prose** — the whole v0.4.0 politics substrate, most of the
+v0.3.0 Era −1 arc — while their `version_goal` still read `post-v0.1.0`. So the roadmap and the
+backlog disagreed about what was in which version, and **the disagreement was invisible unless you
+read both**: the prose was not queryable and the query did not read prose. Fixing that needed no
+decisions at all, only a script.
+
+The residue after reconciliation was 14 items of real prototype work with no theme to belong to,
+and it clustered more cleanly than expected — **v0.1.12 Logistics modes** (convoy distance pricing,
+rail, sea trade, and the supply lens that makes any of it visible) and **v0.1.13 Markets &
+materials** (runtime market emergence, the processing roster, real inventory, co-generation, and
+the save-format version header that adding resource types is precisely the case for). Four more
+folded into v0.1.11, whose theme got written down for the first time.
+
+Four items moved on their **content** rather than on prose, and the reasoning is not obvious from
+their titles, so it is recorded: BL-253 is the *opponent's* scaling term (`run_corp_strategic_step`,
+O(corps × tiles)) and belongs to v0.2.0, not to a performance bucket; BL-314 waits on a seam only
+BL-315's conflict spine creates; BL-182's real content is an **operate-gate**, a permission over
+where a corporation may act, which under BL-094 is a thing a governing body grants; and BL-212
+stayed in the prototype band because its own settlement says it does not wait on BL-218.
+
+Result: **every open item names a minor.** 71 open across v0.1.5 (2), v0.1.6 (2), v0.1.7 (4),
+v0.1.11 (10), v0.1.12 (4), v0.1.13 (6), v0.2.0 (12), v0.3.0 (22), v0.4.0 (9).
+
+Two things deliberately *not* done. The 21 **complete** items still carrying `post-v0.1.0` were
+left alone — they landed before the arc was mapped, so back-filling a minor would fabricate history
+rather than record it. And naming two new minors is a roadmap-shape call that is Ben's, so it is
+filed as **NR-119** with the alternatives (merge them; renumber against the uncut v0.1.5–v0.1.7)
+rather than left as a silent default. Neither costs anything to reverse: a `version_goal` is one
+field, and the band already treats numbering as advisory.
+
+**Still open after this:** NR-102's sequencing decoupling. A minor per item is not an order to
+build them in.
+
+---
+
+## Session — Cut v0.1.10: three items whose own diagnosis was wrong, and a green gate that lied (2026-08-10)
 
 Full mode, Batch Delivery + release — the fifth cut of the session, spanning midnight. Ben:
 *"cut v0.1.10 next."* Six worktree sub-agents; a machine crash mid-flight; integration, every

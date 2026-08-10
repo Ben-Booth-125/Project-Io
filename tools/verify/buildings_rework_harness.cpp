@@ -18,6 +18,7 @@
 #include "world/logistics.hpp"
 #include "world/placement_rules.hpp"
 #include "world/recipe_registry.hpp"
+#include "world/tech_gate.hpp" // BL-344: the military base is tech-gated
 #include "world/world.hpp"
 
 #include <cstdio>
@@ -228,6 +229,12 @@ int main()
         const entity_id corp = w.create_entity();
         corporation_component cc; cc.balance = 100000.0f;
         w.corporations.emplace(corp, cc);
+
+        // BL-344: the military base is now tech-gated. This block tests BL-325's
+        // placement and staffing rules, not the gate (tech_gate_harness owns
+        // that), so grant the tech rather than manufacture the industrial base
+        // and balance its predicate wants.
+        w.earned_techs[corp].insert(gating_tech_for(building_type::military_base));
 
         const float reach_before = tile_reach_cost(w, grid[0][4]);
         entity_id built = null_entity;

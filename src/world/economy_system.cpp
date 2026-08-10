@@ -511,8 +511,16 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
     // weight = centre scale; cap = min(1, mean_hab / 0.6); default 1.0 (uncapped) when no centres.
     std::map<entity_id, float> hab_weighted_sum;
     std::map<entity_id, float> hab_weight_total;
-    for (const auto& [cid, pcc] : w.population_centres)
+    // Ascending centre id: these are float accumulations, so the summation order
+    // must not be read off population_centres' unordered layout.
+    std::vector<entity_id> centre_ids;
+    centre_ids.reserve(w.population_centres.size());
+    for (const auto& kv : w.population_centres)
+        centre_ids.push_back(kv.first);
+    std::sort(centre_ids.begin(), centre_ids.end());
+    for (const entity_id cid : centre_ids)
     {
+        const population_centre_component& pcc = w.population_centres.at(cid);
         const auto tile_it = w.population_centre_tile.find(cid);
         if (tile_it == w.population_centre_tile.end())
             continue;
@@ -534,7 +542,8 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
         const float mean_hab = hab_weighted_sum.at(body) / wit->second;
         return std::min(1.0f, mean_hab / 0.6f);
     };
-    // Building counts per (corp, body) for apportionment.
+    // Building counts per (corp, body) for apportionment. Integer counts commute
+    // exactly, so the unordered corporations walk is safe here.
     std::map<std::pair<entity_id, entity_id>, int> bldg_count_by_corp_body;
     std::map<entity_id, int>                        bldg_count_by_body;
     for (const auto& [corp, cc] : w.corporations)
@@ -849,6 +858,12 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
         }
     }
 
+    // Index the report rows once (BL-360): estimate_building_profit resolves its
+    // row through building_row rather than scanning `buildings` per call.
+    report.building_row.reserve(report.buildings.size());
+    for (std::size_t i = 0; i < report.buildings.size(); ++i)
+        report.building_row.emplace(report.buildings[i].building, i);
+
     // Population food demand (BL-190) is injected by inject_population_demand,
     // called from clear_markets AFTER its per-tick demand reset — injected here
     // it was erased by that reset the same tick and never reached price
@@ -858,8 +873,10 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
     // tile habitability, where weight = population centre scale.
     {
         std::map<entity_id, std::pair<float, float>> hab_sum; // body → (weighted_sum, weight)
-        for (const auto& [cid, pcc] : w.population_centres)
+        // centre_ids (sorted above): float accumulation, fixed summation order.
+        for (const entity_id cid : centre_ids)
         {
+            const population_centre_component& pcc = w.population_centres.at(cid);
             const auto tile_it = w.population_centre_tile.find(cid);
             if (tile_it == w.population_centre_tile.end())
                 continue;
@@ -896,6 +913,32 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
     // Tier thresholds (ticks to grow): scale 1→2: 200, 2→3: 500, 3→4: 1500, 4→5: 5000.
     static constexpr int growth_threshold[6] = { 0, 200, 500, 1500, 5000, 0 };
     const substrate_params& growth_sp = reg.substrate();
+
+    // Per-body market basket, summed over ALL the body's markets (BL-357). A body
+    // hosts several resource-carved markets (BL-096), and reading whichever one an
+    // unordered walk found first let hash layout pick which market gated a centre's
+    // growth — and ignored the rest of the body's supply. Market ids ascending so
+    // the float accumulation order is fixed.
+    std::map<entity_id, std::array<float, resource_count>> basket_supply, basket_demand;
+    {
+        std::vector<entity_id> market_ids;
+        market_ids.reserve(w.markets.size());
+        for (const auto& kv : w.markets)
+            market_ids.push_back(kv.first);
+        std::sort(market_ids.begin(), market_ids.end());
+        for (const entity_id mid : market_ids)
+        {
+            const market_component& mc = w.markets.at(mid);
+            auto& sup = basket_supply[mc.body];
+            auto& dem = basket_demand[mc.body];
+            for (std::size_t r = 0; r < resource_count; ++r)
+            {
+                sup[r] += mc.supply[r];
+                dem[r] += mc.demand[r];
+            }
+        }
+    }
+
     for (auto& [cid, pcc] : w.population_centres)
     {
         if (pcc.scale >= 5)
@@ -915,25 +958,24 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
             continue;
 
         // Met-supply ratio across the whole demand basket (BL-078): a basket-weighted
-        // mean of supply/demand over the body's market, so a centre grows only when
-        // its population's consumption is broadly met and plateaus when it is not.
+        // mean of supply/demand over the body's aggregated markets (BL-357), so a
+        // centre grows only when its population's consumption is broadly met and
+        // plateaus when it is not.
         float met_ratio = 1.0f;
-        for (const auto& [mid, mc] : w.markets)
+        if (const auto dit = basket_demand.find(body); dit != basket_demand.end())
         {
-            if (mc.body != body)
-                continue;
+            const auto& sup = basket_supply.at(body);
             float met_acc = 0.0f, met_weight = 0.0f;
             for (std::size_t r = 0; r < resource_count; ++r)
             {
-                const float b = growth_sp.demand_basket[r];
-                if (b <= 0.0f || mc.demand[r] <= 0.0f)
+                const float bw = growth_sp.demand_basket[r];
+                if (bw <= 0.0f || dit->second[r] <= 0.0f)
                     continue;
-                met_acc    += b * std::min(1.0f, mc.supply[r] / mc.demand[r]);
-                met_weight += b;
+                met_acc    += bw * std::min(1.0f, sup[r] / dit->second[r]);
+                met_weight += bw;
             }
             if (met_weight > 0.0f)
                 met_ratio = met_acc / met_weight;
-            break;
         }
         if (met_ratio < growth_sp.growth_met_threshold)
             continue;

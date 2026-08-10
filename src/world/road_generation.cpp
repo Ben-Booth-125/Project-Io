@@ -56,7 +56,7 @@ entity_id nation_of(const world& w, entity_id tile)
 /// overlap and skipping ocean (roads are a land feature). No-op if unreachable.
 void stamp_edge(world& w, entity_id body, entity_id ta, entity_id tb, std::uint8_t level)
 {
-    const logistics_path p = intra_body_path(w, body, ta, tb);
+    const logistics_path& p = intra_body_path(w, body, ta, tb);
     if (!p.reachable)
         return;
     for (const entity_id t : p.tiles)
@@ -111,7 +111,7 @@ void generate_roads(world& w, entity_id body)
         for (int a = 0; a < n; ++a)
             for (int b = a + 1; b < n; ++b)
             {
-                const logistics_path p =
+                const logistics_path& p =
                     intra_body_path(w, body, nodes[members[a]].tile, nodes[members[b]].tile);
                 const float c = p.reachable ? p.cost : kUnreachable;
                 d[a][b] = d[b][a] = c;
@@ -223,7 +223,7 @@ void generate_roads(world& w, entity_id body)
         for (const int a : ia->second)
             for (const int b : ib->second)
             {
-                const logistics_path p =
+                const logistics_path& p =
                     intra_body_path(w, body, nodes[a].tile, nodes[b].tile);
                 if (p.reachable && p.cost < best)
                 {

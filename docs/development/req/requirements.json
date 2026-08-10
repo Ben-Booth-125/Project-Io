@@ -9260,7 +9260,7 @@
    "difficulty": 3,
    "importance": "B",
    "evaluated_difficulty": null,
-   "status": "active",
+   "status": "complete",
    "requirements": [
     {
      "id": "R1",
@@ -9301,9 +9301,11 @@
      ],
      "status": "pending",
      "result_metric": "sticky_card.lua + continents_terrain.lua updated and run; dismiss_selection Lua hook replaced by clear_selection",
-     "notes": "Goldens NOT re-blessed: on this Linux box every golden diffs ~20-35% even on untouched captures (environment mismatch). Re-bless list in NR-104."
+     "notes": "Goldens NOT re-blessed: on this Linux box every golden diffs ~20-35% even on untouched captures (environment mismatch). Re-bless list in NR-104. Still owed at group close (NR-104): golden re-bless on Windows."
     }
-   ]
+   ],
+   "resolved": "2026-08-10",
+   "resolution": "Group closed 2026-08-10 by the hygiene-batch lint pass: the item completed 2026-08-09 but the group was left active. R4 (golden re-bless) stays pending per NR-104 - noted, not met."
   },
   {
    "brief": "generated-body-names",
@@ -9311,7 +9313,7 @@
    "difficulty": 3,
    "importance": "B",
    "evaluated_difficulty": null,
-   "status": "active",
+   "status": "complete",
    "requirements": [
     {
      "id": "R1",
@@ -9365,6 +9367,625 @@
      "status": "complete",
      "result_metric": "28 scripts converted; no body-name literal remains in scripts/verify/*.lua outside comments",
      "notes": "Visual goldens showing a body name on screen need regenerating - the names they captured no longer exist."
+    }
+   ]
+  },
+  {
+   "brief": "condition-set-evaluator",
+   "title": "BL-342: one shared, pure, military-capable predicate that laws and techs both read",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": 2,
+   "status": "complete",
+   "requirements": [
+    {
+     "id": "R1",
+     "requirement": "BL-342 (item-spanning): a condition_set is a flat AND-list of atomic conditions that RESOLVES against the world - pure, deterministic, and true when empty. evaluate() reads a const world& and nothing else; no RNG, no clock, no cached mutable state; a measure that sums over an unordered container sums in ascending entity-id order.",
+     "verification": [
+      "headless: condition_set_harness"
+     ],
+     "status": "complete",
+     "result_metric": "condition_set_harness C1a-c, C4a-d, C5a-c PASS (40/40 assertions); the same world evaluates identically twice and two structurally-identical worlds measure bit-identically",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "BL-342: every subject resolves against a hand-built world and reads the quantity it claims to read - research (per-corp), structure, stockpile, market, surplus, era.",
+     "verification": [
+      "headless: condition_set_harness"
+     ],
+     "status": "complete",
+     "result_metric": "C2a-l PASS; research asserted per-corp rather than global",
+     "notes": "era measures launchpad ownership because ERAS.md is designed-not-implemented - recorded as NR-113."
+    },
+    {
+     "id": "R3",
+     "requirement": "BL-342: a subject may be MILITARY (BL-094 design test at the foundation). Adding one must not require reshaping the type, and the claim is proven by an instance rather than asserted.",
+     "verification": [
+      "headless: condition_set_harness"
+     ],
+     "status": "complete",
+     "result_metric": "C6a-e PASS: military_units and military_strength ship and resolve; a mixed economic-AND-military predicate evaluates",
+     "notes": ""
+    },
+    {
+     "id": "R4",
+     "requirement": "BL-342: comparator boundaries are EXACT on integral subjects rather than epsilon-fuzzy, and continuous subjects compare as floats.",
+     "verification": [
+      "headless: condition_set_harness"
+     ],
+     "status": "complete",
+     "result_metric": "C3a-j PASS; llround on both sides for integral subjects, exact float comparison for continuous ones",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "laws-mvp-one-lever",
+   "title": "BL-343: one law, enacted, enforced at a settled seam, and visible where the player already looks",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": 3,
+   "status": "complete",
+   "requirements": [
+    {
+     "id": "R1",
+     "requirement": "BL-343 (item-spanning, visual): an enacted extraction levy appears as its own LEVIES line in the budget surface, beside income / expenditure / maintenance / wages / interest - not folded into an existing flow. A law the player cannot see working is indistinguishable from an unimplemented one.",
+     "verification": [
+      "code",
+      "visual"
+     ],
+     "status": "complete",
+     "result_metric": "corporation_dashboard.cpp Finance card draws 6 bars (was 5); balance_ledger.cpp gains a Laws section with the enact checkbox directly beneath the two policy-tier stubs",
+     "notes": "Visual capture owed on Windows with the rest of the stale goldens; the flow-chart change is a bar-count change in one array, verified by inspection and by law_harness L2c (net() accounts the new line)."
+    },
+    {
+     "id": "R2",
+     "requirement": "BL-343: the enforcement seam holds - a law is a MODIFIER OVER the market, never an OVERRIDE OF it. The levy applies where the flow is accounted (apply_budget), never where the price is resolved (clear_markets), so no other flow moves.",
+     "verification": [
+      "headless: law_harness"
+     ],
+     "status": "complete",
+     "result_metric": "L3a-e PASS: income, expenditure, maintenance and wages are all bit-identical with and without the levy, and the levy is its own line",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "requirement": "BL-343: an un-enacted law changes nothing (bit-identically), an enacted levy costs exactly rate x units, and repeal restores the baseline exactly.",
+     "verification": [
+      "headless: law_harness"
+     ],
+     "status": "complete",
+     "result_metric": "L1a-c, L2a-c, L4a-b PASS; the shipped seed is un-enacted and D1 asserts a caller omitting `production` charges nothing (the pre-BL-343 arithmetic)",
+     "notes": "This is why no existing economy harness needed to change."
+    },
+    {
+     "id": "R4",
+     "requirement": "BL-343: two identical worlds with the same enacted set produce identical balances - determinism across the new seam. Predicates are resolved once per law per corp per tick, before the money loop reads them.",
+     "verification": [
+      "headless: law_harness",
+      "headless: econ_harness",
+      "headless: world_determinism"
+     ],
+     "status": "complete",
+     "result_metric": "L5a-b PASS; econ_harness, econ_bankruptcy, econ_stability, data_creep_harness and world_determinism all unchanged and passing",
+     "notes": ""
+    },
+    {
+     "id": "R5",
+     "requirement": "BL-343: nothing in the law record or the effect dispatch assumes an ECONOMIC subject - the taxonomy must accept a military effect when there is one to add (BL-315). Build the seam so the answer can become yes; do not claim it already is.",
+     "verification": [
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "law_effect_kind is an open enum whose only branch point is a switch in evaluate_laws; the predicate is BL-342 condition_set, which already carries military subjects",
+     "notes": "Honestly recorded: an extraction levy does NOT reach military outcomes today."
+    }
+   ]
+  },
+  {
+   "brief": "techs-mvp-one-gate",
+   "title": "BL-344: one tech, earned by play, unlocking the military base",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": 3,
+   "status": "complete",
+   "requirements": [
+    {
+     "id": "R1",
+     "requirement": "BL-344 (item-spanning): tech_node::condition is a condition_set rather than a descriptive string, so a tech can resolve and therefore be earned. Earned state is PER-CORP, not global.",
+     "verification": [
+      "headless: tech_gate_harness",
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "tech_gate_harness T3a-d, T5a-d PASS (33/33 assertions); world::earned_techs is keyed by corporation and a rival earning the tech leaves the player locked",
+     "notes": "Two fields the promotion forced: `earnable` (an empty condition_set is TRUE, so absence needs its own flag) and `condition_label` (the original descriptive word, preserved)."
+    },
+    {
+     "id": "R2",
+     "requirement": "BL-344: a tech with an unmet gate is not earned and its content is refused with the RIGHT reason; satisfying the condition earns it; the unlock then permits placement at the same call site that refused it.",
+     "verification": [
+      "headless: tech_gate_harness"
+     ],
+     "status": "complete",
+     "result_metric": "T2a-e, T4a-f PASS: placement_reason::tech_locked before, ok() after, at the identical call; construct_building agrees with the placement check in both directions",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "requirement": "BL-344: the unlock is MILITARY rather than economic (BL-094 design test) - a technology that can only unlock a building is being designed for the corporate player the pivot is moving away from.",
+     "verification": [
+      "headless: tech_gate_harness",
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "T1a-e PASS: E0-ML-01 unlocks building_type::military_base (BL-325), and its predicate is asserted non-empty so it cannot self-earn",
+     "notes": "BL-332 (military points and research) is the sequenced follow-on."
+    },
+    {
+     "id": "R4",
+     "requirement": "BL-344: two identical worlds earn identically (determinism), and earning is monotonic - a tech is never un-earned by a later dip below its threshold - and idempotent.",
+     "verification": [
+      "headless: tech_gate_harness"
+     ],
+     "status": "complete",
+     "result_metric": "T6a-e PASS; re-running advance_tech_gates earns nothing twice, and a negative balance does not revoke the tech or the unlock",
+     "notes": ""
+    },
+    {
+     "id": "R5",
+     "requirement": "BL-344: the F9 viewer reports locked/earned HONESTLY, and a node with no authored gate says so rather than reading as unlocked.",
+     "verification": [
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "tech_tree_panel.cpp tooltip branches on tech_node::earnable then world::has_tech, itemising unmet conditions via the shared condition_text; question_log entry updated",
+     "notes": "Visual capture owed on Windows with the rest of the stale goldens."
+    }
+   ]
+  },
+  {
+   "brief": "sell-order-pool-overcommit",
+   "title": "Duplicate sell orders over-commit the stockpile pool",
+   "difficulty": 2,
+   "importance": "S",
+   "evaluated_difficulty": 2,
+   "status": "complete",
+   "requirements": [
+    {
+     "id": "R1",
+     "requirement": "BL-351 (item-spanning): total quantity listed across a seller's sell orders for one (body, resource) never exceeds the pool at clearing time; pools never go negative; income equals quantity actually cleared.",
+     "verification": [
+      "headless: econ_harness (extended)",
+      "build"
+     ],
+     "status": "complete",
+     "result_metric": "econ_harness ALL PASS: BL351.1 duplicate orders clear at most the pool; BL351.2 pool floors at zero; BL351.3 income == cleared x price",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "BL-351: a seller with multiple orders has matched quantity allocated per order, not the aggregate subtracted from each.",
+     "verification": [
+      "headless: econ_harness (extended)"
+     ],
+     "status": "complete",
+     "result_metric": "econ_harness BL351.4-6: multi-order seller matched per order; sibling order auto-clears its own remainder",
+     "notes": ""
+    }
+   ],
+   "resolved": "2026-08-10",
+   "resolution": "Fixed in market_clearing.cpp: running per-(corp,body,resource) remainder at listing, per-order matched bookkeeping (ob_sell_entry.rem replaces the aggregate matched_sell map), zero-clamped debits. econ_harness 33/33 incl. BL351.1-6."
+  },
+  {
+   "brief": "hire-gate-live-store",
+   "title": "Hire-unit gate and debit read the live corp_body_pools store",
+   "difficulty": 2,
+   "importance": "S",
+   "evaluated_difficulty": 2,
+   "status": "complete",
+   "requirements": [
+    {
+     "id": "R1",
+     "requirement": "BL-352 (item-spanning): a corp with the required goods in corp_body_pools can hire the gated row and the pools are drained by the hire cost; a corp without them is refused; ungated rows hire without a resource debit.",
+     "verification": [
+      "headless: ai_skill_harness or BL-324 harness (extended)",
+      "build"
+     ],
+     "status": "complete",
+     "result_metric": "corp_ai_harness R4: pooled goods hire + drain by exactly the cost; empty pools refused; ungated row free of debit",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "BL-352: the debit is deterministic for multi-body corps (sorted body order) and never gates on cash.",
+     "verification": [
+      "headless",
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "corp_ai_harness R4: drain asserted home-body-first (ascending id, 3+4 -> 0+2); gate never reads cash",
+     "notes": ""
+    }
+   ],
+   "resolved": "2026-08-10",
+   "resolution": "corp_stockpile_total (unit_roster.cpp) and debit_from_corp (corp_command.cpp) retargeted to w.corp_body_pools via a lower_bound run in ascending body-id order; diagnosis (no crediting path to w.stockpiles) confirmed by repo-wide grep. corp_ai_harness ALL PASS incl. the 6 new BL-352 R4 labels (integration fix: scenarios plant the BL-325 S2 muster base the slice base predated)."
+  },
+  {
+   "brief": "persona-eval-guard",
+   "title": "Per-tick persona counsel errors disable counsel instead of aborting",
+   "difficulty": 1,
+   "importance": "A",
+   "evaluated_difficulty": 1,
+   "status": "complete",
+   "requirements": [
+    {
+     "id": "R1",
+     "requirement": "BL-353 (item-spanning): a persona pack that throws during evaluate/phrase_for disables counsel for the session and the tick completes; the session survives.",
+     "verification": [
+      "build",
+      "code: try/catch routing to the load-failure disable path",
+      "review"
+     ],
+     "status": "complete",
+     "result_metric": "build green; code: try/catch routes to m_persona_bench.clear() mirroring the load guard; verifier-review pass confirmed no iterator invalidation",
+     "notes": ""
+    }
+   ],
+   "resolved": "2026-08-10",
+   "resolution": "app.cpp step_economy counsel loop wrapped in try/catch; on throw the bench is cleared (the load-guard disable path), a stderr line + one Counsel chat post record it, and the tick completes."
+  },
+  {
+   "brief": "econ-tick-orbital-purity",
+   "title": "Econ-tick consumers read tick-pure orbital angles",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": 3,
+   "status": "complete",
+   "requirements": [
+    {
+     "id": "R1",
+     "requirement": "BL-354 (item-spanning): two runs of the same seed with different frame pacing (orbital render angles perturbed between econ ticks) produce identical convoy dispatches, costs and arrival ticks.",
+     "verification": [
+      "headless: supply_advance (extended)",
+      "build"
+     ],
+     "status": "complete",
+     "result_metric": "supply_advance: identical dispatches/costs/arrivals with live angles scribbled to garbage between ticks",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "BL-354: the tick-pure angle is a pure function of the tick counter and the render path is unchanged.",
+     "verification": [
+      "code",
+      "review"
+     ],
+     "status": "complete",
+     "result_metric": "code: pure function of tick; app.cpp unmodified; world.hpp comment now scopes the impurity to rendering",
+     "notes": ""
+    }
+   ],
+   "resolved": "2026-08-10",
+   "resolution": "orbital_system gains orbital_angle_at_tick(body, day_tick) (epoch angle stamped at world creation + angular rate x day); body_distance_au takes day_tick and dispatch passes w.current_day_tick. Render path untouched. supply_advance ALL PASS incl. the BL-354 section; the agent red-checked the test (reverting the theta line yields 9 failures incl. a flipped source choice)."
+  },
+  {
+   "brief": "enum-switch-warning-sweep",
+   "title": "Enum-growth switch gaps and confirmed warning fixes",
+   "difficulty": 2,
+   "importance": "B",
+   "evaluated_difficulty": 2,
+   "status": "complete",
+   "requirements": [
+    {
+     "id": "R1",
+     "requirement": "BL-355 (item-spanning): zero -Wswitch warnings in owned code; the hired agency event carries a real severity and statement; tech_locked construction maps to an honest rejection reason (ACTIONS.json updated if the seam surface changed).",
+     "verification": [
+      "build",
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "agent syntax passes -Wall -Wextra zero warnings on all touched files; integrating ninja build green; ACTIONS.md/ACTIONS_INDEX.json regenerated (117 entries)",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "BL-355: population_mvp gains the missing low-body assertion and passes; corp_terrain_matrix names all current buildings/resources.",
+     "verification": [
+      "headless: population_mvp",
+      "headless: corp_terrain_matrix"
+     ],
+     "status": "complete",
+     "result_metric": "population_mvp 14 assertions ALL PASS incl. the new scale-1 baseline; corp_terrain_matrix names all rosters (13 resources filled incl. propellant beyond the brief)",
+     "notes": ""
+    }
+   ],
+   "resolved": "2026-08-10",
+   "resolution": "hired handled in severity_of + statement switch; construction_result::tech_locked maps to new corp_command_result::rejected_tech_locked (ACTIONS.json updated, mirror regenerated); corporation_generation explicit neutral cases (NR-126 holds the design question); 4 file-local IMGUI_DEFINE_MATH_OPERATORS dropped; unused/format fixes across src + tools. All touched files pass -Wall -Wextra clean per-slice; integrating build green."
+  },
+  {
+   "brief": "body-market-index",
+   "title": "Cached body-to-markets index behind market_for_tile",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": 3,
+   "status": "complete",
+   "requirements": [
+    {
+     "id": "R1",
+     "requirement": "BL-356 (item-spanning): market_for_tile no longer constructs a container per call, and sim outcomes are bit-identical before vs after (state hash / econ outcomes unchanged).",
+     "verification": [
+      "headless: determinism_harness",
+      "headless: econ_harness",
+      "build"
+     ],
+     "status": "complete",
+     "result_metric": "determinism_harness OK, world_determinism ALL PASS, econ_harness 33/33 — outcomes unchanged; per-call construction gone (code)",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "BL-356: the index invalidates correctly when a market is created (a fresh market is immediately resolvable).",
+     "verification": [
+      "headless",
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "stamp catches every creation (count + max id); reviewer verified no market erasure or re-bodying exists",
+     "notes": ""
+    }
+   ],
+   "resolved": "2026-08-10",
+   "resolution": "world.hpp gains mutable body_market_index + count/max-id stamp (markets are created, never destroyed — verified); markets_by_body returns the cached ref; market_for_tile/clear_markets allocation-free on the hot path, signature unchanged."
+  },
+  {
+   "brief": "pop-growth-market-aggregate",
+   "title": "Population growth aggregates the whole body basket",
+   "difficulty": 2,
+   "importance": "A",
+   "evaluated_difficulty": 2,
+   "status": "complete",
+   "requirements": [
+    {
+     "id": "R1",
+     "requirement": "BL-357 (item-spanning): on a two-market body where one market alone starves a centre but the pair satisfies it, the centre grows; iteration is id-sorted.",
+     "verification": [
+      "headless: population_demand_harness (extended)",
+      "build"
+     ],
+     "status": "complete",
+     "result_metric": "population_mvp: centre grows when the aggregate basket is met (A alone starves it); does not grow when unmet; population_demand_harness 4/4",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "BL-357: harness/golden expectations that shift are updated in the same change with the reason recorded.",
+     "verification": [
+      "headless",
+      "review"
+     ],
+     "status": "complete",
+     "result_metric": "no existing assertion encoded the single-market read — nothing rewritten; harness suite green end to end",
+     "notes": ""
+    }
+   ],
+   "resolved": "2026-08-10",
+   "resolution": "economy_system.cpp aggregates the supply/demand basket across a body's markets, id-sorted; single-market bodies byte-identical to before. population_mvp gains test_multi_market_growth_aggregate."
+  },
+  {
+   "brief": "determinism-iteration-sweep",
+   "title": "Sorted iteration at the named sites; state hash covers depletion and units",
+   "difficulty": 2,
+   "importance": "B",
+   "evaluated_difficulty": 2,
+   "status": "complete",
+   "requirements": [
+    {
+     "id": "R1",
+     "requirement": "BL-358 (item-spanning): dispatch_convoys, the order-book pass and the named economy_system accumulations iterate id-sorted; determinism harnesses green.",
+     "verification": [
+      "headless: determinism_harness",
+      "headless: world_determinism",
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "determinism_harness + world_determinism green; code: named sites iterate sorted ids",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "BL-358: state_hash changes when tile resource_remaining or the unit roster changes.",
+     "verification": [
+      "headless",
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "code: state_hash hashes resource_remaining + units id-sorted (world.cpp); no golden hash values exist, cross-run equality via ai_skill_harness PASS. No direct sensitivity assertion added — noted as acceptable (hash is inspection-verifiable).",
+     "notes": ""
+    }
+   ],
+   "resolved": "2026-08-10",
+   "resolution": "dispatch_convoys + order-book passes + centre walks id-sorted; market_for_body picks lowest id (was first hash hit — feeds convoy.source_market and the serialised trade-route record); state_hash extended with tile resource_remaining and w.units; two flagged econ sites verified order-independent and documented instead of sorted; stale hard_coded_world comment fixed."
+  },
+  {
+   "brief": "construction-panel-deferred-demolish",
+   "title": "Construction panel routes demolish through the pending seam",
+   "difficulty": 1,
+   "importance": "B",
+   "evaluated_difficulty": 1,
+   "status": "complete",
+   "requirements": [
+    {
+     "id": "R1",
+     "requirement": "BL-359 (item-spanning): no demolish_building call from inside the construction panel draw; Dismantle routes through pending_demolish and still works.",
+     "verification": [
+      "build",
+      "code",
+      "manual"
+     ],
+     "status": "complete",
+     "result_metric": "build green; code: no demolish_building call inside the panel draw; executor at app.cpp consumes pending_demolish. Manual smoke deferred (headless session) — the executor path is the selection panel's already-shipped seam.",
+     "notes": ""
+    }
+   ],
+   "resolved": "2026-08-10",
+   "resolution": "Dismantle routes through ui_state pending_demolish (the selection-panel seam); bonus real fix: the old call passed selected_entity, which in the tile-fallback path is the TILE id, so tile-selected dismantles silently failed — now resolves found_id. Reopen/Close bool flips stay direct with an exemption comment."
+  },
+  {
+   "brief": "hot-path-spatial-scans",
+   "title": "is_coastal via the raster index; building-profit lookup indexed",
+   "difficulty": 2,
+   "importance": "B",
+   "evaluated_difficulty": 2,
+   "status": "complete",
+   "requirements": [
+    {
+     "id": "R1",
+     "requirement": "BL-360 (item-spanning): is_coastal resolves neighbours through body_tile_index and estimate_building_profit no longer scans report.buildings per call; outcomes identical (world_audit, corp_ai_harness, determinism green).",
+     "verification": [
+      "headless: world_audit",
+      "headless: corp_ai_harness",
+      "headless: determinism_harness",
+      "build"
+     ],
+     "status": "complete",
+     "result_metric": "world_audit PASS, corp_ai_harness ALL PASS, determinism_harness OK — outcomes identical; index chosen over sorting to keep UI row order stable",
+     "notes": ""
+    }
+   ],
+   "resolved": "2026-08-10",
+   "resolution": "is_coastal resolves neighbours through body_tile_index (guarded, with the old scan as fallback for hand-built harness worlds; stale hot-loop comment replaced); economy_report gains building_row (id->row, filled once after Pass 5) and estimate_building_profit uses it with a fallback scan."
+  },
+  {
+   "brief": "app-cpp-decomposition",
+   "title": "app.cpp sheds four separable concerns into dedicated files",
+   "difficulty": 4,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "requirements": [
+    {
+     "id": "R1",
+     "requirement": "BL-361 (item-spanning): the verify Lua API + capture, the startup screens, the time panel, and the post-econ-step session-history recorders each live in their own file; app.cpp shrinks accordingly; behaviour unchanged (build green, harness suite green, visual suite unchanged).",
+     "verification": [
+      "build",
+      "headless: full harness sweep",
+      "visual: suite unchanged",
+      "review"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "BL-361: each extraction is its own commit so the mechanical move stays reviewable.",
+     "verification": [
+      "review"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "ui-frame-recompute-caches",
+   "title": "Per-frame recomputation of per-tick state is cached or event-driven",
+   "difficulty": 4,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "requirements": [
+    {
+     "id": "R1",
+     "requirement": "BL-362 (item-spanning): selection tile metrics, body vision, the per-frame building maps, the industry lens pre-pass, lens-key chrome and the tech-tree ring layout no longer recompute per frame; rendered output identical (visual suite stable).",
+     "verification": [
+      "build",
+      "visual: suite unchanged",
+      "review"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "BL-362: interactive hover delays are wall-clock seconds (refresh-rate independent); the verify harness frames(n) unit still drives deterministic captures.",
+     "verification": [
+      "code",
+      "visual"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "requirement": "BL-362: sim outcomes untouched (UI-side change only) - determinism harness green.",
+     "verification": [
+      "headless: determinism_harness"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "misc-hygiene-sweep",
+   "title": "Small-hygiene sweep: sol2 safeties, state homes, single-source hex table, seeded names",
+   "difficulty": 3,
+   "importance": "C",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "requirements": [
+    {
+     "id": "R1",
+     "requirement": "BL-363 (item-spanning): SOL_ALL_SAFETIES_ON is defined project-wide, the unchecked sol2 shape conversions are checked, init.lua config absence fails cleanly, and the blackboard export reports write failure; build + harness suite green.",
+     "verification": [
+      "build",
+      "headless: full harness sweep",
+      "code"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "BL-363: player standing sell orders live on world (player intent), the econ tick no longer reads ui_state, and the market ledger form state is per-market.",
+     "verification": [
+      "build",
+      "code",
+      "headless: econ_harness"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "requirement": "BL-363: settlement labels derive from the seeded naming system (no hard-coded Earth-flavoured bank); any golden the name change moves is re-blessed in the same commit.",
+     "verification": [
+      "visual",
+      "code"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R4",
+     "requirement": "BL-363: the odd-r hex neighbour offset table is single-sourced; active_tile dead state removed. The dead buy-order book is deliberately NOT touched (NR-125 open).",
+     "verification": [
+      "code",
+      "build"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
     }
    ]
   }

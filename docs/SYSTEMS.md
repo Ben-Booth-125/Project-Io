@@ -4,9 +4,11 @@
 
 Two pillars define the game's end goals: **Trade** and **Conflict**. Every other system creates the conditions, constraints, or capabilities that flow into one or both.
 
-The player is a corporate entity today — an owner of assets and operations — and that shapes the economic layer throughout: for the chartered corp, profit is the motive. The stated aim is to play a **governing body** (BL-094, governing-body pivot, priority A), whose motive is broader and whose levers reach force. Law, policy and science are that player's instruments, not flavour on someone else's economy.
+The player is a corporate entity today — an owner of assets and operations — and that shapes the economic layer throughout: for the chartered corp, profit is the motive. The stated aim is to play a **national private militia** (BL-094, rewritten 2026-08-10 per NR-120), whose motive is narrower than a governing body's would have been — it does not legislate — but whose agency reaches force directly: what it can field, procured from independent suppliers.
 
-Each system below therefore answers one test: **does it reach military as well as economic outcomes?** A system that can only ever move a cost or a price is built for the player we are pivoting away from.
+> **Corrected 2026-08-10 (dated note, authority time-slice — DELIVERY.md § Design state).** This section read "governing body" from 2026-08-04. Superseded, not extended — see BL-094's 2026-08-10 rewrite. **The corp-as-shared-economic-arm assumption in the old framing is specifically retracted**: private companies (including today's chartered corp) become arm's-length counterparties the militia contracts with, not a linked treasury. Full propagation waits for the work to land.
+
+Each system below therefore answers a **replaced** test: **does it change what the militia can field, or what it must answer to?** A system that can only ever move a cost or a price, touching neither, is built for the player we have now pivoted away from twice.
 
 Systems are grouped into three supporting tiers below the pillars.
 
@@ -27,7 +29,7 @@ Choosing **counterparties** preferentially shipped with BL-037 (preferential pur
 ### Conflict
 The player claims, defends, and invades territory through military force. Combat runs concurrently with the economy: supply routes are live targets, and active conflict on a body inhibits its trade connections. Territorial control is both a strategic objective and a source of ongoing economic pressure on opponents.
 
-The **governing body** is the actor that commands force — a corporation's levers stop at the economic, which is why this pillar has stayed thin. BL-094 (governing-body pivot) is Conflict's route to being load-bearing.
+The **national private militia** *(corrected 2026-08-10, NR-120; was "governing body")* is the actor that commands force — a corporation's levers stop at the economic, which is why this pillar has stayed thin. BL-094's rewrite and BL-315 (the militia's conflict spine) are Conflict's route to being load-bearing.
 
 **Build status.** A battle resolver ships — BL-272, `src/world/combat.cpp`: class-matchup matrix × formation doctrine × terrain × supply × season, integer arithmetic, deterministic tie-break. It is consumed by the Era −1 history sim (BL-271), not by the campaign layer. Nothing in Era 0 commands a unit yet; BL-157 (military datamodel stub) is the first campaign-side rung.
 
@@ -89,17 +91,40 @@ The world is generated, not authored — a deterministic, seeded chain (added 20
 The institutional history that makes the campaign premise causal rather than asserted (added 2026-07-31). The pre-national ladder (BL-221, `src/world/history_ladder.cpp`) runs upstream of nation generation and *drives* it — counting agrarian cradles, pricing conquest against exit, and setting the nation seed budget (`nation_params_from_ladder`). Later stages (BL-222 industrial ladder, BL-223 averted rupture) are open. Authority: `docs/lore/HISTORY.md`.
 
 ### Force
-Units, doctrine, and the ceiling on what the player can raise and sustain. *Designed, not built at campaign scale.* The resolver ships (BL-272 — see § Conflict) and province manpower ships (BL-273: `manpower_ceiling`, `replenish_manpower`, `raise_manpower`), both consumed by the Era −1 sim. BL-157 (military datamodel stub, v0.1.4) is the campaign-side rung. Under BL-094 the levers that reach this system — conscription, requisition, war powers — are **laws**, which is precisely why they need a governing body to pass them.
+Units, doctrine, and the ceiling on what the player can raise and sustain. *Designed, not built at campaign scale.* The resolver ships (BL-272 — see § Conflict) and province manpower ships (BL-273: `manpower_ceiling`, `replenish_manpower`, `raise_manpower`), both consumed by the Era −1 sim. BL-157 (military datamodel stub, v0.1.4) is the campaign-side rung. The first *campaign* lever to reach it is a technology, not a building: BL-344 gates the Military Base behind `E0-ML-01` (§ Research). *(Corrected 2026-08-10, NR-120: under the previous framing, "the levers that reach this system — conscription, requisition, war powers — are laws, which is precisely why they need a governing body to pass them." Under the rewrite the militia does not pass these laws — it is subject to them. Conscription and war powers are conditions the militia's recruitment and operations must satisfy or route around, not instruments it wields; see BL-315's 2026-08-10 update.)*
 
 ### Research
-Technology is organised into discrete, modular trees, each unlocked by a visible precondition. Research raises capability ceilings across all systems and competes directly with other budget priorities. It is owned at the **governing-body** tier: research a corporation owns is a tech tree of factories, and must instead reach weapons, logistics and intelligence. *Designed, not built* — BL-156 (tech system early design, v0.1.3), BL-087 (Era 1 tech quests, v0.3.0).
+Technology is organised into discrete, modular trees, each unlocked by a visible precondition. Research raises capability ceilings across all systems and competes directly with other budget priorities. *(Corrected 2026-08-10, NR-120: was "owned at the governing-body tier" — a militia does not run laboratories. It reaches weapons, logistics and intelligence by buying their output through BL-350's procurement seam, the same as any other equipment; whether the militia itself holds any research capability is Sprint 8's open question, § v0.3.0, CONCEPT.md.)*
+
+**The loop is closed (BL-344, landed 2026-08-10, v0.1.4).** Until then `tech_node::condition` was a descriptive *string* — a label that described what a gate would be about but could not resolve — so no tech had ever been earned and the F9 constellation viewer (BL-310) was a picture of a system rather than the system. The field is now a real `condition_set` (§ Conditions below), earned state is **per-corporation** (`world::earned_techs`), and `advance_tech_gates` runs once per economy tick: monotonic (a tech is never un-earned by a later dip below its threshold) and deterministic.
+
+One gate is live, and it is a **military** one on purpose. `E0-ML-01` "Standing Garrison Doctrine" unlocks `building_type::military_base` (BL-325), gated on two extraction sites plus a Cr 2,000 balance — quantities reachable through ordinary play. That choice is BL-094's design test applied: *a technology that can only unlock a building is being designed for the corporate player the pivot is moving away from*. The predicate lives in `src/world/tech_gate.cpp` rather than in `scripts/tech_tree.lua`, because a gate that gates construction has to be linkable from the SDL/Lua-free world superset; the Lua file authors identity, topology and prose, and the viewer reads the same predicate the simulation enforces. A node with **no** authored gate reports "not yet earnable" rather than reading as unlocked — an empty `condition_set` is true by definition, so absence is modelled by absence from the gate table, never by an empty predicate.
+
+Still open: research points and their economy (BL-332), the constellation grain and deeds (BL-087, v0.3.0), quest trees. Verified by `tools/verify/tech_gate_harness.cpp`.
 
 ### Policy
 Two different things share this word, and BL-094 separates them.
 
 **Automation policy** — standing rules governing automatic behaviour: trade thresholds, workforce allocation preferences, exchange policy. This is a convenience altitude; it changes a number in the player's own cost model.
 
-**Law** — the governing body's instrument, and the load-bearing sense. Conscription, requisition, embargo, tariff, war powers: rules that bind actors other than the one who passed them, and that reach force rather than only price. *Designed, not built* — BL-155 (law/policy surface, v0.1.2) and BL-186 (laws ledger, v0.1.2). Laws are enacted by nations; until the pivot lands the player is a law **subject**, not a legislator — the single exception being a chartered corporation's **negotiated** tax rate (BL-280).
+**Law** — *(corrected 2026-08-10, NR-120: was "the governing body's instrument"; the militia is not the legislator, it is bound by law, which sharpens rather than weakens this sentence's own point)* the load-bearing sense of law in Io. Conscription, requisition, embargo, tariff, war powers: rules that bind actors other than the one who passed them, and that reach force rather than only price. Laws are enacted by nations; the player is a law **subject**, not a legislator, **and stays one after the pivot lands** — the single exception being a private militia's own **negotiated** tax or contract terms with its home nation (BL-280, itself likely re-read against the militia's new bargaining shape, BL-350).
+
+**One law is real (BL-343, landed 2026-08-10, v0.1.3).** A `law` (`src/world/law.{hpp,cpp}`) is an id, a `condition_set`, an effect and an `enacted` flag, held on `world::laws` in authored order. The shipped instance is BL-155's law #1, the **extraction levy**: a per-unit charge on raw output, seeded **un-enacted** so the shipped economy is unchanged until someone switches it on (Budget ledger → Laws). It surfaces as its own **Levies** line in the Finance card's flow chart, beside income, inputs, maintenance, wages and interest — because a law the player cannot see working is indistinguishable from an unimplemented one.
+
+**The enforcement seam, settled:** *a law is a modifier OVER the market, never an override OF it.* This is the principle already established when price clamps were vetoed (2026-07-11) — a clamp fights price resolution rather than shifting a flow's cost. So the levy applies where the flow is **accounted** (`apply_budget`), not where the price is **resolved** (`clear_markets`): extraction output is priced by the market exactly as before, and the levy is a separate accounted cost. The market stays the only thing that sets prices, and the player sees the tax as its own number rather than as an unexplained worse price. Predicates are resolved once per law per corp per tick, before the money loop reads them, so ordering is fixed and the determinism invariant holds.
+
+Honestly, an extraction levy reaches economic outcomes and not military ones. What the item owed instead is that **nothing in the record or the effect dispatch assumes an economic subject** — `law_effect_kind` is an open taxonomy a military effect joins without reshaping anything, and the predicate already carries military subjects. Still open: the other nine laws, the other three effect families, enactment politics (BL-186 laws ledger, BL-345 relationship axis), negotiated rates (BL-280). Verified by `tools/verify/law_harness.cpp`.
+
+### Conditions
+The shared predicate laws, techs and quests all read (**BL-342**, landed 2026-08-10) — `src/world/condition_set.{hpp,cpp}`. BL-155 and BL-156 had independently settled on the same object, *"a flat AND-list of atomic conditions — no nested OR-mesh"*, and neither built it; one small pure evaluator turned two design-forward minors into shippable ones.
+
+An atomic condition is `<subject> <comparator> <operand>` plus the qualifier its subject reads. Three properties are load-bearing:
+
+1. **Pure and deterministic.** `evaluate` reads a `const world&` and nothing else — no RNG, no clock, no cached mutable state. It runs every tick for every enacted law, so it sits directly on the determinism invariant; where a measure sums over an unordered container it sums in ascending entity-id order.
+2. **An empty set is true.** Most laws are unconditional once enacted, so the degenerate case is the *common* case and is the cheap path rather than a bolted-on special case. (The corollary matters: "no gate authored" cannot be represented by an empty set, and is carried by its own flag — see § Research.)
+3. **A subject may be MILITARY.** BL-094's design test applied at the foundation *(2026-08-10: the specific test named at the time has since been retired and replaced — see BL-094 § 2026-08-10 — but this founding decision, that a subject enum must be able to name a military quantity at all, is exactly the part that does not depend on which version of the test was in force)*. The eight subjects are `tech_tree.hpp`'s original six labels promoted into resolvable quantities — `research`, `structure`, `stockpile`, `market`, `surplus`, `era` — plus `military_units` and `military_strength`. A subject enum that enumerated only economic quantities is exactly the failure the identity pivot is trying to avoid, and it is far cheaper to avoid now than to unpick.
+
+Counts compare as integers (so `exactly 3` means three, not "within an epsilon of three"); quantities compare as floats. Verified by `tools/verify/condition_set_harness.cpp`.
 
 ---
 
@@ -144,6 +169,11 @@ keeps the loop a contest between a few space-interested specialists rather than 
 management game. Detail and the generation consequences live in
 `docs/generation/GENERATION_STRATEGY.md`.
 
-This premise survives BL-094 (governing-body pivot): when the player takes the governing-body
-seat, that nation's bulk economy stays AI-run background. The player gains law, force and
-research as levers — not a full-economy management burden.
+This premise survives BL-094's rewrite (2026-08-10, NR-120): when the player becomes a national
+private militia chartered by one of the generated nations, that nation's bulk economy stays
+AI-run background exactly as before — the militia is a new entity type attached to a nation, not
+the nation itself, so nothing about the background-economy premise changes. *(Corrected
+2026-08-10: was "when the player takes the governing-body seat... the player gains law, force and
+research as levers" — the militia gains force directly and reaches law/research through
+procurement, not by wielding them; see CONCEPT.md § Player identity.)* The player is not a
+full-economy management burden either way.

@@ -35,11 +35,14 @@ construction_result construct_building(world& w, const recipe_registry& reg,
     body_reach_field(w, tile_it->second.body);
     const placement_rules::placement_result pr =
         placement_rules::can_place_in_world(w, tile, type, target,
-                                            reg.construction().max_logistics_reach);
+                                            reg.construction().max_logistics_reach,
+                                            corp); // BL-344: the tech gate asks WHO is building
     if (!pr)
     {
         if (pr.reason == placement_rules::placement_reason::out_of_logistics_range)
             return construction_result::out_of_range;
+        if (pr.reason == placement_rules::placement_reason::tech_locked)
+            return construction_result::tech_locked;
         if (type == building_type::launchpad)
             return construction_result::slot_occupied;
         return construction_result::invalid_tile; // Port not coastal

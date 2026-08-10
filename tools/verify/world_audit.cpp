@@ -216,6 +216,38 @@ int main()
     generation_report report;
     world w = make_hard_coded_world({}, &report);
 
+    // --- BL-331: starting military presence (built under the BL-330 label,
+    // 2eb8654 — a mislabeled commit; this is the first PASS/FAIL check the
+    // seeding has ever had). ---
+    {
+        bool has_base = false;
+        const auto pcit = w.corporations.find(w.player_entity);
+        if (pcit != w.corporations.end())
+        {
+            for (entity_id asset : pcit->second.assets)
+            {
+                const auto bit = w.buildings.find(asset);
+                if (bit != w.buildings.end() && bit->second.type == building_type::military_base)
+                {
+                    has_base = true;
+                    break;
+                }
+            }
+        }
+        bool has_unit = false;
+        for (const auto& [uid, uc] : w.units)
+        {
+            if (uc.owner == w.player_entity && uc.count > 0)
+            {
+                has_unit = true;
+                break;
+            }
+        }
+        std::printf("\nBL-331 starting military presence: base=%s unit=%s : %s\n",
+                    has_base ? "yes" : "no", has_unit ? "yes" : "no",
+                    (has_base && has_unit) ? "PASS" : "FAIL");
+    }
+
     // --- S2: Kepler composition histogram ---
     const entity_id kepler = w.home_body;
     std::map<int, int> hist;

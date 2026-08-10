@@ -228,7 +228,10 @@ int main()
             b.grid_width = 2; b.grid_height = 2; b.survey.phase = survey_phase::surveyed;
             w.bodies[body] = b;
         }
+        // Tile creation is the needed side effect; the id itself is unused here
+        // (the scorer discovers candidate tiles by scanning the body's grid).
         const entity_id t_ai = make_tile(w, body, 0, 0, terrain_composition::rocky, 1.0f);
+        (void)t_ai;
         const entity_id market = w.create_entity();
         {
             market_component mc{};

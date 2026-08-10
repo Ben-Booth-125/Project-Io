@@ -6,6 +6,7 @@
 #include "corporation_generation.hpp"
 #include "creeds.hpp"
 #include "history_ladder.hpp"
+#include "law.hpp" // BL-343: seed_prototype_laws
 #include "nation_generation.hpp"
 #include "orbital_system.hpp"
 #include "population_generation.hpp"
@@ -687,8 +688,9 @@ world make_hard_coded_world(world_params params, generation_report* report,
             {
                 const std::size_t ri = static_cast<std::size_t>(e.good);
 
-                // Where it actually grows. Gathered once per good, in ascending
-                // tile id, so the scan order is deterministic.
+                // Where it actually grows. Gathered once per good from w.tiles'
+                // unordered walk — safe, because the only consumer below takes a
+                // min over the set, which is order-independent.
                 std::vector<std::pair<int, int>> sources;
                 for (const auto& [tid, tc] : w.tiles)
                     if (tc.body == kepler && tc.resource_deposit[ri] > 0.0f)
@@ -814,6 +816,12 @@ world make_hard_coded_world(world_params params, generation_report* report,
             params.seed ^ a.seed, deposit_scalar, &ast_pl, nullptr, &ast_bias);
     }
 
+    // Freeze each body's authored phase as its epoch angle, so the econ tick can
+    // reconstruct positions purely from the day tick (orbital_angle_at_tick) while
+    // orbital_angle_rad itself keeps advancing per frame for rendering.
+    for (auto& [body_id, body] : w.bodies)
+        body.orbital_epoch_angle_rad = body.orbital_angle_rad;
+
     // ---------------------------------------------------------------------
     // Per-stage system summary for the generation screen. Counts across the
     // bodies the chain just ran, so each revealed stage says what it actually
@@ -887,6 +895,10 @@ world make_hard_coded_world(world_params params, generation_report* report,
             static_cast<double>(pp.drawdown * 100.0f));
         report->stage_lines.emplace_back(buf);
     }
+
+    // BL-343: the prototype's one law, seeded UN-ENACTED so the shipped economy
+    // is unchanged until the player (or a harness) enacts it. See law.hpp.
+    seed_prototype_laws(w);
 
     return w;
 }

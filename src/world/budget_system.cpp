@@ -1,5 +1,7 @@
 #include "budget_system.hpp"
 
+#include "law.hpp" // BL-343: evaluate_laws at the enforcement seam
+
 #include <algorithm>
 #include <map>
 
@@ -53,8 +55,16 @@ void apply_budget(world& w,
                   const recipe_registry& reg,
                   const std::unordered_map<entity_id, corp_cash_flow>& flows,
                   const std::map<std::pair<entity_id, entity_id>, float>& contention,
-                  std::map<entity_id, corp_budget>* breakdown)
+                  std::map<entity_id, corp_budget>* breakdown,
+                  const std::vector<building_report>* production)
 {
+    // BL-343 law enforcement. Skipped entirely when nothing is enacted, so a
+    // world with no laws runs the pre-BL-343 arithmetic untouched.
+    bool any_law_enacted = false;
+    for (const law& l : w.laws)
+        any_law_enacted = any_law_enacted || l.enacted;
+    const bool levy_pass = any_law_enacted && production != nullptr;
+
     // BL-042B: mean habitability per body (from population centres) scales wages.
     // Cached per body — body_mean_habitability scans every centre, so compute each
     // body once; building_profit.hpp's estimate reads the same helper (no drift).
@@ -117,6 +127,36 @@ void apply_budget(world& w,
             delta           -= opex.maintenance;
             bud.wages       += opex.wages;
             delta           -= opex.wages;
+        }
+
+        // BL-343: enacted-law levies. The predicates are resolved ONCE per law
+        // per corp here (evaluate_laws), before the charge is applied, so the
+        // evaluation order is fixed and the money loop stays deterministic. The
+        // charge itself walks `production` — a vector in the economy step's own
+        // deterministic order — and reads only extraction output, because a levy
+        // on raw output is what the extraction levy IS. Processing output is
+        // downstream of a levy already paid on its inputs.
+        if (levy_pass)
+        {
+            const law_effects fx = evaluate_laws(w, corp);
+            if (fx.any)
+            {
+                float levy = 0.0f;
+                for (const building_report& br : *production)
+                {
+                    if (br.corp != corp || br.type != building_type::extraction_site)
+                        continue;
+                    if (br.output_quantity <= 0.0f)
+                        continue;
+                    levy += fx.extraction_levy[static_cast<std::size_t>(br.target_resource)]
+                          * br.output_quantity;
+                }
+                if (levy != 0.0f)
+                {
+                    bud.levies = levy;
+                    delta     -= levy;
+                }
+            }
         }
 
         cc.balance += delta; // bit-identical to the pre-BL-072 arithmetic; may go negative
