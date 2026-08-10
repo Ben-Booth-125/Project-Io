@@ -3,13 +3,14 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 150 entries across 2 volume(s).
+One line per session, newest first — 151 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
+| 2026-08-10 | [Hygiene wave 2: app.cpp halves, and the review barrier earns its place](DEVLOG.md) | BL-257 BL-348 BL-354 BL-361 BL-362 BL-363 | DEVLOG.md |
 | 2026-08-10 | [The hygiene audit that became a batch: four reviewers, thirteen items, ten landed](DEVLOG.md) | BL-266 BL-325 BL-351 BL-352 BL-353 BL-354 BL-355 BL-356 BL-357 BL-358 BL-359 BL-360 BL-361 BL-362 BL-363 | DEVLOG.md |
 | 2026-08-10 | [Cut v0.1.3 and v0.1.4: one small predicate turned two design documents into two releases](DEVLOG.md) | BL-094 BL-155 BL-156 BL-182 BL-186 BL-212 BL-218 BL-253 BL-280 BL-314 BL-315 BL-325 BL-331 BL-332 BL-342 BL-343 BL-344 | DEVLOG.md |
 | 2026-08-10 | [Cut v0.1.10: three items whose own diagnosis was wrong, and a green gate that lied](DEVLOG.md) | BL-079 BL-181 BL-218 BL-257 BL-283 BL-284 BL-290 BL-338 BL-346 BL-347 | DEVLOG.md |

@@ -8070,14 +8070,14 @@
     },
     {
       "category": "Development",
-      "status": "designed",
-      "glyph": "✓",
+      "status": "complete",
+      "glyph": "✔",
       "parked": false,
       "blocked_on": [],
       "written": "2026-08-10",
       "requires": [],
       "authority_doc": "docs/tech/TECH_FOUNDATIONS.md",
-      "archived": false,
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json",
       "id": "BL-361",
       "short_name": "APP_CPP_DECOMPOSITION",
       "priority": "B",
@@ -8088,18 +8088,18 @@
         "src/core/app.cpp"
       ],
       "summary": "Filed 2026-08-10 by the hygiene audit. app.cpp is the largest file in the repo and mixes four separable concerns. Not delivered in the hygiene batch -- filed for a dedicated session.",
-      "design": "The four extractions, biggest first (line ranges as of 2026-08-10):\n1. :1027-2099 + :3695-3806 -- run_verify's ~60 v.set_function registrations plus capture/golden-diff -> a verify_api.cpp / app_capture.cpp pair (~1,200 lines out).\n2. :2251-2746 (+ :459-539 wizard helpers) -- draw_main_menu + draw_generation_screen + wizard preview plumbing -> a startup-screens file (~600 lines), matching docs/ui/STARTUP.md ownership.\n3. :2939-3203 -- the time panel and gear/system-menu blocks inside render() -> ui/time_panel.cpp (~270 lines).\n4. :655-871 -- step_economy's post-step presentation work (nation chat posts, persona counsel, five history recorders) -> a session-history module; the economy step proper is only :637-655.\n\nMechanical moves, no behaviour change; each extraction is its own commit so the diff stays reviewable. Re-measure line ranges before starting -- they drift."
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json"
     },
     {
       "category": "UI",
-      "status": "designed",
-      "glyph": "✓",
+      "status": "complete",
+      "glyph": "✔",
       "parked": false,
       "blocked_on": [],
       "written": "2026-08-10",
       "requires": [],
       "authority_doc": "docs/ui/CANVASES.md",
-      "archived": false,
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json",
       "id": "BL-362",
       "short_name": "UI_FRAME_RECOMPUTE_CACHES",
       "priority": "B",
@@ -8113,18 +8113,18 @@
         "src/ui/hover_card.hpp"
       ],
       "summary": "Filed 2026-08-10 by the hygiene audit. The BL-268/269 tile-raster caching was done well; these surfaces did not get the same treatment. Not delivered in the hygiene batch -- BL-356 (body-market index) removes the worst per-frame cost first; this item carries the rest.",
-      "design": "The list, worst first:\n1. selection_panel.cpp:335-368 -- tile_metrics calls top_decile_production once per deposited resource, each call scanning ALL tiles of ALL bodies with a heap-allocated vals vector; runs from the first frame of every campaign (HQ tile is auto-selected). Cache per-resource p90 and the body habitability/hazard averages per econ tick.\n2. body_surface_canvas.cpp:766-886 -- update_body_vision refloods permanent_vision every frame; inputs change only on build/demolish/road/econ-tick. Recompute on those events. Also intra_body_path returns logistics_path BY VALUE (logistics.cpp:97-107) so every A*-cache hit copies the tile vector -- return const ref.\n3. body_surface_canvas.cpp:1002-1065 -- built_tiles / tile_to_bld / tile_to_corp rebuilt per frame over ALL bodies' buildings; scope to active body and cache on the BL-268 epoch.\n4. body_surface_canvas.cpp:1266-1290 -- Industry lens pre-pass iterates all w.tiles twice per frame filtering on body; use w.body_tile_index.\n5. hover_card.hpp:12/:17 -- hover delays are FRAME COUNTS (0.5 s at 60 Hz, 0.2 s at 144 Hz); convert interactive path to seconds via io.DeltaTime (verify harness frames(n) unit stays).\n6. Lens-key chrome: four lens keys hand-roll begin_lens_key (body_surface_canvas.cpp:482-497, 551-562, 609-624, 648-665); draw_market_key calls market_city_name twice per market per frame. Also the marker hit-zone priority loop is pasted for hover and click (:2541-2575 vs :2685-2707) -- extract resolve_marker_hit.\n7. tech_tree_panel.cpp:128 -- full ring layout recomputed every frame the takeover is open; cache per era."
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json"
     },
     {
       "category": "Development",
-      "status": "designed",
-      "glyph": "✓",
+      "status": "complete",
+      "glyph": "✔",
       "parked": false,
       "blocked_on": [],
       "written": "2026-08-10",
       "requires": [],
       "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
-      "archived": false,
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json",
       "id": "BL-363",
       "short_name": "MISC_HYGIENE_SWEEP",
       "priority": "C",
@@ -8143,7 +8143,7 @@
         "src/main.cpp"
       ],
       "summary": "Filed 2026-08-10 by the hygiene audit: the accumulated minor findings, none urgent, grouped so they are not lost. Not delivered in the hygiene batch.",
-      "design": "The list:\n1. No SOL_ALL_SAFETIES_ON anywhere -- unchecked sol2 gets are UB in release rather than catchable sol::error. One compile definition; expect it to surface latent type mismatches at the call sites below.\n2. persona_pack.cpp:179/:244/:252/:258/:271/:290/:296 -- result-SHAPE conversions unchecked (.valid() proves no error, not the right type): sol::table t = result on a non-table, .get<std::string>() on a non-string. Add shape checks.\n3. app.cpp:547 -- sol::table cfg = m_lua.state()[\"config\"] is an unchecked nil->table conversion; main.cpp:322-327 promises user-edited init.lua fails with a clean error (BL-110). Check presence first.\n4. ui_state.hpp:310 -- player standing sell_orders are real game state on the UI object, read by the econ tick (app.cpp:642) and invisible to any future save seam. Move to world (player intent).\n5. The odd-r hex neighbour offset table is pasted 6 times (body_surface_canvas.cpp x4, placement_rules.cpp:155, river_generation.cpp:13). One divergent digit is a silent geometry bug -- centralise beside the hex helpers.\n6. market_ledger.cpp:99-101 -- sell-order form state is function-local static, shared across every market/body; stale values carry across context switches. Move to ui_state keyed by market.\n7. main.cpp:252-254 -- blackboard export never checks the ofstream opened; a permissions failure reports \"wrote\".\n8. body_surface_canvas.cpp:2340-2346 -- hard-coded Earth-flavoured settlement name bank (Oberon is a real moon) bypasses the seeded naming system and brushes the no-Earth-names standing rule; derive from the nation/body name banks.\n9. The buy-order half of the order book (~100 lines, components.hpp:404 + market_clearing.cpp two-pass matching) has no producer anywhere -- decision owed (NR-125): remove, or keep for the exchange-policy arc.\n10. ui_state.hpp:153 active_tile written once, read never -- remove or wire."
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json"
     }
   ]
 }

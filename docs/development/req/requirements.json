@@ -9862,8 +9862,8 @@
    "title": "app.cpp sheds four separable concerns into dedicated files",
    "difficulty": 4,
    "importance": "B",
-   "evaluated_difficulty": null,
-   "status": "pending",
+   "evaluated_difficulty": 4,
+   "status": "complete",
    "requirements": [
     {
      "id": "R1",
@@ -9874,8 +9874,8 @@
       "visual: suite unchanged",
       "review"
      ],
-     "status": "pending",
-     "result_metric": "",
+     "status": "complete",
+     "result_metric": "Integrating build green (246 targets, CMake globs picked up the five new .cpp files); 25/25 headless harnesses pass; five visual checks render-identical against control goldens blessed from the pre-wave-2 build",
      "notes": ""
     },
     {
@@ -9884,19 +9884,21 @@
      "verification": [
       "review"
      ],
-     "status": "pending",
-     "result_metric": "",
+     "status": "complete",
+     "result_metric": "Four commits, one per extraction (619d3ac, e7e04db, f9c0c51, d7ea2aa); verifier-review confirmed no file-local static was duplicated across TUs and no ODR risk from the linkage change",
      "notes": ""
     }
-   ]
+   ],
+   "resolved": "2026-08-10",
+   "resolution": "Complete 2026-08-10. app.cpp 3826 -> 1422 lines (-2404) across four VERBATIM extractions, one commit each: verify_api.cpp + app_capture.cpp (~1,180 lines), startup_screens.cpp (~580, matching STARTUP.md ownership), time_panel.{hpp,cpp} (~300), session_history.{hpp,cpp} (~230). Bodies were moved by line-range copy so logic reordering was not possible; the verify API's 60 registered function names were diffed byte-identical (scripts/verify/*.lua call them by name). Two forced changes, both recorded: frame_stats_instance lost its anonymous namespace (render() and the CSV tap now sit in different TUs) and the extracted system menu inlines the pause toggle rather than calling private app::dispatch_action - reviewed as character-equivalent."
   },
   {
    "brief": "ui-frame-recompute-caches",
    "title": "Per-frame recomputation of per-tick state is cached or event-driven",
    "difficulty": 4,
    "importance": "B",
-   "evaluated_difficulty": null,
-   "status": "pending",
+   "evaluated_difficulty": 4,
+   "status": "complete",
    "requirements": [
     {
      "id": "R1",
@@ -9906,8 +9908,8 @@
       "visual: suite unchanged",
       "review"
      ],
-     "status": "pending",
-     "result_metric": "",
+     "status": "complete",
+     "result_metric": "Five visual checks vs pre-wave-2 control goldens: hover_freeze, tech_tree_panel, lens_modes render-identical; pop_markers/market_ledger differ only in the economic figures the C2 fix unfroze (canvas and chrome pixel-identical)",
      "notes": ""
     },
     {
@@ -9917,8 +9919,8 @@
       "code",
       "visual"
      ],
-     "status": "pending",
-     "result_metric": "",
+     "status": "complete",
+     "result_metric": "Thresholds carry a half-frame epsilon so verify.frames(30)/(150) land on the same frames the scripts and goldens were authored against; ui_state::fixed_frame_clock steps a fixed 1/60 s under --verify (io.DeltaTime there is vsynced wall clock with real jitter, NOT a fixed timestep - measured, not assumed); interactive delta clamped so a stall cannot snap a card to stuck",
      "notes": ""
     },
     {
@@ -9927,19 +9929,21 @@
      "verification": [
       "headless: determinism_harness"
      ],
-     "status": "pending",
-     "result_metric": "",
+     "status": "complete",
+     "result_metric": "determinism_harness OK and world_determinism ALL PASS; the only world/ edits in the item are the const-ref return signature and no sim logic",
      "notes": ""
     }
-   ]
+   ],
+   "resolved": "2026-08-10",
+   "resolution": "Complete 2026-08-10. update_body_vision, the three marker maps, the industry lens pre-pass, the lens-key chrome, the selection-panel tile metrics and the tech-tree constellation geometry all stopped recomputing per frame; intra_body_path returns a const ref instead of copying the tile vector on every A* cache hit (all 8 call sites audited for lifetime - std::map references survive insertion, and no site holds one across a clear). Hover dwell converted from frame counts to wall-clock seconds. THE REVIEW BARRIER CAUGHT TWO REAL FAULTS HERE, both fixed before close: a float-accumulation off-by-one that moved the stick threshold from frame 150 to 151, and a tech-tree cache stamp (registry address + entry counts) that verify.new_world defeats while dangling every retained node pointer."
   },
   {
    "brief": "misc-hygiene-sweep",
    "title": "Small-hygiene sweep: sol2 safeties, state homes, single-source hex table, seeded names",
    "difficulty": 3,
    "importance": "C",
-   "evaluated_difficulty": null,
-   "status": "pending",
+   "evaluated_difficulty": 3,
+   "status": "complete",
    "requirements": [
     {
      "id": "R1",
@@ -9949,8 +9953,8 @@
       "headless: full harness sweep",
       "code"
      ],
-     "status": "pending",
-     "result_metric": "",
+     "status": "complete",
+     "result_metric": "Integrating build green with safeties on; 25/25 harnesses pass. Two remaining hard .as<T>() sites (recipe_registry, world_gen_config) sit inside main()'s top-level try, so a shape mismatch is a clean fatal error + exit 1 - which is BL-363's intent; noted rather than changed",
      "notes": ""
     },
     {
@@ -9961,8 +9965,8 @@
       "code",
       "headless: econ_harness"
      ],
-     "status": "pending",
-     "result_metric": "",
+     "status": "complete",
+     "result_metric": "sell_orders on world; clear_markets iterates the identical vector in authoring order (determinism unchanged); every reader/writer migrated and ui_state::sell_orders fully removed; econ_harness green",
      "notes": ""
     },
     {
@@ -9972,8 +9976,8 @@
       "visual",
       "code"
      ],
-     "status": "pending",
-     "result_metric": "",
+     "status": "complete",
+     "result_metric": "New saved check scripts/verify/settlement_labels.lua captures \"Keikho\" - a seeded tongue-bank name, not the retired Earth-flavoured bank. Goldens blessed as a NEW baseline. The check locates the largest centre via verify.population_centres() rather than hard-coding a tile, which is how it survives world drift (NR-131 records that pop_markers.lua's fixed (66,6) now frames empty terrain)",
      "notes": ""
     },
     {
@@ -9983,11 +9987,13 @@
       "code",
       "build"
      ],
-     "status": "pending",
-     "result_metric": "",
+     "status": "complete",
+     "result_metric": "hex_neighbors.hpp is world-side and included by both world/ and ui/ (correct direction); active_tile gone repo-wide incl. three docs that claimed it existed. The dead buy-order book was deliberately NOT touched - NR-125 is still open",
      "notes": ""
     }
-   ]
+   ],
+   "resolved": "2026-08-10",
+   "resolution": "Complete 2026-08-10. SOL_ALL_SAFETIES_ON=1 at directory scope (covers ProjectIo plus the two sol-linked harnesses); persona_pack shape checks at all seven conversion sites routed to the existing fail-soft throw; the init.lua config read now presence/type-checked and fails through the BL-110 clean-error channel; the blackboard export checks its ofstream. sell_orders moved from ui_state to world (player intent, visible to a future save seam); market-ledger form state resets on body change; ui_state::active_tile removed. hex_neighbors.hpp single-sources the odd-r table - all six pasted copies were verified BYTE-IDENTICAL before unification, so no latent geometry bug was hiding. Settlement labels now read world::population_centre_name."
   }
  ]
 }

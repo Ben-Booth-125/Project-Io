@@ -2293,6 +2293,24 @@
    "status": "open",
    "source": "BL-363 settlement labels (slice M)",
    "what": "Labels now read world::population_centre_name rather than indexing a hard-coded bank, so a centre whose generated name is empty draws nothing where it previously always got a bank name. That path needs generate_city_name to have returned empty (an unusable tongue), so it should be unreachable in a normal campaign — but it is a real behaviour change from \"always labelled\" and would show as a silently unlabelled city rather than a visible fault. Accepted as the honest failure mode (a made-up Earth name was worse); flagging in case a fallback is wanted."
+  },
+  {
+   "id": "NR-133",
+   "title": "Market-ledger form state landed as a body-keyed static, not on ui_state",
+   "raised": "2026-08-10",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-363 (slice L)",
+   "what": "The item asked for the sell-order form state to move \"into ui_state keyed per market\". It landed as the existing function-local statics plus a `form_body` guard that resets them when the selected body changes. That fixes the reported fault (stale resource/quantity carried across market switches) and matches the file's own convention (selected_body is a static too), but the state is still process-global - it survives verify.new_world - and is keyed by body rather than market. Cheap to finish if the ui_state home is wanted."
+  },
+  {
+   "id": "NR-134",
+   "title": "verify.econ_step now advances current_day_tick — captured economies will differ from older goldens",
+   "raised": "2026-08-10",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Wave-2 review barrier C2 (BL-362)",
+   "what": "The harness drove step_economy with current_day_tick frozen at 0 for the whole session, so anything stamped on the tick never invalidated and, since BL-354, convoy dispatch priced every haul at the epoch orbital position. econ_step now increments it per step. This is more faithful (the economy sees time passing) but it MOVES captured economic figures: pop_markers and market_ledger diff ~1% against pre-fix captures, confined to price values, price curves and comms text. Folds into the NR-130 re-bless pass rather than being blessed separately."
   }
  ]
 }

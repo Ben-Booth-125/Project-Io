@@ -35,36 +35,13 @@
 > § hot-path-spatial-scans. BL-361 (app.cpp split), BL-362 (UI frame caches), BL-363 (misc
 > sweep) were filed, not delivered.
 
-## Hygiene batch wave 2 (promoted from BL-361/BL-362/BL-363) — **IN FLIGHT**
-
-Requirements: requirements.json § app-cpp-decomposition, § ui-frame-recompute-caches,
-§ misc-hygiene-sweep. Two waves because BL-361 rewrites the file two BL-363 tasks edit:
-
-- **[4] H — app.cpp decomposition (BL-361, whole item).** The four extractions (verify API +
-  capture, startup screens, time panel, session-history recorders), one commit each. Files:
-  `src/core/app.cpp` + new files under `src/core/` / `src/ui/`. Wave 1 root.
-- **[3] I — canvas caches (BL-362 part).** Body vision event-driven; per-frame building maps
-  scoped+cached; industry lens via raster; lens-key chrome + marker-hit helper;
-  `intra_body_path` by const ref. Files: `src/ui/body_surface_canvas.cpp`,
-  `src/world/logistics.{cpp,hpp}`. Wave 1 root.
-- **[2] J — panel caches (BL-362 part).** Selection tile metrics per econ tick; hover delays in
-  seconds; tech-tree ring layout cached per era. Files: `src/ui/selection_panel.cpp`,
-  `src/ui/hover_card.hpp`, `src/ui/tech_tree_panel.cpp`. Wave 1 root.
-- **[2] M — hex table + settlement names (BL-363 part).** Single-source odd-r offsets in a
-  world-side header; settlement labels from the seeded naming system. Files: new
-  `src/world/hex_neighbors.hpp`, `src/world/placement_rules.cpp`,
-  `src/world/river_generation.cpp`, `src/ui/body_surface_canvas.cpp`. Wave 1 root.
-- **[2] K — scripting safety (BL-363 part).** SOL_ALL_SAFETIES_ON; persona_pack shape checks;
-  init.lua config presence check; blackboard ofstream check. Files: `CMakeLists.txt`,
-  `src/scripting/persona_pack.cpp`, `src/core/app.cpp`, `src/main.cpp`. **Wave 2** (app.cpp,
-  after H merges).
-- **[2] L — state homes (BL-363 part).** Sell orders world-side; market-ledger form state
-  per-market; active_tile removed. Files: `src/ui/ui_state.hpp`, `src/ui/market_ledger.cpp`,
-  `src/world/world.hpp`, `src/core/app.cpp`. **Wave 2** (app.cpp, after H merges).
-
-Parallelisation note: H ∥ I ∥ J ∥ M (I and M share body_surface_canvas.cpp — worktrees absorb);
-K ∥ L after H lands. Buy-order book untouched (NR-125). Integration, builds, harness + visual
-suites, golden re-bless in the main session.
+> Drained 2026-08-10: hygiene batch wave 2 (BL-361 app.cpp decomposition, BL-362 UI frame
+> caches, BL-363 misc sweep) — all 6 agent slices COMPLETE, merged, build + 25 harnesses green,
+> five visual checks verified against pre-wave-2 control goldens — removed per the retain-one
+> policy. Record lives in DEVLOG.md (2026-08-10 wave-2 entry), the three backlog.json
+> `resolution` fields, and requirements.json § app-cpp-decomposition /
+> § ui-frame-recompute-caches / § misc-hygiene-sweep. The review barrier caught three real
+> faults before close (NR-130/133/134 carry the residuals).
 
 ## Nation/corp generation visibility (promoted from BL-305) — **PAUSED, no tasks started**
 

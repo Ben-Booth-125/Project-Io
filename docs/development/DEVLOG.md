@@ -10,7 +10,57 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — The hygiene audit that became a batch: four reviewers, thirteen items, ten landed (2026-08-10, latest)
+## Session — Hygiene wave 2: app.cpp halves, and the review barrier earns its place (2026-08-10, latest)
+
+Full mode, Batch Delivery — six worktree slices over BL-361/BL-362/BL-363, the three items the
+morning's hygiene batch filed but did not deliver. Two waves, because BL-361 rewrites the file two
+BL-363 tasks edit.
+
+**The headline is BL-361: app.cpp went 3,826 → 1,422 lines** across four extractions (verify Lua
+API + capture, startup screens, time panel, the post-econ-step history recorders), one commit
+each, moved by line-range copy so logic reordering was not possible. The verify API's 60 registered
+function names were diffed byte-identical, because `scripts/verify/*.lua` call them by name.
+
+**The argument of the session is that the review barrier caught three faults a green build and
+passing goldens could not.** Everything compiled, 25 harnesses passed, and five visual checks were
+render-identical — and `verifier-review` still returned FIX FIRST, correctly:
+
+- **The hover stick threshold stopped firing on the frame it used to.** Converting dwell from
+  frame counts to seconds looked clean, but summing `1/60` in float32 reaches 2.49999833 after
+  150 additions — just under `2.5f` — so the card stuck at frame 151 where the integer counter
+  fired at 150, and the appear threshold cleared by roughly one ulp. `hover_freeze.lua` hid it by
+  spending 153 frames. Thresholds now carry a half-frame epsilon.
+- **A cache that never invalidated under `--verify`.** `current_day_tick` is maintained by the
+  interactive loop only, so a capture session left it at 0 and every tick-stamped cache froze for
+  the whole run. This is the nastiest shape a UI bug can take: *the golden is the stale render*, so
+  the check certifies the fault. `verify.econ_step` now advances the tick — which, since BL-354,
+  also means the harness's convoys stop pricing every haul at the epoch orbital position.
+- **A retained-pointer cache whose guard could not fire.** The tech-tree geometry cache stamped on
+  registry address plus entry counts; `verify.new_world` reloads the same file into the same member,
+  so both are unchanged while every cached `const tech_node*` dangles. The registry now carries a
+  reload generation. The code comment had asserted the stamp covered exactly this case.
+
+**A second lesson, this one about the instruments.** Five visual checks failed at ~11.5% and the
+first read was the known capture-before-render artifact — Ben said so, and he was right that it
+happens. It wasn't that: the captures were complete. The goldens were stale by **119 commits**,
+including BL-257 (generated body names — the home body is "Huhaidar" now, not "Kepler") and
+BL-348/349 (province tongues). Mass re-blessing would have buried 119 commits of unreviewed world
+change under a UI commit, so instead the batch was verified against **control goldens blessed from
+the pre-wave-2 build** — which is the attribution the committed goldens could no longer give.
+NR-130 records the owed re-bless pass. A related find (NR-131): `pop_markers.lua` frames a
+hard-coded tile that world drift left empty, so it has been "passing" while capturing none of the
+markers it exists to verify. The new `settlement_labels.lua` shows the fix — locate the subject via
+`verify.population_centres()` and frame whatever the world actually generated.
+
+Also landed: the per-frame recompute pass (vision model, marker maps, industry lens, lens-key
+chrome, selection tile metrics, tech-tree geometry; `intra_body_path` returns a const ref instead
+of copying the tile vector on every A* cache hit, all 8 call sites lifetime-audited);
+`SOL_ALL_SAFETIES_ON` with the persona-pack shape checks it demands; `sell_orders` moved from
+`ui_state` to `world` where a save seam can see it; and the odd-r hex neighbour table single-sourced
+— all six pasted copies verified byte-identical first, so no latent geometry bug was hiding in the
+duplication.
+
+## Session — The hygiene audit that became a batch: four reviewers, thirteen items, ten landed (2026-08-10)
 
 Full mode, Batch Delivery — seven worktree agent slices, integrated and verified in the main
 session. Runtime: not tracked (timer.js not started); the batch ran from audit to green suite
