@@ -410,18 +410,20 @@ void draw_market_key(ImVec2 anchor, float top_limit, float bottom_limit, const w
     std::sort(entries.begin(), entries.end(),
               [](const auto& a, const auto& b) { return a.first < b.first; });
 
-    // Size the box to the widest label so long city names are not clipped.
+    // Size the box to the widest label so long city names are not clipped. One
+    // market_city_name call per market: the row keeps the string the width pass
+    // measured (it used to be built twice per market per frame — BL-362).
     float label_w = ui::fit_width("Market catchments");
-    for (const auto& [mid, col] : entries)
-        label_w = std::max(label_w,
-            swatch + 4.0f + ui::fit_width(market_city_name(w, mid).c_str()));
-    const float box_w = std::max(140.0f, label_w + 2.0f * pad);
-
     std::vector<key_row> rows;
     rows.reserve(entries.size());
     for (const auto& [mid, col] : entries)
-        rows.push_back({ col, IM_COL32(220, 220, 220, 255), market_city_name(w, mid),
+    {
+        std::string name = market_city_name(w, mid);
+        label_w = std::max(label_w, swatch + 4.0f + ui::fit_width(name.c_str()));
+        rows.push_back({ col, IM_COL32(220, 220, 220, 255), std::move(name),
                          key_marker::swatch, 0.0f });
+    }
+    const float box_w = std::max(140.0f, label_w + 2.0f * pad);
 
     draw_scroll_list_key(anchor, top_limit, bottom_limit, "##lens_key_market",
                          "Market catchments", box_w, rows, "No markets", &state);
@@ -481,19 +483,12 @@ void draw_country_key(ImVec2 anchor, float top_limit, float bottom_limit,
 void draw_population_key(ImDrawList* dl, ImVec2 anchor)
 {
     const float pad    = 8.0f;
-    const float box_w  = 156.0f;
     const float line_h = ImGui::GetTextLineHeight();
     const float bar_h  = 10.0f;
 
     const float body_h = pad + line_h + 4.0f + bar_h + 2.0f + line_h + pad;
-    const ImVec2 p0 = { anchor.x - box_w, anchor.y - body_h * 0.5f };
-    const ImVec2 p1 = { p0.x + box_w, p0.y + body_h };
-    dl->AddRectFilled(p0, p1, IM_COL32(18, 18, 24, 210), 4.0f);
-    dl->AddRect      (p0, p1, IM_COL32(80, 80, 90, 255), 4.0f);
-
-    const float x     = p0.x + pad;
-    const float bar_w = box_w - 2.0f * pad;
-    float       y     = p0.y + pad * 0.5f;
+    float x, y, bar_w;
+    begin_lens_key(dl, anchor, 156.0f, body_h, pad, x, y, bar_w);
 
     dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Workforce efficiency"); // fit-exempt: legend box sized to its measured entries (container 2)
     y += line_h + 4.0f;
@@ -550,18 +545,13 @@ ImU32 plate_colour(int index)
 void draw_continent_key(ImDrawList* dl, ImVec2 anchor, const continent_state* plates)
 {
     const float pad    = 8.0f;
-    const float box_w  = 176.0f;
     const float line_h = ImGui::GetTextLineHeight();
     const float sw     = 11.0f; // swatch edge
 
     const float body_h = pad + line_h + 6.0f + sw + 4.0f + sw + 4.0f + line_h + pad;
-    const ImVec2 p0 = { anchor.x - box_w, anchor.y - body_h * 0.5f };
-    const ImVec2 p1 = { p0.x + box_w, p0.y + body_h };
-    dl->AddRectFilled(p0, p1, IM_COL32(18, 18, 24, 210), 4.0f);
-    dl->AddRect      (p0, p1, IM_COL32(80, 80, 90, 255), 4.0f);
-
-    const float x = p0.x + pad;
-    float       y = p0.y + pad * 0.5f;
+    float x, y, inner_w;
+    begin_lens_key(dl, anchor, 176.0f, body_h, pad, x, y, inner_w);
+    (void)inner_w;
 
     dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Tectonic plates"); // fit-exempt: legend box sized to its measured entries (container 2)
     y += line_h + 6.0f;
@@ -608,19 +598,12 @@ void draw_continent_key(ImDrawList* dl, ImVec2 anchor, const continent_state* pl
 void draw_industry_key(ImDrawList* dl, ImVec2 anchor)
 {
     const float pad    = 8.0f;
-    const float box_w  = 156.0f;
     const float line_h = ImGui::GetTextLineHeight();
     const float bar_h  = 10.0f;
 
     const float body_h = pad + line_h + 4.0f + bar_h + 2.0f + line_h + pad;
-    const ImVec2 p0 = { anchor.x - box_w, anchor.y - body_h * 0.5f };
-    const ImVec2 p1 = { p0.x + box_w, p0.y + body_h };
-    dl->AddRectFilled(p0, p1, IM_COL32(18, 18, 24, 210), 4.0f);
-    dl->AddRect      (p0, p1, IM_COL32(80, 80, 90, 255), 4.0f);
-
-    const float x     = p0.x + pad;
-    const float bar_w = box_w - 2.0f * pad;
-    float       y     = p0.y + pad * 0.5f;
+    float x, y, bar_w;
+    begin_lens_key(dl, anchor, 156.0f, body_h, pad, x, y, bar_w);
 
     dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Industry throughput"); // fit-exempt: legend box sized to its measured entries (container 2)
     y += line_h + 4.0f;
@@ -648,20 +631,13 @@ void draw_scarcity_key(ImDrawList* dl, ImVec2 anchor,
                        ui_state& state)
 {
     const float pad    = 8.0f;
-    const float box_w  = 156.0f;
     const float line_h = ImGui::GetTextLineHeight();
     const float bar_h  = 10.0f;
 
     const float body_h = pad + kLensComboH + 4.0f
                        + line_h + 4.0f + bar_h + 2.0f + line_h + 4.0f + line_h + pad;
-    const ImVec2 p0 = { anchor.x - box_w, anchor.y - body_h * 0.5f };
-    const ImVec2 p1 = { p0.x + box_w, p0.y + body_h };
-    dl->AddRectFilled(p0, p1, IM_COL32(18, 18, 24, 210), 4.0f);
-    dl->AddRect      (p0, p1, IM_COL32(80, 80, 90, 255), 4.0f);
-
-    const float x     = p0.x + pad;
-    const float bar_w = box_w - 2.0f * pad;
-    float       y     = p0.y + pad * 0.5f;
+    float x, y, bar_w;
+    begin_lens_key(dl, anchor, 156.0f, body_h, pad, x, y, bar_w);
 
     draw_lens_resource_combo(state, {x, y}, bar_w);
     y += kLensComboH + 4.0f;
@@ -760,11 +736,83 @@ void draw_supply_routes_key(ImVec2 anchor, float top_limit, float bottom_limit, 
                          "Supply routes", box_w, rows, "no lanes from this body", nullptr);
 }
 
+/// BL-362: bumps whenever the logistics caches were cleared since the last look.
+/// invalidate_logistics_caches fires on every build/demolish/completion/road event,
+/// so a shrink of world.astar_cost_cache is the one cheap signal that covers them
+/// all; growth (ordinary path queries filling the cache) never bumps.
+std::uint32_t logistics_generation(const world& w)
+{
+    static std::size_t   last_size = 0;
+    static std::uint32_t gen       = 0;
+    const std::size_t size = w.astar_cost_cache.size();
+    if (size < last_size) ++gen;
+    last_size = size;
+    return gen;
+}
+
+/// BL-362 rebuild stamp for the per-frame derived views (vision model, marker
+/// maps): their inputs move only on a body switch, an econ/day tick, a building
+/// or convoy change, or a logistics invalidation — never mid-frame.
+struct body_frame_stamp
+{
+    entity_id     body      = null_entity;
+    int           day_tick  = -1;
+    std::size_t   buildings = 0;
+    std::size_t   convoys   = 0;
+    std::uint32_t logi_gen  = ~0u; // default never matches a live stamp
+    bool operator==(const body_frame_stamp&) const = default;
+};
+
+body_frame_stamp make_body_frame_stamp(const world& w, entity_id body)
+{
+    return { body, w.current_day_tick, w.buildings.size(), w.convoys.size(),
+             logistics_generation(w) };
+}
+
+/// Nearest-wins marker hit resolution shared by hover and click (BL-031/BL-059):
+/// building outranks market_centre within the glyph radii; the tile fallback
+/// stays with the callers. Extracted so the two paths cannot drift (BL-362).
+entity_id resolve_marker_hit(const std::vector<marker_hit_zone>& zones, float mx, float my)
+{
+    float     best_bld_d2 = std::numeric_limits<float>::max();
+    float     best_mkt_d2 = std::numeric_limits<float>::max();
+    entity_id bld = null_entity;
+    entity_id mkt = null_entity;
+    for (const marker_hit_zone& hz : zones)
+    {
+        const float dx = mx - hz.centre.x;
+        const float dy = my - hz.centre.y;
+        const float d2 = dx * dx + dy * dy;
+        if (d2 > hz.radius * hz.radius)
+            continue;
+        if (hz.kind == marker_hit_zone::kind::building && d2 < best_bld_d2)
+        {
+            best_bld_d2 = d2;
+            bld         = hz.id;
+        }
+        else if (hz.kind == marker_hit_zone::kind::market_centre && d2 < best_mkt_d2)
+        {
+            best_mkt_d2 = d2;
+            mkt         = hz.id;
+        }
+    }
+    return bld != null_entity ? bld : mkt;
+}
+
 } // namespace
 
 void update_body_vision(world& w, ui_state& state, double now_days)
 {
     state.sim_now_days = now_days;
+
+    // BL-362: the flood fills, market_for_tile scans and A* corridor walks below
+    // depend only on the stamp's inputs — skip the rebuild while none has moved.
+    static body_frame_stamp s_vision_stamp;
+    const body_frame_stamp stamp = make_body_frame_stamp(w, state.active_body);
+    if (stamp == s_vision_stamp)
+        return;
+    s_vision_stamp = stamp;
+
     state.permanent_vision.clear();
     state.convoy_beams.clear();
 
@@ -856,7 +904,7 @@ void update_body_vision(world& w, ui_state& state, double now_days)
             if (mk == w.markets.end()) continue;
             const entity_id mc = mk->second.centre_tile;
             if (mc == null_entity) continue;
-            const logistics_path lp = intra_body_path(w, body, centre, mc);
+            const logistics_path& lp = intra_body_path(w, body, centre, mc);
             if (!lp.reachable || lp.tiles.empty()) continue;
             flood(lp.tiles, 1, state.permanent_vision);
         }
@@ -875,9 +923,9 @@ void update_body_vision(world& w, ui_state& state, double now_days)
         const entity_id st = sm->second.centre_tile;
         const entity_id dt = dm->second.centre_tile;
         if (st == null_entity || dt == null_entity) continue;
-        const logistics_path lp = intra_body_path(w, body, st, dt);
+        const logistics_path& lp = intra_body_path(w, body, st, dt);
         if (!lp.reachable || lp.tiles.empty()) continue;
-        std::vector<entity_id> path = lp.tiles;
+        std::vector<entity_id> path = lp.tiles; // copied: reversed below, cache stays canonical
         if (st != std::min(st, dt)) std::reverse(path.begin(), path.end());
         state.convoy_beams.push_back(
             { std::move(path), std::clamp(cv.progress, 0.0f, 1.0f), std::max(cv.speed, 0.0f) });
@@ -997,23 +1045,48 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
 
     // Tiles that carry a building, mapped to their type so the marker pass can
     // draw the type-specific glyph. Also track the building entity per tile for
-    // hit-zone registration (BL-059).
-    std::unordered_map<entity_id, building_type> built_tiles;
-    std::unordered_map<entity_id, entity_id>     tile_to_bld; // tile_id → building entity
-    for (const auto& [bld_id, bld] : w.buildings)
+    // hit-zone registration (BL-059), and the corp owning each built tile (marker
+    // colour + Corporation lens). BL-362: all three are cached behind the shared
+    // stamp — the building/asset sets only move on the events the stamp tracks —
+    // and scoped to the active body (queries only ever ask about its tiles).
+    static body_frame_stamp s_marker_stamp;
+    static std::unordered_map<entity_id, building_type> built_tiles;
+    static std::unordered_map<entity_id, entity_id>     tile_to_bld;  // tile_id → building entity
+    static std::unordered_map<entity_id, entity_id>     tile_to_corp; // tile_id → owning corp
+    const body_frame_stamp marker_stamp = make_body_frame_stamp(w, state.active_body);
+    if (!(marker_stamp == s_marker_stamp))
     {
-        auto tile_it = w.tiles.find(bld.tile);
-        if (tile_it != w.tiles.end() && tile_it->second.body == state.active_body)
+        s_marker_stamp = marker_stamp;
+        built_tiles.clear();
+        tile_to_bld.clear();
+        tile_to_corp.clear();
+        for (const auto& [bld_id, bld] : w.buildings)
         {
-            // Lowest building id wins the tile. w.buildings is an unordered_map, so a
-            // plain last-writer-wins assignment would let its iteration order pick the
-            // representative — fine while a tile holds one building, not once they
-            // stack. Lowest-id is stable across frames and across runs.
-            const auto prev = tile_to_bld.find(bld.tile);
-            if (prev != tile_to_bld.end() && prev->second <= bld_id)
-                continue;
-            built_tiles[bld.tile] = bld.type;
-            tile_to_bld[bld.tile] = bld_id;
+            auto tile_it = w.tiles.find(bld.tile);
+            if (tile_it != w.tiles.end() && tile_it->second.body == state.active_body)
+            {
+                // Lowest building id wins the tile. w.buildings is an unordered_map, so a
+                // plain last-writer-wins assignment would let its iteration order pick the
+                // representative — fine while a tile holds one building, not once they
+                // stack. Lowest-id is stable across frames and across runs.
+                const auto prev = tile_to_bld.find(bld.tile);
+                if (prev != tile_to_bld.end() && prev->second <= bld_id)
+                    continue;
+                built_tiles[bld.tile] = bld.type;
+                tile_to_bld[bld.tile] = bld_id;
+            }
+        }
+        for (const auto& [corp_id, corp] : w.corporations)
+        {
+            for (entity_id bld_id : corp.assets)
+            {
+                const auto bld_it = w.buildings.find(bld_id);
+                if (bld_it == w.buildings.end())
+                    continue;
+                const auto tile_it = w.tiles.find(bld_it->second.tile);
+                if (tile_it != w.tiles.end() && tile_it->second.body == state.active_body)
+                    tile_to_corp[bld_it->second.tile] = corp_id;
+            }
         }
     }
 
@@ -1046,22 +1119,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         const auto it = w.tile_to_nation.find(tile_id);
         return it != w.tile_to_nation.end() ? it->second : null_entity;
     };
-
-    // Corporation owner of a tile, keyed by tile id. Built only when corporations
-    // exist; drives both the building-marker colour and the Corporation lens tint.
-    std::unordered_map<entity_id, entity_id> tile_to_corp;
-    if (!w.corporations.empty())
-    {
-        for (const auto& [corp_id, corp] : w.corporations)
-        {
-            for (entity_id bld_id : corp.assets)
-            {
-                const auto bld_it = w.buildings.find(bld_id);
-                if (bld_it != w.buildings.end())
-                    tile_to_corp[bld_it->second.tile] = corp_id;
-            }
-        }
-    }
 
     // Identity colour for a corporation: delegates to the shared palette source of
     // truth (BL-090) so the marker pass, the Corporation lens, the identity card,
@@ -1266,23 +1323,31 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     float industry_max = 0.0f;
     if (state.overlay == overlay_mode::industry)
     {
+        // BL-362: walk the active body's raster (BL-268) rather than filtering
+        // every body's tiles twice — same tile set, same field, no global scan.
         float max_dep = 0.0f;
-        for (const auto& [tid, tile] : w.tiles)
+        for (const entity_id tid : raster)
         {
-            if (tile.body != state.active_body)
+            if (tid == null_entity)
+                continue;
+            const auto tit = w.tiles.find(tid);
+            if (tit == w.tiles.end())
                 continue;
             float ds = 0.0f;
-            for (const float d : tile.resource_deposit) ds += d;
+            for (const float d : tit->second.resource_deposit) ds += d;
             max_dep = std::max(max_dep, ds);
         }
-        for (const auto& [tid, tile] : w.tiles)
+        for (const entity_id tid : raster)
         {
-            if (tile.body != state.active_body || tile.substrate_density <= 0.0f)
+            if (tid == null_entity)
+                continue;
+            const auto tit = w.tiles.find(tid);
+            if (tit == w.tiles.end() || tit->second.substrate_density <= 0.0f)
                 continue;
             float ds = 0.0f;
-            for (const float d : tile.resource_deposit) ds += d;
+            for (const float d : tit->second.resource_deposit) ds += d;
             const float dep_norm = (max_dep > 0.0f) ? ds / max_dep : 0.0f;
-            const float thr = tile.substrate_density * (0.35f + 0.65f * dep_norm);
+            const float thr = tit->second.substrate_density * (0.35f + 0.65f * dep_norm);
             industry_field[tid] = thr;
             industry_max = std::max(industry_max, thr);
         }
@@ -2530,31 +2595,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // stable hover ticks and show the lens-contextual "why not what" card after
     // kHoverDelay frames of rest on the same entity.
     {
-        // Resolve the highest-priority entity under the cursor.
-        entity_id hover_eid    = null_entity;
-        float     best_bld_d2  = std::numeric_limits<float>::max();
-        float     best_mkt_d2  = std::numeric_limits<float>::max();
-        entity_id bld_hover    = null_entity;
-        entity_id mkt_hover    = null_entity;
-
-        for (const marker_hit_zone& hz : state.marker_hit_zones)
-        {
-            const float dx = mouse.x - hz.centre.x;
-            const float dy = mouse.y - hz.centre.y;
-            const float d2 = dx * dx + dy * dy;
-            if (d2 > hz.radius * hz.radius)
-                continue;
-            if (hz.kind == marker_hit_zone::kind::building && d2 < best_bld_d2)
-            {
-                best_bld_d2 = d2;
-                bld_hover   = hz.id;
-            }
-            else if (hz.kind == marker_hit_zone::kind::market_centre && d2 < best_mkt_d2)
-            {
-                best_mkt_d2 = d2;
-                mkt_hover   = hz.id;
-            }
-        }
+        // Resolve the highest-priority entity under the cursor (shared with the
+        // click path below — resolve_marker_hit, BL-362).
+        const entity_id marker_hover =
+            resolve_marker_hit(state.marker_hit_zones, mouse.x, mouse.y);
 
         // A built tile resolves to its BUILDING across the whole hex, not just inside
         // the glyph's radius: once a tile carries an installation, the installation is
@@ -2564,10 +2608,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (const auto tb = tile_to_bld.find(hovered_tile); tb != tile_to_bld.end())
                 tile_bld = tb->second;
 
-        if (bld_hover != null_entity)
-            hover_eid = bld_hover;
-        else if (mkt_hover != null_entity)
-            hover_eid = mkt_hover;
+        entity_id hover_eid = null_entity;
+        if (marker_hover != null_entity)
+            hover_eid = marker_hover;
         else if (tile_bld != null_entity)
             hover_eid = tile_bld;
         else
@@ -2674,36 +2717,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     {
         if (!state.construction.active)
         {
-            // Resolve marker hit zones in priority order (BL-031).
-            entity_id marker_hit = null_entity;
-            float best_bld_d2  = std::numeric_limits<float>::max();
-            float best_mkt_d2  = std::numeric_limits<float>::max();
-            entity_id bld_hit  = null_entity;
-            entity_id mkt_hit  = null_entity;
-
-            for (const marker_hit_zone& hz : state.marker_hit_zones)
-            {
-                const float dx = mouse.x - hz.centre.x;
-                const float dy = mouse.y - hz.centre.y;
-                const float d2 = dx * dx + dy * dy;
-                if (d2 > hz.radius * hz.radius)
-                    continue;
-                if (hz.kind == marker_hit_zone::kind::building && d2 < best_bld_d2)
-                {
-                    best_bld_d2 = d2;
-                    bld_hit     = hz.id;
-                }
-                else if (hz.kind == marker_hit_zone::kind::market_centre && d2 < best_mkt_d2)
-                {
-                    best_mkt_d2 = d2;
-                    mkt_hit     = hz.id;
-                }
-            }
-            // Building outranks market-centre; both outrank tile.
-            if (bld_hit != null_entity)
-                marker_hit = bld_hit;
-            else if (mkt_hit != null_entity)
-                marker_hit = mkt_hit;
+            // Resolve marker hit zones in priority order (BL-031): building
+            // outranks market-centre; both outrank tile. Shared with hover.
+            const entity_id marker_hit =
+                resolve_marker_hit(state.marker_hit_zones, mouse.x, mouse.y);
 
             // Falling through to the tile means the click missed every marker glyph.
             // On a BUILT tile that still selects the building: the whole hex belongs to
