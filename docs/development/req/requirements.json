@@ -9260,7 +9260,7 @@
    "difficulty": 3,
    "importance": "B",
    "evaluated_difficulty": null,
-   "status": "active",
+   "status": "complete",
    "requirements": [
     {
      "id": "R1",
@@ -9301,9 +9301,11 @@
      ],
      "status": "pending",
      "result_metric": "sticky_card.lua + continents_terrain.lua updated and run; dismiss_selection Lua hook replaced by clear_selection",
-     "notes": "Goldens NOT re-blessed: on this Linux box every golden diffs ~20-35% even on untouched captures (environment mismatch). Re-bless list in NR-104."
+     "notes": "Goldens NOT re-blessed: on this Linux box every golden diffs ~20-35% even on untouched captures (environment mismatch). Re-bless list in NR-104. Still owed at group close (NR-104): golden re-bless on Windows."
     }
-   ]
+   ],
+   "resolved": "2026-08-10",
+   "resolution": "Group closed 2026-08-10 by the hygiene-batch lint pass: the item completed 2026-08-09 but the group was left active. R4 (golden re-bless) stays pending per NR-104 - noted, not met."
   },
   {
    "brief": "generated-body-names",
@@ -9540,6 +9542,298 @@
      "status": "complete",
      "result_metric": "tech_tree_panel.cpp tooltip branches on tech_node::earnable then world::has_tech, itemising unmet conditions via the shared condition_text; question_log entry updated",
      "notes": "Visual capture owed on Windows with the rest of the stale goldens."
+    }
+   ]
+  },
+  {
+   "brief": "sell-order-pool-overcommit",
+   "title": "Duplicate sell orders over-commit the stockpile pool",
+   "difficulty": 2,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "requirements": [
+    {
+     "id": "R1",
+     "requirement": "BL-351 (item-spanning): total quantity listed across a seller's sell orders for one (body, resource) never exceeds the pool at clearing time; pools never go negative; income equals quantity actually cleared.",
+     "verification": [
+      "headless: econ_harness (extended)",
+      "build"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "BL-351: a seller with multiple orders has matched quantity allocated per order, not the aggregate subtracted from each.",
+     "verification": [
+      "headless: econ_harness (extended)"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "hire-gate-live-store",
+   "title": "Hire-unit gate and debit read the live corp_body_pools store",
+   "difficulty": 2,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "requirements": [
+    {
+     "id": "R1",
+     "requirement": "BL-352 (item-spanning): a corp with the required goods in corp_body_pools can hire the gated row and the pools are drained by the hire cost; a corp without them is refused; ungated rows hire without a resource debit.",
+     "verification": [
+      "headless: ai_skill_harness or BL-324 harness (extended)",
+      "build"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "BL-352: the debit is deterministic for multi-body corps (sorted body order) and never gates on cash.",
+     "verification": [
+      "headless",
+      "code"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "persona-eval-guard",
+   "title": "Per-tick persona counsel errors disable counsel instead of aborting",
+   "difficulty": 1,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "requirements": [
+    {
+     "id": "R1",
+     "requirement": "BL-353 (item-spanning): a persona pack that throws during evaluate/phrase_for disables counsel for the session and the tick completes; the session survives.",
+     "verification": [
+      "build",
+      "code: try/catch routing to the load-failure disable path",
+      "review"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "econ-tick-orbital-purity",
+   "title": "Econ-tick consumers read tick-pure orbital angles",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "requirements": [
+    {
+     "id": "R1",
+     "requirement": "BL-354 (item-spanning): two runs of the same seed with different frame pacing (orbital render angles perturbed between econ ticks) produce identical convoy dispatches, costs and arrival ticks.",
+     "verification": [
+      "headless: supply_advance (extended)",
+      "build"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "BL-354: the tick-pure angle is a pure function of the tick counter and the render path is unchanged.",
+     "verification": [
+      "code",
+      "review"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "enum-switch-warning-sweep",
+   "title": "Enum-growth switch gaps and confirmed warning fixes",
+   "difficulty": 2,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "requirements": [
+    {
+     "id": "R1",
+     "requirement": "BL-355 (item-spanning): zero -Wswitch warnings in owned code; the hired agency event carries a real severity and statement; tech_locked construction maps to an honest rejection reason (ACTIONS.json updated if the seam surface changed).",
+     "verification": [
+      "build",
+      "code"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "BL-355: population_mvp gains the missing low-body assertion and passes; corp_terrain_matrix names all current buildings/resources.",
+     "verification": [
+      "headless: population_mvp",
+      "headless: corp_terrain_matrix"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "body-market-index",
+   "title": "Cached body-to-markets index behind market_for_tile",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "requirements": [
+    {
+     "id": "R1",
+     "requirement": "BL-356 (item-spanning): market_for_tile no longer constructs a container per call, and sim outcomes are bit-identical before vs after (state hash / econ outcomes unchanged).",
+     "verification": [
+      "headless: determinism_harness",
+      "headless: econ_harness",
+      "build"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "BL-356: the index invalidates correctly when a market is created (a fresh market is immediately resolvable).",
+     "verification": [
+      "headless",
+      "code"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "pop-growth-market-aggregate",
+   "title": "Population growth aggregates the whole body basket",
+   "difficulty": 2,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "requirements": [
+    {
+     "id": "R1",
+     "requirement": "BL-357 (item-spanning): on a two-market body where one market alone starves a centre but the pair satisfies it, the centre grows; iteration is id-sorted.",
+     "verification": [
+      "headless: population_demand_harness (extended)",
+      "build"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "BL-357: harness/golden expectations that shift are updated in the same change with the reason recorded.",
+     "verification": [
+      "headless",
+      "review"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "determinism-iteration-sweep",
+   "title": "Sorted iteration at the named sites; state hash covers depletion and units",
+   "difficulty": 2,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "requirements": [
+    {
+     "id": "R1",
+     "requirement": "BL-358 (item-spanning): dispatch_convoys, the order-book pass and the named economy_system accumulations iterate id-sorted; determinism harnesses green.",
+     "verification": [
+      "headless: determinism_harness",
+      "headless: world_determinism",
+      "code"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "BL-358: state_hash changes when tile resource_remaining or the unit roster changes.",
+     "verification": [
+      "headless",
+      "code"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "construction-panel-deferred-demolish",
+   "title": "Construction panel routes demolish through the pending seam",
+   "difficulty": 1,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "requirements": [
+    {
+     "id": "R1",
+     "requirement": "BL-359 (item-spanning): no demolish_building call from inside the construction panel draw; Dismantle routes through pending_demolish and still works.",
+     "verification": [
+      "build",
+      "code",
+      "manual"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "hot-path-spatial-scans",
+   "title": "is_coastal via the raster index; building-profit lookup indexed",
+   "difficulty": 2,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "requirements": [
+    {
+     "id": "R1",
+     "requirement": "BL-360 (item-spanning): is_coastal resolves neighbours through body_tile_index and estimate_building_profit no longer scans report.buildings per call; outcomes identical (world_audit, corp_ai_harness, determinism green).",
+     "verification": [
+      "headless: world_audit",
+      "headless: corp_ai_harness",
+      "headless: determinism_harness",
+      "build"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
     }
    ]
   }

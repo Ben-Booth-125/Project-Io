@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*120 entries — 22 open, 98 resolved.*
+*125 entries — 27 open, 98 resolved.*
 
 ---
 
@@ -204,6 +204,31 @@ Confirmed pre-existing rather than assumed: git-stashed every Sprint 9 source ch
 The two timing-threshold failures (econ_stability, home_surface_bench) were not independently re-verified against baseline the same way — they are absolute-millisecond ceilings on a shared/loaded machine, the same class of flake the project has already documented once (BL-258: 'a build-configuration artefact rather than a regression... the Windows tree is deliberately Debug'). Judged low-risk to leave unverified given zero file overlap with this sprint, but that is an inference, not a second confirmed isolation.
 
 **Why it matters.** CLAUDE.md/DEVELOPMENT_PRACTICES treat a green CTest gate as the normal bar before a Full-mode commit. This session's gate is red for reasons unrelated to its own work, confirmed for the largest failure by baseline re-run (Sprint 6's own standing lesson: 'a green gate can lie... build the same commit in a throwaway worktree' — the inverse check, a RED gate on baseline, is the same discipline). Sprint 9's commit proceeds on that evidence rather than blocking on an unrelated pre-existing gap, but the gap itself is real and un-owned as of this entry.
+
+### NR-123 — Hygiene batch filed (BL-351..BL-363): version-goal mapping was a judgement call
+*decision taken on your behalf · raised 2026-08-10 · from 2026-08-10 code-hygiene audit (4 review agents over src/, tools/, warnings build)*
+
+The audit's findings were filed as 13 items. None of the uncut minors owns "engine health" (v0.1.8 did, and is cut), so version goals were assigned thematically: market/econ/determinism fixes -> v0.1.13 (markets & materials), the convoy orbital-purity fix -> v0.1.12 (logistics modes), UI-side items (BL-359 deferred demolish, BL-361 app.cpp split, BL-362 frame caches) -> v0.1.7 (UI alignment). Re-rate freely at re-sequencing.
+
+### NR-124 — Orbital purity approach: sim reads a tick-derived angle, rendering keeps wall-clock
+*decision taken on your behalf · raised 2026-08-10 · from BL-354 (econ-tick orbital purity)*
+
+The fix separates the two consumers rather than slowing rendering to tick grain: econ-tick code (convoy dispatch pricing/source choice) reads an angle computed purely from the tick counter; the canvas keeps its smooth wall-clock angle. The world.hpp:439 "positions are not a pure function of tick" note becomes true of rendering only. Alternative rejected: advancing orbital state only on tick would make planet motion visibly steppy.
+
+### NR-125 — The buy-order half of the order book is dead code (~100 lines): remove or hold?
+*question · raised 2026-08-10 · from Hygiene audit; components.hpp:404, market_clearing.cpp:359-371/:408-489*
+
+No producer anywhere constructs a buy_order (the live call passes only sell orders, app.cpp:642); the two-pass preferred-seller matching for buys has never run. Options: (a) delete it -- the exchange-policy arc (BL-160/BL-161) can re-add it designed against real requirements; (b) keep it as the landed BL-037 shape awaiting a producer. Not acted on in the hygiene batch.
+
+### NR-126 — Do military_base / launchpad / inland_logistics_hub want terrain placement preferences at generation?
+*question · raised 2026-08-10 · from Hygiene audit / -Wswitch; corporation_generation.cpp:280 (tile_score_for)*
+
+The three newest building types fall through tile_score_for to a neutral 1.0, scoring like port/none. BL-355 makes the cases explicit (still 1.0) so the compiler tracks the enum, but whether they SHOULD carry a preference (base near borders? launchpad on flat dry terrain?) is a design call not taken.
+
+### NR-127 — Hire gate retargeted to corp_body_pools (decision taken in BL-352)
+*decision taken on your behalf · raised 2026-08-10 · from BL-352 (hire-gate live store)*
+
+BL-324's design says hires are gated on the corp's own stockpile/market access and are a real spend. The code read the per-building stockpile_component store, which nothing credits (world.hpp:190 calls it unused in L3) -- so the gate was inert and ungated rows were free. The fix reads/debits w.corp_body_pools, the store the live economy actually writes. This makes gated rows genuinely purchasable for the first time -- rival hiring behaviour will change (they can now afford gated units when their pools allow).
 
 ---
 
