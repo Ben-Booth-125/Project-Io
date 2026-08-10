@@ -109,13 +109,13 @@ struct campaign_roster_gate_input
     int ore_q = 0, farm_q = 0, port_q = 0, energy_q = 0;
 };
 
-/// Sum @p corp's stockpile of @p res across every building it owns. Buildings
-/// carry the stockpile, not the corp; exported so both the gate above and the
-/// hire verb's cost debit (corp_command.cpp) share one aggregation.
+/// Sum @p corp's holding of @p res across its (corp, body) pools — the live
+/// L3 store (world.hpp § corp_body_pools). Exported so both the gate above and
+/// the hire verb's cost debit (corp_command.cpp) share one aggregation.
 float corp_stockpile_total(const world& w, entity_id corp, resource_type res);
 
-/// Derive @p corp's campaign gate input: stockpiles summed across its owned
-/// buildings, plus whether it holds a port anywhere.
+/// Derive @p corp's campaign gate input: pools summed across its bodies,
+/// plus whether it holds a port anywhere.
 campaign_roster_gate_input campaign_gate_input(const world& w, entity_id corp);
 
 /// available_rows' campaign-side sibling — gates on @p corp's stockpile/market

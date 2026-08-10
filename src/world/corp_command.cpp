@@ -26,7 +26,8 @@ bool owns(const world& w, entity_id corp, entity_id building)
 // hire_unit's cost debit (BL-324)
 //
 // The campaign roster gate (unit_roster.hpp) asks a yes/no question: does the
-// corp hold ANY of the resource an axis needs, summed across its buildings.
+// corp hold ANY of the resource an axis needs, summed across its (corp, body)
+// pools — the live L3 store (world.hpp § corp_body_pools).
 // The debit below spends a flat, first-cut draw (hire_axis_cost) from that
 // same resource preference order — not final balance, just enough that
 // hiring is a real spend rather than a free unlock. Two-phase (check every
@@ -48,27 +49,25 @@ resource_type hire_axis_resource(const world& w, entity_id corp,
     return candidates.begin()[0]; // unreachable if the gate already passed; a safe fallback.
 }
 
-/// Debit @p amount of @p res from @p corp's stockpile, draining across its
-/// owned buildings in asset order. Only called after affordability is
-/// confirmed, so this should never under-run — but walks defensively rather
-/// than assuming a single building holds the whole amount.
+/// Debit @p amount of @p res from @p corp's (corp, body) pools, draining in
+/// ascending body-id order (the map's own key order, so deterministic). Only
+/// called after affordability is confirmed, so this should never under-run —
+/// but walks defensively rather than assuming a single pool holds the whole
+/// amount.
 void debit_from_corp(world& w, entity_id corp, resource_type res, float amount)
 {
-    const auto cit = w.corporations.find(corp);
-    if (cit == w.corporations.end()) return;
-    for (const entity_id asset : cit->second.assets)
+    for (auto it = w.corp_body_pools.lower_bound({corp, entity_id{0}});
+         it != w.corp_body_pools.end() && it->first.first == corp; ++it)
     {
         if (amount <= 0.0f) return;
-        const auto sit = w.stockpiles.find(asset);
-        if (sit == w.stockpiles.end()) continue;
-        float& q = sit->second.quantities[static_cast<std::size_t>(res)];
+        float& q = it->second.quantities[static_cast<std::size_t>(res)];
         const float take = std::min(q, amount);
         q      -= take;
         amount -= take;
     }
 }
 
-/// Debit the roster row's gated axes from the corp's stockpile. All-or-nothing:
+/// Debit the roster row's gated axes from the corp's pools. All-or-nothing:
 /// checks every gated axis is affordable before debiting any of them.
 bool debit_hire_cost(world& w, entity_id corp, const roster_row& row)
 {
