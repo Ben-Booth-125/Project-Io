@@ -65,6 +65,34 @@ preferences.
   History ledger's Chain view (BL-211) — the plots a player decided a world on
   are the plots they can reopen mid-campaign.
 
+### The globe (BL-256) — and why it does not take input
+
+The pane's right two-thirds is the world itself: round 0 draws the **system**
+(star colour and size, orbits, body sizes) so the screen is never empty while
+there is no body yet; rounds 1–2 draw the **homeworld**, from the real tile
+raster once one has been built. It is the primary view and the charts are the
+extras on top, which is the reorder BL-319 landed.
+
+**It spins on a clock, and it takes no mouse input. That is the design, not a
+gap** (Ben, 2026-08-10): the globe turns one revolution a minute on wall time,
+frozen to 0 under `--verify` so a golden capture never races the animation.
+
+BL-256 originally specified **pan**, clamped in latitude so the camera could not
+pass either pole. That requirement is **cut**, on Ben's call, for a reason worth
+keeping: *an uncontrollable globe tells the player that generation is slightly
+beyond their reach.* It says the same thing the preferences model already says —
+**you set conditions here, you do not steer** — so a draggable camera would have
+quietly contradicted the screen's own premise in order to add a control nobody
+needed. The wizard resolves leans against a seed; the globe should feel like
+something you are watching resolve, not something you are operating.
+
+**Render technique note.** The globe is drawn as **48 meridian slices**, each
+subdivided in latitude, every cell a quad — not the per-pixel inverse projection
+into a texture that BL-256's design proposed. Both avoid the failure mode that
+design was written to dodge (projecting ~7,500 hexes as polygons against ImGui's
+16-bit draw indices); the slice path simply got there with less machinery. Noted
+because the item and the code otherwise read as disagreeing.
+
 ## Handoff — `start_new_game`
 
 The wizard's "Begin", and the one and only generation call:

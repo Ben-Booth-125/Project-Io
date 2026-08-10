@@ -554,8 +554,14 @@ added by Ben 2026-08-04).
   - **Where a corporation is says something** about where it came from.
   - **A claim the architecture was bought on is measured**, not assumed (**BL-284**).
   - **The tick budget holds**, and the estimators agree with what the tick actually credits.
-  - Excluded by scope, filed rather than dropped: the generation globe (**BL-256**) and deed
-    history lines (**BL-309**, designed but unbuilt) — both v0.1.11.
+  - Excluded by scope, filed rather than dropped: deed history lines (**BL-309**, designed but
+    unbuilt) — v0.1.11.
+
+  **BL-256 (generation globe) closed inside this cut, 2026-08-10**, after Ben asked it be verified
+  rather than assumed. Two of its three requirements were already built; the third — a pannable
+  camera — is **cut on a design argument**: the globe spins and takes no input, because an
+  uncontrollable globe says what the preferences-not-parameters model already says, that the player
+  sets conditions rather than steering. Reasoning propagated to `docs/ui/STARTUP.md`.
 
   **Cut 2026-08-10.** Gate: **55 tests, 0 failures** — the first fully green gate of the arc,
   reached only after a clean rebuild exposed a stale object that had been failing a harness from

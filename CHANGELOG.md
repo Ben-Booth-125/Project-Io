@@ -57,9 +57,17 @@ around it, which is the through-line of the minor.
   side. Measured cost: 18 → 36 entries across a 1500-tick run, bounded by body-pair count rather
   than by traffic.
 
+### Also in this cut
+- **The generation globe** (BL-256) turns out to have been finished — verified against the code
+  rather than taken on trust. The wizard's right two-thirds is the world itself: the system in
+  round 0, the real homeworld raster after. Its third requirement, a pannable camera, is
+  **deliberately cut**: the globe spins on a clock and takes no input, because an uncontrollable
+  globe tells the player that generation is slightly beyond their reach — the same thing the
+  preferences-not-parameters model says. A draggable camera would have contradicted the screen's
+  own premise to add a control nobody needed.
+
 ### Known gaps
-- The **generation globe** (BL-256) is not in this cut — it is the one item that wants a human
-  watching while it is built. Moved to v0.1.11 with deed history lines (BL-309, designed, unbuilt).
+- Deed history lines (BL-309) are designed but unbuilt — moved to v0.1.11.
 - **Visual goldens are stale wherever a body name renders.** Confirmed by eye as a pure text delta.
   Visual goldens are Windows-authoritative, so the re-bless belongs on that machine.
 - `region_word` still supplies English province words (Reach, Coast), so province names now read
