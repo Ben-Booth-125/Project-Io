@@ -10,6 +10,7 @@
 #include "market_ledger.hpp" // market_city_name (Market lens catchment key, BL-015)
 #include "nav_pane.hpp"
 #include "presentation.hpp"
+#include "world/hex_neighbors.hpp"   // canonical odd-r neighbour offsets (BL-363)
 #include "world/logistics.hpp"       // intra_body_path (convoy vision beam, BL-152)
 #include "world/market_clearing.hpp" // market_for_tile (Scarcity catchment, prices)
 #include "world/placement_rules.hpp"
@@ -825,12 +826,6 @@ void update_body_vision(world& w, ui_state& state, double now_days)
     const std::vector<entity_id>& grid = body_tile_grid(w, body);
     if (static_cast<int>(grid.size()) < gw * gh) return;
 
-    // Odd-r offset neighbours (col, row deltas), matching the surface draw's grid.
-    static const int even_off[6][2] =
-        {{+1, 0}, {0, -1}, {-1, -1}, {-1, 0}, {-1, +1}, {0, +1}};
-    static const int odd_off[6][2] =
-        {{+1, 0}, {+1, -1}, {0, -1}, {-1, 0}, {0, +1}, {+1, +1}};
-
     // Flood `radius` hops out from `seeds` into `out` (odd-r neighbours, column wrap).
     auto flood = [&](const std::vector<entity_id>& seeds, int radius,
                      std::unordered_set<entity_id>& out) {
@@ -845,7 +840,7 @@ void update_body_vision(world& w, ui_state& state, double now_days)
                 const auto tit = w.tiles.find(tid);
                 if (tit == w.tiles.end()) continue;
                 const tile_component& t = tit->second;
-                const int (*off)[2] = (t.grid_y & 1) ? odd_off : even_off;
+                const int (*off)[2] = hex_neighbors::offsets(t.grid_y);
                 for (int k = 0; k < 6; ++k)
                 {
                     const int nrow = t.grid_y + off[k][1];
@@ -1414,10 +1409,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         const float frac = static_cast<float>(
             std::fmod(std::max(0.0, state.sim_now_days), 90.0) / 90.0);
         constexpr int beam_radius = 2; // Ben's spec: a radius-2 beam of vision.
-        static const int even_off[6][2] =
-            {{+1, 0}, {0, -1}, {-1, -1}, {-1, 0}, {-1, +1}, {0, +1}};
-        static const int odd_off[6][2] =
-            {{+1, 0}, {+1, -1}, {0, -1}, {-1, 0}, {0, +1}, {+1, +1}};
 
         // Flood radius-2 around a path tile, marking each at `inten` (keeping the max).
         auto light = [&](entity_id centre_tile, float inten) {
@@ -1434,7 +1425,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     const auto tit = w.tiles.find(tid);
                     if (tit == w.tiles.end()) continue;
                     const tile_component& t = tit->second;
-                    const int (*off)[2] = (t.grid_y & 1) ? odd_off : even_off;
+                    const int (*off)[2] = hex_neighbors::offsets(t.grid_y);
                     for (int k = 0; k < 6; ++k)
                     {
                         const int nrow = t.grid_y + off[k][1];
@@ -1914,11 +1905,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // is always the true flow direction with no separate lookup needed.
             if (tile.river_edges != 0)
             {
-                static const int r_even_off[6][2] =
-                    {{+1, 0}, {0, -1}, {-1, -1}, {-1, 0}, {-1, +1}, {0, +1}};
-                static const int r_odd_off[6][2] =
-                    {{+1, 0}, {+1, -1}, {0, -1}, {-1, 0}, {0, +1}, {+1, +1}};
-                const int (*r_off)[2] = (tile.grid_y & 1) ? r_odd_off : r_even_off;
+                const int (*r_off)[2] = hex_neighbors::offsets(tile.grid_y);
 
                 const ImU32 river_col    = IM_COL32(90, 160, 235, 235);
                 const ImU32 chevron_col  = IM_COL32(220, 235, 255, 245);
@@ -1989,12 +1976,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             {
                 const entity_id own_nation = nation_of(id);
 
-                // Standard odd-r neighbour offsets (col, row deltas).
-                static const int even_off[6][2] =
-                    {{+1, 0}, {0, -1}, {-1, -1}, {-1, 0}, {-1, +1}, {0, +1}};
-                static const int odd_off[6][2] =
-                    {{+1, 0}, {+1, -1}, {0, -1}, {-1, 0}, {0, +1}, {+1, +1}};
-                const int (*off)[2] = (tile.grid_y & 1) ? odd_off : even_off;
+                // Standard odd-r neighbour offsets (col, row deltas; canonical table, BL-363).
+                const int (*off)[2] = hex_neighbors::offsets(tile.grid_y);
 
                 for (int n = 0; n < 6; ++n)
                 {
@@ -2339,7 +2322,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // nation's tint applies (tier is carried by size, keeping colour out of ownership).
     if (!w.population_centres.empty())
     {
-        struct pop_centre { int col; int row; int scale; entity_id tile; };
+        struct pop_centre { int col; int row; int scale; entity_id tile; entity_id centre; };
         std::vector<pop_centre> pcs;
         pcs.reserve(w.population_centres.size());
         for (const auto& [pid, pc] : w.population_centres)
@@ -2350,7 +2333,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             const auto til = w.tiles.find(tit->second);
             if (til == w.tiles.end() || til->second.body != state.active_body)
                 continue;
-            pcs.push_back({ til->second.grid_x, til->second.grid_y, pc.scale, tit->second });
+            pcs.push_back({ til->second.grid_x, til->second.grid_y, pc.scale, tit->second, pid });
         }
 
         // Cluster contiguous centres (transitive, Chebyshev grid distance <= 3,
@@ -2398,16 +2381,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             }
         }
 
-        // A small settlement-name bank; a City+ conurbation is named deterministically
-        // from its anchor tile id so the label is stable per campaign. (Deriving names
-        // from the host nation is a noted refinement; a stable bank suffices here.)
-        static const char* const settlement_names[] = {
-            "Meridian", "Ashford", "Kepler", "Halcyon", "Cordera", "Blackmere",
-            "Veranov", "Selwyn", "Marchand", "Tarsis", "Oberon", "Calderis",
-            "Ravensford", "Solene", "Highmark", "Dunmoor",
-        };
-        constexpr int settlement_name_count =
-            static_cast<int>(sizeof(settlement_names) / sizeof(settlement_names[0]));
+        // A City+ conurbation is labelled with its anchor centre's PERSISTED name —
+        // generated by the seeded tongue system (generate_city_name, BL-290) and
+        // re-named to the settling culture's speech in name_population_centres, so
+        // the label is deterministic per campaign and speaks the world's own
+        // language. (The old static Earth-flavoured bank was removed, BL-363.)
 
         for (const conurbation& c : cons)
         {
@@ -2427,6 +2405,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             const ImVec2 lc = hex_local_centre(a.col, a.row, hex_size);
             const ImVec2 sc = to_screen(lc);
 
+            const auto name_it = w.population_centre_name.find(a.centre);
+            const char* name = (name_it != w.population_centre_name.end()
+                                && !name_it->second.empty())
+                ? name_it->second.c_str() : nullptr;
+
             const int k_min = (period_px > 0.0f)
                 ? static_cast<int>(std::ceil((visible_left  - sc.x) / period_px)) : 0;
             const int k_max = (period_px > 0.0f)
@@ -2437,10 +2420,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 icons::settlement(dl, mc, sr, c.tier, col);
 
                 // Label City+ conurbations (tier >= 4) only, to keep the map legible.
-                if (c.tier >= 4)
+                if (c.tier >= 4 && name)
                 {
-                    const char* name = settlement_names[
-                        (static_cast<uint32_t>(a.tile) * 2654435761u) % settlement_name_count];
                     const ImVec2 tp{ mc.x + sr + 3.0f, mc.y - sr };
                     dl->AddText({ tp.x + 1.0f, tp.y + 1.0f }, IM_COL32(20, 22, 28, 200), name); // shadow // fit-exempt: legend box sized to its measured entries (container 2)
                     dl->AddText(tp, IM_COL32(236, 230, 214, 255), name); // fit-exempt: legend box sized to its measured entries (container 2)

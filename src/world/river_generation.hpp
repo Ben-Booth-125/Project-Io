@@ -22,10 +22,9 @@
 // ---------------------------------------------------------------------------
 
 /// Hex side ordering used by river tracing and the intra-body A* discount:
-/// 0=E, 1=NE, 2=NW, 3=W, 4=SW, 5=SE (odd-r offset). Mirrors the neighbour-walk
-/// shape used by placement_rules.cpp's is_coastal, independently tabulated here
-/// (river_generation.cpp) so this pass stays self-contained rather than reaching
-/// into placement_rules.
+/// 0=E, 1=NE, 2=NW, 3=W, 4=SW, 5=SE (odd-r offset). The table itself is the
+/// canonical shared one in hex_neighbors.hpp (BL-363); this pass and
+/// placement_rules.cpp's is_coastal both consume it.
 ///
 /// @param dc, dr    Column/row offset from a tile to its candidate neighbour.
 /// @param odd_row   Whether the source tile's grid_y is odd (odd-r offset rule).

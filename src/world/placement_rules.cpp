@@ -1,5 +1,6 @@
 #include "world/placement_rules.hpp"
 
+#include "world/hex_neighbors.hpp"
 #include "world/logistics.hpp"
 #include "world/tech_gate.hpp" // BL-344: structure_unlocked
 #include "world/world.hpp"
@@ -162,10 +163,8 @@ bool is_coastal(const world& w, entity_id tile_id)
         && rit->second.size() == static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh))
         raster = &rit->second;
 
-    // Odd-r offset neighbours (pointy-top hexes).
-    static const int even_off[6][2] = {{+1,0},{0,-1},{-1,-1},{-1,0},{-1,+1},{0,+1}};
-    static const int odd_off[6][2]  = {{+1,0},{+1,-1},{0,-1},{-1,0},{0,+1},{+1,+1}};
-    const int (*off)[2] = (tc.grid_y & 1) ? odd_off : even_off;
+    // Odd-r offset neighbours (pointy-top hexes; canonical table, BL-363).
+    const int (*off)[2] = hex_neighbors::offsets(tc.grid_y);
 
     for (int n = 0; n < 6; ++n)
     {
