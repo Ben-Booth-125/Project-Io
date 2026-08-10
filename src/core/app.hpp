@@ -271,3 +271,10 @@ private:
     double m_last_orbit_days = 0.0; ///< elapsed_days at the previous orbit advance; gives the per-frame delta.
     int    m_last_survey_day = 0;   ///< Whole in-game day at the previous survey advance; drives the per-day survey crossing (BL-067).
 };
+
+namespace ui { class frame_stats; }
+
+/// Frame-budget instrument (BL-249), shared by render()'s phase marks (app.cpp)
+/// and the verify API's frame_reset/frame_csv tap (verify_api.cpp). Defined in
+/// app.cpp; declared here so both translation units reach the same instance.
+ui::frame_stats& frame_stats_instance();
