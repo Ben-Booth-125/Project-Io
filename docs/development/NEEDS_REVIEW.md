@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*159 entries — 58 open, 101 resolved.*
+*167 entries — 66 open, 101 resolved.*
 
 ---
 
@@ -440,6 +440,68 @@ BL-107 (save-format magic + version header) is marked designed-but-BLOCKED on th
 *observation · raised 2026-08-10 · from Sprint re-sequence, 2026-08-10.*
 
 First deferral: the 2026-08-10 five-sprint plan held v0.2.0 so the opponent would be built against a settled player identity. Second: the living world was inserted ahead of it the same day, pushing it from Sprint 13 to Sprint 14. Each deferral has an argument — and the second one is genuinely good, since an opponent is more interesting in a market with real competitors than one with eight lean corps. But two deferrals in one day, both pointing away from the thing the roadmap itself calls 'the thing that makes Io a game rather than a simulation', is a pattern rather than a coincidence. Named here so the v0.1.13 retro examines it deliberately instead of a third accumulating silently.
+
+### NR-162 — Hardware requirements and expected lag are unmeasured
+*question · raised 2026-08-11 · from 2026-08-11 notes session with Ben.*
+
+Ben asked what hardware is needed to support the game in its current state, and how much lag to expect on this machine. No perf doc or profiling harness exists yet - this has never been measured, only guessed at.
+
+### NR-163 — Room for ~10-20 private corporations per nation is a generation-density call, not yet designed
+*question · raised 2026-08-11 · from 2026-08-11 notes session with Ben.*
+
+Ben asked whether the game has room for roughly 10-20 private corporations per nation. NATION_GENERATION.md and GENERATION_STRATEGY.md do not fix a count - the premise is player + major AI as lean specialists against a saturated Nation-AI-owned economy - so this is an open density/perf question, not yet designed.
+
+*Files: `docs/generation/NATION_GENERATION.md`, `docs/generation/GENERATION_STRATEGY.md`*
+
+### NR-164 — Re-stress generation and time-lapse feel when playable
+*question · raised 2026-08-11 · from 2026-08-11 notes session with Ben.*
+
+Ben wants to re-stress-test world generation and the staged-generation time-lapse once the game is playable, to judge whether it feels alive rather than just correct.
+
+*Files: `docs/ui/STARTUP.md`*
+
+### NR-165 — Laws/ideology system should feel distinct from the technology system
+*question · raised 2026-08-11 · from 2026-08-11 notes session with Ben.*
+
+Ben wants the laws/policy and ideology layer (BL-155, law/policy surface design) to feel mechanically distinct from technology, not a reskinned tech tree. Candidate lever: law costs compliance/enforcement, tech costs capability - worth pinning down when BL-155 is worked.
+
+*Files: `docs/lore/HISTORY.md`*
+
+### NR-166 — Time-to-space-industry has no real playtest number yet
+*question · raised 2026-08-11 · from 2026-08-11 notes session with Ben.*
+
+Ben asked how long a player should expect before starting on space industry. ERAS.md gates Era 1 on Rocketry research + Launchpad + propellant, but this is designed, not implemented, so there is no real playtest timing to answer with yet.
+
+*Files: `docs/economy/ERAS.md`*
+
+### NR-167 — AI capability / SOTA tracking is a standing practice, not a one-time task
+*question · raised 2026-08-11 · from 2026-08-11 notes session with Ben.*
+
+Ben re-stressed the need to keep researching AI capability and follow the state of the art, relevant to the local-model AI opponent direction (AI_OPPONENT.md § 10). This is an ongoing watch item, not something that resolves once.
+
+*Files: `docs/ai/AI_OPPONENT.md`*
+
+### NR-168 — Base-game international trade should reliably clear and beat Era 1, not stall the player
+*question · raised 2026-08-11 · from 2026-08-11 notes session with Ben.*
+
+Ben wants assurance the base game always has enough international trade that players do not stall, and it is quite likely a player can beat Era 1 on trade alone. No stated design invariant for this yet in MARKETS.md/FINANCE.md - it is currently an implicit hope, not a tuned target.
+
+*Files: `docs/economy/MARKETS.md`, `docs/economy/FINANCE.md`*
+
+### NR-169 — ai_skill_harness golden bands already drifted before BL-368 — BL-366 (multi-building tile / urban transform) shifted them from 5 to 8 failures, unnoticed at landing
+*observation · raised 2026-08-11 · from BL-368 (real population demand) session, regression sweep.*
+
+BL-368 checked its own ai_skill_harness impact by stashing BL-368-only changes and rerunning against the BL-366-landed baseline: 8 golden-band failures (net-worth min/final across several seeds, one survival-fraction), not the 5 recorded as pre-existing at Sprint 11's close (NR-140). BL-366 (multi-building tile stack cap + urban transform, landed earlier the same session) was never rerun against ai_skill_harness as part of its own verification pass — construction_harness/determinism_harness/world_audit/construction_gate_harness/buildings_rework_harness were, ai_skill_harness was not, since it was not on the regression list at the time. With BL-368 also applied the count returns to 5, but a DIFFERENT five (dial-action thrash x2, net-worth seed 3 x2, survival seed 4) than either the original NR-140 five or the BL-366-only eight — the bands are not stable across landings and nobody is tracking which change moved them or by how much.
+
+**Why it matters.** ai_skill_harness is the AI regression instrument (BL-204) — its whole job is catching an AI-behavior regression a green build and passing goldens would otherwise hide (this is the exact failure mode Wave-2's review barrier caught, per the 2026-08-10 DEVLOG entry). A golden band that silently drifts with every landing and is never re-blessed or root-caused stops doing that job; a real regression could be hiding under the same 5-ish failure count and nobody would see it move.
+
+- Re-bless the golden bands now against current main (post-BL-368), accepting today's numbers as the new baseline, per the standing bless-routinely-not-review policy.
+- Root-cause which specific mechanic (BL-366's urban transform vs BL-368's population demand basket) drove each band shift before re-blessing, so a genuine AI-behavior regression is not accidentally absorbed into the new baseline.
+- Leave as-is and file a dedicated backlog item to reconcile ai_skill_harness golden-band stewardship, since Sprint 10's remaining items (BL-365 especially) will keep moving these bands.
+
+> **Recommendation:** Option 3 — the pattern (multiple Sprint 10/11 items each nudging the same bands) means this wants a standing process fix, not a one-off re-bless: BL-365 (background industry) is about to add ~80 firms' worth of new economic activity and will almost certainly move these bands again.
+
+*Files: `tools/verify/ai_skill_harness.cpp`, `docs/ai/AI_OPPONENT.md`*
 
 ---
 

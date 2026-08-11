@@ -147,6 +147,40 @@ recipes = {
         inputs  = { alloys = 2.0, electronics = 1.0 },
         outputs = { spacecraft_components = 1.0 },
     },
+
+    -- BL-368 (2026-08-11) — the habitability tranche (RESOURCES.md § Habitability
+    -- goods). Recipe quantities are first-cut, legible defaults per the item's
+    -- own design note ("an implementation-time tuning value... matching how
+    -- every other recipe in the prototype is handled"), not a design commitment.
+    -- All three run on the generic processing_facility, per the shipped set —
+    -- no new building_type enum values.
+
+    -- id 14 — Water Treatment Plant: water -> clean water.
+    {
+        name    = "clean_water",
+        inputs  = { water = 2.0 },
+        outputs = { clean_water = 1.0 },
+    },
+
+    -- id 15 — Consumer Goods Factory: food rations + steel -> consumer goods.
+    -- "Refined goods (various)" in RESOURCES.md; steel stands in as the one
+    -- already-shipped refined industrial input.
+    {
+        name    = "consumer_goods",
+        inputs  = { food_rations = 1.0, steel = 1.0 },
+        outputs = { consumer_goods = 1.0 },
+    },
+
+    -- id 16 — Pharmaceutical Lab: water + agricultural produce -> medical
+    -- supplies. RESOURCES.md names "chemical + agricultural" inputs; no
+    -- standalone chemical resource_type exists in the prototype set, so water
+    -- stands in as the process input, mirroring hydroponics_bay's own
+    -- water-as-process-input precedent (id 3 above).
+    {
+        name    = "medical_supplies",
+        inputs  = { water = 1.0, agricultural_produce = 1.0 },
+        outputs = { medical_supplies = 1.0 },
+    },
 }
 
 print(string.format("[Lua] recipes.lua loaded  recipe_count=%d", #recipes))

@@ -10,7 +10,78 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — BL-366 lands: Sprint 10's first foundation, the living world resumed (2026-08-11, latest)
+## Session — BL-368 lands: Sprint 10's second foundation, and a stale bug claim corrected (2026-08-11, latest)
+
+Full mode, one item, continuing the same session as BL-366 below.
+
+**BL-368 — real population demand + habitability tranche, landed.** Generalises the BL-190 flat
+`agricultural_produce`-only population demand stub into a real, price-elastic, multi-resource
+basket (`population_demand_params`, `economy.population_demand` in Lua) — the same elastic shape
+as the BL-078 nation-substrate model, but population-only: no supply term, a pure consumer.
+`inject_population_demand` (`market_clearing.cpp`) now takes the `recipe_registry` and sums
+`scale × demand_scale × basket[r] × (base/price)^elasticity` across every resource in the basket,
+for every population centre, into its catchment market.
+
+**A stale premise, corrected in passing.** BL-368's own design cited a "known shipped bug" —
+population demand zero-reset by `clear_markets` before it could be read. Reading the actual code
+before writing any showed the bug had already been fixed by **BL-190** (2026-07-31);
+`inject_population_demand` already runs after the reset. `docs/economy/MARKETS.md`'s
+Known-limitations list repeated the same stale claim as current — corrected here rather than left
+to mislead the next reader (`io-backlog-prose-goes-stale`: check the authority doc before trusting
+a filed premise).
+
+**The habitability tranche.** Three new `resource_type` values (39 → 42): `clean_water`,
+`consumer_goods`, `medical_supplies` — the three RESOURCES.md's habitability table names as goods
+population centres actually consume as tradeable goods. Building Materials and Utilities stay
+deliberately absent (a different consumption path / an abstracted budget cost, per that table's
+own note). Three new recipes on the generic `processing_facility` (`scripts/recipes.lua` ids
+14–16, no new `building_type` values, matching the shipped set): `clean_water` (water → clean
+water), `consumer_goods` (food rations + steel → consumer goods — "refined goods (various)" in the
+design, steel standing in as the one already-shipped refined input), `medical_supplies` (water +
+agricultural produce → medical supplies — no standalone "chemical" resource exists in the
+prototype set, so water stands in, mirroring Hydroponics Bay's own water-as-process-input
+precedent). Base prices in `scripts/world_gen.lua`.
+
+**Deliberately not built**, named per Rule 0c: the undersupply *effects* (habitability, workforce
+efficiency, growth) RESOURCES.md's table names — the demand signal now moves prices, but does not
+yet feed back into the population/workforce model. Construction Yard and Power Plant (Building
+Materials / Utilities) also stay unbuilt, per the scope note above.
+
+**Verification.** `population_demand_harness` gained an R4 (elasticity + multi-resource +
+untradeable-skip, 4/4 PASS); its existing R1–R3 were updated to hand-configure a basket, since the
+default registry basket is now empty (population demand used to be an unconditional flat stub, now
+it is data-driven and a bare `recipe_registry` carries no data). New
+`tools/verify/habitability_tranche_harness.cpp` (9/9 PASS): all three goods produced, none pegged
+at the market band ceiling over 80 ticks, and a population centre's demand for all three reaching
+the market. Full `ProjectIo` build clean. Reran `econ_harness`, `econ_stability`,
+`resource_chain_harness`, `determinism_harness`, `construction_harness`, `world_audit`,
+`construction_gate_harness`, `buildings_rework_harness`, `multi_building_tile_harness` — all clean.
+
+**`ai_skill_harness` golden-band drift, investigated and filed rather than silently absorbed.**
+A stash-and-rerun of BL-368's own files against the BL-366-landed baseline found **8** golden-band
+failures, not the **5** recorded as pre-existing at Sprint 11's close (NR-140) — BL-366 alone had
+already moved the bands, unchecked at that landing since `ai_skill_harness` was not on its
+regression list. With BL-368 applied the count returns to 5, but a *different* five. Filed as
+**NR-169** rather than re-blessed on the spot: the bands are drifting with every Sprint 10/11
+landing and BL-365 (background industry, ~80 new firms) will almost certainly move them again —
+a standing stewardship gap, not a one-off to paper over.
+
+docs/economy/RESOURCES.md, PRODUCTION.md and MARKETS.md updated (habitability tranche tables, the
+clearing-tick step list gains population demand injection, the Known-limitations correction).
+backlog.json BL-368 → `complete`; requirements.json
+§ real-population-demand-habitability-tranche (R1–R5, all complete); REFINED.md drained.
+
+**Note on the working tree.** `docs/development/backlog.json` and `NEEDS_REVIEW.json`/`.md` also
+carry unrelated in-flight content from a separate concurrent session (BL-370/BL-371 filed items,
+NR-168) — not authored here, left intact rather than reverted, flagged for whoever commits next.
+
+**Still open in Sprint 10.** BL-365 (background industry, the difficulty-5 keystone with an open
+corp_ai-scope question — both foundations it needed, BL-366 and BL-368, are now landed),
+BL-367/BL-130/BL-132/BL-369.
+
+---
+
+## Session — BL-366 lands: Sprint 10's first foundation, the living world resumed (2026-08-11)
 
 Full mode, one item. Origin pulled 174 commits behind onto `main` (fast-forward to `c491b14`,
 v0.1.14/Sprint 11 stamp); a status check on Sprint 10 found only its BL-253 prerequisite landed —
@@ -51,10 +122,10 @@ when already above), and extraction's richness-bound stacking left unchanged. Re
 "answered by BL-366". backlog.json BL-366 → `complete`; requirements.json
 § multi-building-tile-urban-transform (R1–R5, all complete); REFINED.md drained.
 
-**Still open in Sprint 10** (not started this session): BL-368 (real population demand — carries a
-known shipped bug, the zero-reset erasing agri demand before clearing), BL-365 (background
-industry, the difficulty-5 keystone with an open corp_ai-scope question), BL-367/BL-130/BL-132/
-BL-369.
+**Still open in Sprint 10** (not started this session): BL-368 (real population demand — see the
+same day's follow-on entry above, which also found the "known shipped bug" cited here was already
+fixed), BL-365 (background industry, the difficulty-5 keystone with an open corp_ai-scope
+question), BL-367/BL-130/BL-132/BL-369.
 
 **Runtime.** ~1.5 h, Full mode (one item: design review, implementation, new harness, doc
 propagation, backlog/requirements bookkeeping).

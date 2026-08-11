@@ -48,6 +48,15 @@ world_gen = {
             alloys                 = 34.0,
             electronics            = 29.0,
             spacecraft_components  = 140.0,
+
+            -- BL-368: the habitability tranche. Priced modestly above their
+            -- primary input (water 1.5 / agricultural_produce 3.0 / food_rations
+            -- 6.0 / steel 8.0) — welfare goods, not high-margin industrial
+            -- products (RESOURCES.md § Habitability goods). First-cut, retune
+            -- by playtest.
+            clean_water            = 3.0,
+            consumer_goods         = 12.0,
+            medical_supplies       = 14.0,
         },
 
         -- Nation tradeable-resource concentration gates (BL-096): a nation

@@ -3,13 +3,14 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 154 entries across 2 volume(s).
+One line per session, newest first — 155 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
+| 2026-08-11 | [BL-368 lands: Sprint 10's second foundation, and a stale bug claim corrected](DEVLOG.md) | BL-078 BL-130 BL-132 BL-190 BL-365 BL-366 BL-367 BL-368 BL-369 BL-370 BL-371 | DEVLOG.md |
 | 2026-08-11 | [BL-366 lands: Sprint 10's first foundation, the living world resumed](DEVLOG.md) | BL-130 BL-132 BL-193 BL-253 BL-365 BL-366 BL-367 BL-368 BL-369 | DEVLOG.md |
 | 2026-08-10 | [The warm start converges, and the substrate is condemned](DEVLOG.md) | BL-107 BL-112 BL-130 BL-132 BL-193 BL-253 BL-293 BL-340 BL-350 BL-365 BL-366 BL-367 BL-368 BL-369 | DEVLOG.md |
 | 2026-08-10 | [Hygiene wave 2: app.cpp halves, and the review barrier earns its place](DEVLOG.md) | BL-257 BL-348 BL-354 BL-361 BL-362 BL-363 | DEVLOG.md |

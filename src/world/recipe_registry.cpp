@@ -135,6 +135,22 @@ void recipe_registry::load_from_lua(lua_state& lua)
         m_substrate = sp;
     }
 
+    // BL-368 population-demand model (economy.population_demand). Scalars fall
+    // back to the struct defaults so a partial table still loads.
+    sol::optional<sol::table> pop_demand = (*econ)["population_demand"];
+    if (pop_demand)
+    {
+        population_demand_params pd;
+        sol::optional<sol::table> pd_basket = (*pop_demand)["demand_basket"];
+        if (pd_basket)
+            read_resource_map(*pd_basket, pd.demand_basket, "economy.population_demand.demand_basket");
+        pd.demand_elasticity = pop_demand->get_or("demand_elasticity", pd.demand_elasticity);
+        pd.elasticity_min    = pop_demand->get_or("elasticity_min",    pd.elasticity_min);
+        pd.elasticity_max    = pop_demand->get_or("elasticity_max",    pd.elasticity_max);
+        pd.demand_scale      = pop_demand->get_or("demand_scale",      pd.demand_scale);
+        m_population_demand = pd;
+    }
+
     // BL-095 construction-gate (economy.construction).
     sol::optional<sol::table> construction = (*econ)["construction"];
     if (construction)

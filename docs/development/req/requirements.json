@@ -10294,6 +10294,51 @@
      "notes": "construction_harness, determinism_harness, world_audit, construction_gate_harness, buildings_rework_harness all rerun clean; full ProjectIo build clean."
     }
    ]
+  },
+  {
+   "brief": "real-population-demand-habitability-tranche",
+   "title": "BL-368 (real population demand): a price-elastic multi-resource demand basket, generalised from the BL-190 stub, plus the three-good habitability tranche",
+   "difficulty": 4,
+   "importance": "A",
+   "status": "complete",
+   "promoted_from": "backlog.json BL-368, v0.1.13 (Sprint 10)",
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "inject_population_demand pulls a price-elastic DEMAND (scale x demand_scale x basket[r] x (base/price)^elasticity) for every resource in the population_demand basket into a centre catchment market, with NO supply term (population is a pure consumer). Untradeable resources (base_price 0) are skipped regardless of basket weight.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "population_demand_harness R4: 4/4 PASS (suppression above base, boost below base, exact formula match, untradeable skip)."
+    },
+    {
+     "id": "R2",
+     "requirement": "The BL-190 ordering fix (injection after clear_markets reset) is preserved by the generalisation.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "population_demand_harness R1/R2/R3: 6/6 PASS, unchanged shape, updated to hand-configure a basket since the default registry basket is now empty (was implicitly flat 1.0 pre-BL-368)."
+    },
+    {
+     "id": "R3",
+     "requirement": "Three new resource_type values (clean_water, consumer_goods, medical_supplies) each have a real recipe on the generic processing_facility and a real base price, and are each produced at least once and never pegged at the market band ceiling over an 80-tick rollout.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "habitability_tranche_harness R1/R2: 6/6 PASS."
+    },
+    {
+     "id": "R4",
+     "requirement": "A population centre demand for the three new habitability goods reaches the market (survives clear_markets), matching the same ordering contract as R2.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "habitability_tranche_harness R3: 3/3 PASS."
+    },
+    {
+     "id": "R5",
+     "requirement": "No regression in the existing economy/construction/determinism/generation harness suite, and the real ProjectIo target still builds clean against the grown resource_type enum and new Lua tables.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "econ_harness, econ_stability, resource_chain_harness, determinism_harness, construction_harness, world_audit, construction_gate_harness, buildings_rework_harness, multi_building_tile_harness all rerun clean; full ProjectIo build clean."
+    }
+   ]
   }
  ]
 }

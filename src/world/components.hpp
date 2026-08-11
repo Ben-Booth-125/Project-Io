@@ -105,7 +105,20 @@ enum class resource_type : uint8_t
     electronics            = 37, ///< Silicon + refined copper + REE alloy. Electronics Lab.
     spacecraft_components  = 38, ///< Alloys + electronics. Assembly Plant. Terminal — the militia's
                                  ///< procurement contract object (BL-350); no background demand.
-    count                  = 39
+    // --- Habitability tranche (BL-368, 2026-08-11) ---
+    //
+    // The three habitability goods population centres actually consume as
+    // tradeable goods (RESOURCES.md § Habitability goods). Building Materials
+    // and Utilities are deliberately excluded — Building Materials feeds
+    // construction cost (PRODUCTION.md's concern, a different consumption
+    // path) and Utilities is an abstracted budget cost with no resource
+    // identity of its own. Admission rule satisfied on both ends: population
+    // centres are the consumer (inject_population_demand, market_clearing.cpp),
+    // each has a producing recipe (recipes.lua).
+    clean_water            = 39, ///< Water Treatment Plant, from water. Reduces habitability if undersupplied.
+    consumer_goods         = 40, ///< Consumer Goods Factory, from food_rations + steel. Reduces workforce efficiency if undersupplied.
+    medical_supplies       = 41, ///< Pharmaceutical Lab, from water + agricultural_produce. Reduces habitability if undersupplied.
+    count                  = 42
 };
 
 static constexpr std::size_t resource_count = static_cast<std::size_t>(resource_type::count);

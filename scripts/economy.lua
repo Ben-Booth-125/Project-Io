@@ -199,6 +199,28 @@ economy = {
         growth_met_threshold = 0.50, -- basket met-supply ratio a centre needs to grow (BL-078 growth)
     },
 
+    -- BL-368 (2026-08-11): the real per-centre population demand basket,
+    -- generalising the BL-190 flat agricultural_produce-only stub. Same
+    -- price-elastic shape as the substrate model above, but population is a
+    -- pure CONSUMER — no supply term. DEMAND = pcc.scale × demand_scale ×
+    -- basket[r] × elasticity(price). Read by inject_population_demand
+    -- (market_clearing.cpp), called from clear_markets after its demand reset.
+    population_demand = {
+        -- Per-scale-point demand weight per resource. Unlisted resources get 0.
+        demand_basket = {
+            food_rations          = 0.60, -- population primary (replaces the old flat agri stub)
+            agricultural_produce  = 0.20, -- direct consumption, lighter than the processed staple
+            water                 = 0.30, -- life support
+            clean_water           = 0.35, -- BL-368 habitability tranche
+            consumer_goods        = 0.25, -- BL-368 habitability tranche
+            medical_supplies      = 0.15, -- BL-368 habitability tranche
+        },
+        demand_elasticity = 0.80, -- exponent on (base_price / price); matches the substrate shape
+        elasticity_min    = 0.30,
+        elasticity_max    = 2.50,
+        demand_scale      = 1.00,
+    },
+
     -- BL-095: construction is gated on local market supply. Each tick a build
     -- draws 1/build_duration_ticks of its materials as real market DEMAND (bids
     -- the price up, competes with population and other builds) and progresses at a

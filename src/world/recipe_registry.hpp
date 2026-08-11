@@ -59,6 +59,26 @@ struct substrate_params
     float growth_met_threshold = 0.50f; ///< basket met-supply ratio a centre needs to grow.
 };
 
+/// BL-368 population-demand model tunables, authored in scripts/economy.lua under
+/// `economy.population_demand`. Applied at tick time by inject_population_demand:
+/// each population centre pulls DEMAND = pcc.scale × basket[r] × elasticity(price)
+/// from its catchment market for every resource in the basket — no supply term;
+/// population is a pure consumer here, unlike the nation-substrate model above,
+/// which also supplies. Generalises the BL-190 agricultural_produce-only stub
+/// into a real per-centre basket across the tradeable set, moving the substrate's
+/// own price-elasticity shape onto it. See docs/economy/MARKETS.md and
+/// docs/economy/POPULATION.md for the full model.
+struct population_demand_params
+{
+    /// Per-scale-point demand weight per resource. Indexed by
+    /// static_cast<std::size_t>(resource_type). Unlisted resources get 0.
+    std::array<float, resource_count> demand_basket = {};
+    float demand_elasticity = 0.80f; ///< exponent on (base_price / price).
+    float elasticity_min    = 0.30f; ///< clamp lo on the elasticity factor.
+    float elasticity_max    = 2.50f; ///< clamp hi on the elasticity factor.
+    float demand_scale      = 1.00f; ///< global population → demand scale.
+};
+
 /// BL-095 construction-gate tunables, authored in scripts/economy.lua under
 /// `economy.construction`. Read by run_economy_step's construction step, which
 /// paces each build against the local market's recent supply of its materials.
@@ -209,6 +229,9 @@ public:
     /// BL-078 elastic-substrate model tunables (economy.substrate in Lua).
     const substrate_params& substrate() const { return m_substrate; }
 
+    /// BL-368 population-demand model tunables (economy.population_demand in Lua).
+    const population_demand_params& population_demand() const { return m_population_demand; }
+
     /// BL-095 construction-gate tunables (economy.construction in Lua).
     const construction_params& construction() const { return m_construction; }
 
@@ -265,6 +288,7 @@ public:
     // --- direct construction for tests (headless harness builds these by hand) ---
     void set_thresholds(float t_full, float t_idle) { m_t_full = t_full; m_t_idle = t_idle; }
     void set_substrate(const substrate_params& s) { m_substrate = s; }
+    void set_population_demand(const population_demand_params& p) { m_population_demand = p; }
     void set_construction(const construction_params& c) { m_construction = c; }
     void set_military(const military_capability_params& m) { m_military = m; }
     void set_procurement(const procurement_params& p) { m_procurement = p; }
@@ -302,6 +326,7 @@ private:
     /// BL-078 elastic-substrate model tunables (economy.substrate). Defaults match
     /// economy.lua so a hand-built harness registry behaves sensibly without Lua.
     substrate_params m_substrate = {};
+    population_demand_params m_population_demand = {};
 
     /// BL-095 construction-gate tunables (economy.construction). Defaults match
     /// economy.lua so a hand-built harness registry paces builds sensibly.

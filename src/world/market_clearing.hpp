@@ -31,7 +31,7 @@ struct corp_cash_flow
 /// resolution. Deterministic — no RNG.
 ///
 /// @param w World; market demand arrays are mutated in place.
-void inject_population_demand(world& w);
+void inject_population_demand(world& w, const recipe_registry& reg);
 
 /// Clear every body market for one economy tick using a per-(body, resource)
 /// matched order book. For each market and resource:

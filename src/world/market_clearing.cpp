@@ -226,17 +226,19 @@ entity_id market_for_tile(const world& w, entity_id tile)
     return nearest_market(w, it->second, tit->second);
 }
 
-void inject_population_demand(world& w)
+void inject_population_demand(world& w, const recipe_registry& reg)
 {
-    // BL-190: each population centre adds a stub demand of 1 unit of
-    // agricultural_produce per scale level into its catchment market. Lives
-    // here (not run_economy_step) so it lands after clear_markets' demand
-    // reset — injected earlier in the tick it was erased before pricing
-    // (2026-07-31 ordering fix).
-    // stub: replace with food_rations demand when the processing pipeline
-    // connects food production end-to-end (food_rations requires agricultural
-    // produce → processing_facility recipe, deferred).
-    const std::size_t ri = static_cast<std::size_t>(resource_type::agricultural_produce);
+    // BL-190: lives here (not run_economy_step) so it lands after
+    // clear_markets' demand reset — injected earlier in the tick it was
+    // erased before pricing (2026-07-31 ordering fix).
+    //
+    // BL-368: generalises the old single-resource (agricultural_produce, flat
+    // 1/scale) stub into a real per-centre basket across the tradeable set,
+    // price-elastic exactly like the nation-substrate model (BL-078) —
+    // cheaper than base -> consume more, dearer -> less. Population is a pure
+    // CONSUMER here: no supply term is added, unlike inject_substrate_demand.
+    const population_demand_params& pd = reg.population_demand();
+
     for (const auto& [centre_id, pcc] : w.population_centres)
     {
         const auto tile_it = w.population_centre_tile.find(centre_id);
@@ -245,7 +247,23 @@ void inject_population_demand(world& w)
         const entity_id mid = market_for_tile(w, tile_it->second);
         if (mid == null_entity)
             continue;
-        w.markets.at(mid).demand[ri] += static_cast<float>(pcc.scale);
+        market_component& mc = w.markets.at(mid);
+        const float scale = static_cast<float>(pcc.scale) * pd.demand_scale;
+
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            const float base = mc.base_price[r];
+            if (base <= 0.0f)
+                continue; // Untradeable — no base price to anchor the elasticity curve.
+            const float weighted = scale * pd.demand_basket[r];
+            if (weighted <= 0.0f)
+                continue;
+
+            const float price   = (mc.price[r] > 0.0f) ? mc.price[r] : base;
+            const float elastic = std::clamp(std::pow(base / price, pd.demand_elasticity),
+                                             pd.elasticity_min, pd.elasticity_max);
+            mc.demand[r] += weighted * elastic;
+        }
     }
 }
 
@@ -279,7 +297,7 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
 
     // Population food demand (BL-190) — likewise additive after the reset, so
     // the population's pull reaches price resolution.
-    inject_population_demand(w);
+    inject_population_demand(w, reg);
 
     // A (corp, body, resource) with a standing sell order against it is under
     // manual control: the auto-surplus path yields so the floor-priced order

@@ -45,30 +45,38 @@ minable-but-unsellable asymmetry of the BL-040 raws are catalogued in
    a price-elastic per-capita basket demand and an abstract capacity-capped supply that clears
    demand only to `clearing_fraction`, leaving the live margin (the saturation cushion / the
    opportunity gap the player fills). Tunables in `scripts/economy.lua` § `substrate`.
-3. **Auto-surplus** — each `(corp, body)` pool lists everything above its **processor
+3. **Population demand injection** (`inject_population_demand`, BL-190 ordering fix + BL-368
+   basket generalisation) — each population centre pulls a price-elastic, multi-resource DEMAND
+   from its catchment market (food rations, agricultural produce, water, clean water, consumer
+   goods, medical supplies): `pcc.scale × demand_scale × basket[r] × elasticity(price)`. Same
+   elastic shape as the substrate injection above, but population is a pure **consumer** — no
+   supply term. Tunables in `scripts/economy.lua` § `population_demand`. Runs after the reset (and
+   after substrate injection) for the same reason substrate does: written before the reset, it
+   would be erased the same tick it landed (the bug BL-190 fixed, 2026-07-31).
+4. **Auto-surplus** — each `(corp, body)` pool lists everything above its **processor
    reservation** (the inputs its own processors need for a full run next tick) for sale. A
    resource under a standing sell order is exempted — the manual order governs.
-4. **Standing sell orders** — read from `world::sell_orders` (BL-293: the book is world state,
+5. **Standing sell orders** — read from `world::sell_orders` (BL-293: the book is world state,
    placed by the player and by rival corps through the same `place_sell_order` verb), quantity
    capped by the pool, entered into both market supply and the explicit sell book with their
    `floor_price`. Multiple orders against one `(corp, body, resource)` share a **running
    remainder**: total listed quantity never exceeds the pool, each order's matched/auto-cleared
    quantity is tracked per order, and pool debits clamp at zero.
-5. **Auto-demand** — processor input shortfalls and construction material draws
+6. **Auto-demand** — processor input shortfalls and construction material draws
    (`report.purchases`) enter market demand.
-6. **Standing buy orders** — read from `world::buy_orders`, entered into demand and the
+7. **Standing buy orders** — read from `world::buy_orders`, entered into demand and the
    explicit buy book (`max_price`, optional `preferred_seller`).
-7. **Reference prices** — computed once from the accumulated supply/demand (below), so every
+8. **Reference prices** — computed once from the accumulated supply/demand (below), so every
    flow this tick uses the same price.
-8. **Auto clearing** — auto-surplus sells, and auto-demand buys, at the reference price. The
+9. **Auto clearing** — auto-surplus sells, and auto-demand buys, at the reference price. The
    market is a **perfect counterparty**: these always clear in full.
-9. **Order-book matching** (BL-037, preferential purchasing — shipped) — explicit sells vs
-   explicit buys by price-time priority: cheapest ask first, highest bid first, corp id as the
-   deterministic tiebreak. A buyer's `preferred_seller` is served first, tolerated up to
-   **1.10×** the cheapest compatible ask. Trades clear at the **seller's ask**.
-10. **Buyer of last resort** — unmatched player sell quantity auto-clears at
+10. **Order-book matching** (BL-037, preferential purchasing — shipped) — explicit sells vs
+    explicit buys by price-time priority: cheapest ask first, highest bid first, corp id as the
+    deterministic tiebreak. A buyer's `preferred_seller` is served first, tolerated up to
+    **1.10×** the cheapest compatible ask. Trades clear at the **seller's ask**.
+11. **Buyer of last resort** — unmatched player sell quantity auto-clears at
     `max(reference_price, floor_price)`, so listed supply always clears (prototype invariant).
-11. **Price update** — where explicit trades occurred, the price eases toward their VWAP;
+12. **Price update** — where explicit trades occurred, the price eases toward their VWAP;
     otherwise it takes the reference price.
 
 Cash flows accrue per corp and are applied to balances by `apply_budget`
@@ -189,10 +197,12 @@ extracted there enter the economy only by convoy to a Kepler market.
   BL-160 (auto-exchange policy, v0.2.0), whose buy band is the intended player buy surface and
   whose `derive_exchange_orders` is the first live emitter — no interim manual buy tab. See the
   dated note in that item's design for the open preferred-seller call.
-- **The population agri demand stub never reaches clearing.** `run_economy_step`'s
-  population-centre pass writes `agricultural_produce` demand directly into markets, but
-  `clear_markets` zero-resets demand before accumulating — the write is erased the same tick.
-  The real population pull is the substrate basket. Flagged as a code wrinkle, not fixed here.
+- **Population demand's undersupply effects are unwired.** `inject_population_demand` (§ The
+  clearing tick, above) pulls real, price-elastic, multi-resource demand into the market every
+  tick — the BL-190 ordering bug and the BL-368 single-good stub are both resolved (2026-08-11).
+  What is *not* built: a shortfall against that demand does nothing to habitability, workforce
+  efficiency, or growth (RESOURCES.md § Habitability goods names these as the intended effects).
+  The demand signal moves prices; it does not yet feed back into the population/workforce model.
 - **Markets are static.** Seeded once at world-gen; no runtime creation, destruction, or
   migration.
 

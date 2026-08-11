@@ -245,17 +245,30 @@ Propellant and spacecraft components are the key outputs enabling space access. 
 
 Habitability goods are consumed by population centres for welfare rather than production. They do not feed industrial chains, but their supply raises local habitability, which raises workforce efficiency, which indirectly raises production throughput. Their profit margins are lower than industrial products, but they are load-bearing for any body that hosts a significant population.
 
-> **None** of this table exists in `resource_type` — the whole track is an unmodelled design target (marked 2026-07-31).
+> **Three of five landed (BL-368, 2026-08-11).** Clean water, Consumer goods and Medical supplies
+> — the three population centres actually consume as tradeable goods — are now real `resource_type`
+> values with recipes and market demand. **Building materials and Utilities are deliberately still
+> absent**: Building materials feeds construction cost, a different consumption path
+> (`docs/economy/PRODUCTION.md`'s concern, not population demand); Utilities is an abstracted budget
+> cost with no resource identity of its own, and stays that way by design.
 
 | Resource | Primary inputs | Building | Effect if undersupplied |
 |----------|---------------|----------|------------------------|
 | Clean water | Water | Water Treatment Plant | Reduces habitability; suppresses population growth |
-| Building materials | Stone + timber | Construction Yard | Increases construction cost of all buildings if scarce |
-| Consumer goods | Food rations + refined goods (various) | Consumer Goods Factory | Reduces workforce efficiency |
-| Medical supplies | Chemical outputs + agricultural | Pharmaceutical Lab | Reduces habitability; raises mortality (long-term) |
-| Utilities | — (abstracted as budget cost) | Power Plant, Sanitation | Habitability floor drops without continuous supply |
+| Building materials | Stone + timber | Construction Yard | Increases construction cost of all buildings if scarce (still absent — see above) |
+| Consumer goods | Food rations + steel | Consumer Goods Factory | Reduces workforce efficiency |
+| Medical supplies | Water + agricultural produce | Pharmaceutical Lab | Reduces habitability; raises mortality (long-term) |
+| Utilities | — (abstracted as budget cost) | Power Plant, Sanitation | Habitability floor drops without continuous supply (still absent — see above) |
 
-Habitability goods are not in the prototype — and, having no enum values, they have **no** market demand slots either (the arrays are sized by `resource_count`; corrected 2026-07-31). Authoring them means the save-format retrofit described under § Prototype scope. The buildings that would produce them are listed in `docs/economy/PRODUCTION.md`.
+The three landed goods carry real recipes (`scripts/recipes.lua` ids 14-16, all on the generic
+`processing_facility` — no new `building_type` enum values, matching the shipped set) and a real
+base price (`scripts/world_gen.lua`). Their demand comes from population centres directly
+(`inject_population_demand`, `docs/economy/MARKETS.md` § Population demand), not from the
+nation-substrate model. The undersupply *effects* named above (reduced habitability, workforce
+efficiency, growth) are **not yet wired** — landing the goods and their demand is BL-368's scope;
+consuming supply-shortfall into those effects is unbuilt follow-on. Building materials and
+Utilities remain unmodelled design targets with no enum values and no market demand slots (the
+arrays are sized by `resource_count`).
 
 ---
 
@@ -273,31 +286,29 @@ The full resource list above is the design target. For the prototype (Layers 3�
 | Refined fuel | 2 | — | from Petroleum |
 | Food rations | 2 | — | from Agricultural produce |
 
-The `resource_type` enum (`src/world/components.hpp`) holds **39 values** as of BL-340
-(2026-08-11; 32 after BL-308, 31 after BL-286, 23 before it). The seven added by BL-340 are the
-processing-chain roster — silicon, refined copper, REE alloy, machinery, alloys, electronics,
-spacecraft components — closing the Tier 2/3 tables above bar liquid oxygen (folded into the
-Chemical Plant's recipes, no enum value of its own by design) and the deferred habitability
-goods. See `docs/economy/PRODUCTION.md` § Chemical Plant / § Launchpad for propellant, and this
-file's Tier 2/3 tables above for the BL-340 roster's recipes. Adding a resource changes
-`resource_count` and with it the width of every serialised `std::array<float, resource_count>` —
-tile deposits and reserves, market supply/demand/price/base-price, stockpiles, nation abundance
-and substrate capacity. **Extending the enum IS a save-format retrofit**, but every one of those
-arrays is already sized off `resource_count` rather than a hardcoded width, so both BL-286's and
-BL-340's extensions needed no manual per-array edit — only the enum + base-price/recipe authoring.
-Habitability goods still have no enum value; they cannot be held, priced, or traded until BL-368
-lands.
+The `resource_type` enum (`src/world/components.hpp`) holds **42 values** as of BL-368
+(2026-08-11; 39 after BL-340, 32 after BL-308, 31 after BL-286, 23 before it). The three added by
+BL-368 are the habitability tranche — clean water, consumer goods, medical supplies — the only
+three habitability goods population centres actually consume as tradeable goods; Building
+materials and Utilities are deliberately still absent (§ Habitability goods above). See
+`docs/economy/PRODUCTION.md` § Chemical Plant / § Launchpad for propellant, and this file's Tier
+2/3 tables above for the BL-340 roster's recipes. Adding a resource changes `resource_count` and
+with it the width of every serialised `std::array<float, resource_count>` — tile deposits and
+reserves, market supply/demand/price/base-price, stockpiles, nation abundance and substrate
+capacity. **Extending the enum IS a save-format retrofit**, but every one of those arrays is
+already sized off `resource_count` rather than a hardcoded width, so BL-286's, BL-340's and
+BL-368's extensions each needed no manual per-array edit — only the enum + base-price/recipe
+authoring.
 
 The full design list including ambient and habitability goods is approximately **35–40 entries**
-— a design target now substantially covered. The shipped count is 39 (23 pre-BL-286 + 8 logistics
-goods + propellant + 7 processing-chain roster), frozen for the prototype pending BL-368's
-habitability tranche.
+— a design target now substantially covered. The shipped count is 42 (23 pre-BL-286 + 8 logistics
+goods + propellant + 7 processing-chain roster + 3 habitability tranche).
 
 ---
 
-## What actually trades (recorded 2026-07-31; updated 2026-08-11 for BL-340)
+## What actually trades (recorded 2026-07-31; updated 2026-08-11 for BL-340/BL-368)
 
-The load-bearing fact for any market work: of the 39 enum values, only a fraction carry a
+The load-bearing fact for any market work: of the 42 enum values, only a fraction carry a
 non-zero `base_price`, and `resolve_price` / the clearing pass ignore everything else
 (`docs/economy/MARKETS.md`). The tradeable set is:
 
@@ -318,11 +329,14 @@ non-zero `base_price`, and `resolve_price` / the clearing pass ignore everything
 - **Seven processing-chain goods (BL-340)**: silicon 5.0, refined copper 7.5, REE alloy 16.0,
   machinery 22.0, alloys 34.0, electronics 29.0, spacecraft components 140.0 — a deliberately
   widening margin ladder up the tiers (spacecraft components sits 56× iron ore).
+- **Three habitability-tranche goods (BL-368)**: clean water 3.0, consumer goods 12.0, medical
+  supplies 14.0 — priced modestly above their primary inputs, per § Habitability goods above;
+  demand comes from population centres directly (`inject_population_demand`), not the substrate.
 
 Everything else has `base_price` 0 and is **never traded** — this no longer includes any BL-040
-(full-set deposit authoring) raw; all six are priced above. Pricing the remainder (habitability
-goods, most logistics goods) is part of the owed market-rework family (BL-130, real market
-inventory, BL-368, and kin — MARKETS.md § Owed follow-ons).
+(full-set deposit authoring) raw; all six are priced above. Pricing the remainder (Building
+materials, Utilities, most logistics goods) is part of the owed market-rework family (BL-130, real
+market inventory, and kin — MARKETS.md § Owed follow-ons).
 
 Water is in this tradeable set from tick 0: it carries an authored base price on the home-body
 markets and sits in the substrate demand basket (`scripts/economy.lua`, weight 0.40).

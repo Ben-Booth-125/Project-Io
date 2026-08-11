@@ -255,6 +255,29 @@ These produce habitability goods (see `docs/economy/RESOURCES.md`) consumed by p
 
 Habitability production buildings use processing building mechanics (recipe, workforce scalar, stockpile). They differ from industrial processing buildings only in that their outputs feed population demand rather than further industrial chains.
 
+> **Three of five implemented (BL-368, 2026-08-11).** Water Treatment Plant, Consumer Goods
+> Factory and Pharmaceutical Lab are all `processing_facility` recipes (`scripts/recipes.lua` ids
+> 14-16, mirroring the shipped set — no new `building_type` enum values), not the standalone
+> processor types the table above still names as design targets. Recipe quantities are first-cut
+> tuning values, matching every other shipped recipe:
+>
+> | Recipe | Inputs | Output |
+> |---|---|---|
+> | `clean_water` (id 14) | Water × 2.0 | Clean water × 1.0 |
+> | `consumer_goods` (id 15) | Food rations × 1.0 + Steel × 1.0 | Consumer goods × 1.0 |
+> | `medical_supplies` (id 16) | Water × 1.0 + Agricultural produce × 1.0 | Medical supplies × 1.0 |
+>
+> Consumer Goods Factory's input differs from the table's "refined goods (various)" — steel
+> stands in as the one already-shipped refined industrial input. Pharmaceutical Lab's input
+> differs from "chemical outputs" — no standalone chemical `resource_type` exists in the
+> prototype set, so water stands in as the process input, mirroring Hydroponics Bay's own
+> water-as-process-input precedent above. **Construction Yard and Power Plant remain unbuilt** —
+> Building materials and Utilities are deliberately still absent from `resource_type`
+> (RESOURCES.md § Habitability goods). The *effects* column (habitability, workforce efficiency,
+> growth) is also still unwired — landing the goods and population demand for them was this
+> item's scope; consuming a supply shortfall into those effects is unbuilt follow-on.
+> Verified by `tools/verify/habitability_tranche_harness.cpp`.
+
 ---
 
 ## Infrastructure buildings
