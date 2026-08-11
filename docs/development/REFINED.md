@@ -1,5 +1,22 @@
 # Project Io — REFINED (active worklist)
 
+> Drained 2026-08-11: BL-365 (background industry keystone), Sprint 10's keystone and the
+> reason BL-130/BL-263/BL-368 were pulled in out of turn — 2 worktree tasks COMPLETE
+> (T1 core swap, T2 docs) — removed per the retain-one policy. Record lives in backlog.json
+> BL-365's `resolution` field and requirements.json § background-industry-keystone (R1–R7).
+> Real background corporations (`corporation_component.is_background`) replace the abstract
+> nation-substrate injection: `generate_background_firms` calibrates per body until real
+> production reaches ~90% of real demand (measured, not authored), background firms run the
+> FULL corp_ai scored-utility layer per Ben's explicit 2026-08-11 call, `nation_substrate` /
+> `inject_substrate_demand` are deleted outright. `pregame_balance_harness 80` (real world)
+> ALL PASS, plateau moved from ~185k cr to ~42k cr (real competitors now claim market share).
+> `nation.resource_abundance` deliberately kept — independent of the substrate mechanism
+> (NR-172). Three new NEEDS_REVIEW entries: NR-170 (pre-existing population_mvp failure,
+> unrelated), NR-171 (data_creep_harness 1500-tick building growth from the larger corp
+> population — not a leak, needs a longer-horizon rerun to confirm convergence), NR-172
+> (resource_abundance keep decision). `ai_skill_harness` golden-band drift (NR-169) not
+> re-blessed this session — left for a dedicated stewardship pass, now that the
+> substrate-to-real-firms transition BL-365 itself anticipated as the likely trigger is done.
 
 > Drained 2026-08-11: BL-130 (real market inventory), the last link in BL-365's blocker chain,
 > 1 task COMPLETE — removed per the retain-one policy. Record lives in DEVLOG.md (2026-08-11

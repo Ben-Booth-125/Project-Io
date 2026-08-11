@@ -161,18 +161,19 @@ the MCP server (BL-278, `ProjectIo --serve` plus `tools/mcp/`). It is v0.1.1's n
 change to a control, lens, ledger or panel must update its dictionary entry — a stale entry
 misleads an AI player the way a stale golden misleads a visual check.
 
-**The broad economy is the nations'; corporations are specialists.** The campaign opens on a
-saturated, earth-like economy whose bulk industrial base is owned and run by the **Nation AI**
-as background. The player and the major AI rivals are **specialist corporations** occupying a
-focused slice of the chain, differentiated by an interest in expanding to space — which is what
-keeps the loop a contest between a few space-interested specialists rather than a full-economy
-management game. Detail and the generation consequences live in
-`docs/generation/GENERATION_STRATEGY.md`.
+**The broad economy is background firms'; the player and rivals are specialists.** The campaign
+opens on a saturated, earth-like economy whose bulk industrial base is owned and run by **real
+background corporations** (`corporation_component.is_background`, BL-365, 2026-08-11) — *not* by
+a nation actor, and no longer by the abstract nation substrate that preceded them. The player and
+the major AI rivals are **specialist corporations** occupying a focused slice of the chain,
+differentiated by an interest in expanding to space — which is what keeps the loop a contest
+between a few space-interested specialists rather than a full-economy management game. Detail and
+the generation consequences live in `docs/generation/GENERATION_STRATEGY.md`.
 
 This premise survives BL-094's rewrite (2026-08-10, NR-120): when the player becomes a national
-private militia chartered by one of the generated nations, that nation's bulk economy stays
-AI-run background exactly as before — the militia is a new entity type attached to a nation, not
-the nation itself, so nothing about the background-economy premise changes. *(Corrected
+private militia chartered by one of the generated nations, the bulk economy on that nation's
+territory stays background-firm-run exactly as before — the militia is a new entity type attached
+to a nation, not the nation itself, so nothing about the background-economy premise changes. *(Corrected
 2026-08-10: was "when the player takes the governing-body seat... the player gains law, force and
 research as levers" — the militia gains force directly and reaches law/research through
 procurement, not by wielding them; see CONCEPT.md § Player identity.)* The player is not a

@@ -10429,6 +10429,65 @@
      "notes": "15-harness suite all clean; pregame_balance_harness clean (also where a real pre-existing BL-368 bug — missing Lua resource-name registrations — was found and fixed). ai_skill_harness drift (8→9 failures) assessed and attributed, recorded in NR-169 rather than re-blessed."
     }
    ]
+  },
+  {
+   "brief": "background-industry-keystone",
+   "title": "BL-365 (background industry keystone): the market saturates because real background firms produce and consume, not because a substrate pass injects supply/demand",
+   "difficulty": 5,
+   "importance": "A",
+   "status": "complete",
+   "promoted_from": "backlog.json BL-365, v0.1.13 (Sprint 10) — keystone, unblocked 2026-08-11",
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "Background firms are generated as real corporation_component entries (is_background=true) with real assets/buildings that produce and consume through the ordinary economy tick — not a substrate injection.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "corporation_generation.cpp generate_background_firms: real corporation_component (is_background=true) entries with real placed buildings, wired into app::start_new_game / --serve / --blackboard-export before the pre-game warm start."
+    },
+    {
+     "id": "R2",
+     "requirement": "Firm-generation calibration is measured, not authored: generation stops once real production meets ~90% (clearing_fraction) of real demand for the tradeable set, so the opportunity gap is preserved by construction.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "Measured stop condition: production_ratio() vs body_demand() >= 0.90 (clearing_fraction), not an authored count; capped at 40 firms/body as a hard bound."
+    },
+    {
+     "id": "R3",
+     "requirement": "Background firms run the full corp_ai scored-utility layer identically to rival corps (no reduced model) at the ~80-corp scale, without an unacceptable per-tick cost regression (BL-253 O(corps×tiles) fix load-bearing).",
+     "class": "headless",
+     "status": "complete",
+     "notes": "Background firms are ordinary w.corporations entries; corp_ai.cpp run_corp_strategic_step already iterates all non-player corps uniformly — no reduced model. pregame_balance_harness 80 (real world) runs clean."
+    },
+    {
+     "id": "R4",
+     "requirement": "nation.resource_abundance and the substrate capacity arrays (inject_substrate_demand and its call site) are deleted outright, not kept behind a flag.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "nation_substrate/w.nation_substrates/substrate_params/inject_substrate_demand deleted outright. nation.resource_abundance deliberately KEPT — independent of the substrate mechanism (UI + market-carving reads); see NEEDS_REVIEW NR-172."
+    },
+    {
+     "id": "R5",
+     "requirement": "BL-340s background-demand step for silicon, refined_copper, ree_alloy, machinery, alloys, electronics is implemented; spacecraft_components gets no background demand.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "inject_background_demand (market_clearing.cpp) — new background_demand_params, 6 processing resources, spacecraft_components excluded by construction (unlisted basket weight)."
+    },
+    {
+     "id": "R6",
+     "requirement": "pregame_balance_harness 80 (real generated world, 80-tick warm start) runs clean: no crash, no negative-balance runaway, sane trajectory with background firms active.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "pregame_balance_harness 80 against the real generated world: ALL PASS (0 failures), plateau ~42k cr, no crash, no negative-balance runaway."
+    },
+    {
+     "id": "R7",
+     "requirement": "MARKETS.md and GENERATION_STRATEGY.md (and CORPORATION_GENERATION.md if touched) describe the background-firm model in place of the substrate; no doc still asserts the old nation-substrate mechanism as current.",
+     "class": "visual",
+     "status": "complete",
+     "notes": "MARKETS.md, GENERATION_STRATEGY.md, CORPORATION_GENERATION.md, GLOSSARY.md updated to describe background firms in place of the substrate."
+    }
+   ]
   }
  ]
 }

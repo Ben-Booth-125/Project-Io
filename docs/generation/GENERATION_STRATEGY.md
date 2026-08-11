@@ -82,8 +82,8 @@ This premise is what **simplifies the gameplay loop**: the player does not have 
 balance an entire economy, only to compete as a specialist and convert that position into
 off-world reach. It is the reason corporation generation produces **lean, focus-coherent
 holdings** rather than a broad spread (see `CORPORATION_GENERATION.md` § Pass 3), and the
-reason nation generation carries the broad industrial base implicitly rather than the player
-managing it.
+reason the broad industrial base is carried by generated background firms rather than by the
+player managing it.
 
 ---
 
