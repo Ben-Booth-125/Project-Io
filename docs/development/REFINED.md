@@ -1,6 +1,15 @@
 # Project Io — REFINED (active worklist)
 
 
+> Drained 2026-08-11: BL-130 (real market inventory), the last link in BL-365's blocker chain,
+> 1 task COMPLETE — removed per the retain-one policy. Record lives in DEVLOG.md (2026-08-11
+> entry), backlog.json BL-130's `resolution` field, and requirements.json
+> § real-market-inventory (R1–R5). Found and fixed a real, pre-existing bug while diagnosing an
+> unrelated crash: BL-368's three new resources were never registered in
+> `recipe_registry.cpp`'s Lua name table, so the actual game had been crashing on startup since
+> BL-368 landed earlier this session. Also fixed three existing harnesses whose fixtures assumed
+> the retired unconditional-auto-buy model. BL-365 (the keystone) is now unblocked.
+
 > Drained 2026-08-11: BL-263 (spontaneous market emergence), promoted out of turn to unblock
 > BL-365 (blocked_on BL-130, which requires BL-263), 1 task COMPLETE — removed per the
 > retain-one policy. Record lives in DEVLOG.md (2026-08-11 entry), backlog.json BL-263's

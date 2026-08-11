@@ -419,6 +419,18 @@ struct market_component
     std::array<float, resource_count> demand = {};
     std::array<float, resource_count> price = {};      ///< Current resolved price; set to base_price until first tick.
     std::array<float, resource_count> base_price = {}; ///< Rarity-derived floor; authored at world creation.
+
+    /// BL-130: REAL persistent per-resource stock — not reset each tick (unlike
+    /// supply/demand above, which stay per-tick FLOW figures for price
+    /// resolution/reporting). Fills from this tick's sell-side clearing
+    /// (`clear_markets`, after all auto-surplus/standing-sell listing);
+    /// drains during the PRIOR phase of the same economy tick — production
+    /// (`run_processing`) and construction (`run_construction`), both of which
+    /// run before `clear_markets` — against whatever stock is left from
+    /// PRIOR ticks' sales. A processor or a build can therefore only draw what
+    /// the market genuinely has on hand; it is no longer an unconditional,
+    /// infinite auto-buy. See docs/economy/MARKETS.md § Real market inventory.
+    std::array<float, resource_count> inventory = {};
 };
 
 /// A standing sell order — the manual side of the market. Each economy tick the

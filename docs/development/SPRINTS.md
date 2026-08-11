@@ -45,7 +45,7 @@ and/or a version goal (v0.1.1 etc.).
 | 7 | The stub minors become releases | **Closed** — v0.1.3 and v0.1.4 cut; `post-v0.1.0` swept, every open item names a minor |
 | 8 | Who the player is (design only) | **Closed 2026-08-10** — BL-094 rewritten as the militia, BL-350 filed, v0.3.0 roster reconciled |
 | 9 | The militia takes the field | **Closed 2026-08-10** — v0.1.5 cut; BL-325/BL-331 landed, BL-332 designed and re-versioned |
-| 10–14 | Re-sequenced 2026-08-10 (the living world inserted) | **In progress** — Sprint 11 (procurement) closed 2026-08-11, all three landed; Sprint 10 (living world) resumed 2026-08-11, both foundations (BL-366, BL-368) landed, keystone (BL-365) and three items still `designed` — see § Sprints 10–14 below |
+| 10–14 | Re-sequenced 2026-08-10 (the living world inserted) | **In progress** — Sprint 11 (procurement) closed 2026-08-11, all three landed; Sprint 10 (living world) resumed 2026-08-11, both foundations plus the full BL-365 blocker chain (BL-263, BL-130) landed — only the BL-365 keystone itself and three lower-priority items remain `designed` — see § Sprints 10–14 below |
 
 **Next up (2026-08-10).** Sprint 5 is closed on Ben's call — *"I am happy with the generation
 progress we made"* — and the board went momentarily to zero goaled sprints. The plan for
@@ -282,13 +282,13 @@ now deferred a second time**, both times in the same direction.
 
 **Owed at the cut.** A written done-definition for v0.1.13, per NR-103.
 
-**Progress (2026-08-11).** BL-253 (prerequisite), **BL-366 (multi-building tile stack cap + urban
-transform)** and **BL-368 (real population demand + habitability tranche)** now `complete` — both
-foundations landed. Attempting BL-365 next found it `blocked_on` **BL-130** (real market
-inventory), which itself `requires` **BL-263** (spontaneous market emergence) — neither was in
-Sprint 10's original plan, but both are now load-bearing prerequisites, pulled in out of turn.
-**BL-263 landed** the same day. BL-130 is next; BL-367, BL-132 and BL-369 remain `designed`, not
-yet promoted. See DEVLOG's 2026-08-11 entries.
+**Progress (2026-08-11).** BL-253, **BL-366**, **BL-368**, **BL-263** and **BL-130** all
+`complete` — the entire blocker chain BL-365 turned out to sit behind (`blocked_on` BL-130,
+which `requires` BL-263) is now clear, alongside both of Sprint 10's original foundations.
+**BL-365 itself is next** — the keystone, difficulty 5, with its own open corp_ai-scope question
+already settled (2026-08-11: full scored-utility layer for every background firm, not a reduced
+model). BL-367, BL-132 and BL-369 remain `designed`, not yet promoted. See DEVLOG's 2026-08-11
+entries.
 
 ## Sprint 11 — Procurement, and the goods it is about (cut v0.1.14)
 

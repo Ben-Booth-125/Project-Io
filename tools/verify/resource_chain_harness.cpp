@@ -68,6 +68,20 @@ int main()
     mc.base_price[ri(resource_type::electronics)]             = 29.0f;
     mc.base_price[ri(resource_type::spacecraft_components)]   = 140.0f;
     mc.price = mc.base_price;
+    // BL-130: real inventory now gates a processor's draw beyond its own pool.
+    // This chain's raw extractors (silica/copper_ore/rare_earth_ore) feed
+    // ample pool via their own ramp, but the mid-chain intermediates
+    // (silicon/refined_copper/ree_alloy/alloys) are entirely internal to one
+    // corp's own reservation — a corp never SELLS what its own downstream
+    // stage needs, so the market would never see real inventory for them on
+    // its own. Seed it directly, standing in for the background industry
+    // (BL-365, not yet built) that would otherwise supply a real market in
+    // these goods — this harness's own scope is the recipe/chain shape, not
+    // background-firm bootstrapping.
+    mc.inventory[ri(resource_type::silicon)]        = 1.0e5f;
+    mc.inventory[ri(resource_type::refined_copper)] = 1.0e5f;
+    mc.inventory[ri(resource_type::ree_alloy)]      = 1.0e5f;
+    mc.inventory[ri(resource_type::alloys)]         = 1.0e5f;
     w.markets[market] = mc;
 
     // Three extraction sites (silica, copper_ore, rare_earth_ore), ample reserve.

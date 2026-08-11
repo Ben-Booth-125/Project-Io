@@ -10384,6 +10384,51 @@
      "notes": "Identical 8 failures to the BL-366-only baseline — no further movement. NR-169 corrected accordingly."
     }
    ]
+  },
+  {
+   "brief": "real-market-inventory",
+   "title": "BL-130 (real market inventory): markets hold real persistent stock on the buy side; production and construction draw and drain it instead of an unconditional auto-buy",
+   "difficulty": 3,
+   "importance": "A",
+   "status": "complete",
+   "promoted_from": "backlog.json BL-130, v0.1.13 (Sprint 10) — hard prerequisite for BL-365",
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "A processor with zero pool and zero market inventory idles rather than auto-buying; ample market inventory yields a full batch and drains the market by exactly the drawn quantity; partial pool + market coverage still yields a full batch, drawing pool-first then the market remainder.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "market_inventory_harness R1/R2/R3: 7/7 PASS."
+    },
+    {
+     "id": "R2",
+     "requirement": "The two-threshold partial-run model applies uniformly whether or not a market backs the body — the old 'market body always full batch' special case is retired.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "market_inventory_harness R4: 3/3 PASS."
+    },
+    {
+     "id": "R3",
+     "requirement": "Inventory fills from real corp sales only (auto-surplus + standing sell orders), never from the BL-078 abstract nation-substrate supply.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "market_inventory_harness R5: 2/2 PASS."
+    },
+    {
+     "id": "R4",
+     "requirement": "run_construction (BL-095 pacing) reads and drains the same real inventory field, replacing its old recent-supply proxy.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "market_inventory_harness R6: 2/2 PASS."
+    },
+    {
+     "id": "R5",
+     "requirement": "No regression in the existing economy/construction/determinism/generation/supply harness suite (verified from a FRESH rebuild, not stale exes), and the real generated-world 80-tick warm start (pregame_balance_harness) stays sane — no crash, no negative balance, all dynamism/determinism assertions pass.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "15-harness suite all clean; pregame_balance_harness clean (also where a real pre-existing BL-368 bug — missing Lua resource-name registrations — was found and fixed). ai_skill_harness drift (8→9 failures) assessed and attributed, recorded in NR-169 rather than re-blessed."
+    }
+   ]
   }
  ]
 }

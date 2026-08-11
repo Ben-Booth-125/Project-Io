@@ -127,7 +127,16 @@ market_agg aggregate_body(const world& w, entity_id body)
 /// years = ticks / 4.
 constexpr int default_warm_start_ticks = 12;
 
+int real_main(int argc, char** argv);
+
 int main(int argc, char** argv)
+{
+    try { return real_main(argc, argv); }
+    catch (const std::exception& e) { std::printf("EXCEPTION: %s\n", e.what()); return 99; }
+    catch (...) { std::printf("UNKNOWN EXCEPTION\n"); return 98; }
+}
+
+int real_main(int argc, char** argv)
 {
     int warm_start_ticks = default_warm_start_ticks;
     if (argc > 1)

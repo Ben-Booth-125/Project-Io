@@ -10,7 +10,79 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — BL-263 lands: BL-365's blocker chain, first link (2026-08-11, latest)
+## Session — BL-130 lands: BL-365's blocker chain closed, and a live crash caught in passing (2026-08-11, latest)
+
+Full mode, one item, continuing the same session as BL-263/BL-368/BL-366 below.
+
+**BL-130 — real market inventory, landed.** The last link before BL-365 itself. Adds
+`market_component.inventory` — real, persistent per-resource stock, never reset per tick (unlike
+`supply`/`demand`, which stay per-tick flow figures). **Fills** from real corp sales only
+(auto-surplus + standing sell orders, tallied separately so the BL-078 substrate's abstract
+supply — a pricing fiction nobody actually sold — cannot inflate real stock). **Drains** during
+production (`run_processing`) and construction (`run_construction`), both of which run before
+`clear_markets` in the same tick, against whatever survived prior ticks' sales.
+
+The real behavioural change: `run_processing`'s old special case — *any* market body runs an
+unconditional full batch, auto-buying whatever the pool didn't cover — is retired. Coverage is
+now `(pool + market inventory) / need` per input, and the two-threshold partial-run model (full
+at `t_full`, scaled to `t_idle`, idle below) governs uniformly whether or not a market backs the
+body. `run_construction`'s BL-095 pacing rate swaps its old "last tick's cleared supply" proxy
+for the same real field, and now actually drains it. Both consumers draw the same live inventory
+in a fixed, already-deterministic tick order (construction, then production), and a processor's
+run fraction is bounded by the coverage-min across every input by construction — so nothing can
+double-spend the same stock; no proportional-fairness math was needed. The **sell side is
+unchanged** — still unconditional, per the standing prototype invariant.
+
+**A live crash, found and fixed in passing.** Verifying against the real generated world
+(`pregame_balance_harness`) turned up a silent `abort()` — the harness printed two Lua-load lines
+and stopped, exit code 3, no message. Added a top-level try/catch (kept — a real improvement to
+the harness) to surface it: `Unknown resource 'clean_water' in recipe 'clean_water' outputs`.
+BL-368 had added three `resource_type` values but never registered their Lua names in
+`recipe_registry.cpp`'s `resource_from_name` table — every hand-built harness that constructs a
+`recipe_registry` directly in C++ was blind to this, so **the actual game has been crashing on
+startup since BL-368 landed earlier this session**, unnoticed until this check. Fixed by adding
+the three missing table entries. Confirmed pre-existing (not a BL-130 artifact) by
+stashing-and-rerunning against the BL-263 baseline first — same crash, same message.
+
+**Two existing-harness fixture gaps, fixed.** `econ_harness` and `resource_chain_harness` hand-
+build a `recipe_registry` + `market_component` and expect the old unconditional-auto-buy
+behaviour; `construction_gate_harness` seeds `mc.supply` (the retired proxy) to represent "the
+market has stock". All three needed `mc.inventory` seeded alongside their existing fixtures —
+not a change in test intent, just which field now carries "the market has real stock". Caught
+these the hard way: a first regression pass showed everything green, which turned out to be
+**stale `.exe` files** — the individual harness CMake targets are separate from the `ProjectIo`
+target and were never rebuilt after the source edits. This is the *third* time a stale-exe
+mistake surfaced this session (see NR-169); every harness in the sweep was explicitly rebuilt
+from clean before the numbers below were trusted.
+
+**Verification.** New `tools/verify/market_inventory_harness.cpp` (14/14 PASS): idle with
+nothing available, a full batch from ample market stock with an exact drain check, pool-then-
+market draw order, the two-threshold model applying uniformly on a market body, a real sale (not
+substrate) landing in inventory, and construction's own gate reading/draining the same field.
+Full `ProjectIo` build clean. The complete 15-harness suite rerun clean from a fresh rebuild.
+`pregame_balance_harness` (the real generated world, 80-tick warm start): climbs cleanly to a
+~108k plateau, no crash, no negative balance, all 5 dynamism/determinism assertions pass —
+different plateau value than the pre-BL-130 substrate-driven trajectory (expected: the underlying
+model materially changed), but the shape is sane. `ai_skill_harness` moved from 8 to 9 golden-
+band failures (one new: seed 4 net-worth min) — attributable and expected this time, a real
+economic consequence of the mechanic working as designed, not instability; recorded in NR-169
+rather than re-blessed.
+
+docs/economy/MARKETS.md gains § Real market inventory and corrects two stale passages (the
+"no stored inventory" limitation, the auto-demand/auto-clearing step descriptions);
+docs/economy/PRODUCTION.md's stale 2026-07-31 "thresholds bypassed on market bodies" note is
+corrected. backlog.json BL-130 → `complete`; requirements.json § real-market-inventory (R1–R5,
+all complete); REFINED.md drained.
+
+**BL-365's blocker chain is now fully closed.** BL-253, BL-366, BL-368, BL-263 and BL-130 are all
+`complete`. BL-365 itself — the keystone, difficulty 5 — is next.
+
+**Runtime.** ~2 h, Full mode (one item, but the deepest of the session's chain: a core-model
+rewrite touching every read site of market supply, plus a live production bug found and fixed).
+
+---
+
+## Session — BL-263 lands: BL-365's blocker chain, first link (2026-08-11)
 
 Full mode, one item, continuing the same session as BL-368/BL-366 below.
 

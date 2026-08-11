@@ -70,6 +70,11 @@ int main()
     mc.base_price[ri(resource_type::iron_ore)] = 2.5f;
     mc.base_price[ri(resource_type::steel)]    = 8.0f;
     mc.price = mc.base_price;
+    // BL-130: real inventory now gates what a processor can draw beyond its own
+    // pool. Ample stock here restores this fixture's original intent — a market
+    // backs P's shortfall so it runs a full batch, same as the pre-BL-130
+    // unconditional auto-buy did when a market existed at all.
+    mc.inventory[ri(resource_type::iron_ore)] = 1000.0f;
     w.markets[market] = mc;
 
     // --- extraction corp E: iron_ore richness 2.0, workforce 0.5, no hazard ---

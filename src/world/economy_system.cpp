@@ -174,12 +174,13 @@ building_report run_extraction(world& w, const recipe_registry& reg,
     return rep;
 }
 
-/// Processing: run the recipe pool-first under the two-threshold model, recording
-/// the auto-bought shortfall into `purchases`.
+/// Processing: run the recipe pool-first, then against the local market's real
+/// inventory (BL-130) under the two-threshold model, recording the drawn
+/// quantity into `purchases`.
 building_report run_processing(world& w, const recipe_registry& reg,
                                entity_id corp, entity_id building_id,
                                const building_component& b,
-                               bool body_has_market,
+                               entity_id market_id,
                                float contention,
                                economy_report& out)
 {
@@ -210,8 +211,12 @@ building_report run_processing(world& w, const recipe_registry& reg,
     }
 
     stockpile_component& pool = w.pool_for(corp, body);
+    // BL-130: a processor's real available stock is its own pool PLUS the local
+    // market's real inventory — a genuine finite draw, not an unconditional
+    // auto-buy. Mutable: this function actually consumes what it draws, below.
+    market_component* mc = (market_id != null_entity) ? &w.markets.at(market_id) : nullptr;
 
-    // Pool coverage of a full run = the scarcest input's pool fraction.
+    // Coverage of a full run = the scarcest input's (pool + market inventory) fraction.
     float coverage = std::numeric_limits<float>::infinity();
     bool  has_input = false;
     for (std::size_t r = 0; r < resource_count; ++r)
@@ -220,8 +225,9 @@ building_report run_processing(world& w, const recipe_registry& reg,
         if (in <= 0.0f)
             continue;
         has_input = true;
-        const float need = in * batches_full;
-        const float cov  = (need > 0.0f) ? pool.quantities[r] / need : std::numeric_limits<float>::infinity();
+        const float need   = in * batches_full;
+        const float avail  = pool.quantities[r] + (mc ? std::max(0.0f, mc->inventory[r]) : 0.0f);
+        const float cov    = (need > 0.0f) ? avail / need : std::numeric_limits<float>::infinity();
         if (cov < coverage)
         {
             coverage              = cov;
@@ -232,16 +238,13 @@ building_report run_processing(world& w, const recipe_registry& reg,
     if (!has_input)
         coverage = 1.0f; // degenerate no-input recipe runs full
 
-    // Run fraction. With a market on the body the building runs a full batch,
-    // drawing inputs pool-first and auto-buying any shortfall (the Layer 3 path).
-    // Without a market it falls back to the two-threshold partial run from its
-    // own pool: full at/above t_full, scaled between t_idle and t_full, idle below.
+    // Run fraction — the two-threshold model, uniformly, whether or not a
+    // market backs this body. BL-130 retires the old "a market body always
+    // runs full batch" special case: a market's inventory is now real and
+    // finite, so it earns its place in `coverage` above rather than bypassing
+    // the threshold model outright (docs/economy/PRODUCTION.md, corrected).
     float run = 0.0f;
-    if (body_has_market)
-    {
-        run = 1.0f;
-    }
-    else if (coverage >= reg.t_full())
+    if (coverage >= reg.t_full())
     {
         run = 1.0f;
     }
@@ -251,14 +254,17 @@ building_report run_processing(world& w, const recipe_registry& reg,
     }
     else
     {
-        rep.idle = true; // too little to bootstrap and nowhere to buy
+        rep.idle = true; // too little between pool and market to bootstrap
         return rep;
     }
 
     const float batches = batches_full * run;
 
-    // Consume inputs pool-first; the remainder (only possible with a market) is
-    // auto-bought and recorded as this tick's purchases / market demand.
+    // Consume inputs pool-first; the remainder draws on the market's real
+    // inventory (BL-130) — guaranteed sufficient at this `run` level by the
+    // coverage-min construction above (every input's avail/need_full >= run).
+    // Recorded into `bought` for clear_markets' pricing pass, same as before —
+    // now billing a real draw rather than an unconditional one.
     auto& bought = out.purchases[std::make_pair(corp, body)];
     for (std::size_t r = 0; r < resource_count; ++r)
     {
@@ -268,7 +274,13 @@ building_report run_processing(world& w, const recipe_registry& reg,
         const float need      = in * batches;
         const float from_pool = std::min(pool.quantities[r], need);
         pool.quantities[r] -= from_pool;
-        bought[r]          += (need - from_pool); // 0 when the pool covered it
+        const float remainder = need - from_pool;
+        if (remainder <= 0.0f)
+            continue;
+        const float from_market = mc ? std::min(std::max(0.0f, mc->inventory[r]), remainder) : 0.0f;
+        if (mc)
+            mc->inventory[r] = std::max(0.0f, mc->inventory[r] - from_market);
+        bought[r] += from_market;
     }
 
     float produced = 0.0f;
@@ -421,11 +433,12 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
         const float duration           = econ.build_duration_ticks;
         if (duration <= 0.0f) { b.ticks_remaining = 0; continue; } // instant safety
 
-        // Local market — read its RECENT supply (last tick's cleared throughput) as
-        // the derived "stock" the build competes for. No stored inventory, no new
-        // serialised field (BL-095).
-        const entity_id mid       = market_for_tile(w, b.tile);
-        const market_component* m = (mid != null_entity) ? &w.markets.at(mid) : nullptr;
+        // BL-130: read the market's REAL persistent inventory — what is actually
+        // on hand from prior ticks' sales — rather than last tick's cleared
+        // throughput. Mutable: a build that draws on it actually consumes it
+        // (below), same as any other consumer competing for the same stock.
+        const entity_id mid = market_for_tile(w, b.tile);
+        market_component* m = (mid != null_entity) ? &w.markets.at(mid) : nullptr;
 
         // Rate = the fraction of this tick's material need the market can supply,
         // set by the scarcest required material; below 1/max_stretch it pauses.
@@ -435,7 +448,7 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
             const float need = econ.resource_build_cost[r] / duration;
             if (need <= 0.0f)
                 continue;
-            const float avail = m ? m->supply[r] : 0.0f;
+            const float avail = m ? std::max(0.0f, m->inventory[r]) : 0.0f;
             rate = std::min(rate, avail / need);
         }
         rate = std::clamp(rate, 0.0f, 1.0f);
@@ -444,9 +457,11 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
         if (rate <= 0.0f)
             continue;
 
-        // Draw this tick's materials as real market demand (bids price up, competes
-        // with population and other builds) via the shared auto-buy path, and charge
-        // the flat build_cost portion incrementally to the owning corp.
+        // Draw this tick's materials from the market's real inventory (BL-130) and
+        // charge the flat build_cost portion incrementally to the owning corp.
+        // `bought` still records the drawn quantity as market demand for pricing
+        // (clear_markets), same as before — the transaction is now real, not just
+        // its billing.
         const entity_id corp = owner_corp_of(w, bid);
         const entity_id body = building_body(w, b);
         if (corp != null_entity && body != null_entity)
@@ -455,8 +470,12 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
             for (std::size_t r = 0; r < resource_count; ++r)
             {
                 const float need = econ.resource_build_cost[r] / duration;
-                if (need > 0.0f)
-                    bought[r] += need * rate;
+                if (need <= 0.0f)
+                    continue;
+                const float drawn = need * rate;
+                bought[r] += drawn;
+                if (m)
+                    m->inventory[r] = std::max(0.0f, m->inventory[r] - drawn);
             }
             const auto cit = w.corporations.find(corp);
             if (cit != w.corporations.end())
@@ -563,13 +582,6 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
         for (auto it = completed.rbegin(); it != completed.rend(); ++it)
             w.procurement_contracts.erase(w.procurement_contracts.begin() + static_cast<long>(*it));
     }
-
-    // Bodies that host a market — a processor on one auto-buys input shortfalls
-    // rather than idling for want of pool stock (see run_processing).
-    std::unordered_set<entity_id> bodies_with_market;
-    bodies_with_market.reserve(w.markets.size());
-    for (const auto& [mid, mc] : w.markets)
-        bodies_with_market.insert(mc.body);
 
     // BL-042: Derive per-body workforce supply from population centres.
     // Scale → labour-force table (units available to industry on this body).
@@ -914,9 +926,12 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
                 }
                 case building_type::processing_facility:
                 {
-                    const bool has_market = bodies_with_market.count(body) != 0;
+                    // BL-130: the building's own catchment market (not just "any
+                    // market on the body" — a multi-market body, BL-096/BL-263,
+                    // must draw its own centre's stock, not a sibling market's).
+                    const entity_id market_id = market_for_tile(w, b.tile);
                     report.buildings.push_back(
-                        run_processing(w, reg, corp, building_id, b, has_market,
+                        run_processing(w, reg, corp, building_id, b, market_id,
                                        contention_for(corp, body), report));
                     break;
                 }

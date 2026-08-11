@@ -129,17 +129,18 @@ The Quarry and Lumber Camp exist specifically to harvest ambient resources (ston
 
 A processing building holds a **recipe** (`building_component.recipe`, indexing the Lua recipe registry): a set of input resources consumed and a set of outputs produced per economy tick, with a fixed conversion rate authored in Lua. Recipes support multiple inputs and outputs and reagents (e.g. coal in the steel recipe is an input that yields no separate product).
 
-Processing buildings draw inputs from — and add outputs to — the shared per-`(corporation, body)` stockpile pool (inputs are taken pool-first; any shortfall is auto-bought from the market, see § Stockpile and output flow). They use the same workforce scalar as extraction buildings.
+Processing buildings draw inputs from — and add outputs to — the shared per-`(corporation, body)` stockpile pool (inputs are taken pool-first; any shortfall draws the local market's real inventory, see § Stockpile and output flow and MARKETS.md § Real market inventory). They use the same workforce scalar as extraction buildings.
 
 When the inputs available cannot cover a full conversion, the building does **not** simply halt: it follows a **two-threshold partial run**. If the limiting input covers at least `T_full` of one conversion, the building runs at full rate; between `T_idle` and `T_full` it scales its output down to what the limiting input allows; below `T_idle` it idles. The two thresholds are tunable economic constants.
 
-> **The thresholds are the no-market fallback only (recorded 2026-07-31).** On any body that
-> hosts a market the thresholds are **bypassed**: the building runs a full batch (`run = 1.0`),
-> draws inputs pool-first, and auto-buys the whole shortfall (`run_processing`,
-> `src/world/economy_system.cpp`). The two-threshold model above governs only bodies with no
-> market — today that is every body except Kepler. Note `scripts/economy.lua`'s comment block
-> disagrees with **both** branches (it describes the mid-band as "run full, auto-buying"
-> regardless of market) — flagged for a code-comment fix, not edited here.
+> **The thresholds now govern every body uniformly (BL-130, 2026-08-11, superseding the
+> 2026-07-31 note this replaces).** A market body no longer bypasses the two-threshold model —
+> that special case existed only because the market's "supply" was an unconditional, infinite
+> auto-buy. Now that a market's stock is real and finite (`market_component.inventory`,
+> MARKETS.md), it earns its place in the SAME coverage calculation the no-market fallback always
+> used: coverage = `(pool + market inventory) / need` per input, full rate at/above `T_full`,
+> scaled between `T_idle`/`T_full`, idle below `T_idle`. The old `scripts/economy.lua` comment
+> mismatch this note used to flag no longer applies — there is only one model now.
 
 ### Recipes by building type
 

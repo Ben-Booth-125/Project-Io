@@ -96,13 +96,17 @@ minable-but-unsellable asymmetry of the BL-040 raws are catalogued in
    remainder**: total listed quantity never exceeds the pool, each order's matched/auto-cleared
    quantity is tracked per order, and pool debits clamp at zero.
 6. **Auto-demand** — processor input shortfalls and construction material draws
-   (`report.purchases`) enter market demand.
+   (`report.purchases`) enter market demand. BL-130: this is billing, not a fresh grant — the
+   real transaction already happened, capped by real inventory, in the PRIOR phase of the same
+   tick (production and construction both run before `clear_markets`; see § Real market
+   inventory below). What lands here is exactly what was actually drawn.
 7. **Standing buy orders** — read from `world::buy_orders`, entered into demand and the
    explicit buy book (`max_price`, optional `preferred_seller`).
 8. **Reference prices** — computed once from the accumulated supply/demand (below), so every
    flow this tick uses the same price.
-9. **Auto clearing** — auto-surplus sells, and auto-demand buys, at the reference price. The
-   market is a **perfect counterparty**: these always clear in full.
+9. **Auto clearing** — auto-surplus sells at the reference price (**perfect counterparty**: the
+   sell side is still unconditional — see § Real market inventory); auto-demand billed at the
+   reference price for whatever was already drawn in step 6.
 10. **Order-book matching** (BL-037, preferential purchasing — shipped) — explicit sells vs
     explicit buys by price-time priority: cheapest ask first, highest bid first, corp id as the
     deterministic tiebreak. A buyer's `preferred_seller` is served first, tolerated up to
@@ -114,6 +118,46 @@ minable-but-unsellable asymmetry of the BL-040 raws are catalogued in
 
 Cash flows accrue per corp and are applied to balances by `apply_budget`
 (`src/world/budget_system.cpp`).
+
+## Real market inventory (BL-130, 2026-08-11)
+
+`market_component.inventory` is **real, persistent stock** — not reset each tick, unlike
+`supply`/`demand`, which stay per-tick FLOW figures for pricing and reporting. It is the
+substrate BL-263's outpost markets need (a market clearing against remote demand has stock in
+transit and stock on hand, which a derived-from-recent-supply figure cannot represent) and the
+end of the market's old role as an unconditional, infinite counterparty on the **buy** side.
+
+**Fills from real corp sales only** — auto-surplus and standing sell orders, tallied separately
+from `mc.supply[r]` so the BL-078 nation-substrate's abstract supply (a pricing fiction, never
+actually sold by anyone) cannot inflate real stock. Filled during `clear_markets`, after all
+sell-side listing completes.
+
+**Drains during production and construction — both of which run BEFORE `clear_markets` in the
+same tick** — against whatever stock survived from **prior ticks'** sales:
+
+- **`run_processing`** no longer runs an unconditional full batch just because a market exists on
+  the body. Coverage is now `(pool + market inventory) / need`, computed per input exactly as the
+  no-market two-threshold model always did — full batch at/above `t_full`, scaled between
+  `t_idle` and `t_full`, idle below `t_idle`. The old "a market body always runs full batch,
+  auto-buying any shortfall" special case is retired: a market's stock is real and finite now, so
+  it earns its place in the same coverage calculation rather than bypassing it. Draws pool-first,
+  then the market's real inventory for the remainder, decrementing it directly.
+- **`run_construction`** (BL-095's pacing rate) reads `market_component.inventory` directly in
+  place of the old "last tick's cleared supply" proxy, and now actually **drains** it as the
+  build draws — the rate calculation is unchanged in shape, only what it reads and consumes.
+
+Because both consumers draw from the SAME live inventory value in a fixed, deterministic order
+(construction first, then production — the existing tick order), and a processor's `run` fraction
+is bounded by the coverage-min across every input, the total drawn from a market in one tick can
+never exceed what was actually on hand — no double-spend, no negative inventory, no ordering
+dependence beyond the tick's own fixed pass order.
+
+**The sell side is unchanged** — auto-surplus and standing sell orders still clear in full
+unconditionally (§ Known limitations), so a seller never sees different behaviour. What changed
+is only whether a *buyer* (a processor, a build) can get what it wants when the market's real
+shelf is bare.
+
+Verified by `tools/verify/market_inventory_harness.cpp`.
 
 ## Where the order book lives
 
@@ -212,9 +256,9 @@ extracted there enter the economy only by convoy to a Kepler market.
 
 ## Known limitations (honest list)
 
-- **No stored inventory.** `market_component.supply` is a derived per-tick flow, not a stock —
-  the market absorbs any quantity and conjures any shortfall at the resolved price. Revisiting
-  this is BL-130 (real market inventory).
+- **The SELL side still has no cap.** `market_component.supply` stays a derived per-tick flow for
+  pricing purposes, and the market still absorbs any listed sell quantity in full — BL-130 (below)
+  makes the BUY side real and finite; selling remains unconditional, same as before.
 - **Anchored prices.** The [0.25×, 4×] band caps every scarcity signal at 4× base. This is the
   band the BL-078 (product-market inertness) diagnosis found products pegged against — resolved
   in *shape* by the elastic substrate (prices now discover within the band), but the ceiling

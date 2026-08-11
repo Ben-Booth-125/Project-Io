@@ -46,6 +46,9 @@ resource_type resource_from_name(const std::string& name, bool& ok)
         { "alloys",                resource_type::alloys },
         { "electronics",           resource_type::electronics },
         { "spacecraft_components", resource_type::spacecraft_components },
+        { "clean_water",           resource_type::clean_water },
+        { "consumer_goods",        resource_type::consumer_goods },
+        { "medical_supplies",      resource_type::medical_supplies },
     };
 
     const auto it = table.find(name);

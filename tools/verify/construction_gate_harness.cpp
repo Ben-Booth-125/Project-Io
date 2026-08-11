@@ -27,7 +27,8 @@ std::size_t ri(resource_type r) { return static_cast<std::size_t>(r); }
 
 // Build a world with one corp owning one processing building under construction
 // (build_duration_ticks = 3, needs 24 steel), anchored to a market on its body.
-// Returns the ids via out-params. `steel_supply` seeds the market's recent supply.
+// Returns the ids via out-params. `steel_supply` seeds the market's real
+// inventory (BL-130) — what it can actually supply the build.
 struct scene { world w; entity_id bld; entity_id market; entity_id corp; };
 
 scene make_scene(const recipe_registry& reg, float steel_supply)
@@ -54,7 +55,11 @@ scene make_scene(const recipe_registry& reg, float steel_supply)
         mc.centre_tile = tile; // so market_for_tile(tile) routes here
         mc.base_price[ri(resource_type::steel)] = 8.0f;
         mc.price = mc.base_price;
-        mc.supply[ri(resource_type::steel)] = steel_supply; // "recent supply" the build reads
+        // BL-130: run_construction now reads real inventory, not "recent
+        // supply" — seed both so this fixture's name (`steel_supply`) still
+        // means "what the market can actually supply the build".
+        mc.supply[ri(resource_type::steel)]    = steel_supply;
+        mc.inventory[ri(resource_type::steel)] = steel_supply;
         w.markets[s.market] = mc;
     }
 

@@ -509,6 +509,18 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         sell_books[mid][r].push_back({order.corp, available, order.floor_price, available});
     }
 
+    // BL-130: fill real inventory from this tick's REAL corp-sourced sales only —
+    // auto-surplus (auto_sells) and the standing sell orders just listed above
+    // (sell_books). Deliberately NOT read off mc.supply[r] as a whole: that array
+    // also carries inject_substrate_demand's abstract nation supply (a pricing
+    // fiction, never actually sold by anyone), which must not inflate real stock.
+    for (const auto_sell_entry& se : auto_sells)
+        w.markets.at(se.market).inventory[se.r] += se.qty;
+    for (const auto& [mid, sell_by_r] : sell_books)
+        for (const auto& [r, entries] : sell_by_r)
+            for (const ob_sell_entry& e : entries)
+                w.markets.at(mid).inventory[r] += e.qty;
+
     // Auto-demand: processor input shortfalls from the economy report.
     for (const auto& [key, bought] : report.purchases)
     {
