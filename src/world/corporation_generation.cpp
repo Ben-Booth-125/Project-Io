@@ -329,7 +329,8 @@ entity_id author_building(world& w,
     // infrastructure (BL-325) and produces nothing either, so it matches — see
     // construction.cpp's own zero-staff condition, which lists both.
     bc.workforce_assigned =
-        (btype == building_type::port || btype == building_type::military_base) ? 0.0f : 0.5f;
+        (btype == building_type::port || btype == building_type::military_base
+         || btype == building_type::research_institute) ? 0.0f : 0.5f; // BL-332: passive, like military_base
 
     if (btype == building_type::extraction_site)
     {

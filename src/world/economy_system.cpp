@@ -496,6 +496,35 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
     // the local market can supply them (full / stretched / paused).
     run_construction(w, reg, report);
 
+    // BL-332 capability points: a flat per-tick credit to the owning corp's
+    // military_points / science for every COMPLETED military_base /
+    // research_institute it holds — passive, no workforce dependency (both
+    // types staff at zero), symmetric across every corp. Runs after
+    // run_construction so a base finishing this tick already counts, mirroring
+    // the rest of this function's build-then-produce ordering. Iterates each
+    // corp's own `assets` vector (not w.buildings), so per-corp determinism
+    // needs no extra sort — only that corp's own building list, in its own
+    // stored order, decides its own accumulator.
+    {
+        const auto& mp = reg.military();
+        for (auto& [corp, cc] : w.corporations)
+        {
+            for (const entity_id bid : cc.assets)
+            {
+                const auto bit = w.buildings.find(bid);
+                if (bit == w.buildings.end())
+                    continue;
+                const building_component& b = bit->second;
+                if (b.ticks_remaining > 0 || b.decommissioned)
+                    continue; // still under construction, or torn down
+                if (b.type == building_type::military_base)
+                    cc.military_points += mp.military_points_per_base_tick;
+                else if (b.type == building_type::research_institute)
+                    cc.science += mp.science_per_research_institute_tick;
+            }
+        }
+    }
+
     // Bodies that host a market — a processor on one auto-buys input shortfalls
     // rather than idling for want of pool stock (see run_processing).
     std::unordered_set<entity_id> bodies_with_market;

@@ -99,6 +99,7 @@ void building(ImDrawList* dl, ImVec2 centre, float r, building_type type, ImU32 
         case building_type::port:                 triangle(dl, centre, r, fill);  break;
         case building_type::inland_logistics_hub: hub_node(dl, centre, r, fill);  break; // BL-149
         case building_type::military_base:        shield(dl, centre, r, fill);    break; // BL-325
+        case building_type::research_institute:   research(dl, centre, r, fill);  break; // BL-332
         default:
             dl->AddCircleFilled(centre, r, fill);
             dl->AddCircle(centre, r, outline, 0, 1.0f);

@@ -67,6 +67,16 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\resource_chain_harness.cpp ^
    /Fo:build_gen\verify\resource_chain_harness\ /Fe:build_gen\verify\resource_chain_harness.exe
 .\build_gen\verify\resource_chain_harness.exe
 
+:: Military capability points (BL-332) — a completed military_base credits its
+:: owning corp's military_points and a completed research_institute credits
+:: science, symmetric across player and non-player corps; neither accumulates
+:: while under construction or decommissioned.
+cl /nologo /std:c++20 /EHsc /I src tools\verify\military_capability_harness.cpp ^
+   src\world\world.cpp src\world\economy_system.cpp ^
+   src\world\market_clearing.cpp src\world\budget_system.cpp ^
+   /Fo:build_gen\verify\military_capability_harness\ /Fe:build_gen\verify\military_capability_harness.exe
+.\build_gen\verify\military_capability_harness.exe
+
 :: World audit — Kepler biome balance (S2) + extraction placement (S1) +
 :: deposit-reserve seeding (resource_remaining = richness x reserve factor).
 cl /nologo /std:c++20 /EHsc /I src tools\verify\world_audit.cpp ^

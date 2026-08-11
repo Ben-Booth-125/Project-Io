@@ -115,6 +115,16 @@ struct logistics_node_params
     float discount_cap            = 0.50f; ///< ceiling on the summed node discount (fraction of the haul cost).
 };
 
+/// BL-332 capability-point accumulation rates, authored in scripts/economy.lua under the
+/// top-level `military` table. A flat per-tick credit to the owning corp's
+/// corporation_component.military_points / .science for every COMPLETED military_base /
+/// research_institute it owns — see economy_system.cpp's capability-points pass.
+struct military_capability_params
+{
+    float military_points_per_base_tick       = 1.0f;
+    float science_per_research_institute_tick = 1.0f;
+};
+
 /// Player road-placement cost for a single tier (BL-147 core, BL-172 ladder), authored in
 /// scripts/economy.lua under `economy.roads.{track,road,highway}`. A placed road tile costs a
 /// flat credit sum plus per-resource materials bought from the local market — the same cost
@@ -178,6 +188,9 @@ public:
     /// BL-095 construction-gate tunables (economy.construction in Lua).
     const construction_params& construction() const { return m_construction; }
 
+    /// BL-332 capability-point accumulation rates (economy.military in Lua).
+    const military_capability_params& military() const { return m_military; }
+
     /// Base logistics cost per unit distance per unit cargo for the given convoy mode.
     float logistics_cost(convoy_mode m) const
     {
@@ -226,6 +239,7 @@ public:
     void set_thresholds(float t_full, float t_idle) { m_t_full = t_full; m_t_idle = t_idle; }
     void set_substrate(const substrate_params& s) { m_substrate = s; }
     void set_construction(const construction_params& c) { m_construction = c; }
+    void set_military(const military_capability_params& m) { m_military = m; }
     void set_economics(building_type type, const building_economics& e)
     {
         m_building_econ[static_cast<std::size_t>(type)] = e;
@@ -250,8 +264,9 @@ private:
     std::vector<recipe> m_recipes;
 
     /// Indexed by building_type (none / extraction_site / processing_facility / port /
-    /// launchpad / inland_logistics_hub / military_base — BL-325 bumped the count 6 → 7).
-    std::array<building_economics, 7> m_building_econ = {};
+    /// launchpad / inland_logistics_hub / military_base / research_institute — BL-332
+    /// bumped the count 7 → 8).
+    std::array<building_economics, 8> m_building_econ = {};
 
     float m_t_full = 1.0f;
     float m_t_idle = 0.2f;
@@ -263,6 +278,10 @@ private:
     /// BL-095 construction-gate tunables (economy.construction). Defaults match
     /// economy.lua so a hand-built harness registry paces builds sensibly.
     construction_params m_construction = {};
+
+    /// BL-332 capability-point rates. Defaults match economy.lua so a
+    /// hand-built harness registry behaves sensibly without Lua.
+    military_capability_params m_military = {};
 
     /// Logistics base cost per unit distance per unit cargo, indexed by convoy_mode
     /// (land=0, sea=1, air=2, space=3). Defaults match economy.lua values.

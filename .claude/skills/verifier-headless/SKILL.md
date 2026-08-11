@@ -43,6 +43,12 @@ in `tools/verify/README.md`.
   ree_alloy, machinery, alloys, electronics, spacecraft_components) is produced
   at least once and never sits pegged at the `[0.25×, 4×]` band ceiling for the
   whole run. Links the same TUs as `econ_harness`.
+- **`military_capability_harness`** — capability points (BL-332): a completed
+  `military_base` credits its owning corp's `military_points` and a completed
+  `research_institute` credits `science`, at the authored per-tick rate,
+  symmetric across player and non-player corps; a building still under
+  construction (`ticks_remaining > 0`) or decommissioned accumulates nothing.
+  Links the same TUs as `econ_harness`.
 - **`data_creep_harness`** — data-creep instrument (BL-251, v0.1.0 quality audit).
   Runs the **real** generated world (`make_hard_coded_world`) for 1500 ticks, sampling
   ~30 counters (entities, every component store, pools, markets, convoys, trade routes,

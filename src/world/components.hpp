@@ -164,6 +164,11 @@ enum class building_type : uint8_t
     military_base       = 6, ///< BL-325 S1: unit muster building. Produces nothing, staffs at zero,
                              ///< and is deliberately NOT a supply anchor — military reach IS the
                              ///< economic reach field (BL-325 ruling 3). Hire moves onto it in S2.
+    research_institute  = 7, ///< BL-332: the dedicated "how does tech get done" building. Passive
+                             ///< like military_base (produces nothing tradeable, staffs at zero) —
+                             ///< its output is a flat per-tick credit to its owning corp's
+                             ///< `corporation_component::science`, a market-invisible accumulator,
+                             ///< not a resource_type. See economy_system.cpp's capability-points pass.
 };
 
 /// Sentinel `building_component.recipe` value meaning "no processing recipe is
@@ -616,6 +621,18 @@ struct corporation_component
     /// marker glyph itself is unaffected.
     entity_id hq_building     = null_entity;
     float     influence_range = 0.0f;
+
+    /// Capability-point accumulators (BL-332). Stockpiled, market-invisible,
+    /// never decaying — closer to "research points" than a resource_type
+    /// good (no market slot, no price, not held in a (corp, body) pool).
+    /// military_points is produced passively by every completed military_base
+    /// the corp owns (Ben, 2026-08-08: "produced by bases"); science by every
+    /// completed research_institute. Symmetric across every corp — player,
+    /// rival, background — matching the same-clock extension BL-324 gave
+    /// hire_unit. No spend mechanism reads either yet: BL-087's constellation
+    /// (band progress) is the intended sink, not built by this item.
+    float military_points = 0.0f;
+    float science          = 0.0f;
 };
 
 // ---------------------------------------------------------------------------

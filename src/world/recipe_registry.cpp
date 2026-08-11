@@ -159,6 +159,7 @@ void recipe_registry::load_from_lua(lua_state& lua)
             { "launchpad",            building_type::launchpad },
             { "inland_logistics_hub", building_type::inland_logistics_hub }, // BL-149
             { "military_base",        building_type::military_base },        // BL-325 S1
+            { "research_institute",   building_type::research_institute },   // BL-332
         };
         for (const named_type& nt : types)
         {
@@ -178,6 +179,16 @@ void recipe_registry::load_from_lua(lua_state& lua)
                                   std::string("buildings.") + nt.key + ".resource_costs");
             m_building_econ[static_cast<std::size_t>(nt.type)] = e;
         }
+    }
+
+    // BL-332 capability-point accumulation rates (economy.military).
+    sol::optional<sol::table> military = (*econ)["military"];
+    if (military)
+    {
+        military_capability_params mp;
+        mp.military_points_per_base_tick       = military->get_or("military_points_per_base_tick",       mp.military_points_per_base_tick);
+        mp.science_per_research_institute_tick = military->get_or("science_per_research_institute_tick", mp.science_per_research_institute_tick);
+        m_military = mp;
     }
 
     // Road-placement cost per tier (economy.roads.{track,road,highway}, BL-172; BL-147 shipped a

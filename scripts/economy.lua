@@ -109,6 +109,31 @@ economy = {
             build_duration_ticks = 4.0,
             resource_costs = { steel = 35.0 },
         },
+        -- BL-332: Research Institute — the dedicated tech-progress building.
+        -- Same passive shape as military_base (base_rate 0, staffs at zero);
+        -- its output is a flat per-tick credit to the owning corp's
+        -- military.science accumulator (economy.military below), not a
+        -- resource_type good. Priced like military_base — a garrison-grade
+        -- installation, not a waypoint.
+        research_institute = {
+            base_rate   = 0.0,
+            maintenance = 15.0,
+            base_wage   = 10.0,
+            build_cost  = 300.0,
+            build_duration_ticks = 4.0,
+            resource_costs = { steel = 35.0 },
+        },
+    },
+
+    -- BL-332: capability-point accumulation rates. Flat per-tick credit to the
+    -- owning corp's corporation_component.military_points / .science for every
+    -- COMPLETED military_base / research_institute it owns — passive, no
+    -- workforce dependency (both buildings staff at zero). First-cut authored
+    -- constants; retune by playtest. No spend mechanism reads either yet
+    -- (BL-087's constellation is the intended future sink).
+    military = {
+        military_points_per_base_tick       = 1.0,
+        science_per_research_institute_tick = 1.0,
     },
 
     -- Player-placeable roads, now a three-tier ladder (BL-172; BL-147 shipped a single tier). A

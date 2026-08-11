@@ -10160,6 +10160,47 @@
    "resolved": "2026-08-11",
    "evaluated_difficulty": 4,
    "resolution": "Complete. Seven new resource_type values (silicon, refined_copper, ree_alloy, machinery, alloys, electronics, spacecraft_components) land with base prices (world_gen.lua), recipes (recipes.lua ids 7-13), UI presentation (presentation.cpp) and doc updates (RESOURCES.md, PRODUCTION.md). Six pre-existing raws (coal, silica, copper_ore, rare_earth_ore, iron_nickel_ore, platinum_group_metals) gain base prices, closing the minable-but-unsellable asymmetry the design's own measurement identified as the real cost centre — the enum extension itself was free (every array already sizes off resource_count). Steel's recipe gains a coal reagent, closing NR-158. New resource_chain_harness (14 assertions) verifies the full chain produces and prices correctly; six pre-existing harnesses plus the real build confirmed no regression, with ai_skill_harness's 300-tick benchmark measured bit-identical to its pre-change baseline. Background demand for the roster is explicitly BL-365's responsibility, not built here, per the 2026-08-10 sequencing call."
+  },
+  {
+   "brief": "military-capability-points",
+   "title": "BL-332 (military points + research building): passive per-tick accumulators, symmetric across every corp",
+   "difficulty": 3,
+   "importance": "B",
+   "status": "complete",
+   "promoted_from": "backlog.json BL-332, v0.1.14 (Sprint 11)",
+   "rows": [
+    {
+     "id": "R0",
+     "requirement": "ITEM-SPANNING. Every completed military_base credits its owning corp's corporation_component.military_points at the authored per-tick rate; every completed research_institute (a new building_type) credits science, at its own authored rate. Both accumulators are stockpiled and market-invisible — no resource_type value, no market slot. Symmetric across player, rival and background corps (Q4).",
+     "class": "headless",
+     "status": "complete",
+     "notes": "military_capability_harness (new): 6/6 PASS — completed base/institute credit correctly, a non-player corp accumulates identically to the player corp, a building under construction or decommissioned accumulates nothing."
+    },
+    {
+     "id": "R1",
+     "requirement": "research_institute is a real, placeable building_type (any non-ocean land tile, no deposit — same shape as military_base): placement rules, zero workforce staffing, UI name/icon, and the player build-mode candidate list all cover it.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "components.hpp (enum + corp fields), placement_rules.cpp, construction.cpp/corporation_generation.cpp (zero-staff), presentation.cpp (name), icons.cpp (glyph — reuses the existing research() icon), selection_panel.cpp (build candidate + any-placeable list)."
+    },
+    {
+     "id": "R2",
+     "requirement": "The accumulation rates are authored, tunable data (economy.lua), not hardcoded constants, matching every other economics value in the registry.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "scripts/economy.lua military table (military_points_per_base_tick, science_per_research_institute_tick); recipe_registry.hpp military_capability_params + recipe_registry.cpp Lua parse."
+    },
+    {
+     "id": "R3",
+     "requirement": "Existing headless harnesses and the real ProjectIo target stay green after the new building_type and corp fields land.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "econ_harness, econ_stability, construction_harness, world_audit, determinism_harness, order_book_harness, resource_chain_harness: 0 failures each. ai_skill_harness bit-identical to its pre-change baseline (no corp_ai build candidate was added for research_institute — out of this item's scope, see resolution). ProjectIo builds clean."
+    }
+   ],
+   "resolved": "2026-08-11",
+   "evaluated_difficulty": 3,
+   "resolution": "Complete, production side only — matching the item's own settled scope (\"the design half\" plus, this pass, its build). A new research_institute building_type (7->8 values) and two corporation_component accumulators (military_points, science) land: military_base and research_institute both credit their owning corp passively, per tick, gated on completion (ticks_remaining <= 0, not decommissioned) — the same idiom BL-325/BL-350's completed-base checks use. Symmetric across every corp, confirmed by a dedicated non-player-corp assertion. No spend mechanism reads either accumulator yet (BL-087's constellation is the intended future sink, explicitly out of scope) and no corp_ai build candidate was added for research_institute, so rival/background corps will not build one autonomously yet — they still accumulate military_points from any military_base they already build via the existing muster candidate. New military_capability_harness (6 assertions) verifies the production rule directly; seven pre-existing harnesses plus the real build confirmed no regression, with ai_skill_harness measured bit-identical to its pre-change baseline."
   }
  ]
 }

@@ -99,7 +99,8 @@ construction_result construct_building(world& w, const recipe_registry& reg,
     // at zero.
     bc.workforce_assigned =
         (type == building_type::port || type == building_type::inland_logistics_hub
-         || type == building_type::military_base) ? 0.0f : 0.5f;
+         || type == building_type::military_base
+         || type == building_type::research_institute) ? 0.0f : 0.5f; // BL-332: passive, like military_base
     // Build-time pacing (playtest patch, 2026-07-06): the building sits idle
     // for build_duration_ticks economy ticks before economy_system lets it produce.
     //

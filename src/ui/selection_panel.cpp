@@ -894,7 +894,8 @@ void draw_tile_selection(world& w, ui_state& ui)
                                            building_type::port,
                                            building_type::launchpad,
                                            building_type::inland_logistics_hub,
-                                           building_type::military_base})
+                                           building_type::military_base,
+                                           building_type::research_institute})
                 if (placement_rules::can_place_in_world(w, sel, bt, resource_type::iron_ore,
                                                        ui.max_logistics_reach).ok())
                 { any_placeable = true; break; }
@@ -1200,6 +1201,7 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
     cands.push_back({building_type::launchpad,            resource_type::iron_ore, "Launchpad"});
     cands.push_back({building_type::inland_logistics_hub, resource_type::iron_ore, "Inland Logistics Hub"}); // BL-149
     cands.push_back({building_type::military_base,        resource_type::iron_ore, "Military Base"});        // BL-325 S1
+    cands.push_back({building_type::research_institute,   resource_type::iron_ore, "Research Institute"});   // BL-332
 
     // BL-326: fold group by building family — Ben rejected the profit-ranked flat list
     // for named, expandable groups. Assigned by type rather than parsed from the display
@@ -1209,6 +1211,7 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
         c.category = (c.type == building_type::extraction_site)     ? "Extraction"
                     : (c.type == building_type::processing_facility) ? "Processing"
                     : (c.type == building_type::military_base)       ? "Military"
+                    : (c.type == building_type::research_institute)  ? "Military"
                                                                       : "Infrastructure";
 
     for (candidate& c : cands)
