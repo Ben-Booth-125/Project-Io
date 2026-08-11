@@ -347,6 +347,60 @@ std::vector<entity_id> sorted_corp_ids(const world& w)
     std::sort(ids.begin(), ids.end());
     return ids;
 }
+
+/// A surveyed, deposit-bearing tile ranked as a build-candidate site.
+/// Corp-independent: survey state and deposit richness are world facts, not
+/// per-corp knowledge (BL-068's activity fog gates market visibility, not
+/// geographic survey). Populated once per tick and read by every due corp,
+/// rather than rescanned per corp — see BL-253.
+struct extraction_site
+{
+    entity_id     tile;
+    float         suitability;
+    resource_type target;
+};
+
+/// The O(tiles) half of the build-candidate scan, hoisted out of the per-corp
+/// loop (BL-253): `run_corp_strategic_step` used to walk every tile for every
+/// due corp this tick, an O(corps x tiles) term that dominates the tick at
+/// scale (measured: time ~ size^1.28 in BL-250's scaling sweep). Everything
+/// this function reads — composition, survey, deposit richness, landform —
+/// is a world fact, not per-corp state, so the ranked top-M list is identical
+/// for every corp evaluating this tick; only the later can_place_in_world
+/// filter (tech gate, logistics reach) and scoring are genuinely per-corp,
+/// and both run over this already-truncated top-M list, not the full tile set.
+std::vector<extraction_site> rank_extraction_sites(const world& w, int top_m)
+{
+    std::vector<extraction_site> sites;
+    for (const auto& [tid, tc] : w.tiles)
+    {
+        if (placement_rules::is_ocean_tile(tc.composition))
+            continue;
+        if (!tile_surveyed(w, tc))
+            continue; // geographic fog: unsurveyed tiles are not candidates
+        bool any = false;
+        const resource_type best = placement_rules::richest_extractable(tc, any);
+        if (!any)
+            continue;
+        const float rich = tc.resource_deposit[static_cast<std::size_t>(best)];
+        if (rich <= 0.0f)
+            continue;
+        // Terrain affinity × deposit richness: mountains/canyons expose
+        // minerals (TILES.md), read here as a mild suitability bonus.
+        float affinity = 1.0f;
+        if (tc.landform == terrain_landform::mountain ||
+            tc.landform == terrain_landform::canyon)
+            affinity = 1.15f;
+        sites.push_back({tid, rich * affinity, best});
+    }
+    std::sort(sites.begin(), sites.end(), [](const extraction_site& a, const extraction_site& b) {
+        if (a.suitability != b.suitability) return a.suitability > b.suitability;
+        return a.tile < b.tile;
+    });
+    if (static_cast<int>(sites.size()) > top_m)
+        sites.resize(static_cast<std::size_t>(top_m));
+    return sites;
+}
 } // namespace
 
 bool corp_strategic_eval_due(const world& w, entity_id corp, int tick, const corp_ai_params& p)
@@ -374,6 +428,12 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
     const std::vector<entity_id> corp_ids = sorted_corp_ids(w);
 
     const int k = std::max(1, p.cadence_k);
+
+    // BL-253: the ranked build-candidate site list is a world fact, not a
+    // per-corp one — compute it once for the whole tick rather than once per
+    // due corp. Cheap to build unconditionally even on ticks with no due
+    // corp (rare, and still O(tiles) once rather than O(tiles) per corp).
+    const std::vector<extraction_site> ranked_sites = rank_extraction_sites(w, p.top_m_sites);
 
     for (std::size_t index = 0; index < corp_ids.size(); ++index)
     {
@@ -409,37 +469,9 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         std::vector<candidate> cands;
 
         // ---- Build candidates: surveyed, deposit-bearing tiles, top-M ------
+        // Site ranking is precomputed once per tick above (BL-253); only the
+        // per-corp filter (tech gate, logistics reach) and scoring run here.
         {
-            struct site { entity_id tile; float suitability; resource_type target; };
-            std::vector<site> sites;
-            for (const auto& [tid, tc] : w.tiles)
-            {
-                if (placement_rules::is_ocean_tile(tc.composition))
-                    continue;
-                if (!tile_surveyed(w, tc))
-                    continue; // geographic fog: unsurveyed tiles are not candidates
-                bool any = false;
-                const resource_type best = placement_rules::richest_extractable(tc, any);
-                if (!any)
-                    continue;
-                const float rich = tc.resource_deposit[static_cast<std::size_t>(best)];
-                if (rich <= 0.0f)
-                    continue;
-                // Terrain affinity × deposit richness: mountains/canyons expose
-                // minerals (TILES.md), read here as a mild suitability bonus.
-                float affinity = 1.0f;
-                if (tc.landform == terrain_landform::mountain ||
-                    tc.landform == terrain_landform::canyon)
-                    affinity = 1.15f;
-                sites.push_back({tid, rich * affinity, best});
-            }
-            std::sort(sites.begin(), sites.end(), [](const site& a, const site& b) {
-                if (a.suitability != b.suitability) return a.suitability > b.suitability;
-                return a.tile < b.tile;
-            });
-            if (static_cast<int>(sites.size()) > p.top_m_sites)
-                sites.resize(static_cast<std::size_t>(p.top_m_sites));
-
             // Known accepted divergence (BL-162): estimate_prospective_profit
             // (world/building_profit.hpp) is the same model done properly — it takes
             // opex through compute_building_opex, so it carries habitability-scaled
@@ -447,7 +479,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             // Deliberately NOT switched: it would move AI build scoring, hence world
             // evolution, hence every blessed golden, for no player-visible gain.
             const building_economics& ex = reg.economics(building_type::extraction_site);
-            for (const site& s : sites)
+            for (const extraction_site& s : ranked_sites)
             {
                 if (!placement_rules::can_place_in_world(w, s.tile, building_type::extraction_site, s.target))
                     continue;

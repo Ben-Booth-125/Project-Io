@@ -10071,6 +10071,47 @@
    "resolved": "2026-08-08",
    "evaluated_difficulty": 4,
    "resolution": "Complete bar R7's visual leg, blocked by a pre-existing broken include unrelated to this item (NR-091). The order book is world state, serialised on its own flat-binary stream, matched inside the economy tick, and reachable by three new corp_verbs that the player's presses and the rival-corp scorer both route through. order_book_harness 43/43 PASS; econ_harness, corp_ai, corp_agency, history_log, econ_stability and corp_ai_predictive all green. ai_skill_harness's net-worth golden bands fail - but they ALREADY failed 5 assertions at unmodified HEAD, and every determinism assertion passes on both sides. Not re-blessed; see NR-090.\n\nTWO THINGS THE SWEEP TURNED UP, both recorded rather than papered over. The static review found a pre-existing value-minting bug in clear_markets that overlapping sell orders trigger — fixed here, since this item is what made it reachable by a scorer (NR-092). And data_creep_harness R1 now fails where unmodified HEAD passes: rival trading delays the build plateau from tick 500 to tick 1000 (it is still flat from 1000 to 1500). Not re-blessed; NR-093 carries the decision. econ_stability's R6 wall-clock assertion is flaky on this machine under build load — it passed clean on a third consecutive run."
+  },
+  {
+   "brief": "strategic-scan-tile-cost",
+   "title": "BL-253 (O(corps x tiles) scan): run_corp_strategic_step's build-candidate site ranking runs once per tick, not once per due corp",
+   "difficulty": 3,
+   "importance": "A",
+   "status": "complete",
+   "promoted_from": "backlog.json BL-253, re-goaled A/v0.1.13 as BL-365's hard prerequisite (2026-08-10)",
+   "rows": [
+    {
+     "id": "R0",
+     "requirement": "ITEM-SPANNING. The build-candidate site scan (survey + deposit-richness + terrain-affinity ranking, top-M truncation) is computed once per economy tick rather than once per due corp, cutting the O(corps x tiles) term BL-250's scaling sweep found. Behaviour is bit-identical to the per-corp rescan it replaces: nothing in the scan (composition, survey state, deposit richness, landform) is corp-specific or mutated mid-tick by an earlier due corp's command (survey completion is multi-tick via dispatch_survey, not instant), so hoisting it changes cost, not outcome.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "econ_stability R6 sweep exponent 1.28 -> 1.18 (tolerance 1.50), worst-rung growth 3.17x -> 3.01x for a 2x size step (tolerance 4.00x). ai_skill_harness (5 seeds, 300 ticks) produces byte-identical net_worth/action-count output before and after (verified by stash/rebuild/rerun on both sides) - confirms zero behaviour change, only cost."
+    },
+    {
+     "id": "R1",
+     "requirement": "econ_stability R5/R6 (prototype-scale tick budget, sweep exponent, no-quadratic-doubling, largest-rung-under-1ms) all still PASS after the change.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "econ_stability: ALL PASS, 0 failures. R6 exponent 1.18 (was 1.28), all four sub-assertions green."
+    },
+    {
+     "id": "R2",
+     "requirement": "determinism_harness and order_book_harness (both link corp_ai.cpp) stay green: the hoist introduces no clock/RNG/iteration-order dependence.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "determinism_harness: 25/25 PASS. order_book_harness: 45/45 PASS."
+    },
+    {
+     "id": "R3",
+     "requirement": "The real ProjectIo target and world_audit still build and run clean against the changed TU.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "Both build clean (ninja, 0 warnings surfaced). world_audit: all assertions PASS, exit 0."
+    }
+   ],
+   "resolved": "2026-08-11",
+   "evaluated_difficulty": 3,
+   "resolution": "Complete. rank_extraction_sites() (src/world/corp_ai.cpp) hoists the O(tiles) survey/richness/affinity scan out of the per-corp loop in run_corp_strategic_step, computed once per tick and read by every due corp; only the per-corp can_place_in_world filter (tech gate, logistics reach) and scoring still run per corp, over the already-truncated top-M list. Verified behaviour-preserving by stash-and-diff against unmodified main: ai_skill_harness's 5-seed/300-tick benchmark produces numerically identical net_worth curves and action-verb counts on both sides, including its pre-existing golden-band failures (seeds 1-4 'net-worth final' fail identically on both sides - tracked by NR-140, not caused or worsened by this item; not re-blessed here since it is out of this item's scope). econ_stability's BL-250 scaling sweep is the direct measurement: exponent 1.28 -> 1.18, worst 2x-size-step growth 3.17x -> 3.01x, all six harnesses/build targets green. BL-365 (background industry, ~80 corps) is now unblocked."
   }
  ]
 }
