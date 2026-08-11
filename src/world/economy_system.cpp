@@ -478,6 +478,11 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
             // (is_supply_anchor's ticks_remaining contract, 2026-08-08), so the
             // reach field goes stale at this moment too, not only at placement.
             invalidate_logistics_caches(w);
+            // BL-263: COMPLETION is also the spontaneous-market-emergence
+            // trigger. No-op if the body already has a market (including an
+            // instant build that already spawned one at placement, construction.cpp).
+            if (body != null_entity)
+                maybe_spawn_market(w, reg, body, b.tile);
         }
     }
 }

@@ -24,8 +24,41 @@ fallback market is seeded.
 
 **Catchment routing:** a tile clears against the market whose `centre_tile` is nearest
 (`market_for_tile`); a corp's body-aggregate clearing routes via its lowest-id building's tile
-(`market_for_corp_on_body`). Markets are **fixed at world-gen** — nothing creates or destroys
-one at runtime.
+(`market_for_corp_on_body`). This section describes the **home body's** own market set, fixed at
+world-gen. Off-world, markets are no longer fixed — see § Spontaneous market emergence below.
+
+## Spontaneous market emergence (BL-263, 2026-08-11)
+
+Off-world (any body other than `world::home_body`), a market is **runtime state, not a
+generation artifact**: it comes into existence the tick a body's first building *completes*
+(`maybe_spawn_market`, called from both `construct_building`'s instant-completion path and
+`run_construction`'s pacing loop, `economy_system.cpp`) — investment, not presence; a survey
+(BL-067) completing is explicitly **not** the trigger, keeping the geographic and commercial fogs
+independent (`docs/ui/DISCOVERY.md`). **Any** corporation can cause one; the player does not learn
+of a rival-created market for free — it enters at the activity fog's Unknown tier
+(`docs/ui/DISCOVERY.md`) like any other undiscovered activity. Exactly **one market per body**
+off-world (BL-096's population-anchored carving does not apply — an outpost has no population to
+anchor to); the home body's own carved multi-market seeding is untouched. A market **never
+disappears** — nothing in the engine ever removes an entry from `world::markets`; an outpost whose
+last building is decommissioned simply goes dormant (stops clearing anything, per the ordinary
+zero-supply/zero-demand case), which the activity fog's existing Stale tier already models.
+
+**Opening prices** come from the home body's own `base_price`, marked up by distance
+(`market_emergence_params.price_distance_gain`, `economy.market_emergence` in Lua) rather than
+from `world_gen`'s flat `base_price` table or from EMA smoothing, which cannot run with no price
+history. A resource untradeable at home (`base_price` 0) stays untradeable at the outpost.
+
+**What clears there.** An outpost has real supply (whatever it produces) and essentially no local
+demand, so clearing only against local population would collapse its prices to the floor the
+instant it started producing — the failure mode BL-263's design flagged as most likely to read as
+broken. Instead, `inject_interbody_demand` pulls a distance-discounted slice of the **home body's
+own unmet demand** (its `demand - supply`, when positive) onto every outpost market's demand each
+tick, additive alongside `inject_population_demand` — "nobody builds a mine on a moon to sell to
+the moon." This is deliberately simpler than modelling every possible source/destination pair: the
+home body is the one market every outpost is presumed to ultimately feed, directly or through
+`dispatch_convoys`' own existing physical routing (which independently moves the corp's stockpiled
+surplus between bodies — this mechanism only shapes the outpost's local *price*, it moves no
+goods itself).
 
 ## What trades
 

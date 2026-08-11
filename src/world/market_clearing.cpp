@@ -267,6 +267,116 @@ void inject_population_demand(world& w, const recipe_registry& reg)
     }
 }
 
+namespace {
+
+/// The lowest-id market on @p body, or `null_entity` if none — the same stable
+/// pick `supply_system.cpp`'s own `market_for_body` makes (duplicated rather
+/// than shared: that one lives in an anonymous namespace, internal linkage).
+entity_id market_for_body(const world& w, entity_id body)
+{
+    entity_id best = null_entity;
+    for (const auto& [mid, mc] : w.markets)
+        if (mc.body == body && (best == null_entity || mid < best))
+            best = mid;
+    return best;
+}
+
+/// Distance proxy (AU) between two bodies, for BL-263's opening-price markup and
+/// inter-body demand pull — NOT the precise tick-pure angular distance
+/// `supply_system.cpp`'s convoy routing uses (that drives real haul cost and
+/// speed; this only shapes a price curve). A moon is approximated at its
+/// parent's radius, matching that function's own moon approximation. Pure
+/// function of generation-time orbital_radius_au — no tick dependency, so this
+/// distance never changes across a campaign.
+float body_radius_distance_au(const world& w, entity_id a, entity_id b)
+{
+    if (a == b)
+        return 0.0f;
+    auto radius = [&](entity_id id) -> float {
+        const auto it = w.bodies.find(id);
+        if (it == w.bodies.end())
+            return 0.0f;
+        const body_component* bc = &it->second;
+        // Moon: approximate at its parent's orbital radius (mirrors
+        // supply_system.cpp's body_distance_au moon handling).
+        if (bc->parent != null_entity)
+        {
+            const auto pit = w.bodies.find(bc->parent);
+            if (pit != w.bodies.end())
+                bc = &pit->second;
+        }
+        return bc->orbital_radius_au;
+    };
+    return std::fabs(radius(a) - radius(b));
+}
+
+} // namespace
+
+entity_id maybe_spawn_market(world& w, const recipe_registry& reg, entity_id body, entity_id tile)
+{
+    if (market_for_body(w, body) != null_entity)
+        return null_entity; // one market per body off-world; already have one.
+
+    const market_emergence_params& mp = reg.market_emergence();
+    const entity_id home_market = (w.home_body != null_entity)
+        ? market_for_body(w, w.home_body) : null_entity;
+
+    market_component mc;
+    mc.body        = body;
+    mc.centre_tile = tile; // the completed building's own tile — the site that earned it.
+
+    if (home_market != null_entity)
+    {
+        const market_component& hm = w.markets.at(home_market);
+        const float dist = body_radius_distance_au(w, body, w.home_body);
+        const float markup = 1.0f + mp.price_distance_gain * dist;
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            if (hm.base_price[r] <= 0.0f)
+                continue; // Untradeable at home stays untradeable here.
+            mc.base_price[r] = hm.base_price[r] * markup;
+        }
+    }
+    // Else: home body carries no market (a degenerate harness fixture) — the new
+    // market opens all-zero base_price, the same safe "untradeable" fallback
+    // every unauthored resource already gets; no crash, no special case needed.
+    mc.price = mc.base_price; // start at the seeded opening price, same as generation.
+
+    const entity_id mid = w.create_entity();
+    w.markets[mid] = mc;
+    return mid;
+}
+
+void inject_interbody_demand(world& w, const recipe_registry& reg)
+{
+    if (w.home_body == null_entity)
+        return;
+    const entity_id home_market_id = market_for_body(w, w.home_body);
+    if (home_market_id == null_entity)
+        return;
+    const market_component& home = w.markets.at(home_market_id);
+    const market_emergence_params& mp = reg.market_emergence();
+
+    for (auto& [mid, mc] : w.markets)
+    {
+        if (mc.body == w.home_body)
+            continue; // The home body pulls demand onto outposts, not itself.
+
+        const float dist   = body_radius_distance_au(w, mc.body, w.home_body);
+        const float falloff = 1.0f + mp.distance_falloff * dist;
+
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            const float home_shortfall = home.demand[r] - home.supply[r];
+            if (home_shortfall <= 0.0f)
+                continue;
+            if (mc.base_price[r] <= 0.0f)
+                continue; // Untradeable here regardless of what's wanted at home.
+            mc.demand[r] += home_shortfall * mp.pull_fraction / falloff;
+        }
+    }
+}
+
 std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     world& w,
     const recipe_registry& reg,
@@ -298,6 +408,12 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // Population food demand (BL-190) — likewise additive after the reset, so
     // the population's pull reaches price resolution.
     inject_population_demand(w, reg);
+
+    // BL-263: the home body's own unmet demand pulls a discounted slice onto
+    // every outpost market, additive after the resets above — without this an
+    // outpost with real supply and no local population collapses to the price
+    // floor the instant it starts producing.
+    inject_interbody_demand(w, reg);
 
     // A (corp, body, resource) with a standing sell order against it is under
     // manual control: the auto-surplus path yields so the floor-priced order

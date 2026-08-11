@@ -162,6 +162,14 @@ construction_result construct_building(world& w, const recipe_registry& reg,
     if (type != building_type::extraction_site)
         placement_rules::maybe_transform_to_urban(w, tile);
 
+    // BL-263: COMPLETION is the market-emergence trigger, and for an instant
+    // build (ticks_remaining == 0 here — build_duration_ticks <= 0, above)
+    // placement IS completion. The run_construction pacing loop (economy_system.cpp)
+    // only ever visits buildings that started with ticks_remaining > 0, so this is
+    // the one completion this function must catch itself.
+    if (bc.ticks_remaining <= 0)
+        maybe_spawn_market(w, reg, tile_it->second.body, tile);
+
     cc.assets.push_back(bld_id);
     // BL-095: no up-front debit — run_construction charges build_cost + materials
     // incrementally as the build progresses (pay-as-you-build).

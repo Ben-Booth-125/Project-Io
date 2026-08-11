@@ -221,6 +221,17 @@ economy = {
         demand_scale      = 1.00,
     },
 
+    -- BL-263 (2026-08-11): spontaneous market emergence — a market appears the
+    -- tick the first building completes on a body that has none, seeded from the
+    -- home body's own prices/demand rather than from nothing. See
+    -- maybe_spawn_market / inject_interbody_demand (market_clearing.cpp) and
+    -- docs/economy/MARKETS.md § Spontaneous market emergence.
+    market_emergence = {
+        price_distance_gain = 0.08, -- opening-price markup per AU from the home body
+        pull_fraction       = 0.50, -- fraction of the home body's unmet demand pulled onto an outpost
+        distance_falloff    = 0.15, -- per-AU falloff denominator on the pulled demand
+    },
+
     -- BL-095: construction is gated on local market supply. Each tick a build
     -- draws 1/build_duration_ticks of its materials as real market DEMAND (bids
     -- the price up, competes with population and other builds) and progresses at a

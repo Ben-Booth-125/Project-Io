@@ -151,6 +151,17 @@ void recipe_registry::load_from_lua(lua_state& lua)
         m_population_demand = pd;
     }
 
+    // BL-263 spontaneous-market-emergence tunables (economy.market_emergence).
+    sol::optional<sol::table> market_emergence = (*econ)["market_emergence"];
+    if (market_emergence)
+    {
+        market_emergence_params me;
+        me.price_distance_gain = market_emergence->get_or("price_distance_gain", me.price_distance_gain);
+        me.pull_fraction       = market_emergence->get_or("pull_fraction",       me.pull_fraction);
+        me.distance_falloff    = market_emergence->get_or("distance_falloff",    me.distance_falloff);
+        m_market_emergence = me;
+    }
+
     // BL-095 construction-gate (economy.construction).
     sol::optional<sol::table> construction = (*econ)["construction"];
     if (construction)

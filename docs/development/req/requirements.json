@@ -10339,6 +10339,51 @@
      "notes": "econ_harness, econ_stability, resource_chain_harness, determinism_harness, construction_harness, world_audit, construction_gate_harness, buildings_rework_harness, multi_building_tile_harness all rerun clean; full ProjectIo build clean."
     }
    ]
+  },
+  {
+   "brief": "spontaneous-market-emergence",
+   "title": "BL-263 (spontaneous market emergence): a market appears the tick a body's first building completes, seeded from home-body prices, pulling home-body demand rather than collapsing to the price floor",
+   "difficulty": 4,
+   "importance": "B",
+   "status": "complete",
+   "promoted_from": "backlog.json BL-263, v0.1.13 (Sprint 10) — unblocks BL-130, in turn a hard prerequisite of BL-365",
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "maybe_spawn_market creates exactly one market on a body the first time any building on it completes (any corporation); a second completion on the same body creates no second market. Placement-time instant completion and the run_construction pacing-loop completion both fire the trigger.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "market_emergence_harness R1/R2/R4: 5/5 PASS."
+    },
+    {
+     "id": "R2",
+     "requirement": "The new market's centre_tile is the completed building's own tile; opening base_price is the home market's own base_price marked up by a distance-from-home-body factor, and price starts equal to base_price (no EMA history). A resource untradeable at home (base_price 0) stays untradeable at the new market.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "market_emergence_harness R2/R3: 5/5 PASS, exact formula match."
+    },
+    {
+     "id": "R3",
+     "requirement": "inject_interbody_demand pulls a distance-discounted slice of the home body's own unmet demand (demand - supply, when positive) onto every OTHER body's market per resource, exactly matching the authored formula; never pulls for an untradeable resource; never injects into the home market itself; is a clean no-op when the world has no home market.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "market_emergence_harness R5/R6/R7: 6/6 PASS."
+    },
+    {
+     "id": "R4",
+     "requirement": "No regression in the existing economy/construction/determinism/generation/supply harness suite, and the real ProjectIo target still builds clean.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "econ_harness, econ_stability, resource_chain_harness, determinism_harness, construction_harness, world_audit, construction_gate_harness, buildings_rework_harness, multi_building_tile_harness, population_demand_harness, habitability_tranche_harness, supply_advance, trade_routes_harness, commercial_fog_harness all rerun clean; full ProjectIo build clean."
+    },
+    {
+     "id": "R5",
+     "requirement": "ai_skill_harness golden-band impact assessed with a fresh rebuild (not a stale exe) to confirm this item does not introduce further drift beyond what BL-366 already caused.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "Identical 8 failures to the BL-366-only baseline — no further movement. NR-169 corrected accordingly."
+    }
+   ]
   }
  ]
 }

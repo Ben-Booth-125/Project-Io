@@ -22,16 +22,59 @@ struct corp_cash_flow
     float expenditure = 0.0f; ///< Inputs auto-bought × resolved price.
 };
 
-/// Inject population food demand into body markets (BL-190: a plain
-/// market-demand pull, never a starvation mechanic). Each population centre adds
-/// 1 unit of agricultural_produce demand per scale level to its catchment market
-/// (market_for_tile, so BL-096 multi-market bodies route by nearest centre).
-/// Called from clear_markets after the per-tick supply/demand reset, before the
-/// order-book pass, so the demand is additive and survives into price
-/// resolution. Deterministic — no RNG.
+/// Inject population demand into body markets (BL-190 ordering fix + BL-368
+/// basket generalisation: a plain market-demand pull, never a starvation
+/// mechanic). Each population centre pulls a price-elastic, multi-resource
+/// basket (population_demand_params, economy.population_demand in Lua) into its
+/// catchment market (market_for_tile, so BL-096 multi-market bodies route by
+/// nearest centre) — population is a pure CONSUMER, no supply term. Called from
+/// clear_markets after the per-tick supply/demand reset, before the order-book
+/// pass, so the demand is additive and survives into price resolution.
+/// Deterministic — no RNG.
 ///
 /// @param w World; market demand arrays are mutated in place.
 void inject_population_demand(world& w, const recipe_registry& reg);
+
+/// BL-263: if @p body carries no market yet, create one — the spontaneous
+/// market emergence trigger fires the tick a body's FIRST building completes
+/// (any corporation; investment, not presence). No-op if the body already has a
+/// market (including the home body's own BL-096 carved seeding, which always
+/// predates any completion trigger) or the body id is invalid.
+///
+/// Opening prices are seeded from `market_for_body(w, w.home_body)`'s own
+/// base_price, marked up by distance (market_emergence_params.price_distance_gain)
+/// — not from world_gen's flat base_price table and not from EMA, which cannot
+/// run with no history. If the home body itself has no market (a degenerate
+/// harness fixture), the new market opens with all-zero base_price — untradeable
+/// but harmless, the same safe fallback every other resource with base_price 0
+/// already gets.
+///
+/// The new market's `centre_tile` is the completed building's own tile — an
+/// off-world outpost has no population-centre tile to anchor to, and this is at
+/// least the site that earned the market. Deterministic: a pure function of
+/// world state (body distances, market ids) with no RNG; market ids come from
+/// `world::create_entity`'s monotonic counter, never container size.
+///
+/// @param w        Mutable world; may insert into `w.markets`.
+/// @param reg      Loaded registry (market_emergence_params).
+/// @param body     Body the just-completed building sits on.
+/// @param tile     The completed building's own tile (the new market's centre).
+/// @return         The new market's id, or `null_entity` if none was created.
+entity_id maybe_spawn_market(world& w, const recipe_registry& reg, entity_id body, entity_id tile);
+
+/// BL-263: pulls a discounted slice of the home body's own unmet demand
+/// (demand - supply, when positive) onto every OTHER body's market, per
+/// resource — "an outpost market clears primarily against inter-body demand...
+/// nobody builds a mine on a moon to sell to the moon." Without this an outpost
+/// with real supply and no local population collapses to the price floor the
+/// instant it starts producing. Called from clear_markets after
+/// inject_population_demand (additive, same ordering contract). No-op if the
+/// home body has no market. Deterministic — no RNG, a pure function of the
+/// already-accumulated demand/supply this tick.
+///
+/// @param w   World; every non-home-body market's demand is mutated in place.
+/// @param reg Loaded registry (market_emergence_params).
+void inject_interbody_demand(world& w, const recipe_registry& reg);
 
 /// Clear every body market for one economy tick using a per-(body, resource)
 /// matched order book. For each market and resource:

@@ -10,7 +10,72 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — BL-368 lands: Sprint 10's second foundation, and a stale bug claim corrected (2026-08-11, latest)
+## Session — BL-263 lands: BL-365's blocker chain, first link (2026-08-11, latest)
+
+Full mode, one item, continuing the same session as BL-368/BL-366 below.
+
+**The blocker chain, found before writing any code.** Moving to BL-365 (the Sprint 10 keystone)
+next, its design's own `blocked_on` field named **BL-130** (real market inventory) as a hard
+prerequisite — settled 2026-08-11 in BL-365's own design pass: *"a market that conjures any
+shortfall undercuts the whole point of modelling real producers."* BL-130 itself `requires`
+**BL-263** (spontaneous market emergence), also un-landed. Neither was in Sprint 10's original
+plan. Surfaced to Ben rather than pushed through silently, per the standing sequencing rule; his
+call was to work the chain in order — BL-263 → BL-130 → BL-365.
+
+**BL-263 — spontaneous market emergence, landed.** All five of Ben's 2026-08-02 settled calls
+implemented as specified. **Trigger**: the first building *completing* (not placing) on a body
+with no market — `maybe_spawn_market`, wired into both `construct_building`'s instant-completion
+path (`build_duration_ticks <= 0`) and `run_construction`'s pacing-loop completion
+(`economy_system.cpp`); survey completion is explicitly *not* the trigger, keeping the geographic
+and commercial fogs independent. **Who**: any corporation — no player-only gate; a rival-created
+market on an unvisited body needed no new fog code, since the existing activity fog (BL-089)
+already gates on presence/routes, not market existence directly. **One market per body**
+off-world, checked before spawning; the home body's BL-096 carved seeding is untouched.
+**Never disappears**: no deletion code exists anywhere for markets, so persistence-with-dormancy
+falls out for free — a dormant outpost is just the ordinary zero-supply/zero-demand case.
+**Opening prices**: the home market's own `base_price`, marked up by a distance proxy
+(`|orbital_radius_au` difference`|`, moon-approximated at its parent — a cheaper stand-in for
+`supply_system.cpp`'s precise tick-pure angular distance, adequate for a price curve though not
+for real haul routing). **What clears**: new `inject_interbody_demand` pulls a
+distance-discounted slice of the home body's own unmet demand onto every outpost market each
+tick (`economy.market_emergence` in Lua) — the mechanism that stops an outpost with real supply
+and no local population from collapsing to the price floor the instant it starts producing,
+independent of `dispatch_convoys`' own physical routing.
+
+**No save-format work** — named in the design as a real consequence, but there is no general
+serialisation system in this codebase yet to extend (no `src/world/serialisation.cpp`), so that
+half of BL-263's design stays deferred to whenever the save seam actually lands, not built here.
+
+**A self-correction.** BL-368's `ai_skill_harness` finding (below) claimed a *different* 5-failure
+set after landing, versus the BL-366-only 8-failure baseline. Rebuilding `ai_skill_harness` fresh
+before trusting it against BL-263 caught the error: the "5" reading was a **stale `.exe`**, never
+rebuilt after the stash-and-pop investigation that produced the 8-failure baseline. A clean
+rebuild with BL-366+BL-368+BL-263 all applied reproduces the exact same 8 failures as the
+BL-366-only baseline — BL-368 and BL-263 do not move the bands further, at least not detectably.
+NR-169 corrected accordingly; the lesson (rebuild after any stash/pop before trusting a result)
+is recorded there too.
+
+**Verification.** New `tools/verify/market_emergence_harness.cpp` (16/16 PASS): no market before
+any building, correct spawn on completion, correct `centre_tile`, exact opening-price and
+pulled-demand formulas checked arithmetically (not just sign), no second market on a second
+building, no self-pull on the home market, and a graceful all-zero-price degenerate fixture with
+no home market at all (no crash). Full `ProjectIo` build clean. Reran `econ_harness`,
+`econ_stability`, `resource_chain_harness`, `determinism_harness`, `construction_harness`,
+`world_audit`, `construction_gate_harness`, `buildings_rework_harness`,
+`multi_building_tile_harness`, `population_demand_harness`, `habitability_tranche_harness`,
+`supply_advance`, `trade_routes_harness`, `commercial_fog_harness` — all clean, checked for real
+`FAIL` lines rather than trusting a `grep -c FAIL` count (which false-positives on summary text
+like "0 failures").
+
+docs/economy/MARKETS.md gains § Spontaneous market emergence. backlog.json BL-263 → `complete`;
+requirements.json § spontaneous-market-emergence (R1–R5, all complete); REFINED.md drained.
+
+**Still blocking BL-365.** BL-130 (real market inventory) is next — the last link before the
+keystone itself.
+
+---
+
+## Session — BL-368 lands: Sprint 10's second foundation, and a stale bug claim corrected (2026-08-11)
 
 Full mode, one item, continuing the same session as BL-366 below.
 

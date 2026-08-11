@@ -1,6 +1,14 @@
 # Project Io — REFINED (active worklist)
 
 
+> Drained 2026-08-11: BL-263 (spontaneous market emergence), promoted out of turn to unblock
+> BL-365 (blocked_on BL-130, which requires BL-263), 1 task COMPLETE — removed per the
+> retain-one policy. Record lives in DEVLOG.md (2026-08-11 entry), backlog.json BL-263's
+> `resolution` field, and requirements.json § spontaneous-market-emergence (R1–R5). Corrected an
+> earlier stale-exe reading in NR-169 in passing: BL-368/BL-263 do not move `ai_skill_harness`'s
+> golden bands beyond what BL-366 already did. BL-130 (real market inventory) is next — now the
+> only thing standing between here and BL-365 itself.
+
 > Drained 2026-08-11: BL-368 (real population demand + habitability tranche), Sprint 10's second
 > foundation item, 1 task COMPLETE — removed per the retain-one policy. Record lives in DEVLOG.md
 > (2026-08-11 entry), backlog.json BL-368's `resolution` field, and requirements.json

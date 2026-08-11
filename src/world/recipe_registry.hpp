@@ -59,6 +59,34 @@ struct substrate_params
     float growth_met_threshold = 0.50f; ///< basket met-supply ratio a centre needs to grow.
 };
 
+/// BL-263 spontaneous-market-emergence tunables, authored in scripts/economy.lua
+/// under `economy.market_emergence`. Two independent uses, both keyed off distance
+/// from the home body (world::home_body), the only body with a market at world
+/// generation: seeding a newly-spawned outpost market's opening prices
+/// (maybe_spawn_market), and pulling a discounted slice of the home body's own
+/// unmet demand onto every outpost market each tick so an outpost with supply and
+/// no local population does not collapse to the price floor
+/// (inject_interbody_demand). See docs/economy/MARKETS.md § Spontaneous market
+/// emergence.
+struct market_emergence_params
+{
+    /// Opening-price markup per AU of distance from the home body: a spawned
+    /// market's base_price[r] = home_market.base_price[r] * (1 + price_distance_gain
+    /// * distance_au) — haul cost makes goods dearer the further they must travel,
+    /// mirroring BL-191's endemic-good distance pricing but keyed to a real
+    /// per-resource base price rather than a flat source price.
+    float price_distance_gain = 0.08f;
+    /// Fraction of the home body's own unmet demand (demand - supply, when
+    /// positive) pulled onto each outpost market per tick, before the distance
+    /// falloff below.
+    float pull_fraction = 0.50f;
+    /// Falloff denominator per AU: pulled_demand = home_shortfall * pull_fraction
+    /// / (1 + distance_falloff * distance_au). Further outposts feel less of the
+    /// home body's pull — plausible if a haul is expensive, and it keeps a distant
+    /// outpost's price from being yanked to Kepler's exactly.
+    float distance_falloff = 0.15f;
+};
+
 /// BL-368 population-demand model tunables, authored in scripts/economy.lua under
 /// `economy.population_demand`. Applied at tick time by inject_population_demand:
 /// each population centre pulls DEMAND = pcc.scale × basket[r] × elasticity(price)
@@ -232,6 +260,9 @@ public:
     /// BL-368 population-demand model tunables (economy.population_demand in Lua).
     const population_demand_params& population_demand() const { return m_population_demand; }
 
+    /// BL-263 spontaneous-market-emergence tunables (economy.market_emergence in Lua).
+    const market_emergence_params& market_emergence() const { return m_market_emergence; }
+
     /// BL-095 construction-gate tunables (economy.construction in Lua).
     const construction_params& construction() const { return m_construction; }
 
@@ -289,6 +320,7 @@ public:
     void set_thresholds(float t_full, float t_idle) { m_t_full = t_full; m_t_idle = t_idle; }
     void set_substrate(const substrate_params& s) { m_substrate = s; }
     void set_population_demand(const population_demand_params& p) { m_population_demand = p; }
+    void set_market_emergence(const market_emergence_params& m) { m_market_emergence = m; }
     void set_construction(const construction_params& c) { m_construction = c; }
     void set_military(const military_capability_params& m) { m_military = m; }
     void set_procurement(const procurement_params& p) { m_procurement = p; }
@@ -327,6 +359,7 @@ private:
     /// economy.lua so a hand-built harness registry behaves sensibly without Lua.
     substrate_params m_substrate = {};
     population_demand_params m_population_demand = {};
+    market_emergence_params m_market_emergence = {};
 
     /// BL-095 construction-gate tunables (economy.construction). Defaults match
     /// economy.lua so a hand-built harness registry paces builds sensibly.

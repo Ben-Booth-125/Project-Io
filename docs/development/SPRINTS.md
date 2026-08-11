@@ -284,8 +284,11 @@ now deferred a second time**, both times in the same direction.
 
 **Progress (2026-08-11).** BL-253 (prerequisite), **BL-366 (multi-building tile stack cap + urban
 transform)** and **BL-368 (real population demand + habitability tranche)** now `complete` — both
-foundations landed. BL-365 (the keystone), BL-367, BL-130, BL-132 and BL-369 remain `designed`,
-not yet promoted. See DEVLOG's 2026-08-11 entries.
+foundations landed. Attempting BL-365 next found it `blocked_on` **BL-130** (real market
+inventory), which itself `requires` **BL-263** (spontaneous market emergence) — neither was in
+Sprint 10's original plan, but both are now load-bearing prerequisites, pulled in out of turn.
+**BL-263 landed** the same day. BL-130 is next; BL-367, BL-132 and BL-369 remain `designed`, not
+yet promoted. See DEVLOG's 2026-08-11 entries.
 
 ## Sprint 11 — Procurement, and the goods it is about (cut v0.1.14)
 
