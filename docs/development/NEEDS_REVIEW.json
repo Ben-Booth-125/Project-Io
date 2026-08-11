@@ -2613,6 +2613,19 @@
    "source": "BL-365 design draft — its dominant open question.",
    "what": "BL-365 multiplies corp count by roughly an order of magnitude. corp_ai's per-corp evaluation is what BL-253 identifies as an O(corps x tiles) tile rescan, and the econ tick already costs ~3.5 ms on the real generated world with eight corps — with pre_game_ticks now 80, that runs before the first frame of every new game. Running the full scored-utility layer for ~80 corps may be unaffordable even with BL-253 fixed. The likely answer is a reduced per-tick model for background firms (produce, sell, maintain; no build/demolish scoring) with corp_ai reserved for the handful of RIVAL corps that actually contest the player — but that introduces a two-tier actor model, which is a design commitment in its own right and should be Ben's call rather than a build-time expedient.",
    "resolution": "FULL CORP_AI FOR ALL BACKGROUND FIRMS (Ben, 2026-08-11) — not the reduced produce/sell/maintain model recommended. All ~80 background firms run the same scored-utility layer as rival corps; no two-tier actor model. Consequence: the perf risk this entry raised is now load-bearing rather than hedged — BL-253 (the O(corps x tiles) scan fix) becomes a hard prerequisite for BL-365, not a nicety, matching its re-goal to A/v0.1.13. BL-365's design field carries the update."
+  },
+  {
+   "id": "NR-161",
+   "title": "Sprint 10 (v0.1.13) design pass closed out: BL-365/366/367/368/369 all now designed",
+   "raised": "2026-08-11",
+   "kind": "observation",
+   "status": "resolved",
+   "source": "Sprint 10 design session, following on from the 2026-08-10 living-world pivot.",
+   "what": "Ben's calls, recorded here as the durable summary (each also lives inline in its item's design field): BL-365 background firms run FULL corp_ai for all ~80 (not a reduced model) - makes BL-253 (now complete) a hard prerequisite, not a hedge. Corp-facing surfaces distinguish background firms from named rivals rather than listing ~80 uniformly - corporation_component gains bool is_background. BL-130 (real market inventory) promoted to a hard BL-365 prerequisite - a market that conjures shortfall undercuts the whole modelling premise. BL-366's stack bound is terrain-type capacity with a one-way urban terrain_composition transition, cap table authored (6 habitable / 4 industrial / 2 hostile). BL-367 (management UI) resolved by extending shipped precedent, no further Ben input needed: grouped-by-stack listing, tile-selects/marker-selects click model, dominant-glyph + count-badge marker reusing the survey badge's k/N convention. BL-368 grows a real habitability-goods resource tranche now (Clean Water, Consumer Goods, Medical Supplies - Building Materials and Utilities stay out of scope) rather than staying restricted to existing resources. BL-369 settled as a documented settling pass, no calendar meaning (2026-08-11, ERAS.md updated).",
+   "files": [
+    "docs/development/backlog.json"
+   ],
+   "resolution": "All five items now status designed. BL-253 (the hard perf prerequisite) is complete and committed (1a2c0ee). BL-130 gained a new inbound dependency from BL-365 that it did not carry before. Next buildable items in dependency order: BL-130 and BL-368 have no blockers and can promote independently; BL-366 has no blockers; BL-365 waits on BL-130 and BL-366; BL-367 waits on BL-366."
   }
  ]
 }
