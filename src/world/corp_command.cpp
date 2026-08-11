@@ -1,5 +1,6 @@
 #include "corp_command.hpp"
 
+#include "condition_set.hpp" // BL-350: request_quote's embargo decline condition
 #include "construction.hpp"
 #include "logistics.hpp" // invalidate_logistics_caches (idle/resume flips the anchor set)
 #include "recipe_registry.hpp"
@@ -8,6 +9,7 @@
 #include "world.hpp"
 
 #include <algorithm>
+#include <cmath>
 
 namespace {
 
@@ -123,6 +125,77 @@ entity_id any_market_on_body(const world& w, entity_id body)
         if (mc.body == body && (best == null_entity || mid < best))
             best = mid; // lowest id, so the answer does not depend on map order
     return best;
+}
+
+/// BL-350 Q2, decline condition 1 ("no capacity"): does `supplier` own a
+/// COMPLETED building that can produce `resource` at all? Extraction: a site
+/// targeting the resource. Processing: a recipe whose sole authored output is
+/// the resource. Returns the producing building's body via `out_body` (the
+/// contract fulfils there) — null on no match.
+bool supplier_has_capacity(const world& w, const recipe_registry& reg, entity_id supplier,
+                           resource_type resource, entity_id& out_body)
+{
+    const auto cit = w.corporations.find(supplier);
+    if (cit == w.corporations.end())
+        return false;
+    for (const entity_id bid : cit->second.assets)
+    {
+        const auto bit = w.buildings.find(bid);
+        if (bit == w.buildings.end())
+            continue;
+        const building_component& b = bit->second;
+        if (b.ticks_remaining > 0 || b.decommissioned)
+            continue; // still under construction, or torn down
+        if (b.type == building_type::extraction_site && b.target_resource == resource)
+        {
+            const auto tit = w.tiles.find(b.tile);
+            out_body = (tit != w.tiles.end()) ? tit->second.body : null_entity;
+            return out_body != null_entity;
+        }
+        if (b.type == building_type::processing_facility)
+        {
+            const recipe* r = reg.get_recipe(b.recipe);
+            if (r != nullptr && r->outputs[static_cast<std::size_t>(resource)] > 0.0f)
+            {
+                const auto tit = w.tiles.find(b.tile);
+                out_body = (tit != w.tiles.end()) ? tit->second.body : null_entity;
+                return out_body != null_entity;
+            }
+        }
+    }
+    return false;
+}
+
+/// BL-350 Q2, decline condition 2 ("no input access"): for a PROCESSED good
+/// (the recipe found by supplier_has_capacity), can the supplier's own local
+/// market actually be bought from for every non-zero input? Extraction has no
+/// recipe inputs, so it always passes this leg — capacity alone gates it.
+/// Reuses run_construction's own "unpriced == unbuyable" reading rather than
+/// modelling live supply, matching BL-340's asymmetry fix.
+bool supplier_has_input_access(const world& w, const recipe_registry& reg, entity_id supplier,
+                               resource_type resource, entity_id body)
+{
+    const auto cit = w.corporations.find(supplier);
+    if (cit == w.corporations.end())
+        return true;
+    for (const entity_id bid : cit->second.assets)
+    {
+        const auto bit = w.buildings.find(bid);
+        if (bit == w.buildings.end() || bit->second.type != building_type::processing_facility)
+            continue;
+        const recipe* r = reg.get_recipe(bit->second.recipe);
+        if (r == nullptr || r->outputs[static_cast<std::size_t>(resource)] <= 0.0f)
+            continue; // not the producing recipe
+        const entity_id mid = any_market_on_body(w, body);
+        if (mid == null_entity)
+            return false; // no market to buy inputs from at all
+        const market_component& mc = w.markets.at(mid);
+        for (std::size_t i = 0; i < resource_count; ++i)
+            if (r->inputs[i] > 0.0f && mc.base_price[i] <= 0.0f)
+                return false; // an input this recipe needs cannot be bought here
+        return true;
+    }
+    return true; // extraction (or no recipe found) — nothing to check
 }
 
 /// Number of standing sell orders `corp` currently holds, across all bodies.
@@ -397,6 +470,116 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             // so a removal cannot invalidate a command already composed against
             // another order.
             w.sell_orders.erase(it);
+            return corp_command_result::applied;
+        }
+
+        case corp_verb::request_quote:
+        {
+            if (w.corporations.find(cmd.counterparty) == w.corporations.end())
+                return corp_command_result::rejected_invalid;
+            if (cmd.counterparty == cmd.corp)
+                return corp_command_result::rejected_invalid; // no self-contracting
+            if (!(cmd.quantity > 0.0f))
+                return corp_command_result::rejected_invalid;
+
+            // Q2, in the order the design names them: capacity, input access,
+            // embargo, reputation.
+            entity_id body = null_entity;
+            if (!supplier_has_capacity(w, reg, cmd.counterparty, cmd.target, body))
+                return corp_command_result::rejected_no_capacity;
+            if (!supplier_has_input_access(w, reg, cmd.counterparty, cmd.target, body))
+                return corp_command_result::rejected_no_input_access;
+
+            const auto embargo_it = w.corp_embargo_conditions.find(cmd.counterparty);
+            if (embargo_it != w.corp_embargo_conditions.end() &&
+                !evaluate(embargo_it->second, w, cmd.corp))
+                return corp_command_result::rejected_embargo;
+
+            const float reputation =
+                [&]{ const auto rit = w.corp_reputation.find({cmd.corp, cmd.counterparty});
+                     return rit != w.corp_reputation.end() ? rit->second : 0.0f; }();
+            if (reputation < reg.procurement().reputation_floor)
+                return corp_command_result::rejected_reputation;
+
+            // Price: the supplier's local market price (or base_price with no
+            // live resolution yet), same "what the good actually costs here"
+            // reading run_construction's auto-buy uses. Lead time: derived, not
+            // authored (BL-350's own framing) — a bigger order takes longer, a
+            // supplier with real capacity is faster.
+            const entity_id mid = any_market_on_body(w, body);
+            const float unit_price = (mid != null_entity)
+                ? (w.markets.at(mid).price[static_cast<std::size_t>(cmd.target)] > 0.0f
+                       ? w.markets.at(mid).price[static_cast<std::size_t>(cmd.target)]
+                       : w.markets.at(mid).base_price[static_cast<std::size_t>(cmd.target)])
+                : 0.0f;
+            const float throughput = std::max(1.0f, reg.economics(building_type::processing_facility).base_rate);
+            const int lead_time = static_cast<int>(reg.procurement().base_lead_ticks *
+                                                    std::ceil(cmd.quantity / throughput));
+
+            procurement_quote q;
+            q.id              = w.allocate_procurement_id();
+            q.buyer           = cmd.corp;
+            q.supplier        = cmd.counterparty;
+            q.body            = body;
+            q.resource        = cmd.target;
+            q.quantity        = cmd.quantity;
+            q.unit_price      = unit_price;
+            q.lead_time_ticks = lead_time;
+            w.procurement_quotes.push_back(q);
+            return corp_command_result::applied;
+        }
+
+        case corp_verb::accept_quote:
+        {
+            if (cmd.order == 0)
+                return corp_command_result::rejected_invalid;
+            const auto it = std::find_if(w.procurement_quotes.begin(), w.procurement_quotes.end(),
+                                         [&](const procurement_quote& q) { return q.id == cmd.order; });
+            if (it == w.procurement_quotes.end())
+                return corp_command_result::rejected_invalid; // no such quote (or already consumed)
+            if (it->buyer != cmd.corp)
+                return corp_command_result::rejected_not_owner;
+
+            const float total   = it->quantity * it->unit_price;
+            const float deposit = total * reg.procurement().deposit_fraction;
+            corporation_component& buyer = w.corporations.at(cmd.corp);
+            if (buyer.balance < deposit)
+                return corp_command_result::rejected_funds;
+
+            procurement_contract c;
+            c.id              = w.allocate_procurement_id();
+            c.buyer           = it->buyer;
+            c.supplier        = it->supplier;
+            c.body            = it->body;
+            c.resource        = it->resource;
+            c.quantity        = it->quantity;
+            c.unit_price      = it->unit_price;
+            c.lead_time_ticks = it->lead_time_ticks;
+            c.ticks_elapsed   = 0;
+            c.deposit_paid    = deposit;
+
+            buyer.balance -= deposit;
+            w.procurement_contracts.push_back(c);
+            w.procurement_quotes.erase(it); // consumed: cannot accept twice
+            return corp_command_result::applied;
+        }
+
+        case corp_verb::cancel_contract:
+        {
+            if (cmd.order == 0)
+                return corp_command_result::rejected_invalid;
+            const auto it = std::find_if(w.procurement_contracts.begin(), w.procurement_contracts.end(),
+                                         [&](const procurement_contract& c) { return c.id == cmd.order; });
+            if (it == w.procurement_contracts.end())
+                return corp_command_result::rejected_invalid;
+            if (it->buyer != cmd.corp)
+                return corp_command_result::rejected_not_owner;
+
+            // Forfeits the deposit (no refund) and moves reputation down —
+            // BL-350 Q1/Q3. Erased, not flagged: a cancelled contract has
+            // nothing left to pace.
+            w.corp_reputation[{it->buyer, it->supplier}] += reg.procurement().reputation_on_cancel;
+            w.procurement_contracts.erase(it);
             return corp_command_result::applied;
         }
     }

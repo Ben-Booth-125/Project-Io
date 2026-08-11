@@ -136,6 +136,18 @@ economy = {
         science_per_research_institute_tick = 1.0,
     },
 
+    -- BL-350: the procurement/contract seam — "a build order placed with
+    -- someone else", BL-095's shape with materials drawn against the
+    -- SUPPLIER's market and the output delivered to the BUYER's pool.
+    -- First-cut authored constants; retune by playtest.
+    procurement = {
+        deposit_fraction       = 0.25, -- debited at accept_quote; remainder paced across lead_time_ticks
+        base_lead_ticks        = 2.0,
+        reputation_floor       = -5.0, -- request_quote declines below this; 0 for an unseen pair
+        reputation_on_complete = 1.0,
+        reputation_on_cancel   = -2.0,
+    },
+
     -- Player-placeable roads, now a three-tier ladder (BL-172; BL-147 shipped a single tier). A
     -- road is a per-tile mutation (raises tile.road_level, lowering its A* traversal cost), not a
     -- building — no maintenance/recipe, just an up-front placement cost. The tiers, by road_level:

@@ -49,6 +49,16 @@ in `tools/verify/README.md`.
   symmetric across player and non-player corps; a building still under
   construction (`ticks_remaining > 0`) or decommissioned accumulates nothing.
   Links the same TUs as `econ_harness`.
+- **`procurement_harness`** — the procurement/contract seam (BL-350): one contract
+  quoted, accepted, paced and delivered end to end with the treasury debited in
+  the split shape (a deposit at `accept_quote`, the remainder paced across
+  `lead_time_ticks`), plus one decline observed for each of `request_quote`'s
+  four refusal conditions (no capacity, no input access, embargo via
+  `condition_set`, reputation floor), plus `cancel_contract` forfeiting the
+  deposit and moving reputation down. Links `world.cpp`, `economy_system.cpp`,
+  `market_clearing.cpp`, `budget_system.cpp`, `corp_command.cpp`,
+  `construction.cpp`, `placement_rules.cpp`, `condition_set.cpp`,
+  `survey_system.cpp`, `logistics.cpp`, `unit_roster.cpp`.
 - **`data_creep_harness`** — data-creep instrument (BL-251, v0.1.0 quality audit).
   Runs the **real** generated world (`make_hard_coded_world`) for 1500 ticks, sampling
   ~30 counters (entities, every component store, pools, markets, convoys, trade routes,

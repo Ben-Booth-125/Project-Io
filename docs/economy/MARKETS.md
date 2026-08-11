@@ -106,6 +106,42 @@ What follows from the move:
 - **Persistence.** `order_book.{hpp,cpp}`, the second flat-binary stream in `world/*` after
   `history_log`: magic `IOOB` + version, and a bad stream is refused rather than reinterpreted.
 
+## Procurement — a layer over the market, not a second market (BL-350, 2026-08-11)
+
+A procurement contract is **a build order placed with someone else**: BL-095's own
+commit-on-affordability, draw-materials-per-tick, pay-across-the-build shape, with the materials
+drawn against the **supplier's** market and the output delivered to the **buyer's** pool. The
+counterparty is a NAMED corp with a price, a lead time, and a possible refusal — not a purchase
+order against an unlimited market, and not an order-book entry (the book is price-time priority
+over anonymous asks; it has no representation for a named counterparty or a lead time). It joins
+the same `corp_command` seam the order book does, for the same reason: the player's press and the
+AI's command are one implementation.
+
+- **Three verbs** (`corp_verb::request_quote` / `accept_quote` / `cancel_contract`, `world.hpp`
+  §11–14, append-only after `set_workforce_auto`). `request_quote` evaluates four decline
+  conditions in order — no capacity (the supplier holds no completed building that produces the
+  good), no input access (the supplier's local market cannot supply its recipe's inputs), embargo
+  (`world::corp_embargo_conditions`, a `condition_set` per supplier — BL-342's generic predicate
+  machinery reaching procurement for free), reputation floor (`world::corp_reputation`, one scalar
+  per (buyer, supplier) pair) — and returns a distinguishable `corp_command_result` for each.
+- **Split payment.** A deposit (`economy.procurement.deposit_fraction`, first cut 0.25) debits at
+  `accept_quote`; the remainder is drawn evenly across the quote's `lead_time_ticks`
+  (`economy_system.cpp`'s contract-pacing pass, right after the capability-points pass). A known
+  simplification against BL-095's own model: the pace is fixed rather than market-gated
+  (stretch/pause on the supplier's live throughput) — a follow-on refinement, not built here.
+- **Lead time is derived, not authored**: `base_lead_ticks x ceil(quantity / supplier_throughput)`
+  — a bigger order takes longer, a capable supplier is faster, and the quote is incidentally an
+  intelligence channel (legitimate under BL-068: the supplier volunteers its own throughput in the
+  price it quotes).
+- **Reputation moves only on completion (+) or cancellation (−)** — narrow by design: it shifts
+  price/tie-breaking, never gates access beyond the decline floor above (that is BL-087's job).
+- **Persistence.** `procurement.{hpp,cpp}`, the fourth flat-binary stream in `world/*`: magic
+  `IOPC` + version, `world::procurement_quotes` / `procurement_contracts` / `corp_reputation`
+  round-trip in stored order, and a bad stream is refused rather than reinterpreted.
+- **The militia's own demand.** `spacecraft_components` (BL-340) carries no background demand —
+  a militia's contracts are its only buyer, which is what makes the BL-340/BL-350 coupling real
+  rather than thematic.
+
 ## Price resolution
 
 `resolve_price`, per (market, resource):

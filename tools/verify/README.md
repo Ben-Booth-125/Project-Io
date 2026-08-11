@@ -77,6 +77,21 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\military_capability_harness.cpp 
    /Fo:build_gen\verify\military_capability_harness\ /Fe:build_gen\verify\military_capability_harness.exe
 .\build_gen\verify\military_capability_harness.exe
 
+:: Procurement/contract seam (BL-350) — one contract quoted, accepted, paced
+:: and delivered end to end with the treasury debited in the split shape
+:: (deposit at accept, remainder paced across lead time), plus one decline
+:: observed for each of the four refusal conditions (capacity, input access,
+:: embargo, reputation), plus cancellation forfeiting the deposit and moving
+:: reputation down.
+cl /nologo /std:c++20 /EHsc /I src tools\verify\procurement_harness.cpp ^
+   src\world\world.cpp src\world\economy_system.cpp ^
+   src\world\market_clearing.cpp src\world\budget_system.cpp ^
+   src\world\corp_command.cpp src\world\construction.cpp src\world\placement_rules.cpp ^
+   src\world\condition_set.cpp src\world\survey_system.cpp src\world\logistics.cpp ^
+   src\world\unit_roster.cpp ^
+   /Fo:build_gen\verify\procurement_harness\ /Fe:build_gen\verify\procurement_harness.exe
+.\build_gen\verify\procurement_harness.exe
+
 :: World audit — Kepler biome balance (S2) + extraction placement (S1) +
 :: deposit-reserve seeding (resource_remaining = richness x reserve factor).
 cl /nologo /std:c++20 /EHsc /I src tools\verify\world_audit.cpp ^

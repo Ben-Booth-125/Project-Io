@@ -525,6 +525,40 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
         }
     }
 
+    // BL-350 procurement contracts: paced like a BL-095 build — the deposit
+    // was already debited at accept_quote, so each tick draws an even slice of
+    // the remainder from the BUYER's balance (a simplification of BL-095's own
+    // market-gated stretch/pause rate: a contract paces on a fixed schedule
+    // rather than the supplier's live throughput, a known first-cut cut — see
+    // BL-350's item resolution). On completion the full quantity is credited
+    // to the buyer's (buyer, body) pool and reputation moves up. Ascending
+    // contract id (insertion order — the vector is appended-to, never
+    // reordered) keeps this deterministic without an extra sort.
+    {
+        const auto& pp = reg.procurement();
+        std::vector<std::size_t> completed;
+        for (std::size_t i = 0; i < w.procurement_contracts.size(); ++i)
+        {
+            procurement_contract& c = w.procurement_contracts[i];
+            const auto bit = w.corporations.find(c.buyer);
+            if (bit == w.corporations.end())
+                continue; // buyer no longer exists — leave the contract inert
+            const float remaining_total = c.quantity * c.unit_price * (1.0f - pp.deposit_fraction);
+            const float per_tick = (c.lead_time_ticks > 0) ? remaining_total / static_cast<float>(c.lead_time_ticks) : remaining_total;
+            bit->second.balance -= per_tick;
+            ++c.ticks_elapsed;
+            if (c.ticks_elapsed >= c.lead_time_ticks)
+            {
+                w.pool_for(c.buyer, c.body).quantities[static_cast<std::size_t>(c.resource)] += c.quantity;
+                w.corp_reputation[{c.buyer, c.supplier}] += pp.reputation_on_complete;
+                completed.push_back(i);
+            }
+        }
+        // Erase back-to-front so earlier indices stay valid.
+        for (auto it = completed.rbegin(); it != completed.rend(); ++it)
+            w.procurement_contracts.erase(w.procurement_contracts.begin() + static_cast<long>(*it));
+    }
+
     // Bodies that host a market — a processor on one auto-buys input shortfalls
     // rather than idling for want of pool stock (see run_processing).
     std::unordered_set<entity_id> bodies_with_market;

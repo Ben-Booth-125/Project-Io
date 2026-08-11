@@ -320,6 +320,41 @@ struct world
     /// @return A fresh, never-before-issued order handle (always nonzero).
     uint32_t allocate_order_id() { return next_order_id++; }
 
+    /// Live procurement quotes (BL-350) — the answer to `request_quote`,
+    /// before `accept_quote` converts one into a `procurement_contract`. A
+    /// parallel object to the order book, not an entry in it (that item's
+    /// Q4) — see procurement_quote's own comment.
+    std::vector<procurement_quote> procurement_quotes;
+
+    /// Accepted procurement contracts, paced like a BL-095 build: a deposit
+    /// debited at accept_quote, the remainder drawn across `lead_time_ticks`,
+    /// delivered to the buyer's pool on completion. See procurement_contract.
+    std::vector<procurement_contract> procurement_contracts;
+
+    /// Next stable procurement handle (quotes and contracts share one
+    /// namespace — the same "stable across erase, unlike a vector index"
+    /// contract as `next_order_id`).
+    uint32_t next_procurement_id = 1;
+    uint32_t allocate_procurement_id() { return next_procurement_id++; }
+
+    /// A supplier's standing embargo predicate (BL-350's Q2, the law/embargo
+    /// decline condition) — keyed by the SUPPLIER corp; `request_quote`
+    /// evaluates it against the buyer. Absent = no entry = the default
+    /// `condition_set{}` (empty = always true = no embargo), so a supplier
+    /// with no authored embargo declines nothing on this axis. Nothing
+    /// authors a non-empty entry yet — the read path is the mechanism BL-350
+    /// exists to prove condition_set reaches procurement "for free"; content
+    /// (an enacted law that populates this) is a BL-343/BL-350 follow-on.
+    std::unordered_map<entity_id, condition_set> corp_embargo_conditions;
+
+    /// Standing counterparty reputation (BL-350's Q3): one scalar per
+    /// (buyer, supplier) pair, moved only by a contract's completion (+) or
+    /// cancellation (-). std::map, not unordered — this is read in sorted
+    /// order wherever it feeds a deterministic pass (none yet; kept
+    /// consistent with the project's other pair-keyed maps, e.g.
+    /// economy_system.cpp's bldg_count_by_corp_body).
+    std::map<std::pair<entity_id, entity_id>, float> corp_reputation;
+
     /// Strategic AI decision log (BL-202): a fixed 256-entry ring of the most
     /// recent corp commands + score rationale, in deterministic application
     /// order. Derived observability (the chat feed / harness read it), not

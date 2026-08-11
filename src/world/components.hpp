@@ -462,6 +462,45 @@ struct buy_order
 static_assert(sizeof(sell_order) == 24, "sell_order is a save-format record — see order_book.hpp");
 static_assert(sizeof(buy_order)  == 28, "buy_order is a save-format record — see order_book.hpp");
 
+/// A live price quote (BL-350) — the answer to `request_quote`, before it is
+/// accepted into a `procurement_contract`. Parallel to the order book rather
+/// than an entry in it (that item's Q4): the book is price-time priority over
+/// ANONYMOUS asks, with no representation for a named counterparty or a lead
+/// time. Held in `world::procurement_quotes`; `accept_quote` consumes one by
+/// id, converting it into a contract.
+struct procurement_quote
+{
+    uint32_t      id           = 0;              ///< Stable handle; see sell_order::id.
+    entity_id     buyer        = null_entity;
+    entity_id     supplier     = null_entity;
+    entity_id     body         = null_entity;    ///< Where the supplier fulfils from.
+    resource_type resource     = resource_type::iron_ore;
+    float         quantity     = 0.0f;
+    float         unit_price   = 0.0f;           ///< Quoted at request time; locked in on accept.
+    int32_t       lead_time_ticks = 0;            ///< `base_ticks x ceil(quantity / throughput)`.
+};
+
+/// An accepted procurement contract (BL-350) — "a build order placed with
+/// someone else", BL-095's pay-as-you-build shape with the materials drawn
+/// against the SUPPLIER's market and the output delivered to the BUYER's pool.
+/// Held in `world::procurement_contracts`.
+struct procurement_contract
+{
+    uint32_t      id              = 0;             ///< Stable handle; see sell_order::id.
+    entity_id     buyer           = null_entity;
+    entity_id     supplier        = null_entity;
+    entity_id     body            = null_entity;
+    resource_type resource        = resource_type::iron_ore;
+    float         quantity        = 0.0f;
+    float         unit_price      = 0.0f;
+    int32_t       lead_time_ticks = 0;
+    int32_t       ticks_elapsed   = 0;
+    float         deposit_paid    = 0.0f; ///< Already debited at accept_quote (economy.procurement.deposit_fraction).
+};
+
+static_assert(sizeof(procurement_quote)    == 32, "procurement_quote is a save-format record — see procurement.hpp");
+static_assert(sizeof(procurement_contract) == 40, "procurement_contract is a save-format record — see procurement.hpp");
+
 /// Land-use classification of a tile or zone. Drives the trade-off between
 /// residential, industrial, agricultural, and undeveloped land.
 /// See docs/economy/POPULATION.md § Land-use trade-offs.

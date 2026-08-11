@@ -125,6 +125,30 @@ struct military_capability_params
     float science_per_research_institute_tick = 1.0f;
 };
 
+/// BL-350 procurement/contract tunables, authored in scripts/economy.lua under the top-level
+/// `procurement` table.
+struct procurement_params
+{
+    /// Fraction of the contract's total price (quantity x unit_price) debited at
+    /// accept_quote; the remainder is drawn evenly across lead_time_ticks. First
+    /// cut 0.25 — see BL-350's Q1 (both alternatives, on-delivery-only and
+    /// on-order-only, fail concretely; the design's own reasoning is in the item).
+    float deposit_fraction = 0.25f;
+
+    /// Base lead time, ticks — multiplied by ceil(quantity / supplier_throughput)
+    /// to get the quote's lead_time_ticks.
+    float base_lead_ticks = 2.0f;
+
+    /// (buyer, supplier) reputation floor below which request_quote declines
+    /// outright (BL-350 Q2's fourth condition). Reputation starts at 0 for an
+    /// unseen pair, so a floor at or below 0 never gates a first-ever quote.
+    float reputation_floor = -5.0f;
+
+    /// Reputation delta on a contract's completion (+) / cancellation (-).
+    float reputation_on_complete = 1.0f;
+    float reputation_on_cancel   = -2.0f;
+};
+
 /// Player road-placement cost for a single tier (BL-147 core, BL-172 ladder), authored in
 /// scripts/economy.lua under `economy.roads.{track,road,highway}`. A placed road tile costs a
 /// flat credit sum plus per-resource materials bought from the local market — the same cost
@@ -191,6 +215,9 @@ public:
     /// BL-332 capability-point accumulation rates (economy.military in Lua).
     const military_capability_params& military() const { return m_military; }
 
+    /// BL-350 procurement/contract tunables (economy.procurement in Lua).
+    const procurement_params& procurement() const { return m_procurement; }
+
     /// Base logistics cost per unit distance per unit cargo for the given convoy mode.
     float logistics_cost(convoy_mode m) const
     {
@@ -240,6 +267,7 @@ public:
     void set_substrate(const substrate_params& s) { m_substrate = s; }
     void set_construction(const construction_params& c) { m_construction = c; }
     void set_military(const military_capability_params& m) { m_military = m; }
+    void set_procurement(const procurement_params& p) { m_procurement = p; }
     void set_economics(building_type type, const building_economics& e)
     {
         m_building_econ[static_cast<std::size_t>(type)] = e;
@@ -282,6 +310,9 @@ private:
     /// BL-332 capability-point rates. Defaults match economy.lua so a
     /// hand-built harness registry behaves sensibly without Lua.
     military_capability_params m_military = {};
+
+    /// BL-350 procurement tunables. Defaults match economy.lua.
+    procurement_params m_procurement = {};
 
     /// Logistics base cost per unit distance per unit cargo, indexed by convoy_mode
     /// (land=0, sea=1, air=2, space=3). Defaults match economy.lua values.

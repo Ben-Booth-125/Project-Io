@@ -191,6 +191,19 @@ void recipe_registry::load_from_lua(lua_state& lua)
         m_military = mp;
     }
 
+    // BL-350 procurement/contract tunables (economy.procurement).
+    sol::optional<sol::table> procurement = (*econ)["procurement"];
+    if (procurement)
+    {
+        procurement_params pp;
+        pp.deposit_fraction        = procurement->get_or("deposit_fraction",        pp.deposit_fraction);
+        pp.base_lead_ticks         = procurement->get_or("base_lead_ticks",         pp.base_lead_ticks);
+        pp.reputation_floor        = procurement->get_or("reputation_floor",        pp.reputation_floor);
+        pp.reputation_on_complete  = procurement->get_or("reputation_on_complete",  pp.reputation_on_complete);
+        pp.reputation_on_cancel    = procurement->get_or("reputation_on_cancel",    pp.reputation_on_cancel);
+        m_procurement = pp;
+    }
+
     // Road-placement cost per tier (economy.roads.{track,road,highway}, BL-172; BL-147 shipped a
     // single `local` tier). Same shape as a building's cost (flat credits + market-bought
     // materials) but paid up front at placement. Tier index 0..2 = Track/Road/Highway.

@@ -44,6 +44,11 @@ enum class corp_verb : uint8_t
     place_sell_order,   ///< Push a standing sell order onto world.sell_orders (subject = body).
     remove_sell_order,  ///< Erase the standing sell order with id `order`.
     set_workforce_auto, ///< building_component.workforce_auto := true (hand the dial back).
+    // --- BL-350: the procurement/contract seam joins the seam (2026-08-11) ---
+    // Appended AFTER set_workforce_auto, same append-only rule.
+    request_quote,   ///< Ask `counterparty` for a price + lead time on `target`/`quantity` at `subject` (body).
+    accept_quote,     ///< Convert the live quote `order` into a contract; debits the deposit.
+    cancel_contract,  ///< Terminate contract `order` in flight; forfeits the deposit, moves reputation.
 };
 
 /// Ceiling on one corporation's outstanding sell orders. The book is now
@@ -78,9 +83,16 @@ struct corp_command
     uint16_t      unit_type = 0;                        ///< hire_unit: index into unit_roster_table().
 
     // --- BL-293 order-book args ---
-    float    quantity    = 0.0f; ///< place_sell_order: max units offered per tick (> 0).
+    float    quantity    = 0.0f; ///< place_sell_order: max units offered per tick (> 0). Also request_quote.
     float    floor_price = 0.0f; ///< place_sell_order: minimum unit price (>= 0; 0 = market price).
-    uint32_t order       = 0;    ///< remove_sell_order: the sell_order::id to erase.
+    uint32_t order       = 0;    ///< remove_sell_order: the sell_order::id to erase. Also accept_quote /
+                                  ///< cancel_contract: the procurement_quote / procurement_contract id.
+
+    // --- BL-350 procurement args ---
+    /// request_quote: the supplier corp being asked. `subject` names the body
+    /// the contract fulfils at; `target` (resource_type, reused from `build`)
+    /// names the resource; `quantity` names the amount.
+    entity_id counterparty = null_entity;
 };
 
 /// Outcome of applying a command. Only `applied` mutates the world; every
@@ -95,6 +107,11 @@ enum class corp_command_result : uint8_t
     rejected_funds,         ///< Solvency check inside the seam refused the spend.
     rejected_state,         ///< No-op in current state (already idle, survey in progress, ...).
     rejected_tech_locked,   ///< BL-344: the corp has not earned the tech that unlocks this type.
+    // --- BL-350: request_quote's four distinguishable decline conditions ---
+    rejected_no_capacity,     ///< The named supplier holds no completed building that can produce the good.
+    rejected_no_input_access, ///< The supplier's local market cannot supply the recipe's inputs.
+    rejected_embargo,         ///< The supplier's condition_set evaluates false against the buyer.
+    rejected_reputation,      ///< The (buyer, supplier) reputation pair sits below the standing floor.
 };
 
 /// Apply one command through the player-grade seams. Deterministic; a rejected
