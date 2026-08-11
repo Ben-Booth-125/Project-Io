@@ -145,24 +145,39 @@ and what the v0.1.x band is stubbing *for*, both change. See § v0.3.0.
 
 ### The near sequence — which sprint cuts which minor
 
-Planned in one pass on 2026-08-10 and owned by [`SPRINTS.md`](SPRINTS.md) § Sprints 8–12; named
+Planned in one pass on 2026-08-10 and owned by [`SPRINTS.md`](SPRINTS.md) § Sprints 8–14; named
 here only so the roadmap's themes and the live sequence do not drift apart again, which is the
 failure NR-102 (sequencing decoupling) records. **This table is the plan, not a commitment** —
-amend it when a goal changes, not at the retro.
+amend it when a goal changes, not at the retro. *Amended the same day it was written: Sprints 8 and
+9 both closed, and a new Sprint 10 (the living world) was inserted ahead of procurement, shifting
+everything after it by one.*
 
 | Sprint | Cuts | Theme |
 |---|---|---|
-| 8 | *(no tag)* | **Who the player is.** Design only. Rewrite BL-094 as the militia, design BL-315, file the procurement seam, reconcile v0.3.0's roster. |
-| 9 | **v0.1.5** | **The militia takes the field** — military bases & supply, a starting base and unit, military points + research. |
-| 10 | **v0.1.14** | **Procurement & its goods** — the contract seam, plus BL-340's resource tiers pulled forward. |
-| 11 | **v0.1.11** | **Reconciled** — laws and tech surfaces reframed for an actor that is subject to law rather than the source of it, plus the minor's untouched remainder. |
-| 12 | **v0.1.7** | **Generation visibility** — the Generation Ledger, field-overlay lenses, the UX review, and BL-317's owed prehistory timelapse. |
+| 8 | *(no tag)* | **Who the player is.** ✅ Closed 2026-08-10. BL-094 rewritten as the militia, BL-350 filed, v0.3.0 roster reconciled. |
+| 9 | **v0.1.5** | **The militia takes the field.** ✅ Closed 2026-08-10. Military bases & supply, a starting base and unit; BL-332 designed and re-versioned. |
+| 10 | **v0.1.13** | **The living world** — real background industry replaces the abstract substrate, multi-building tiles, real population demand, and the O(corps × tiles) scan fixed ahead of it. |
+| 11 | **v0.1.14** | **Procurement & its goods** — the contract seam plus BL-340's resource tiers, landing into a market that now has real suppliers to choose between. |
+| 12 | **v0.1.11** | **Reconciled** — laws and tech surfaces reframed for an actor that is subject to law rather than the source of it, plus the minor's untouched remainder. |
+| 13 | **v0.1.7** | **Generation visibility** — the Generation Ledger, field-overlay lenses, the UX review, and BL-317's owed prehistory timelapse. |
 
-**Deliberately not in the five: v0.2.0 (the AI opponent).** It is the thing that makes Io a game
+**Why the living world was inserted (2026-08-10, Ben's call).** *"Replace the substrate entirely."*
+The saturation the economic premise assumes is currently an abstraction injected once per tick —
+`inject_substrate_demand` — with no building behind it: **~16–32 buildings sit on Kepler's 15,120
+tiles**. Two consequences drove the ordering. Procurement's counterparty model needs suppliers to
+choose between, and against eight lean corps *"another supplier may still quote"* is often false —
+it would ship correct and unexercised, the shape of Sprint 9's `hire_unit` (NR-121). And BL-340's
+substrate-basket step would otherwise be built twice, since BL-365 removes the function it extends.
+**v0.1.13 was the natural home** rather than a new minor: it had been hollowed out when BL-340 left
+for v0.1.14, and BL-130 / BL-132 were already orphans that belong to this work.
+
+**Deliberately not in the six: v0.2.0 (the AI opponent).** It is the thing that makes Io a game
 rather than a simulation, and holding it is a real cost — accepted so the opponent is built
-against a settled player identity instead of re-fitted to one. **v0.1.12** (logistics modes) and
-**v0.1.13** (markets & materials, less BL-340) are unblocked and uncontroversial; either is a good
-filler if a sprint above finishes short.
+against a settled player identity instead of re-fitted to one. It is the obvious **Sprint 14**, and
+it has now been **deferred twice in the same direction** (the refocus, then the living world); the
+second deferral at least argues for itself, since an opponent is more interesting in a market with
+real competitors. **v0.1.12** (logistics modes) is unblocked and uncontroversial — a good filler if
+a sprint above finishes short.
 
 ### v0.1.0 — Quality audit + legibility polish + cut
 

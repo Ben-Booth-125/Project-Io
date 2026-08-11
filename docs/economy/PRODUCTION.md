@@ -153,6 +153,13 @@ A building type may support multiple recipes. The active recipe for a given buil
 
 Coal is consumed as a process fuel and reagent but does not appear as a separate intermediate product. The iron-nickel recipe requires no carbon addition because metallic asteroids are already reduced.
 
+> **Doc/code mismatch, recorded 2026-08-10 (NR-158) — not fixed here.** The Era 0 row above says
+> *iron ore + coal (reagent)*; `scripts/recipes.lua` id 1 is `{ iron_ore = 2.0 }` with **no coal**.
+> One of the two has been wrong for some time. It is left for **BL-340** (processing chain roster),
+> which prices coal for the first time — and whose admission rule (*a resource must have a consumer*)
+> argues for fixing the **recipe** rather than the doc, since that gives coal a consumer and makes
+> this table true.
+
 #### Refinery
 
 | Inputs | Output | Era |

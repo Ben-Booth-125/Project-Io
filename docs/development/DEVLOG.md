@@ -10,7 +10,81 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — Hygiene wave 2: app.cpp halves, and the review barrier earns its place (2026-08-10, latest)
+## Session — The warm start converges, and the substrate is condemned (2026-08-10, latest)
+
+Full mode, design + one Light code change. Two design passes (BL-340/BL-350 jointly, BL-365–369 as
+a new cluster), one measured behaviour change, and a sprint re-sequence — all landed against a
+repository that spent most of the session mid-merge.
+
+**The measurement is the session.** `pre_game_ticks` was 12, and its own comment justified that
+defensively: *"~3 in-game years … short enough not to diverge under the prototype's un-tuned
+economy."* Ben asked for 20 years. Rather than assume, the warm-start length was made a parameter
+of `pregame_balance_harness` and measured. The fear does not hold — the economy **converges**:
+
+| Phase | Ticks | Behaviour |
+|---|---|---|
+| Linear | 1–23 | ~5,530 cr/tick, dead straight |
+| Knee | ~24 | growth begins decaying |
+| Plateau | **47–80** | **~185k cr, ±60 oscillation, drifting slightly down** |
+
+All five economy assertions still pass at 80, determinism holds, and the balance never goes
+negative. `pre_game_ticks` is now **80**, at ~3.5 ms/tick — about 240 ms of extra startup.
+
+**That plateau is what condemned the substrate.** The player corp saturates at ~185k not from any
+lack of ambition but because `inject_substrate_demand` clears a fixed fraction and there is nothing
+further to trade against. Ben's call, on seeing it: *"replace the substrate entirely."* Filed as
+**BL-365** (background industry) plus **BL-366** (multi-building tiles), **BL-368** (real population
+demand), **BL-367** (management surface) and **BL-369** (warm-start calendar semantics).
+
+Two things the design pass corrected rather than accepted. **"A tile is one building" was never the
+shipped rule** — `stack_capacity` already returns 1–5 for extraction sites and counts per
+`(tile, type, target)`, so BL-366 completes the question BL-193 explicitly deferred rather than
+pivoting away from a philosophy the code never had. And **who owns background industry is settled
+by the rulebook, not by taste**: the standing rules forbid a nation actor and sanction background
+corporations, so it is more firms, not nations (NR-150).
+
+**BL-340 and BL-350 were designed jointly**, because each is incoherent alone — one is the buying,
+the other the thing bought. The decision that makes the pairing real is that
+`spacecraft_components` gets **no background demand**, so the militia's contracts are its only
+buyer. BL-340's own filed premise turned out backwards: the enum extension is nearly free (every
+per-resource array is already sized off `resource_count`), while the real work is that three of the
+four raws its recipes consume carry `base_price` 0 and so **cannot be bought at all**. The item's
+centre of gravity is closing the minable-but-unsellable asymmetry.
+
+**The sprint order then flipped, and the reason is BL-350's own design.** Its counterparty model
+needs suppliers to choose between; against eight lean corps *"another supplier may still quote"* is
+usually false, and it would have shipped correct and unexercised — the exact shape of Sprint 9's
+`hire_unit` (NR-121). Sprint 10 now cuts **v0.1.13** (the living world), procurement moves to
+Sprint 11, and everything after shifts one. v0.1.13 was the natural home: it had been hollowed out
+when BL-340 left for v0.1.14, and BL-130/BL-132 were already orphans belonging to this work.
+**BL-253** (the O(corps × tiles) scan) was re-goaled C/v0.2.0 → **A/v0.1.13** as a hard
+prerequisite — the term is linear in corp count and this multiplies corp count tenfold, in front of
+an 80-tick warm start that runs before the first frame.
+
+**Working against a mid-merge tree shaped the session's method.** `backlog.json`,
+`NEEDS_REVIEW.json`, `requirements.json`, `REFINED.md` and `DEVLOG.md` all carried conflict markers
+for most of it, and `backlog_query.js` — a plain `JSON.parse` — failed hard rather than degrading.
+Both design passes were therefore written to staging files under `docs/development/pending/` and
+folded in only once the merge landed. Reading the *incoming* branch before finalising was not
+optional: BL-293 added a second flat-binary stream, which reversed a conclusion this session had
+already reached about BL-107 (NR-157) and rewrote BL-350's answer on how procurement should reach
+the order book.
+
+Two findings recorded rather than fixed. `pregame_balance_harness` passes BL-112 R1 off a price
+pegged at exactly **4.00× base** — the hard band ceiling — rather than a discovered margin, in both
+the 12- and 80-tick runs (NR-156). And PRODUCTION.md's Smelter table has disagreed with
+`recipes.lua` about coal for some time (NR-158). Both are handed to the items that will touch them.
+
+**Runtime:** not tracked. Design-heavy; the code change is one constant plus a harness parameter.
+
+**Still open after this:** v0.2.0 has now been deferred twice in one day, both times in the same
+direction (NR-159). And BL-365's dominant question — whether ~80 background firms can run the full
+`corp_ai` layer or need a reduced model — is a two-tier-actor design commitment, not a build-time
+detail (NR-160).
+
+---
+
+## Session — Hygiene wave 2: app.cpp halves, and the review barrier earns its place (2026-08-10)
 
 Full mode, Batch Delivery — six worktree slices over BL-361/BL-362/BL-363, the three items the
 morning's hygiene batch filed but did not deliver. Two waves, because BL-361 rewrites the file two

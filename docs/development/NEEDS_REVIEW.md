@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*143 entries — 45 open, 98 resolved.*
+*158 entries — 60 open, 98 resolved.*
 
 ---
 
@@ -375,6 +375,81 @@ With rival corps trading (BL-293), seed 0 final net worth is 975,219 against a L
 *observation · raised 2026-08-10 · from BL-293 reconciliation merge; tools/verify/data_creep_harness.cpp*
 
 R1 (every persistent counter plateaus between the mid and final sample) now fails on world.buildings: 458 at tick 500 -> 556 at tick 1000 -> 556 at tick 1500. Growth stops, but after the harness mid-sample, so the mid(500)->final(1500) delta of 98 exceeds the tolerance. Richer corps (trading income) simply keep building for longer. It is a calibration question — move the mid sample later, or measure the plateau over the final third — not a data leak; RSS still plateaus (R2) and the counter is genuinely flat over the last 500 ticks. The BL-293 author predicted this exact failure in the commit message.
+
+### NR-146 — BL-350 unblocked from BL-094 — a v0.1.14 item cannot block on a v0.3.0 one
+*decision taken on your behalf · raised 2026-08-10 · from Joint BL-340/BL-350 design pass, 2026-08-10.*
+
+BL-350 (procurement seam) was filed blocked_on [BL-094], but BL-350 targets v0.1.14 and BL-094 (the militia entity) targets v0.3.0 — an item silently unbuildable because its blocker lands three minors later. Cleared blocked_on, kept requires [BL-094] as a read-alongside. The justification is that the seam is buyer-agnostic: a contract is between two corp-like entities holding a treasury and a pool, and today both are `corporation`. When the militia entity lands it becomes the natural buyer with no change to the seam. What BL-094 supplies is the narrative — why the buyer does not simply build the thing itself — and narrative does not block a mechanism. If Ben disagrees, the fix is to re-goal BL-350 to v0.3.0, not to restore the block.
+
+### NR-147 — BL-340 sized at seven new resources by an admission rule, not by taste
+*decision taken on your behalf · raised 2026-08-10 · from Joint BL-340/BL-350 design pass, 2026-08-10.*
+
+BL-340's filed open question was 'how many of the 31 resources actually need to exist'. Answered with a rule rather than a number: a resource_type value must be consumed by an authored recipe, or be a terminal object some named actor contracts for or consumes — no orphans. That yields seven (silicon, refined_copper, ree_alloy, machinery, alloys, electronics, spacecraft_components) and excludes liquid oxygen (already folded into the Chemical Plant recipes) and the habitability goods (consumer deferred from the prototype). The precedent cited is BL-286: eight logistics goods added with full enum/serialisation/base-price wiring and no consumer, still inert two minors later. Machinery is the one soft call — it is a terminal good with no downstream consumer, admitted because it makes the Fabricator a choice (machinery for the background economy vs alloys for the space chain) rather than a forced path. Worth Ben's eye specifically.
+
+### NR-148 — spacecraft_components gets no background demand — the militia is its only buyer
+*decision taken on your behalf · raised 2026-08-10 · from Joint BL-340/BL-350 design pass, 2026-08-10.*
+
+The load-bearing choice that makes designing BL-340 and BL-350 together worthwhile rather than merely convenient. Every other new good gets background demand; spacecraft_components deliberately gets none. The consequence is that the procurement seam becomes the ONLY reason the top of the production chain exists — the background economy does not want space equipment, a militia does. It also means the good will read as dead until BL-350 lands, which is intended, not a defect. Reverse this and the two items decouple into ordinary economic depth plus an ordinary purchase verb.
+
+### NR-149 — Procurement refusal is a hard decline, not a payable penalty
+*decision taken on your behalf · raised 2026-08-10 · from BL-350 design pass, 2026-08-10 (question 2 of the four filed on the item).*
+
+A supplier that declines states a reason and cannot be paid through; the player routes around the refusal to a competing quote instead. Chosen over the surcharge model because a buyable refusal collapses the counterparty into a vending machine with a markup — which is what BL-094's rewrite retracted the shared treasury to avoid. Stated as the design's own test: if everything is buyable, there is no counterparty. The four decline conditions are no capacity, no input access (reuses BL-095's paused test), a false condition_set (BL-342, shipped — this is how the law layer reaches procurement for free), and a reputation floor.
+
+### NR-150 — Background industry is more corporations, not a nation actor — settled by the rulebook
+*decision taken on your behalf · raised 2026-08-10 · from BL-365 design draft, 2026-08-10, following Ben's "replace the substrate entirely".*
+
+Who owns the industry that fills a saturated world is the first question BL-365 has to answer, and it is not a matter of preference. io-standing-rules.md prohibits nation behaviour (BL-054 stays deferred) while explicitly sanctioning background CORPORATIONS running a deterministic scored-utility layer over the corp-command seam (BL-202/BL-203, widened by BL-324). Nation-owned industry would need the one actor class the rules forbid; corporate industry needs no new exception at all. Recorded because it looks like a design choice and is actually a constraint — if Ben wants nations to own industry, that is a standing-rules amendment, not a BL-365 detail.
+
+### NR-151 — Saturation is a calibrated generation invariant, not an authored building count
+*decision taken on your behalf · raised 2026-08-10 · from BL-365 design draft, 2026-08-10.*
+
+Rather than authoring 'place N buildings', generation places background firms until the body's real production meets a target fraction of its real demand — first cut 0.90, deliberately the same figure as today's substrate clearing_fraction, so the opportunity gap is preserved by construction rather than by injection. The world then stays saturated when recipes, deposits or population are retuned, instead of silently desaturating. It also keeps BL-078's and BL-112's requirements meaningful under a new mechanism: same assertions, now emergent rather than arranged. Sizing input worth checking at build time — the ~16-32 figure quoted for the current world is the GENERATED count; NR-145 records world.buildings reaching 458 by tick 500 and 556 by tick 1000 as corp_ai builds, so the post-warm-start count is much higher than the generated one and is the number the calibration should target.
+
+### NR-152 — pre_game_ticks 12 -> 80 (20 in-game years), on measurement rather than assertion
+*decision taken on your behalf · raised 2026-08-10 · from Ben, 2026-08-10: "let's ramp it up and do 20 years of economy ticks". Landed in src/core/app.cpp.*
+
+The old figure carried a defensive justification in its own comment — '~3 in-game years ... short enough not to diverge under the prototype's un-tuned economy'. That was measured with pregame_balance_harness (parameterised the same session so warm-start length can be measured without editing the app) and did not hold: the player corp's balance grows linearly at ~5,530 cr/tick to tick 23, knees at ~24, and PLATEAUS from ~tick 47 at ~185k cr, oscillating +/-60 and drifting slightly down. It converges. All five economy assertions still pass at 80, determinism holds, balance never goes negative. Cost is ~3.5 ms/tick on the real generated world, so ~240 ms of extra startup. The plateau is the point: 12 stopped on the straight part of the curve, so the opening world was still mid-transient. NOTE this does not move the campaign calendar — the clock is rebased and play still opens at 1960; that question is filed as BL-369.
+
+### NR-153 — Sprint order flipped — the living world (v0.1.13) lands before procurement (v0.1.14)
+*decision taken on your behalf · raised 2026-08-10 · from Ben, 2026-08-10, choosing between two presented orderings.*
+
+Sprint 10 becomes the living world; procurement moves to Sprint 11; v0.1.11 to 12, v0.1.7 to 13, v0.2.0 to 14. Two reasons carried the call. BL-350's counterparty model — a supplier that can refuse, with the player routing around to a competing quote — needs suppliers to choose between, and against eight lean corps 'another supplier may still quote' is often false; it would ship correct and unexercised, the exact shape of Sprint 9's hire_unit (NR-121). And BL-340's substrate-basket step would otherwise be built and then deleted, since BL-365 removes the function it extends. The accepted cost is that the militia refocus payoff slips another sprint, and v0.2.0 is deferred a second time (see NR-159).
+
+### NR-154 — BL-340's background-demand step is deleted, not deferred
+*decision taken on your behalf · raised 2026-08-10 · from Consequence of NR-153, applied to both items the same session.*
+
+BL-340's design pass originally specified substrate demand_basket weights plus an abstract refined-goods capacity in inject_substrate_demand, and named it the item's risk step. With BL-365 sequenced first and removing that function outright, the step is struck from BL-340 rather than moved later in it. Background production and consumption for the seven new goods becomes BL-365's responsibility. The underlying HAZARD transfers rather than disappearing: a good with demand and no supply pegs at 4x base forever, which under real background industry means no firm produces it — BL-365 carries it as an explicit failure condition. The intended demand shape is retained in BL-340's design as calibration input.
+
+### NR-155 — "A tile is one building" was never the shipped rule
+*observation · raised 2026-08-10 · from Reading placement_rules.cpp against Ben's 2026-08-10 framing.*
+
+Ben proposed pivoting off 'the design philosophy that a tile is one building'. The code does not implement that philosophy: stack_capacity returns a richness-derived 1-5 for extraction_site and 1 for everything else, and buildings_on_tile counts per (tile, type, target) — so one tile already carries several iron sites plus several coal sites plus one processor plus one port plus one hub. What is capacity-1 is every NON-extraction type, which is precisely the question BL-193 deferred rather than answered ('whether processors stack on land, workforce or road tier is a separate question'). BL-366 is therefore a completion of BL-193, not a pivot away from it, and is written that way. Flagged because the framing difference changes what the item is understood to be doing.
+
+### NR-156 — pregame_balance_harness's 'lucrative gap' assertion passes off a 4x band peg
+*observation · raised 2026-08-10 · from pregame_balance_harness runs at 12 and 80 ticks, 2026-08-10.*
+
+BL-112 R1 asserts 'the fillable gap is lucrative (best price >= 1.3x base)' and reports a best price/base ratio of exactly 4.00 in both runs — food_rations at 12 ticks, steel at 80. 4.00 is the hard ceiling of resolve_price's [0.25x, 4x] band, so the assertion passes BECAUSE a price is jammed against the clamp, not because a margin was discovered. That is a vacuous green of the same family data_creep's coverage section was built to catch. Not fixed here (it would change a shipped gate mid-merge), but BL-365 must not inherit it: under real background industry a good pegged at the ceiling means nobody produces it, which is a generation bug rather than an opportunity.
+
+### NR-157 — BL-107's 'no flat-binary serialiser exists' is stale — and BL-340's dependency is live again
+*observation · raised 2026-08-10 · from BL-340 design pass, re-read against the BL-293 merge.*
+
+BL-107 (save-format magic + version header) is marked designed-but-BLOCKED on the grounds that 'no flat-binary serialiser exists in world/* yet'. That was true pre-merge. It is not now: history_log.{hpp,cpp} and order_book.{hpp,cpp} are two such streams, both already carrying the magic + version header BL-107 specifies and both citing BL-107 as their reason. BL-107's remaining scope is the WORLD-SNAPSHOT header, not the first-ever one, and its status line should say so. The knock-on for BL-340 reverses a conclusion reached earlier the same session: read_order_book rejects a resource byte outside the known resource_type range, so widening the enum now moves a validation boundary in shipped serialised state. Not a blocker, but the version bump is a real step rather than a hypothetical one.
+
+### NR-158 — PRODUCTION.md and recipes.lua disagree on the steel recipe
+*observation · raised 2026-08-10 · from BL-340 design pass, 2026-08-10.*
+
+PRODUCTION.md § Smelter states 'Iron ore + coal (reagent) -> Steel'. scripts/recipes.lua id 1 is { iron_ore = 2.0 } with no coal at all. One of the two is wrong and has been for some time. Worth reconciling inside BL-340, since that item prices coal for the first time and the admission rule it adopts (a resource must have a consumer) would otherwise argue against pricing coal at all. Recommendation recorded on the item: add the reagent to the recipe rather than correct the doc — coal then has a consumer, and the doc becomes true.
+
+### NR-159 — v0.2.0 (the AI opponent) has now been deferred twice, both times in the same direction
+*observation · raised 2026-08-10 · from Sprint re-sequence, 2026-08-10.*
+
+First deferral: the 2026-08-10 five-sprint plan held v0.2.0 so the opponent would be built against a settled player identity. Second: the living world was inserted ahead of it the same day, pushing it from Sprint 13 to Sprint 14. Each deferral has an argument — and the second one is genuinely good, since an opponent is more interesting in a market with real competitors than one with eight lean corps. But two deferrals in one day, both pointing away from the thing the roadmap itself calls 'the thing that makes Io a game rather than a simulation', is a pattern rather than a coincidence. Named here so the v0.1.13 retro examines it deliberately instead of a third accumulating silently.
+
+### NR-160 — Do background firms run the full corp_ai scored-utility layer, or a reduced produce/sell model?
+*question · raised 2026-08-10 · from BL-365 design draft — its dominant open question.*
+
+BL-365 multiplies corp count by roughly an order of magnitude. corp_ai's per-corp evaluation is what BL-253 identifies as an O(corps x tiles) tile rescan, and the econ tick already costs ~3.5 ms on the real generated world with eight corps — with pre_game_ticks now 80, that runs before the first frame of every new game. Running the full scored-utility layer for ~80 corps may be unaffordable even with BL-253 fixed. The likely answer is a reduced per-tick model for background firms (produce, sell, maintain; no build/demolish scoring) with corp_ai reserved for the handful of RIVAL corps that actually contest the player — but that introduces a two-tier actor model, which is a design commitment in its own right and should be Ben's call rather than a build-time expedient.
 
 ---
 

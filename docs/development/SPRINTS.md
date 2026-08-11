@@ -43,7 +43,9 @@ and/or a version goal (v0.1.1 etc.).
 | 5 | Era −1 history sim, 0–2000 CE (BL-271–275) | **Closed 2026-08-10** — four of five landed (BL-271/272/273/275); BL-274 (era-keyed rosters) and BL-317 (prehistory timelapse) carried to v0.3.0 |
 | 6 | The release sprint | **Closed** — five versions tagged (v0.1.1, v0.1.2, v0.1.8, v0.1.9, v0.1.10); every cut minor now carries a done-definition |
 | 7 | The stub minors become releases | **Closed** — v0.1.3 and v0.1.4 cut; `post-v0.1.0` swept, every open item names a minor |
-| 8–12 | The next five, planned 2026-08-10 | **Planned** — see § Sprints 8–12 below |
+| 8 | Who the player is (design only) | **Closed 2026-08-10** — BL-094 rewritten as the militia, BL-350 filed, v0.3.0 roster reconciled |
+| 9 | The militia takes the field | **Closed 2026-08-10** — v0.1.5 cut; BL-325/BL-331 landed, BL-332 designed and re-versioned |
+| 10–14 | Re-sequenced 2026-08-10 (the living world inserted) | **Planned** — see § Sprints 10–14 below |
 
 **Next up (2026-08-10).** Sprint 5 is closed on Ben's call — *"I am happy with the generation
 progress we made"* — and the board went momentarily to zero goaled sprints. The plan for
@@ -57,7 +59,13 @@ nothing said in what order to build them.
 
 ---
 
-# Sprints 8–12 — the plan (written 2026-08-10)
+# Sprints 8–14 — the plan (written 2026-08-10, re-sequenced the same day)
+
+> **Re-sequenced 2026-08-10 (Ben).** Sprints 8 and 9 closed the same day they were planned. A new
+> **Sprint 10 — the living world** was then inserted ahead of procurement, on Ben's steer that the
+> world should be filled with real industry and the abstract substrate replaced outright. Everything
+> after it shifts by one: procurement 10→11, v0.1.11 12, v0.1.7 13, and v0.2.0 becomes the obvious
+> Sprint 14. The reasoning for the insertion is in Sprint 10's own § Why this precedes procurement.
 
 Five sprints, planned in one pass at Ben's direction, because Sprint 5 closed and nothing was
 goaled. They are sequenced against one thing: **the 2026-08-10 refocus** (NR-120).
@@ -232,21 +240,68 @@ modelling what it buys.
   three bugs (missing candidate type, in-flight re-proposal, tech-gate blindness) was a five-minute
   fix once found, and each was invisible until a real 300-tick rollout was run against it.
 
-## Sprint 10 — Procurement, and the goods it is about (new minor)
+## Sprint 10 — The living world (cut v0.1.13)
+
+**Goal.** The market saturates because real firms produce and consume, not because a substrate pass
+injects supply and demand. Ben, 2026-08-10: *"we should do more work to fill out a living world,
+with saturated markets, and plenty of buildings … this is the only way I can see a saturated market
+working, where the player is part of a larger market where most of the mundane trades happen behind
+the scenes."* His call the same day: **replace the substrate entirely**, rather than keeping it and
+adding buildings as texture.
+
+**Planned.** **BL-253** (the O(corps × tiles) strategic scan — re-goaled C/v0.2.0 → A/v0.1.13 and a
+hard prerequisite, not an adjacent nicety), then **BL-366** (multi-building tiles) and **BL-368**
+(real population demand) as the two foundations, then **BL-365** (background industry) as the
+keystone, with **BL-367** (management surface) and **BL-369** (warm-start calendar) alongside.
+**BL-130** (real market inventory) and **BL-132** (market cogeneration) are absorbed from v0.1.13's
+existing five — both were orphans and both are components of this rather than neighbours of it.
+
+**Why v0.1.13 rather than a new minor.** It was hollowed out on 2026-08-10 when BL-340 left for
+v0.1.14, leaving five items with no A-priority among them. This gives it a keystone and rescues two
+C-items into a coherent story. Nothing needs renumbering.
+
+**Why this precedes procurement.** BL-350's counterparty model — a supplier that quotes, delays or
+refuses, with the player routing around a refusal to a competing quote — needs suppliers to choose
+between. Against today's 8 lean corps and ~24 buildings on 15,120 tiles, *"another supplier may
+still quote"* is often simply false, and the mechanic would ship correct but unexercised. That is
+exactly Sprint 9's `hire_unit`: shipped correct, never once observed firing across five harness
+seeds (NR-121). Ordering this first also **deletes** BL-340's substrate step rather than building it
+twice, since BL-365 removes the function that step would have extended.
+
+**The measurement that motivated it.** `pregame_balance_harness 80` (2026-08-10, the real generated
+world): the player corp's balance grows linearly to tick 23, knees at ~24, and **plateaus from ~tick
+47 at ~185k cr**. The economy has a carrying capacity and reaches it. The same run also landed
+`pre_game_ticks` 12 → 80 — the old figure's justification (*"short enough not to diverge under the
+prototype's un-tuned economy"*) was measured and did not hold; it converges.
+
+**Risk.** The largest of the five sprints by some distance — BL-365 is difficulty 5 and
+`design-owed`, and its dominant open question (do ~80 background firms run the full `corp_ai`
+scored-utility layer, or a reduced produce/sell model?) is a perf question that BL-253 only
+partly de-risks. Accepted cost, named here so the retro does not have to rediscover it: **v0.2.0 is
+now deferred a second time**, both times in the same direction.
+
+**Owed at the cut.** A written done-definition for v0.1.13, per NR-103.
+
+## Sprint 11 — Procurement, and the goods it is about (cut v0.1.14)
 
 **Goal.** The refocus's actual mechanic, plus the resource tiers that make "space equipment" a
 thing rather than a label.
 
-**Planned.** Sprint 8's filed procurement items, and **BL-340** (the processing half of the
-buildings roster — new resource types with market, price and recipe) pulled forward per ruling 3.
-Needs a minor of its own; **v0.1.14 "Procurement"** is the obvious name, to be confirmed at the
-cut. v0.1.13 keeps markets and the save-format header without its keystone, which is fine — those
-five items stand on their own.
+**Planned.** **BL-350** (the procurement/contract seam) and **BL-340** (the processing roster) —
+both `designed` as of 2026-08-10, in a joint design pass, because they are mechanism and content for
+the same premise. Plus **BL-332** (military points + research building), which moved here from
+v0.1.5 at Sprint 9's retro as resource-tier plumbing of the same kind.
 
-**Dependency note.** BL-340 is difficulty 4 and `design-owed`. It is the single largest unknown in
-this plan and the most likely thing to spill into Sprint 11.
+**What the re-sequence changed.** BL-340's substrate-basket step is **deleted, not deferred** —
+Sprint 10's BL-365 removes `inject_substrate_demand`, so background demand for the seven new goods
+is BL-365's responsibility. BL-350 now lands into a saturated world, which is the whole reason the
+order flipped.
 
-## Sprint 11 — v0.1.11 reconciled (cut v0.1.11)
+**Dependency note.** BL-340 is difficulty 4. It was the single largest unknown in the original plan;
+the joint design pass has reduced that, and its remaining risk is pricing calibration rather than
+shape.
+
+## Sprint 12 — v0.1.11 reconciled (cut v0.1.11)
 
 **Goal.** The fattest open minor, built against the actor Sprint 8 defined rather than the one it
 was written for.
@@ -259,7 +314,7 @@ from an enactment ledger. Then the items the refocus does not touch: **BL-211** 
 `design-owed`, difficulty 5) is the one to watch — Sprint 8 will likely have merged its bargaining
 model into the procurement seam, in which case it shrinks or dissolves.
 
-## Sprint 12 — Generation visibility, and the owed timelapse (cut v0.1.7)
+## Sprint 13 — Generation visibility, and the owed timelapse (cut v0.1.7)
 
 **Goal.** Close the generation arc Ben declared himself happy with, including the one piece he
 named as still owed.
@@ -272,18 +327,22 @@ v0.3.0: it is the history time-lapse Ben named at Sprint 5's close, and it is a
 generation-visibility item by nature rather than an Era −1 one.
 
 **One sequencing option worth taking.** BL-317 pairs naturally with **BL-264** (wizard layout
-after per-stage folding) — both are New World wizard stages. If Sprint 11 is building BL-264
+after per-stage folding) — both are New World wizard stages. If Sprint 12 is building BL-264
 anyway, riding BL-317 alongside it gets the timelapse three sprints earlier for very little extra,
-and Sprint 12 loses nothing it needs.
+and Sprint 13 loses nothing it needs.
 
 ---
 
 ## What this plan deliberately does not carry
 
 - **v0.2.0 (the AI opponent), 12 items.** It is the thing that makes Io a game rather than a
-  simulation, and it is *not* in the next five sprints. That is a real cost, accepted because the
+  simulation, and it is *not* in the sprints above. That is a real cost, accepted because the
   opponent should be built against a settled player identity, not re-fitted to one. It is the
-  obvious Sprint 13.
+  obvious **Sprint 14**. **Deferred twice now** — first for the militia refocus, then again for the
+  living world when Sprint 10 was inserted on 2026-08-10. Both deferrals point the same way, and
+  the second one has an argument in its favour (an opponent is more interesting in a market with
+  real competitors than in one with eight lean corps). Name it at the v0.1.13 retro rather than
+  letting a third accumulate silently.
 - **v0.1.12 (logistics modes), 4 items** — rail, ports, convoy distance pricing, supply-lens
   flow. Unblocked and uncontroversial; a good filler if any sprint above finishes short.
 - **v0.4.0, 9 items.** Politics, and the history-ladder tail. Downstream of everything here.
