@@ -246,23 +246,6 @@ struct tile_component
     std::uint8_t river_downstream = 0;
 };
 
-/// Background nation-owned economy baseline for one (nation, body) pair. Carries
-/// only *generation* coefficients; the live demand/supply is derived at tick time
-/// by inject_substrate_demand from these plus the economy.substrate tunables
-/// (BL-078). Injected into the body's markets each economy tick to give them
-/// liquidity and a price-discovering demand/supply model.
-struct nation_substrate
-{
-    /// Abstract production capacity per resource on this body, derived from
-    /// owned-tile deposits weighted by population proximity (Σ density·deposit).
-    /// Scaled by economy.substrate.capacity_scale at tick time to cap supply, so a
-    /// resource the nation lacks the deposit for leaves a live, fillable gap.
-    std::array<float, resource_count> capacity = {};
-    /// Catchment population/economic weight (Σ of the density ripple over owned
-    /// tiles) that drives the per-capita basket demand at tick time.
-    float population_weight = 0.0f;
-};
-
 /// Survey lifecycle of a body (BL-067, docs/ui/SOLAR.md § Survey badge).
 /// A body starts `hidden` — the player knows only its type, orbital position and
 /// grid size. Dispatching a survey moves it through `in_transit` (probe en route,
@@ -663,6 +646,15 @@ struct corporation_component
     /// True for exactly one corporation per campaign — the human player's
     /// corporation. Set after all corps are generated.
     bool is_player = false;
+
+    /// True for a BL-365 background firm — a real corporation generated purely
+    /// to fill the body's production/demand gap (the old abstract nation-substrate
+    /// injection's replacement). A corp is exactly one of player / rival /
+    /// background — is_player and is_background are never both true. Background
+    /// firms are otherwise ordinary corporations: real buildings, real recipes,
+    /// real stockpiles, picked up by corp_ai.cpp's uniform non-player iteration
+    /// like any rival.
+    bool is_background = false;
 
     /// Building entity IDs owned by this corporation at campaign start.
     /// Populated by Pass 3 (starting asset placement); each entry has a

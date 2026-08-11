@@ -1,5 +1,6 @@
 #include "corporation_generation.hpp"
 
+#include "world/economy_system.hpp"
 #include "world/placement_rules.hpp"
 #include "world/settlement.hpp"
 
@@ -861,6 +862,161 @@ hq_designation designate_hq(const world& w, const std::vector<entity_id>& assets
     return { hq, max_d + kProjectedReachUnits };
 }
 
+// ---------------------------------------------------------------------------
+// BL-365 helpers — generate_background_firms measurement + placement
+// ---------------------------------------------------------------------------
+
+/// Nominal batches/tick a processing_facility with the standard 0.5
+/// workforce_assigned (author_building's own default) runs at a full (100%)
+/// workforce target — mirrors run_processing's `batches_full` formula
+/// (economy_system.cpp) without needing a live building_component's
+/// workforce_target; every freshly-authored building opens at 100%.
+float nominal_processing_batches(const recipe_registry& reg)
+{
+    constexpr float default_workforce_assigned = 0.5f;
+    return reg.economics(building_type::processing_facility).base_rate
+         * default_workforce_assigned;
+}
+
+/// Accumulate `body_id`'s current REAL production into `production`
+/// (resource-indexed), from every building actually in the world — extraction
+/// via the exported `extraction_nominal` (economy_system.hpp) at contention 1.0
+/// (nominal, uncontended), processing via its assigned recipe's outputs scaled
+/// by `nominal_processing_batches`. A processor with no recipe assigned yet
+/// (no_recipe) contributes nothing; this function always assigns one to any
+/// processing building it itself authors before the next measurement.
+void accumulate_body_production(const world& w, const recipe_registry& reg,
+                                entity_id body_id,
+                                std::array<float, resource_count>& production)
+{
+    for (const auto& [bid, b] : w.buildings)
+    {
+        const auto tit = w.tiles.find(b.tile);
+        if (tit == w.tiles.end() || tit->second.body != body_id)
+            continue;
+        if (b.decommissioned)
+            continue;
+        if (b.type == building_type::extraction_site)
+        {
+            const float nominal = extraction_nominal(w, reg, b, 1.0f);
+            if (nominal > 0.0f)
+                production[static_cast<std::size_t>(b.target_resource)] += nominal;
+        }
+        else if (b.type == building_type::processing_facility)
+        {
+            const recipe* rcp = reg.get_recipe(b.recipe);
+            if (!rcp)
+                continue;
+            const float batches = nominal_processing_batches(reg);
+            for (std::size_t r = 0; r < resource_count; ++r)
+                if (rcp->outputs[r] > 0.0f)
+                    production[r] += batches * rcp->outputs[r];
+        }
+    }
+}
+
+/// `body_id`'s aggregate demand: population_demand_params + BL-340's
+/// background_demand_params baskets, weighted by every population centre's
+/// `scale` on the body — the same two consumer-side pulls `clear_markets`
+/// injects every tick (`inject_population_demand` / `inject_background_demand`,
+/// market_clearing.cpp). Read here at pre-game generation time as the target
+/// the measured stop condition below sizes background production against.
+std::array<float, resource_count> body_demand(const world& w, const recipe_registry& reg,
+                                              entity_id body_id)
+{
+    std::array<float, resource_count> demand = {};
+    float total_scale = 0.0f;
+    for (const auto& [cid, pcc] : w.population_centres)
+    {
+        const auto tile_it = w.population_centre_tile.find(cid);
+        if (tile_it == w.population_centre_tile.end())
+            continue;
+        const auto tit = w.tiles.find(tile_it->second);
+        if (tit == w.tiles.end() || tit->second.body != body_id)
+            continue;
+        total_scale += static_cast<float>(pcc.scale);
+    }
+    if (total_scale <= 0.0f)
+        return demand;
+
+    const population_demand_params&  pd = reg.population_demand();
+    const background_demand_params&  bd = reg.background_demand();
+    for (std::size_t r = 0; r < resource_count; ++r)
+        demand[r] = total_scale * (pd.demand_scale * pd.demand_basket[r]
+                                  + bd.demand_scale * bd.demand_basket[r]);
+    return demand;
+}
+
+/// Basket-weighted mean production/demand ratio over the body's tradeable set —
+/// the measured 90% stop condition reads this. Mirrors the met_ratio calculation
+/// the population-growth step (economy_system.cpp) uses for its own basket-wide
+/// gate: a mean of per-resource production/demand, each clamped at 1.0 so an
+/// oversupplied resource cannot mask a genuine gap elsewhere. A body with no
+/// measurable demand reads as fully met (1.0) — nothing to fill.
+float production_ratio(const std::array<float, resource_count>& production,
+                       const std::array<float, resource_count>& demand)
+{
+    float acc = 0.0f, weight = 0.0f;
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        if (demand[r] <= 0.0f)
+            continue;
+        acc    += std::min(1.0f, production[r] / demand[r]);
+        weight += 1.0f;
+    }
+    return (weight > 0.0f) ? (acc / weight) : 1.0f;
+}
+
+/// The resource with the largest ABSOLUTE shortfall (demand − production).
+/// Returns resource_count (out of range — the caller's "nothing left to fill"
+/// signal) if no resource has a positive shortfall.
+std::size_t biggest_gap_resource(const std::array<float, resource_count>& production,
+                                 const std::array<float, resource_count>& demand)
+{
+    std::size_t best     = resource_count;
+    float       best_gap = 0.0f;
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        const float gap = demand[r] - production[r];
+        if (gap > best_gap)
+        {
+            best_gap = gap;
+            best     = r;
+        }
+    }
+    return best;
+}
+
+/// The processing recipe whose outputs best relieve the current per-resource
+/// shortfall vector: highest Σ(positive gap × recipe.outputs). Returns -1 if no
+/// recipe relieves any current gap at all (the caller then falls back to
+/// extraction — the gap resource is presumably a raw, not a processed good).
+int best_recipe_for_gaps(const recipe_registry& reg,
+                         const std::array<float, resource_count>& production,
+                         const std::array<float, resource_count>& demand)
+{
+    const int n = reg.recipe_count(building_type::processing_facility);
+    int   best_i     = -1;
+    float best_score = 0.0f;
+    for (int i = 0; i < n; ++i)
+    {
+        const recipe& cand = reg.recipe_at(building_type::processing_facility, i);
+        float score = 0.0f;
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            const float gap = demand[r] - production[r];
+            if (gap > 0.0f && cand.outputs[r] > 0.0f)
+                score += gap * cand.outputs[r];
+        }
+        if (score > best_score)
+        {
+            best_score = score;
+            best_i     = i;
+        }
+    }
+    return best_i;
+}
+
 } // namespace
 
 // ---------------------------------------------------------------------------
@@ -1316,4 +1472,179 @@ std::vector<entity_id> generate_corporations(
     }
 
     return corp_ids;
+}
+
+// ---------------------------------------------------------------------------
+// BL-365 — generate_background_firms
+// ---------------------------------------------------------------------------
+
+std::vector<entity_id> generate_background_firms(
+    world& w, const recipe_registry& reg, uint32_t seed)
+{
+    std::vector<entity_id> firm_ids;
+    if (w.nations.empty())
+        return firm_ids;
+
+    // Distinct bodies carrying at least one population centre — the only bodies
+    // with a real demand basket (body_demand, above) to size production
+    // against. Sorted + de-duplicated for determinism (population_centres is
+    // unordered_map-backed).
+    std::vector<entity_id> body_ids;
+    for (const auto& [cid, pcc] : w.population_centres)
+    {
+        (void)pcc;
+        const auto tile_it = w.population_centre_tile.find(cid);
+        if (tile_it == w.population_centre_tile.end())
+            continue;
+        const auto tit = w.tiles.find(tile_it->second);
+        if (tit == w.tiles.end())
+            continue;
+        body_ids.push_back(tit->second.body);
+    }
+    std::sort(body_ids.begin(), body_ids.end());
+    body_ids.erase(std::unique(body_ids.begin(), body_ids.end()), body_ids.end());
+
+    // clearing_fraction — the exact figure the deleted BL-078 substrate model
+    // used (economy.substrate.clearing_fraction, 0.90) to preserve the "live,
+    // fillable opportunity gap" invariant BL-078/BL-112 depend on: real
+    // background production covers most, not all, of demand, leaving room for
+    // the player to fill the rest.
+    constexpr float target_ratio           = 0.90f;
+    constexpr int   max_firms_per_body     = 40; // hard bound — never infinite-loop
+    constexpr int   max_iterations_per_body = 2 * max_firms_per_body; // slack for placement misses
+
+    // Distinct xor-offset seeds, independent of generate_corporations' own
+    // streams (seed_asset etc.) so the two passes cannot collide even though
+    // both draw from placement RNG.
+    std::mt19937 asset_rng(seed ^ 0x3D6F9A11u);
+    std::mt19937 name_rng(seed ^ 0x6E17C4B0u);
+    std::mt19937 stock_rng(seed ^ 0x1A2B3C4Du);
+
+    for (const entity_id body_id : body_ids)
+    {
+        // Nations that actually own tiles on this body — a background firm only
+        // opens where a nation exists to host it, exactly like generate_corporations.
+        std::vector<entity_id> nation_ids;
+        for (const auto& [nid, nc] : w.nations)
+        {
+            for (entity_id tid : nc.tiles)
+            {
+                const auto tit = w.tiles.find(tid);
+                if (tit != w.tiles.end() && tit->second.body == body_id)
+                {
+                    nation_ids.push_back(nid);
+                    break;
+                }
+            }
+        }
+        if (nation_ids.empty())
+            continue;
+        std::sort(nation_ids.begin(), nation_ids.end());
+
+        const std::array<float, resource_count> demand = body_demand(w, reg, body_id);
+
+        // Occupancy is rebuilt from the authoritative source each body (mirrors
+        // generate_corporations' own player-muster-building block) — every
+        // building already on the board, including this body's own prior
+        // background firms placed earlier in this same loop.
+        std::unordered_set<entity_id> occupied_tiles;
+        occupied_tiles.reserve(w.buildings.size() * 2);
+        for (const auto& kv : w.buildings)
+            occupied_tiles.insert(kv.second.tile);
+
+        int nation_cursor    = 0;
+        int firms_this_body  = 0;
+        for (int iter = 0; iter < max_iterations_per_body && firms_this_body < max_firms_per_body; ++iter)
+        {
+            std::array<float, resource_count> production = {};
+            accumulate_body_production(w, reg, body_id, production);
+
+            // MEASURED stop condition — real production vs real demand, not a
+            // firm-count target.
+            if (production_ratio(production, demand) >= target_ratio)
+                break;
+
+            const std::size_t gap_r = biggest_gap_resource(production, demand);
+            if (gap_r == resource_count)
+                break; // no resource genuinely short — nothing left worth filling
+
+            // Prefer processing when some recipe's output actually relieves the
+            // gap resource (a refined good — silicon, machinery, ...);
+            // otherwise the firm extracts the gap resource as a raw directly.
+            const int  recipe_i = best_recipe_for_gaps(reg, production, demand);
+            const bool go_processing = (recipe_i >= 0)
+                && (reg.recipe_at(building_type::processing_facility, recipe_i).outputs[gap_r] > 0.0f);
+            const industrial_focus focus = go_processing ? industrial_focus::processing
+                                                          : industrial_focus::extraction;
+
+            const entity_id home_nid = nation_ids[static_cast<std::size_t>(
+                nation_cursor % static_cast<int>(nation_ids.size()))];
+            ++nation_cursor;
+            const auto nit = w.nations.find(home_nid);
+            if (nit == w.nations.end())
+                continue;
+
+            std::vector<entity_id> assets = place_starting_assets(
+                w, nit->second, focus, occupied_tiles, asset_rng);
+            if (assets.empty())
+                continue; // this nation had nothing left to anchor on this round; try the next
+
+            // Author a recipe onto every processing facility placed, targeted at
+            // the gap this firm exists to fill — generation-time processors
+            // otherwise stay `no_recipe` until app::load_economy's blanket
+            // steel default, which has already run by the time this function is
+            // called (see the header's ordering note), so a gap-targeted recipe
+            // here is strictly better than losing every background processor to
+            // the same steel default.
+            if (go_processing && recipe_i >= 0)
+            {
+                const recipe&  chosen    = reg.recipe_at(building_type::processing_facility, recipe_i);
+                const uint16_t chosen_id = reg.recipe_id(chosen.name);
+                for (const entity_id bid : assets)
+                {
+                    const auto bit = w.buildings.find(bid);
+                    if (bit != w.buildings.end()
+                        && bit->second.type == building_type::processing_facility)
+                        bit->second.recipe = chosen_id;
+                }
+            }
+
+            // Financial profile: background firms open lean, same as every other
+            // generated corp (corporation_params::base_capital defaults to 0 —
+            // capital is earned through the pre-game warm start, not seeded).
+            corporation_component cc;
+            cc.name          = make_corp_name(nit->second.name, name_rng);
+            cc.home_nation   = home_nid;
+            cc.focus         = focus;
+            cc.starting_capital = 0.0f;
+            cc.balance          = 0.0f;
+            cc.is_player     = false;
+            cc.is_background = true;
+
+            const entity_id home_body = corp_home_body(w, assets);
+            const hq_designation hq   = designate_hq(w, assets, home_body);
+            cc.hq_building     = hq.building;
+            cc.influence_range = hq.range;
+            cc.assets          = std::move(assets);
+
+            const entity_id corp_id = w.create_entity();
+            w.corporations[corp_id] = std::move(cc);
+            firm_ids.push_back(corp_id);
+            ++firms_this_body;
+
+            // Starting stockpile — the same BL-116 generator every generated
+            // corp uses, so a background firm opens with materials from turn
+            // one exactly like a rival does.
+            if (home_body != null_entity)
+            {
+                const auto stock = generate_starting_stockpile(
+                    focus, /*capital=*/0.0f, /*base_capital=*/0.0f, stock_rng);
+                stockpile_component& pool = w.pool_for(corp_id, home_body);
+                for (std::size_t r = 0; r < resource_count; ++r)
+                    pool.quantities[r] += stock[r];
+            }
+        }
+    }
+
+    return firm_ids;
 }

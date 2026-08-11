@@ -489,9 +489,9 @@ static void test_multi_market_growth_aggregate()
 
     // Non-empty basket so the met-supply gate actually bites (threshold 0.5).
     recipe_registry reg;
-    substrate_params sp{};
-    sp.demand_basket[ri(resource_type::agricultural_produce)] = 1.0f;
-    reg.set_substrate(sp);
+    growth_params gp{};
+    gp.demand_basket[ri(resource_type::agricultural_produce)] = 1.0f;
+    reg.set_growth(gp);
 
     const std::size_t food = ri(resource_type::agricultural_produce);
 

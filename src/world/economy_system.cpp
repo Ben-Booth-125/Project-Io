@@ -995,7 +995,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
     // clear_markets in the tick), so it is deterministic and price-consistent.
     // Tier thresholds (ticks to grow): scale 1→2: 200, 2→3: 500, 3→4: 1500, 4→5: 5000.
     static constexpr int growth_threshold[6] = { 0, 200, 500, 1500, 5000, 0 };
-    const substrate_params& growth_sp = reg.substrate();
+    const growth_params& growth_sp = reg.growth();
 
     // Per-body market basket, summed over ALL the body's markets (BL-357). A body
     // hosts several resource-carved markets (BL-096), and reading whichever one an
@@ -1186,82 +1186,8 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
     return report;
 }
 
-void inject_substrate_demand(world& w, const recipe_registry& reg)
-{
-    const substrate_params& sp = reg.substrate();
-
-    for (auto& [key, sub] : w.nation_substrates)
-    {
-        const entity_id nation_id = key.first;
-        const entity_id body_id   = key.second;
-
-        // BL-096: distribute the nation's substrate across the markets on this body
-        // that sit in its OWN territory (a market whose centre_tile the nation owns);
-        // if it owns none (it folded into a neighbour under the resource carve), fall
-        // back to the body's lowest-id market. Split equally so the per-nation totals
-        // are conserved however many markets the carve produced. Markets are gathered
-        // in ascending id order for determinism.
-        std::vector<entity_id> targets;
-        entity_id fallback = null_entity;
-        {
-            std::vector<entity_id> body_markets;
-            for (const auto& [mid, mc] : w.markets)
-                if (mc.body == body_id)
-                    body_markets.push_back(mid);
-            std::sort(body_markets.begin(), body_markets.end());
-            for (const entity_id mid : body_markets)
-            {
-                if (fallback == null_entity)
-                    fallback = mid; // lowest-id market on the body
-                const entity_id ct = w.markets.at(mid).centre_tile;
-                if (ct == null_entity)
-                    continue;
-                const auto nit = w.tile_to_nation.find(ct);
-                if (nit != w.tile_to_nation.end() && nit->second == nation_id)
-                    targets.push_back(mid);
-            }
-        }
-        if (targets.empty() && fallback != null_entity)
-            targets.push_back(fallback);
-        if (targets.empty())
-            continue; // no markets on this body
-
-        const float share = 1.0f / static_cast<float>(targets.size());
-        const float pop_w = sub.population_weight * share;
-
-        for (const entity_id mid : targets)
-        {
-            market_component& mc = w.markets.at(mid);
-            for (std::size_t r = 0; r < resource_count; ++r)
-            {
-                // Only tradeable resources carry a substrate; untradeables have no
-                // base price to anchor the elasticity curve.
-                const float base = mc.base_price[r];
-                if (base <= 0.0f)
-                    continue;
-                const float weighted = pop_w * sp.demand_basket[r] * sp.demand_scale;
-                if (weighted <= 0.0f)
-                    continue;
-
-                // DEMAND — price-elastic: cheaper than base → consume more, dearer
-                // → less. Reads last tick's cleared price (0 before the first clear
-                // falls back to base). Deterministic; a curve, not RNG.
-                const float price   = (mc.price[r] > 0.0f) ? mc.price[r] : base;
-                const float elastic = std::clamp(std::pow(base / price, sp.demand_elasticity),
-                                                 sp.elasticity_min, sp.elasticity_max);
-                const float demand  = weighted * elastic;
-
-                // SUPPLY — abstract nation capacity that tracks demand and clears it
-                // only to `clearing_fraction`, capped by deposit-derived capacity.
-                // Ample capacity → a thin saturation margin (price just above base);
-                // a resource the nation lacks → supply pegs short, price rises (the
-                // fillable opportunity gap BL-112/BL-079 read).
-                const float capacity = sub.capacity[r] * share * sp.capacity_scale;
-                const float supply   = std::min(capacity, demand * sp.clearing_fraction);
-
-                mc.demand[r] += demand;
-                mc.supply[r] += supply;
-            }
-        }
-    }
-}
+// inject_substrate_demand (BL-078) was removed by BL-365: the abstract
+// nation-substrate demand/supply injection is replaced entirely by real
+// background corporations (corporation_generation.cpp's
+// generate_background_firms) trading through the normal recipe/workforce/
+// market pipeline. See docs/economy/MARKETS.md.

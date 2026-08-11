@@ -820,10 +820,14 @@ std::vector<entity_id> generate_nations(
         w.tile_to_nation[tid] = nation_ids[static_cast<std::size_t>(ni)];
     }
 
-    // --- Pass 6: substrate density + nation_substrate accumulation ---
+    // --- Pass 6: substrate density (BL-050) ---
     // For each nation-owned tile, find the nearest population centre on the same
     // body and compute a density ripple. Tiles on bodies with no centres are left
-    // at substrate_density = 0.
+    // at substrate_density = 0. Purely a rendering field now (the Industry lens,
+    // body_surface_canvas.cpp) — BL-365 replaced the nation_substrate aggregate
+    // this used to also feed with real background firms (corporation_generation.cpp
+    // generate_background_firms), so nothing downstream reads density for market
+    // injection any more.
     constexpr float ripple_radius = 8.0f;
 
     for (int idx = 0; idx < total; ++idx)
@@ -867,21 +871,6 @@ std::vector<entity_id> generate_nations(
         }
 
         tc.substrate_density = best_density;
-
-        if (best_density <= 0.0f)
-            continue;
-
-        const entity_id nation_id = nation_ids[static_cast<std::size_t>(ni)];
-        nation_substrate& sub = w.nation_substrates[std::make_pair(nation_id, body_id)];
-
-        // BL-078: store only generation baselines here — raw deposit-weighted
-        // capacity and the population-proximity weight. The economic scalars
-        // (capacity_scale, basket, elasticity, clearing_fraction) are applied at
-        // tick time by inject_substrate_demand, so the demand/supply model is
-        // fully retunable from economy.lua without regenerating the world.
-        sub.population_weight += best_density;
-        for (std::size_t r = 0; r < resource_count; ++r)
-            sub.capacity[r] += best_density * tc.resource_deposit[r];
     }
 
     return nation_ids;

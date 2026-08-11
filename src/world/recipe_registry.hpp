@@ -41,21 +41,21 @@ struct building_economics
     float build_duration_ticks = 0.0f;
 };
 
-/// BL-078 elastic nation-substrate model tunables, authored in scripts/economy.lua
-/// under `economy.substrate`. Applied at tick time by inject_substrate_demand so
-/// the whole demand/supply model is retunable without regenerating the world.
-/// See docs/economy/PRODUCTION.md (on landing) and economy.lua for the full model.
-struct substrate_params
+/// BL-365 population-growth-gate tunables, authored in scripts/economy.lua under
+/// `economy.population_growth`. Read only by the population-growth step in
+/// run_economy_step (economy_system.cpp) to test whether a centre's basket is
+/// broadly met before it levels up. This is the surviving remnant of the old
+/// BL-078 elastic nation-substrate model — that model's demand/supply INJECTION
+/// (capacity, clearing_fraction, elasticity) was deleted by BL-365, which
+/// replaced the abstract substrate with real background corporations
+/// (corporation_generation.cpp's generate_background_firms); the growth gate
+/// still needs *some* basket + threshold to test consumption against, so those
+/// two fields alone survive under a new name.
+struct growth_params
 {
-    /// Per-capita aggregate demand weight per resource (population + background
-    /// industry pull). Indexed by static_cast<std::size_t>(resource_type).
+    /// Per-capita basket weight per resource, used ONLY to weight the met-supply
+    /// ratio the growth gate reads. Indexed by static_cast<std::size_t>(resource_type).
     std::array<float, resource_count> demand_basket = {};
-    float capacity_scale       = 2.0f;  ///< deposit-derived capacity → supply ceiling scale.
-    float clearing_fraction    = 0.90f; ///< abstract supply clears this fraction of demand (leaves the margin).
-    float demand_elasticity    = 0.80f; ///< exponent on (base_price / price).
-    float elasticity_min       = 0.30f; ///< clamp lo on the elasticity factor.
-    float elasticity_max       = 2.50f; ///< clamp hi on the elasticity factor.
-    float demand_scale         = 1.00f; ///< global population → demand scale.
     float growth_met_threshold = 0.50f; ///< basket met-supply ratio a centre needs to grow.
 };
 
@@ -91,11 +91,10 @@ struct market_emergence_params
 /// `economy.population_demand`. Applied at tick time by inject_population_demand:
 /// each population centre pulls DEMAND = pcc.scale × basket[r] × elasticity(price)
 /// from its catchment market for every resource in the basket — no supply term;
-/// population is a pure consumer here, unlike the nation-substrate model above,
-/// which also supplies. Generalises the BL-190 agricultural_produce-only stub
-/// into a real per-centre basket across the tradeable set, moving the substrate's
-/// own price-elasticity shape onto it. See docs/economy/MARKETS.md and
-/// docs/economy/POPULATION.md for the full model.
+/// population is a pure consumer here. Generalises the BL-190
+/// agricultural_produce-only stub into a real per-centre basket across the
+/// tradeable set. See docs/economy/MARKETS.md and docs/economy/POPULATION.md
+/// for the full model.
 struct population_demand_params
 {
     /// Per-scale-point demand weight per resource. Indexed by
@@ -105,6 +104,27 @@ struct population_demand_params
     float elasticity_min    = 0.30f; ///< clamp lo on the elasticity factor.
     float elasticity_max    = 2.50f; ///< clamp hi on the elasticity factor.
     float demand_scale      = 1.00f; ///< global population → demand scale.
+};
+
+/// BL-340/BL-365 background-industrial-demand tunables, authored in
+/// scripts/economy.lua under `economy.background_demand`. A world-scale pull
+/// (not per-centre, unlike population_demand_params above) representing the
+/// aggregate offstage economy's appetite for mid-chain processing goods —
+/// silicon, refined_copper, ree_alloy, machinery, alloys, electronics.
+/// Deliberately excludes spacecraft_components: BL-340's design keeps the
+/// militia's procurement contracts as that good's only buyer. Applied at tick
+/// time by inject_background_demand (market_clearing.cpp), called from
+/// clear_markets alongside inject_population_demand. Same price-elastic shape;
+/// scaled per market by that market's body's total population scale.
+struct background_demand_params
+{
+    /// Per-population-scale-point demand weight per resource. Indexed by
+    /// static_cast<std::size_t>(resource_type). Unlisted resources get 0.
+    std::array<float, resource_count> demand_basket = {};
+    float demand_elasticity = 0.80f; ///< exponent on (base_price / price).
+    float elasticity_min    = 0.30f; ///< clamp lo on the elasticity factor.
+    float elasticity_max    = 2.50f; ///< clamp hi on the elasticity factor.
+    float demand_scale      = 1.00f; ///< global scale → demand scale.
 };
 
 /// BL-095 construction-gate tunables, authored in scripts/economy.lua under
@@ -254,11 +274,14 @@ public:
     float t_full() const { return m_t_full; }
     float t_idle() const { return m_t_idle; }
 
-    /// BL-078 elastic-substrate model tunables (economy.substrate in Lua).
-    const substrate_params& substrate() const { return m_substrate; }
+    /// BL-365 population-growth-gate tunables (economy.population_growth in Lua).
+    const growth_params& growth() const { return m_growth; }
 
     /// BL-368 population-demand model tunables (economy.population_demand in Lua).
     const population_demand_params& population_demand() const { return m_population_demand; }
+
+    /// BL-340/BL-365 background-industrial-demand tunables (economy.background_demand in Lua).
+    const background_demand_params& background_demand() const { return m_background_demand; }
 
     /// BL-263 spontaneous-market-emergence tunables (economy.market_emergence in Lua).
     const market_emergence_params& market_emergence() const { return m_market_emergence; }
@@ -318,8 +341,9 @@ public:
 
     // --- direct construction for tests (headless harness builds these by hand) ---
     void set_thresholds(float t_full, float t_idle) { m_t_full = t_full; m_t_idle = t_idle; }
-    void set_substrate(const substrate_params& s) { m_substrate = s; }
+    void set_growth(const growth_params& s) { m_growth = s; }
     void set_population_demand(const population_demand_params& p) { m_population_demand = p; }
+    void set_background_demand(const background_demand_params& b) { m_background_demand = b; }
     void set_market_emergence(const market_emergence_params& m) { m_market_emergence = m; }
     void set_construction(const construction_params& c) { m_construction = c; }
     void set_military(const military_capability_params& m) { m_military = m; }
@@ -357,8 +381,9 @@ private:
 
     /// BL-078 elastic-substrate model tunables (economy.substrate). Defaults match
     /// economy.lua so a hand-built harness registry behaves sensibly without Lua.
-    substrate_params m_substrate = {};
+    growth_params m_growth = {};
     population_demand_params m_population_demand = {};
+    background_demand_params m_background_demand = {};
     market_emergence_params m_market_emergence = {};
 
     /// BL-095 construction-gate tunables (economy.construction). Defaults match

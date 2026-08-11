@@ -164,23 +164,17 @@ economy = {
         highway = { build_cost = 90.0, resource_costs = { steel = 14.0 } },
     },
 
-    -- BL-078: the elastic nation-substrate model. The saturated background
-    -- economy (GENERATION_STRATEGY.md) is given two precise faces at tick time.
-    --   DEMAND  = population_weight × demand_basket[r] × elasticity(price)
-    --     a tiered per-capita basket (food primary, industry inputs lighter) that
-    --     is price-elastic — a lower price raises consumed quantity along a
-    --     down-sloping curve, so price *discovers* instead of clamping.
-    --   SUPPLY  = min(capacity[r] × capacity_scale, demand × clearing_fraction)
-    --     an abstract nation production capacity (deposit-derived at generation)
-    --     that tracks demand and clears it only to `clearing_fraction`, leaving a
-    --     live margin — the saturation cushion where capacity is ample, a wide
-    --     opportunity gap where the nation lacks the deposit (supply pegs short,
-    --     price rises: the gap the player fills).
-    -- All faces are deterministic (a curve, not RNG). Magnitudes are legible
-    -- defaults, retuned by playtest once real price ranges are visible.
-    substrate = {
-        -- Per-capita aggregate demand weight per resource (population + background
-        -- industry pull). Unlisted resources get 0 (no substrate demand).
+    -- BL-365: the old BL-078 elastic nation-substrate model is GONE — the
+    -- saturated background economy (GENERATION_STRATEGY.md) is now real
+    -- background corporations (corporation_generation.cpp's
+    -- generate_background_firms), producing and consuming through the normal
+    -- recipe/workforce/market pipeline like any corp. What survives here is
+    -- only the basket + threshold the population-growth gate in
+    -- run_economy_step still needs, to test whether a centre's consumption is
+    -- broadly met before it levels up.
+    population_growth = {
+        -- Per-capita basket weight per resource, used only to weight the
+        -- growth gate's met-supply ratio. Unlisted resources get 0.
         demand_basket = {
             food_rations         = 0.70,  -- population primary
             agricultural_produce = 0.55,  -- food processing + direct
@@ -190,13 +184,29 @@ economy = {
             iron_ore             = 0.35,  -- background smelting input
             petroleum            = 0.30,  -- background refining input
         },
-        capacity_scale     = 2.0,  -- deposit-derived capacity → supply ceiling scale
-        clearing_fraction  = 0.90, -- abstract supply clears this fraction of demand (leaves the cushion/margin)
-        demand_elasticity  = 0.80, -- exponent on (base_price / price); higher = more price-responsive
-        elasticity_min     = 0.30, -- clamp on the elasticity factor (dear goods still consumed a little)
-        elasticity_max     = 2.50, -- clamp on the elasticity factor (cheap goods consumption saturates)
-        demand_scale       = 1.00, -- global population → demand scale
-        growth_met_threshold = 0.50, -- basket met-supply ratio a centre needs to grow (BL-078 growth)
+        growth_met_threshold = 0.50, -- basket met-supply ratio a centre needs to grow
+    },
+
+    -- BL-340/BL-365: background-industrial demand for the mid-chain processing
+    -- goods real background firms alone would under-consume during the
+    -- pre-game warm start / early game, before enough of them exist. A
+    -- world-scale pull, not per-centre (unlike population_demand below).
+    -- Deliberately excludes spacecraft_components — the militia's procurement
+    -- contracts are that good's only intended buyer (BL-340).
+    background_demand = {
+        demand_basket = {
+            silicon         = 0.20,
+            refined_copper  = 0.20,
+            ree_alloy       = 0.15,
+            machinery       = 0.15,
+            alloys          = 0.15,
+            electronics     = 0.15,
+            -- spacecraft_components intentionally absent — militia-only demand.
+        },
+        demand_elasticity = 0.80,
+        elasticity_min     = 0.30,
+        elasticity_max     = 2.50,
+        demand_scale       = 1.00,
     },
 
     -- BL-368 (2026-08-11): the real per-centre population demand basket,

@@ -2732,6 +2732,70 @@
     "docs/ai/AI_OPPONENT.md"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-170",
+   "title": "population_mvp R4 (Kepler agricultural demand > 0) is a pre-existing failure, unrelated to BL-365",
+   "raised": "2026-08-11",
+   "kind": "observation",
+   "status": "open",
+   "source": "BL-365 (background industry keystone) T1 session, verification sweep.",
+   "what": "tools/verify/population_mvp.cpp's test_population_on_kepler R4 constructs a bare `recipe_registry reg;` (no Lua load, so population_demand_params::demand_basket is all-zero by construction) and then asserts Kepler's cleared agricultural_produce demand is > 0 after run_economy_step + clear_markets. It fails: demand reads 0.0. Confirmed via `git show 5ced127:tools/verify/population_mvp.cpp` that the R4 test body is byte-identical to the pre-BL-365 baseline (BL-130, the last commit before this worktree's changes) — BL-365's T1 work (deleting inject_substrate_demand, adding inject_background_demand, renaming substrate_params to growth_params) touches none of R4's code path or its assertion. The failure is a consequence of BL-368 (real per-centre population demand, landed earlier the same day) generalising the old flat BL-190 agricultural_produce stub into a Lua-authored basket lookup — an empty registry now yields zero population demand for every resource, where the old flat-stub code apparently did not depend on any authored basket. BL-368 did not update this harness's R4 setup to load scripts/economy.lua (or call reg.set_population_demand with a non-zero basket) to match its own change.",
+   "why_it_matters": "population_mvp is a headless regression gate (verifier-headless); a silently-broken assertion in it is a hole in coverage for population/demand behavior, the exact system BL-365's own background-firm generation reads (body_demand in corporation_generation.cpp calls reg.population_demand()). Left as one FAILURE in an otherwise-clean run, it could be mistaken for a BL-365 regression by a future session that does not check blame first.",
+   "options": [
+    "Fix R4's setup to either load scripts/economy.lua (matching how run-the-real-app measures it) or call reg.set_population_demand with a non-zero agricultural_produce basket weight, mirroring test_multi_market_growth_aggregate's own reg.set_growth pattern just below it in the same file.",
+    "File a dedicated backlog item for the fix, scoped to tools/verify/population_mvp.cpp only, tagged against BL-368.",
+    "Leave as a known pre-existing failure until BL-368's own follow-up (if any) touches this harness."
+   ],
+   "recommendation": "Option 1 — a two-line fix (reg.set_population_demand with a nonzero agricultural_produce weight, same shape as the existing R... growth_params call site) restores the assertion's intent without waiting on a separate item; out of scope for BL-365 T1 itself since BL-365 did not cause it, so left unfixed here and logged for the next session or BL-365's own T2/T3 follow-up to pick up.",
+   "files": [
+    "tools/verify/population_mvp.cpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-171",
+   "title": "data_creep_harness R1 (world-counter plateau) now fails: buildings/entities/stockpiles/corp-assets climb linearly across a 1500-tick run, not caused by a leak but by real, unbounded corp_ai building activity now that background firms are real corps",
+   "raised": "2026-08-11",
+   "kind": "observation",
+   "status": "open",
+   "source": "BL-365 (background industry keystone) T1 session, data_creep_harness run (1500 ticks, tolerances authored pre-BL-365).",
+   "what": "world.buildings/world.stockpiles/corporation.assets(sum) all grow at a steady ~1.25/tick from tick 500 to tick 1500 (452 -> 1702), well past data_creep_harness's authored tolerance of 9 for a 'plateau'. entities (distinct ids) grows similarly. This is NOT a leak — R3/R4 (run completion, convoy/trade-route cycling) both pass, and the growth looks like ordinary corp_ai build activity (build/demolish/survey/road scoring, io-standing-rules.md's BL-202/203 exception) continuing indefinitely rather than converging. Before BL-365, corp_ai only evaluated ~8 rival corps with lean 3-4/2-3/1-2 holding ranges (CORPORATION_GENERATION.md's specialist premise) — a small, quickly-saturating candidate pool. BL-365 replaces the abstract substrate with real background firms (calibrated to ~90% of real demand at generation time, per generate_background_firms in corporation_generation.cpp) that ALSO run the full corp_ai scored-utility layer every tick (Ben's 2026-08-11 Q1 ruling in BL-365's own design: 'full corp_ai... not a reduced model'). With dozens-to-~100 more corps each independently scoring build opportunities against a growing population's demand, the aggregate building count no longer plateaus inside a 1500-tick horizon the way the old 8-corp world did. pregame_balance_harness's own 80-tick warm start (the length app::start_new_game actually runs) DOES plateau cleanly (~42k cr, oscillating +/-, all 5 dynamism/determinism assertions PASS) — so the concerning growth is a longer-horizon (1500-tick) phenomenon this session did not have time to root-cause further: is it genuinely unbounded (an economy that never saturates because population keeps growing and outpacing corp density), or does it eventually plateau past 1500 ticks (data_creep_harness's own horizon may simply be short relative to the new, larger corp population's convergence time)?",
+   "why_it_matters": "data_creep_harness exists specifically to catch a runaway-entity-count class of bug (a leak, or an AI loop that never stops spending/building) before it reaches a live long session. A world with unbounded building growth would eventually degrade performance (BL-253's O(corps x tiles) concern, already flagged as load-bearing in BL-365's own design prose) and may indicate corp_ai's build-scoring never reads a saturation signal at the WORLD level, only at each individual corp's own local profit motive — which is plausibly correct design (each corp doesn't know or care that its competitors already filled the gap) but was never stress-tested at this corp count before BL-365.",
+   "options": [
+    "Extend data_creep_harness's sample horizon (e.g. to 5000-10000 ticks) to see whether building count eventually plateaus once the now-larger corp population converges, before concluding this is a real unboundedness problem.",
+    "Recalibrate data_creep_harness's building/entity/stockpile tolerances for the new, larger post-BL-365 baseline corp count, treating the higher steady-state growth rate as expected rather than a bug (same treatment as the accepted ai_skill_harness golden-band drift, NR-169).",
+    "Investigate whether corp_ai's build scoring should read a body-level or world-level saturation signal (production/demand ratio, the same one generate_background_firms uses for its own stop condition) so corp_ai's OWN building activity slows once the body is broadly saturated, rather than relying solely on each corp's local profit-per-building never reaching zero.",
+    "File a dedicated backlog item if option 3's investigation confirms a genuine gap (corp_ai has no saturation-awareness) rather than just a slower-than-1500-tick convergence."
+   ],
+   "recommendation": "Option 1 first (cheap: rerun data_creep_harness at a longer horizon) to distinguish 'converges slowly' from 'never converges' before deciding between recalibration (2) and a genuine corp_ai design gap (3) — this session did not have time to run that longer sweep (each 1500-tick run already took ~255s).",
+   "files": [
+    "tools/verify/data_creep_harness.cpp",
+    "src/world/corp_ai.cpp",
+    "src/world/corporation_generation.cpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-172",
+   "title": "nation.resource_abundance kept, not deleted, despite BL-365 design prose saying it would be — genuinely independent of the substrate mechanism",
+   "raised": "2026-08-11",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-365 (background industry keystone) T1 session, integration review.",
+   "what": "BL-365's design (Q3, 2026-08-11) stated nation.resource_abundance and the substrate capacity arrays get deleted outright once real firms replace them. T1 implementation deleted nation_substrate/nation_substrates/substrate_params (the actual substrate injection state) but deliberately kept nation_component::resource_abundance — it is a separate per-nation sum of owned-tile resource deposits (nation_generation.cpp:519-543, scaled in settlement.cpp:770), read by src/ui/entity_summary.cpp's ranked top-resources display and by hard_coded_world.cpp:601. Neither read site is substrate-specific; both are general nation-info summaries unrelated to inject_substrate_demand. Deleting it would break a UI display for no reason connected to this item's purpose.",
+   "why_it_matters": "The design doc's blanket claim (both resource_abundance and the capacity arrays get deleted) does not hold once the actual usage sites are checked — worth a conscious sign-off that keeping resource_abundance is correct, since it diverges from written design prose.",
+   "options": [
+    "Confirm the read (resource_abundance is independent, general nation info) and consider the design prose amended by this note.",
+    "Ben decides resource_abundance should also go, with the UI display (entity_summary.cpp) either removed or resourced from something else."
+   ],
+   "recommendation": "Option 1 — no action needed, the field earns its keep independent of BL-365.",
+   "files": [
+    "src/world/components.hpp",
+    "src/world/nation_generation.cpp",
+    "src/ui/entity_summary.cpp"
+   ],
+   "resolution": null
   }
  ]
 }

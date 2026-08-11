@@ -46,6 +46,7 @@
 #include "world/construction.hpp"
 #include "world/tech_gate.hpp" // BL-344: gating_tech_for (refusal names the missing tech)
 #include "world/corp_ai.hpp"
+#include "world/corporation_generation.hpp"
 #include "world/history_log.hpp"
 #include "world/placement_rules.hpp"
 #include "world/survey_system.hpp"
@@ -324,6 +325,15 @@ void app::start_new_game()
 
     setup_world(m_pending_world_params);
     load_economy();
+
+    // BL-365: generate REAL background corporations now that the recipe registry
+    // is loaded (their measured stop condition reads real recipe outputs, which
+    // setup_world's world-gen pass — run before load_economy — cannot see; see
+    // generate_background_firms' own header comment for the full ordering
+    // rationale). Run BEFORE the pre-game warm start below so the new firms'
+    // opening balances/pools get the same simulated operating history every
+    // other generated corp receives.
+    generate_background_firms(m_world, m_registry, m_active_world_params.seed ^ 0x8A21F00Du);
 
     // Pre-game warm start ([C3] pre-game profit): seed the balance history with the
     // opening capital, then run the real economy loop forward a notional operating

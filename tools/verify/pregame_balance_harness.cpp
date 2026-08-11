@@ -39,6 +39,7 @@
 #include "world/budget_system.hpp"
 #include "world/components.hpp"
 #include "world/construction.hpp"
+#include "world/corporation_generation.hpp"
 #include "world/economy_system.hpp"
 #include "world/hard_coded_world.hpp"
 #include "world/market_clearing.hpp"
@@ -161,6 +162,10 @@ int real_main(int argc, char** argv)
     world w = make_hard_coded_world();
     seed_default_recipes(w, reg);
 
+    // BL-365: real background corporations, mirroring app::run's own ordering
+    // (generated once reg is loaded, before the warm-start ticks below).
+    generate_background_firms(w, reg, /*seed=*/0x8A21F00Du);
+
     const entity_id corp = w.player_entity;
     const entity_id home = w.home_body;
 
@@ -233,9 +238,13 @@ int real_main(int argc, char** argv)
               "BL-112 R1: the fillable gap is lucrative (best price >= 1.3x base)");
     }
 
-    // BL-078 R1 — ELASTIC demand: on a home market, lowering a resource's price
-    // raises the substrate demand injected for it. Manipulate one market's price and
-    // re-inject, comparing demand at base price vs half price for the same resource.
+    // BL-365 R1 (successor to the deleted BL-078 R1) — ELASTIC demand: on a home
+    // market, lowering a resource's price raises the population demand injected
+    // for it. The old substrate injection is gone (BL-365 replaced it with real
+    // background corporations); inject_population_demand carries the same
+    // price-elastic shape and is still called every tick from clear_markets, so
+    // it is the surviving test of the elasticity property. Manipulate one
+    // market's price and re-inject, comparing demand at base price vs half price.
     {
         entity_id mid = null_entity;
         for (const auto& [id, mc] : w.markets)
@@ -249,19 +258,19 @@ int real_main(int argc, char** argv)
 
             mc.supply.fill(0.0f); mc.demand.fill(0.0f);
             mc.price[r] = base;                 // dear-ish (== base)
-            inject_substrate_demand(w, reg);
+            inject_population_demand(w, reg);
             const float demand_at_base = mc.demand[r];
 
             mc.supply.fill(0.0f); mc.demand.fill(0.0f);
             mc.price[r] = base * 0.5f;           // cheaper
-            inject_substrate_demand(w, reg);
+            inject_population_demand(w, reg);
             const float demand_cheaper = mc.demand[r];
 
             std::printf("  (food_rations demand at base=%.2f, at 0.5x base=%.2f)\n",
                         static_cast<double>(demand_at_base), static_cast<double>(demand_cheaper));
             elastic_ok = demand_cheaper > demand_at_base * 1.05f;
         }
-        check(elastic_ok, "BL-078 R1: demand is price-elastic (cheaper price -> more demanded)");
+        check(elastic_ok, "BL-365 R1: demand is price-elastic (cheaper price -> more demanded)");
     }
 
     // Determinism — same seed -> identical home-market supply/demand after an equal
@@ -269,6 +278,7 @@ int real_main(int argc, char** argv)
     {
         world w2 = make_hard_coded_world();
         seed_default_recipes(w2, reg);
+        generate_background_firms(w2, reg, /*seed=*/0x8A21F00Du);
         for (int t = 1; t <= warm_start_ticks; ++t)
             tick(w2, reg, t);
         const market_agg a2 = aggregate_body(w2, home);
