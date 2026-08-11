@@ -307,14 +307,54 @@ visibility-honest, monotone, tapers, and vetoes at the documented ratios; R4: an
 saturated-market scene actually vetoes a build the plain BL-202 scorer would have taken) and
 regression-checked against `corp_ai_harness.cpp` (BL-202), all green.
 
+### 2C. Trading (BL-293, landed 2026-08-08)
+
+Ben, 2026-08-07, resolving NR-083: *"Order book needs to be a background process, the AI must be
+able to trade as a player does."* A player-only fence over the trade verbs was proposed and
+explicitly rejected, so the scorer reaches the order book exactly as it reaches build and survey
+— `place_sell_order` is a `corp_verb`, and rival corps are the corps that drive the seam.
+
+**This is a grant of reach, not of skill, and the distinction is the design.** "Can trade" is not
+"trades well": a scorer that dumps stock at the floor price is genuinely *worse* than one that
+does not trade, because it drags the resolved price down for everyone including itself — and the
+auto-surplus path was already clearing that stock at the reference price anyway. So the first cut
+is the narrowest thing that is still trading:
+
+- **Candidate**: for each `(corp, body)` pool, each resource the local market prices, stock above
+  `trade_hold_threshold` (50 units) — well clear of any processor's per-tick draw, so listing can
+  never compete with feeding the corp's own chain.
+- **Quantity**: `trade_release_fraction` (0.5) of the excess. It meters its release rather than
+  emptying the pool into one quarter's clearing.
+- **Floor**: `trade_floor_multiple` × the market's `base_price` — the rarity-derived value floor,
+  the closest per-resource cost reference the world exposes. At 1.0 the corp simply refuses to
+  sell below it.
+- **Score**: expected cash valued *at the floor*, not at the current price. The conservative
+  estimate, so a listing on a crashed market cannot outscore a genuinely profitable dial.
+- **Bucket**: Should-Have. Listing accumulated stock carries no capex — it brings cash *in* — so
+  it can never starve a higher bucket, which is the only test the buckets apply.
+- **Anti-thrash**: never a second order on a `(corp, body, resource)` that already has one, and
+  at most `max_trades` (1) order-book command per evaluation. A trade command's subject is a body,
+  not a building, so it takes no dial slot and records no building cooldown.
+
+All three numbers are `corp_ai_params` fields, so tuning is a data change. **Two honest gaps**,
+both follow-on work rather than defects here: `base_price` is a rarity floor and not a production
+cost, so on a resource whose real cost sits above its rarity floor the AI will sell at a loss;
+and the book is one-sided — `buy_order` has world state and a save format but no verb, so the AI
+can release stock and cannot bid for it. A real strategy (price trend, timed release, targeting a
+rival's shortage) is later work.
+
+Verified by `tools/verify/order_book_harness.cpp` § R5, which asserts the conservatism as
+behaviour rather than as intent: never below the rarity floor, never on a pool under the
+threshold, never a duplicate, and never on the player's own corp.
+
 ### Hysteresis & action budget
 
 - **Do-nothing bias**: a candidate must beat the incumbent (or doing nothing) by a relative
   margin θ (~15%) — the anti-thrash rule.
 - **Cooldowns**: a building that changed recipe/workforce/state holds for C ticks; reversals ride
   loss/gain streaks (the BL-079 `loss_streak` idiom, generalised).
-- **Budget**: per evaluation, at most **1 construction + a small number of dial changes** per
-  corp; total committed spend capped by the solvency gate.
+- **Budget**: per evaluation, at most **1 construction + a small number of dial changes + 1
+  order-book command** per corp; total committed spend capped by the solvency gate.
 - **Determinism**: stable iteration (sorted `corp_ids`, stored asset order, tile-index order);
   ties break on lowest entity id; the only randomness is a per-corp hash of the world seed used
   as a fixed personality jitter on weights — constant per campaign, deterministic by construction.

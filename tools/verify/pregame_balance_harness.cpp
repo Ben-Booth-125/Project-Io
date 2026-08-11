@@ -48,6 +48,7 @@
 
 #include <array>
 #include <cstdio>
+#include <cstdlib>
 #include <vector>
 
 namespace {
@@ -74,7 +75,7 @@ void tick(world& w, const recipe_registry& reg, int t)
                      reg.logistics_cost(convoy_mode::space));
     advance_convoys(w);
     const economy_report report = run_economy_step(w, reg);
-    const auto flows = clear_markets(w, reg, report, {});
+    const auto flows = clear_markets(w, reg, report);
     apply_budget(w, reg, flows, report.workforce_contention, nullptr);
     credit_arrived_convoys(w, t);
 }
@@ -118,8 +119,30 @@ market_agg aggregate_body(const world& w, entity_id body)
 
 } // namespace
 
-int main()
+/// Warm-start length in quarterly economy ticks. Defaults to the shipped
+/// `app::start_new_game` figure so the gate's assertions keep measuring what the
+/// app actually does; override from argv to measure a proposed length before
+/// changing the app (Ben, 2026-08-10: "20 years of economy ticks" = 80).
+/// A tick is one quarter (k_ticks_per_year = 4, budget_system.hpp), so
+/// years = ticks / 4.
+constexpr int default_warm_start_ticks = 12;
+
+int main(int argc, char** argv)
 {
+    int warm_start_ticks = default_warm_start_ticks;
+    if (argc > 1)
+    {
+        const int n = std::atoi(argv[1]);
+        if (n <= 0)
+        {
+            std::printf("usage: %s [warm_start_ticks]   (positive integer)\n", argv[0]);
+            return 2;
+        }
+        warm_start_ticks = n;
+    }
+    std::printf("Warm start: %d ticks (%.2f in-game years)\n\n",
+                warm_start_ticks, warm_start_ticks / 4.0);
+
     lua_state lua;
     lua.load("scripts/recipes.lua");
     lua.load("scripts/economy.lua");
@@ -137,7 +160,7 @@ int main()
     std::printf("Tick  0: balance = %.1f cr (opening — generation only)\n",
                 static_cast<double>(w.corporations[corp].balance));
     bool went_negative = false;
-    for (int t = 1; t <= 12; ++t)
+    for (int t = 1; t <= warm_start_ticks; ++t)
     {
         tick(w, reg, t);
         const float bal = w.corporations[corp].balance;
@@ -237,7 +260,7 @@ int main()
     {
         world w2 = make_hard_coded_world();
         seed_default_recipes(w2, reg);
-        for (int t = 1; t <= 12; ++t)
+        for (int t = 1; t <= warm_start_ticks; ++t)
             tick(w2, reg, t);
         const market_agg a2 = aggregate_body(w2, home);
         bool identical = (a2.markets == agg.markets);

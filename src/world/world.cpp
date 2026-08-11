@@ -67,6 +67,11 @@ uint64_t world::state_hash(int tick) const
             fnv1a_u32(h, id);
             fnv1a_f32(h, b.workforce_assigned);
             fnv1a_i32(h, b.workforce_target);
+            // workforce_auto is a dial the tick reads and the seam writes
+            // (set_workforce clears it, set_workforce_auto sets it), so a
+            // divergence in it is a real divergence — it was missing here
+            // until BL-293 gave the flag a command verb.
+            fnv1a_i32(h, b.workforce_auto ? 1 : 0);
             fnv1a_u32(h, b.recipe);
             fnv1a_i32(h, b.decommissioned ? 1 : 0);
             fnv1a_i32(h, b.ticks_remaining);
@@ -126,6 +131,38 @@ uint64_t world::state_hash(int tick) const
             fnv1a_u32(h, u.type);
             fnv1a_i32(h, u.strength);
         }
+    }
+
+    // The order book (BL-293). Hashed in STORED order, not sorted: the book is a
+    // price-TIME priority queue, so its sequence is part of the state, and two
+    // books holding the same orders in a different order really are different
+    // worlds. That makes this the one section here whose determinism rests on the
+    // container rather than on a re-sort — which is exactly why it is hashed:
+    // insertion order is only stable because every write goes through the command
+    // seam, and this is the assertion that catches it if that ever stops being
+    // true. `next_order_id` is folded too, so a world that has issued and erased
+    // an order does not hash equal to one that never issued it.
+    fnv1a_u32(h, next_order_id);
+    fnv1a_u32(h, static_cast<uint32_t>(sell_orders.size()));
+    for (const sell_order& o : sell_orders)
+    {
+        fnv1a_u32(h, o.id);
+        fnv1a_u32(h, o.corp);
+        fnv1a_u32(h, o.body);
+        fnv1a_u32(h, static_cast<uint32_t>(o.resource));
+        fnv1a_f32(h, o.quantity);
+        fnv1a_f32(h, o.floor_price);
+    }
+    fnv1a_u32(h, static_cast<uint32_t>(buy_orders.size()));
+    for (const buy_order& o : buy_orders)
+    {
+        fnv1a_u32(h, o.id);
+        fnv1a_u32(h, o.corp);
+        fnv1a_u32(h, o.body);
+        fnv1a_u32(h, static_cast<uint32_t>(o.resource));
+        fnv1a_f32(h, o.quantity);
+        fnv1a_f32(h, o.max_price);
+        fnv1a_u32(h, o.preferred_seller);
     }
 
     return h;

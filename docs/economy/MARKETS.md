@@ -47,16 +47,17 @@ minable-but-unsellable asymmetry of the BL-040 raws are catalogued in
    opportunity gap the player fills). Tunables in `scripts/economy.lua` § `substrate`.
 3. **Auto-surplus** — each `(corp, body)` pool lists everything above its **processor
    reservation** (the inputs its own processors need for a full run next tick) for sale. A
-   resource under a standing player sell order is exempted — the manual order governs.
-4. **Player sell orders** — quantity capped by the pool, entered into both market supply and
-   the explicit sell book with their `floor_price`. Multiple orders against one
-   `(corp, body, resource)` share a **running remainder** (BL-351): total listed quantity never
-   exceeds the pool, each order's matched/auto-cleared quantity is tracked per order, and pool
-   debits clamp at zero.
+   resource under a standing sell order is exempted — the manual order governs.
+4. **Standing sell orders** — read from `world::sell_orders` (BL-293: the book is world state,
+   placed by the player and by rival corps through the same `place_sell_order` verb), quantity
+   capped by the pool, entered into both market supply and the explicit sell book with their
+   `floor_price`. Multiple orders against one `(corp, body, resource)` share a **running
+   remainder**: total listed quantity never exceeds the pool, each order's matched/auto-cleared
+   quantity is tracked per order, and pool debits clamp at zero.
 5. **Auto-demand** — processor input shortfalls and construction material draws
    (`report.purchases`) enter market demand.
-6. **Player buy orders** — entered into demand and the explicit buy book (`max_price`,
-   optional `preferred_seller`).
+6. **Standing buy orders** — read from `world::buy_orders`, entered into demand and the
+   explicit buy book (`max_price`, optional `preferred_seller`).
 7. **Reference prices** — computed once from the accumulated supply/demand (below), so every
    flow this tick uses the same price.
 8. **Auto clearing** — auto-surplus sells, and auto-demand buys, at the reference price. The
@@ -72,6 +73,38 @@ minable-but-unsellable asymmetry of the BL-040 raws are catalogued in
 
 Cash flows accrue per corp and are applied to balances by `apply_budget`
 (`src/world/budget_system.cpp`).
+
+## Where the order book lives
+
+`world::sell_orders` and `world::buy_orders` — **world state**, not UI state, since BL-293
+(2026-08-07). Ben's ruling: *"Order book needs to be a background process, the AI must be able
+to trade as a player does."*
+
+It used to sit on `ui_state` and arrive at `clear_markets` as a caller-supplied argument, which
+cost three things at once. Clearing was something the **UI drove** rather than something the
+simulation does, so a headless tick sold nothing standing. A `corp_command` mutates `world&`, so
+there was **nothing for a trade verb to mutate** and no text-driven player could trade. And
+nothing on the serialisation seam referenced an order, so a player's standing orders would not
+have **survived a save**. One misplacement, three symptoms.
+
+What follows from the move:
+
+- **One implementation of what a press means.** `place_sell_order` / `remove_sell_order` are
+  `corp_verb`s (`corp_command.hpp`). The Market Ledger's buttons queue commands that
+  `app::render` applies through `apply_corp_command` — the same call the rival-corp scorer
+  makes. A player and an AI cannot diverge, because there is nothing to diverge.
+- **Rival corps trade.** The scored-utility layer reaches the verb like any other
+  (`io-standing-rules.md` § rival-corp exception, widened for this). Its first cut is
+  deliberately conservative — surplus past a hold threshold, floored at the rarity price — and
+  lives in `corp_ai_params`.
+- **Orders carry a stable `id`.** Removal names the id, never an index, so withdrawing one order
+  cannot renumber another.
+- **Insertion order is semantic.** Matching is price-**time** priority, so the book's sequence is
+  state: it is never re-sorted, it is serialised in place, and `world::state_hash` folds it as
+  stored rather than sorted. `order_book_harness` asserts that two books holding the same orders
+  in a different sequence hash differently — the tripwire for a determinism leak.
+- **Persistence.** `order_book.{hpp,cpp}`, the second flat-binary stream in `world/*` after
+  `history_log`: magic `IOOB` + version, and a bad stream is refused rather than reinterpreted.
 
 ## Price resolution
 
@@ -113,8 +146,10 @@ extracted there enter the economy only by convoy to a Kepler market.
   BL-040 raws minable but unsellable (RESOURCES.md § What actually trades) — the standing
   market-inertness residue.
 - **The buy-order book is engine-only.** `clear_markets` implements it, and harnesses exercise
-  it, but the live app passes only `world::sell_orders` — no UI path submits a buy order yet,
-  so preferred-seller routing is dormant in play. *Decided 2026-07-31:* the wiring waits for
+  it, but nothing writes `world::buy_orders` — no press and no `corp_verb` submits a buy order
+  yet, so preferred-seller routing is dormant in play. BL-293 gave the buy side world state and
+  a save format alongside the sell side, but not a verb: the book is one-sided, so the AI can
+  release stock and cannot bid for it. *Decided 2026-07-31:* the wiring waits for
   BL-160 (auto-exchange policy, v0.2.0), whose buy band is the intended player buy surface and
   whose `derive_exchange_orders` is the first live emitter — no interim manual buy tab. See the
   dated note in that item's design for the open preferred-seller call.

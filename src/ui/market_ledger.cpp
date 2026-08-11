@@ -62,27 +62,36 @@ namespace {
 // I make?" is a market question, so it now lives on the market surface rather
 // than the building surface). Columns/actions carried over faithfully from the
 // old draw_sell_orders_section (construction_panel.cpp, pre-BL-159).
-void draw_sell_orders_tab(const world& w, std::vector<sell_order>& orders,
-                          entity_id body, const market_component* market)
+//
+// BL-293 (2026-08-07): the orders themselves now live in `world::sell_orders`,
+// so this reads the world and ENQUEUES commands rather than mutating a UI vector.
+// The press does the same thing the AI's command does because it is the same
+// command — the tab composes a `corp_command` and `app::render` applies it
+// through `apply_corp_command`.
+void draw_sell_orders_tab(const world& w, ui_state& state, entity_id body,
+                          const market_component* market)
 {
     const entity_id corp = w.player_entity;
 
     bool any = false;
-    for (std::size_t i = 0; i < orders.size(); ++i)
+    for (const sell_order& o : w.sell_orders)
     {
-        const sell_order& o = orders[i];
         if (o.corp != corp || o.body != body)
             continue;
         any = true;
-        ImGui::PushID(static_cast<int>(i));
+        // PushID on the ORDER ID, not the loop index: the id is what the remove
+        // command names, and it is stable across the erase that a press causes.
+        ImGui::PushID(static_cast<int>(o.id));
         ImGui::Text("%s  x%.0f  >= %.1f",
             resource_name(o.resource), o.quantity, o.floor_price);
         ImGui::SameLine();
         if (ImGui::SmallButton("Remove"))
         {
-            orders.erase(orders.begin() + static_cast<long>(i));
-            ImGui::PopID();
-            break;
+            corp_command cmd;
+            cmd.corp  = corp;
+            cmd.verb  = corp_verb::remove_sell_order;
+            cmd.order = o.id;
+            state.pending_order_commands.push_back(cmd);
         }
         ImGui::PopID();
     }
@@ -139,13 +148,14 @@ void draw_sell_orders_tab(const world& w, std::vector<sell_order>& orders,
     ImGui::BeginDisabled(add_resource < 0 || add_quantity <= 0.0f);
     if (ImGui::Button("Add sell order"))
     {
-        sell_order o;
-        o.corp        = corp;
-        o.body        = body;
-        o.resource    = static_cast<resource_type>(add_resource);
-        o.quantity    = add_quantity;
-        o.floor_price = add_floor;
-        orders.push_back(o);
+        corp_command cmd;
+        cmd.corp        = corp;
+        cmd.verb        = corp_verb::place_sell_order;
+        cmd.subject     = body; // place_sell_order's subject is the body
+        cmd.target      = static_cast<resource_type>(add_resource);
+        cmd.quantity    = add_quantity;
+        cmd.floor_price = add_floor;
+        state.pending_order_commands.push_back(cmd);
     }
     ImGui::EndDisabled();
 }
@@ -153,7 +163,6 @@ void draw_sell_orders_tab(const world& w, std::vector<sell_order>& orders,
 } // namespace
 
 void draw_market_ledger(const world& w, ui_state& s,
-                        std::vector<sell_order>& sell_orders,
                         const market_plot_history& history, bool& open)
 {
     if (!open)
@@ -277,7 +286,7 @@ void draw_market_ledger(const world& w, ui_state& s,
 
     if (s.market_ledger_view == 1)
     {
-        draw_sell_orders_tab(w, sell_orders, selected_body, &mc);
+        draw_sell_orders_tab(w, s, selected_body, &mc);
         ui::foldout_end();
         return;
     }

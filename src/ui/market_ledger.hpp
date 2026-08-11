@@ -15,13 +15,14 @@ namespace ui {
 ///                given market and opens Sell Orders.
 /// @param history Per-market, per-resource price / supply / demand time series for
 ///                trend plots (BL-063). Empty series render as "(no data yet)".
-/// @param sell_orders The player's standing sell orders (`world::sell_orders`,
-///                BL-363) — passed mutably alongside the const world so the
-///                Sell Orders tab can add/remove entries.
 /// @param open    Open/closed flag; cleared by the close button.
+///
+/// The Sell Orders tab reads standing orders from `world::sell_orders` (BL-293)
+/// and, since the book is world state, ADDS/REMOVES by enqueuing a `corp_command`
+/// onto `s.pending_order_commands` — the const `world&` here cannot be mutated
+/// directly, so `app::render` applies the request through `apply_corp_command`.
 void draw_market_ledger(const world& w,
                         ui_state& s,
-                        std::vector<sell_order>& sell_orders,
                         const market_plot_history& history,
                         bool& open);
 

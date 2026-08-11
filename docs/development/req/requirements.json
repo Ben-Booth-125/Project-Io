@@ -9994,6 +9994,83 @@
    ],
    "resolved": "2026-08-10",
    "resolution": "Complete 2026-08-10. SOL_ALL_SAFETIES_ON=1 at directory scope (covers ProjectIo plus the two sol-linked harnesses); persona_pack shape checks at all seven conversion sites routed to the existing fail-soft throw; the init.lua config read now presence/type-checked and fails through the BL-110 clean-error channel; the blackboard export checks its ofstream. sell_orders moved from ui_state to world (player intent, visible to a future save seam); market-ledger form state resets on body change; ui_state::active_tile removed. hex_neighbors.hpp single-sources the odd-r table - all six pasted copies were verified BYTE-IDENTICAL before unification, so no latent geometry bug was hiding. Settlement labels now read world::population_centre_name."
+  },
+  {
+   "brief": "order-book-in-world",
+   "title": "BL-293 (order book unreachable by command): the order book becomes world state, clears as a background process, and is reachable by corp_command",
+   "difficulty": 4,
+   "importance": "A",
+   "status": "complete",
+   "promoted_from": "Ben, 2026-08-07 (NR-083): 'Order book needs to be a background process, the AI must be able to trade as a player does.'",
+   "rows": [
+    {
+     "id": "R0",
+     "requirement": "ITEM-SPANNING. A corporation with a surplus can place, hold and remove a standing sell order entirely through `apply_corp_command`, with no UI involvement: the order lives in `world`, survives a save/load round-trip, is matched by the economy tick itself, and yields the same result whether the presser is the player or a rival corp.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "order_book_harness R0.1-R0.5, R1.1-R1.3, R1b.1-R1b.2. 45/45 PASS."
+    },
+    {
+     "id": "R1",
+     "requirement": "`world` owns the order book. `sell_orders`/`buy_orders` are fields of `world`, not of `ui_state`; no `world/*` translation unit takes an order list as a caller-supplied argument.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "world::sell_orders / world::buy_orders. clear_markets' two order-list parameters removed entirely; every call site updated (main.cpp x3, app.cpp, 12 harnesses)."
+    },
+    {
+     "id": "R2",
+     "requirement": "The order book round-trips through a flat-binary stream with a leading magic + version header (BL-107's rule), and a stream with a wrong magic, a wrong version, or a truncated body is REJECTED without mutating the destination world.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "order_book.{hpp,cpp}, magic IOOB + version 1, modelled on history_log. R2.1-R2.6 cover round-trip-in-stored-order plus all three rejection modes."
+    },
+    {
+     "id": "R3",
+     "requirement": "Matching is a background process: an economy tick clears standing orders with no caller passing them in, so a headless loop that never touches the UI still sells a corp's standing order.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "R1.1 is the assertion: a clear_markets call with no order argument still debits the pool against a standing order. R1b was added by the static review pass, which found that overlapping orders on one triple sold stock that did not exist (pool went NEGATIVE, corp paid for 20 units of a 10-unit pool) plus the mirror under-sell in the auto-clear. Pre-existing and UI-reachable, but this item widened the door; both fixed. See NR-092."
+    },
+    {
+     "id": "R4",
+     "requirement": "`place_sell_order`, `remove_sell_order` and `set_workforce_auto` are `corp_verb`s that validate at player grade: a rejected command mutates nothing, and each rejection reason is distinguishable (no corp / not owner / invalid / state).",
+     "class": "headless",
+     "status": "complete",
+     "notes": "R3.1-R3.11 (place/remove) and R3.15-R3.17 (auto). Also caught that set_workforce never cleared workforce_auto, which the dictionary always claimed it did - fixed; see NR-086."
+    },
+    {
+     "id": "R5",
+     "requirement": "DETERMINISM. Two same-seed runs of the same tick sequence, with order-book traffic on both, produce identical `world::state_hash` at every sampled tick — and the hash CHANGES when a standing order changes, so the order book is genuinely inside the canonicalisation rather than invisible to it.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "R4.1-R4.5. R4.5 is the load-bearing one: the same orders in a different SEQUENCE hash differently, so price-time priority sits inside the canonicalisation. workforce_auto folded into state_hash too (NR-088)."
+    },
+    {
+     "id": "R6",
+     "requirement": "A rival corp reaches the trade verbs through the same scored-utility seam it reaches build/demolish/survey through, and its first-cut rule is conservative: it never places an order below the market's rarity floor, and never on a pool it has not got surplus in.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "R5.1-R5.7. Conservatism asserted as behaviour, not intent: never below the rarity floor, never under the hold threshold, never a duplicate, never on the player's corp. Tunables in corp_ai_params; two honest gaps in NR-087."
+    },
+    {
+     "id": "R7",
+     "requirement": "The player's Market Ledger presses go through `apply_corp_command` rather than mutating a UI vector, so the dictionary's transcription of them is true by construction.",
+     "class": "visual",
+     "status": "complete",
+     "notes": "Market Ledger reads w.sell_orders and queues corp_commands that app::render applies through apply_corp_command. NOT VISUALLY VERIFIED - the app does not build at HEAD: src/ui/tile_inspector.cpp (committed at ca22b3a) includes world/sim_terrain_build.hpp, which exists in no commit or branch. Pre-existing and unrelated; see NR-091. Both touched UI units compile clean in isolation. [CLOSED 2026-08-10 at the reconciliation merge: the blocker recorded here — the app not building at this branch HEAD — was a broken include since fixed on main, so the check was finally runnable. The sell_order golden still diffs, but for the unrelated world-content staleness NR-130 tracks, not for this seam.]",
+     "result_metric": "verify.place_sell_order reports applied=1, n=1 — the press composes a corp_command and apply_corp_command registers it on world.sell_orders; the ledger reads the book back."
+    },
+    {
+     "id": "R8",
+     "requirement": "DOCS. `.claude/rules/io-standing-rules.md`'s rival-corp exception names trading among the permitted verbs; `ACTIONS.json`'s three entries carry their `corp_verb` and the `_note` overclaim about \"the full word interface\" is gone; the mirror is re-rendered rather than hand-edited.",
+     "class": "review",
+     "status": "complete",
+     "notes": "Standing rules amended and flagged (NR-085). ACTIONS.json: four entries re-transcribed from the seam, the _note overclaim replaced, and render_actions.js's own hardcoded 'full word interface' preamble corrected. Mirror re-rendered, never hand-edited."
+    }
+   ],
+   "resolved": "2026-08-08",
+   "evaluated_difficulty": 4,
+   "resolution": "Complete bar R7's visual leg, blocked by a pre-existing broken include unrelated to this item (NR-091). The order book is world state, serialised on its own flat-binary stream, matched inside the economy tick, and reachable by three new corp_verbs that the player's presses and the rival-corp scorer both route through. order_book_harness 43/43 PASS; econ_harness, corp_ai, corp_agency, history_log, econ_stability and corp_ai_predictive all green. ai_skill_harness's net-worth golden bands fail - but they ALREADY failed 5 assertions at unmodified HEAD, and every determinism assertion passes on both sides. Not re-blessed; see NR-090.\n\nTWO THINGS THE SWEEP TURNED UP, both recorded rather than papered over. The static review found a pre-existing value-minting bug in clear_markets that overlapping sell orders trigger — fixed here, since this item is what made it reachable by a scorer (NR-092). And data_creep_harness R1 now fails where unmodified HEAD passes: rival trading delays the build plateau from tick 500 to tick 1000 (it is still flat from 1000 to 1500). Not re-blessed; NR-093 carries the decision. econ_stability's R6 wall-clock assertion is flaky on this machine under build load — it passed clean on a third consecutive run."
   }
  ]
 }

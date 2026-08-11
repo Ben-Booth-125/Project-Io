@@ -314,17 +314,19 @@ int main()
         { corporation_component cc; cc.balance = 0.0f; ws.corporations[corp] = cc; }
         ws.pool_for(corp, b).quantities[ri(resource_type::steel)] = 10.0f;
 
-        std::vector<sell_order> orders;
-        sell_order o; o.corp = corp; o.body = b; o.resource = resource_type::steel;
+        // The order goes into the WORLD's book (BL-293), not into a vector handed
+        // to clear_markets — clearing reads the book itself now.
+        sell_order o; o.id = ws.allocate_order_id();
+        o.corp = corp; o.body = b; o.resource = resource_type::steel;
         o.quantity = 10.0f; o.floor_price = 6.0f;
-        orders.push_back(o);
+        ws.sell_orders.push_back(o);
 
         economy_report empty; // no production this scenario
-        auto f = clear_markets(ws, reg, empty, orders);
+        auto f = clear_markets(ws, reg, empty);
         check(near(ws.markets[m].price[ri(resource_type::steel)], 5.0f),
               "SO.1 steel price floored+eased to 5.0", ws.markets[m].price[ri(resource_type::steel)], 5.0f);
         check(near(f[corp].income, 60.0f),
-              "SO.2 player order sells 10 at floor 6 (income 60)", f[corp].income, 60.0f);
+              "SO.2 standing order sells 10 at floor 6 (income 60)", f[corp].income, 60.0f);
         check(near(ws.pool_for(corp, b).quantities[ri(resource_type::steel)], 0.0f),
               "SO.3 pool debited by the order", ws.pool_for(corp, b).quantities[ri(resource_type::steel)], 0.0f);
     }
@@ -346,14 +348,15 @@ int main()
         { corporation_component cc; cc.balance = 0.0f; ws.corporations[corp] = cc; }
         ws.pool_for(corp, b).quantities[ri(resource_type::steel)] = 10.0f;
 
-        std::vector<sell_order> orders;
+        // BL-293: the book is world state, so the duplicate orders are placed on
+        // the world rather than handed to clear_markets.
         sell_order o; o.corp = corp; o.body = b; o.resource = resource_type::steel;
         o.quantity = 10.0f; o.floor_price = 6.0f;
-        orders.push_back(o);
-        orders.push_back(o);
+        o.id = ws.allocate_order_id(); ws.sell_orders.push_back(o);
+        o.id = ws.allocate_order_id(); ws.sell_orders.push_back(o);
 
         economy_report empty;
-        auto f = clear_markets(ws, reg, empty, orders);
+        auto f = clear_markets(ws, reg, empty);
         const float pool_after = ws.pool_for(corp, b).quantities[ri(resource_type::steel)];
         const float cleared    = 10.0f - pool_after;
         check(cleared <= 10.0f + 1e-3f && near(cleared, 10.0f),
@@ -384,18 +387,17 @@ int main()
         { corporation_component cc; cc.balance = 0.0f; ws.corporations[buyer] = cc; }
         ws.pool_for(seller, b).quantities[ri(resource_type::steel)] = 10.0f;
 
-        std::vector<sell_order> sells;
+        // BL-293: both sides of the book are world state now.
         sell_order so; so.corp = seller; so.body = b; so.resource = resource_type::steel;
         so.quantity = 5.0f; so.floor_price = 2.0f;
-        sells.push_back(so);
-        sells.push_back(so);
-        std::vector<buy_order> buys;
+        so.id = ws.allocate_order_id(); ws.sell_orders.push_back(so);
+        so.id = ws.allocate_order_id(); ws.sell_orders.push_back(so);
         buy_order bo; bo.corp = buyer; bo.body = b; bo.resource = resource_type::steel;
         bo.quantity = 5.0f; bo.max_price = 10.0f;
-        buys.push_back(bo);
+        bo.id = ws.allocate_order_id(); ws.buy_orders.push_back(bo);
 
         economy_report empty;
-        auto f = clear_markets(ws, reg, empty, sells, buys);
+        auto f = clear_markets(ws, reg, empty);
         check(near(f[seller].income, 5.0f * 2.0f + 5.0f * 6.828427f),
               "BL351.4 multi-order seller: matched order + other order's auto-clear",
               f[seller].income, 44.142f);

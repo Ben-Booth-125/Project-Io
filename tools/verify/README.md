@@ -317,6 +317,25 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\history_log_harness.cpp ^
 .\build\era_world_harness.exe
 ```
 
+```bat
+:: Order book in world state (BL-293) - the book moved out of ui_state, matching
+:: moved into the economy tick, and three presses joined the corp-command seam.
+:: R0/R1: a corp places, holds and removes a standing order entirely through
+:: apply_corp_command, and the tick sells against it with nobody passing it in.
+:: R2: write_order_book/read_order_book round-trip the book IN ITS STORED ORDER
+:: (price-time priority makes the sequence state) and refuse a wrong-magic /
+:: wrong-version / truncated stream without writing anything partial. R3: every
+:: rejection reason of place_sell_order / remove_sell_order / set_workforce_auto
+:: is distinguishable and mutates nothing, including the per-corp book cap.
+:: R4: state_hash is identical across two same-seed runs WITH order traffic, and
+:: moves when an order changes - including the same orders in a different
+:: sequence. R5: the rival-corp scorer reaches the trade verb conservatively.
+:: Links the SDL/Lua-free world superset (mirror IO_WORLD_SOURCES, as
+:: history_log_harness). Prefer the CMake target:
+::   cmake --build build --target order_book_harness
+.\build\order_book_harness.exe
+```
+
 On Windows via CMake (no need to hand-list sources): `cmake --build build --target history_log_harness`
 then `.\build\history_log_harness.exe` — picked up by the generic `tools/verify/*.cpp` glob batch
 at the foot of `CMakeLists.txt`, the same path `creeds_harness`/`continents_harness` use.

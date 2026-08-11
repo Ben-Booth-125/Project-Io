@@ -331,9 +331,27 @@ void app::start_new_game()
     // moved balances, and live market figures rather than a cold zero state. Run
     // here (after load_economy) so it reuses the loaded registry rather than a
     // duplicated one; run_verify stays deterministically cold and does not warm up.
-    // ~3 in-game years of quarterly econ ticks — long enough for a plausible history,
-    // short enough not to diverge under the prototype's un-tuned economy.
-    constexpr int pre_game_ticks = 12;
+    //
+    // 20 in-game years of quarterly econ ticks (Ben, 2026-08-10). The previous
+    // figure was 12 (~3 years), chosen defensively — "short enough not to diverge
+    // under the prototype's un-tuned economy". That fear was measured and did not
+    // hold: `pregame_balance_harness 80` shows the player corp's balance growing
+    // linearly (~5,530 cr/tick) to tick 23, decelerating through a knee at ~tick 24,
+    // and PLATEAUING from ~tick 47 at ~185k cr, where it oscillates ±60 cr and drifts
+    // very slightly down. It converges rather than diverging, all five economy
+    // assertions still pass, and determinism holds.
+    //
+    // The plateau is the point: 12 ticks stops on the straight part of the curve, so
+    // the opening world is still accelerating and reads as mid-transient. 80 stops
+    // well past the knee, on a settled economy — which is what "let the dust settle"
+    // asks for. Cost is ~3.5 ms/tick on the real generated world, so ~240 ms of extra
+    // startup; the tick cost, not the count, is what the saturation work will move.
+    //
+    // NOTE this does NOT move the campaign calendar. The clock is rebased to the
+    // epoch below, so the warm start consumes no in-game time and play still opens at
+    // `epoch_year` (1960). Making the warm start span 1940->1960 on the calendar is a
+    // separate, unfiled decision — see docs/development/pending/.
+    constexpr int pre_game_ticks = 80;
     {
         const auto pit = m_world.corporations.find(m_world.player_entity);
         ui::push_capped(m_balance_history,
@@ -412,7 +430,7 @@ void app::step_economy()
                      m_registry.logistics_cost(convoy_mode::space));
     advance_convoys(m_world);
     m_last_econ_report = run_economy_step(m_world, m_registry);
-    auto flows = clear_markets(m_world, m_registry, m_last_econ_report, m_world.sell_orders);
+    auto flows = clear_markets(m_world, m_registry, m_last_econ_report);
     apply_budget(m_world, m_registry, flows, m_last_econ_report.workforce_contention,
                  &m_last_econ_report.budgets,
                  &m_last_econ_report.buildings); // BL-343: law enforcement seam
@@ -990,8 +1008,7 @@ void app::render()
     // Construction panel — an ordinary fold-out tab in the shell column (BL-122),
     // one of the mutually-exclusive column occupants (ledgers + Selection).
     ui::draw_construction_panel(m_world, m_registry, m_last_econ_report, m_ui, &m_ui.show_construction_panel);
-    ui::draw_market_ledger(m_world, m_ui, m_world.sell_orders, m_market_history,
-                           m_ui.show_market_ledger);
+    ui::draw_market_ledger(m_world, m_ui, m_market_history, m_ui.show_market_ledger);
     {
         // Budget ledger (BL-171): profit chart reads the income/expenditure series;
         // the rank table's change column reads the ranking from ~4 econ ticks back.
@@ -1209,6 +1226,19 @@ void app::render()
         dispatch_survey(m_world, m_ui.pending_survey_dispatch);
         m_ui.pending_survey_dispatch = null_entity; // consume the request
     }
+
+    // Order-book presses (BL-293) — same seam-consuming shape as the survey
+    // dispatch above, applied through apply_corp_command so the player's press
+    // and a rival corp's command share one implementation. A rejection is not
+    // reported to the surface: the ledger's own form already enforces the same
+    // preconditions, so a rejection here means a race (the body's market gone,
+    // the order already removed) and the correct response is to do nothing.
+    for (corp_command& cmd : m_ui.pending_order_commands)
+    {
+        cmd.tick = static_cast<int>(m_sim_loop.day_tick());
+        apply_corp_command(m_world, m_registry, cmd);
+    }
+    m_ui.pending_order_commands.clear(); // consume the requests
 
     // F1 key-binding cheat-sheet — generated from s_bindings so it never drifts.
     if (m_show_help)

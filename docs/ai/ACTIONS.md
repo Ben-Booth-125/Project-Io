@@ -4,8 +4,14 @@ Every control in the game: what pressing it does, and why you would. Readable
 mirror of [`ACTIONS.json`](ACTIONS.json), which is canonical — the JSON is the
 machine-consumable half an AI player reads (BL-270). Pair it with the corp
 blackboard export (BL-206, the read channel) and the corp-command seam
-(`src/world/corp_command.hpp`, the write channel) and an LLM has the full
-word interface to play through.
+(`src/world/corp_command.hpp`, the write channel) and an LLM has the word
+interface to play through.
+
+**What that does and does not cover.** Every entry in the *gameplay* family is
+issuable as a `corp_verb` — true since BL-293 (2026-08-08) closed the last three
+gaps, and worth restating here because this line claimed it for a while before it
+was so. The other four families are view controls that were never on the command
+seam by design, and the order book's buy side has a save format but no verb yet.
 
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
@@ -91,38 +97,43 @@ word interface to play through.
 
 **Reason to select.** Lowers intra-body haul cost along the tile, cheapening every supply run that routes through it — the press that tightens the chain between extraction sites, processors, and the market. Worth it on tiles carrying real freight; a road on an unused tile is pure spend.
 
-### `gameplay.place_sell_order` — The 'Sell Orders' tab of the Market Ledger (opened from the nav rail; the tab is scoped to the ledger's selected market body).
+### `gameplay.place_sell_order` — The 'Sell Orders' tab of the Market Ledger (opened from the nav rail; the tab is scoped to the ledger's selected market body). Since BL-293 the press is not the only route: place_sell_order is a corp_verb, so an agent issues it directly against the corp-command seam and a rival corp's scorer issues it too.
 
-**Press.** Open the Market Ledger, switch to the Sell Orders tab, pick a resource in the combo (only resources the market prices are listed), type a Quantity/qtr and a Floor price, click 'Add sell order'. The button is disabled with no resource chosen or quantity <= 0.
+**Press.** Open the Market Ledger, switch to the Sell Orders tab, pick a resource in the combo (only resources the market prices are listed), type a Quantity/qtr and a Floor price, click 'Add sell order'. The button is disabled with no resource chosen or quantity <= 0. The button does not mutate anything itself — it queues a corp_command that the frame's end applies through apply_corp_command, which is the same call an agent makes.
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `body` | `entity_id` | The body whose market the order lists on — the ledger's currently selected body. |
-| `resource` | `resource_type` | What to sell. Must have a positive base price on this market. |
+| `body` | `entity_id` | The body whose market the order lists on — the ledger's currently selected body. Carried in the command's `subject` field (the survey verb's convention: subject IS the body). |
+| `resource` | `resource_type` | What to sell. Carried in the command's `target` field, shared with build's extraction target. Must have a positive base price on this market. |
 | `quantity` | `float > 0` | Maximum units offered per quarter, capped each tick by what the (corp, body) pool actually holds. |
 | `floor_price` | `float >= 0` | Minimum acceptable unit price. 0 means sell at the market price. |
 
 **Valid when:**
-- The selected body has a market ('This body has no market.' otherwise, and no form renders).
-- The resource is priced on that market (base_price > 0).
-- Quantity is positive.
+- The acting corporation exists (rejected_no_corp otherwise).
+- `subject` names a real body (rejected_invalid otherwise).
+- That body carries at least one market (rejected_invalid otherwise; the ledger renders 'This body has no market.' and no form at all).
+- The resource is priced on that market — base_price > 0 (rejected_invalid otherwise).
+- Quantity is strictly positive and floor_price is not negative (rejected_invalid otherwise).
+- The corporation holds fewer than `max_sell_orders_per_corp` (64) standing orders (rejected_state otherwise — the book is capped, and a placement past the cap is refused rather than silently dropped).
 
-**Expected output.** A STANDING order — it persists until removed and is evaluated every economy tick, not once. Each tick it lists up to `quantity` from the corp's pool on that body (an empty pool lists nothing, silently); it clears at max(resolved market price, floor) — with no matching buyer it still auto-clears at that price, so offered supply always clears in the prototype, but a floor above what the resolution supports means less or nothing sells that tick. CRITICAL side effect: the (corp, body, resource) triple leaves the automatic surplus-selling path — the auto path yields to the manual order — so a too-high floor does not just fail to sell, it stops that resource selling AT ALL on that body and the stock piles up. There is no rejection enum; a bad order simply sits there selling nothing.
+**Expected output.** A STANDING order in WORLD state — `world::sell_orders`, not a UI list — carrying a stable nonzero `id` that `remove_sell_order` later names. It persists until removed, survives a save (the order book is on the flat-binary serialisation seam, order_book.hpp), and is evaluated every economy tick by clear_markets itself, with no caller handing it over. Each tick it lists up to `quantity` from the corp's pool on that body (an empty pool lists nothing, silently); it clears at max(resolved market price, floor) — with no matching buyer it still auto-clears at that price, so offered supply always clears in the prototype, but a floor above what the resolution supports means less or nothing sells that tick. CRITICAL side effect, unchanged: the (corp, body, resource) triple leaves the automatic surplus-selling path — the auto path yields to the standing order — so a too-high floor does not just fail to sell, it stops that resource selling AT ALL on that body and the stock piles up. Orders append, so position in the book is time priority; a rejected command mutates nothing.
 
-**Reason to select.** Price and quantity control the auto-sell path lacks: floor-protect against dumping stock into a crashed price, or meter quantity to ration a stockpile toward a construction project or a better market. The manual side of the trade loop — the press when 'sell everything at whatever it fetches' is the wrong answer.
+**Reason to select.** Price and quantity control the auto-sell path lacks: floor-protect against dumping stock into a crashed price, or meter quantity to ration a stockpile toward a construction project or a better market. The manual side of the trade loop — the press when 'sell everything at whatever it fetches' is the wrong answer. The rival-corp scorer reaches for it on exactly one signal: stock past a hold threshold, listed at a floor over the rarity price.
 
-### `gameplay.remove_sell_order` — The 'Remove' button beside each listed order on the Market Ledger's Sell Orders tab.
+### `gameplay.remove_sell_order` — The 'Remove' button beside each listed order on the Market Ledger's Sell Orders tab; also a corp_verb, issuable directly.
 
-**Press.** Open the Market Ledger, switch to the Sell Orders tab; each of the player's standing orders on the selected body renders as a row ('<resource> x<qty> >= <floor>') with a small 'Remove' button. Click Remove on the target row. Immediate — no confirmation.
+**Press.** Open the Market Ledger, switch to the Sell Orders tab; each of the player's standing orders on the selected body renders as a row ('<resource> x<qty> >= <floor>') with a small 'Remove' button. Click Remove on the target row. Immediate — no confirmation. The row queues a corp_command naming the order's id.
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `order` | `row reference` | Which standing order to remove, identified by the row pressed — i.e. the (body, resource, quantity, floor_price) tuple displayed. Internally the order's index in the sell-order list. Only the player's own orders on the ledger's selected body are listed. |
+| `order` | `uint32 order id` | Which standing order to remove, by its stable `sell_order::id` — NOT its index. The id is allocated once at placement, never reused, and unaffected by the removal of any other order, so a command composed against one order cannot be invalidated by a concurrent removal of another. Only the player's own orders on the ledger's selected body are listed, but the verb can name any order the acting corp owns. |
 
 **Valid when:**
-- The order exists — the button only renders on rows that do, so there is no rejection mode; a body with no orders shows 'No sell orders on this body.' and nothing to press.
+- The acting corporation exists (rejected_no_corp otherwise).
+- `order` is nonzero and names an order currently in the book (rejected_invalid otherwise).
+- The acting corporation owns that order (rejected_not_owner otherwise — a corp cannot withdraw a rival's listing).
 
-**Expected output.** The order is erased from the standing sell-order list immediately, at no cost. From the next economy tick that quantity is no longer listed for sale. Routing consequence: if this was the LAST remaining order for that (corp, body, resource) triple, the triple returns to the automatic surplus-selling path — each tick the pool's surplus above processor reservation auto-sells at the market's reference price, with no floor protection. If another order for the same triple still stands, manual control persists. Nothing else changes; already-cleared past sales are untouched.
+**Expected output.** The order is erased from `world::sell_orders` immediately, at no cost; every surviving order keeps its id. From the next economy tick that quantity is no longer listed. Routing consequence, unchanged: if this was the LAST remaining order for that (corp, body, resource) triple, the triple returns to the automatic surplus-selling path — each tick the pool's surplus above processor reservation auto-sells at the market's reference price, with no floor protection. If another order for the same triple still stands, manual control persists. Nothing else changes; already-cleared past sales are untouched. A rejected removal mutates nothing.
 
 **Reason to select.** Ends manual control over a resource's sales: hand it back to the auto-surplus path when floor-pricing or rationing is no longer wanted (e.g. the price crash passed, or a too-high floor was silently stockpiling the resource instead of selling it). Also the only way to correct a mistyped order — there is no edit; remove and re-add.
 
@@ -176,25 +187,28 @@ word interface to play through.
 - The acting corporation exists (rejected_no_corp otherwise).
 - The corporation owns the building (rejected_not_owner otherwise).
 - The value is inside [0, 200] (rejected_invalid otherwise).
+- The building is not ALREADY at that target AND already pinned (rejected_state otherwise). Setting the value the auto-solver happens to be holding is NOT a no-op — it takes control away from the solver, which is a real change.
 
-**Expected output.** workforce_target is set AND workforce_auto is cleared — a manual move pins the dial, so the per-tick profit-max auto-solver stops adjusting this building until Auto is re-enabled. This IS the workforce-auto opt-out. Actual staffing is the target mediated by body-level labour contention: when the corp's demand on the body exceeds the habitability-sized pool, every building is throttled by the same fraction and the band prints 'Body allows N%'. Wages scale with assigned workforce; output scales with effective workforce. Setting the value already held is a no-op (rejected_state).
+**Expected output.** workforce_target is set AND workforce_auto is cleared — a manual move pins the dial, so the per-tick profit-max auto-solver stops adjusting this building until Auto is re-enabled. This IS the workforce-auto opt-out. Actual staffing is the target mediated by body-level labour contention: when the corp's demand on the body exceeds the habitability-sized pool, every building is throttled by the same fraction and the band prints 'Body allows N%'. Wages scale with assigned workforce; output scales with effective workforce. Since BL-293 the command seam clears workforce_auto exactly as the press does — before that it set the target and left the flag, so an agent's target was silently re-solved on the next tick. Setting a value already held on an already-pinned dial is a no-op (rejected_state).
 
 **Reason to select.** Trades wage bill against output when the solver's profit-max answer is not what is wanted — throttle to cut losses without idling, staff to 0 to park a building cheaply, or overdrive past 100% to feed a downstream chain even at a per-building loss. Also the deliberate press for taking manual control away from the auto-solver.
 
-### `gameplay.set_workforce_auto` — The 'Auto' checkbox beside the band's workforce slider; the 'Auto (N%)' button above the panel's tier grid.
+### `gameplay.set_workforce_auto` — The 'Auto' checkbox beside the band's workforce slider; the 'Auto (N%)' button above the panel's tier grid. Also a corp_verb.
 
-**Press.** Select the owned building, click the Auto checkbox (band) or the Auto button (panel). Clicking while already on is a plain re-assert on the checkbox; the button simply sets it on.
+**Press.** Select the owned building, click the Auto checkbox (band) or the Auto button (panel). Clicking while already on is a plain re-assert on the checkbox; the button simply sets it on. At the command seam, re-asserting is rejected_state rather than a silent success.
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `building` | `entity_id` | The building handed back to the auto-solver. |
+| `building` | `entity_id` | The building handed back to the auto-solver. Carried in the command's `subject`. |
 
 **Valid when:**
-- The acting corporation exists.
-- The corporation owns the building.
-- Construction is complete (controls hidden until then).
+- The acting corporation exists (rejected_no_corp otherwise).
+- `subject` names a real building (rejected_invalid otherwise).
+- The corporation owns the building (rejected_not_owner otherwise).
+- The building is not ALREADY on auto (rejected_state otherwise — a genuine no-op).
+- Construction is complete (the UI hides the controls until then; the seam does not itself gate on this).
 
-**Expected output.** workforce_auto := true. Each economy tick the solver sets this building's workforce_target to the profit-maximising value; the panel's Auto button displays the currently solved percentage. This is the only sanctioned auto-action on the player's corporation — it moves one dial and never places, relocates, retargets, or decommissions anything. Any later manual target (slider drag or tier button) clears it again.
+**Expected output.** workforce_auto := true. Each economy tick the solver sets this building's workforce_target to the profit-maximising value; the panel's Auto button displays the currently solved percentage. This is the only sanctioned auto-action on the player's corporation — it moves one dial and never places, relocates, retargets, or decommissions anything. Any later manual target clears it again, from the slider, the tier grid, OR the set_workforce verb.
 
 **Reason to select.** Removes one micromanagement dial per building. The right press whenever 'maximise this building's own profit' is exactly the intent — freshly built buildings start with it on, so this mostly exists to undo an earlier manual pin.
 

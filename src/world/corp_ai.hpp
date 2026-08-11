@@ -32,6 +32,34 @@ struct corp_ai_params
     int   cooldown_evals  = 4;     ///< Evals a touched building holds before re-dialling.
     int   max_builds      = 1;     ///< Constructions per corp per evaluation.
     int   max_dials       = 3;     ///< Dial changes (recipe/workforce/idle/resume) per evaluation.
+    int   max_trades      = 1;     ///< Order-book commands per corp per evaluation (BL-293).
+
+    // --- Trading (BL-293). DELIBERATELY CONSERVATIVE FIRST CUT, AND TUNABLE ---
+    // "Can trade" is not "trades well": a scorer that dumps stock at the floor
+    // price is worse than one that does not trade at all, because it drags the
+    // resolved price down for everyone including itself. So the rule here is the
+    // narrowest one that is still genuine trading — list what has visibly piled
+    // up, and refuse to sell it cheap — and it is expressed as two numbers rather
+    // than as a market strategy, so tuning it is a data change. A real strategy
+    // (reading price trend, timing releases, targeting a rival's shortage) is a
+    // later item; see AI_OPPONENT.md.
+
+    /// Stock a corp holds on a body before any of it is considered surplus worth
+    /// listing. Well above a processor's per-tick input draw, so the trade
+    /// candidate cannot compete with feeding the corp's own chain — the pool has
+    /// to have genuinely accumulated.
+    float trade_hold_threshold = 50.0f;
+
+    /// Fraction of the stock above the threshold that one order lists. Below 1.0
+    /// so the corp meters its release rather than emptying the pool into a single
+    /// quarter's clearing.
+    float trade_release_fraction = 0.5f;
+
+    /// Floor price as a multiple of the market's BASE price — the rarity-derived
+    /// value floor, which is the closest thing to a cost reference the world
+    /// currently exposes per resource. At 1.0 the corp simply refuses to sell
+    /// below the rarity floor; above 1.0 it holds out for a margin over it.
+    float trade_floor_multiple = 1.0f;
 
     /// Solvency reserve floor = max(floor_constant, floor_wage_mult × the corp's
     /// per-tick wage bill). A tick is one quarter, so the default is two

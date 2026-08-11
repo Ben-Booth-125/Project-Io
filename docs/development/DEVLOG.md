@@ -332,6 +332,90 @@ relaunched with an explicit *commit as soon as something works* instruction, whi
 
 ---
 
+## Session — The order book stops being a picture and starts being state (2026-08-08)
+
+Full mode, delivery. One item: **BL-293 (order book unreachable by command)**, landed. Runtime:
+~2.5 h.
+
+**The item was filed as "three presses have no `corp_verb` — add them", and that is not the
+work.** The 2026-08-07 scope correction found why: `sell_order` was *defined* in
+`world/components.hpp` but *stored* in `ui/ui_state.hpp`, and handed to `clear_markets` by the
+caller. A `corp_verb` mutates `world&`, so there was nothing for a trade verb to mutate. One
+misplacement produced three symptoms at once — clearing was something the UI *drove* rather than
+something the simulation *does*, no text-driven player could trade, and standing orders sat
+outside the save seam entirely, so they would not have survived a save. Ben's ruling (NR-083):
+*"Order book needs to be a background process, the AI must be able to trade as a player does."*
+The player-only fence proposed alongside it was explicitly rejected.
+
+**What landed.** The book is `world::sell_orders` / `buy_orders`, with stable per-order ids so
+removal names identity rather than an index. `order_book.{hpp,cpp}` serialises it — magic `IOOB`
++ version, the second flat-binary stream in `world/*` after `history_log`, refusing a bad stream
+rather than reinterpreting it. `clear_markets` **dropped both order-list parameters** and reads
+the world, so a headless tick sells a standing order with nobody handing it over. Three verbs
+joined the seam (`place_sell_order`, `remove_sell_order`, `set_workforce_auto` — the enum is 11
+wide now, append-only). The Market Ledger's buttons queue `corp_command`s that `app::render`
+applies through `apply_corp_command`: the player's press and the AI's command are one
+implementation rather than two that agree.
+
+**Rival corps trade, and the first cut is deliberately dull.** "Can trade" is not "trades well" —
+a scorer that dumps stock at the floor is worse than one that does not trade, because it drags
+the resolved price down for everyone including itself. So: surplus past a hold threshold, half
+the excess, floored at the market's rarity price, scored *at the floor*. Three numbers in
+`corp_ai_params`, so tuning is a data change. The two honest gaps are recorded rather than
+papered over (NR-087): `base_price` is a rarity floor and not a production cost, and the book is
+one-sided — `buy_order` has world state and a save format but still no verb.
+
+**The standing rules were amended, and flagged rather than slipped in** (NR-085). The rival-corp
+exception enumerates what the scored-utility layer may do, and trading was not on the list;
+Ben's ruling widens it, so the rule file changed in the same commit. It is a grant of *reach*,
+not of skill, and the amended text says so.
+
+**Found along the way.** `set_workforce` never cleared `workforce_auto`, though `ACTIONS.json`
+has always claimed it did and the UI has always done it — so a command-driven agent's target was
+silently re-solved by the profit-max solver on the next tick, which is the worst failure mode a
+word interface has (the press appears to succeed, then evaporates). The seam now matches the
+press (NR-086). `state_hash` was missing `workforce_auto` too (NR-088).
+
+**Verification.** `order_book_harness`, 43/43 PASS. The assertion the move earns is R4.5: the
+same orders in a different *sequence* hash differently, because matching is price-**time**
+priority, so the book's order is state and not an implementation detail. `econ_harness`,
+`corp_ai`, `corp_agency`, `history_log`, `econ_stability` and `corp_ai_predictive` all green.
+
+**Two things measured rather than assumed.** `ai_skill_harness`'s net-worth golden bands fail —
+but a worktree at unmodified HEAD fails 5 of them already, and every BL-204 determinism assertion
+passes on both sides. Not re-blessed: doing so inside a trade commit would have hidden both the
+pre-existing drift and the intended behaviour change (NR-090). And the app does not build at
+HEAD at all — `src/ui/tile_inspector.cpp`, committed at ca22b3a, includes
+`world/sim_terrain_build.hpp`, which exists in no commit or branch (NR-091). That blocks BL-293's
+one visual requirement; both touched UI units compile clean in isolation.
+
+**Dictionary last, as required.** The seam changed first, then `ACTIONS.json` was re-transcribed
+from `corp_command.hpp` and the mirror re-rendered. The "full word interface" overclaim turned
+out to live in `render_actions.js`'s hardcoded preamble as well as in `_note`; both corrected,
+and the replacement states what is still *not* reachable rather than making a fresh sweeping
+claim.
+
+**The static review earned its place.** Reading the listing loop next to the debit loop found
+that overlapping sell orders on one `(corp, body, resource)` were each listed against the *full*
+pool and each debited it — a pool of 10 with two orders of 10 ended at **−10 units with the corp
+paid for 20**. The economy could mint value. Pre-existing and reachable from the ledger the whole
+time, but putting placement on the command seam turned it from something a careful player avoids
+into something a scorer can do in a loop. A second, opposite bug sat beside it: the auto-clear
+subtracted one corp's whole matched total from every one of its orders on the triple. Both fixed,
+both now covered by `order_book_harness` R1b (NR-092). No build catches this class; that is the
+argument for the no-compile tier.
+
+**And one signal not papered over.** `data_creep_harness` R1 passes at unmodified HEAD and fails
+here: rival trading pushes the build plateau from tick 500 out to tick 1000 (still flat from 1000
+to 1500). The mechanism is indirect — a standing order takes its triple off the auto-surplus
+path, which moves prices, which keeps builds scoring above the hysteresis margin for longer. Not
+re-blessed; NR-093 carries the decision, and it raises a real question about whether that
+whole-triple yield rule — written for a player's deliberate order — is the right rule now that a
+scorer places them.
+
+**Also filed.** BL-325 (corp borders on the hex grid) from Ben's steer that the corp border
+circle "basically tells us nothing" — a circle is a picture of a scalar, and it is about to
+contradict BL-323's irregular logistics-reach field. Two design questions owed first (NR-089).
 ## Session — Cut v0.1.9: five worktree agents, and three of them branched from a base that had already moved (2026-08-09)
 
 Full mode, Batch Delivery + release — the fourth cut of the session. Ben: *"cut v0.1.9 next."*

@@ -647,23 +647,34 @@ int app::run_verify(const std::string& script_path, bool bless)
     });
 
     // --- US-008: standing sell-order placement ------------------------------
-    // Place a standing sell order through the SAME path the market ledger's
-    // "Add sell order" button uses: push a sell_order onto m_world.sell_orders, the
-    // vector step_economy() feeds to clear_markets. Body resolves to the player's
-    // home body. Returns the resulting sell_orders count so a script can assert the
-    // order registered. Realises the placement half of US-008.
+    // Place a standing sell order through the SAME path the Market Ledger's
+    // "Add sell order" button uses — which since BL-293 is the corp-command seam,
+    // not a push onto a vector. Applied immediately here rather than enqueued: a
+    // verify script is a caller with a mutable world in hand, so it takes the same
+    // route app::render takes when it drains m_ui.pending_order_commands. Body
+    // resolves to the player's home body. Returns the resulting count of the
+    // player's standing orders, so a script can assert the order registered — and
+    // a REJECTED order now returns the unchanged count rather than silently
+    // registering, which the old vector path could not express at all.
     v.set_function("place_sell_order",
         [this](const std::string& res, double qty, double floor) -> int {
-            sell_order o;
-            o.corp        = m_world.player_entity;
-            o.body        = m_world.home_body;
-            o.resource    = resource_from_name(res);
-            o.quantity    = static_cast<float>(qty);
-            o.floor_price = static_cast<float>(floor);
-            m_world.sell_orders.push_back(o);
-            SDL_Log("verify.place_sell_order: %s x%.0f >= %.1f (n=%zu)",
-                    res.c_str(), qty, floor, m_world.sell_orders.size());
-            return static_cast<int>(m_world.sell_orders.size());
+            corp_command cmd;
+            cmd.tick        = static_cast<int>(m_sim_loop.day_tick());
+            cmd.corp        = m_world.player_entity;
+            cmd.verb        = corp_verb::place_sell_order;
+            cmd.subject     = m_world.home_body;
+            cmd.target      = resource_from_name(res);
+            cmd.quantity    = static_cast<float>(qty);
+            cmd.floor_price = static_cast<float>(floor);
+            const corp_command_result r = apply_corp_command(m_world, m_registry, cmd);
+
+            int n = 0;
+            for (const sell_order& o : m_world.sell_orders)
+                if (o.corp == m_world.player_entity) ++n;
+            SDL_Log("verify.place_sell_order: %s x%.0f >= %.1f (applied=%d, n=%d)",
+                    res.c_str(), qty, floor,
+                    r == corp_command_result::applied ? 1 : 0, n);
+            return n;
         });
 
     // Read the resolved market price of `res` on the player's home body — lets a

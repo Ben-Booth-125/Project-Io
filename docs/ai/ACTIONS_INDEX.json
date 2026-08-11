@@ -19,11 +19,11 @@
   ],
   [
    "gameplay.place_sell_order",
-   "The 'Sell Orders' tab of the Market Ledger (opened from the nav rail; the tab is scoped to the ledger's selected market body)."
+   "The 'Sell Orders' tab of the Market Ledger (opened from the nav rail; the tab is scoped to the ledger's selected market body). Since BL-293 the press is not the only route: place_sell_order is a corp_verb, so an agent issues it directly against the corp-command seam and a rival corp's scorer issues it too."
   ],
   [
    "gameplay.remove_sell_order",
-   "The 'Remove' button beside each listed order on the Market Ledger's Sell Orders tab."
+   "The 'Remove' button beside each listed order on the Market Ledger's Sell Orders tab; also a corp_verb, issuable directly."
   ],
   [
    "gameplay.resume",
@@ -39,7 +39,7 @@
   ],
   [
    "gameplay.set_workforce_auto",
-   "The 'Auto' checkbox beside the band's workforce slider; the 'Auto (N%)' button above the panel's tier grid."
+   "The 'Auto' checkbox beside the band's workforce slider; the 'Auto (N%)' button above the panel's tier grid. Also a corp_verb."
   ],
   [
    "gameplay.survey",

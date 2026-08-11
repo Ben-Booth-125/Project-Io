@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*132 entries — 34 open, 98 resolved.*
+*143 entries — 45 open, 98 resolved.*
 
 ---
 
@@ -264,6 +264,117 @@ The item asked for the sell-order form state to move "into ui_state keyed per ma
 *decision taken on your behalf · raised 2026-08-10 · from Wave-2 review barrier C2 (BL-362)*
 
 The harness drove step_economy with current_day_tick frozen at 0 for the whole session, so anything stamped on the tick never invalidated and, since BL-354, convoy dispatch priced every haul at the epoch orbital position. econ_step now increments it per step. This is more faithful (the economy sees time passing) but it MOVES captured economic figures: pop_markers and market_ledger diff ~1% against pre-fix captures, confined to price values, price curves and comms text. Folds into the NR-130 re-bless pass rather than being blessed separately.
+
+### NR-135 — STANDING RULES AMENDED: the rival-corp exception now permits trading. Flagging rather than slipping it in
+*decision taken on your behalf · raised 2026-08-08 · from Implementing BL-293 (order book unreachable by command), 2026-08-08.*
+
+`.claude/rules/io-standing-rules.md` enumerates what the BL-202/BL-203 scored-utility layer may do on a background corp: build, demolish, survey, road, plus predictive spending. Trading is not on that list. Ben's NR-083 ruling ("the AI must be able to trade as a player does") widens it, so BL-293 amends that enumeration in the same change - otherwise the code and the standing rules contradict each other from the moment this lands. [Renumbered from NR-085 on 2026-08-10: the BL-293 branch sat unmerged while main used that id for a different entry.]
+
+**Why it matters.** This is a RULES FILE, not a doc. Its whole value is that it is short, always-on and never edited casually; an amendment that arrives inside a feature commit is exactly the kind of change that should be seen rather than merged past. The widening is real and worth stating plainly: a background corporation can now place and withdraw standing sell orders on the open market, priced, on its own initiative. That is a larger grant than 'idle a loss-maker'. It is what Ben asked for, and the determinism constraint that governs the rest of the exception governs this too (the scorer is pure, seeded and replayable), but Ben should read the amended sentence and confirm it says what he meant.
+
+*Files: `.claude/rules/io-standing-rules.md`, `src/world/corp_ai.cpp`, `docs/development/backlog.json`*
+
+### NR-136 — set_workforce now clears workforce_auto at the seam, matching the press it was always documented as
+*decision taken on your behalf · raised 2026-08-08 · from Implementing BL-293 (order book unreachable by command), 2026-08-08.*
+
+`ACTIONS.json`'s set_workforce entry has always said "workforce_target is set AND workforce_auto is cleared - a manual move pins the dial". The UI does that (selection_panel.cpp, construction_panel.cpp). `apply_corp_command` did NOT: it set the target and left the flag alone. BL-293 makes the seam match, and correspondingly relaxes the no-op test from "target already equal" to "target already equal AND already pinned". [Renumbered from NR-086 on 2026-08-10: the BL-293 branch sat unmerged while main used that id for a different entry.]
+
+**Why it matters.** It is a behaviour change to an EXISTING verb, made while adding three new ones, so it deserves to be seen separately. Without it, a command-driven agent playing the player's corp sets a workforce target and the BL-181 auto-solver silently overwrites it on the next tick - the agent's press appears to succeed and then evaporates, which is the worst failure mode a word interface can have. Rival corps are unaffected either way (the solver only runs on the player's corp), so the blast radius is the agent seam and nothing else. The dictionary was right and the seam was wrong, which is the direction CLAUDE.md says to resolve such disagreements - but that rule is about transcription, and this is a code change, so it is logged rather than assumed.
+
+*Files: `src/world/corp_command.cpp`, `docs/ai/ACTIONS.json`*
+
+### NR-137 — The AI's first-cut trading rule is three numbers, not a strategy - and it is deliberately dull
+*decision taken on your behalf · raised 2026-08-08 · from Implementing BL-293 (order book unreachable by command), 2026-08-08.*
+
+Ben's ruling made rival corps able to trade; it did not say how well. The rule shipped: list stock only above a hold threshold (50 units on a body), release half the excess, floor the price at the market's rarity-derived base_price. Scored in expected cash at the FLOOR price so it competes honestly with dials and builds. Never places a second order on a (corp, body, resource) that already has one. All three numbers are `corp_ai_params` fields (trade_hold_threshold, trade_release_fraction, trade_floor_multiple), so tuning them is a data change. [Renumbered from NR-087 on 2026-08-10: the BL-293 branch sat unmerged while main used that id for a different entry.]
+
+**Why it matters.** 'Can trade' is not 'trades well', and a naive scorer that dumps stock at the floor is genuinely WORSE than one that does not trade - it drags the resolved price down for everyone including itself, and the auto-surplus path was already clearing that stock at the reference price anyway. So the conservative cut is the correct first move, but it is a call about opponent behaviour, which is Ben's axis. Two things worth his eye: (1) base_price is a RARITY floor, not a production cost - it is the closest per-resource cost reference the world exposes, but on a resource whose real production cost sits above its rarity floor the AI will happily sell at a loss; (2) the AI still has no reason to BUY, because buy_order has no verb and no press, so the book is one-sided. Both are follow-on work, not defects in this item.
+
+*Files: `src/world/corp_ai.hpp`, `src/world/corp_ai.cpp`, `docs/ai/AI_OPPONENT.md`*
+
+### NR-138 — state_hash now folds workforce_auto and the order book, so BL-204 hash values change
+*observation · raised 2026-08-08 · from Implementing BL-293 (order book unreachable by command), 2026-08-08.*
+
+`world::state_hash` (BL-204) covered balances, building dials, market prices and pools. It did not cover `workforce_auto` - a dial the tick reads and the seam now writes - and could not cover the order book, which was not world state. Both are folded in now. The order book is hashed in STORED order rather than sorted, deliberately: matching is price-TIME priority, so the book's sequence is itself state. [Renumbered from NR-088 on 2026-08-10: the BL-293 branch sat unmerged while main used that id for a different entry.]
+
+**Why it matters.** No harness compares a hash against a recorded literal - ai_skill_harness compares two runs of the same build against each other - so nothing breaks. But any hash value written down in a doc, a devlog or a review note from before 2026-08-08 no longer reproduces, and someone will eventually try. Worth knowing the reason rather than debugging it. The stored-order choice also means the order book is the one section of the hash whose determinism rests on container discipline rather than on a re-sort; the new order_book_harness asserts it, and that assertion is the reason it is safe.
+
+*Files: `src/world/world.cpp`, `src/world/world.hpp`, `tools/verify/order_book_harness.cpp`*
+
+### NR-139 — BL-325 (corp borders on the hex grid) carries two open design questions before anyone builds it
+*decision-needed · raised 2026-08-08 · from Implementing BL-293 (order book unreachable by command), 2026-08-08.*
+
+Filed from Ben's 2026-08-08 steer that the corp border circle 'basically tells us nothing'. Q1: WHICH tile set is the border - (a) tiles within influence_range of the seat (the honest hex rendering of today's circle), (b) tiles inside the corp's logistics-reach budget (what 'a valid move' actually means once BL-323 lands), or (c) held tiles plus neighbours? Q2: always-on fill is heavy over a hex grid and will fight other overlays - outline always-on, fill only under the Corporation lens? [Renumbered from NR-089 on 2026-08-10: the BL-293 branch sat unmerged while main used that id for a different entry.]
+
+**Why it matters.** Q1 decides whether BL-325 is a small independent reskin or a consumer of BL-323's reach field, which changes both its sequencing and its difficulty. Ben's own stated purpose - 'more easily see what is and isn't a valid move' - argues for (b), but (b) means the item cannot land before the buildings rework does. Worth answering before it is promoted.
+
+- Q1a - influence_range hexes: independent of BL-323, small, but still a picture of a scalar.
+- Q1b - logistics-reach budget: matches the stated purpose, depends on BL-323.
+- Q1c - held tiles + neighbours: cheapest to compute, weakest claim to meaning.
+
+> **Recommendation:** Q1b, sequenced after BL-323; Q2 outline-always / fill-on-lens, matching the Country lens's grammar.
+
+*Files: `src/ui/body_surface_canvas.cpp`, `docs/development/backlog.json`*
+
+### NR-140 — ai_skill_harness golden bands: already stale before BL-293, and trading moved them further. Not re-blessed
+*decision-needed · raised 2026-08-08 · from Implementing BL-293 (order book unreachable by command), 2026-08-08.*
+
+Measured both sides rather than assuming. On an unmodified HEAD (6206545) worktree, `ai_skill_harness` already FAILS 5 assertions: seed 0 net-worth final + min, seed 1 net-worth final + min, and seed 3's dial-action thrash ceiling. With BL-293 applied it fails 7 — seed 1's 'final' now passes, and seeds 2 and 4 'final' now fail. Every BL-204 R0 DETERMINISM assertion passes on both sides, including the two-same-seed-runs state_hash equality that BL-293's own R5 depends on. [Renumbered from NR-090 on 2026-08-10: the BL-293 branch sat unmerged while main used that id for a different entry.]
+
+**Why it matters.** Two separate things are tangled here and only one is mine. (1) The bands were ALREADY stale at HEAD — that drift predates this item and re-blessing it inside a trade commit would erase the evidence of whatever caused it. (2) Rival corps now list stock at a floor price instead of letting the auto-surplus path clear it at the reference price, which legitimately moves net worth; that part IS mine and is an intended behaviour change, not a regression.
+
+I did not re-bless the goldens. Doing so would have made the harness green while hiding both problems, and the harness's own framing calls these 'disposable golden bands' precisely because they are meant to be re-cut deliberately, not swept. The decision owed is whether to re-cut them now (one pass, after agreeing the trade parameters in NR-087 are the ones to bake in) or to first find the pre-existing drift, since re-cutting now bakes an unexplained baseline into the new numbers.
+
+- A - Find the pre-existing drift first (what changed between the last blessing and HEAD), then re-cut all bands once, with trading on.
+- B - Re-cut the bands now against BL-293's behaviour and file the pre-existing drift separately.
+- C - Leave both; the determinism assertions are the load-bearing ones and they pass.
+
+> **Recommendation:** A. The bands are a skill-regression signal and a signal nobody has explained is not a signal. It is also cheap: the drift is bounded by the commits since the last blessing. B risks baking an unexplained baseline in permanently, and C lets the harness sit red, which trains everyone to ignore it.
+
+*Files: `tools/verify/ai_skill_harness.cpp`, `src/world/corp_ai.cpp`*
+
+### NR-141 — The app does not build at HEAD: tile_inspector.cpp includes a header that exists in no commit or branch
+*observation · raised 2026-08-08 · from Implementing BL-293, 2026-08-08 - hit when trying to build ProjectIo to verify the Market Ledger change.*
+
+`src/ui/tile_inspector.cpp:9` includes `world/sim_terrain_build.hpp`. That header does not exist in the working tree, in HEAD, or in any local or remote branch (`git log --all -- src/world/sim_terrain_build.hpp` returns nothing). tile_inspector.cpp was committed at ca22b3a ('One silhouette check instead of a hundred and forty-six'), so the `ProjectIo` target has been unbuildable since that commit. Every `src/*.cpp` is globbed into the target, so this one file fails the whole app link - it is not confined to the tile inspector. [Renumbered from NR-091 on 2026-08-10: the BL-293 branch sat unmerged while main used that id for a different entry.]
+
+**Why it matters.** Nothing to do with BL-293, but it blocks that item's one visual requirement (R7: the Market Ledger's presses going through the command seam) and it will block the next person the same way. Same shape as the concurrent-session problem already known in this tree - committed source referencing an uncommitted header - which suggests the header is sitting untracked on whichever machine authored ca22b3a and simply was not added. Cheapest fix is almost certainly `git add` of the missing file from that machine; the alternative is reconstructing it from tile_inspector.cpp's usage. Worth resolving before anything else needs a visual check.
+
+*Files: `src/ui/tile_inspector.cpp`, `src/world/sim_terrain_build.hpp`*
+
+### NR-142 — Review caught a real defect the build could not: overlapping sell orders sold stock that did not exist
+*observation · raised 2026-08-08 · from Static review pass over the integrated BL-293 change, 2026-08-08.*
+
+Several sell orders may name the same (corp, body, resource) — the command seam permits it deliberately, and a player can always add two overlapping orders in the Market Ledger. `clear_markets` listed each one at min(order.quantity, POOL) without reserving the pool across them, and the downstream auto-clear debited the pool once PER ORDER. Measured: a pool of 10 with two orders of 10 ended at -10 units with the corp paid for 20. Money and goods from nothing. A second, opposite bug sat beside it: the auto-clear's `matched_sell` aggregate is keyed by (corp, market, resource), and the same total was subtracted from every one of that corp's orders on the triple, under-selling instead of over-selling. Both fixed — the pool is now reserved across orders in placement order (the same time priority the matcher uses), and the matched total is consumed order by order rather than re-read. [Renumbered from NR-092 on 2026-08-10: the BL-293 branch sat unmerged while main used that id for a different entry.]
+
+**Why it matters.** PRE-EXISTING, and reachable from the UI the whole time — this is not damage BL-293 did. But BL-293 widened the door considerably by putting order placement on the command seam, where an agent or a scorer can issue placements in a loop, so it stopped being a thing a careful player avoids and became a thing the game does to itself. Worth flagging for two reasons beyond the fix. First, it is the clearest argument yet for the static review pass: no build catches it, no existing harness covered it, and it survived every green run in this session until someone read the listing loop next to the debit loop. Second, it means the economy could mint value, which is the class of bug that invalidates every balance number measured before today. Now covered by order_book_harness R1b.
+
+*Files: `src/world/market_clearing.cpp`, `tools/verify/order_book_harness.cpp`*
+
+### NR-143 — Rival trading delays the build plateau: data_creep R1 now fails where unmodified HEAD passes
+*decision-needed · raised 2026-08-08 · from Implementing BL-293, 2026-08-08 - regression sweep.*
+
+`data_creep_harness` R1 ('every persistent world counter plateaus between the mid and final sample') PASSES on an unmodified HEAD worktree and FAILS with BL-293 applied. The counters that move are buildings, stockpiles, corporation.assets and distinct entities, all by exactly 65. The growth is between the tick-500 and tick-1000 samples; from tick 1000 to tick 1500 the delta is ZERO. So the plateau did not disappear — it moved later. R2 (process RSS plateaus) still passes, and the order book itself is not among the growing counters. [Renumbered from NR-093 on 2026-08-10: the BL-293 branch sat unmerged while main used that id for a different entry.]
+
+**Why it matters.** The mechanism is almost certainly indirect rather than a leak: a standing order makes the auto-surplus path YIELD for that (corp, body, resource), which changes market supply, which changes prices, which changes how long a build keeps scoring above the hysteresis margin. Rival corps expand for longer before settling. That is arguably the correct consequence of giving them a second lever, not a defect — but it is a change in opponent behaviour that nobody asked for, discovered by a harness rather than intended, and it deserves a decision rather than a re-cut assertion. The reason to care: R1 is a save-format creep guard, and 'plateaus by tick 1000 instead of tick 500' is a weaker guarantee than the one it was written to give. Not re-blessed.
+
+- A - Accept: widen R1's plateau window to start at the tick-1000 sample, noting why. Cheapest, and honest if the later plateau is genuinely stable.
+- B - Investigate whether the trade rule should leave the auto-surplus path alone for the UNLISTED remainder, rather than making the whole triple yield. That yield rule predates BL-293 and was written for a player's deliberate order, not a scorer's.
+- C - Run the harness longer (3000+ ticks) to confirm the plateau really is a plateau and not a slower climb, before deciding.
+
+> **Recommendation:** C then A. The one thing that would change the answer is whether it is flat or merely slower, and that is one longer run away. B is a real design question but a larger one — the 'a standing order takes the whole triple off the auto path' rule is doing more work now that a scorer places orders, and it is worth its own item rather than a fix smuggled into this one.
+
+*Files: `tools/verify/data_creep_harness.cpp`, `src/world/corp_ai.cpp`, `src/world/market_clearing.cpp`*
+
+### NR-144 — Rival trading triples AI net worth: ai_skill golden bands now fail on final, and re-blessing is a judgement call
+*question · raised 2026-08-10 · from BL-293 reconciliation merge; tools/verify/ai_skill_harness.cpp*
+
+With rival corps trading (BL-293), seed 0 final net worth is 975,219 against a Linux band of [141,000, 331,000] — roughly 3x the ceiling, and all five seeds fail the FINAL check while min, solvency, survival and both thrash ceilings still pass. The shape (rich at the end, same trough, same survival) is consistent with corps converting idle stock to cash rather than with a broken scorer. But the size is worth a look before the bands are re-blessed: clear_markets is a PERFECT COUNTERPARTY (MARKETS.md — auto paths always clear in full at max(reference, floor)), so listing surplus is close to free money, and the first-cut trade rule sells half the excess at the rarity floor every evaluation. If that reads as too generous, the fix is the trade rule or the counterparty, not the band. I did NOT re-bless: the bands are the AI-skill regression signal, and blessing a 3x move would retire the signal that noticed it.
+
+### NR-145 — data_creep R1 fails on a DELAYED plateau, not a leak
+*observation · raised 2026-08-10 · from BL-293 reconciliation merge; tools/verify/data_creep_harness.cpp*
+
+R1 (every persistent counter plateaus between the mid and final sample) now fails on world.buildings: 458 at tick 500 -> 556 at tick 1000 -> 556 at tick 1500. Growth stops, but after the harness mid-sample, so the mid(500)->final(1500) delta of 98 exceeds the tolerance. Richer corps (trading income) simply keep building for longer. It is a calibration question — move the mid sample later, or measure the plateau over the final third — not a data leak; RSS still plateaus (R2) and the counter is genuinely flat over the last 500 ticks. The BL-293 author predicted this exact failure in the commit message.
 
 ---
 

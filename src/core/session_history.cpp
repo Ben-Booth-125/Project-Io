@@ -43,6 +43,11 @@ void post_nation_agency_comms(const world& w, const economy_report& report,
             case agency_event::kind::road_placed:       return 1;
             case agency_event::kind::workforce_set:     return 1;
             case agency_event::kind::survey_dispatched: return 1;
+            // Order-book traffic is the quietest thing a corp does — routine
+            // commerce, not a change in the industrial landscape — so it only
+            // reaches the nation feed on a tick where nothing else happened.
+            case agency_event::kind::order_placed:      return 1;
+            case agency_event::kind::order_removed:     return 1;
             }
             return 0;
         };
@@ -99,6 +104,12 @@ void post_nation_agency_comms(const world& w, const economy_report& report,
                 break;
             case agency_event::kind::hired:
                 text = "We acknowledge the mustering of a private security formation on our soil.";
+                break;
+            case agency_event::kind::order_placed:
+                text = "Domestic producers are bringing stock to market.";
+                break;
+            case agency_event::kind::order_removed:
+                text = "A domestic producer has withdrawn stock from sale.";
                 break;
             }
             ui::chat_post(chat, day_tick, nid, 0, std::move(text));
