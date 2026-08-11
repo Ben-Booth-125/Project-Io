@@ -74,18 +74,24 @@ minable-but-unsellable asymmetry of the BL-040 raws are catalogued in
 
 1. **Reset** — every market's `supply` and `demand` arrays zero. There is no stored inventory;
    both are per-tick flows.
-2. **Substrate injection** (`inject_substrate_demand`, BL-078) — the nation background economy:
-   a price-elastic per-capita basket demand and an abstract capacity-capped supply that clears
-   demand only to `clearing_fraction`, leaving the live margin (the saturation cushion / the
-   opportunity gap the player fills). Tunables in `scripts/economy.lua` § `substrate`.
+2. **Background-firm production** (BL-365, 2026-08-11) — real corporations
+   (`corporation_component.is_background = true`), generated at world-gen and running the same
+   corp_ai scored-utility layer as rivals, produce, sell, and buy through the ORDINARY steps of
+   this tick (auto-surplus, standing orders, auto-demand — steps 4, 5, 6 below) exactly like any
+   other corp. There is no separate injection step for background supply any more: saturation and
+   the live opportunity margin are now **emergent** from real generated firms, not asserted by a
+   function. This replaces `inject_substrate_demand` (BL-078), which wrote an abstract
+   per-(nation,body) `nation_substrate` capacity/demand pair straight into the market arrays
+   without any building behind it; that function, `nation.resource_abundance`, and the substrate
+   capacity arrays are deleted. See § Background corporations below.
 3. **Population demand injection** (`inject_population_demand`, BL-190 ordering fix + BL-368
    basket generalisation) — each population centre pulls a price-elastic, multi-resource DEMAND
    from its catchment market (food rations, agricultural produce, water, clean water, consumer
-   goods, medical supplies): `pcc.scale × demand_scale × basket[r] × elasticity(price)`. Same
-   elastic shape as the substrate injection above, but population is a pure **consumer** — no
-   supply term. Tunables in `scripts/economy.lua` § `population_demand`. Runs after the reset (and
-   after substrate injection) for the same reason substrate does: written before the reset, it
-   would be erased the same tick it landed (the bug BL-190 fixed, 2026-07-31).
+   goods, medical supplies): `pcc.scale × demand_scale × basket[r] × elasticity(price)`. Population
+   is a pure **consumer** — no supply term; the corresponding supply now comes from real background
+   firms (step 2), not from an elastic substrate. Tunables in `scripts/economy.lua` §
+   `population_demand`. Runs after the reset for the same reason step 2 must: written before the
+   reset, it would be erased the same tick it landed (the bug BL-190 fixed, 2026-07-31).
 4. **Auto-surplus** — each `(corp, body)` pool lists everything above its **processor
    reservation** (the inputs its own processors need for a full run next tick) for sale. A
    resource under a standing sell order is exempted — the manual order governs.
@@ -119,6 +125,43 @@ minable-but-unsellable asymmetry of the BL-040 raws are catalogued in
 Cash flows accrue per corp and are applied to balances by `apply_budget`
 (`src/world/budget_system.cpp`).
 
+## Background corporations (BL-365, 2026-08-11)
+
+**The market saturates because real firms produce and consume, not because a substrate pass
+injects supply and demand.** Previously `inject_substrate_demand` (BL-078) wrote an abstract
+per-(nation,body) `nation_substrate` — a capacity figure with no building behind it — straight
+into the market's `supply`/`demand` arrays each tick, clearing demand to a fixed
+`clearing_fraction` (first cut 0.90) by construction. That function, `nation.resource_abundance`,
+and the substrate capacity arrays are deleted; nothing in the engine injects fictional supply or
+demand any more.
+
+In its place, world-gen runs a **second, later corporation-generation pass**
+(`docs/generation/CORPORATION_GENERATION.md` § Pass 6) that places real background firms — real
+buildings, on real tiles, with `corporation_component.is_background = true` — until the body's
+real production meets the same ~90% target fraction of real demand. The count is **calibrated**,
+not authored: generation keeps adding firms/holdings until the measured production/demand ratio
+crosses the target, so the figure stays correct as recipes, deposits, or population are retuned.
+
+Background firms are not a cheaper stand-in for the player's rivals. They run the **full corp_ai
+scored-utility layer** — build, demolish, survey, road, hire, and trade decisions, identical to
+the handful of named rival corps (Ben, 2026-08-11, overriding a reduced-model recommendation) —
+against the same `corp_command` seam and the same market this section documents. A background
+firm's sell orders, auto-surplus, and auto-demand are ordinary rows in steps 4–7 above; there is
+no separate code path for them. This also inherits BL-340's background-demand step for silicon,
+refined_copper, ree_alloy, machinery, alloys, and electronics — **not** `spacecraft_components`,
+which stays player/AI-procurement-only so the militia's contracts remain its only buyer
+(`docs/economy/MARKETS.md` § Procurement above).
+
+**Data-model hook, not a UI change.** `is_background` exists on `corporation_component` today so
+generation and `export_corp_blackboard` (BL-206) can distinguish "background noise" from a named
+rival. Aggregating ~80 background firms into one entry on the Corporation lens and dashboard is
+future UI work, out of this item's scope — today every corp, background or not, is still listed
+individually on any surface that enumerates corporations.
+
+**BL-130 (real market inventory, below) is a hard prerequisite, not a neighbour.** Real background
+firms selling into a market that still conjured any buy-side shortfall would undercut the entire
+point of modelling real producers, which is why this item required BL-130 to land first.
+
 ## Real market inventory (BL-130, 2026-08-11)
 
 `market_component.inventory` is **real, persistent stock** — not reset each tick, unlike
@@ -128,9 +171,10 @@ transit and stock on hand, which a derived-from-recent-supply figure cannot repr
 end of the market's old role as an unconditional, infinite counterparty on the **buy** side.
 
 **Fills from real corp sales only** — auto-surplus and standing sell orders, tallied separately
-from `mc.supply[r]` so the BL-078 nation-substrate's abstract supply (a pricing fiction, never
-actually sold by anyone) cannot inflate real stock. Filled during `clear_markets`, after all
-sell-side listing completes.
+from `mc.supply[r]`. This is a residual note from before BL-365 removed the old
+nation-substrate's abstract supply (a pricing fiction, never actually sold by anyone); today
+every seller filling `mc.inventory` is a real corp, background or not. Filled during
+`clear_markets`, after all sell-side listing completes.
 
 **Drains during production and construction — both of which run BEFORE `clear_markets` in the
 same tick** — against whatever stock survived from **prior ticks'** sales:
@@ -261,8 +305,11 @@ extracted there enter the economy only by convoy to a Kepler market.
   makes the BUY side real and finite; selling remains unconditional, same as before.
 - **Anchored prices.** The [0.25×, 4×] band caps every scarcity signal at 4× base. This is the
   band the BL-078 (product-market inertness) diagnosis found products pegged against — resolved
-  in *shape* by the elastic substrate (prices now discover within the band), but the ceiling
-  itself is retained deliberately, to be retuned once real ranges are visible.
+  in *shape* first by the elastic substrate and now by real background-firm supply (BL-365,
+  prices discover within the band against real production), but the ceiling itself is retained
+  deliberately, to be retuned once real ranges are visible. A resource pegged at exactly 4× base
+  is now a generation-calibration bug (background production absent or under-target), not a
+  legitimate "lucrative fillable gap" — see `docs/generation/CORPORATION_GENERATION.md` § Pass 6.
 - **Most of the enum cannot trade.** Base price 0 across the non-subset resources makes the
   BL-040 raws minable but unsellable (RESOURCES.md § What actually trades) — the standing
   market-inertness residue.
