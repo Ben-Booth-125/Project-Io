@@ -382,11 +382,6 @@ struct world
     static constexpr float default_workforce_supply = 3.0f;
     std::map<std::pair<entity_id, entity_id>, float> workforce_supply_overrides;
 
-    /// Background-industry aggregate per (nation, body). Populated once at world-gen;
-    /// injected into market supply/demand each tick by inject_substrate_demand.
-    /// Uses std::map for deterministic iteration (same rationale as corp_body_pools).
-    std::map<std::pair<entity_id, entity_id>, nation_substrate> nation_substrates;
-
     /// Effective workforce available to `corp` on `body` this tick. The labour the
     /// corporation's buildings on that body contend for under the pool model.
     ///

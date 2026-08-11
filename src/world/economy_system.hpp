@@ -146,21 +146,6 @@ struct economy_report
     std::map<entity_id, corp_budget> budgets;
 };
 
-/// Inject the elastic nation-substrate demand/supply into body markets (BL-078).
-/// For each (nation, body) substrate, demand is a price-elastic per-capita basket
-/// (population_weight × economy.substrate.demand_basket × elasticity(price)) and
-/// supply is an abstract nation capacity that tracks demand and clears it only
-/// partially, capped by deposit-derived capacity — leaving a live margin (the
-/// saturation cushion where capacity is ample, a fillable gap where it is short).
-/// Called from clear_markets after the per-tick supply/demand reset, before the
-/// order-book pass, so substrate is additive to the market quantities. Reads last
-/// tick's cleared price, so the model is a stabilising negative feedback.
-/// Deterministic — no RNG; a curve.
-///
-/// @param w   World; market supply/demand arrays are mutated in place.
-/// @param reg Loaded registry; supplies the economy.substrate tunables.
-void inject_substrate_demand(world& w, const recipe_registry& reg);
-
 /// Run one economy step over every corporation's buildings: extraction credits
 /// the (corp, body) pool with its target resource and draws the same amount from
 /// the tile's finite `resource_remaining` reserve (tapering as it nears empty,

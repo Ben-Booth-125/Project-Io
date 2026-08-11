@@ -267,6 +267,54 @@ void inject_population_demand(world& w, const recipe_registry& reg)
     }
 }
 
+void inject_background_demand(world& w, const recipe_registry& reg)
+{
+    // BL-340/BL-365: the offstage economy's own pull on the mid-chain
+    // processing goods, world-scale rather than per-centre (unlike
+    // inject_population_demand above) — real background firms alone would
+    // under-consume these during the early game before enough of them exist.
+    const background_demand_params& bd = reg.background_demand();
+
+    // Per-body population scale: sum of every centre's scale on that body,
+    // gathered once so every market on a multi-market body (BL-096) sees the
+    // same pull. std::map keyed by entity_id → deterministic accumulation
+    // order regardless of population_centres' unordered_map layout.
+    std::map<entity_id, float> body_scale;
+    for (const auto& [cid, pcc] : w.population_centres)
+    {
+        const auto tile_it = w.population_centre_tile.find(cid);
+        if (tile_it == w.population_centre_tile.end())
+            continue;
+        const auto tit = w.tiles.find(tile_it->second);
+        if (tit == w.tiles.end())
+            continue;
+        body_scale[tit->second.body] += static_cast<float>(pcc.scale);
+    }
+
+    for (auto& [mid, mc] : w.markets)
+    {
+        const auto sit = body_scale.find(mc.body);
+        if (sit == body_scale.end() || sit->second <= 0.0f)
+            continue;
+        const float scale = sit->second * bd.demand_scale;
+
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            const float base = mc.base_price[r];
+            if (base <= 0.0f)
+                continue; // untradeable — no base price to anchor the elasticity curve.
+            const float weighted = scale * bd.demand_basket[r];
+            if (weighted <= 0.0f)
+                continue; // spacecraft_components (and anything else unlisted) stays at 0.
+
+            const float price   = (mc.price[r] > 0.0f) ? mc.price[r] : base;
+            const float elastic = std::clamp(std::pow(base / price, bd.demand_elasticity),
+                                             bd.elasticity_min, bd.elasticity_max);
+            mc.demand[r] += weighted * elastic;
+        }
+    }
+}
+
 namespace {
 
 /// The lowest-id market on @p body, or `null_entity` if none — the same stable
@@ -399,15 +447,13 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         mc.demand.fill(0.0f);
     }
 
-    // Inject the elastic nation-substrate demand/supply into markets before the
-    // order-book runs. Must come after the zero-reset above so substrate is additive
-    // to the order-book quantities, not erased by it. (BL-078: reads last tick's
-    // cleared price for the demand elasticity.)
-    inject_substrate_demand(w, reg);
-
-    // Population food demand (BL-190) — likewise additive after the reset, so
-    // the population's pull reaches price resolution.
+    // Population food demand (BL-190) — additive after the reset above, so the
+    // population's pull reaches price resolution.
     inject_population_demand(w, reg);
+
+    // BL-340/BL-365: background-industrial demand for the mid-chain processing
+    // goods, additive alongside population demand. See inject_background_demand.
+    inject_background_demand(w, reg);
 
     // BL-263: the home body's own unmet demand pulls a discounted slice onto
     // every outpost market, additive after the resets above — without this an
@@ -512,8 +558,9 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // BL-130: fill real inventory from this tick's REAL corp-sourced sales only —
     // auto-surplus (auto_sells) and the standing sell orders just listed above
     // (sell_books). Deliberately NOT read off mc.supply[r] as a whole: that array
-    // also carries inject_substrate_demand's abstract nation supply (a pricing
-    // fiction, never actually sold by anyone), which must not inflate real stock.
+    // also carries inject_population_demand's/inject_background_demand's pure
+    // demand-side pulls and any residual pricing-only signal, which must not
+    // inflate real stock.
     for (const auto_sell_entry& se : auto_sells)
         w.markets.at(se.market).inventory[se.r] += se.qty;
     for (const auto& [mid, sell_by_r] : sell_books)

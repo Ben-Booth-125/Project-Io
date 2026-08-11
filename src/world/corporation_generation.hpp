@@ -1,5 +1,6 @@
 #pragma once
 
+#include "recipe_registry.hpp"
 #include "world.hpp"
 
 #include <cstdint>
@@ -80,3 +81,52 @@ std::vector<entity_id> generate_corporations(
     const corporation_params& params,
     uint32_t seed,
     const struct settlement_state* settle = nullptr);
+
+/// BL-365 — generate REAL background corporations (`is_background = true`) that
+/// produce and consume through the normal recipe/workforce/market pipeline,
+/// replacing the old abstract nation-substrate demand/supply injection
+/// (BL-078's `inject_substrate_demand`, deleted). Reuses this file's own
+/// clustered asset-placement machinery (`place_starting_assets`), so a
+/// background firm's holdings read exactly like a rival's: a focus-shaped
+/// cluster anchored on a scored tile, not a scatter.
+///
+/// MUST run after `generate_corporations` (so player/rival holdings claim the
+/// choicest tiles first — background firms fill what's left) AND after the
+/// recipe_registry is loaded from Lua, because the stop condition below reads
+/// real recipe outputs. `make_hard_coded_world` runs BEFORE the Lua economy
+/// layer loads (see app::setup_world / app::load_economy ordering, and the
+/// identical constraint the pre-game warm start documents in app.cpp) — so,
+/// unlike `generate_corporations`, this function is NOT called from inside
+/// `hard_coded_world.cpp`. Callers invoke it once `reg` is loaded, mirroring
+/// the pre-game-warm-start seam: `app::run` calls it right after
+/// `load_economy()`, before the warm-start ticks (so the warm start also seeds
+/// the new firms' opening balances); the headless `--serve` / blackboard-export
+/// paths in `main.cpp` call it right after their own `reg.load_from_lua`.
+///
+/// MEASURED stop condition (the load-bearing decision, not a fixed firm count):
+/// for each body carrying at least one population centre, spawns one firm at a
+/// time — extraction or processing, whichever the current biggest per-resource
+/// production/demand gap calls for — until aggregate real production (summed
+/// from every building's actual recipe/extraction output, generated firms
+/// included) reaches ~90% of aggregate demand (population + BL-340 background
+/// pull, the same clearing_fraction the deleted substrate model used) over the
+/// body's tradeable resource set, or a bound bites (max_firms_per_body /
+/// max_iterations) — logged, not crashed, if 90% is unreachable (e.g. a body
+/// missing the resource's deposit entirely).
+///
+/// Deterministic in @p seed (xor-offset from `generate_corporations`'
+/// seed_asset stream so the two passes cannot collide).
+///
+/// @param w   World already carrying generated nations, corporations, tiles,
+///            and markets (`generate_corporations` + market seeding must have
+///            already run).
+/// @param reg Loaded recipe registry — supplies recipe outputs, building
+///            economics, population_demand and background_demand tunables.
+/// @param seed Per-run RNG seed for deterministic, reproducible placement.
+/// @return    Entity ids of the background corporations created (possibly
+///            empty if every body is already at/above the clearing fraction,
+///            or no body qualifies).
+std::vector<entity_id> generate_background_firms(
+    world& w,
+    const recipe_registry& reg,
+    uint32_t seed);

@@ -358,7 +358,6 @@ enum counter : int
     c_ai_decisions,        ///< Ring occupancy (capped at 256 by construction).
     c_ai_decisions_total,  ///< Lifetime pushes — EXPECTED to climb; reported, not asserted.
     c_workforce_overrides,
-    c_nation_substrates,
     c_rep_buildings,       ///< Transient: economy_report.buildings.
     c_rep_agency_events,   ///< Transient: economy_report.agency_events.
     c_rep_purchases,       ///< Transient: economy_report.purchases.
@@ -394,7 +393,6 @@ const char* const k_counter_names[c_count] = {
     "world.ai_decisions.entries",
     "world.ai_decisions.total [informational]",
     "world.workforce_supply_overrides",
-    "world.nation_substrates",
     "economy_report.buildings [transient]",
     "economy_report.agency_events [transient]",
     "economy_report.purchases [transient]",
@@ -477,7 +475,6 @@ sample take_sample(int tick, const world& w, const economy_report& rep,
     s.v[c_ai_decisions]         = static_cast<long long>(w.ai_decisions.entries.size());
     s.v[c_ai_decisions_total]   = static_cast<long long>(w.ai_decisions.total);
     s.v[c_workforce_overrides]  = static_cast<long long>(w.workforce_supply_overrides.size());
-    s.v[c_nation_substrates]    = static_cast<long long>(w.nation_substrates.size());
 
     s.v[c_rep_buildings]      = static_cast<long long>(rep.buildings.size());
     s.v[c_rep_agency_events]  = static_cast<long long>(rep.agency_events.size());

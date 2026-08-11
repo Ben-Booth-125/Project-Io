@@ -35,6 +35,20 @@ struct corp_cash_flow
 /// @param w World; market demand arrays are mutated in place.
 void inject_population_demand(world& w, const recipe_registry& reg);
 
+/// Inject background-industrial demand into body markets (BL-340/BL-365). A
+/// world-scale pull for the mid-chain processing goods (silicon, refined_copper,
+/// ree_alloy, machinery, alloys, electronics — deliberately NOT
+/// spacecraft_components, whose only intended buyer is the militia's
+/// procurement contracts) — the offstage economy's own appetite for these
+/// goods, layered on top of whatever real background corporations produce and
+/// consume. Scaled per market by that market's body's total population scale
+/// (sum of every population centre's `scale` on the body), same price-elastic
+/// shape as inject_population_demand. Called from clear_markets alongside it,
+/// after the per-tick supply/demand reset. Deterministic — no RNG.
+///
+/// @param w World; market demand arrays are mutated in place.
+void inject_background_demand(world& w, const recipe_registry& reg);
+
 /// BL-263: if @p body carries no market yet, create one — the spontaneous
 /// market emergence trigger fires the tick a body's FIRST building completes
 /// (any corporation; investment, not presence). No-op if the body already has a

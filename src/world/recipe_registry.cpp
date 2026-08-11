@@ -119,23 +119,18 @@ void recipe_registry::load_from_lua(lua_state& lua)
         m_t_idle = thr->get_or("t_idle", 0.2f);
     }
 
-    // BL-078 elastic-substrate model (economy.substrate). Scalars fall back to the
-    // struct defaults (which mirror economy.lua) so a partial table still loads.
-    sol::optional<sol::table> substrate = (*econ)["substrate"];
-    if (substrate)
+    // BL-365 population-growth gate (economy.population_growth). Scalars fall
+    // back to the struct defaults so a partial table still loads. This is the
+    // surviving remnant of the old BL-078 substrate model (see growth_params).
+    sol::optional<sol::table> growth = (*econ)["population_growth"];
+    if (growth)
     {
-        substrate_params sp;
-        sol::optional<sol::table> basket = (*substrate)["demand_basket"];
+        growth_params gp;
+        sol::optional<sol::table> basket = (*growth)["demand_basket"];
         if (basket)
-            read_resource_map(*basket, sp.demand_basket, "economy.substrate.demand_basket");
-        sp.capacity_scale       = substrate->get_or("capacity_scale",       sp.capacity_scale);
-        sp.clearing_fraction    = substrate->get_or("clearing_fraction",    sp.clearing_fraction);
-        sp.demand_elasticity    = substrate->get_or("demand_elasticity",    sp.demand_elasticity);
-        sp.elasticity_min       = substrate->get_or("elasticity_min",       sp.elasticity_min);
-        sp.elasticity_max       = substrate->get_or("elasticity_max",       sp.elasticity_max);
-        sp.demand_scale         = substrate->get_or("demand_scale",         sp.demand_scale);
-        sp.growth_met_threshold = substrate->get_or("growth_met_threshold", sp.growth_met_threshold);
-        m_substrate = sp;
+            read_resource_map(*basket, gp.demand_basket, "economy.population_growth.demand_basket");
+        gp.growth_met_threshold = growth->get_or("growth_met_threshold", gp.growth_met_threshold);
+        m_growth = gp;
     }
 
     // BL-368 population-demand model (economy.population_demand). Scalars fall
@@ -152,6 +147,22 @@ void recipe_registry::load_from_lua(lua_state& lua)
         pd.elasticity_max    = pop_demand->get_or("elasticity_max",    pd.elasticity_max);
         pd.demand_scale      = pop_demand->get_or("demand_scale",      pd.demand_scale);
         m_population_demand = pd;
+    }
+
+    // BL-340/BL-365 background-industrial-demand model (economy.background_demand).
+    // Scalars fall back to the struct defaults so a partial table still loads.
+    sol::optional<sol::table> bg_demand = (*econ)["background_demand"];
+    if (bg_demand)
+    {
+        background_demand_params bd;
+        sol::optional<sol::table> bd_basket = (*bg_demand)["demand_basket"];
+        if (bd_basket)
+            read_resource_map(*bd_basket, bd.demand_basket, "economy.background_demand.demand_basket");
+        bd.demand_elasticity = bg_demand->get_or("demand_elasticity", bd.demand_elasticity);
+        bd.elasticity_min    = bg_demand->get_or("elasticity_min",    bd.elasticity_min);
+        bd.elasticity_max    = bg_demand->get_or("elasticity_max",    bd.elasticity_max);
+        bd.demand_scale      = bg_demand->get_or("demand_scale",      bd.demand_scale);
+        m_background_demand = bd;
     }
 
     // BL-263 spontaneous-market-emergence tunables (economy.market_emergence).

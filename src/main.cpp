@@ -3,6 +3,7 @@
 #include "world/budget_system.hpp"
 #include "world/corp_ai.hpp"
 #include "world/corp_command.hpp"
+#include "world/corporation_generation.hpp"
 #include "world/economy_system.hpp"
 #include "world/hard_coded_world.hpp"
 #include "world/market_clearing.hpp"
@@ -95,6 +96,9 @@ int run_serve(int ticks)
     for (auto& [id, b] : w.buildings)
         if (b.type == building_type::processing_facility && b.recipe == no_recipe)
             b.recipe = default_recipe;
+
+    // BL-365: real background corporations, generated now that reg is loaded.
+    generate_background_firms(w, reg, /*seed=*/0x8A21F00Du);
 
     int tick = 0;
     for (int t = 1; t <= ticks; ++t)
@@ -218,6 +222,9 @@ int run_blackboard_export(const std::string& which, const std::string& out_dir, 
     for (auto& [id, b] : w.buildings)
         if (b.type == building_type::processing_facility && b.recipe == no_recipe)
             b.recipe = default_recipe;
+
+    // BL-365: real background corporations, generated now that reg is loaded.
+    generate_background_firms(w, reg, /*seed=*/0x8A21F00Du);
 
     for (int t = 1; t <= ticks; ++t)
     {
