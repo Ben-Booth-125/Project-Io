@@ -32,6 +32,21 @@ resource_type resource_from_name(const std::string& name, bool& ok)
         { "bullion",              resource_type::bullion },
         { "trade_goods_misc",     resource_type::trade_goods_misc },
         { "propellant",           resource_type::propellant },
+        // BL-340 (2026-08-11): closes the minable-but-unsellable asymmetry
+        // (raws) and the processing-chain roster (new goods).
+        { "coal",                  resource_type::coal },
+        { "silica",                resource_type::silica },
+        { "copper_ore",            resource_type::copper_ore },
+        { "rare_earth_ore",        resource_type::rare_earth_ore },
+        { "iron_nickel_ore",       resource_type::iron_nickel_ore },
+        { "platinum_group_metals", resource_type::platinum_group_metals },
+        { "silicon",               resource_type::silicon },
+        { "refined_copper",        resource_type::refined_copper },
+        { "ree_alloy",             resource_type::ree_alloy },
+        { "machinery",             resource_type::machinery },
+        { "alloys",                resource_type::alloys },
+        { "electronics",           resource_type::electronics },
+        { "spacecraft_components", resource_type::spacecraft_components },
     };
 
     const auto it = table.find(name);

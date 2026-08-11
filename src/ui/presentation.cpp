@@ -63,6 +63,16 @@ constexpr resource_presentation resource_table[resource_count] = {
     // in its (corp, body) pool and the Launchpad burns it, so it reaches the
     // stockpile strips the moment a Chemical Plant runs.
     { "Propellant",        "Prop",IM_COL32(180, 220, 235, 255) }, // cryogenic pale blue
+    // --- Tier 2/3: processing chain roster (BL-340). Margin widens up the
+    // tiers, so hue saturates and warms from silicon through spacecraft
+    // components — the value gradient reads on the strip, not just in price.
+    { "Silicon",            "Si+", IM_COL32(210, 200, 170, 255) }, // pale refined sand
+    { "Refined Copper",     "Cu+", IM_COL32(224, 150,  80, 255) }, // brighter Okabe-Ito orange
+    { "REE Alloy",          "REE+",IM_COL32(210, 180, 245, 255) }, // brighter violet
+    { "Machinery",          "Mch", IM_COL32(170, 175, 190, 255) }, // cool machined steel
+    { "Alloys",             "Aly", IM_COL32(190, 160, 200, 255) }, // steel-violet blend
+    { "Electronics",        "Elc", IM_COL32(130, 200, 210, 255) }, // circuit teal
+    { "Spacecraft Components","S/C",IM_COL32(235, 210, 100, 255) }, // high-value gold
 };
 
 // Reserved corporation identity colours. Slot 0 is the player's corporation; the

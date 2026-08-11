@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*159 entries — 59 open, 100 resolved.*
+*159 entries — 58 open, 101 resolved.*
 
 ---
 
@@ -435,11 +435,6 @@ BL-112 R1 asserts 'the fillable gap is lucrative (best price >= 1.3x base)' and 
 *observation · raised 2026-08-10 · from BL-340 design pass, re-read against the BL-293 merge.*
 
 BL-107 (save-format magic + version header) is marked designed-but-BLOCKED on the grounds that 'no flat-binary serialiser exists in world/* yet'. That was true pre-merge. It is not now: history_log.{hpp,cpp} and order_book.{hpp,cpp} are two such streams, both already carrying the magic + version header BL-107 specifies and both citing BL-107 as their reason. BL-107's remaining scope is the WORLD-SNAPSHOT header, not the first-ever one, and its status line should say so. The knock-on for BL-340 reverses a conclusion reached earlier the same session: read_order_book rejects a resource byte outside the known resource_type range, so widening the enum now moves a validation boundary in shipped serialised state. Not a blocker, but the version bump is a real step rather than a hypothetical one.
-
-### NR-158 — PRODUCTION.md and recipes.lua disagree on the steel recipe
-*observation · raised 2026-08-10 · from BL-340 design pass, 2026-08-10.*
-
-PRODUCTION.md § Smelter states 'Iron ore + coal (reagent) -> Steel'. scripts/recipes.lua id 1 is { iron_ore = 2.0 } with no coal at all. One of the two is wrong and has been for some time. Worth reconciling inside BL-340, since that item prices coal for the first time and the admission rule it adopts (a resource must have a consumer) would otherwise argue against pricing coal at all. Recommendation recorded on the item: add the reagent to the recipe rather than correct the doc — coal then has a consumer, and the doc becomes true.
 
 ### NR-159 — v0.2.0 (the AI opponent) has now been deferred twice, both times in the same direction
 *observation · raised 2026-08-10 · from Sprint re-sequence, 2026-08-10.*
@@ -1937,6 +1932,13 @@ Three consequences that are not restatements of BL-094:
 3. 'FOR SPACE' RE-ANCHORS THE ERA LADDER. The militia's procurement target is space equipment, so the Era 0 -> Era 1 gate (ERAS.md: rocketry + launchpad + propellant) stops being a distant unlock and becomes the thing the player is buying toward from the start.
 
 **Why it matters.** v0.3.0 carries 22 open items — the largest single block on the board — and every one of them was specified against 'governing body'. BL-315 (governing-body conflict spine) is design-owed and names the superseded framing in its own title. Planning five sprints without settling this would sequence work against an actor that no longer exists.
+
+### NR-158 — PRODUCTION.md and recipes.lua disagree on the steel recipe
+*observation · raised 2026-08-10 · from BL-340 design pass, 2026-08-10.*
+
+PRODUCTION.md § Smelter states 'Iron ore + coal (reagent) -> Steel'. scripts/recipes.lua id 1 is { iron_ore = 2.0 } with no coal at all. One of the two is wrong and has been for some time. Worth reconciling inside BL-340, since that item prices coal for the first time and the admission rule it adopts (a resource must have a consumer) would otherwise argue against pricing coal at all. Recommendation recorded on the item: add the reagent to the recipe rather than correct the doc — coal then has a consumer, and the doc becomes true.
+
+> **RESOLVED.** FIXED (BL-340, 2026-08-11): scripts/recipes.lua id 0 now consumes iron_ore 2.0 + coal 1.0, matching PRODUCTION.md's Smelter table. Coal priced in world_gen.lua (base_price 2.0), giving it a consumer per BL-340's admission rule rather than leaving it an orphan raw.
 
 ### NR-160 — Do background firms run the full corp_ai scored-utility layer, or a reduced produce/sell model?
 *question · raised 2026-08-10 · from BL-365 design draft — its dominant open question.*

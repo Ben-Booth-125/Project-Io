@@ -56,6 +56,17 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\econ_stability.cpp ^
    /Fo:build_gen\verify\econ_stability\ /Fe:build_gen\verify\econ_stability.exe
 .\build_gen\verify\econ_stability.exe
 
+:: Resource-chain roster (BL-340) — every one of the seven new goods (silicon,
+:: refined_copper, ree_alloy, machinery, alloys, electronics,
+:: spacecraft_components) is produced (a building's output_quantity > 0 at
+:: least once) and priced off the 4x band ceiling, over an 80-tick rollout on
+:: a hand-built three-extractor + seven-processor chain.
+cl /nologo /std:c++20 /EHsc /I src tools\verify\resource_chain_harness.cpp ^
+   src\world\world.cpp src\world\economy_system.cpp ^
+   src\world\market_clearing.cpp src\world\budget_system.cpp ^
+   /Fo:build_gen\verify\resource_chain_harness\ /Fe:build_gen\verify\resource_chain_harness.exe
+.\build_gen\verify\resource_chain_harness.exe
+
 :: World audit — Kepler biome balance (S2) + extraction placement (S1) +
 :: deposit-reserve seeding (resource_remaining = richness x reserve factor).
 cl /nologo /std:c++20 /EHsc /I src tools\verify\world_audit.cpp ^

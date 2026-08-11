@@ -203,7 +203,11 @@ out there.
 
 Refined goods are the primary goods in inter-body trade during the early game.
 
-> Of this table only **steel, refined fuel, and food rations** exist in `resource_type`; silicon, refined copper, REE alloy, and liquid oxygen are unmodelled design targets (marked 2026-07-31).
+> **Steel, refined fuel, food rations, silicon, refined copper and REE alloy** exist in
+> `resource_type` (silicon/refined copper/REE alloy landed 2026-08-11, BL-340). Liquid oxygen
+> stays an unmodelled design target — it is folded into the Chemical Plant's two propellant
+> recipes (BL-308) rather than given its own enum value, since nothing outside the plant would
+> ever hold it.
 
 | Resource | Primary inputs | Processing building |
 |----------|---------------|---------------------|
@@ -221,7 +225,9 @@ Refined goods are the primary goods in inter-body trade during the early game.
 
 Products are the highest-value goods and the primary driver of market price divergence. Most require multiple refined-good inputs.
 
-> **None** of this table exists in `resource_type` — the whole tier is an unmodelled design target (marked 2026-07-31).
+> **Machinery, alloys, electronics and spacecraft components** exist in `resource_type`
+> (landed 2026-08-11, BL-340); **propellant** already existed (BL-308). The whole tier is
+> modelled — the "unmodelled design target" banner is retired.
 
 | Resource | Primary inputs | Processing building |
 |----------|---------------|---------------------|
@@ -267,30 +273,31 @@ The full resource list above is the design target. For the prototype (Layers 3�
 | Refined fuel | 2 | — | from Petroleum |
 | Food rations | 2 | — | from Agricultural produce |
 
-The `resource_type` enum (`src/world/components.hpp`) holds **32 values** as of BL-308
-(2026-08-09; 31 after BL-286, 23 before it) — not the full design list above. The thirty-second is
-**propellant**, the good a Launchpad burns per space-mode launch: made in a Chemical Plant by
-either the Era 0 atmosphere route or the Era 1 water-electrolysis route, and deliberately **not**
-priced in `kepler_base_price` (it is produced and burned inside a corp's own pool, not traded).
-See `docs/economy/PRODUCTION.md` § Chemical Plant / § Launchpad. Adding a resource changes
+The `resource_type` enum (`src/world/components.hpp`) holds **39 values** as of BL-340
+(2026-08-11; 32 after BL-308, 31 after BL-286, 23 before it). The seven added by BL-340 are the
+processing-chain roster — silicon, refined copper, REE alloy, machinery, alloys, electronics,
+spacecraft components — closing the Tier 2/3 tables above bar liquid oxygen (folded into the
+Chemical Plant's recipes, no enum value of its own by design) and the deferred habitability
+goods. See `docs/economy/PRODUCTION.md` § Chemical Plant / § Launchpad for propellant, and this
+file's Tier 2/3 tables above for the BL-340 roster's recipes. Adding a resource changes
 `resource_count` and with it the width of every serialised `std::array<float, resource_count>` —
 tile deposits and reserves, market supply/demand/price/base-price, stockpiles, nation abundance
 and substrate capacity. **Extending the enum IS a save-format retrofit**, but every one of those
-arrays is already sized off `resource_count` rather than a hardcoded width, so BL-286's eight-good
-extension (§ Logistics goods above) needed no manual per-array edit — only the enum + the Kepler
-base-price authoring. The Tier 2/3 refined goods, habitability goods, and most Tier 3 products
-above still have no enum value; they cannot be held, priced, or traded until a future retrofit
-adds them.
+arrays is already sized off `resource_count` rather than a hardcoded width, so both BL-286's and
+BL-340's extensions needed no manual per-array edit — only the enum + base-price/recipe authoring.
+Habitability goods still have no enum value; they cannot be held, priced, or traded until BL-368
+lands.
 
 The full design list including ambient and habitability goods is approximately **35–40 entries**
-— a design target. The shipped count is 32 (23 pre-BL-286 + 8 logistics goods + propellant),
-frozen for the prototype pending further items.
+— a design target now substantially covered. The shipped count is 39 (23 pre-BL-286 + 8 logistics
+goods + propellant + 7 processing-chain roster), frozen for the prototype pending BL-368's
+habitability tranche.
 
 ---
 
-## What actually trades (recorded 2026-07-31; updated 2026-08-04 for BL-286)
+## What actually trades (recorded 2026-07-31; updated 2026-08-11 for BL-340)
 
-The load-bearing fact for any market work: of the 32 enum values, only a fraction carry a
+The load-bearing fact for any market work: of the 39 enum values, only a fraction carry a
 non-zero `base_price`, and `resolve_price` / the clearing pass ignore everything else
 (`docs/economy/MARKETS.md`). The tradeable set is:
 
@@ -305,13 +312,17 @@ non-zero `base_price`, and `resolve_price` / the clearing pass ignore everything
   **distance-derived** per-market base prices: `1.5 × (1 + 7.0 × normalised distance to the
   nearest source)` (§ Mercantile below). Only the 2–3 goods the world's biosphere actually
   evolved get priced.
+- **Six raws, newly priced (BL-340)**: coal 2.0, silica 2.0, copper ore 3.0, rare earth ore 6.0,
+  iron-nickel ore 3.0, platinum-group metals 40.0 — closing the minable-but-unsellable asymmetry
+  below.
+- **Seven processing-chain goods (BL-340)**: silicon 5.0, refined copper 7.5, REE alloy 16.0,
+  machinery 22.0, alloys 34.0, electronics 29.0, spacecraft components 140.0 — a deliberately
+  widening margin ladder up the tiers (spacecraft components sits 56× iron ore).
 
-Everything else — including every BL-040 (full-set deposit authoring) raw: coal, silica,
-copper ore, rare-earth ore, iron-nickel ore, platinum-group metals — has `base_price` 0 and is
-**never traded**. Note the asymmetry: the BL-040 raws have authored tile deposits, so they are
-**minable but unsellable** — an extraction site can dig coal into a pool that no market will
-ever clear. Pricing them is part of the owed market-rework family (BL-130, real market
-inventory, and kin — MARKETS.md § Owed follow-ons).
+Everything else has `base_price` 0 and is **never traded** — this no longer includes any BL-040
+(full-set deposit authoring) raw; all six are priced above. Pricing the remainder (habitability
+goods, most logistics goods) is part of the owed market-rework family (BL-130, real market
+inventory, BL-368, and kin — MARKETS.md § Owed follow-ons).
 
 Water is in this tradeable set from tick 0: it carries an authored base price on the home-body
 markets and sits in the substrate demand basket (`scripts/economy.lua`, weight 0.40).

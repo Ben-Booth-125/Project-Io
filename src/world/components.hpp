@@ -89,7 +89,23 @@ enum class resource_type : uint8_t
     // moment saves exist: from then on, a new resource_type value is a
     // save-format break and needs a version bump + migration.
     propellant            = 31, ///< Launch propellant; consumed per space-mode convoy dispatch.
-    count                 = 32
+    // --- Tier 2/3: processing chain roster (BL-340, 2026-08-11) ---
+    //
+    // Closes the minable-but-unsellable asymmetry on silica/copper_ore/
+    // rare_earth_ore (base_price 0 before this) and gives the militia's
+    // procurement contracts (BL-350) a terminal good to buy. Admission rule
+    // applied (PRODUCTION.md / this item's design): every value here is
+    // consumed by an authored recipe, or is a terminal object a named actor
+    // contracts for. No orphans — see BL-286 for the cautionary precedent.
+    silicon                = 32, ///< Refined from silica. Refinery.
+    refined_copper         = 33, ///< Refined from copper ore. Smelter.
+    ree_alloy              = 34, ///< Refined from rare earth ore. Refinery.
+    machinery              = 35, ///< Steel + refined copper. Fabricator. Alloys' alternative path.
+    alloys                 = 36, ///< Steel + REE alloy. Fabricator.
+    electronics            = 37, ///< Silicon + refined copper + REE alloy. Electronics Lab.
+    spacecraft_components  = 38, ///< Alloys + electronics. Assembly Plant. Terminal — the militia's
+                                 ///< procurement contract object (BL-350); no background demand.
+    count                  = 39
 };
 
 static constexpr std::size_t resource_count = static_cast<std::size_t>(resource_type::count);

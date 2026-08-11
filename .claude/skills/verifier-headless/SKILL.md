@@ -37,6 +37,12 @@ in `tools/verify/README.md`.
   survives a loaded machine. Reading the sweep: the exponent sitting above 1.0 is
   `run_corp_strategic_step`'s O(corps × tiles) candidate scan (BL-253), not a
   regression.
+- **`resource_chain_harness`** — the processing-chain roster (BL-340): a hand-built
+  three-extractor (silica/copper_ore/rare_earth_ore) + seven-processor chain run
+  80 ticks, asserting every one of the seven new goods (silicon, refined_copper,
+  ree_alloy, machinery, alloys, electronics, spacecraft_components) is produced
+  at least once and never sits pegged at the `[0.25×, 4×]` band ceiling for the
+  whole run. Links the same TUs as `econ_harness`.
 - **`data_creep_harness`** — data-creep instrument (BL-251, v0.1.0 quality audit).
   Runs the **real** generated world (`make_hard_coded_world`) for 1500 ticks, sampling
   ~30 counters (entities, every component store, pools, markets, convoys, trade routes,

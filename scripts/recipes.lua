@@ -12,12 +12,14 @@
 -- Magnitudes are legible round defaults, iterated by playtest (PRODUCTION.md).
 
 recipes = {
-    -- id 0 — Smelter: iron ore -> steel.
-    -- (The full design adds coal as a reagent; coal is outside the seven-resource
-    --  prototype subset, so the L3 recipe is the single-input form.)
+    -- id 0 — Smelter: iron ore + coal (reagent) -> steel. Coal joined the
+    -- priced set at BL-340 (world_gen.lua's base_price), closing the gap
+    -- between this recipe and PRODUCTION.md's Smelter table, which always
+    -- named coal as a reagent — and giving coal a consumer, per the
+    -- admission rule (BL-340) rather than leaving it an orphan raw.
     {
         name    = "steel",
-        inputs  = { iron_ore = 2.0 },
+        inputs  = { iron_ore = 2.0, coal = 1.0 },
         outputs = { steel = 1.0 },
     },
 
@@ -84,6 +86,66 @@ recipes = {
         name    = "propellant_electrolysis",
         inputs  = { water = 3.0, refined_fuel = 1.0 },
         outputs = { propellant = 1.0 },
+    },
+
+    -- BL-340 (2026-08-11) — the processing-chain roster. Every value here
+    -- passes the admission rule (PRODUCTION.md / this item): consumed by an
+    -- authored recipe below, or terminal (spacecraft_components — the
+    -- militia's procurement contract object, BL-350; no background demand).
+    -- Building types stay recipes on the generic processing_facility, per
+    -- the shipped five — no new building_type enum values.
+
+    -- id 7 — Refinery: silica -> silicon.
+    {
+        name    = "silicon",
+        inputs  = { silica = 2.0 },
+        outputs = { silicon = 1.0 },
+    },
+
+    -- id 8 — Smelter: copper ore -> refined copper.
+    {
+        name    = "refined_copper",
+        inputs  = { copper_ore = 2.0 },
+        outputs = { refined_copper = 1.0 },
+    },
+
+    -- id 9 — Refinery: rare earth ore -> REE alloy.
+    {
+        name    = "ree_alloy",
+        inputs  = { rare_earth_ore = 2.0 },
+        outputs = { ree_alloy = 1.0 },
+    },
+
+    -- id 10 — Fabricator: steel + refined copper -> machinery. The
+    -- Fabricator's alternative path to alloys (id 11) — a real choice
+    -- between the two rather than a forced chain.
+    {
+        name    = "machinery",
+        inputs  = { steel = 1.0, refined_copper = 1.0 },
+        outputs = { machinery = 1.0 },
+    },
+
+    -- id 11 — Fabricator: steel + REE alloy -> alloys.
+    {
+        name    = "alloys",
+        inputs  = { steel = 1.0, ree_alloy = 1.0 },
+        outputs = { alloys = 1.0 },
+    },
+
+    -- id 12 — Electronics Lab: silicon + refined copper + REE alloy -> electronics.
+    {
+        name    = "electronics",
+        inputs  = { silicon = 1.0, refined_copper = 1.0, ree_alloy = 0.5 },
+        outputs = { electronics = 1.0 },
+    },
+
+    -- id 13 — Assembly Plant: alloys + electronics -> spacecraft components.
+    -- Terminal good; BL-365 gives it deliberately NO background demand so
+    -- the militia's BL-350 contracts are its only buyer.
+    {
+        name    = "spacecraft_components",
+        inputs  = { alloys = 2.0, electronics = 1.0 },
+        outputs = { spacecraft_components = 1.0 },
     },
 }
 

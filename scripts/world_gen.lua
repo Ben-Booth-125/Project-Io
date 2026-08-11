@@ -25,6 +25,29 @@ world_gen = {
             steel                 = 8.0,
             refined_fuel          = 10.0,
             food_rations          = 6.0,
+
+            -- BL-340: closing the minable-but-unsellable asymmetry. These
+            -- raws had authored deposits (BL-040) but no base price, so a
+            -- processing building drawing on them stalled forever.
+            coal                  = 2.0,  -- also the steel reagent, see recipes.lua
+            silica                = 2.0,
+            copper_ore            = 3.0,
+            rare_earth_ore        = 6.0,  -- low concentration, high base price
+            iron_nickel_ore       = 3.0,
+            platinum_group_metals = 40.0, -- terminal: the belt's high-value trade good
+
+            -- BL-340: the processing-chain roster. Margin widens up the
+            -- tiers (Tier 3 promises "widest price divergence" per
+            -- RESOURCES.md) — spacecraft_components sits 56x iron ore,
+            -- the value gradient the space-equipment premise rests on.
+            -- First-cut authored constants; retune by playtest.
+            silicon                = 5.0,
+            refined_copper         = 7.5,
+            ree_alloy              = 16.0,
+            machinery              = 22.0,
+            alloys                 = 34.0,
+            electronics            = 29.0,
+            spacecraft_components  = 140.0,
         },
 
         -- Nation tradeable-resource concentration gates (BL-096): a nation

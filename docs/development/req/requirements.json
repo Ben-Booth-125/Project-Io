@@ -10112,6 +10112,54 @@
    "resolved": "2026-08-11",
    "evaluated_difficulty": 3,
    "resolution": "Complete. rank_extraction_sites() (src/world/corp_ai.cpp) hoists the O(tiles) survey/richness/affinity scan out of the per-corp loop in run_corp_strategic_step, computed once per tick and read by every due corp; only the per-corp can_place_in_world filter (tech gate, logistics reach) and scoring still run per corp, over the already-truncated top-M list. Verified behaviour-preserving by stash-and-diff against unmodified main: ai_skill_harness's 5-seed/300-tick benchmark produces numerically identical net_worth curves and action-verb counts on both sides, including its pre-existing golden-band failures (seeds 1-4 'net-worth final' fail identically on both sides - tracked by NR-140, not caused or worsened by this item; not re-blessed here since it is out of this item's scope). econ_stability's BL-250 scaling sweep is the direct measurement: exponent 1.28 -> 1.18, worst 2x-size-step growth 3.17x -> 3.01x, all six harnesses/build targets green. BL-365 (background industry, ~80 corps) is now unblocked."
+  },
+  {
+   "brief": "processing-chain-roster",
+   "title": "BL-340 (processing chain roster): seven new resource_type values with market, price and serialisation wiring",
+   "difficulty": 4,
+   "importance": "B",
+   "status": "complete",
+   "promoted_from": "backlog.json BL-340, v0.1.14 (Sprint 11)",
+   "rows": [
+    {
+     "id": "R0",
+     "requirement": "ITEM-SPANNING. Seven new resource_type values (silicon, refined_copper, ree_alloy, machinery, alloys, electronics, spacecraft_components) exist, are priced, and are producible through an authored recipe chain, closing the minable-but-unsellable asymmetry on silica/copper_ore/rare_earth_ore (base_price 0 before this). No orphans: every value is consumed by a recipe or is terminal (spacecraft_components — BL-350's contract object).",
+     "class": "headless",
+     "status": "complete",
+     "notes": "resource_chain_harness (new): all 7 goods produced (a building output_quantity > 0 at least once) and none pegged at the 4x band ceiling for the whole 80-tick run. 14/14 PASS."
+    },
+    {
+     "id": "R1",
+     "requirement": "The enum extension (32 -> 39) is additive only: every per-resource array is sized off resource_count with no fixed-width array anywhere in src/world/, so widening it needed no per-array edit.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "components.hpp enum append only; order_book.cpp's range check (uint8_t < resource_type::count) is symbolic and needed no edit. Confirmed by determinism_harness and order_book_harness staying green."
+    },
+    {
+     "id": "R2",
+     "requirement": "The steel recipe (id 0) is corrected to consume iron_ore + coal, matching PRODUCTION.md's Smelter table (closing NR-158) and giving coal a priced consumer per the admission rule.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "scripts/recipes.lua id 0. econ_harness/econ_stability/construction_harness/world_audit/ai_skill_harness all rerun after the change: all green, ai_skill_harness bit-identical to its pre-change baseline (the change is never exercised in that benchmark's 300-tick window on the seeded generated world)."
+    },
+    {
+     "id": "R3",
+     "requirement": "Existing headless harnesses and the real ProjectIo target stay green after the enum/recipe/pricing change: determinism, order-book, world-audit, construction, econ arithmetic and stability.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "econ_harness, econ_stability, construction_harness, world_audit, determinism_harness, order_book_harness: 0 failures each. ProjectIo builds clean."
+    },
+    {
+     "id": "R4",
+     "requirement": "The seven new resources have UI presentation (name, short label, colour) rather than falling through to the unauthored placeholder, and the docs reflect what now exists in resource_type.",
+     "class": "review",
+     "status": "complete",
+     "notes": "src/ui/presentation.cpp resource_table gains 7 authored rows (exact count match against the new resource_count = 39, verified by grep). docs/economy/RESOURCES.md Tier 2/3 banners and enum-count prose updated; docs/economy/PRODUCTION.md NR-158 note resolved."
+    }
+   ],
+   "resolved": "2026-08-11",
+   "evaluated_difficulty": 4,
+   "resolution": "Complete. Seven new resource_type values (silicon, refined_copper, ree_alloy, machinery, alloys, electronics, spacecraft_components) land with base prices (world_gen.lua), recipes (recipes.lua ids 7-13), UI presentation (presentation.cpp) and doc updates (RESOURCES.md, PRODUCTION.md). Six pre-existing raws (coal, silica, copper_ore, rare_earth_ore, iron_nickel_ore, platinum_group_metals) gain base prices, closing the minable-but-unsellable asymmetry the design's own measurement identified as the real cost centre — the enum extension itself was free (every array already sizes off resource_count). Steel's recipe gains a coal reagent, closing NR-158. New resource_chain_harness (14 assertions) verifies the full chain produces and prices correctly; six pre-existing harnesses plus the real build confirmed no regression, with ai_skill_harness's 300-tick benchmark measured bit-identical to its pre-change baseline. Background demand for the roster is explicitly BL-365's responsibility, not built here, per the 2026-08-10 sequencing call."
   }
  ]
 }
