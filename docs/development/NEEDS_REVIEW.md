@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*158 entries — 60 open, 98 resolved.*
+*158 entries — 59 open, 99 resolved.*
 
 ---
 
@@ -445,11 +445,6 @@ PRODUCTION.md § Smelter states 'Iron ore + coal (reagent) -> Steel'. scripts/re
 *observation · raised 2026-08-10 · from Sprint re-sequence, 2026-08-10.*
 
 First deferral: the 2026-08-10 five-sprint plan held v0.2.0 so the opponent would be built against a settled player identity. Second: the living world was inserted ahead of it the same day, pushing it from Sprint 13 to Sprint 14. Each deferral has an argument — and the second one is genuinely good, since an opponent is more interesting in a market with real competitors than one with eight lean corps. But two deferrals in one day, both pointing away from the thing the roadmap itself calls 'the thing that makes Io a game rather than a simulation', is a pattern rather than a coincidence. Named here so the v0.1.13 retro examines it deliberately instead of a third accumulating silently.
-
-### NR-160 — Do background firms run the full corp_ai scored-utility layer, or a reduced produce/sell model?
-*question · raised 2026-08-10 · from BL-365 design draft — its dominant open question.*
-
-BL-365 multiplies corp count by roughly an order of magnitude. corp_ai's per-corp evaluation is what BL-253 identifies as an O(corps x tiles) tile rescan, and the econ tick already costs ~3.5 ms on the real generated world with eight corps — with pre_game_ticks now 80, that runs before the first frame of every new game. Running the full scored-utility layer for ~80 corps may be unaffordable even with BL-253 fixed. The likely answer is a reduced per-tick model for background firms (produce, sell, maintain; no build/demolish scoring) with corp_ai reserved for the handful of RIVAL corps that actually contest the player — but that introduces a two-tier actor model, which is a design commitment in its own right and should be Ben's call rather than a build-time expedient.
 
 ---
 
@@ -1942,4 +1937,11 @@ Three consequences that are not restatements of BL-094:
 3. 'FOR SPACE' RE-ANCHORS THE ERA LADDER. The militia's procurement target is space equipment, so the Era 0 -> Era 1 gate (ERAS.md: rocketry + launchpad + propellant) stops being a distant unlock and becomes the thing the player is buying toward from the start.
 
 **Why it matters.** v0.3.0 carries 22 open items — the largest single block on the board — and every one of them was specified against 'governing body'. BL-315 (governing-body conflict spine) is design-owed and names the superseded framing in its own title. Planning five sprints without settling this would sequence work against an actor that no longer exists.
+
+### NR-160 — Do background firms run the full corp_ai scored-utility layer, or a reduced produce/sell model?
+*question · raised 2026-08-10 · from BL-365 design draft — its dominant open question.*
+
+BL-365 multiplies corp count by roughly an order of magnitude. corp_ai's per-corp evaluation is what BL-253 identifies as an O(corps x tiles) tile rescan, and the econ tick already costs ~3.5 ms on the real generated world with eight corps — with pre_game_ticks now 80, that runs before the first frame of every new game. Running the full scored-utility layer for ~80 corps may be unaffordable even with BL-253 fixed. The likely answer is a reduced per-tick model for background firms (produce, sell, maintain; no build/demolish scoring) with corp_ai reserved for the handful of RIVAL corps that actually contest the player — but that introduces a two-tier actor model, which is a design commitment in its own right and should be Ben's call rather than a build-time expedient.
+
+> **RESOLVED.** FULL CORP_AI FOR ALL BACKGROUND FIRMS (Ben, 2026-08-11) — not the reduced produce/sell/maintain model recommended. All ~80 background firms run the same scored-utility layer as rival corps; no two-tier actor model. Consequence: the perf risk this entry raised is now load-bearing rather than hedged — BL-253 (the O(corps x tiles) scan fix) becomes a hard prerequisite for BL-365, not a nicety, matching its re-goal to A/v0.1.13. BL-365's design field carries the update.
 

@@ -20,6 +20,14 @@ Only Era 0 and Era 1 are designed for the prototype. Later eras are stubbed.
 **Territory:** home planet and bodies of equivalent class (rocky, habitable, or near-habitable planets).  
 **Strategic question:** build an industrial base capable of funding and supplying the first space operation.
 
+> **The warm start has no calendar meaning (BL-369, 2026-08-11).** `app::start_new_game` runs
+> `pre_game_ticks` (80, ~20 years) before play begins, then rebases the clock — so play always
+> opens at epoch 1960 regardless of how many warm-start ticks ran. This is a settling pass that
+> produces a plausible opening position, not a simulated 1940→1960 history; the world is
+> generated *at* 1960 state and ticked forward to reach a steady economy, not generated at an
+> earlier date and advanced. Revisit only if the opening year becomes player-visible or
+> configurable (see `docs/ui/STARTUP.md`'s New World wizard).
+
 ### Character
 
 The opening economy is heavy industry: iron ore, coal, petroleum, and the products derived from them. Corporations operate globally but the solar system is a project, not yet an industry. The player competes for terrestrial resources and market position while working toward the economic threshold required for space access.
