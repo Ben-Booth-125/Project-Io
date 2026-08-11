@@ -301,6 +301,41 @@ order flipped.
 the joint design pass has reduced that, and its remaining risk is pricing calibration rather than
 shape.
 
+### Retro (2026-08-11) — all three landed, all three complete
+
+All three items shipped in build order — BL-340 first (least architecturally risky), then BL-332,
+then BL-350 (the largest, most integration-sensitive) — each independently verified and committed
+before the next started, per the file collision map: all three touch `components.hpp` and
+`recipe_registry.{hpp,cpp}`, so sequencing rather than parallel worktree agents kept the shared
+headers single-writer.
+
+**What actually shipped.**
+
+- **BL-340** — seven new `resource_type` values (32 → 39) plus six newly-priced raws, closing the
+  minable-but-unsellable asymmetry the item's own measurement found. New `resource_chain_harness`.
+- **BL-332** — a `research_institute` building_type (7 → 8) and two corp-level accumulators
+  (`military_points`, `science`), passive and symmetric across every corp. New
+  `military_capability_harness`. Production side only — no spend mechanism, no `corp_ai` build
+  candidate, both named as follow-on scope rather than built.
+- **BL-350** — three new `corp_verbs` on the shared command seam, a fourth flat-binary stream
+  (`procurement.{hpp,cpp}`, magic `IOPC`), and BL-342's `condition_set` reaching a real consumer
+  (the embargo decline) for the first time. New `procurement_harness`. One named simplification:
+  fixed-schedule contract pacing rather than BL-095's market-gated stretch/pause rate.
+
+**Verification shape, held across all three.** Every item: (1) built and ran clean against the
+real `ProjectIo` target; (2) reran every existing harness whose linked TUs it touched, with zero
+new failures; (3) added its own dedicated new harness rather than folding assertions into an
+existing one. `ai_skill_harness`'s five pre-existing golden-band failures (NR-140) were checked
+bit-identical before/after each landing — none of the three moved them, confirmed rather than
+assumed by stash-and-rerun where the change plausibly could have (BL-340's steel/coal recipe fix).
+
+**What was deliberately not built**, named per Rule 0c rather than silently dropped: BL-332's
+spend mechanism (BL-087's constellation is the intended sink) and its `corp_ai` build candidate;
+BL-350's own richer pacing model and its `corp_ai` candidate — the seam is buyer-agnostic and
+player-reachable today, an AI user is a follow-on. BL-365 (Sprint 10's keystone, still only
+`designed`) still owns background demand for BL-340's roster and remains the item that would
+actually exercise BL-350's "another supplier may still quote" premise at scale.
+
 ## Sprint 12 — v0.1.11 reconciled (cut v0.1.11)
 
 **Goal.** The fattest open minor, built against the actor Sprint 8 defined rather than the one it
