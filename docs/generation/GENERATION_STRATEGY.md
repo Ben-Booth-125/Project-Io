@@ -48,20 +48,29 @@ six-pass core stays fixed and every extension lands as a **sibling pass** readin
 
 The campaign opens on a **saturated, earth-like economy**. The home world's broad industrial
 base — the bulk of ordinary extraction, processing, and manufacture — is **owned and run by
-the Nation AI as background**. It is not the player's playing field and is not surfaced as
-manageable detail; it is the saturated substrate the contest happens *on top of*.
+real background corporations** (BL-365, 2026-08-11), not a nation actor. It is not the player's
+playing field and is not surfaced as manageable detail on any per-firm basis; it is the saturated
+background the contest happens *on top of*.
 
-**Refined into two faces (BL-078, 2026-07-07).** The substrate is *redefined, not removed*.
-Its **demand face** is population — a price-elastic per-capita basket (so every product has a
-real referent and price *discovers* rather than clamping) with minimal met-supply-keyed growth.
-Its **supply face** is the nation's abstract production capacity, which tracks that demand and
-clears it only *partially*, leaving a **live margin** — the saturation cushion where the nation
-has the capacity, and a wide **opportunity gap** where it lacks the deposit (price pegs high;
-the gap the player fills). The markets those faces feed are **resource-carved (BL-096)**: a
-nation's territory fractures into more markets where its tradeable-resource concentration is
-high and folds into a neighbour where it is barren, with nations as the carving actor. Together
-these keep the premise (a saturated base the player competes *on top of*) while making it a
-legible, fillable opportunity surface rather than an inert price floor.
+**Real firms, calibrated count, not an injected substrate (BL-365, superseding BL-050/BL-078,
+2026-08-11).** Earlier designs modelled this background as an abstract *substrate*: a per-capita
+demand basket plus a nation-level abstract supply capacity, injected straight into market arrays
+each tick by `inject_substrate_demand`, with no building behind either side. That mechanism is
+gone. Background industry is now **generated corporations** — `corporation_component.is_background
+= true` — with real buildings that actually produce and consume through the ordinary economy tick.
+Generation is **calibrated, not authored**: firms are placed until real production reaches ~90% of
+real demand for the tradeable resource set (`docs/economy/MARKETS.md` § Background corporations),
+the same figure BL-078's `clearing_fraction` used, now **emergent** rather than **injected**. This
+is a **corporation**, not a nation, actor deliberately — `.claude/rules/io-standing-rules.md`
+sanctions a scored-utility strategy layer for background *corporations* but forbids nation-level
+strategic behaviour, so filling the world with nation-owned industry would need the one actor class
+the standing rules forbid. Background firms run the **full corp_ai scored-utility layer**, identical
+to today's ~8 rival corps, not a cheaper reduced model (Ben, 2026-08-11). The markets they feed stay
+**resource-carved (BL-096)**: a nation's territory fractures into more markets where its
+tradeable-resource concentration is high and folds into a neighbour where it is barren, with
+nations still the carving actor even though they no longer own the industry. Together these keep
+the premise (a saturated base the player competes *on top of*) while making it a legible, fillable
+opportunity surface rather than an inert price floor.
 
 **Corporations are specialists, not full-chain industrialists.** The player and the major AI
 rivals each occupy a **focused slice** of the resource chain and are differentiated by a single
@@ -117,10 +126,15 @@ input to the staged-generation Tile Ledger ([[BL-100]]) as a tuning surface.
 - **Tiles** establish the physical reality: terrain, hazard, habitability, and resource
   deposits. Nothing downstream contradicts tile data — nations and corporations are *placed
   onto* it.
-- **Nations** draw territory over the tiles and carry the broad industrial base (the premise
-  above). A nation's `economic_focus` biases which corporations register there.
+- **Nations** draw territory over the tiles. A nation's `economic_focus` biases which
+  corporations register there; carving resource-carved markets (BL-096) stays a nation-level
+  act even though the broad industrial base itself is now firm-owned (below).
 - **Corporations** are placed within their home nation's territory as **specialists**: a lean,
-  focus-coherent set of holdings clustered in the nation (see `CORPORATION_GENERATION.md`).
+  focus-coherent set of holdings clustered in the nation (see `CORPORATION_GENERATION.md`). A
+  later, separate generation pass places **background** corporations that carry the broad
+  industrial base the premise above describes (BL-365, `CORPORATION_GENERATION.md` § Pass 6) —
+  the specialist premise for the player and named rivals is unchanged; only who fills in the
+  rest of the economy changed, from an abstract substrate to real background firms.
 
 ---
 
@@ -208,10 +222,12 @@ owning doc's § Open items.
 - **Post-WW2 industrial grounding.** The focus→asset-mix patterns should be grounded in research
   on the post-WW2 industries that led to space-related capability, so a specialist's holdings
   read as a plausible pathway toward off-world reach rather than an arbitrary mix.
-- **Generating the saturated substrate — closed 2026-07-04.** The economic premise (above) says
-  the Nation AI owns the broad background industry; this is no longer just described, it is
-  **generated** (BL-050, shipped 2026-06-17 — a per-tile industry/productivity field that consumes
-  shared tile building-slots + resources, aggregated into the per-body markets on both supply and
-  demand, player-displaceable) and now **rendered** as the Industry map-lens (BL-084, shipped
-  2026-07-04; see `docs/ui/LENSES.md`). **[B4]** is closed; residual sub-design (if any surfaces)
-  moves to a fresh item rather than reopening this one.
+- **Generating the saturated background — closed 2026-07-04, mechanism superseded 2026-08-11.**
+  The economic premise (above) says the broad background industry is generated, not authored; this
+  was originally **[B4]** (BL-050, shipped 2026-06-17 — a per-tile industry/productivity field
+  aggregated into per-body markets) and rendered as the Industry map-lens (BL-084, shipped
+  2026-07-04; see `docs/ui/LENSES.md`). **BL-050's and BL-078's substrate mechanism is itself
+  superseded by BL-365** (2026-08-11): the background is now real generated corporations, not a
+  per-tile field or an injected nation capacity — see § The economic premise above and
+  `docs/economy/MARKETS.md` § Background corporations. The Industry lens's rendering job is
+  unaffected; what changed is what it renders the aggregate of.
