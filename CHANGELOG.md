@@ -6,9 +6,9 @@ All notable changes to Project Io are recorded here. The format follows
 the prototype is in flux).
 
 Each released version corresponds to an annotated git tag (`vX.Y.Z`) — the tag is the
-authoritative version-history record. A local-only snapshot of `src/` is also kept under
-`backups/vX.Y.Z/` as a convenience rollback point (gitignored, not the record). See
-`docs/development/DEVELOPMENT_PRACTICES.md` § Cutting a release.
+authoritative version-history record; no local `backups/` snapshot is kept (that convenience
+scheme was retired 2026-07-31). See `docs/development/DEVELOPMENT_PRACTICES.md` § Cutting a
+release.
 
 ## [Unreleased]
 
@@ -25,6 +25,31 @@ authoritative version-history record. A local-only snapshot of `src/` is also ke
   drainage grounds and the green value. S7d now asserts the property that does not depend on
   province ownership (the corporation set is not a monoculture) and *reports* the three-way split
   instead of asserting it. Verified by the sweep the item specified: 0.15 / 0.20 / 0.25 now agree.
+
+## [0.1.14] — 2026-08-11
+
+**Procurement, and the goods it is about.** The refocus's actual mechanic — a corporation
+contracting a private company for equipment, rather than buying against an unlimited market or
+producing it in-house — plus the resource tiers that make "space equipment" a thing rather than a
+label.
+
+### Added
+- **The processing chain roster** (BL-340). Seven new tradeable resources — silicon, refined
+  copper, REE alloy, machinery, alloys, electronics, spacecraft components — with market pricing,
+  recipes and UI presentation. Closes the "minable but unsellable" gap on silica, copper ore and
+  rare earth ore (deposits existed, no market ever priced them), and fixes the Smelter's steel
+  recipe to actually consume coal as its reagent, matching the design docs.
+- **Military points and a dedicated Research Institute** (BL-332). Every corporation now accrues
+  `military_points` from its completed Military Bases and `science` from a new Research Institute
+  building, passively, per tick — the production half of "how does tech get done", symmetric
+  across the player and every rival/background corporation. No spend mechanism reads either
+  currency yet; that is the tech tree's job, landing separately.
+- **The procurement/contract seam** (BL-350). A corporation can request a quote from a named
+  supplier, accept it into a running contract (a deposit up front, the rest paid across an
+  agreed lead time), or cancel one in flight. A supplier can refuse — no production capacity, no
+  access to its own inputs, an embargo, or a poor trading history with the asker — with the
+  refusal reason always legible. The same command both a player's press and a rival corporation's
+  own decision-making go through.
 
 ## [0.1.4] — 2026-08-10
 
@@ -619,7 +644,8 @@ Layer 2 finalisation.
 
 Initial prototype snapshot — application shell, canvases, and the hard-coded world.
 
-[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.10...HEAD
+[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.14...HEAD
+[0.1.14]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.10...v0.1.14
 [0.1.10]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.1...v0.1.8

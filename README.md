@@ -89,7 +89,16 @@ it against a committed golden image:
 ./build/ProjectIo --verify scripts/verify/corporation_lens.lua
 ```
 
-## Latest releases — v0.1.1, v0.1.2, v0.1.8, v0.1.9 and v0.1.10
+## Latest releases — v0.1.1, v0.1.2, v0.1.8, v0.1.9, v0.1.10 and v0.1.14
+
+**v0.1.14 — procurement, and the goods it is about.** The refocus's actual mechanic: a
+corporation can request a quote from a named supplier, accept it into a running contract (a
+deposit up front, the rest paced across an agreed lead time), or cancel one in flight — and a
+supplier can refuse, legibly, for one of four reasons (no capacity, no input access, an embargo,
+a poor trading history). Backed by seven new tradeable resources (silicon through spacecraft
+components) that close the gap between what the world can dig up and what the market will
+actually price, plus military points and a Research Institute — the production half of "how does
+tech get done", accruing passively for every corporation.
 
 **v0.1.10 — generation & content: what the world is called and what it is made of.** Every
 generated proper noun is now coined from its own culture's phonology, and the kinship between names
