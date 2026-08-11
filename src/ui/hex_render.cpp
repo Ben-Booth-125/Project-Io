@@ -87,6 +87,7 @@ ImU32 terrain_colour(terrain_composition t)
         case terrain_composition::ocean:     return IM_COL32( 40,  80, 160, 255);
         case terrain_composition::regolith:  return IM_COL32(138, 130, 120, 255);
         case terrain_composition::metallic:  return IM_COL32(158, 150, 140, 255);
+        case terrain_composition::urban:     return IM_COL32(120, 118, 128, 255); // BL-366: built-over grey.
     }
     return IM_COL32( 60,  60,  60, 255);
 }

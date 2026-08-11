@@ -10249,6 +10249,51 @@
    "resolved": "2026-08-11",
    "evaluated_difficulty": 4,
    "resolution": "Complete, mechanism only — matching the item's own excluded scope (no militia entity, no negotiation dialogue, no multi-round haggling, no corp_ai candidate: BL-094's buyer is deliberately not required, the seam is buyer-agnostic). Three new corp_verbs (request_quote/accept_quote/cancel_contract, enum 11->14) join corp_command on the same seam BL-293's order book uses. A procurement_quote/procurement_contract pair (world.hpp, parallel to the order book per Q4, not an order-book entry) implements the full lifecycle: split payment (Q1, deposit_fraction 0.25 authored in economy.lua), four distinguishable hard-decline reasons evaluated at quote time (Q2 — capacity, input access, embargo via BL-342's condition_set reaching procurement for the first time, and a standing (buyer,supplier) reputation floor that only moves on completion/cancellation, Q3), and a fourth flat-binary stream (procurement.{hpp,cpp}, magic IOPC) modelled exactly on order_book.{hpp,cpp}. One known, named simplification: contract pacing is a fixed per-tick schedule rather than BL-095's market-gated stretch/pause rate — the deposit/remainder split and end-to-end delivery are the load-bearing behaviour this item exists to prove, and the richer pacing model is a follow-on refinement, not re-litigated here. New procurement_harness (18 assertions) verifies the full lifecycle plus all four declines plus cancellation; eight pre-existing harnesses plus the real build confirmed no regression, with ai_skill_harness's pre-existing failures (NR-140) unchanged."
+  },
+  {
+   "brief": "multi-building-tile-urban-transform",
+   "title": "BL-366 (multi-building tile): per-composition non-extraction stack cap, aggregate cross-type occupancy, and the one-way urban transform",
+   "difficulty": 3,
+   "importance": "A",
+   "status": "complete",
+   "promoted_from": "backlog.json BL-366, v0.1.13 (Sprint 10)",
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "non_extraction_stack_cap returns the authored per-composition table (grassland/forest/wetland=6, tundra=3, barren/rocky/regolith/metallic=4, volcanic/icy=2, urban=12, ocean=0).",
+     "class": "headless",
+     "status": "complete",
+     "notes": "multi_building_tile_harness R1: 12/12 PASS."
+    },
+    {
+     "id": "R2",
+     "requirement": "Non-extraction occupancy is counted in AGGREGATE across every non-extraction type on a tile (not per type); filling the composition cap fires the one-way urban transform.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "multi_building_tile_harness R2/R7: mixed processing_facility/inland_logistics_hub/research_institute placements fire the transform on the 6th; a 2-building tile never transforms."
+    },
+    {
+     "id": "R3",
+     "requirement": "Once urban, new extraction/ambient placement is refused (no_deposit) even against a real seeded deposit; extraction sites standing before the transform are grandfathered and unaffected; the tile habitability floor is raised to >= 0.80 without ever being lowered.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "multi_building_tile_harness R3/R4/R5/R6/R6b: 6/6 PASS."
+    },
+    {
+     "id": "R4",
+     "requirement": "Extraction stacking (the pre-existing richness/k_richness_per_site rule) is unaffected by this item.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "multi_building_tile_harness R8: PASS."
+    },
+    {
+     "id": "R5",
+     "requirement": "No regression in the existing construction/placement/determinism/generation harness suite, and the real ProjectIo target still builds clean.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "construction_harness, determinism_harness, world_audit, construction_gate_harness, buildings_rework_harness all rerun clean; full ProjectIo build clean."
+    }
+   ]
   }
  ]
 }

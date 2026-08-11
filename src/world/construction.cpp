@@ -156,6 +156,12 @@ construction_result construct_building(world& w, const recipe_registry& reg,
     w.buildings[bld_id]  = bc;
     w.stockpiles[bld_id] = stockpile_component{};
 
+    // BL-366: a non-extraction placement may fill the tile's composition cap and
+    // fire the one-way urban transform. Checked after insertion so the new
+    // building itself counts toward the cap.
+    if (type != building_type::extraction_site)
+        placement_rules::maybe_transform_to_urban(w, tile);
+
     cc.assets.push_back(bld_id);
     // BL-095: no up-front debit — run_construction charges build_cost + materials
     // incrementally as the build progresses (pay-as-you-build).

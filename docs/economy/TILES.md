@@ -25,8 +25,37 @@ Composition describes the material character of the tile — the geology, ecolog
 | Ocean | Open deep water | — (no buildings) | Marine goods (deferred) |
 | Regolith | Loose surface material on airless bodies | Very low | Regolith, stone (polar ice sits on icy tiles) |
 | Metallic | High metal content; asteroid or ancient impact surface | Very low | Iron-nickel ore, platinum group metals, regolith |
+| Urban | Built over by its own non-extraction building stack (BL-366, runtime-only) | High | None — no new extraction or ambient placement |
 
 **Habitable compositions** — grassland, forest, wetland — support population centres and amenity production. The others are primarily extraction or infrastructure terrain.
+
+### Urban transform (BL-366)
+
+Composition is fixed at generation for every other value, but `urban` is the one deliberate
+runtime exception the opening paragraph carves out: a tile whose **non-extraction** building
+stack (processors, ports, hubs, admin, amenity, military base, research institute — combined,
+not per type) fills its starting composition's cap **transforms**, one-way, to `urban`. This
+answers the half of BL-193 (building stacks) that stacking left open — extraction already stacks
+by deposit richness (`k_richness_per_site`, unchanged by this item); non-extraction stacking is
+now bounded by this cap instead of the old flat ceiling of 1.
+
+**Non-extraction cap by starting composition** (`non_extraction_stack_cap`, `placement_rules.cpp`):
+
+| Composition | Cap | Rationale |
+|---|---|---|
+| Grassland, Forest, Wetland | 6 | Habitable; already the settlement-favoured compositions (POPULATION.md) |
+| Tundra | 3 | Marginal habitability |
+| Barren, Rocky, Regolith, Metallic | 4 | Industrial-friendly, low habitability ceiling |
+| Volcanic, Icy | 2 | Hostile; already carry the lowest habitability ceiling |
+| Ocean | 0 (exempt) | No buildings at all — `can_place` already refuses it |
+| Urban | 12 | Soft-bounded in practice by workforce contention, not this number |
+
+Once urban, a tile takes **no new extraction or ambient-resource placement** — the ground is
+built over. Extraction sites already standing when the transform fired are grandfathered; they
+keep operating, unaffected. The transform also raises the tile's `habitability` to at least
+`0.80` (never lowers it) — established infrastructure, not raw terrain, now bounds who can live
+there. It is a pure function of tile state (no RNG) and fires identically for player, rival and
+background corps.
 
 **Wetland is a drainage feature, not a climate zone (BL-338, 2026-08-09).** Every other
 composition falls out of the Pass 4 `(latitude band, moisture)` table alone. Wetland is the one

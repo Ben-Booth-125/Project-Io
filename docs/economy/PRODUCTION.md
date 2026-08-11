@@ -71,16 +71,23 @@ the combined draw. The ordered walk is `placement_rules::stack_members`; reading
 carrying the economics, the ceiling is a **legibility** bound — how many markers a tile can host
 and a player can reason about — not the balance lever.
 
-**Non-extraction buildings stay capacity 1.** Whether processors stack on land, workforce or
-road tier is a separate question, **deferred** by BL-193 rather than answered by it.
+**Non-extraction stacking is answered by BL-366, not deferred any longer.** Every non-extraction
+type (processors, ports, hubs, admin, amenity, military base, research institute) is bounded in
+**aggregate** — all types on one tile combined, not per type — by a per-composition cap table
+(`non_extraction_stack_cap`, `placement_rules.cpp`; the table and rationale live in
+`docs/economy/TILES.md` § Urban transform). Filling the cap fires a one-way transform to the
+`urban` terrain composition, which raises the cap further (12) and blocks new extraction/ambient
+placement on that tile. Extraction stacking itself (`k_richness_per_site`, above) is untouched —
+a separate, richness-bound axis.
 
 Implementation: the constants and the rank/curve helpers live in
 `src/world/placement_rules.{hpp,cpp}` (`k_stack_output_decay`, `stack_output_scalar`,
 `stack_members`, `stack_rank`); the combined-nominal taper is a per-tile **stack pre-pass** in
 `run_economy_step` (`src/world/economy_system.cpp`), sized before any site draws so the sites
 that run first do not taper the sites that run after them. The Selection panel's "On this tile"
-block reports the count, the ceiling, this site's rank and its share. Verified by
-`tools/verify/stack_capacity_harness.cpp`.
+block reports the count, the ceiling, this site's rank and its share. Extraction stacking is
+verified by `tools/verify/stack_capacity_harness.cpp`; the BL-366 non-extraction cap and urban
+transform by `tools/verify/multi_building_tile_harness.cpp`.
 
 ### Extraction buildings
 

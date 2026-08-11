@@ -129,6 +129,7 @@ const char* composition_name(terrain_composition c)
         case terrain_composition::ocean:     return "Ocean";
         case terrain_composition::regolith:  return "Regolith";
         case terrain_composition::metallic:  return "Metallic";
+        case terrain_composition::urban:     return "Urban";
     }
     return "?";
 }

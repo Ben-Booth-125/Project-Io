@@ -10,7 +10,58 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — The warm start converges, and the substrate is condemned (2026-08-10, latest)
+## Session — BL-366 lands: Sprint 10's first foundation, the living world resumed (2026-08-11, latest)
+
+Full mode, one item. Origin pulled 174 commits behind onto `main` (fast-forward to `c491b14`,
+v0.1.14/Sprint 11 stamp); a status check on Sprint 10 found only its BL-253 prerequisite landed —
+the five real content items (BL-366, BL-368, the BL-365 keystone, BL-367, BL-130/BL-132/BL-369)
+were all still `designed`, nothing promoted to REFINED.md. Ben's call: resume Sprint 10 now,
+foundations first.
+
+**BL-366 — multi-building tile stack cap + urban transform, landed.** Answers the half of BL-193
+(building stacks) the item deferred: non-extraction buildings (processors, ports, hubs, admin,
+military base, research institute) are no longer capacity-1 per tile. A new `terrain_composition
+::urban` value (12th, `components.hpp`) plus a per-composition non-extraction cap table
+(`non_extraction_stack_cap`, `placement_rules.cpp`) — grassland/forest/wetland 6, tundra 3,
+barren/rocky/regolith/metallic 4, volcanic/icy 2, urban 12, ocean 0 (exempt). The cap counts
+**every non-extraction type on a tile combined**, not per type — a new
+`non_extraction_buildings_on_tile` aggregate counter, distinct from the existing per-(tile, type,
+target) `buildings_on_tile` extraction stacking uses. Filling the cap fires a one-way
+`maybe_transform_to_urban`, wired into `construct_building` (`construction.cpp`) right after a
+non-extraction placement lands. Once urban: `can_place` refuses new extraction/ambient placement
+(`no_deposit`) even against a real seeded deposit, sites already standing are grandfathered and
+keep operating untouched, and tile habitability is raised to at least 0.80 (never lowered).
+Extraction stacking itself (`k_richness_per_site`, richness/50) is untouched — a separate axis.
+`presentation.cpp` / `hex_render.cpp` gain the urban name + colour (built-over grey).
+
+**Deliberately not built**, named per Rule 0c: the per-composition build-cost/logistics discount
+and a transform notification/log line — both named in the design as implementation-time tuning
+values, not committed there.
+
+**Verification.** New `tools/verify/multi_building_tile_harness.cpp` (26/26 PASS): the cap table,
+aggregate cross-type occupancy firing the transform on the 6th mixed-type placement (not the 6th
+of one type — the case that actually distinguishes this from the old per-type rule), urban's own
+higher cap admitting a 7th, extraction refusal post-transform, grandfathering of a pre-transform
+extraction site, the habitability floor holding in both directions (raised when below, untouched
+when already above), and extraction's richness-bound stacking left unchanged. Reran
+`construction_harness`, `determinism_harness`, `world_audit`, `construction_gate_harness`,
+`buildings_rework_harness` — all clean, zero regression. Full `ProjectIo` build clean (CMake/MSVC
+14.44). `docs/economy/TILES.md` gains § Urban transform (cap table + rationale);
+`docs/economy/PRODUCTION.md`'s non-extraction-stacking paragraph updated from "deferred" to
+"answered by BL-366". backlog.json BL-366 → `complete`; requirements.json
+§ multi-building-tile-urban-transform (R1–R5, all complete); REFINED.md drained.
+
+**Still open in Sprint 10** (not started this session): BL-368 (real population demand — carries a
+known shipped bug, the zero-reset erasing agri demand before clearing), BL-365 (background
+industry, the difficulty-5 keystone with an open corp_ai-scope question), BL-367/BL-130/BL-132/
+BL-369.
+
+**Runtime.** ~1.5 h, Full mode (one item: design review, implementation, new harness, doc
+propagation, backlog/requirements bookkeeping).
+
+---
+
+## Session — The warm start converges, and the substrate is condemned (2026-08-10)
 
 Full mode, design + one Light code change. Two design passes (BL-340/BL-350 jointly, BL-365–369 as
 a new cluster), one measured behaviour change, and a sprint re-sequence — all landed against a

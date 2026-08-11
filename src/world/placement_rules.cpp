@@ -103,6 +103,11 @@ placement_result can_place(const tile_component& tc, building_type type, resourc
         case building_type::extraction_site:
             // Extraction must sit on a non-zero deposit of a prototype-extractable
             // target resource.
+            // BL-366: an urban tile is built over — no new extraction or
+            // ambient-resource placement. Sites already standing when the
+            // transform fired are grandfathered (this only gates NEW placement).
+            if (tc.composition == terrain_composition::urban)
+                return placement_reason::no_deposit;
             if (is_extractable(target)
                 && tc.resource_deposit[static_cast<std::size_t>(target)] > 0.0f)
                 return placement_reason::ok;
@@ -285,8 +290,15 @@ placement_result can_place_in_world(const world& w, entity_id tile_id,
     // Stack ceiling: a tile carries several sites working one deposit, but not
     // without limit. Checked last — a full stack is the least interesting reason
     // to refuse, and the terrain reasons above teach the player more.
-    if (buildings_on_tile(w, tile_id, type, target)
-        >= stack_capacity(tc_it->second, type, target))
+    //
+    // BL-366: non-extraction occupancy is counted in aggregate (every type
+    // combined) against the composition's cap, not per building type — the cap
+    // bounds the whole non-extraction stack, which is what fires the urban
+    // transform.
+    const int occupancy = (type == building_type::extraction_site)
+        ? buildings_on_tile(w, tile_id, type, target)
+        : non_extraction_buildings_on_tile(w, tile_id);
+    if (occupancy >= stack_capacity(tc_it->second, type, target))
         return placement_reason::slot_full;
 
     return placement_reason::ok;
@@ -307,11 +319,77 @@ float stack_output_scalar(int rank)
 int stack_capacity(const tile_component& tc, building_type type, resource_type target)
 {
     if (type != building_type::extraction_site)
-        return 1;
+        return non_extraction_stack_cap(tc.composition);
 
     const float richness = tc.resource_deposit[static_cast<std::size_t>(target)];
     const int   cap      = static_cast<int>(richness / k_richness_per_site);
     return cap < 1 ? 1 : cap;
+}
+
+// BL-366: authored per-composition non-extraction ceiling (first cut, a tuning
+// table not a hardcoded rule — see the item's design for the rationale behind
+// each band). Grassland/Forest/Wetland are the settlement-favoured compositions
+// (POPULATION.md); Volcanic/Icy already carry TILES.md's lowest habitability
+// ceiling; Ocean is exempt (can_place already refuses buildings there).
+int non_extraction_stack_cap(terrain_composition composition)
+{
+    switch (composition)
+    {
+        case terrain_composition::grassland:
+        case terrain_composition::forest:
+        case terrain_composition::wetland:
+            return 6;
+        case terrain_composition::tundra:
+            return 3;
+        case terrain_composition::barren:
+        case terrain_composition::rocky:
+        case terrain_composition::regolith:
+        case terrain_composition::metallic:
+            return 4;
+        case terrain_composition::volcanic:
+        case terrain_composition::icy:
+            return 2;
+        case terrain_composition::urban:
+            return 12; // Soft-bounded in practice by workforce contention, not this number.
+        case terrain_composition::ocean:
+        default:
+            return 0;
+    }
+}
+
+int non_extraction_buildings_on_tile(const world& w, entity_id tile_id)
+{
+    int n = 0;
+    for (const auto& [bid, bc] : w.buildings)
+    {
+        if (bc.tile == tile_id && bc.type != building_type::extraction_site)
+            ++n;
+    }
+    return n;
+}
+
+bool maybe_transform_to_urban(world& w, entity_id tile_id)
+{
+    const auto it = w.tiles.find(tile_id);
+    if (it == w.tiles.end())
+        return false;
+    tile_component& tc = it->second;
+    if (tc.composition == terrain_composition::urban
+        || tc.composition == terrain_composition::ocean)
+        return false;
+    if (non_extraction_buildings_on_tile(w, tile_id) >= non_extraction_stack_cap(tc.composition))
+    {
+        tc.composition = terrain_composition::urban;
+        // Urban carries the same High habitability ceiling as the
+        // settlement-favoured compositions it supersedes (grassland/forest,
+        // derive_environment in tile_generation.cpp) — established
+        // infrastructure, not raw terrain, now bounds who can live here. Raised,
+        // never lowered: a marginal composition (tundra/volcanic/icy) that built
+        // up to urban should not be stuck at its pre-transform ceiling.
+        tc.habitability = std::max(tc.habitability, 0.80f);
+        return true;
+    }
+    return false;
 }
 
 int buildings_on_tile(const world& w, entity_id tile_id,

@@ -252,15 +252,44 @@ float stack_output_scalar(int rank);
 ///
 /// Extraction scales with the target resource's deposit richness — one site per
 /// `k_richness_per_site` of deposit, at least one wherever a deposit exists at
-/// all. Every other building type returns 1: whether processors stack on land,
-/// workforce or road tier is a separate question, deferred by BL-193 rather than
-/// answered by it.
+/// all. Every other building type is bounded by `non_extraction_stack_cap` — the
+/// question BL-193 deferred, answered by BL-366.
 ///
 /// @param tc     The candidate tile.
 /// @param type   Building type.
 /// @param target Extraction target (ignored for non-extraction types).
 /// @return       Maximum simultaneous buildings of that kind on the tile (>= 1).
 int stack_capacity(const tile_component& tc, building_type type, resource_type target);
+
+/// BL-366: ceiling on **total** non-extraction buildings (processors, ports, hubs,
+/// admin, amenity, military base, research institute — combined, not per type) a
+/// tile of the given starting composition can carry before it transforms to
+/// `urban`. Extraction stacking is a separate, richness-bound axis untouched by
+/// this cap. `urban` itself returns a high ceiling, soft-bounded in practice by
+/// workforce contention rather than this number; `ocean` returns 0 (no buildings
+/// there at all — `can_place` already refuses it).
+///
+/// @param composition The tile's terrain_composition.
+/// @return             Non-extraction building ceiling for that composition.
+int non_extraction_stack_cap(terrain_composition composition);
+
+/// Total non-extraction buildings (every type except extraction_site) standing on
+/// @p tile_id — the aggregate `non_extraction_stack_cap` is the ceiling for.
+///
+/// @param w       Read-only world state.
+/// @param tile_id Tile to count on.
+/// @return        Count of non-extraction buildings on the tile.
+int non_extraction_buildings_on_tile(const world& w, entity_id tile_id);
+
+/// BL-366: if @p tile_id's non-extraction building count has reached its
+/// composition's cap, flips `terrain_composition` to `urban`. One-way — a no-op
+/// if the tile is already `urban` or `ocean`. Pure function of tile state (no
+/// RNG); call after a non-extraction building is placed.
+///
+/// @param w       Mutable world state.
+/// @param tile_id Tile to check.
+/// @return        true if the tile transformed this call.
+bool maybe_transform_to_urban(world& w, entity_id tile_id);
 
 /// The tile's stack of @p type / @p target buildings in **stored order, oldest
 /// first** — ascending entity id, which is creation order because ids are handed

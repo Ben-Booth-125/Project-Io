@@ -1,6 +1,14 @@
 # Project Io — REFINED (active worklist)
 
 
+> Drained 2026-08-11: BL-366 (multi-building tile stack cap + urban transform), Sprint 10's
+> first foundation item, 1 task COMPLETE — removed per the retain-one policy (light-weight enough
+> to land in one direct pass rather than a multi-task promotion). Record lives in DEVLOG.md
+> (2026-08-11 entry), backlog.json BL-366's `resolution` field, and requirements.json
+> § multi-building-tile-urban-transform (R1–R5). Sprint 10's remaining items (BL-368 real
+> population demand, BL-365 background industry keystone, BL-367/BL-130/BL-132/BL-369) stay
+> `designed`, not yet promoted.
+
 > Drained 2026-08-09: build-heavy v0.1.1 batch — render-precision audit (BL-215, 5 tasks
 > COMPLETE) and selection always open (BL-266, 3 tasks COMPLETE; R4 golden re-bless pending,
 > NR-104) — removed per the retain-one policy. Record lives in DEVLOG.md (2026-08-09 entry),

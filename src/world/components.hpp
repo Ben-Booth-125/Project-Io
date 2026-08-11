@@ -126,6 +126,10 @@ enum class terrain_composition : uint8_t
     ocean     = 8,  ///< Open deep water; carries no land deposits and no buildings.
     regolith  = 9,  ///< Loose surface material on airless bodies.
     metallic  = 10, ///< High metal content; iron-nickel ore, platinum group metals.
+    urban     = 11, ///< BL-366: one-way transform, fired when a tile's non-extraction building
+                    ///< stack fills its starting composition's cap. No new extraction or
+                    ///< ambient-resource placement; existing extraction sites are grandfathered.
+                    ///< High habitability ceiling; never reverts.
 };
 
 /// Physical shape of a tile — its elevation, slope, and form. Modifies the base
