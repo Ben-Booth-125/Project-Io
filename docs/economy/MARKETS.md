@@ -253,6 +253,19 @@ AI's command are one implementation.
   (`world::corp_embargo_conditions`, a `condition_set` per supplier — BL-342's generic predicate
   machinery reaching procurement for free), reputation floor (`world::corp_reputation`, one scalar
   per (buyer, supplier) pair) — and returns a distinguishable `corp_command_result` for each.
+
+  > **Authoring a `market` condition: it measures the WORLD, not a market (BL-342, NR-114).**
+  > `condition_subject::market` resolves to the **mean resolved price across every market in the
+  > world**, summed in ascending entity-id order for determinism — not the price in the local
+  > market, and not the corp's own markets. There is no market qualifier on `condition`, because
+  > a law or tech asking "is this good expensive yet?" is asking a world-level question, and a
+  > mean is harder to game than a max. The consequence to author around: **a corp trading in one
+  > expensive market cannot satisfy a market condition on its own.** If a per-market predicate is
+  > ever wanted, add a qualifier to `condition` rather than changing what this subject means.
+  > `evaluate` also takes a **subject corp** (`condition_set::evaluate(set, world, subject_corp)`),
+  > since every consumer — a levy charged to a corp, a tech earned per corp — is per-corporation;
+  > pass `null_entity` for a genuinely world-level predicate and the corp-scoped subjects measure
+  > zero.
 - **Split payment.** A deposit (`economy.procurement.deposit_fraction`, first cut 0.25) debits at
   `accept_quote`; the remainder is drawn evenly across the quote's `lead_time_ticks`
   (`economy_system.cpp`'s contract-pacing pass, right after the capability-points pass). A known
@@ -264,9 +277,13 @@ AI's command are one implementation.
   price it quotes).
 - **Reputation moves only on completion (+) or cancellation (−)** — narrow by design: it shifts
   price/tie-breaking, never gates access beyond the decline floor above (that is BL-087's job).
-- **Persistence.** `procurement.{hpp,cpp}`, the fourth flat-binary stream in `world/*`: magic
-  `IOPC` + version, `world::procurement_quotes` / `procurement_contracts` / `corp_reputation`
-  round-trip in stored order, and a bad stream is refused rather than reinterpreted.
+- **Persistence.** `procurement.{hpp,cpp}`, the **third** flat-binary stream in `world/*` —
+  `history_log` (`IOHL`) and `order_book` (`IOOB`) are the other two, and there is no fourth
+  *(corrected 2026-08-12: this line read "the fourth"; `grep magic src/` finds exactly three)*.
+  Magic `IOPC` + version, `world::procurement_quotes` / `procurement_contracts` /
+  `corp_reputation` round-trip in stored order, and a bad stream is refused rather than
+  reinterpreted. All three carry the header BL-107 specifies; what BL-107 still owes is the
+  **world-snapshot** header, which no stream here provides.
 - **The militia's own demand.** `spacecraft_components` (BL-340) carries no background demand —
   a militia's contracts are its only buyer, which is what makes the BL-340/BL-350 coupling real
   rather than thematic.

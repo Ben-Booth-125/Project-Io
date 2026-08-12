@@ -632,12 +632,12 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 
 **Valid when:**
 - Only reachable by keyboard cycle.
-- Planetary-only. The economy should have ticked a few times so the nation-substrate injection has settled.
+- Planetary-only. The field is fixed at generation, so no economy ticks are needed before reading it.
 - Cleared by cycling off it or the clear hotkey, not by a bar re-click.
 
-**Expected output.** A sequential dark-to-amber throughput tint: each tile's nation-owned substrate density weighted by its terrain deposit richness, normalised to the body's maximum — brightest where dense background occupation sits on rich terrain. Tiles with no substrate keep plain terrain. Low-to-high amber gradient key. Pure rendering — it changes nothing in the market arithmetic. Pointer clicks fall through to the tile (Tile Ledger); there is no dedicated ledger route.
+**Expected output.** A sequential dark-to-amber throughput tint: each tile's generation-time substrate density weighted by its terrain deposit richness, normalised to the body's maximum — brightest where dense background occupation sits on rich terrain. Tiles with no substrate keep plain terrain. Low-to-high amber gradient key. Pure rendering — it changes nothing in the market arithmetic. Pointer clicks fall through to the tile (Tile Ledger); there is no dedicated ledger route.
 
-**Reason to select.** Where does the existing, nation-owned background economy already operate — distinct from where people live (Population) and from player/corp production? Context for competition: the substrate is what injects background supply and demand into each market. Largely informational; it frames the world you are entering rather than pointing at a specific action.
+**Reason to select.** Weak signal — prefer Production or the building markers. Since BL-365 (2026-08-11) the background economy is REAL background corporations with real buildings, and the density ripple this lens tints was left behind as a generation-time rendering field that nothing else reads. So it shows where background industry plausibly sits, not where it is, and it does NOT drive market supply or demand — that was true of the deleted substrate injection and is false now. Read Production (real output intensity) or the building markers for the real distribution; treat this tint as world flavour.
 
 ### `lens.market` — Minimap lens bar, slot 4 (the three-ascending-vertical-bars glyph)
 

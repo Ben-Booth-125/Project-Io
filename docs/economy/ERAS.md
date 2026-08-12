@@ -7,6 +7,18 @@
 > dispatches iff the corp holds a launchpad on the source body (`corp_has_launchpad_on`,
 > `src/world/supply_system.cpp`). No research, no propellant reserve, no staffing check.
 > The design below stands as the target; the inline markers flag the terms with no code backing.
+>
+> **One thing in code now says "era", and it means launchpad (BL-342, 2026-08-10).**
+> `condition_subject::era` — the predicate subject the laws and techs layers evaluate through
+> `condition_set::evaluate` (`src/world/condition_set.cpp`) — reports **1 for a corp that owns a
+> launchpad and 0 otherwise**, because that is the only era-like distinction the simulation can
+> honestly measure today. It is a proxy, chosen so that authored conditions keep meaning the same
+> thing when the real Era system lands: the *measure* becomes a lookup, the *conditions* do not
+> change. **Do not author an `era` condition that would read wrongly under it** — `era >= 1`
+> today is exactly `owns a launchpad`, so a condition meant to capture "the corp has industrialised
+> into space" is fine, and one meant to capture "the campaign has advanced to Era 1" is not, since
+> the era is per-corp under the proxy and world-wide under the design. When the Era system is
+> implemented, replace the measure body and re-run `condition_set_harness` C2h/C2l. (NR-113.)
 
 An **Era** is a named phase in the game's industrial arc, defined by the accessible territory, available buildings, and the dominant strategic challenge. Eras are a formal game system: each has a defined entry gate, a distinct resource profile, and a characteristic question for the player to answer. The game begins in Era 0; transitions are triggered by meeting explicit conditions, not by an automatic timer.
 

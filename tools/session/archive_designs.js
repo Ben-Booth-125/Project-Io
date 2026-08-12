@@ -36,9 +36,30 @@ const kb = (n) => `${(n / 1024).toFixed(1)} KB`;
 const backlog = JSON.parse(fs.readFileSync(BL_PATH, 'utf8'));
 const before = fs.statSync(BL_PATH).size;
 
+// Write JSON back in the FILE'S OWN shape, not this tool's house style (NR-109).
+// backlog.json is stored at 1-space indent with LF; the cold stores are at 2 with
+// CRLF. Serialising everything at 2/LF made every archive run rewrite all ~7,500
+// lines of backlog.json, which buried the real change inside a whole-file diff and
+// made a merge conflict near-certain. Existing file wins; new files get 2-space.
 const writeJson = (abs, data) => {
     fs.mkdirSync(path.dirname(abs), { recursive: true });
-    fs.writeFileSync(abs, JSON.stringify(data, null, 2) + '\n');
+
+    let indent = 2;
+    let crlf = false;
+    let trailingNewline = true;
+    if (fs.existsSync(abs)) {
+        const prev = fs.readFileSync(abs, 'utf8');
+        crlf = prev.includes('\r\n');
+        trailingNewline = /\n$/.test(prev);
+        // The first nested key's leading run of spaces is the file's indent unit.
+        const m = prev.replace(/\r\n/g, '\n').match(/^\{\n( +)"/);
+        if (m) indent = m[1].length;
+    }
+
+    let out = JSON.stringify(data, null, indent);
+    if (crlf) out = out.replace(/\n/g, '\r\n');
+    if (trailingNewline) out += crlf ? '\r\n' : '\n';
+    fs.writeFileSync(abs, out);
 };
 
 if (restore) {
@@ -111,7 +132,10 @@ function doArchive() {
 
     const after = fs.statSync(BL_PATH).size;
     console.log(`\nArchived ${moved} item(s) into ${stores.size} cold file(s).`);
-    console.log(`${BL_REL}: ${kb(before)} → ${kb(after)}  (−${kb(before - after)}, ${((1 - after / before) * 100).toFixed(0)}% smaller)`);
+    // Signed, so a file that GREW does not report as "−-11.4 KB, -1% smaller" (NR-109).
+    const delta = before - after;
+    const dir = delta >= 0 ? 'smaller' : 'larger';
+    console.log(`${BL_REL}: ${kb(before)} → ${kb(after)}  (${delta >= 0 ? '−' : '+'}${kb(Math.abs(delta))}, ${Math.abs((1 - after / before) * 100).toFixed(0)}% ${dir})`);
     verify();
     process.exit(bad ? 1 : 0);
 }

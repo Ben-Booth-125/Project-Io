@@ -33,7 +33,7 @@ Continent the eighth); "off the bar" lenses are reached by the keyboard lens-cyc
 | `production` | 7 | Planetary intensity tint, red→yellow→green vs body mean (BL-137) + key | built |
 | `continent` | 8 | Planetary plate tint + boundary lift + plate-count key (BL-226, landed 2026-07-30) | built |
 | `scarcity` | off the bar | Per-market shortfall blocks + key | built |
-| `industry` | off the bar | Substrate-throughput amber tint + key (BL-084) | built |
+| `industry` | off the bar | Substrate-throughput amber tint + key (BL-084) | built — **but its field is vestigial since BL-365**; see § Industry lens |
 | `supply` | off the bar | Solar per-convoy lines · Circumplanetary convoy-count badge · Planetary per-tile convoy glyph | built — Layer 5 convoys are live |
 | `reach` | off the bar | Planetary key listing the active body's trade-route endpoints by recency (BL-011, landed 2026-07-08) | built |
 | `supply_routes` | off the bar | Planetary key of aggregated lanes, log-scaled thickness (BL-014, landed 2026-07-08) | built |
@@ -642,20 +642,34 @@ minimap lens bar — the BL-093 redesign keeps the on-screen row to 7 glyphs, so
 Scarcity) is reached by **keyboard lens-cycle only**, joining Supply. The `overlay_mode::industry`
 render pass below is unaffected; only the bar presence changed.
 
-**Intent.** Read the map as an *economic-throughput surface*: where the existing, nation-owned
+**Intent.** Read the map as an *economic-throughput surface*: where the existing background
 industry already is — distinct from where people live (BL-083's markers) or where labour is
 efficient (Population). Part of the 2026-07-01 visibility-pass cluster's three-layer read:
 Settlements (BL-083, discrete markers) · Industry (this lens) · You (BL-085, identity chrome).
 
-**Data definition (settled).** The substrate is mechanically live from BL-050: every tile carries
-`substrate_density` in `[0, 1]`, the nation-owned background occupation injected each economy tick
-as `background_supply[]`/`background_demand[]` into the body's market clearing. Rendered raw,
+> **⚠ The field this lens draws no longer drives anything (BL-365, 2026-08-11).** Read the
+> paragraph below as history and the one after it as the current state. The lens still renders
+> correctly; what changed is what its tint *means*.
+
+**Data definition (as built, BL-050).** Every tile carries `substrate_density` in `[0, 1]`, the
+nation-owned background occupation, which was injected each economy tick as
+`background_supply[]`/`background_demand[]` into the body's market clearing. Rendered raw,
 `substrate_density` ripples outward from population centres and reads collinear with the Population
 lens, so the lens instead renders a **throughput field**: each tile's `substrate_density` weighted
 by its **terrain deposit richness** (the sum of `resource_deposit` across all resources, normalised
 to the body's richest tile) — brightest where dense occupation sits on rich terrain, decoupling the
 field from the population ripple. **Pure rendering**: no change to `substrate_density` or the market
 arithmetic.
+
+**What it means now (BL-365).** Background industry is **real corporations with real buildings**
+(`corporation_component.is_background`); `nation_substrate` and `inject_substrate_demand` are
+deleted. `substrate_density` survives as a **generation-time ripple that nothing but this lens
+reads** — `nation_generation.cpp` Pass 6 says so in its own comment ("purely a rendering field
+now"). So the tint is a *plausible-looking picture of where industry would be*, not a reading of
+where it **is**: the real background firms are ordinary buildings, already drawn as building
+markers and counted by the Production lens. Whether the lens should be re-pointed at real
+background-firm buildings — or retired in favour of Production — is an open call (NR-173); until
+it is taken, do not read this lens as evidence about the market.
 
 **Rung.** Planetary only — the substrate field is per-tile and has no inter-body surface. Guarded
 behind `overlay_mode::industry` in
@@ -678,8 +692,9 @@ base to full industrial amber, matching the placement convention of the other bu
 former nav-rail-inset left edge). The key landed in the 2026-07-04 reconciliation
 (the lens's original delivery shipped the tint but not the key).
 
-**Interaction notes.** Planetary-only, single-select; the script runs `verify.econ_step(4)` so the
-substrate injection has settled before capture. Verified by `scripts/verify/industry_lens.lua`
+**Interaction notes.** Planetary-only, single-select; the script runs `verify.econ_step(4)`, which
+mattered when the injection had to settle before capture and is now merely harmless — the field is
+generation-time and does not move with the tick. Verified by `scripts/verify/industry_lens.lua`
 against blessed goldens (`industry_lens_full`, `industry_lens_zoom`).
 
 ## Continent lens *(built 2026-07-30 — BL-226)*

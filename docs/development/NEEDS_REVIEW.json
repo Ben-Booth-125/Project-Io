@@ -1853,18 +1853,20 @@
    "title": "119 commits since the v0.1.0 tag and no version cut; CHANGELOG [Unreleased] still reads 'Nothing yet'",
    "raised": "2026-08-09",
    "kind": "observation",
-   "status": "open",
+   "status": "resolved",
    "source": "Roadmap gap review, 2026-08-09 session",
-   "what": "The v0.1.0 tag is 2026-08-03. Six days and 119 commits later there is no v0.1.1 tag, and CHANGELOG.md's [Unreleased] section is empty - so the changelog is not merely un-stamped, it is not accruing. Meanwhile the roadmap kept extending FORWARD in the same window (v1.0.0 named 2026-08-08, the Era -1 arc folded into v0.3.0, four stub minors re-sequenced). Direction is being added faster than releases are being cut, which is the opposite of Ben's stated aim (2026-08-09: 'cut as many versions as we can now, rather than working on the lofty, conceptual stuff'). The cost is compounding: cutting v0.1.1 now means reconstructing changelog entries from 119 commits rather than 0, and it grows daily. Recommend either accruing [Unreleased] per delivery from here, or generating it from the DEVLOG at cut time."
+   "what": "The v0.1.0 tag is 2026-08-03. Six days and 119 commits later there is no v0.1.1 tag, and CHANGELOG.md's [Unreleased] section is empty - so the changelog is not merely un-stamped, it is not accruing. Meanwhile the roadmap kept extending FORWARD in the same window (v1.0.0 named 2026-08-08, the Era -1 arc folded into v0.3.0, four stub minors re-sequenced). Direction is being added faster than releases are being cut, which is the opposite of Ben's stated aim (2026-08-09: 'cut as many versions as we can now, rather than working on the lofty, conceptual stuff'). The cost is compounding: cutting v0.1.1 now means reconstructing changelog entries from 119 commits rather than 0, and it grows daily. Recommend either accruing [Unreleased] per delivery from here, or generating it from the DEVLOG at cut time.",
+   "resolution": "2026-08-12 review-queue sweep: Overtaken by events, and comprehensively. Nine minors have been cut since this was written: tags v0.1.1, v0.1.2, v0.1.3, v0.1.4, v0.1.8, v0.1.9, v0.1.10 and v0.1.14 all exist, CHANGELOG.md carries a dated released section for each, and [Unreleased] is accruing again (BL-348 and BL-349 entries sit in it now, not \"Nothing yet\"). The compounding cost this entry warned about did not materialise. One residue survives and is filed separately as NR-174: v0.1.5 has a done-definition written \"at the cut\" in ROADMAP.md but no tag and no CHANGELOG section, so the cut was declared in prose and never executed."
   },
   {
    "id": "NR-098",
    "title": "v0.1.1 is a bucket, not a theme: its named theme is complete, 26 retrofitted items hold the cut hostage",
    "raised": "2026-08-09",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "Roadmap gap review, 2026-08-09 session",
-   "what": "v0.1.1's theme is the word interface, and all three legs shipped: BL-270 (action dictionary) complete, BL-206 (blackboard export) complete, BL-278 (Io MCP server) complete. Despite that, v0.1.1 carries 29 open items. ROADMAP.md is candid about how: 'Retrofitted 2026-08-08 - still open, surfaced 2026-08-01 -> 08-04', three later waves of unrelated work assigned to a minor whose theme had already finished. That violates the roadmap's own versioning grain ('one minor carries one coherent theme') and is the single biggest reason no version has been cut. The 26 passengers cluster cleanly into shell/legibility (BL-215, BL-229, BL-260, BL-265, BL-266, BL-292, BL-281, BL-216, BL-193, BL-184, BL-185), build health (BL-288, BL-291, BL-302, BL-322, BL-285) and generation/content (BL-290, BL-257, BL-256, BL-338, BL-308, BL-309, BL-283, BL-284, BL-282) - three plausible minors. QUESTION: cut v0.1.1 on its actual theme now and re-home the passengers into those three, or keep holding the tag? One genuine wrinkle is filed separately as NR-099."
+   "what": "v0.1.1's theme is the word interface, and all three legs shipped: BL-270 (action dictionary) complete, BL-206 (blackboard export) complete, BL-278 (Io MCP server) complete. Despite that, v0.1.1 carries 29 open items. ROADMAP.md is candid about how: 'Retrofitted 2026-08-08 - still open, surfaced 2026-08-01 -> 08-04', three later waves of unrelated work assigned to a minor whose theme had already finished. That violates the roadmap's own versioning grain ('one minor carries one coherent theme') and is the single biggest reason no version has been cut. The 26 passengers cluster cleanly into shell/legibility (BL-215, BL-229, BL-260, BL-265, BL-266, BL-292, BL-281, BL-216, BL-193, BL-184, BL-185), build health (BL-288, BL-291, BL-302, BL-322, BL-285) and generation/content (BL-290, BL-257, BL-256, BL-338, BL-308, BL-309, BL-283, BL-284, BL-282) - three plausible minors. QUESTION: cut v0.1.1 on its actual theme now and re-home the passengers into those three, or keep holding the tag? One genuine wrinkle is filed separately as NR-099.",
+   "resolution": "2026-08-12 review-queue sweep: Acted on and closed. v0.1.1 was cut on its actual theme (tag v0.1.1, 2026-08-09, \"Cut v0.1.1 — the word interface\"), with the 24 passengers re-homed into v0.1.8 / v0.1.9 / v0.1.10 / v0.2.0 rather than the stub minors being renumbered — the decision recorded in NR-111, which stays open for your review of the split itself. Every one of those three destination minors has since been cut too, which is the strongest evidence the split was along the right seams."
   },
   {
    "id": "NR-099",
@@ -1880,9 +1882,10 @@
    "title": "v0.1.2 is finished but uncut, and BL-323's own scoped-out residual was never filed as an item",
    "raised": "2026-08-09",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "Roadmap gap review, 2026-08-09 session; BL-323 design field",
-   "what": "v0.1.2 (buildings rework) has exactly one open item, BL-323, and BL-323's own design field records every slice as landed 2026-08-08: S2 + S2b (logistics reach gate), S1 partial (extractables 4 -> 15), S3 (site-dependent build time), S4 (construction legibility), plus the three-defect reach hardening - harnesses 12/12 and 26/26 PASS, requirements groups complete. The only residual is explicitly scoped OUT in the item's own words: 'the processing-chain half of S1 (Chemical Plant, Electronics Lab, Fabricator, Assembly Plant, most Refinery outputs) needs NEW resource_type values with market/price/serialisation wiring - a bigger item than Lua authoring, not attempted here.' That residual has no backlog item, so closing BL-323 would silently drop it. QUESTION: file the processing-chain item (new resource_types + market/serialisation wiring, its own version goal), flip BL-323 complete, and cut v0.1.2? On the evidence this is the cheapest available cut - the work is done and verified; only bookkeeping stands in the way."
+   "what": "v0.1.2 (buildings rework) has exactly one open item, BL-323, and BL-323's own design field records every slice as landed 2026-08-08: S2 + S2b (logistics reach gate), S1 partial (extractables 4 -> 15), S3 (site-dependent build time), S4 (construction legibility), plus the three-defect reach hardening - harnesses 12/12 and 26/26 PASS, requirements groups complete. The only residual is explicitly scoped OUT in the item's own words: 'the processing-chain half of S1 (Chemical Plant, Electronics Lab, Fabricator, Assembly Plant, most Refinery outputs) needs NEW resource_type values with market/price/serialisation wiring - a bigger item than Lua authoring, not attempted here.' That residual has no backlog item, so closing BL-323 would silently drop it. QUESTION: file the processing-chain item (new resource_types + market/serialisation wiring, its own version goal), flip BL-323 complete, and cut v0.1.2? On the evidence this is the cheapest available cut - the work is done and verified; only bookkeeping stands in the way.",
+   "resolution": "2026-08-12 review-queue sweep: Both halves closed. v0.1.2 is cut (tag v0.1.2, 2026-08-09, \"buildings rework: remoteness stops being free\"). BL-323's scoped-out residual — the processing-chain half of S1, needing new resource_type values — was filed and has since shipped as BL-340 (PROCESSING_CHAIN_ROSTER, complete, v0.1.14); NR-147 records how it was sized (an admission rule, seven resources) and NR-154 records that its substrate-demand step was deleted rather than deferred."
   },
   {
    "id": "NR-101",
@@ -1901,16 +1904,17 @@
    "kind": "observation",
    "status": "open",
    "source": "Roadmap gap review, 2026-08-09 session",
-   "what": "Two coupled effects, both mechanical rather than judgement calls, but they are why minors stall partway. (1) SEQUENCE: v0.1.2 (buildings) was built to completion while v0.1.1 stayed open, and v0.1.5 military work is landing now, three minors ahead - BL-325 (military base) and BL-331 (starting military presence) both have commits on main. Building out of order is fine as work; the cost is that every minor ends up partially done and none reaches a cuttable state. (2) STATUS LAG: BL-325 and BL-331 still read 'designed' though 'Military base S1: the muster building lands (BL-325)' is committed. ROADMAP.md already caught this exact pattern once - 'Three of those had already landed and were simply never flipped off the non-terminal landed status, so they had been reading as open work' - and it has recurred. Worth a status sweep before any cut, since open-item counts are the input to deciding what a minor still owes."
+   "what": "Two coupled effects, both mechanical rather than judgement calls, but they are why minors stall partway. (1) SEQUENCE: v0.1.2 (buildings) was built to completion while v0.1.1 stayed open, and v0.1.5 military work is landing now, three minors ahead - BL-325 (military base) and BL-331 (starting military presence) both have commits on main. Building out of order is fine as work; the cost is that every minor ends up partially done and none reaches a cuttable state. (2) STATUS LAG: BL-325 and BL-331 still read 'designed' though 'Military base S1: the muster building lands (BL-325)' is committed. ROADMAP.md already caught this exact pattern once - 'Three of those had already landed and were simply never flipped off the non-terminal landed status, so they had been reading as open work' - and it has recurred. Worth a status sweep before any cut, since open-item counts are the input to deciding what a minor still owes. [2026-08-12 sweep: effect (1) SEQUENCE is resolved — nine minors have been cut since, so building out of order stopped leaving every minor partially done. Effect (2) STATUS LAG is STILL LIVE and is now measurable: `backlog_lint` reports four items whose requirement group is complete while the item still reads \"designed\" — BL-325 (military base), BL-274 (era-keyed rosters), BL-262 (scoring system) and BL-296 (F9 tech-tree viewer). BL-331 has since gone to \"complete\", so the lag is being worked off, just not swept. Left open deliberately: moving an item to a terminal status is a delivery judgement — BL-325 in particular has an unverified end-to-end path recorded in NR-121 — and not a call to take on your behalf inside a doc sweep.]"
   },
   {
    "id": "NR-103",
    "title": "Root cause of the stalled cuts: no minor between v0.1.0 and v1.0.0 has a done-definition",
    "raised": "2026-08-09",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "Roadmap gap review, 2026-08-09 session",
-   "what": "ROADMAP.md writes done-definitions for exactly two versions: v0.1.0 (the prototype cut) and v1.0.0 (the playable-game cut, named 2026-08-08). Every minor in between is deliberately theme-level - 'the expanded-prototype milestones above (v0.1.x -> v0.4.0) stay theme-level and earn their own done-definitions as they firm up'. That deferral is the root cause of everything in NR-097 through NR-102. A theme with no done-definition has no test for 'is this finished?', so it can absorb items indefinitely - which is exactly what v0.1.1 did, taking on 26 retrofitted items after its own three legs had shipped. The two versions that DO have done-definitions are also the only two that have ever been cut or scheduled. QUESTION: write a short done-definition (3-5 bullets, v0.1.0's is the model) for each minor we intend to cut, starting with the ones that are already finished. It is the cheapest structural fix available and it converts 'when is this done?' from a judgement call into a checklist."
+   "what": "ROADMAP.md writes done-definitions for exactly two versions: v0.1.0 (the prototype cut) and v1.0.0 (the playable-game cut, named 2026-08-08). Every minor in between is deliberately theme-level - 'the expanded-prototype milestones above (v0.1.x -> v0.4.0) stay theme-level and earn their own done-definitions as they firm up'. That deferral is the root cause of everything in NR-097 through NR-102. A theme with no done-definition has no test for 'is this finished?', so it can absorb items indefinitely - which is exactly what v0.1.1 did, taking on 26 retrofitted items after its own three legs had shipped. The two versions that DO have done-definitions are also the only two that have ever been cut or scheduled. QUESTION: write a short done-definition (3-5 bullets, v0.1.0's is the model) for each minor we intend to cut, starting with the ones that are already finished. It is the cheapest structural fix available and it converts 'when is this done?' from a judgement call into a checklist.",
+   "resolution": "2026-08-12 review-queue sweep: Answered, and the answer is now the standing rule. ROADMAP.md writes a done-definition **at each cut** and cites this entry by name for why — the practice is stated at the head of the document (\"now carries a done-definition written at the cut … a theme with no done-definition has no test for finished and absorbs items indefinitely (NR-103)\"), and executed for v0.1.1, v0.1.2, v0.1.3, v0.1.4, v0.1.5, v0.1.8, v0.1.9 and v0.1.10, with the unpromoted band carrying the rule forward (\"each earns its done-definition at promotion, per NR-103\"). The root cause this entry identified is fixed at the process level, not just once."
   },
   {
    "id": "NR-104",
@@ -1944,9 +1948,10 @@
    "title": "archive_designs.js reformats the whole of backlog.json: it writes 2-space indent, the file is stored at 1",
    "raised": "2026-08-09",
    "kind": "observation",
-   "status": "open",
+   "status": "resolved",
    "source": "v0.1.2 cut, 2026-08-09 - archiving BL-323's design prose",
-   "what": "tools/session/archive_designs.js:41 writes `JSON.stringify(data, null, 2)`, but docs/development/backlog.json is committed with a 1-space indent. So archiving ANY item silently reformats all ~7,500 lines: the run for BL-323 produced a 7531-insertion / 7502-deletion diff, and the file GREW from 895.6 KB to 907.1 KB even though 11.3 KB of prose had just moved out to the cold store. The tool's own summary line misreports this as '-1% smaller' (it prints a negated delta: '--11.4 KB'). Two consequences: the real change becomes unreviewable inside a whole-file diff, and it is a near-certain merge conflict for any concurrent session touching the backlog - which is exactly the situation this cut ran into. Worked around by rewriting backlog.json at indent=1 afterwards, which brought the diff back to 32 insertions / 3 deletions. FIX: change the indent to 1 for backlog.json (the cold archive files ARE 2-space, so the constant cannot simply be shared), and correct the sign on the size-delta message. Small item; not filed as a backlog entry because it is a two-line fix, but it will bite again on the next landing if left. (Filed as NR-104 initially; renumbered to NR-109 the same session after a concurrent session independently claimed NR-104 — see NR-110.) UPDATE, same session: the format has now FLIPPED — a concurrent session's archiver run committed backlog.json at 2-space, so HEAD is 2-space and the 1-space convention this entry describes is gone. That makes the fix a decision rather than a revert: pick one indent for backlog.json, make archive_designs.js write it, and normalise once. Until then every archiver run flips the whole file and every hand-edit flips it back."
+   "what": "tools/session/archive_designs.js:41 writes `JSON.stringify(data, null, 2)`, but docs/development/backlog.json is committed with a 1-space indent. So archiving ANY item silently reformats all ~7,500 lines: the run for BL-323 produced a 7531-insertion / 7502-deletion diff, and the file GREW from 895.6 KB to 907.1 KB even though 11.3 KB of prose had just moved out to the cold store. The tool's own summary line misreports this as '-1% smaller' (it prints a negated delta: '--11.4 KB'). Two consequences: the real change becomes unreviewable inside a whole-file diff, and it is a near-certain merge conflict for any concurrent session touching the backlog - which is exactly the situation this cut ran into. Worked around by rewriting backlog.json at indent=1 afterwards, which brought the diff back to 32 insertions / 3 deletions. FIX: change the indent to 1 for backlog.json (the cold archive files ARE 2-space, so the constant cannot simply be shared), and correct the sign on the size-delta message. Small item; not filed as a backlog entry because it is a two-line fix, but it will bite again on the next landing if left. (Filed as NR-104 initially; renumbered to NR-109 the same session after a concurrent session independently claimed NR-104 — see NR-110.) UPDATE, same session: the format has now FLIPPED — a concurrent session's archiver run committed backlog.json at 2-space, so HEAD is 2-space and the 1-space convention this entry describes is gone. That makes the fix a decision rather than a revert: pick one indent for backlog.json, make archive_designs.js write it, and normalise once. Until then every archiver run flips the whole file and every hand-edit flips it back.",
+   "resolution": "2026-08-12 review-queue sweep: Fixed and verified on a live archive. `writeJson` now writes each file in the FILE'S OWN shape — it reads back the existing indent (from the first nested key) and line endings, so backlog.json keeps 1-space/LF and the cold stores keep 2-space/CRLF, with new files defaulting to 2. Measured on the real BL-365 archive run: backlog.json diffs **2 insertions / 2 deletions** (the design→pointer swap and the `archived` key) instead of the 7531/7502 whole-file rewrite this entry recorded. The misreported delta is fixed too — the summary line was `−${kb(before - after)}` with no sign handling, printing \"−-11.4 KB, -1% smaller\" for a file that grew; it now picks −/+ and smaller/larger from the sign. `backlog_lint` passes with 0 failures afterwards."
   },
   {
    "id": "NR-110",
@@ -1987,7 +1992,7 @@
    "title": "condition_subject::era measures launchpad ownership, because the Era system is designed but not implemented",
    "raised": "2026-08-10",
    "kind": "decision-taken",
-   "status": "open",
+   "status": "resolved",
    "source": "BL-342 (condition_set evaluator)",
    "what": "tech_tree.hpp listed `era` among its six condition labels, so BL-342 promoted it with the rest. ERAS.md opens with a status banner saying the Era system is designed and NOT implemented; in code, space access is gated on launchpad presence and nothing else. So the era subject measures exactly that: a corp owning a launchpad reads Era 1, otherwise Era 0.",
    "why_it_matters": "It is the honest measure rather than an invented one, and it keeps every authored `era` condition meaning the same thing when the real Era system lands (the measure becomes a lookup; the conditions do not change). But it does mean an `era >= 1` gate today is really a `owns a launchpad` gate, and anyone authoring one should know that.",
@@ -1996,7 +2001,7 @@
     "src/world/condition_set.cpp",
     "docs/economy/ERAS.md"
    ],
-   "resolution": null
+   "resolution": "2026-08-12 review-queue sweep: Recorded where an author would look. ERAS.md's status banner now carries the proxy explicitly: `condition_subject::era` reports 1 for a corp owning a launchpad and 0 otherwise, why that is the honest measure rather than an invented one, the replace-the-measure / keep-the-conditions path when the real Era system lands, and — the part that actually protects a future author — WHICH conditions read wrongly under it: \"era >= 1\" today means \"owns a launchpad\", so a condition meaning \"this corp has industrialised into space\" is safe and one meaning \"the campaign has reached Era 1\" is not, since the proxy is per-corp and the design is world-wide. Your recommendation kept as-is; no code changed."
   },
   {
    "id": "NR-114",
@@ -2373,12 +2378,12 @@
   },
   {
    "id": "NR-139",
-   "title": "BL-325 (corp borders on the hex grid) carries two open design questions before anyone builds it",
+   "title": "BL-364 (corp borders on the hex grid) carries two open design questions before anyone builds it — and this entry cited the WRONG item id",
    "raised": "2026-08-08",
    "kind": "decision-needed",
    "status": "open",
    "source": "Implementing BL-293 (order book unreachable by command), 2026-08-08.",
-   "what": "Filed from Ben's 2026-08-08 steer that the corp border circle 'basically tells us nothing'. Q1: WHICH tile set is the border - (a) tiles within influence_range of the seat (the honest hex rendering of today's circle), (b) tiles inside the corp's logistics-reach budget (what 'a valid move' actually means once BL-323 lands), or (c) held tiles plus neighbours? Q2: always-on fill is heavy over a hex grid and will fight other overlays - outline always-on, fill only under the Corporation lens? [Renumbered from NR-089 on 2026-08-10: the BL-293 branch sat unmerged while main used that id for a different entry.]",
+   "what": "Filed from Ben's 2026-08-08 steer that the corp border circle 'basically tells us nothing'. Q1: WHICH tile set is the border - (a) tiles within influence_range of the seat (the honest hex rendering of today's circle), (b) tiles inside the corp's logistics-reach budget (what 'a valid move' actually means once BL-323 lands), or (c) held tiles plus neighbours? Q2: always-on fill is heavy over a hex grid and will fight other overlays - outline always-on, fill only under the Corporation lens? [Renumbered from NR-089 on 2026-08-10: the BL-293 branch sat unmerged while main used that id for a different entry.] [2026-08-12 sweep — ID CORRECTION: every \"BL-325\" in this entry is wrong. BL-325 is MILITARY_BASE_AND_SUPPLY, a shipped v0.1.5 item; the corp-border work is **BL-364** (CORP_BORDER_HEXES, design-owed, v0.1.2), which was renumbered off BL-325 on 2026-08-10 precisely because that id was already taken — its own summary records the renumber. This entry was itself renumbered in the same collision (from NR-091) and kept the stale id, so it is a second-order instance of exactly the hazard NR-110 documents: with no next_id.js equivalent for NR ids, a concurrent-session renumber fixes the id on the entry but not the ids INSIDE it. No content change — Q1 and Q2 as written are still the open questions, and BL-364's design field already carries both verbatim, so nothing is lost, only mis-addressed.]",
    "why_it_matters": "Q1 decides whether BL-325 is a small independent reskin or a consumer of BL-323's reach field, which changes both its sequencing and its difficulty. Ben's own stated purpose - 'more easily see what is and isn't a valid move' - argues for (b), but (b) means the item cannot land before the buildings rework does. Worth answering before it is promoted.",
    "options": [
     "Q1a - influence_range hexes: independent of BL-323, small, but still a picture of a scalar.",
@@ -2388,7 +2393,7 @@
    "recommendation": "Q1b, sequenced after BL-323; Q2 outline-always / fill-on-lens, matching the Country lens's grammar.",
    "files": [
     "src/ui/body_surface_canvas.cpp",
-    "docs/development/backlog.json"
+    "docs/development/backlog.json (BL-364)"
    ]
   },
   {
@@ -2416,14 +2421,15 @@
    "title": "The app does not build at HEAD: tile_inspector.cpp includes a header that exists in no commit or branch",
    "raised": "2026-08-08",
    "kind": "observation",
-   "status": "open",
+   "status": "resolved",
    "source": "Implementing BL-293, 2026-08-08 - hit when trying to build ProjectIo to verify the Market Ledger change.",
    "what": "`src/ui/tile_inspector.cpp:9` includes `world/sim_terrain_build.hpp`. That header does not exist in the working tree, in HEAD, or in any local or remote branch (`git log --all -- src/world/sim_terrain_build.hpp` returns nothing). tile_inspector.cpp was committed at ca22b3a ('One silhouette check instead of a hundred and forty-six'), so the `ProjectIo` target has been unbuildable since that commit. Every `src/*.cpp` is globbed into the target, so this one file fails the whole app link - it is not confined to the tile inspector. [Renumbered from NR-091 on 2026-08-10: the BL-293 branch sat unmerged while main used that id for a different entry.]",
    "why_it_matters": "Nothing to do with BL-293, but it blocks that item's one visual requirement (R7: the Market Ledger's presses going through the command seam) and it will block the next person the same way. Same shape as the concurrent-session problem already known in this tree - committed source referencing an uncommitted header - which suggests the header is sitting untracked on whichever machine authored ca22b3a and simply was not added. Cheapest fix is almost certainly `git add` of the missing file from that machine; the alternative is reconstructing it from tile_inspector.cpp's usage. Worth resolving before anything else needs a visual check.",
    "files": [
     "src/ui/tile_inspector.cpp",
     "src/world/sim_terrain_build.hpp"
-   ]
+   ],
+   "resolution": "2026-08-12 review-queue sweep: Gone. `src/world/sim_terrain_build.hpp` exists in the working tree at HEAD and `src/ui/tile_inspector.cpp:10` resolves against it, so the missing-header cause named here is no longer present — the file evidently landed once the concurrent session's branch merged, which is the resolution NR-110 predicted for this class of fault. Note the honest limit: this was verified by inspection, not by a full app build, so it clears THIS cause rather than certifying the target green."
   },
   {
    "id": "NR-142",
@@ -2521,7 +2527,7 @@
    "status": "open",
    "title": "Background industry is more corporations, not a nation actor — settled by the rulebook",
    "source": "BL-365 design draft, 2026-08-10, following Ben's \"replace the substrate entirely\".",
-   "what": "Who owns the industry that fills a saturated world is the first question BL-365 has to answer, and it is not a matter of preference. io-standing-rules.md prohibits nation behaviour (BL-054 stays deferred) while explicitly sanctioning background CORPORATIONS running a deterministic scored-utility layer over the corp-command seam (BL-202/BL-203, widened by BL-324). Nation-owned industry would need the one actor class the rules forbid; corporate industry needs no new exception at all. Recorded because it looks like a design choice and is actually a constraint — if Ben wants nations to own industry, that is a standing-rules amendment, not a BL-365 detail."
+   "what": "Who owns the industry that fills a saturated world is the first question BL-365 has to answer, and it is not a matter of preference. io-standing-rules.md prohibits nation behaviour (BL-054 stays deferred) while explicitly sanctioning background CORPORATIONS running a deterministic scored-utility layer over the corp-command seam (BL-202/BL-203, widened by BL-324). Nation-owned industry would need the one actor class the rules forbid; corporate industry needs no new exception at all. Recorded because it looks like a design choice and is actually a constraint — if Ben wants nations to own industry, that is a standing-rules amendment, not a BL-365 detail. [2026-08-12 sweep — PROPAGATED, entry left open for your ruling: the premise had landed in GENERATION_STRATEGY.md (BL-365 T2) but two upstream docs still said the opposite, and both are now corrected — SYSTEMS.md (\"whose bulk industrial base is owned and run by the **Nation AI**\") and CLAUDE.md's own doc map (\"a saturated, earth-like base whose broad industry the Nation AI owns\"). Both now name real background corporations and say plainly that it is neither a nation actor nor the abstract substrate. This records where the decision now lives; it does not answer it for you.]"
   },
   {
    "id": "NR-151",
@@ -2530,7 +2536,7 @@
    "status": "open",
    "title": "Saturation is a calibrated generation invariant, not an authored building count",
    "source": "BL-365 design draft, 2026-08-10.",
-   "what": "Rather than authoring 'place N buildings', generation places background firms until the body's real production meets a target fraction of its real demand — first cut 0.90, deliberately the same figure as today's substrate clearing_fraction, so the opportunity gap is preserved by construction rather than by injection. The world then stays saturated when recipes, deposits or population are retuned, instead of silently desaturating. It also keeps BL-078's and BL-112's requirements meaningful under a new mechanism: same assertions, now emergent rather than arranged. Sizing input worth checking at build time — the ~16-32 figure quoted for the current world is the GENERATED count; NR-145 records world.buildings reaching 458 by tick 500 and 556 by tick 1000 as corp_ai builds, so the post-warm-start count is much higher than the generated one and is the number the calibration should target."
+   "what": "Rather than authoring 'place N buildings', generation places background firms until the body's real production meets a target fraction of its real demand — first cut 0.90, deliberately the same figure as today's substrate clearing_fraction, so the opportunity gap is preserved by construction rather than by injection. The world then stays saturated when recipes, deposits or population are retuned, instead of silently desaturating. It also keeps BL-078's and BL-112's requirements meaningful under a new mechanism: same assertions, now emergent rather than arranged. Sizing input worth checking at build time — the ~16-32 figure quoted for the current world is the GENERATED count; NR-145 records world.buildings reaching 458 by tick 500 and 556 by tick 1000 as corp_ai builds, so the post-warm-start count is much higher than the generated one and is the number the calibration should target. [2026-08-12 sweep — PROPAGATED, entry left open for your ruling: the premise had landed in GENERATION_STRATEGY.md (BL-365 T2) but two upstream docs still said the opposite, and both are now corrected — SYSTEMS.md (\"whose bulk industrial base is owned and run by the **Nation AI**\") and CLAUDE.md's own doc map (\"a saturated, earth-like base whose broad industry the Nation AI owns\"). Both now name real background corporations and say plainly that it is neither a nation actor nor the abstract substrate. This records where the decision now lives; it does not answer it for you.]"
   },
   {
    "id": "NR-152",
@@ -2563,10 +2569,11 @@
    "id": "NR-155",
    "raised": "2026-08-10",
    "kind": "observation",
-   "status": "open",
+   "status": "resolved",
    "title": "\"A tile is one building\" was never the shipped rule",
    "source": "Reading placement_rules.cpp against Ben's 2026-08-10 framing.",
-   "what": "Ben proposed pivoting off 'the design philosophy that a tile is one building'. The code does not implement that philosophy: stack_capacity returns a richness-derived 1-5 for extraction_site and 1 for everything else, and buildings_on_tile counts per (tile, type, target) — so one tile already carries several iron sites plus several coal sites plus one processor plus one port plus one hub. What is capacity-1 is every NON-extraction type, which is precisely the question BL-193 deferred rather than answered ('whether processors stack on land, workforce or road tier is a separate question'). BL-366 is therefore a completion of BL-193, not a pivot away from it, and is written that way. Flagged because the framing difference changes what the item is understood to be doing."
+   "what": "Ben proposed pivoting off 'the design philosophy that a tile is one building'. The code does not implement that philosophy: stack_capacity returns a richness-derived 1-5 for extraction_site and 1 for everything else, and buildings_on_tile counts per (tile, type, target) — so one tile already carries several iron sites plus several coal sites plus one processor plus one port plus one hub. What is capacity-1 is every NON-extraction type, which is precisely the question BL-193 deferred rather than answered ('whether processors stack on land, workforce or road tier is a separate question'). BL-366 is therefore a completion of BL-193, not a pivot away from it, and is written that way. Flagged because the framing difference changes what the item is understood to be doing.",
+   "resolution": "2026-08-12 review-queue sweep: Correct as filed, and since answered by the work. The premise was never shipped — `stack_capacity` is a richness-derived ceiling for extraction_site — and the half BL-193 left open (non-extraction stacking) is no longer deferred: BL-366 landed an authored per-composition ceiling (`non_extraction_stack_cap`, 2 on volcanic/icy through 6 on grassland/forest/wetland to 12 on urban), counted in AGGREGATE across every non-extraction type rather than per type, with an urban transform when the stack fills. Both authority docs carry the real rule: PRODUCTION.md § Building stacks (\"Non-extraction stacking is answered by BL-366, not deferred any longer\") and TILES.md § the composition table. Nothing left to correct — the docs no longer describe a philosophy the code does not implement."
   },
   {
    "id": "NR-156",
@@ -2581,10 +2588,11 @@
    "id": "NR-157",
    "raised": "2026-08-10",
    "kind": "observation",
-   "status": "open",
+   "status": "resolved",
    "title": "BL-107's 'no flat-binary serialiser exists' is stale — and BL-340's dependency is live again",
    "source": "BL-340 design pass, re-read against the BL-293 merge.",
-   "what": "BL-107 (save-format magic + version header) is marked designed-but-BLOCKED on the grounds that 'no flat-binary serialiser exists in world/* yet'. That was true pre-merge. It is not now: history_log.{hpp,cpp} and order_book.{hpp,cpp} are two such streams, both already carrying the magic + version header BL-107 specifies and both citing BL-107 as their reason. BL-107's remaining scope is the WORLD-SNAPSHOT header, not the first-ever one, and its status line should say so. The knock-on for BL-340 reverses a conclusion reached earlier the same session: read_order_book rejects a resource byte outside the known resource_type range, so widening the enum now moves a validation boundary in shipped serialised state. Not a blocker, but the version bump is a real step rather than a hypothetical one."
+   "what": "BL-107 (save-format magic + version header) is marked designed-but-BLOCKED on the grounds that 'no flat-binary serialiser exists in world/* yet'. That was true pre-merge. It is not now: history_log.{hpp,cpp} and order_book.{hpp,cpp} are two such streams, both already carrying the magic + version header BL-107 specifies and both citing BL-107 as their reason. BL-107's remaining scope is the WORLD-SNAPSHOT header, not the first-ever one, and its status line should say so. The knock-on for BL-340 reverses a conclusion reached earlier the same session: read_order_book rejects a resource byte outside the known resource_type range, so widening the enum now moves a validation boundary in shipped serialised state. Not a blocker, but the version bump is a real step rather than a hypothetical one.",
+   "resolution": "2026-08-12 review-queue sweep: Both halves fixed this session. (1) BL-107 no longer asserts that no serialiser exists: its `blocked_on` was the bare token \"FLAT_BINARY_SERIALISATION\", which now reads as SATISFIED when it is not, and was retargeted to name the thing actually missing — a world-snapshot serialiser, which no backlog item covers — while the \"**BLOCKED:** no flat-binary serialiser exists in world/*\" paragraph is marked stale and corrected in place. Sharpened while checking: there are THREE such streams now, not two — `history_log` (IOHL), `order_book` (IOOB) and `procurement` (IOPC) — all carrying BL-107's magic + version header. (2) MARKETS.md called procurement \"the fourth flat-binary stream\"; corrected to the third, since `grep magic src/` finds exactly three. The BL-340 knock-on needs no action: BL-340 has shipped complete."
   },
   {
    "id": "NR-158",
@@ -2781,7 +2789,7 @@
    "title": "nation.resource_abundance kept, not deleted, despite BL-365 design prose saying it would be — genuinely independent of the substrate mechanism",
    "raised": "2026-08-11",
    "kind": "decision-taken",
-   "status": "open",
+   "status": "resolved",
    "source": "BL-365 (background industry keystone) T1 session, integration review.",
    "what": "BL-365's design (Q3, 2026-08-11) stated nation.resource_abundance and the substrate capacity arrays get deleted outright once real firms replace them. T1 implementation deleted nation_substrate/nation_substrates/substrate_params (the actual substrate injection state) but deliberately kept nation_component::resource_abundance — it is a separate per-nation sum of owned-tile resource deposits (nation_generation.cpp:519-543, scaled in settlement.cpp:770), read by src/ui/entity_summary.cpp's ranked top-resources display and by hard_coded_world.cpp:601. Neither read site is substrate-specific; both are general nation-info summaries unrelated to inject_substrate_demand. Deleting it would break a UI display for no reason connected to this item's purpose.",
    "why_it_matters": "The design doc's blanket claim (both resource_abundance and the capacity arrays get deleted) does not hold once the actual usage sites are checked — worth a conscious sign-off that keeping resource_abundance is correct, since it diverges from written design prose.",
@@ -2794,6 +2802,54 @@
     "src/world/components.hpp",
     "src/world/nation_generation.cpp",
     "src/ui/entity_summary.cpp"
+   ],
+   "resolution": "2026-08-12 review-queue sweep: Option 1 taken, and the design prose amended so it stops contradicting the code. BL-365 has landed and its prose is now in the cold store, so the amendment went there (docs/development/archive/backlog-design-2026-Q3.json) per the \"amend a landed item's prose in the cold file\" rule — Q3's \"dead substrate state is deleted, not kept\" paragraph now carries a dated block recording that `nation.resource_abundance` was KEPT, what it actually is (a per-nation sum of owned-tile deposits, distinct from the substrate it sat beside), its two non-substrate readers, and that deleting it would have removed a working UI surface to satisfy a sentence rather than a dependency. Verified it resolves through `backlog_query BL-365 --full`. Reopen if you would rather the field went after all."
+  },
+  {
+   "id": "NR-173",
+   "title": "The Industry lens now tints a field that nothing else reads — re-point it at real background firms, or retire it?",
+   "raised": "2026-08-12",
+   "kind": "question",
+   "status": "open",
+   "source": "Review-queue sweep, 2026-08-12 — found while correcting the stale substrate premise for NR-150/NR-151",
+   "what": "BL-365 replaced the abstract nation substrate with real background corporations, and `nation_generation.cpp` Pass 6 now describes `tile.substrate_density` in its own comment as \"purely a rendering field now\". The Industry lens (BL-084) is the only consumer left: it tints each tile by that generation-time ripple weighted by terrain deposit richness. So the lens still renders exactly as blessed, but what it MEANS has quietly changed — it draws where background industry plausibly would sit, while the real background firms are ordinary buildings sitting somewhere else on the same map. LENSES.md and `ACTIONS.json`'s lens.industry entry both still claimed the field 'injects background supply and demand into each market'; that claim is corrected as of this sweep, but the lens itself is untouched.",
+   "why_it_matters": "A lens whose tint no longer answers its own question is worse than an absent one: it looks like evidence. The action dictionary's version of the fault is sharper still — an AI player reading the old `reason_to_select` would have treated the tint as a market signal and been wrong every time. Corrected in prose, but the surface remains a picture of a scalar, which is the same objection Ben raised against the corp border circle ('basically tells us nothing', NR-139).",
+   "options": [
+    "Re-point it at real background-firm buildings — per-tile count/output of `is_background` corp buildings, which is what the lens name has always promised. Makes it a true lens again and gives the saturated world a surface of its own.",
+    "Retire `overlay_mode::industry` and let Production carry it — Production already tints real output intensity, and Industry is keyboard-cycle-only anyway, so the roster loses a lens nobody presses rather than a capability.",
+    "Keep as flavour, labelled — leave the vestigial field, and let the corrected docs stand as the whole fix.",
+    "Delete `tile.substrate_density` outright along with the lens — the field is BL-050's last remnant and costs a float per tile."
+   ],
+   "recommendation": "Option 1 or 2, not 3. The two are close: option 1 keeps a distinct question ('where is the industry I did not build?') that Production does not quite ask, since Production is body-relative intensity including the player's own; option 2 is honest about the fact that Industry was already trimmed off the visible bar the day it shipped. Option 3 leaves a surface that reads as evidence and is not, which is the thing worth avoiding. Option 4 only after 1 is ruled out — `substrate_density` is cheap and deleting it is a save-format touch for no gain.",
+   "files": [
+    "docs/ui/LENSES.md",
+    "docs/ai/ACTIONS.json",
+    "src/ui/body_surface_canvas.cpp",
+    "src/world/nation_generation.cpp",
+    "src/world/components.hpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-174",
+   "title": "v0.1.5 was declared cut in ROADMAP.md but never tagged or stamped — the one release residue left over from NR-097",
+   "raised": "2026-08-12",
+   "kind": "observation",
+   "status": "open",
+   "source": "Review-queue sweep, 2026-08-12 — found while checking whether NR-097 (no version cut) was overtaken",
+   "what": "ROADMAP.md carries \"## Done-definition — v0.1.5 (military systems, cut by Sprint 9)\", annotated \"Written at the cut, per NR-103's fix\", and two queue entries head themselves \"Sprint 9 (cut v0.1.5)\" (NR-121, NR-122). But there is **no v0.1.5 tag** (`git tag -l v0.1.5` is empty), **no `## [0.1.5]` section in CHANGELOG.md**, and README.md's \"Latest releases\" line lists v0.1.1, v0.1.2, v0.1.8, v0.1.9, v0.1.10 and v0.1.14 — skipping it. DEVELOPMENT_PRACTICES § Cutting a release names the annotated tag as \"the authoritative version-history record\", so on the authoritative record v0.1.5 was never released. Consistent with this, BL-325 — the item the done-definition leads with — still reads \"designed\" rather than terminal (NR-102).",
+   "why_it_matters": "It is the exact failure NR-097 named, surviving in one place after the other nine were fixed: direction written forward faster than a release is stamped. And it is the more confusing half of that failure, because the done-definition's presence makes the cut look complete to anyone reading the roadmap — a future reader reconciling ROADMAP against `git tag` finds a version that exists in prose and nowhere else. Cheap to fix now while the sprint is recent; archaeology in a month.",
+   "options": [
+    "Stamp and tag v0.1.5 retroactively from the Sprint 9 commits — CHANGELOG section plus annotated tag — and move BL-325 to a terminal status. Makes the record match the prose.",
+    "Demote the ROADMAP heading from \"cut by Sprint 9\" to \"ready to cut\", and cut it properly with the next release pass. Honest, and defers the stamping work.",
+    "Fold v0.1.5's content into the next cut and strike the separate minor, on the grounds that the re-sequencing (NR-153) already moved the numbering around it."
+   ],
+   "recommendation": "Option 1 if the criteria genuinely hold, since the done-definition is already written and the evidence is one sprint old. But note the coupling: its own done-definition says what the cut does NOT claim (hire_unit never observed firing end-to-end for a rival corp, NR-121), so stamping it is a statement that a cut may ship with a named unverified path — which is defensible and worth making deliberately rather than by default. Option 2 if that reads as too loose.",
+   "files": [
+    "docs/development/ROADMAP.md",
+    "CHANGELOG.md",
+    "README.md",
+    "docs/development/backlog.json"
    ],
    "resolution": null
   }
