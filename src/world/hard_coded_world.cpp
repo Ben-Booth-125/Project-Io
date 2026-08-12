@@ -632,6 +632,71 @@ world make_hard_coded_world(world_params params, generation_report* report,
             centre_ids.push_back(cid);
         std::sort(centre_ids.begin(), centre_ids.end());
 
+        // BL-132 change (2): markets centre on a static resource<->population
+        // trade-flow PROXY rather than sitting exactly on the population tile.
+        // Live trade routes don't exist at gen-time, so the proxy is the
+        // strongest nearby pull toward a rich deposit: within a bounded radius
+        // of the population tile, the site maximising richness/(1+dist^2) wins
+        // (a simple gravity model — closer and richer both raise the pull),
+        // defaulting back to the population tile itself when nothing nearby
+        // beats it (the common case away from a rich cluster, which keeps this
+        // a proxy rather than a relocation of every market). Kepler's raster
+        // grid, built once here rather than per-market.
+        constexpr int    market_gw = 180, market_gh = 84;
+        constexpr int    proxy_radius = 8; // tiles — a market's plausible catchment reach
+        std::vector<entity_id> kepler_tile_ids(
+            static_cast<std::size_t>(market_gw * market_gh), null_entity);
+        for (const auto& [tid, tc] : w.tiles)
+        {
+            if (tc.body != kepler)
+                continue;
+            const int idx = tc.grid_y * market_gw + tc.grid_x;
+            if (idx >= 0 && idx < market_gw * market_gh)
+                kepler_tile_ids[static_cast<std::size_t>(idx)] = tid;
+        }
+        auto tile_richness = [&](entity_id tid) -> float {
+            const auto it = w.tiles.find(tid);
+            if (it == w.tiles.end())
+                return 0.0f;
+            float sum = 0.0f;
+            for (const resource_type rt : tradeable_raws)
+                sum += it->second.resource_deposit[static_cast<std::size_t>(rt)];
+            return sum;
+        };
+        auto trade_flow_proxy_site = [&](entity_id pop_tile) -> entity_id {
+            const auto pit = w.tiles.find(pop_tile);
+            if (pit == w.tiles.end())
+                return pop_tile;
+            const int pcol = pit->second.grid_x, prow = pit->second.grid_y;
+
+            entity_id best_site  = pop_tile;
+            float     best_score = tile_richness(pop_tile); // dist=0 -> /(1+0)
+            for (int dr = -proxy_radius; dr <= proxy_radius; ++dr)
+            {
+                const int row = prow + dr;
+                if (row < 0 || row >= market_gh)
+                    continue;
+                for (int dc = -proxy_radius; dc <= proxy_radius; ++dc)
+                {
+                    if (dr == 0 && dc == 0)
+                        continue;
+                    const int col = ((pcol + dc) % market_gw + market_gw) % market_gw;
+                    const entity_id cand = kepler_tile_ids[
+                        static_cast<std::size_t>(row * market_gw + col)];
+                    if (cand == null_entity)
+                        continue;
+                    const float d2 = static_cast<float>(dr * dr + dc * dc);
+                    const float score = tile_richness(cand) / (1.0f + d2);
+                    if (score > best_score)
+                    {
+                        best_score = score;
+                        best_site  = cand;
+                    }
+                }
+            }
+            return best_site;
+        };
+
         int markets_seeded = 0;
         for (const entity_id cid : centre_ids)
         {
@@ -652,7 +717,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
                 continue; // folds into a neighbouring market (routed by market_for_tile)
 
             market_component mc = kepler_market_template;
-            mc.centre_tile = tile_it->second;
+            mc.centre_tile = trade_flow_proxy_site(tile_it->second);
             mc.price       = mc.base_price; // start at canonical base
             w.markets[w.create_entity()] = mc;
             ++markets_seeded;
