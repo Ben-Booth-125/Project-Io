@@ -10,9 +10,19 @@
 namespace {
 
 /// Map a Lua resource name (matching the resource_type enum identifiers) to the
-/// enum value. Only the prototype's tradeable subset needs to resolve here —
-/// world_gen.lua authors Kepler's starting market, not the full economy table
-/// (that's recipes.lua/economy.lua's job). Returns false in `ok` for an unknown name.
+/// enum value. Returns false in `ok` for an unknown name.
+///
+/// COVERS THE WHOLE ENUM, deliberately. This table used to hold only "the
+/// prototype's tradeable subset", on the reasoning that world_gen.lua authors
+/// Kepler's starting market rather than the full economy table. That reasoning
+/// made the table a hand-synced duplicate of the one in recipe_registry.cpp, and
+/// on 2026-08-12 it cost a startup crash: BL-368 priced the habitability tranche
+/// (clean_water, consumer_goods, medical_supplies) in world_gen.lua and added it
+/// to recipe_registry's table but not this one, so load_from_lua threw
+/// "Unknown resource 'medical_supplies'" and the app died right after generation.
+/// A subset is only safe while nobody authors outside it, which is not a property
+/// anyone can check at the point of authoring. So: every enum value resolves here,
+/// and a new resource is added to this table as a matter of course.
 resource_type resource_from_name(const std::string& name, bool& ok)
 {
     static const std::unordered_map<std::string, resource_type> table = {
@@ -47,6 +57,26 @@ resource_type resource_from_name(const std::string& name, bool& ok)
         { "alloys",                resource_type::alloys },
         { "electronics",           resource_type::electronics },
         { "spacecraft_components", resource_type::spacecraft_components },
+        // BL-368 (2026-08-11): the habitability tranche. Priced in world_gen.lua
+        // from the day it landed; missing here until 2026-08-12, which is the
+        // crash described above.
+        { "clean_water",           resource_type::clean_water },
+        { "consumer_goods",        resource_type::consumer_goods },
+        { "medical_supplies",      resource_type::medical_supplies },
+        // The remaining enum values, so this table is complete rather than a
+        // subset that happens to cover what is authored today. Endemic and
+        // ambient goods (BL-286/BL-191): unpriced in world_gen.lua right now,
+        // but authoring a price for one must not be a crash.
+        { "regolith",              resource_type::regolith },
+        { "stone",                 resource_type::stone },
+        { "timber",                resource_type::timber },
+        { "sand",                  resource_type::sand },
+        { "clay",                  resource_type::clay },
+        { "peat",                  resource_type::peat },
+        { "tobacco",               resource_type::tobacco },
+        { "spices",                resource_type::spices },
+        { "coffee",                resource_type::coffee },
+        { "furs",                  resource_type::furs },
     };
 
     const auto it = table.find(name);
