@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*175 entries — 55 open, 120 resolved.*
+*176 entries — 55 open, 121 resolved.*
 
 ---
 
@@ -2179,4 +2179,21 @@ Ben's idea, recorded as raised: the active map lens could change what clicking t
 > **RESOLVED.** ANSWERED (Ben, 2026-08-12, Q&A form): **the lens replaces the selection subject** — option 1. Each overlay_mode names what a click resolves to, overriding the fixed building > market_centre > tile marker priority while that lens is active (Resource -> deposit, Country -> nation, Corporation -> corp, Market -> market centre; none -> today behaviour). Note the fall-through caveat this entry raised is now a design constraint on the implementing item rather than an objection: the lenses with no tile-grid subject (Reach, Supply-routes, Scarcity) must each still name a subject or explicitly keep the default priority, or a click under them does nothing. Filed as BL-372 (lens-keyed selection subject).
 
 *Files: `src/ui/ui_state.hpp`, `src/ui/selection.hpp`, `docs/ui/SELECTION.md`, `docs/ui/LENSES.md`, `docs/ai/ACTIONS.json`*
+
+### NR-177 — Project refocus to 0 CE — ancient era as a standalone commercial product, space work stashed for DLC
+*question · raised 2026-08-12 · from Ben, 2026-08-12 — raised directly in session, answered the same session via Q&A form*
+
+Ben: 'our project is too grand to be able to really feel out the gameplay', so refocus to 0 CE and play in the ancient era to test the feel; strongly considering releasing ancient-era gameplay and stashing much of the current work as DLC. Grounding done before answering: the ancient era ALREADY EXISTS in the tree as a simulation — history_sim.cpp runs a 0 CE -> 1960 year tick with polities, four scored verbs, cohesion and supply decay; combat.cpp resolves battles on a class x doctrine x terrain x supply x season model; settlement.cpp, creeds.cpp, tongue.cpp, works_roster + scripts/works.lua and ancient_tech_ladder.json surround it. All of it is bot-only, headless, province-grain and year-tick, with no player seam, no canvas surface and no market.
+
+**Why it matters.** The refocus inverts what carries. The framing 'stash the space work' implies the GAME carries and the space CONTENT stashes; measured against the tree it is closer to the reverse — the ~54k lines of playable surface (canvases, lenses, ledgers, markets, order book, construction, selection, hotkeys) are all shaped for the 1960 corporation, while the ancient content is a headless simulation. Getting the carry/stash boundary wrong is expensive in both directions: stashing something era-agnostic loses proven work, and carrying something 1960-shaped drags the space premise into the ancient product.
+
+- Re-anchor the Era ladder — ancient becomes Era 0, today's 1960 Terrestrial becomes a later Era, one codebase, DLC ships as later Eras.
+- Stash the space work on a branch, build ancient as its own product, merge back for DLC.
+- Hard fork — ancient is a separate project, space work archived.
+
+> **Recommendation:** Re-anchor was recommended on merit (one codebase, one save format, no stash to rot, and CONCEPT.md's Era ladder already says each Era necessitates the one before). Ben chose the branch stash — see resolution.
+
+> **RESOLVED.** ANSWERED (Ben, 2026-08-12, Q&A form) — four rulings, plus his stated reason. REASON: 'When making your ideal game, you should first focus on a smaller project with similar design.' The ancient game is therefore a deliberate practice product, not an abandonment of the space game. (1) RELATIONSHIP: stash the space work on a branch, build ancient as its own product, merge back for DLC — NOT the recommended re-anchor. (2) PLAYER IDENTITY: a mercenary company — the militia ancestor, hired force plus its own supply. This is NOT a third identity pivot; it is BL-094's national private militia one era earlier, same shape (procure force, field it, be paid), so the identity settled on 2026-08-10 is being TESTED rather than replaced. (3) GRAIN: tile and fine tick — keep today's campaign grain and rebuild the ancient content onto it. CONSEQUENCE, and it is counterintuitive: history_sim does NOT become the play layer. It stays the GENERATOR with its stop_year moved from 1960 to ~0 CE, which makes generation cheaper rather than more expensive. (4) RELEASE BAR: commercial release, Steam or itch, paid, needing polish and content depth. CONSEQUENCES STILL OWED, none of them settled by this entry: the conflict spine (BL-315) moves from v0.3.0 groundwork onto the critical path, because a mercenary company's core loop is built entirely on the pillar CONCEPT.md still calls the least-designed and which nothing in the campaign layer commands; the mercenary SELL side (who contracts you, on what terms, win/lose consequences) has no item at all, where procurement.cpp is only the buy side; the product needs a name, since Io is a moon of Jupiter; and ROADMAP.md, CONCEPT.md and ERAS.md all still assert the current arc. Landing those is work, to be filed as backlog items rather than carried here.
+
+*Files: `docs/CONCEPT.md`, `docs/development/ROADMAP.md`, `docs/economy/ERAS.md`, `docs/economy/RESOURCES.md`, `src/world/history_sim.cpp`, `src/world/combat.cpp`, `src/world/components.hpp`*
 
