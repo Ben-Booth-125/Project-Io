@@ -10533,6 +10533,44 @@
      "notes": "BL-367 appended to the construction_panel and selection_panel entries; SELECTION.md gained a Multi-building tiles section; ICONS.md gained the badge catalogue row."
     }
    ]
+  },
+  {
+   "brief": "market-cogeneration",
+   "title": "BL-132 (market cogeneration): population near resources, markets on a trade-flow proxy, corp-level carving",
+   "difficulty": 5,
+   "importance": "C",
+   "status": "complete",
+   "promoted_from": "backlog.json BL-132, v0.1.13 (Sprint 10)",
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "generate_population_centres weights its candidate pool by nearby extractable-deposit richness (multiplicative with the existing adjacency weight), so population is more likely to spawn near rich resources without changing the RNG draw sequence (determinism preserved).",
+     "class": "headless",
+     "status": "complete",
+     "notes": "population_generation.cpp richness_weight(); verified via world_audit/settlement_harness/demography_harness, all pass, BL-096 R4 + BL-257 R2 determinism unaffected."
+    },
+    {
+     "id": "R2",
+     "requirement": "A market's centre_tile is a static resource<->population trade-flow proxy (a bounded-radius richness/(1+dist^2) gravity search from the anchoring population tile) rather than the population tile itself, falling back to the population tile when nothing nearby beats it.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "hard_coded_world.cpp trade_flow_proxy_site(); pure function of generation-time tile data, no RNG. BL-096 R1/R2/R4 hold."
+    },
+    {
+     "id": "R3",
+     "requirement": "generate_corporations runs before Kepler's market-seeding block (the reorder), and the market-carving gate's concentration term factors how many distinct corporations hold an asset in a nation's territory, not raw geology alone.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "hard_coded_world.cpp: generate_corporations moved before market block; corps_in_nation term with corp_presence_gain (world_gen.lua tunable, default 0.15). world_determinism R1 (bit-identical incl. corps/entities) and BL-182 R2 (HQ designation identical across generations) both hold."
+    },
+    {
+     "id": "R4",
+     "requirement": "Determinism is preserved end to end across all three changes: the same seed reproduces an identical world, including population placement, market map, and corp holdings.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "world_determinism R1 PASS; BL-096 R4, BL-257 R2, BL-182 R2 all PASS after all three slices landed together."
+    }
+   ]
   }
  ]
 }

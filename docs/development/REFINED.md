@@ -1,5 +1,19 @@
 # Project Io — REFINED (active worklist)
 
+> Drained 2026-08-12: BL-132 (market cogeneration), Sprint 10's last item — 3 sequential slices
+> COMPLETE per the item's own settled sequencing (population resource-awareness -> trade-flow
+> market siting -> corp-level carving reorder, deliberately not entangled) — removed per the
+> retain-one policy. Record lives in backlog.json BL-132's `resolution` field and
+> requirements.json § market-cogeneration (R1–R4). (1) `generate_population_centres` weights its
+> candidate pool by nearby extractable-deposit richness. (2) A market's `centre_tile` is a static
+> resource↔population trade-flow proxy (bounded-radius gravity search) rather than the bare
+> population tile. (3) `generate_corporations` now runs before market seeding (the reorder), and
+> the market-carving gate's concentration term factors distinct-corp presence in a nation's
+> territory (`corp_presence_gain`, tunable in world_gen.lua). All three are pure functions of
+> generation-time data — no new RNG draws — so determinism carries through unchanged:
+> `world_determinism` R1 (bit-identical incl. corps/entities), BL-096 R1/R2/R4, BL-182 R1/R2, and
+> BL-257 R1/R2 all hold. `GENERATION_STRATEGY.md` gained a Market co-generation paragraph.
+
 > Drained 2026-08-12: BL-367 (multi-building management surface), 1 task COMPLETE (light-weight
 > enough for one direct pass) — removed per the retain-one policy. Record lives in backlog.json
 > BL-367's `resolution` field and requirements.json § multi-building-management-surface (R1–R5).

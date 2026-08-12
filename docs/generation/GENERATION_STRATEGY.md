@@ -85,6 +85,19 @@ holdings** rather than a broad spread (see `CORPORATION_GENERATION.md` § Pass 3
 reason the broad industrial base is carried by generated background firms rather than by the
 player managing it.
 
+**Market co-generation (BL-132, landed 2026-08-12).** Three changes on top of BL-096's
+nation-carved market model, each reading the previous rather than replacing it: (1) population
+centres now weight their placement toward nearby extractable-deposit richness, not adjacency to
+an existing centre alone — population spawns near rich resources. (2) A market's site is a
+static resource↔population **trade-flow proxy**: since live trade routes don't exist at
+generation time, each market centres on the strongest nearby pull toward a rich deposit within a
+bounded radius of its anchoring population tile, rather than sitting exactly on that tile. (3)
+**Corporations now generate before markets** (the one true reorder among the three), and the
+nation-carving gate's concentration term factors how many distinct corporations already hold an
+asset in that territory — a commercially-contested territory fractures into more markets on top
+of raw geology, not geology alone. Nations remain the carving actor (per the bullet above); this
+adds *who is competing there* as a second signal alongside *what the ground holds*.
+
 ---
 
 ## The world descriptor — seed + generation parameters (BL-114)
