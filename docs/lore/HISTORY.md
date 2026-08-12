@@ -1,9 +1,25 @@
 # Kepler — Historical Foundations
 
-Why the campaign world of 1960 is market-based and non-hegemonic, told as a stage ladder the
+Why the campaign world is market-based and non-hegemonic, told as a stage ladder the
 generation stack can hang dated history lines off. Companion to `../generation/PLANETOLOGY.md`
 (which ends at the civilisation gate) and `../generation/NATION_GENERATION.md` /
 `../generation/GENERATION_STRATEGY.md` (which assume the world this document explains).
+
+> **THE CAMPAIGN EPOCH IS 0 CE, NOT 1960 (Ben, 2026-08-12).** Read every "1960" below as "the
+> campaign epoch", and the epoch as **0 CE**. The project refocused to the ancient era (NR-177),
+> so this ladder no longer runs up to an industrial start — it runs up to an ancient one.
+>
+> **What this costs the ladder, stated plainly.** Stages 1–4 (agrarian surplus, the enforceable
+> promise, fragmentation-with-connectivity, capital disciplines the sovereign) are pre-industrial
+> and land inside a 4000 BCE → 0 CE run intact. **Stages 5 and 6 — the energy transition and
+> saturation — are past the new epoch entirely** and are no longer campaign backstory; they
+> become DLC-era material alongside the parked space arc. They were already flagged superseded
+> by BL-223, so this narrows a doc that was already known to be wrong there rather than
+> overturning settled prose.
+>
+> The one-shot pass this document describes is now driven by the stepped year-tick sim
+> (`src/world/history_sim.{hpp,cpp}`), 4000 BCE → 0 CE, stepping 100 → 50 → 20 → 10 → 5 → 1
+> years. A settle-dominated deep prehistory is the intended shape (NR-178, ruled 2026-08-12).
 
 ## Purpose
 

@@ -585,10 +585,20 @@ identity.
 
 - **Seed counts scale with grid area.** The Pass 5 seed counts are authored for a
   reference-scale globe; taken as absolutes they collapse to near-zero coverage on
-  the prototype's 180×84 grids. `scale_to_area()` scales the counts up with grid
+  a prototype-scale grid. `scale_to_area()` scales the counts up with grid
   area (never below the authored count, so small bodies such as Pallas are
-  unaffected). Reference lowered 1800 → 1200 tiles in the 2026-06-14 retune, so
-  the 180×84 grids get a ~12.6× scale factor.
+  unaffected). Reference lowered 1800 → 1200 tiles in the 2026-06-14 retune.
+
+  > **The homeworld grid is 312×145 = 45,240 tiles (Ben, 2026-08-12)**, three times the area of
+  > the 180×84 = 15,120 it was authored against, which put the scale factor at ~12.6×; it is now
+  > ~37.7×. Because `scale_to_area()` derives the factor from the actual grid, **nothing here
+  > needed changing** — this note exists so the figures above are not read as current.
+  >
+  > The authority for the dimensions is `home_grid_width` / `home_grid_height`
+  > (`src/world/hard_coded_world.hpp`). It became a real authority on the same date: the
+  > homeworld construction site in `hard_coded_world.cpp` had **hardcoded the literals 180, 84**
+  > while the wizard preview read the constants, so the two had silently diverged and changing
+  > the constant moved the preview without moving the world.
 - **Kepler biome-balance retune (2026-06-14).** Three co-ordinated changes,
   now reflected in the tables above and recorded here as deliberate deviations
   from the original authored values: the **cold polar band** tightened from the

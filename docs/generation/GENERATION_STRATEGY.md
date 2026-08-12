@@ -17,9 +17,13 @@ The subject docs:
 - **`TILE_GENERATION.md`** — the procedural tile pipeline (terrain, ocean, deposits) per body.
 - **`NATION_GENERATION.md`** — Voronoi territory placement and nation profiles over the tile map,
   now driven by the pre-national history ladder.
-- **`../lore/HISTORY.md`** — the institutional history ladder: *why* the 1960 campaign world is
-  market-based and non-hegemonic. Stages 0–2 are built (BL-221); Stages 5–6 as written are
-  superseded pending BL-223 (averted rupture).
+- **`../lore/HISTORY.md`** — the institutional history ladder: *why* the campaign world is
+  market-based and non-hegemonic. Stages 0–2 are built (BL-221).
+  **The campaign epoch is 0 CE, not 1960 (Ben, 2026-08-12, NR-177)**, and generation now runs a
+  stepped 4000 BCE → 0 CE prehistory. Stages 5–6 (the energy transition and saturation) fall
+  *past* the new epoch entirely and become DLC-era material — they were already superseded
+  pending BL-223, so this narrows a section that was known wrong rather than overturning
+  settled prose.
 - **`CORPORATION_GENERATION.md`** — corporation placement, focus, holdings, and finance.
 - **`GENERATION_LEDGER.md`** — the tuning surface that explains *why* a tile generated as it did
   (Chain half built and player-facing; breadcrumb/lens half still design).

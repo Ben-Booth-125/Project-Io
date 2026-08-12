@@ -26,9 +26,22 @@ Only Era 0 and Era 1 are designed for the prototype. Later eras are stubbed.
 
 ---
 
+> **THE CAMPAIGN EPOCH MOVED TO 0 CE (Ben, 2026-08-12).** Every "1960" below is superseded.
+> The project refocused to the ancient era (NR-177): the player is a mercenary company, the
+> space arc is parked on `era/space`, and generation now runs a stepped prehistory from
+> **4000 BCE to 0 CE** (`history_sim_params`, `src/world/history_sim.hpp`) rather than 0 CE to
+> 1960. This is a dated note rather than a rewrite — the Era *structure* below (a gear shift
+> that changes what the game is about, each Era necessitating the one before) is unaffected and
+> still the target. What changed is where the ladder starts, and that Era 1+ is DLC scope.
+>
+> The 4000-year prehistory is a **generator**, not a play layer: it produces the 0 CE world the
+> campaign opens on. Its clock steps 100 → 50 → 20 → 10 → 5 → 1 years so resolution concentrates
+> near the epoch, and a settle-dominated deep prehistory is the intended shape, not a defect
+> (NR-178, ruled 2026-08-12).
+
 ## Era 0 — Terrestrial
 
-**Starts:** game start (campaign epoch: 1 January 1960).  
+**Starts:** game start (campaign epoch: 1 January 1960 — **superseded, now 0 CE**; see the note above).  
 **Territory:** home planet and bodies of equivalent class (rocky, habitable, or near-habitable planets).  
 **Strategic question:** build an industrial base capable of funding and supplying the first space operation.
 

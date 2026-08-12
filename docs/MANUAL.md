@@ -119,6 +119,11 @@ The **seed** is an 8-digit hex value. You can roll it, type one in, or copy the 
 same seed and the same preferences always produce the same world; this is guaranteed, not
 incidental.
 
+Generation then runs **4000 years of history**, from 4000 BCE to the campaign epoch of **0 CE**,
+before handing you a world with settled peoples, borders drawn by centuries of war, and cities
+where the ground actually rewarded building one. The homeworld is a **312 × 145 hex grid — 45,240
+tiles**, of which roughly 18,000 are land.
+
 ### 2.2 The screen — `[BUILT · REFRAMING]`
 
 | Region | What it is |
@@ -259,7 +264,11 @@ seeds deposits. **Rivers**, **population centres**, the **institutional history 
 
 Every tile carries a **composition** (what it is made of) and a **landform** (what shape it is).
 Composition drives colour and deposits; landform drives movement cost, hazard, habitability and
-mineral richness. Landform is the reason a mountain costs about twice a plain to cross.
+mineral richness. Landform is the reason a mountain costs about twice a plain to cross — in money
+*and* in days.
+
+The homeworld is **312 × 145 = 45,240 tiles**, about 18,200 of them land, and a tile is roughly
+128 km across.
 
 *Authority: `docs/economy/TILES.md`.*
 
@@ -302,8 +311,14 @@ differently.
 ### 4.7 Logistics — `[BUILT]`
 
 Roads come in three tiers and are generated as a per-nation lattice; cities are free logistics hubs.
-Convoys route goods between markets at a cost weighted by terrain, and inter-body price convergence
-follows the routes. Distance is meant to cost something in more than one way.
+Convoys route goods between markets at a cost weighted by terrain, and distance costs both money
+and **time**.
+
+A tile is about **128 km across** — derived from the planet's generated mass, not authored. A laden
+caravan makes ~25 km/day overland and ~130 km/day by sea, and terrain multiplies that: a mountain
+crossing costs about twice a plain. So a regional haul clears in a single quarter and a
+cross-continental one takes several, which is what makes siting and sea access strategic rather
+than cosmetic.
 
 *Authority: `docs/economy/SUPPLY.md`.*
 
@@ -371,11 +386,21 @@ engine ships no HTTP client, no API key and no cloud dependency, and it never wi
 
 *Authority: `docs/ai/AI_OPPONENT.md`.*
 
-### 4.14 The pre-history — `[BUILT · REFRAMING]`
+### 4.14 The pre-history — `[BUILT]`
 
-Before you arrive, the world runs. Polities settle, campaign, invest and consolidate on a year tick;
-cohesion falls when ground is lost, so defeat compounds; supply decays with distance and with the
-breadth of what you hold, so empires stall on arithmetic rather than on a designer's cap.
+Before you arrive, the world runs — **4000 years of it, from 4000 BCE to the 0 CE campaign epoch.**
+Polities settle, campaign, invest and consolidate; cohesion falls when ground is lost, so defeat
+compounds; supply decays with distance and with the breadth of what you hold, so empires stall on
+arithmetic rather than on a designer's cap.
+
+**The clock steps.** Decisions come every 100 years in deep prehistory, then 50, 20, 10, 5, and
+finally every year approaching the epoch — so the recent centuries that shaped your starting world
+are simulated in detail while the distant ones are painted in broad strokes. That is 136 decision
+rounds rather than 4000, which is both cheaper and finer where it matters. Population, meanwhile,
+grows every real year regardless; only the *decisions* are stepped.
+
+A deep prehistory dominated by settling new ground rather than by war is the intended shape, not an
+accident.
 
 This is a generator, not a play layer. It produces the world you start in, and its architecture —
 not its constants — is what graduates into the campaign.

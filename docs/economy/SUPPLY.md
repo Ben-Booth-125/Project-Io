@@ -26,6 +26,38 @@ Cargo leaves the source pool at **dispatch**, not arrival. Goods in transit are 
 
 ---
 
+## Travel time — distance costs time, not only money (2026-08-12)
+
+Until this date **distance cost money and never cost time.** Convoy speed was `1 / distance_in_AU`
+— an interplanetary calibration — and `body_distance_au` returns 0 for two markets on the same
+body, so speed clamped to 1.0 and **every intra-body convoy arrived in exactly one econ tick
+(90 days)**, whether it crossed one tile or the whole map.
+
+That is why tripling the map (312×145, 45,240 tiles) could not on its own make distance feel
+bigger: with travel time constant, a bigger map just means the same 90 days buys three times the
+reach.
+
+**A tile now has a physical size, and it is derived rather than authored.** Planetology already
+generates `home_mass`; a rocky planet's radius follows its mass as roughly R ∝ M^0.27, so radius →
+circumference → `circumference / grid_width` gives kilometres per tile. At Earth mass on the
+312-column grid that is **~128 km per tile** (`body_km_per_tile`, `src/world/logistics.hpp`).
+
+**Travel time reuses the terrain weighting the pathfinder already computes.** `logistics_path::cost`
+is terrain-weighted (plains ×1.0 … mountain ×2.0), so it is a count of *effective* tiles — and
+terrain cost is already a time multiplier. No parallel table was needed:
+
+```
+days   = path.cost × km_per_tile ÷ km_per_day
+ticks  = ceil(days ÷ 90)          # the economy clears quarterly
+```
+
+Two modes, differing by roughly five times, which is what makes coastal trade worth designing
+(BL-188): **land ~25 km/day** (an ox-and-cart caravan) and **sea ~130 km/day** (a coasting vessel).
+A short regional haul still lands in one quarter; a long one now takes several.
+
+The space lane keeps its own ~1-tick-per-AU calibration, unchanged — it is the only leg the AU
+model was ever right for, and it is parked with the space arc on `era/space`.
+
 ## Logistical cost
 
 Each convoy incurs a budget outflow:

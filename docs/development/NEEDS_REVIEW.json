@@ -2956,6 +2956,75 @@
     "src/world/components.hpp"
    ],
    "resolution": "ANSWERED (Ben, 2026-08-12, Q&A form) — four rulings, plus his stated reason. REASON: 'When making your ideal game, you should first focus on a smaller project with similar design.' The ancient game is therefore a deliberate practice product, not an abandonment of the space game. (1) RELATIONSHIP: stash the space work on a branch, build ancient as its own product, merge back for DLC — NOT the recommended re-anchor. (2) PLAYER IDENTITY: a mercenary company — the militia ancestor, hired force plus its own supply. This is NOT a third identity pivot; it is BL-094's national private militia one era earlier, same shape (procure force, field it, be paid), so the identity settled on 2026-08-10 is being TESTED rather than replaced. (3) GRAIN: tile and fine tick — keep today's campaign grain and rebuild the ancient content onto it. CONSEQUENCE, and it is counterintuitive: history_sim does NOT become the play layer. It stays the GENERATOR with its stop_year moved from 1960 to ~0 CE, which makes generation cheaper rather than more expensive. (4) RELEASE BAR: commercial release, Steam or itch, paid, needing polish and content depth. CONSEQUENCES STILL OWED, none of them settled by this entry: the conflict spine (BL-315) moves from v0.3.0 groundwork onto the critical path, because a mercenary company's core loop is built entirely on the pillar CONCEPT.md still calls the least-designed and which nothing in the campaign layer commands; the mercenary SELL side (who contracts you, on what terms, win/lose consequences) has no item at all, where procurement.cpp is only the buy side; the product needs a name, since Io is a moon of Jupiter; and ROADMAP.md, CONCEPT.md and ERAS.md all still assert the current arc. Landing those is work, to be filed as backlog items rather than carried here."
+  },
+  {
+   "id": "NR-178",
+   "title": "The stepped decision clock is NOT behaviour-neutral — a 100-year band never reaches Invest at all",
+   "raised": "2026-08-12",
+   "kind": "observation",
+   "status": "resolved",
+   "source": "Measured while landing the 4000 BCE stepped clock (Ben's 2026-08-12 steer), tools/verify/stepped_clock_harness.cpp R6",
+   "what": "The stepped clock was designed on the assumption that scaling each per-year RATE by its band width makes a run roughly invariant to band choice — a 100-year band credits 100x per round and therefore lands in about the same place as a 1-year band. MEASUREMENT REFUTES THAT. Holding the world, the seed and the 4000-year span fixed and varying ONLY the band width: a 100-year band (40 decision rounds) accrues tech credit of exactly ZERO, while a 20-year band (200 rounds) accrues 146,440. Invest is not under-credited at 100 years; it is never CHOSEN at 100 years. Sampling the world at 40 moments rather than 200 changes which verb wins the argmax at each moment, and with Settle dominating the comparison the coarse run settles at every single one (459 foundings, 0 battles, 0 conquests across the default ladder run).",
+   "why_it_matters": "Two things follow, and the second is the expensive one. (1) The band ladder cannot be treated as a transparent performance optimisation — it is a design parameter that changes what history the generator produces, so the boundaries have to be tuned against outcomes rather than picked for tidiness. The current default ladder (100/50/20/10/5/1) spends its two coarsest bands, 3000 of the 4000 years, in the regime where Invest is never selected. (2) The underlying cause is NOT the stepped clock. It is BL-318 (shared-currency scorer): history_sim.hpp already records that the four verbs are scored on incommensurable scales, that BL-309's normalisation attempt was reverted, and that the observed failure mode was exactly a Settle-dominated run with conquests at zero. The stepped clock did not introduce this; it made it visible and it amplifies it at coarse bands.",
+   "options": [
+    "Tune the band boundaries so the coarse bands are narrower (e.g. start the 20-year band earlier), accepting more decision rounds for better-behaved history.",
+    "Land BL-318 (shared-currency scorer) first, then re-measure the ladder against a scorer where Invest can actually win.",
+    "Accept a settle-dominated deep prehistory as correct — 4000-2000 BCE arguably SHOULD be mostly settlement expansion rather than investment or war."
+   ],
+   "recommendation": "Option 3 is more defensible than it first looks and should be considered before spending anything: a world whose earliest two millennia are dominated by settling new ground, with little war and little technological investment, is a plausible neolithic-to-bronze-age shape rather than a bug. But it should be a CHOSEN outcome, not one inherited from a scorer defect that history_sim.hpp already documents as unresolved. So: decide whether the deep-prehistory shape is what is wanted, and if it is, record that here so BL-318's eventual fix does not silently overturn it.",
+   "files": [
+    "src/world/history_sim.hpp",
+    "src/world/history_sim.cpp",
+    "tools/verify/stepped_clock_harness.cpp",
+    "docs/lore/HISTORY.md"
+   ],
+   "resolution": "ANSWERED (Ben, 2026-08-12): option 3 — a settle-dominated deep prehistory is CORRECT and intended, not a defect to tune around. The band ladder stays as proposed (100/50/20/10/5/1 over 4000 BCE -> 0 CE), and the two coarsest bands spending 3000 of the 4000 years in a settle-only regime is the shape wanted: the neolithic-to-bronze-age stretch should be expansion into new ground rather than war or investment. RECORDED SO IT IS NOT SILENTLY OVERTURNED: when BL-318 (shared-currency scorer) lands and Invest can win the argmax on its own merits, the deep-prehistory bands must be re-checked against THIS ruling rather than allowed to drift into a war-and-invest early history by side effect. The stepped clock is therefore accepted as non-behaviour-neutral by design."
+  },
+  {
+   "id": "NR-179",
+   "title": "Two gate harnesses were already failing before the 3x map change, for unrelated reasons",
+   "raised": "2026-08-12",
+   "kind": "observation",
+   "status": "open",
+   "source": "Found while verifying the 3x map / stepped-clock work (Ben, 2026-08-12); ctest -LE sweep, 63 of 67 passed",
+   "what": "The gate reported four failures. TWO ARE PRE-EXISTING and grid-independent, established by inspection rather than assumed. (1) stack_capacity_harness S.R3 'non-extraction type stays capacity 1 on a rich tile' gets 4, wants 1, five times. The harness builds a SYNTHETIC tile_component and calls placement_rules::stack_capacity directly — it never touches the tile grid — and placement_rules.cpp is unmodified, so no map change can reach it. Something widened stack capacity to non-extraction building types without updating this assertion. (2) population_mvp R4 'Kepler market.demand[agricultural_produce] > 0' gets 0 across ALL 11 Kepler markets. Cause: the harness constructs an EMPTY recipe_registry on the comment 'empty -- population injection runs unconditionally', which was true until BL-368 generalised inject_population_demand into a per-centre basket read from reg.population_demand(). population_demand_params::demand_basket is zero-initialised, so an empty registry injects nothing on any grid of any size.",
+   "why_it_matters": "Both were misattributable to the map change and neither is caused by it — an incorrect attribution would have sent someone hunting a generation bug that does not exist. More importantly, each is a harness whose assertion has quietly stopped describing the product: stack_capacity_harness encodes a rule the code no longer follows, and population_mvp encodes a setup contract BL-368 retired. A red gate that is mostly stale assertions is the exact failure mode v0.1.8 was cut to fix (NR-103's finding, and BL-288's 'the suite reported ten failures; exactly one was a failing assertion'). These two are how it comes back.",
+   "options": [
+    "Fix both harnesses: give population_mvp a real demand basket, and update stack_capacity_harness S.R3 to the rule the code actually implements (or fix the code if the widening was unintended).",
+    "Fix population_mvp only — its setup contract is unambiguously stale — and triage stack_capacity_harness separately, since 'capacity 4 on a non-extraction type' may be a real defect rather than a stale test.",
+    "File both as backlog items and leave the gate red until they are scheduled."
+   ],
+   "recommendation": "Option 2. population_mvp is a clear-cut stale setup contract and cheap to fix. stack_capacity_harness is NOT obviously stale — BL-193's design deliberately left 'whether processors stack' as a deferred question, and the assertion says richness must not leak into that answer. Getting 4 instead of 1 may well be richness leaking exactly as the comment warned, in which case the code is wrong and the test is right. Do not touch that assertion until someone has read stack_capacity's current implementation against BL-193's intent.",
+   "files": [
+    "tools/verify/population_mvp.cpp",
+    "tools/verify/stack_capacity_harness.cpp",
+    "src/world/placement_rules.cpp",
+    "src/world/market_clearing.cpp"
+   ],
+   "resolution": ""
+  },
+  {
+   "id": "NR-180",
+   "title": "BL-253 was already fixed; the 3x-map tick cost is run_economy_step, and econ_stability cannot see it",
+   "raised": "2026-08-12",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Measured while acting on Ben's 2026-08-12 instruction to fix BL-253",
+   "what": "Asked to fix BL-253 (the O(corps x tiles) strategic scan), I found it ALREADY COMPLETE — rank_extraction_sites was hoisted out of the per-corp loop and the code says so. The real cost was elsewhere. Two safe micro-optimisations to that function (memoising the per-tile body lookup, partial_sort instead of a full sort of ~18,000 sites to keep ~64) are correct and behaviour-identical but moved the needle NOT AT ALL: 300/600-tick rollouts stayed at 47s/105s. A new tools/verify/tick_profile.cpp then answered it in one run: run_economy_step is 89.7% of the tick, with clear_markets a distant 8.1% and everything else — convoys, orbits, budget, surveys — under 1.2% combined. | DECISION TAKEN 2026-08-12, reversible: data_creep_harness is PARKED out of the routine gate (CMakeLists sweep label). Sequence, so the reasoning is not lost — the 240s LONG tier was outgrown; a new 1200s XLONG tier was added and the run exceeded THAT too, because per-tick cost rises as buildings accumulate and the 4500-tick tail is far dearer than a 300/600-tick sample projects. Trimming ticks to fit was rejected (a plateau measured before saturation keeps the test green while emptying it) and raising the bound a second time is the exact treadmill that section exists to refuse. The sweep section header was amended to distinguish TWO reasons a harness lands there: a research sweep whose cost is the point, versus a parked regression check that is a DEBT.",
+   "why_it_matters": "Three things. (1) The instrument that exists to catch this is blind to it: econ_stability sweeps bodies x corps and NEVER varies tile count, so it reported 0.09 ms/tick and a healthy sub-linear 0.85 exponent while the real rollout went from ~4.7 to ~165 ms/tick. Both numbers were true and they measured different things. (2) Two rounds of plausible guessing (the BL-253 site, then micro-optimising it) produced no improvement; one profiling run localised it. The profiler is now committed so the next such question costs one run. (3) The absolute figures are DEBUG-tree numbers — BL-288 records that build/ is deliberately Debug and econ_stability already SKIPs its absolute assertion for that reason — so the 50x is inflated and the Release figure is unknown. | THE GATE NOW HAS NO DATA-CREEP COVERAGE. That is a real hole and it is why this entry is a decision-taken rather than an observation: the fix is to restore the tick cost, never to edit the exclusion list.",
+   "options": [
+    "Extend econ_stability's sweep to vary TILE COUNT as a third axis, so the blind spot closes permanently.",
+    "Profile run_economy_step internally (it is 90% of the tick) with a real recipe registry — tick_profile currently uses an empty one, so its absolute numbers understate production work.",
+    "Measure in Release before optimising anything further — the Debug amplification may be most of the apparent regression."
+   ],
+   "recommendation": "Option 3 first, then 1. Optimising against Debug numbers risks tuning for an artefact, and it is the cheapest of the three to answer. Then extend econ_stability along the tile axis, because the blind spot is the reason a 50x real-world regression could sit behind a green performance gate at all — that is worth more than any single optimisation.",
+   "files": [
+    "src/world/corp_ai.cpp",
+    "src/world/economy_system.cpp",
+    "tools/verify/tick_profile.cpp",
+    "tools/verify/econ_stability.cpp"
+   ],
+   "resolution": ""
   }
  ]
 }

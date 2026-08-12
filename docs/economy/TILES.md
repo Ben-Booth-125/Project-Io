@@ -295,6 +295,28 @@ Percentages are of each body's **land** tiles; ocean is excluded.
 Land-tile counts behind the shares: system 25,412 — Cinder 15,120 (no ocean, so every tile is
 land), Kepler 6,092 of 15,120, Selene 3,780, Pallas 420.
 
+> **RE-MEASURED 2026-08-12 for the 3× homeworld grid** (180×84 → 312×145; `world_audit`, clean
+> build). The figures above and in the table are the pre-change census and are kept for
+> comparison; these are current:
+>
+> | Body | Land | Total |
+> |---|---|---|
+> | Cinder | 15,120 | 15,120 (no ocean) |
+> | **Kepler** | **18,227** | **45,240** |
+> | Selene | 3,780 | 3,780 |
+> | Pallas | 420 | 420 |
+> | **System** | **37,547** | — |
+>
+> System-wide landform shares: plains 75.8%, valley 12.1%, highland 9.6%, mountain 1.3%,
+> crater 0.6%, canyon 0.3%, rift 0.1%. Kepler alone: plains 88.1%, highland 9.0%, mountain 1.4%,
+> canyon 0.6%, crater 0.6%, rift 0.3%, **valley 0.0%**.
+>
+> **Kepler's biome balance improved, and its valley share is still zero.** Forest+wetland is now
+> **10.96% of land** (1,090 forest + 907 wetland) against the ~7.4% the smaller grid produced,
+> comfortably clear of the S2 ≥3% bar. The 0.0% valley finding recorded below survives the
+> rescale unchanged, which is worth knowing: it is a property of the `(band, moisture)` table
+> rather than of grid resolution.
+
 **Relief lands lower than the 2026-08-04 note projected.** Mountain plus highland is **12.1%** system-wide
 and **15.3%** on Kepler, against the ~14.0% that note recorded — it was quoting a home-body figure as
 though it were the system one. **Kepler's 0.0% valley is real, not a stale artifact**: it survives
