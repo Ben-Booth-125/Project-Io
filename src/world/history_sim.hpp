@@ -77,6 +77,36 @@ struct sim_terrain_view
 };
 
 // ---------------------------------------------------------------------------
+// The stepped decision clock (Ben, 2026-08-12)
+// ---------------------------------------------------------------------------
+
+/// One rung of the stepped clock: this band covers years **below**
+/// `until_year`, and inside it polities take a decision round every
+/// `step_years` years.
+///
+/// THE STEP GATES DECISIONS, NOT TIME. Demography still advances one real year
+/// at a time in every band — population does not stop growing between a
+/// polity's choices, and making it do so would have compressed 4000 years of
+/// growth into 136 years of it. What the band changes is how often the scorer
+/// runs, which is both the expensive part of the loop and the part that
+/// deserves to be coarse in deep prehistory and fine near the epoch.
+///
+/// The consequence for the tunables below: a quantity that is a **rate** (per
+/// year) must be multiplied by the step when it is applied, and a quantity that
+/// is an **event** (a battle is lost, a province changes hands) must not.
+/// `run_history_sim` scales exactly three rates — tech progress, cohesion
+/// recovery and contest decay — and nothing else.
+struct sim_tick_band
+{
+    int64_t until_year = 0; ///< This band covers years < until_year.
+    int     step_years = 1; ///< Years between decision rounds inside it.
+};
+
+/// Ceiling on the band table. Fixed-size rather than a vector so
+/// `history_sim_params` stays trivially copyable and allocation-free.
+inline constexpr int sim_tick_band_max = 8;
+
+// ---------------------------------------------------------------------------
 // Tunables
 // ---------------------------------------------------------------------------
 
@@ -86,8 +116,26 @@ struct sim_terrain_view
 /// so the loop runs and the harness can bind assertions to its behaviour.
 struct history_sim_params
 {
-    int64_t start_year = 0;    ///< Calendar year the run begins (the antiquity stop).
-    int64_t stop_year  = 1960; ///< Calendar year the run ends (the campaign epoch).
+    /// THE RUN IS 4000 BCE -> 0 CE (Ben, 2026-08-12), not 0 CE -> 1960.
+    /// The campaign epoch moved to 0 CE with the ancient refocus (NR-177), so
+    /// this loop's job changed from "run the run-up to an industrial start" to
+    /// "run the run-up to an ancient one" — and 4000 BCE is where a settled,
+    /// agrarian world with something to fight over begins.
+    int64_t start_year = -4000; ///< Calendar year the run begins (4000 BCE).
+    int64_t stop_year  = 0;     ///< Calendar year the run ends (the campaign epoch).
+
+    /// The stepped decision clock, coarsest first. Bands must be sorted
+    /// ascending by `until_year`; a year at or past the last band's
+    /// `until_year` falls back to the last band's step.
+    ///
+    /// The default ladder is Ben's (2026-08-12): 100 -> 50 -> 20 -> 10 -> 5 -> 1,
+    /// with boundaries chosen so resolution concentrates near the epoch. It
+    /// costs **136 decision rounds** across 4000 years against 4000 on a flat
+    /// tick — cheaper AND finer where it matters, which is the whole point.
+    sim_tick_band tick_bands[sim_tick_band_max] = {
+        {-2000, 100}, {-1000, 50}, {-400, 20}, {-100, 10}, {-20, 5}, {0, 1}
+    };
+    int tick_band_count = 6; ///< Live entries in `tick_bands`.
 
     // --- Objective selection (BL-277 Q1) ----------------------------------
     int w_farm = 300; ///< Weight on a target province's farm endowment.
@@ -453,6 +501,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
 /// supply-decay stall against it, and a test that recomputed distance its own
 /// way would be testing its own arithmetic rather than the sim's.
 int province_distance(const province& a, const province& b, int gw);
+
+/// Years between decision rounds at calendar year @p y, read from @p p's band
+/// table. Returns the first band whose `until_year` exceeds @p y, falling back
+/// to the last live band; never returns less than 1.
+///
+/// Exposed because the harness binds to the band schedule directly — a test
+/// that recomputed the ladder its own way would be testing its own arithmetic,
+/// the same reason `province_distance` is public.
+int step_for_year(const history_sim_params& p, int64_t y);
 
 /// Bytes the time-lapse substrate occupies — the quantity the requirement
 /// bounds, and the reason the encoding is a change list rather than a grid.

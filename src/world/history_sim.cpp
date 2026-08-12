@@ -156,6 +156,22 @@ int province_distance(const province& a, const province& b, int gw)
     return dc > dr ? dc : dr; // Chebyshev — movement is eight-connected.
 }
 
+int step_for_year(const history_sim_params& p, int64_t y)
+{
+    const int n = clampi(p.tick_band_count, 0, sim_tick_band_max);
+    if (n <= 0)
+        return 1; // No table: fall back to the flat year tick.
+
+    for (int i = 0; i < n; ++i)
+        if (y < p.tick_bands[i].until_year)
+            return p.tick_bands[i].step_years > 0 ? p.tick_bands[i].step_years : 1;
+
+    // Past the last boundary — the finest band governs the tail. This is the
+    // ordinary case for the last band, whose `until_year` IS the stop year.
+    const int last = p.tick_bands[n - 1].step_years;
+    return last > 0 ? last : 1;
+}
+
 // ---------------------------------------------------------------------------
 
 history_sim_state run_history_sim(settlement_state&         ss,
@@ -356,6 +372,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
     const int64_t years = params.stop_year - params.start_year;
     out.battles_per_century.assign(static_cast<std::size_t>(years / 100 + 1), 0);
 
+    // The stepped decision clock (Ben, 2026-08-12). `y` still advances one real
+    // year at a time — demography must not skip — but the polities only ACT
+    // when the year reaches `next_decision`, which walks forward by the current
+    // band's step. See history_sim.hpp § The stepped decision clock.
+    int64_t next_decision = params.start_year;
+    int     step_years    = step_for_year(params, params.start_year);
+
     for (int64_t y = params.start_year; y < params.stop_year; ++y)
     {
         const std::size_t century =
@@ -374,6 +397,19 @@ history_sim_state run_history_sim(settlement_state&         ss,
             out.peak_population = total_pop;
             out.peak_year       = y;
         }
+
+        // ---- The decision gate -------------------------------------------
+        //
+        // Below the band's step there is nothing for the polities to do this
+        // year: demography above has already run, and the scorer — the
+        // expensive half of this loop — is deliberately coarse in deep
+        // prehistory. `step_years` is read here and used by the three RATE
+        // applications further down (tech progress, cohesion recovery, contest
+        // decay), which must cover the whole interval since the last round.
+        if (y < next_decision)
+            continue;
+        step_years    = step_for_year(params, y);
+        next_decision = y + step_years;
 
         // ---- Each polity acts, in id order (deterministic) ---------------
         for (polity& q : out.polities)
@@ -803,7 +839,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
             case sim_verb::invest:
             {
                 const int d = clampi(best_target, 0, sim_domain_count - 1);
-                q.progress_q[d] += clampi(best_score, 0, 1000);
+                // A RATE: investment accrues per year, so a coarse band must
+                // credit the whole interval. Without this a 100-year band would
+                // advance tech exactly as far as a 1-year one and the ladder
+                // would never leave band 1 (history_sim.hpp § stepped clock).
+                q.progress_q[d] += clampi(best_score, 0, 1000) * step_years;
                 // A band costs more the higher it sits — capacity follows the
                 // map, and it never runs away (ANCIENT_TECH_LADDER § diffusion).
                 const int cost = 4000 * q.capacity[d];
@@ -819,12 +859,18 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 for (int hi : held)
                 {
                     province& p = ss.provinces[static_cast<std::size_t>(hi)];
-                    p.contest_q = clampi(p.contest_q - 8, 0, 1000);
+                    // A RATE: a frontier cools by the year, not by the round.
+                    p.contest_q = clampi(p.contest_q - 8 * step_years, 0, 1000);
                 }
                 // Cohesion recovers only here, and slower than it is lost — so
                 // the spiral is escapable, but only by a polity that stops
                 // fighting for several years running (BL-308).
-                q.cohesion_q = clampi(q.cohesion_q + params.cohesion_recovery_q,
+                //
+                // A RATE, for the same reason: `cohesion_recovery_q` is
+                // documented per year of Consolidate, so a coarse band credits
+                // the interval it actually covers. The clamp still bounds it,
+                // so a 100-year band recovers fully rather than overshooting.
+                q.cohesion_q = clampi(q.cohesion_q + params.cohesion_recovery_q * step_years,
                                       params.cohesion_floor_q, 1000);
                 break;
             }
