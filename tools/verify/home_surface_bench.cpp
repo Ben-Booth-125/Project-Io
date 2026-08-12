@@ -78,7 +78,13 @@ int main()
 
     std::printf("bench: %d runs, mean %.1f ms, worst %.1f ms\n",
                 runs, total_ms / runs, worst_ms);
-    check(worst_ms < 1000.0, "worst preview under the 1s ceiling");
+    // CEILING RAISED 1s -> 3s, 2026-08-12, for the 3x map (15,120 -> 45,240
+    // tiles). The old bar was authored against a preview a third this size;
+    // measured worst is now ~1220 ms, so 3s keeps roughly the same proportional
+    // headroom the 1s bar gave before rather than being fitted to the new
+    // number. Scaled, not merely widened — a bar moved to just above whatever
+    // was measured stops being a regression detector.
+    check(worst_ms < 3000.0, "worst preview under the 3s ceiling");
 
     std::printf(g_failures ? "FAILURES: %d\n" : "ALL PASS (0 failures)\n", g_failures);
     return g_failures ? 1 : 0;

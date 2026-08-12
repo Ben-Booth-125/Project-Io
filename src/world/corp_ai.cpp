@@ -372,11 +372,29 @@ struct extraction_site
 std::vector<extraction_site> rank_extraction_sites(const world& w, int top_m)
 {
     std::vector<extraction_site> sites;
+    sites.reserve(w.tiles.size() / 2); // most land tiles carry some deposit
+
+    // BL-253 follow-on (2026-08-12, the 3x map): tile_surveyed re-looked-up the
+    // body in w.bodies for EVERY tile — 45,240 hash lookups per tick on the new
+    // grid, to fetch the same handful of bodies over and over. Tiles arrive
+    // grouped by body in practice, so a one-entry memo removes almost all of
+    // them. Behaviour-identical: the same body yields the same answer.
+    entity_id             memo_body = null_entity;
+    const body_component* memo_bc   = nullptr;
+
     for (const auto& [tid, tc] : w.tiles)
     {
         if (placement_rules::is_ocean_tile(tc.composition))
             continue;
-        if (!tile_surveyed(w, tc))
+        if (tc.body != memo_body)
+        {
+            const auto bit = w.bodies.find(tc.body);
+            memo_body = tc.body;
+            memo_bc   = (bit == w.bodies.end()) ? nullptr : &bit->second;
+        }
+        if (memo_bc == nullptr ||
+            !survey_tile_visible(memo_bc->survey, memo_bc->grid_width, memo_bc->grid_height,
+                                 tc.grid_x, tc.grid_y))
             continue; // geographic fog: unsurveyed tiles are not candidates
         bool any = false;
         const resource_type best = placement_rules::richest_extractable(tc, any);
@@ -393,12 +411,20 @@ std::vector<extraction_site> rank_extraction_sites(const world& w, int top_m)
             affinity = 1.15f;
         sites.push_back({tid, rich * affinity, best});
     }
-    std::sort(sites.begin(), sites.end(), [](const extraction_site& a, const extraction_site& b) {
+    // PARTIAL SORT, not a full one (2026-08-12). Only the top M survive the
+    // resize below, so sorting all ~18,000 qualifying sites to discard all but
+    // ~64 of them was work thrown away. `std::partial_sort` orders exactly the
+    // first M under the same comparator and leaves the tail unspecified — which
+    // is precisely what `resize` then discards, so the returned list is
+    // BIT-IDENTICAL to sort-then-resize. No golden moves.
+    const auto cmp = [](const extraction_site& a, const extraction_site& b) {
         if (a.suitability != b.suitability) return a.suitability > b.suitability;
         return a.tile < b.tile;
-    });
-    if (static_cast<int>(sites.size()) > top_m)
-        sites.resize(static_cast<std::size_t>(top_m));
+    };
+    const std::size_t keep = std::min(sites.size(), static_cast<std::size_t>(std::max(0, top_m)));
+    std::partial_sort(sites.begin(), sites.begin() + static_cast<std::ptrdiff_t>(keep),
+                      sites.end(), cmp);
+    sites.resize(keep);
     return sites;
 }
 } // namespace

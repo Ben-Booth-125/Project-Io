@@ -560,27 +560,58 @@ file(GLOB IO_VERIFY_HARNESSES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/too
 # drift sat unnoticed among nine false positives.
 set(IO_TEST_TIMEOUT_DEFAULT 60)
 set(IO_TEST_TIMEOUT_LONG 240)
+
 set(IO_TEST_LONG_HARNESSES
     corp_terrain_matrix
     econ_stability
-    data_creep_harness
     earthlike_lean_trace
     earthlike_tile_census
     mediterranean_sweep
     notable_worlds
 )
 
-# RESEARCH SWEEPS - labelled `sweep`, and NOT part of the routine gate.
+# EXCLUDED FROM THE ROUTINE GATE - labelled `sweep`. TWO REASONS live here, and
+# conflating them would hide the second.
 #
-# These are not regression checks that happen to be slow; they are open-ended
-# exploration tools that answer a design question over many generated worlds,
-# and both ran past 400s without finishing. Their cost is the point, so the
-# answer is to stop pretending they are gate tests rather than to keep raising
-# a bound they will always outgrow. Run them deliberately, by name or by label.
+# (1) RESEARCH SWEEPS. Not regression checks that happen to be slow; open-ended
+# exploration tools that answer a design question over many generated worlds, and
+# both ran past 400s without finishing. Their cost is the point, so the answer is
+# to stop pretending they are gate tests rather than to keep raising a bound they
+# will always outgrow. Run them deliberately, by name or by label.
 # (Their runtime is BL-320's subject; this only stops them failing the gate.)
+#
+# (2) PARKED REGRESSION CHECKS. A check that SHOULD bind in the gate but has been
+# made unaffordable by a performance regression elsewhere. These are a debt, not a
+# category — each one is a hole in the gate, and each carries a note saying what
+# must be fixed to bring it back. Do not let one sit here quietly.
 set(IO_TEST_SWEEP_HARNESSES
     history_sim_harness
     history_sweep
+
+    # PARKED FOR A DIFFERENT REASON (2026-08-12), and the distinction matters.
+    #
+    # The two above are open-ended exploration tools whose cost IS the point.
+    # data_creep_harness is not: it is a genuine regression check that belongs in
+    # the gate, and it is here only because it has become unaffordable to run.
+    #
+    # The 3x map (15,120 -> 45,240 tiles) put the real-world rollout at ~165 ms/tick
+    # and rising as buildings accumulate. Its plateau window must reach saturation
+    # to mean anything, and on the larger world that needs ~4500 ticks — which
+    # exceeded a 1200 s bound when tried. Trimming ticks to fit was rejected: a
+    # plateau measured BEFORE saturation keeps the test green while emptying it,
+    # and raising the bound again is the exact treadmill this section exists to
+    # refuse.
+    #
+    # WHAT IS LOST, STATED PLAINLY: the gate currently has NO data-creep coverage.
+    # That is a real hole, accepted only because the alternative was a test that
+    # passes without checking anything.
+    #
+    # TO RESTORE IT: fix the tick cost, not this list. NR-180 records that
+    # run_economy_step is 89.7% of the tick (measured by tools/verify/tick_profile.cpp),
+    # that these are Debug-tree figures whose Release equivalent is unknown, and
+    # that econ_stability sweeps bodies x corps and can never see a tile-count term
+    # at all — which is how a ~50x regression sat behind a green performance gate.
+    data_creep_harness
 )
 
 # WALL-CLOCK BENCHES - labelled `bench`, and only meaningful on an idle machine.

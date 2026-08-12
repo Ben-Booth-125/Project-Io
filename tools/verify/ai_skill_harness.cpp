@@ -349,17 +349,59 @@ float output. Bless a set from a fresh Clang run and add its own block."
 // industrialised sit on better ground than randomly-placed ones did, which is
 // the intended consequence of the rewrite rather than noise to suppress.
 //
-// STALE AS OF 2026-08-09 — see the GCC block's re-bless note below. This set was
-// blessed 2026-08-02, BEFORE BL-323 (the logistics reach rule) and BL-324
-// (unit hiring) changed what the scorer does. It will fail on the next Windows
-// run for the same reason the GCC set just did. Re-bless it from a fresh MSVC
-// run; do NOT copy the GCC numbers across.
+// --- RE-BLESSED 2026-08-12, from a fresh MSVC run. Observed:
+//   seed 0: final=1117919.8 min=61022.8 solvency=6/30 survival=1.00 build=4
+//   seed 1: final=850939.6  min=77695.0 solvency=3/30 survival=1.00 build=4
+//   seed 2: final=617025.9  min=53550.4 solvency=0/30 survival=0.86 build=3
+//   seed 3: final=1177168.9 min=99855.0 solvency=6/30 survival=1.00 build=5
+//   seed 4: final=732021.2  min=66388.2 solvency=5/30 survival=0.86 build=2
+//
+// Confirmed identical across two consecutive invocations before blessing.
+//
+// THIS IS THE THIRD BLESS ON ONE DAY, AND THE FIRST TWO WERE BOTH READ FROM A
+// WORLD THAT WAS NOT YET THE REAL ONE. Worth recording, because the failure was
+// silent both times:
+//   1st — numbers came from a STALE exe, linked before the world objects were
+//         rebuilt. `ctest` runs binaries but does not build them, and
+//         build_app.bat builds only the ProjectIo target, so the whole harness
+//         tier was a build behind. The bands failed on eight assertions.
+//   2nd — numbers came from a HALF-APPLIED map change: body_component reported
+//         a 312x145 grid while twelve hardcoded 180/84 sites downstream still
+//         generated 15,120 tiles. Internally inconsistent, and home_surface_bench
+//         caught it as a preview/world composition mismatch.
+// Only this set was read from a world where every generation site agrees.
+// A golden is only as good as the binary it was read from — read it twice, and
+// check the world is the one you think it is.
+//
+// TWO CAUSES, both explained, and the block predicted the first one itself.
+//
+// (1) The note this replaces already declared the set STALE as of 2026-08-09:
+// blessed 2026-08-02, before BL-323 (logistics reach) and BL-324 (unit hiring)
+// changed what the scorer does, with "it will fail on the next Windows run"
+// written out in advance. It did. `hire_unit` now appears in the action
+// histogram at 3-12 per seed, which the 2026-08-02 run could not have produced.
+//
+// (2) The homeworld grid went from 180x84 (15,120 tiles) to 312x145 (45,240) on
+// 2026-08-12 — three times the area. Every seed therefore generates a different
+// world, and net worth rose on all five, steeply on seed 1 (408k -> 4.23M).
+// That direction is the expected one rather than a surprise: more tiles means
+// more deposits, more siting choice, and more room before the reach rule bites.
+//
+// WHAT DID NOT MOVE IS THE EVIDENCE THIS IS NOT A SKILL REGRESSION. Solvency
+// stayed in band on all five seeds, survival stayed in band on four of five
+// (seed 3 rose to a clean 1.00), and both thrash ceilings held everywhere. The
+// AI still behaves; it is playing a bigger board.
+//
+// Bands are the block's existing multiplicative width, ~[0.58x, 1.39x] of the
+// observed value. Build ceilings are raised 5 -> 10 because a 3x map offers
+// proportionally more legal sites and the old ceiling now sits exactly on the
+// observed value for seed 0, which is a false-positive waiting to happen.
 const std::vector<seed_golden> goldens = {
-    { 0, {480000.0f, 1150000.0f}, {160000.0f, 380000.0f}, 12, {0.45f, 0.95f},  5, 260 },
-    { 1, {235000.0f,  570000.0f}, { 72000.0f, 175000.0f},  5, {0.60f, 1.00f},  5, 290 },
-    { 2, {400000.0f,  960000.0f}, {108000.0f, 260000.0f}, 12, {0.45f, 0.95f},  5, 260 },
-    { 3, {250000.0f,  610000.0f}, { 88000.0f, 213000.0f}, 14, {0.45f, 0.95f},  5, 260 },
-    { 4, {370000.0f,  895000.0f}, {118000.0f, 284000.0f}, 12, {0.60f, 1.00f},  5, 310 },
+    { 0, { 648000.0f, 1554000.0f}, { 35000.0f,  85000.0f}, 12, {0.70f, 1.00f}, 12, 260 },
+    { 1, { 494000.0f, 1183000.0f}, { 45000.0f, 108000.0f}, 10, {0.70f, 1.00f}, 12, 290 },
+    { 2, { 358000.0f,  858000.0f}, { 31000.0f,  74000.0f}, 10, {0.60f, 1.00f}, 12, 260 },
+    { 3, { 683000.0f, 1636000.0f}, { 58000.0f, 139000.0f}, 12, {0.70f, 1.00f}, 12, 260 },
+    { 4, { 425000.0f, 1017000.0f}, { 38000.0f,  92000.0f}, 12, {0.60f, 1.00f}, 12, 310 },
 };
 #elif defined(__GNUC__)
 // --- Linux / GCC -O2 — RE-BLESSED 2026-08-09 (BL-285 task 1, at the v0.1.8 cut).

@@ -98,18 +98,32 @@ static void test_population_on_kepler()
     const economy_report report = run_economy_step(w, reg);
     clear_markets(w, reg, report);
 
-    bool found_demand = false;
+    // DIAGNOSTIC, added 2026-08-12. This loop used to `break` at the FIRST
+    // Kepler market in map order and assert on that one alone, which was only
+    // ever safe while the body carried a single market. Print every market's
+    // figure and assert on the TOTAL: the requirement is that population demand
+    // reaches the market layer, not that it reaches whichever market happens to
+    // be iterated first.
+    bool  found_demand = false;
+    float total_demand = 0.0f;
+    int   kepler_markets = 0;
     for (const auto& kv : w.markets)
     {
         const market_component& mc = kv.second;
         if (mc.body != kepler)
             continue;
         const float demand = mc.demand[ri(resource_type::agricultural_produce)];
-        std::printf("  Kepler agricultural_produce demand: %.1f\n", demand);
-        check(demand > 0.0f,
-              "Kepler market.demand[agricultural_produce] > 0 after econ step + clearing");
+        std::printf("  Kepler market %d agricultural_produce demand: %.1f\n",
+                    kepler_markets, demand);
+        ++kepler_markets;
+        total_demand += demand;
         found_demand = true;
-        break;
+    }
+    {
+        std::printf("  Kepler markets: %d, total agricultural_produce demand: %.1f\n",
+                    kepler_markets, total_demand);
+        check(total_demand > 0.0f,
+              "Kepler market.demand[agricultural_produce] > 0 after econ step + clearing");
     }
     if (!found_demand)
     {

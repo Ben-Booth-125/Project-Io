@@ -519,21 +519,38 @@ int main(int argc, char* argv[])
 {
     // Tick ceiling is overridable so the instrument can be run harder by hand;
     // the default is the ROADMAP's "1000+".
-    std::vector<int> marks = { 100, 250, 500, 1000, 1500 };
+    // RE-CALIBRATED 2026-08-12 for the 3x map (180x84 -> 312x145, 15,120 ->
+    // 45,240 tiles). The old schedule topped out at 1500 ticks, and on the
+    // larger world the build-out has NOT saturated by then: entities, buildings,
+    // stockpiles and corp assets were all still climbing at the final sample.
+    //
+    // That was not a leak. Those four counters are exactly the ones with an
+    // obvious driver — corps are still finding legal sites, because three times
+    // the tiles takes proportionally longer to fill. A plateau instrument has to
+    // reach saturation before "still climbing" means anything, so the schedule
+    // scales with the world rather than the world outgrowing the schedule.
+    std::vector<int> marks = { 300, 750, 1500, 3000, 4500 };
     if (argc > 1)
     {
         const int ceiling = std::max(100, std::atoi(argv[1]));
         marks.clear();
-        for (const int m : { 100, 250, 500, 1000, 1500, 2000, 4000 })
+        for (const int m : { 300, 750, 1500, 3000, 4500, 6000, 12000 })
             if (m <= ceiling) marks.push_back(m);
         if (marks.empty() || marks.back() != ceiling) marks.push_back(ceiling);
     }
     const int total_ticks = marks.back();
 
-    // T_mid is the last mark at or below 500 (the plateau window's left edge).
+    // T_mid is the last mark at or below a THIRD of the run — the plateau
+    // window's left edge, so the assertion covers the late two thirds.
+    //
+    // Derived rather than hardcoded (it was the literal 500, which silently
+    // stopped being a third of the run the moment the schedule changed). Now an
+    // overridden ceiling moves the window with it instead of leaving the
+    // instrument asserting over whatever fraction the old constant happens to
+    // name.
     int mid_tick = marks.front();
     for (const int m : marks)
-        if (m <= 500) mid_tick = m;
+        if (m <= total_ticks / 3) mid_tick = m;
 
     std::printf("BL-251 data-creep instrument (+BL-254 convoy traffic) — real generated world,"
                 " %d ticks\n", total_ticks);
@@ -670,10 +687,24 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    // Locate T_mid = 500 (or the sample nearest half the run if 500 is absent).
+    // Locate T_mid: the last sample at or below a THIRD of the run, matching the
+    // rule the header printed above.
+    //
+    // THIS WAS A SECOND, INDEPENDENT HARDCODED 500 (fixed 2026-08-12). The
+    // printed T_mid and the T_mid the assertion actually used were derived in
+    // two different places from the same literal, so they agreed only by
+    // coincidence. Rescaling the mark schedule for the 3x map desynced them
+    // instantly: the header announced "T_mid = 1500" while the delta was still
+    // measured from tick 300, which reported world.buildings as CLIMBING by 270
+    // when the true delta over the announced window was ZERO — the counter had
+    // saturated at 731 by tick 750 and never moved again.
+    //
+    // A plateau instrument that measures a different window than the one it
+    // names is worse than no instrument, so the rule now lives in one place.
+    const int mid_cutoff = samples.back().tick / 3;
     std::size_t mid_i = 0;
     for (std::size_t i = 0; i + 1 < samples.size(); ++i)
-        if (samples[i].tick <= 500) mid_i = i;
+        if (samples[i].tick <= mid_cutoff) mid_i = i;
     const std::size_t end_i = samples.size() - 1;
 
     struct climber { int c; long long mid, end; };
