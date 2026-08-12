@@ -4,9 +4,11 @@
 #include "world/placement_rules.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <random>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -109,6 +111,38 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed)
     if (candidates.empty())
         return;
 
+    // BL-132 change (1): population spawns near rich resources. Deposit
+    // richness (the extraction rate multiplier, tile_component::resource_deposit)
+    // summed over the extractable set, per candidate — a pure function of
+    // generation-time tile data, no tick dependency. Normalised against the
+    // richest candidate ON THIS BODY (not a fixed absolute scale, since richness
+    // is body-relative and its raw magnitude varies with generation params) into
+    // a 1..5 weight bucket, same shape as the existing 1×/3× adjacency weight
+    // below so the two compose by multiplication rather than fighting over which
+    // wins.
+    std::unordered_map<int, float> idx_to_richness;
+    idx_to_richness.reserve(candidates.size());
+    float max_richness = 0.0f;
+    for (const int idx : candidates)
+    {
+        const entity_id tid = tile_ids[static_cast<std::size_t>(idx)];
+        const auto tc_it = w.tiles.find(tid);
+        if (tc_it == w.tiles.end())
+            continue;
+        float sum = 0.0f;
+        for (const resource_type er : placement_rules::k_extractable)
+            sum += tc_it->second.resource_deposit[static_cast<std::size_t>(er)];
+        idx_to_richness[idx] = sum;
+        max_richness = std::max(max_richness, sum);
+    }
+    auto richness_weight = [&](int idx) -> int {
+        const auto rit = idx_to_richness.find(idx);
+        const float r = (rit != idx_to_richness.end()) ? rit->second : 0.0f;
+        return (max_richness > 0.0f)
+            ? 1 + static_cast<int>(std::round(4.0f * r / max_richness))
+            : 1;
+    };
+
     // Determine target centre count: 20–40, scaled by tile count / 1000.
     // A 180×84 grid (~15 120 tiles) yields ~15 centres before clamping → 20.
     const int raw_count = static_cast<int>(total) / 1000;
@@ -133,14 +167,17 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed)
             break;
 
         // Build weighted candidate list: tiles adjacent to an existing centre
-        // get 3× weight; others get 1×.
+        // get 3× weight; others get 1×. BL-132 change (1): multiplied by a
+        // 1..5 richness weight so a rich, unclaimed deposit competes with (and
+        // can outweigh) a merely-adjacent tile, rather than richness only ever
+        // acting as a tie-breaker within the adjacency tier.
         std::vector<int> pool;
         pool.reserve(candidates.size() * 3);
         for (const int idx : candidates)
         {
             if (occupied_indices.count(idx))
                 continue; // already occupied
-            const int weight = adjacent_indices.count(idx) ? 3 : 1;
+            const int weight = (adjacent_indices.count(idx) ? 3 : 1) * richness_weight(idx);
             for (int w2 = 0; w2 < weight; ++w2)
                 pool.push_back(idx);
         }
