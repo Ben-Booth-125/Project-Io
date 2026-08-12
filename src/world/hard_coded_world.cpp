@@ -24,6 +24,7 @@
 #include <iterator>
 #include <map>
 #include <random>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -563,6 +564,18 @@ world make_hard_coded_world(world_params params, generation_report* report,
         w.stockpiles[kepler_processor] = stockpile_component{};
     }
 
+    // BL-132 change (3): corporations generate BEFORE markets, not after --
+    // the reorder this item's design calls for, so market carving can read
+    // where competing corporations actually cluster, not just raw nation
+    // geology. Moved from its old post-market position (below); its own
+    // ordering needs are already satisfied here: nations + kepler_settlement
+    // exist (Pass 1/2/BL-219 focus), and the pre-authored installations just
+    // above are in w.buildings for corporate asset placement to collision-avoid.
+    // Corporations: 6-10 actors registered in the generated nations, including
+    // the player's (which sets w.player_entity). See CORPORATION_GENERATION.md.
+    generate_corporations(w, corporation_params{ .corporation_count = gen_cfg.corporation_count },
+        /*seed=*/params.seed ^ 0x4A71012u, &kepler_settlement);
+
     // Kepler markets — population-anchored but RESOURCE-CARVED (BL-096). Markets
     // still anchor to population-centre tiles (catchment routing via market_for_tile
     // partitions the map), but how finely a nation's territory is split into markets
@@ -573,7 +586,12 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // Nations are the carving actor, so a resource cluster spanning two nations'
     // territory yields two markets. One-pass at world-gen, deterministic; a small
     // seeded jitter varies the borderline split per campaign (fresh XOR offset,
-    // uncorrelated with the nation/corp streams). Fuller co-generation is BL-132.
+    // uncorrelated with the nation/corp streams). BL-132 layers two more terms
+    // onto this same nation-carved gate: the market SITE itself is a
+    // resource<->population trade-flow proxy rather than the bare population
+    // tile (see trade_flow_proxy_site below), and the concentration driving the
+    // gate also reads how many distinct corporations are already competing in
+    // the territory (corps_in_nation below), not raw geology alone.
     // Resources outside the tradeable prototype subset stay at base 0 and are never
     // traded. Supply/demand are seeded by the substrate injection each tick.
     {
@@ -593,6 +611,34 @@ world make_hard_coded_world(world_params params, generation_report* report,
         const float rich_factor   = gen_cfg.market_carving.rich_factor;   // concentration >= mean × this → fracture (gate 2)
         const float barren_factor = gen_cfg.market_carving.barren_factor; // concentration <  mean × this → fold    (gate 4)
 
+        // BL-132 change (3): how many DISTINCT corporations hold at least one
+        // asset in a nation's territory — the actual competing-actor count a
+        // reorder to "corps before markets" exists to make available. A
+        // territory several corporations are already carving between them
+        // reads as more commercially contested than the same raw geology held
+        // by none, so it nudges toward fracture (more, finer markets) on top
+        // of the geological concentration term below, rather than replacing it
+        // — richness says there's something worth trading, corp presence says
+        // multiple actors are already trading it.
+        std::map<entity_id, int> corps_in_nation; // std::map → ascending id (deterministic)
+        for (const auto& [cid, cc] : w.corporations)
+        {
+            std::unordered_set<entity_id> nations_touched;
+            for (const entity_id bid : cc.assets)
+            {
+                const auto bit = w.buildings.find(bid);
+                if (bit == w.buildings.end())
+                    continue;
+                const auto nit = w.tile_to_nation.find(bit->second.tile);
+                if (nit == w.tile_to_nation.end())
+                    continue;
+                nations_touched.insert(nit->second);
+            }
+            for (const entity_id nid : nations_touched)
+                ++corps_in_nation[nid];
+        }
+        const float corp_presence_gain = gen_cfg.market_carving.corp_presence_gain;
+
         std::map<entity_id, float> concentration; // std::map → ascending id (deterministic)
         for (const auto& [nid, nc] : w.nations)
         {
@@ -600,7 +646,9 @@ world make_hard_coded_world(world_params params, generation_report* report,
             for (const resource_type rt : tradeable_raws)
                 sum += nc.resource_abundance[static_cast<std::size_t>(rt)];
             const float tiles = static_cast<float>(std::max<std::size_t>(1, nc.tiles.size()));
-            concentration[nid] = sum / tiles;
+            const auto cit = corps_in_nation.find(nid);
+            const int  n_corps = (cit != corps_in_nation.end()) ? cit->second : 0;
+            concentration[nid] = (sum / tiles) * (1.0f + corp_presence_gain * static_cast<float>(n_corps));
         }
         // Seeded jitter in ascending nation-id order (deterministic; fresh offset).
         {
@@ -792,16 +840,6 @@ world make_hard_coded_world(world_params params, generation_report* report,
             }
         }
     }
-
-    // Corporations: 6–10 actors registered in the generated nations, including
-    // the player's (which sets w.player_entity). Runs after the nations exist and
-    // after the pre-authored Kepler installations are in w.buildings, so corporate
-    // asset placement collision-avoids those tiles. See CORPORATION_GENERATION.md.
-    // BL-219: the settlement record is handed over so each corp's focus is a
-    // consequence of the province it anchors to — its ancient endowment plus
-    // how early that province industrialised — rather than a table lookup.
-    generate_corporations(w, corporation_params{ .corporation_count = gen_cfg.corporation_count },
-        /*seed=*/params.seed ^ 0x4A71012u, &kepler_settlement);
 
     // Player unit stub on Kepler, sited on the same home tile the installations
     // used (BL-324: position is a tile id, not a body).

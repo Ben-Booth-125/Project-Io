@@ -62,9 +62,14 @@ world_gen = {
         -- Nation tradeable-resource concentration gates (BL-096): a nation
         -- richer than mean * rich_factor fractures into more markets; one
         -- poorer than mean * barren_factor folds into its neighbour.
+        -- corp_presence_gain (BL-132): each distinct corporation holding an
+        -- asset in a nation's territory multiplies its concentration by
+        -- (1 + this), so a commercially-contested territory fractures
+        -- further on top of raw geology. 0 disables the effect.
         carving = {
-            rich_factor   = 1.30,
-            barren_factor = 0.70,
+            rich_factor        = 1.30,
+            barren_factor      = 0.70,
+            corp_presence_gain = 0.15,
         },
 
         -- Endemic-good distance pricing (BL-191): cheap at the source tile,

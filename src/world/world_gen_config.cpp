@@ -119,8 +119,9 @@ void world_gen_config::load_from_lua(lua_state& lua)
 
         if (sol::optional<sol::table> cv = (*km)["carving"])
         {
-            market_carving.rich_factor   = cv->get_or("rich_factor",   market_carving.rich_factor);
-            market_carving.barren_factor = cv->get_or("barren_factor", market_carving.barren_factor);
+            market_carving.rich_factor        = cv->get_or("rich_factor",        market_carving.rich_factor);
+            market_carving.barren_factor      = cv->get_or("barren_factor",      market_carving.barren_factor);
+            market_carving.corp_presence_gain = cv->get_or("corp_presence_gain", market_carving.corp_presence_gain);
         }
 
         if (sol::optional<sol::table> en = (*km)["endemic"])

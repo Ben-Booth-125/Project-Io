@@ -19,6 +19,11 @@ struct market_carving_params
 {
     float rich_factor   = 1.30f; ///< concentration >= mean * this -> fracture (more markets).
     float barren_factor = 0.70f; ///< concentration <  mean * this -> fold (fewer markets).
+    /// BL-132 change (3): each distinct corporation holding an asset in a
+    /// nation's territory multiplies its concentration by (1 + this), nudging
+    /// a commercially-contested territory toward fracture on top of raw
+    /// geology. 0 = corp presence has no effect (the pre-BL-132 formula).
+    float corp_presence_gain = 0.15f;
 };
 
 /// Endemic-good distance pricing tunables (BL-191), authored in scripts/world_gen.lua
