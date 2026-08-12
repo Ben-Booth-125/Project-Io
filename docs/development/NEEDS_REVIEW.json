@@ -2852,6 +2852,27 @@
     "docs/development/backlog.json"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-173",
+   "title": "BL-367 (multi-building management surface) landed without a live side-by-side screenshot of the grouped-stack list and the +N badge",
+   "raised": "2026-08-12",
+   "kind": "observation",
+   "status": "open",
+   "source": "BL-367 delivery session.",
+   "what": "Implemented the grouped-by-stack list (construction_panel.cpp draw_tile_stack_list), the Manage-button/canvas-marker tile-routing fix, and the on-canvas +N badge (body_surface_canvas.cpp), per the item's 2026-08-11 settled design. Verified: ProjectIo builds clean, launches without crash (Lua loads, no render error in the startup log). NOT verified: an actual screenshot of a real multi-building tile showing the grouped list and the badge rendered correctly (correct stagger vs the corp-identity tag, correct text fit) — building a multi-building save state and driving the UI to it was out of scope for this pass.",
+   "why_it_matters": "A UI feature that compiles and launches can still misrender (text overlap, badge collision, wrong stack ordering) in a way only a live screenshot catches — the standing practice (CLAUDE.md, DEVELOPMENT_PRACTICES.md) is to open the live app for exactly this kind of visual call.",
+   "options": [
+    "Build a quick fixture (place several buildings on one tile via the construction ledger in a live session or a headless harness) and capture a screenshot of the grouped list + badge.",
+    "Wait for BL-365s background firms (which routinely produce multi-building tiles) to surface a real one in the next live session and check it there."
+   ],
+   "recommendation": "Option 2 is cheap and likely soon — BL-365s ~80 background firms make multi-building tiles common in any fresh campaign now, so the next live session should hit one without deliberately constructing a fixture.",
+   "files": [
+    "src/ui/construction_panel.cpp",
+    "src/ui/selection_panel.cpp",
+    "src/ui/body_surface_canvas.cpp"
+   ],
+   "resolution": null
   }
  ]
 }

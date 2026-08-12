@@ -74,7 +74,8 @@
    "backlog_item": [
     "BL-029",
     "BL-082",
-    "BL-095"
+    "BL-095",
+    "BL-367"
    ],
    "files": [
     "src/ui/construction_panel.cpp"
@@ -195,7 +196,8 @@
    "backlog_item": [
     "BL-067",
     "BL-068",
-    "BL-071"
+    "BL-071",
+    "BL-367"
    ],
    "files": [
     "src/ui/selection_panel.cpp"

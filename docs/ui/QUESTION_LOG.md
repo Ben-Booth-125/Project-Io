@@ -42,7 +42,7 @@ alphabetical order.
 
 **Because:** Placement carries terrain, deposit, slot and now logistics-reach rules (BL-323). A refusal the player cannot read is indistinguishable from a broken build, so the panel must state the reason, not merely deny.
 
-*Demanded by BL-029, BL-082, BL-095 · `src/ui/construction_panel.cpp` · id `construction_panel`*
+*Demanded by BL-029, BL-082, BL-095, BL-367 · `src/ui/construction_panel.cpp` · id `construction_panel`*
 
 ### Economy panel (Corps / Holdings / Markets)
 
@@ -106,7 +106,7 @@ alphabetical order.
 
 **Because:** The pinned, polymorphic detail surface for the current selection. It is the answer to the click model's promise: single-click selects, and something must visibly happen when it does.
 
-*Demanded by BL-067, BL-068, BL-071 · `src/ui/selection_panel.cpp` · id `selection_panel`*
+*Demanded by BL-067, BL-068, BL-071, BL-367 · `src/ui/selection_panel.cpp` · id `selection_panel`*
 
 ### Tech tree viewer (F9)
 

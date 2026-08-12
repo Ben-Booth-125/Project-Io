@@ -10488,6 +10488,51 @@
      "notes": "MARKETS.md, GENERATION_STRATEGY.md, CORPORATION_GENERATION.md, GLOSSARY.md updated to describe background firms in place of the substrate."
     }
    ]
+  },
+  {
+   "brief": "multi-building-management-surface",
+   "title": "BL-367 (multi-building management surface): the building-management surface handles a tile holding several buildings of several types",
+   "difficulty": 3,
+   "importance": "B",
+   "status": "complete",
+   "promoted_from": "backlog.json BL-367, v0.1.13 (Sprint 10)",
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "A tile with exactly one building still routes straight to its single-building detail view (construction_panel.cpp draw_selected_section), zero extra clicks — the pre-BL-367 behavior is unchanged for the common case.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "draw_selected_section: falls through to tile_stacks() only when the building-id lookup misses; the single-stack/single-member branch resolves directly to the one building, matching prior behavior."
+    },
+    {
+     "id": "R2",
+     "requirement": "A tile with more than one building (several stacks, or one stack with several members) shows a grouped-by-stack list (mirroring placement_rules::stack_members grouping) instead of silently landing on an arbitrary first match.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "tile_stacks()/draw_tile_stack_list() in construction_panel.cpp; selecting a row sets selected_entity to that stacks lowest-id member."
+    },
+    {
+     "id": "R3",
+     "requirement": "The Manage Buildings action (selection_panel.cpp) and the on-canvas building-marker click (body_surface_canvas.cpp) both route a multi-building tile to the tile (grouped list), not to whichever building an unordered_map iterates first.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "Both call sites now count buildings-per-tile before deciding whether to jump straight to a building id or fall through to the tile id."
+    },
+    {
+     "id": "R4",
+     "requirement": "The on-canvas marker for a multi-building tile carries a \"+N\" count badge (dominant-stack glyph unchanged, no new glyph shape), staggered from the existing corp-identity tag so the two never overlap.",
+     "class": "visual",
+     "status": "complete",
+     "notes": "body_surface_canvas.cpp hit-zone block; ICONS.md documents the badge. Live-app launch confirmed no crash/render error; a deliberate side-by-side multi-building screenshot is owed (NR-173)."
+    },
+    {
+     "id": "R5",
+     "requirement": "question_log.json carries the surface change (BL-260 mandate) and SELECTION.md documents the new click model + list.",
+     "class": "visual",
+     "status": "complete",
+     "notes": "BL-367 appended to the construction_panel and selection_panel entries; SELECTION.md gained a Multi-building tiles section; ICONS.md gained the badge catalogue row."
+    }
+   ]
   }
  ]
 }

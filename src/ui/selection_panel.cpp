@@ -926,16 +926,22 @@ void draw_tile_selection(world& w, ui_state& ui)
         ImGui::SameLine();
 
         // Manage — enabled only when a building occupies this tile; selecting it
-        // switches the band to the building layout next frame.
-        entity_id bld_here = null_entity;
+        // switches the band to the building layout next frame. BL-367: a tile can
+        // now hold several buildings (BL-366 lifted the capacity-1 rule for
+        // non-extraction types), so this counts rather than grabbing the first
+        // match — a single building still jumps straight to its detail (zero
+        // extra clicks for the common case); more than one lands on the tile's
+        // grouped-by-stack list (construction_panel.cpp draw_tile_stack_list).
+        int       bld_count = 0;
+        entity_id bld_here  = null_entity;
         for (const auto& [bid, bc] : w.buildings)
-            if (bc.tile == sel) { bld_here = bid; break; }
-        if (tile_icon_button("##act_manage", bsz, bld_here != null_entity,
-                             bld_here != null_entity ? "Manage building" : "No building here",
+            if (bc.tile == sel) { ++bld_count; bld_here = bid; }
+        if (tile_icon_button("##act_manage", bsz, bld_count > 0,
+                             bld_count > 0 ? "Manage building" : "No building here",
                              glyph_gear) &&
-            bld_here != null_entity)
+            bld_count > 0)
         {
-            ui.selected_entity = bld_here;
+            ui.selected_entity = (bld_count == 1) ? bld_here : sel;
         }
 
         tile_icon_button("##act_history", bsz, /*enabled=*/false,

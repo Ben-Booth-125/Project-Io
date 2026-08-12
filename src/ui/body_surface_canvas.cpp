@@ -1048,6 +1048,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     static std::unordered_map<entity_id, building_type> built_tiles;
     static std::unordered_map<entity_id, entity_id>     tile_to_bld;  // tile_id → building entity
     static std::unordered_map<entity_id, entity_id>     tile_to_corp; // tile_id → owning corp
+    // BL-367: how many buildings stand on the tile — the "+N" badge count, and
+    // the signal that a marker click should land on the TILE (grouped stack
+    // list) rather than assuming the whole hex is one installation.
+    static std::unordered_map<entity_id, int>            tile_bld_count;
     const body_frame_stamp marker_stamp = make_body_frame_stamp(w, state.active_body);
     if (!(marker_stamp == s_marker_stamp))
     {
@@ -1055,11 +1059,13 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         built_tiles.clear();
         tile_to_bld.clear();
         tile_to_corp.clear();
+        tile_bld_count.clear();
         for (const auto& [bld_id, bld] : w.buildings)
         {
             auto tile_it = w.tiles.find(bld.tile);
             if (tile_it != w.tiles.end() && tile_it->second.body == state.active_body)
             {
+                ++tile_bld_count[bld.tile];
                 // Lowest building id wins the tile. w.buildings is an unordered_map, so a
                 // plain last-writer-wins assignment would let its iteration order pick the
                 // representative — fine while a tile holds one building, not once they
@@ -2115,12 +2121,32 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     const auto bld_it = tile_to_bld.find(id);
                     if (bld_it != tile_to_bld.end())
                     {
+                        // BL-367: one marker still stands for the whole tile (no
+                        // per-stack markers — the "+N" badge below is what tells
+                        // the two apart), so a tile with more than one building no
+                        // longer assumes the whole hex is a single installation —
+                        // the click lands on the TILE (grouped stack list) instead
+                        // of jumping into whichever building sorts lowest-id.
+                        const int count = tile_bld_count.count(id) ? tile_bld_count.at(id) : 1;
                         marker_hit_zone hz;
-                        hz.id     = bld_it->second;
+                        hz.id     = (count > 1) ? id : bld_it->second;
                         hz.kind   = marker_hit_zone::kind::building;
                         hz.centre = {cx, cy};
                         hz.radius = mr * 2.0f;
                         state.marker_hit_zones.push_back(hz);
+
+                        if (count > 1)
+                        {
+                            // "+N" badge, lower-right — staggered past the corp-identity
+                            // tag (also lower-right) per ICONS.md's multi-badge offset
+                            // convention, same k/N text idiom the survey badge uses.
+                            char nbuf[8];
+                            std::snprintf(nbuf, sizeof nbuf, "+%d", count - 1);
+                            const ImVec2 bpos{ cx + draw_r * 0.56f, cy + draw_r * 0.68f };
+                            const ImU32  bcol = IM_COL32(230, 230, 235, 235);
+                            dl->AddCircleFilled(bpos, 8.0f, IM_COL32(18, 20, 26, 225), 12);
+                            dl->AddText({bpos.x - 7.0f, bpos.y - 6.0f}, bcol, nbuf); // fit-exempt: on-canvas marker badge, no containing box
+                        }
                     }
                 }
             }
@@ -2714,10 +2740,18 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // 2026-07-22 call). The tile element is the prospecting view for UNBUILT
             // ground — routing a built tile to it offers a Construct button that the
             // placement rules then refuse, which is the bug this closes.
+            // BL-367: that "whole hex is one installation" assumption only holds for
+            // exactly one building — once BL-366 lets a tile stack several, the hex
+            // stays reachable as the grouped-by-stack tile view instead.
             entity_id fallback = hovered_tile;
             if (hovered_tile != null_entity)
-                if (const auto tb = tile_to_bld.find(hovered_tile); tb != tile_to_bld.end())
+            {
+                const auto tb = tile_to_bld.find(hovered_tile);
+                const auto cnt_it = tile_bld_count.find(hovered_tile);
+                const int  count = (cnt_it != tile_bld_count.end()) ? cnt_it->second : 0;
+                if (tb != tile_to_bld.end() && count <= 1)
                     fallback = tb->second;
+            }
 
             state.selected_entity = (marker_hit != null_entity) ? marker_hit : fallback;
         }

@@ -223,6 +223,85 @@ resource_type primary_output_resource(const recipe& r)
     return static_cast<resource_type>(best);
 }
 
+// BL-367: one row of the tile's grouped-by-stack list — mirrors
+// placement_rules::stack_members' own (type, target) grouping rather than
+// inventing a second one (BL-229's construction ledger already reads
+// stack_members this way for its own "N/cap" display).
+struct building_stack_row
+{
+    building_type          type;
+    resource_type          target;   // meaningful only when type == extraction_site
+    std::vector<entity_id> members;  // ascending id (stack_members' own order)
+};
+
+// Every distinct (type, target) stack standing on @p tile_id, in a stable
+// order (extraction stacks first by target enum, then the rest by type enum)
+// so the list does not reshuffle frame to frame as buildings complete.
+std::vector<building_stack_row> tile_stacks(const world& w, entity_id tile_id)
+{
+    std::vector<building_stack_row> rows;
+    for (const auto& [bid, bc] : w.buildings)
+    {
+        if (bc.tile != tile_id)
+            continue;
+        const resource_type target = (bc.type == building_type::extraction_site)
+            ? bc.target_resource : resource_type{};
+        auto it = std::find_if(rows.begin(), rows.end(), [&](const building_stack_row& r) {
+            return r.type == bc.type &&
+                   (bc.type != building_type::extraction_site || r.target == target);
+        });
+        if (it == rows.end())
+        {
+            rows.push_back({bc.type, target, {bid}});
+        }
+        else
+        {
+            it->members.push_back(bid);
+        }
+    }
+    for (auto& r : rows)
+        std::sort(r.members.begin(), r.members.end());
+    std::sort(rows.begin(), rows.end(), [](const building_stack_row& a, const building_stack_row& b) {
+        if (a.type != b.type)
+            return a.type < b.type;
+        return a.target < b.target;
+    });
+    return rows;
+}
+
+void draw_selected_section(world& w, const recipe_registry& reg,
+                           const economy_report& report, ui_state& state);
+
+// BL-367: the grouped stack list shown when a selected TILE holds more than
+// one building (several stacks, or one stack with several members) — the
+// surface a heterogeneous BL-366 tile needs to stay readable. Each row is one
+// stack ("Extraction: Iron Ore x3"); selecting a row drills into that stack's
+// lowest-id member via the ordinary single-building detail below, reusing
+// state.selected_entity as the switch (a building id routes straight there
+// next frame, same as clicking an on-canvas marker does).
+void draw_tile_stack_list(world& w, entity_id tile_id, ui_state& state,
+                          const std::vector<building_stack_row>& stacks)
+{
+    ImGui::TextDisabled("This tile holds %d building%s:",
+                        static_cast<int>(stacks.size()), stacks.size() == 1 ? "" : "s");
+    ImGui::Spacing();
+
+    for (const building_stack_row& row : stacks)
+    {
+        std::string label = building_type_name(row.type);
+        if (row.type == building_type::extraction_site)
+        {
+            label += ": ";
+            label += resource_name(row.target);
+        }
+        char buf[96];
+        std::snprintf(buf, sizeof buf, "%s x%d", label.c_str(),
+                     static_cast<int>(row.members.size()));
+        if (ImGui::Selectable(buf, false, 0, {0, ImGui::GetFrameHeight() * 1.4f}))
+            state.selected_entity = row.members.front();
+    }
+}
+
 // Inline detail under the Buildings tab: answers "how do I configure the thing I
 // have" for whichever row the player selected in the buildings table above. Ben's
 // 2026-07-15 building-management mockup (UI shell): title + placeholder image, a
@@ -244,15 +323,18 @@ void draw_selected_section(world& w, const recipe_registry& reg,
     }
     else
     {
-        // Fall back to tile-match for the normal "select a tile, see its building" case.
-        for (auto& [id, bld] : w.buildings)
+        // BL-367: a tile with more than one building groups by stack instead of
+        // silently landing on whichever one an unordered_map iterates first.
+        const std::vector<building_stack_row> stacks = tile_stacks(w, state.selected_entity);
+        if (stacks.size() > 1 || (stacks.size() == 1 && stacks.front().members.size() > 1))
         {
-            if (bld.tile == state.selected_entity)
-            {
-                found    = &bld;
-                found_id = id;
-                break;
-            }
+            draw_tile_stack_list(w, state.selected_entity, state, stacks);
+            return;
+        }
+        if (!stacks.empty())
+        {
+            found    = &w.buildings.at(stacks.front().members.front());
+            found_id = stacks.front().members.front();
         }
     }
 
@@ -263,6 +345,20 @@ void draw_selected_section(world& w, const recipe_registry& reg,
     }
 
     building_component& b = *found;
+
+    // BL-367: a "‹ tile" back link when this building's tile carries siblings,
+    // so drilling into one stack from the grouped list stays reversible.
+    if (found_id != null_entity)
+    {
+        const std::vector<building_stack_row> siblings = tile_stacks(w, b.tile);
+        const bool multi = siblings.size() > 1 ||
+            (siblings.size() == 1 && siblings.front().members.size() > 1);
+        if (multi && ImGui::SmallButton("<- This tile's buildings"))
+        {
+            state.selected_entity = b.tile;
+            return;
+        }
+    }
 
     // --- Identity plate: the building's own glyph, its name, and where it stands ---
     //

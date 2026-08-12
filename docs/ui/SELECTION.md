@@ -136,6 +136,35 @@ top to bottom:
    per LENSES.md), plus **two reserved slots** so the grid's shape doesn't have to change when a
    fifth/sixth action lands.
 
+### Multi-building tiles (BL-367)
+
+BL-366 lifted the capacity-1 rule for non-extraction building types, so a tile can carry a
+heterogeneous set — several extraction stacks against different deposits, several processors,
+plus infrastructure. Three questions this raised, resolved 2026-08-11 from shipped precedent
+rather than a new mockup:
+
+- **Grouped by stack, not a flat list.** `placement_rules::stack_members` already groups a tile's
+  buildings by `(type, target)`; the management surface (`draw_selected_section`,
+  `src/ui/construction_panel.cpp`) mirrors that grouping instead of inventing a second one. A tile
+  with more than one stack (or one stack with more than one member) shows a list — one row per
+  stack, e.g. *"Extraction: Iron Ore x3"*, *"Processing: Steel Mill x2"* — before the single-building
+  detail. A tile with exactly one building still routes straight to its detail, zero extra clicks
+  for the common case.
+- **Click model: the tile selects the aggregate; drilling into a row selects that stack.**
+  Extends the single-click-selects model above rather than replacing it. On canvas, only ONE
+  marker still renders per built tile (BL-231's dominant-silhouette convention) — for exactly one
+  building the click still lands on that installation directly (Ben's 2026-07-22 "whole hex
+  belongs to the installation" ruling, unchanged); for more than one it now falls through to the
+  **tile**, whose Manage Buildings action opens the grouped list above. Selecting a row there sets
+  the same `selected_entity` a canvas building-marker click would, so a single-building tile and a
+  drilled-into stack reach the identical detail view either way. A **"‹ this tile's buildings"**
+  back link on that detail view returns to the list when the tile carries siblings.
+- **On-canvas marker: dominant-stack glyph + a "+N" count badge.** No new glyph shape — the
+  marker keeps rendering the tile's lowest-id (dominant) building's silhouette, and a tile with
+  more than one building gains a small "+N" text badge (N = additional buildings), lower-right,
+  staggered past the existing BL-090 corp-identity tag which already sits there — the same k/N
+  text-overlay idiom the Solar-canvas survey badge uses for region progress. See ICONS.md.
+
 The whole band widened to make room for this (`shell_column_width` narrowed from its BL-124
 ~[480,576] range to ~[380,460] — see LAYOUT.md § The shell column; the BL-124 widening was
 explicitly to host the Selection sidebar, which no longer lives in that column at all since

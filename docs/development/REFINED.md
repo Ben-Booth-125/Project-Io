@@ -1,5 +1,18 @@
 # Project Io — REFINED (active worklist)
 
+> Drained 2026-08-12: BL-367 (multi-building management surface), 1 task COMPLETE (light-weight
+> enough for one direct pass) — removed per the retain-one policy. Record lives in backlog.json
+> BL-367's `resolution` field and requirements.json § multi-building-management-surface (R1–R5).
+> construction_panel.cpp's building-detail view groups a tile's buildings by stack
+> (`tile_stacks`/`draw_tile_stack_list`), mirroring `placement_rules::stack_members`'s own
+> grouping; a single-building tile still routes straight to its detail. selection_panel.cpp's
+> Manage button and body_surface_canvas.cpp's marker-click/fallback both now count
+> buildings-per-tile instead of grabbing an arbitrary first match. On-canvas marker gained a
+> "+N" count badge, staggered past the corp-identity tag. Docs: SELECTION.md, ICONS.md,
+> question_log.json updated. ProjectIo builds clean, launches without crash; a live screenshot
+> of a real multi-building tile is owed (NR-173), expected to surface naturally given BL-365's
+> background firms.
+
 > Drained 2026-08-11: BL-365 (background industry keystone), Sprint 10's keystone and the
 > reason BL-130/BL-263/BL-368 were pulled in out of turn — 2 worktree tasks COMPLETE
 > (T1 core swap, T2 docs) — removed per the retain-one policy. Record lives in backlog.json
