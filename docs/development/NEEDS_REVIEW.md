@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*172 entries — 61 open, 111 resolved.*
+*175 entries — 64 open, 111 resolved.*
 
 ---
 
@@ -509,6 +509,52 @@ ROADMAP.md carries "## Done-definition — v0.1.5 (military systems, cut by Spri
 > **Recommendation:** Option 1 if the criteria genuinely hold, since the done-definition is already written and the evidence is one sprint old. But note the coupling: its own done-definition says what the cut does NOT claim (hire_unit never observed firing end-to-end for a rival corp, NR-121), so stamping it is a statement that a cut may ship with a named unverified path — which is defensible and worth making deliberately rather than by default. Option 2 if that reads as too loose.
 
 *Files: `docs/development/ROADMAP.md`, `CHANGELOG.md`, `README.md`, `docs/development/backlog.json`*
+
+### NR-173 — BL-367 (multi-building management surface) landed without a live side-by-side screenshot of the grouped-stack list and the +N badge
+*observation · raised 2026-08-12 · from BL-367 delivery session.*
+
+Implemented the grouped-by-stack list (construction_panel.cpp draw_tile_stack_list), the Manage-button/canvas-marker tile-routing fix, and the on-canvas +N badge (body_surface_canvas.cpp), per the item's 2026-08-11 settled design. Verified: ProjectIo builds clean, launches without crash (Lua loads, no render error in the startup log). NOT verified: an actual screenshot of a real multi-building tile showing the grouped list and the badge rendered correctly (correct stagger vs the corp-identity tag, correct text fit) — building a multi-building save state and driving the UI to it was out of scope for this pass.
+
+**Why it matters.** A UI feature that compiles and launches can still misrender (text overlap, badge collision, wrong stack ordering) in a way only a live screenshot catches — the standing practice (CLAUDE.md, DEVELOPMENT_PRACTICES.md) is to open the live app for exactly this kind of visual call.
+
+- Build a quick fixture (place several buildings on one tile via the construction ledger in a live session or a headless harness) and capture a screenshot of the grouped list + badge.
+- Wait for BL-365s background firms (which routinely produce multi-building tiles) to surface a real one in the next live session and check it there.
+
+> **Recommendation:** Option 2 is cheap and likely soon — BL-365s ~80 background firms make multi-building tiles common in any fresh campaign now, so the next live session should hit one without deliberately constructing a fixture.
+
+*Files: `src/ui/construction_panel.cpp`, `src/ui/selection_panel.cpp`, `src/ui/body_surface_canvas.cpp`*
+
+### NR-175 — Three hand-synced resource-name tables, and the third fails SILENTLY — root cause of the 2026-08-12 startup crash
+*observation · raised 2026-08-12 · from Diagnosing the reported crash after generation, 2026-08-12*
+
+The crash was `ProjectIo: fatal error: Unknown resource 'medical_supplies' in world_gen.kepler_market.base_price`, thrown from `world_gen_config::load_from_lua`. Cause: `resource_type` name lookup is implemented THREE times, each an independent hand-maintained table in its own anonymous namespace, and no two agree. Measured against the 42-value enum: `recipe_registry.cpp` had 34 (missing the eight Era -1 goods), `world_gen_config.cpp` had 29, `verify_api.cpp` has **20**. BL-368 priced the habitability tranche (clean_water, consumer_goods, medical_supplies) in world_gen.lua and added it to recipe_registry's table but not the other two, so the app died at startup. FIXED this session: world_gen_config's table now covers the whole enum, and its comment says why a subset is not safe. `verify_api.cpp` is deliberately LEFT for your call — see below, because its fix changes check semantics rather than merely unbreaking a load.
+
+**Why it matters.** The two failure modes are not equally visible, and the quiet one is the dangerous one. `world_gen_config` and `recipe_registry` both THROW on an unknown name — loud, immediate, diagnosable in a minute, which is what happened here. `verify_api`'s version instead returns `resource_type::iron_ore` for anything it does not recognise. So a verify script naming any of the 22 resources it lacks — every BL-340 processing good, the whole habitability tranche, all the Era -1 goods — silently lenses, orders or inspects IRON ORE instead, and the check passes against a golden that shows the wrong resource. That is a vacuous green of the same family NR-156 flags in pregame_balance_harness, but harder to spot, because nothing is out of range — it is simply the wrong good. The visual harness is the instrument we trust to catch rendering regressions; an instrument that quietly substitutes its default is worse than one that fails.
+
+- Consolidate to ONE canonical `resource_from_name` over the whole enum, exported from a small header (e.g. world/resource_names.hpp) and used by all three call sites. Removes the class of bug rather than this instance. Note the verify variant would need to keep an explicit fallback at ITS call sites if any script relies on the iron_ore default.
+- Complete `verify_api.cpp`'s table in place (leave the three copies), and additionally make its unknown-name path LOUD — assert or report rather than defaulting to iron_ore, so a mistyped resource in a check fails the check instead of quietly re-pointing it.
+- Complete verify_api's table only, keeping the silent iron_ore fallback. Cheapest; leaves the silent-substitution hazard intact for the next resource added.
+- Leave verify_api as is — no script currently names a missing resource, so nothing is wrong today.
+
+> **Recommendation:** Option 1 plus the loud-failure half of option 2. The consolidation is the real fix — three tables that must agree, with no check that they do, is a defect generator, and it has now generated one crash and one latent silent-substitution bug. The loud failure matters independently of consolidation: a check harness should never silently substitute a default for a name its author typed. Worth a quick audit as part of it — grep the verify scripts for resource names outside the current 20 to see whether any blessed golden is already showing iron ore where its script asked for something else. Option 4 is the one to avoid: it is true only until the next resource lands, which on this codebase's recent rate is weeks.
+
+*Files: `src/world/world_gen_config.cpp`, `src/world/recipe_registry.cpp`, `src/core/verify_api.cpp`, `src/world/components.hpp`, `scripts/world_gen.lua`*
+
+### NR-176 — Different selection modes given a lens — should the active lens change what a click selects?
+*question · raised 2026-08-12 · from Ben, 2026-08-12 — raised directly, filed for his own later expansion*
+
+Ben's idea, recorded as raised: the active map lens could change what clicking the canvas selects. Today selection is lens-blind. The Planetary canvas registers marker_hit_zone entries each frame and resolves a click by a FIXED priority — building > market_centre > tile (src/ui/ui_state.hpp, the marker_hit_zone comment) — and overlay_mode (the same header, 14 modes) feeds only the draw pass. So under the Resource lens a click still lands on whatever building sits on the deposit, not on the deposit; under Country it lands on the tile, not the nation; under Reach or Supply-routes, whose subject is a body-pair edge rather than anything on the tile grid, there is no corresponding selectable at all. The proposal is that the lens declares the selection subject, so what the player is LOOKING at is what a click GRABS. The specific per-lens mapping is Ben's to fill in — this entry captures the question, not an answer.
+
+**Why it matters.** It is the one place the lens family stops short of being a mode. A lens today changes the wash and the legend but nothing about interaction, which means the player reads at one altitude and clicks at another — they switch to Corporation to see the ownership pattern, click the pattern, and get a tile. It also bears on SELECTION.md's click model (single-click selects, double-click navigates) and on the ACTIONS dictionary: every canvas click action currently has one meaning, and a lens-keyed selection subject makes that meaning conditional, which the AI player reads through ACTIONS.json. Cheap to answer, awkward to retrofit once more lenses land.
+
+- Lens declares the selection subject — each overlay_mode names what a click resolves to, overriding the fixed marker priority while that lens is active (Resource → deposit, Country → nation, Corporation → corp, Market → market centre, none → today's building > market_centre > tile).
+- Lens re-orders rather than replaces — the same hit-test candidates, but the lens promotes its own subject to the top of the priority list, so a click still falls through to the tile when the lens has nothing there. Preserves the invariant that every click selects something.
+- Leave selection lens-blind, and instead make the lens's subject reachable through the Selection panel (e.g. a click on a tile under Country offers its nation as a related-entity jump). Keeps one click model; adds a step.
+- No change — the lens is a rendering mode only.
+
+> **Recommendation:** None offered — this is Ben's design idea and the per-lens mapping is the substance of it. Worth noting for whichever way it goes: options 1 and 2 differ mainly in failure behaviour, and option 2's fall-through is the safer default under the lenses whose subject is not on the tile grid (Reach, Supply-routes, Scarcity), where option 1 would leave a click doing nothing. If it becomes work, it wants a backlog item against SELECTION.md + LENSES.md + the ACTIONS canvas family, not a patch to the hit-test.
+
+*Files: `src/ui/ui_state.hpp`, `src/ui/selection.hpp`, `docs/ui/SELECTION.md`, `docs/ui/LENSES.md`, `docs/ai/ACTIONS.json`*
 
 ---
 
