@@ -265,12 +265,67 @@ const std::vector<building_type>& focus_asset_pattern(industrial_focus focus)
     return extraction_mix;
 }
 
+/// Pick one of seven per-landform weights. A small readability helper so the
+/// infrastructure siting preferences below read as a table rather than a switch
+/// nested in a switch. Weights are given in `terrain_landform` declaration order.
+///
+/// @param lf The tile's landform.
+/// @return   The weight matching `lf` (1.0 for an unknown value).
+float landform_lean(terrain_landform lf,
+                    float plains, float highland, float mountain,
+                    float canyon, float valley, float crater, float rift)
+{
+    switch (lf)
+    {
+        case terrain_landform::plains:   return plains;
+        case terrain_landform::highland: return highland;
+        case terrain_landform::mountain: return mountain;
+        case terrain_landform::canyon:   return canyon;
+        case terrain_landform::valley:   return valley;
+        case terrain_landform::crater:   return crater;
+        case terrain_landform::rift:     return rift;
+    }
+    return 1.0f;
+}
+
+/// How dry and firm a composition's ground is, as a placement multiplier. Used by
+/// the launchpad preference: dust and rock are good pad ground, marsh and ice are
+/// not. Not a hazard measure — hazard is applied separately for every type.
+///
+/// @param comp The tile's composition.
+/// @return     A positive multiplier, 1.0 for compositions with no strong lean.
+float dryness_lean(terrain_composition comp)
+{
+    switch (comp)
+    {
+        case terrain_composition::barren:
+        case terrain_composition::rocky:
+        case terrain_composition::regolith:  return 1.3f;
+        case terrain_composition::metallic:
+        case terrain_composition::tundra:
+        case terrain_composition::grassland: return 1.0f;
+        case terrain_composition::forest:    return 0.8f;
+        case terrain_composition::volcanic:  return 0.7f;
+        case terrain_composition::icy:       return 0.6f;
+        case terrain_composition::wetland:   return 0.5f;
+        case terrain_composition::ocean:     return 0.001f; // can_place rejects these anyway
+    }
+    return 1.0f;
+}
+
 /// Score one tile for hosting a building of `btype`, higher is better. Mirrors the
 /// per-focus preference the single-asset placer used: extraction wants the richest
 /// *extractable* deposit (a site must be able to work its tile), processing/port
 /// want any workable land but lean mildly toward some deposit nearby; every type
 /// shies away from hazardous tiles. Returns a strictly positive score for any
 /// non-ocean tile so a candidate is always placeable.
+///
+/// The three infrastructure types carry a first-cut siting lean (Ben, 2026-08-12,
+/// resolving NR-126 — "lazily evaluate these however you like"): launchpads want
+/// flat dry ground, logistics hubs flat peopled ground, military bases commanding
+/// ground near a population worth garrisoning. No generated world moves today —
+/// `focus_asset_pattern` never proposes these types — so the lean is dormant until
+/// something places them, and is tuning data rather than a settled design.
 ///
 /// @param tc    The candidate tile.
 /// @param btype The building type proposed for it.
@@ -290,13 +345,28 @@ float tile_score_for(const tile_component& tc, building_type btype)
             // Mild lean toward tiles with some deposit (own feedstock nearby).
             score = total_deposit(tc) * 0.5f + 1.0f;
             break;
-        case building_type::port:
         case building_type::launchpad:
+            // Flat and dry: a pad wants easy ground and no weather. Plains best,
+            // slope penalised hard; dry compositions preferred over wet/icy ones.
+            score = landform_lean(tc.landform, 1.6f, 1.0f, 0.35f, 0.5f, 1.1f, 0.9f, 0.4f);
+            score *= dryness_lean(tc.composition);
+            break;
         case building_type::inland_logistics_hub:
+            // Flat and peopled: a depot wants ground a road can cross and traffic
+            // worth carrying, so it leans on habitability rather than on deposits.
+            score = landform_lean(tc.landform, 1.5f, 1.0f, 0.3f, 0.5f, 1.3f, 0.7f, 0.6f);
+            score *= (0.7f + tc.habitability * 0.6f);
+            break;
         case building_type::military_base:
+            // Commanding ground near something worth garrisoning: elevation is an
+            // advantage here rather than a cost, but an empty peak is not a posting.
+            score = landform_lean(tc.landform, 1.0f, 1.5f, 1.2f, 1.1f, 0.9f, 1.0f, 1.0f);
+            score *= (0.8f + tc.habitability * 0.4f);
+            break;
+        case building_type::port:
         case building_type::none:
-            // Deliberately neutral; a real siting preference for the non-port
-            // infrastructure types is an open design question (NR-126).
+            // Deliberately neutral — ports are already sited by can_place's coastal
+            // test, and `none` is not a real sited type.
             score = 1.0f;
             break;
     }

@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*175 entries — 64 open, 111 resolved.*
+*175 entries — 55 open, 120 resolved.*
 
 ---
 
@@ -48,6 +48,8 @@ Two coupled effects, both mechanical rather than judgement calls, but they are w
 *question · raised 2026-08-09 · from BL-266 worktree agent, 2026-08-09*
 
 Two things for your eye. (1) Goldens: sticky_card_00/02-05, new sticky_card_01_resting_corp (old sticky_card_01_dismissed.png orphaned - delete), continents_lens_kepler_key, and every golden showing the Selection band header (selection_band_*, selection_bar_*, selection_building_manage, selection_tile_*, walk_04_selection, v009_emblem_selection_and_markers) need re-blessing - the [x] dismiss control is gone and [>] moved. Not re-blessed this session: on the Linux box ALL goldens diff 20-35% even on untouched captures, so a bless here would be blind. (2) Layout call: the Continent lens key permanently overlaps the always-open band corner (see continents_lens_kepler_key capture) - does the key want a new home?
+
+> **RESOLVED.** PARTIALLY ANSWERED — layout half settled, golden half still open. ANSWERED (Ben, 2026-08-12, Q&A form) for the layout half: **the Continent lens key floats above the always-open Selection band** rather than moving corner or docking to the lens bar. So the key keeps its position and gains z-order over the band. The **golden re-bless half of this entry stays open** — it is unaffected by the layout call, and NR-130 records that the committed goldens are stale by ~119 commits of world drift regardless. Filed as BL-376 (lens key float).
 
 ### NR-107 — BL-215 (render audit): tick labels abbreviate only from 1000 up, not always
 *decision taken on your behalf · raised 2026-08-09 · from BL-215 design § 5 — 'labels format through fmt::abbreviate instead of %g'*
@@ -128,21 +130,6 @@ apply_budget charges the levy on building_report rows of type extraction_site on
 
 *Files: `src/world/budget_system.cpp`, `src/world/law.cpp`*
 
-### NR-118 — Is corporate focus diversity a guarantee, or a preference the generator states honestly?
-*question · raised 2026-08-10 · from BL-349 (S7d over-asserts), which offered this as its option 2*
-
-corporation_generation.cpp rerolls corp home provinces up to six times trying to represent all three focus classes, but only re-picks provinces INSIDE each corp's home nation -- so the floor is unmeetable when no corp's nation holds a processing-capable province. The code calls the unmet floor honest and lets the emergent set stand. BL-349 softened the test to match (option 1). Option 2 was to widen the reroll so the floor becomes meetable and keep the hard assertion.
-
-**Why it matters.** It is a design claim, not a test question: does a generated world PROMISE the player at least one rival of each focus, or does it promise only that focus follows from the ground each corp sits on? On the default seed, processing corps go 1 -> 0 as lowland_share moves, so a world with no processing rival is reachable today and nothing tells the player that is intentional.
-
-- Leave as is -- focus follows the ground, and an absent class is the ground speaking. Cheapest, and consistent with the specialists premise.
-- Widen the reroll beyond the home nation so the floor is meetable, then restore the hard assertion. Changes generated worlds.
-- Keep it emergent but SURFACE it -- if no rival of a class exists, say so somewhere the player reads, rather than leaving it silent.
-
-> **Recommendation:** Option 1 or 3. Option 2 buys a guarantee by letting a corp anchor outside its own nation, which fights BL-219's whole argument that a corp's focus is a consequence of the province it anchors to.
-
-*Files: `src/world/corporation_generation.cpp`, `tools/verify/settlement_harness.cpp`*
-
 ### NR-121 — BL-325 S2's hire path was never positively observed firing for a rival corp — construction can stall indefinitely on steel-poor tiles
 *observation · raised 2026-08-10 · from Sprint 9 (cut v0.1.5) — debugging why ai_skill_harness's hire_unit tally stayed at 0 after adding corp_ai's military_base build candidate*
 
@@ -183,11 +170,6 @@ The fix separates the two consumers rather than slowing rendering to tick grain:
 *question · raised 2026-08-10 · from Hygiene audit; components.hpp:404, market_clearing.cpp:359-371/:408-489*
 
 No producer anywhere constructs a buy_order (the live call passes only sell orders, app.cpp:642); the two-pass preferred-seller matching for buys has never run. Options: (a) delete it -- the exchange-policy arc (BL-160/BL-161) can re-add it designed against real requirements; (b) keep it as the landed BL-037 shape awaiting a producer. Not acted on in the hygiene batch.
-
-### NR-126 — Do military_base / launchpad / inland_logistics_hub want terrain placement preferences at generation?
-*question · raised 2026-08-10 · from Hygiene audit / -Wswitch; corporation_generation.cpp:280 (tile_score_for)*
-
-The three newest building types fall through tile_score_for to a neutral 1.0, scoring like port/none. BL-355 makes the cases explicit (still 1.0) so the compiler tracks the enum, but whether they SHOULD carry a preference (base near borders? launchpad on flat dry terrain?) is a design call not taken.
 
 ### NR-127 — Hire gate retargeted to corp_body_pools (decision taken in BL-352)
 *decision taken on your behalf · raised 2026-08-10 · from BL-352 (hire-gate live store)*
@@ -264,21 +246,6 @@ Ben's ruling made rival corps able to trade; it did not say how well. The rule s
 **Why it matters.** No harness compares a hash against a recorded literal - ai_skill_harness compares two runs of the same build against each other - so nothing breaks. But any hash value written down in a doc, a devlog or a review note from before 2026-08-08 no longer reproduces, and someone will eventually try. Worth knowing the reason rather than debugging it. The stored-order choice also means the order book is the one section of the hash whose determinism rests on container discipline rather than on a re-sort; the new order_book_harness asserts it, and that assertion is the reason it is safe.
 
 *Files: `src/world/world.cpp`, `src/world/world.hpp`, `tools/verify/order_book_harness.cpp`*
-
-### NR-139 — BL-364 (corp borders on the hex grid) carries two open design questions before anyone builds it — and this entry cited the WRONG item id
-*decision-needed · raised 2026-08-08 · from Implementing BL-293 (order book unreachable by command), 2026-08-08.*
-
-Filed from Ben's 2026-08-08 steer that the corp border circle 'basically tells us nothing'. Q1: WHICH tile set is the border - (a) tiles within influence_range of the seat (the honest hex rendering of today's circle), (b) tiles inside the corp's logistics-reach budget (what 'a valid move' actually means once BL-323 lands), or (c) held tiles plus neighbours? Q2: always-on fill is heavy over a hex grid and will fight other overlays - outline always-on, fill only under the Corporation lens? [Renumbered from NR-089 on 2026-08-10: the BL-293 branch sat unmerged while main used that id for a different entry.] [2026-08-12 sweep — ID CORRECTION: every "BL-325" in this entry is wrong. BL-325 is MILITARY_BASE_AND_SUPPLY, a shipped v0.1.5 item; the corp-border work is **BL-364** (CORP_BORDER_HEXES, design-owed, v0.1.2), which was renumbered off BL-325 on 2026-08-10 precisely because that id was already taken — its own summary records the renumber. This entry was itself renumbered in the same collision (from NR-091) and kept the stale id, so it is a second-order instance of exactly the hazard NR-110 documents: with no next_id.js equivalent for NR ids, a concurrent-session renumber fixes the id on the entry but not the ids INSIDE it. No content change — Q1 and Q2 as written are still the open questions, and BL-364's design field already carries both verbatim, so nothing is lost, only mis-addressed.]
-
-**Why it matters.** Q1 decides whether BL-325 is a small independent reskin or a consumer of BL-323's reach field, which changes both its sequencing and its difficulty. Ben's own stated purpose - 'more easily see what is and isn't a valid move' - argues for (b), but (b) means the item cannot land before the buildings rework does. Worth answering before it is promoted.
-
-- Q1a - influence_range hexes: independent of BL-323, small, but still a picture of a scalar.
-- Q1b - logistics-reach budget: matches the stated purpose, depends on BL-323.
-- Q1c - held tiles + neighbours: cheapest to compute, weakest claim to meaning.
-
-> **Recommendation:** Q1b, sequenced after BL-323; Q2 outline-always / fill-on-lens, matching the Country lens's grammar.
-
-*Files: `src/ui/body_surface_canvas.cpp`, `docs/development/backlog.json (BL-364)`*
 
 ### NR-140 — ai_skill_harness golden bands: already stale before BL-293, and trading moved them further. Not re-blessed
 *decision-needed · raised 2026-08-08 · from Implementing BL-293 (order book unreachable by command), 2026-08-08.*
@@ -391,13 +358,6 @@ First deferral: the 2026-08-10 five-sprint plan held v0.2.0 so the opponent woul
 
 Ben asked what hardware is needed to support the game in its current state, and how much lag to expect on this machine. No perf doc or profiling harness exists yet - this has never been measured, only guessed at.
 
-### NR-163 — Room for ~10-20 private corporations per nation is a generation-density call, not yet designed
-*question · raised 2026-08-11 · from 2026-08-11 notes session with Ben.*
-
-Ben asked whether the game has room for roughly 10-20 private corporations per nation. NATION_GENERATION.md and GENERATION_STRATEGY.md do not fix a count - the premise is player + major AI as lean specialists against a saturated Nation-AI-owned economy - so this is an open density/perf question, not yet designed.
-
-*Files: `docs/generation/NATION_GENERATION.md`, `docs/generation/GENERATION_STRATEGY.md`*
-
 ### NR-164 — Re-stress generation and time-lapse feel when playable
 *question · raised 2026-08-11 · from 2026-08-11 notes session with Ben.*
 
@@ -405,33 +365,12 @@ Ben wants to re-stress-test world generation and the staged-generation time-laps
 
 *Files: `docs/ui/STARTUP.md`*
 
-### NR-165 — Laws/ideology system should feel distinct from the technology system
-*question · raised 2026-08-11 · from 2026-08-11 notes session with Ben.*
-
-Ben wants the laws/policy and ideology layer (BL-155, law/policy surface design) to feel mechanically distinct from technology, not a reskinned tech tree. Candidate lever: law costs compliance/enforcement, tech costs capability - worth pinning down when BL-155 is worked.
-
-*Files: `docs/lore/HISTORY.md`*
-
-### NR-166 — Time-to-space-industry has no real playtest number yet
-*question · raised 2026-08-11 · from 2026-08-11 notes session with Ben.*
-
-Ben asked how long a player should expect before starting on space industry. ERAS.md gates Era 1 on Rocketry research + Launchpad + propellant, but this is designed, not implemented, so there is no real playtest timing to answer with yet.
-
-*Files: `docs/economy/ERAS.md`*
-
 ### NR-167 — AI capability / SOTA tracking is a standing practice, not a one-time task
 *question · raised 2026-08-11 · from 2026-08-11 notes session with Ben.*
 
 Ben re-stressed the need to keep researching AI capability and follow the state of the art, relevant to the local-model AI opponent direction (AI_OPPONENT.md § 10). This is an ongoing watch item, not something that resolves once.
 
 *Files: `docs/ai/AI_OPPONENT.md`*
-
-### NR-168 — Base-game international trade should reliably clear and beat Era 1, not stall the player
-*question · raised 2026-08-11 · from 2026-08-11 notes session with Ben.*
-
-Ben wants assurance the base game always has enough international trade that players do not stall, and it is quite likely a player can beat Era 1 on trade alone. No stated design invariant for this yet in MARKETS.md/FINANCE.md - it is currently an implicit hope, not a tuned target.
-
-*Files: `docs/economy/MARKETS.md`, `docs/economy/FINANCE.md`*
 
 ### NR-169 — ai_skill_harness golden bands drift with each Sprint 10 landing (BL-366: 5→8, BL-130: 8→9) — standing stewardship gap
 *observation · raised 2026-08-11 · from BL-368 (real population demand) session, regression sweep.*
@@ -479,22 +418,6 @@ world.buildings/world.stockpiles/corporation.assets(sum) all grow at a steady ~1
 
 *Files: `tools/verify/data_creep_harness.cpp`, `src/world/corp_ai.cpp`, `src/world/corporation_generation.cpp`*
 
-### NR-173 — The Industry lens now tints a field that nothing else reads — re-point it at real background firms, or retire it?
-*question · raised 2026-08-12 · from Review-queue sweep, 2026-08-12 — found while correcting the stale substrate premise for NR-150/NR-151*
-
-BL-365 replaced the abstract nation substrate with real background corporations, and `nation_generation.cpp` Pass 6 now describes `tile.substrate_density` in its own comment as "purely a rendering field now". The Industry lens (BL-084) is the only consumer left: it tints each tile by that generation-time ripple weighted by terrain deposit richness. So the lens still renders exactly as blessed, but what it MEANS has quietly changed — it draws where background industry plausibly would sit, while the real background firms are ordinary buildings sitting somewhere else on the same map. LENSES.md and `ACTIONS.json`'s lens.industry entry both still claimed the field 'injects background supply and demand into each market'; that claim is corrected as of this sweep, but the lens itself is untouched.
-
-**Why it matters.** A lens whose tint no longer answers its own question is worse than an absent one: it looks like evidence. The action dictionary's version of the fault is sharper still — an AI player reading the old `reason_to_select` would have treated the tint as a market signal and been wrong every time. Corrected in prose, but the surface remains a picture of a scalar, which is the same objection Ben raised against the corp border circle ('basically tells us nothing', NR-139).
-
-- Re-point it at real background-firm buildings — per-tile count/output of `is_background` corp buildings, which is what the lens name has always promised. Makes it a true lens again and gives the saturated world a surface of its own.
-- Retire `overlay_mode::industry` and let Production carry it — Production already tints real output intensity, and Industry is keyboard-cycle-only anyway, so the roster loses a lens nobody presses rather than a capability.
-- Keep as flavour, labelled — leave the vestigial field, and let the corrected docs stand as the whole fix.
-- Delete `tile.substrate_density` outright along with the lens — the field is BL-050's last remnant and costs a float per tile.
-
-> **Recommendation:** Option 1 or 2, not 3. The two are close: option 1 keeps a distinct question ('where is the industry I did not build?') that Production does not quite ask, since Production is body-relative intensity including the player's own; option 2 is honest about the fact that Industry was already trimmed off the visible bar the day it shipped. Option 3 leaves a surface that reads as evidence and is not, which is the thing worth avoiding. Option 4 only after 1 is ruled out — `substrate_density` is cheap and deleting it is a save-format touch for no gain.
-
-*Files: `docs/ui/LENSES.md`, `docs/ai/ACTIONS.json`, `src/ui/body_surface_canvas.cpp`, `src/world/nation_generation.cpp`, `src/world/components.hpp`*
-
 ### NR-174 — v0.1.5 was declared cut in ROADMAP.md but never tagged or stamped — the one release residue left over from NR-097
 *observation · raised 2026-08-12 · from Review-queue sweep, 2026-08-12 — found while checking whether NR-097 (no version cut) was overtaken*
 
@@ -539,22 +462,6 @@ The crash was `ProjectIo: fatal error: Unknown resource 'medical_supplies' in wo
 > **Recommendation:** Option 1 plus the loud-failure half of option 2. The consolidation is the real fix — three tables that must agree, with no check that they do, is a defect generator, and it has now generated one crash and one latent silent-substitution bug. The loud failure matters independently of consolidation: a check harness should never silently substitute a default for a name its author typed. Worth a quick audit as part of it — grep the verify scripts for resource names outside the current 20 to see whether any blessed golden is already showing iron ore where its script asked for something else. Option 4 is the one to avoid: it is true only until the next resource lands, which on this codebase's recent rate is weeks.
 
 *Files: `src/world/world_gen_config.cpp`, `src/world/recipe_registry.cpp`, `src/core/verify_api.cpp`, `src/world/components.hpp`, `scripts/world_gen.lua`*
-
-### NR-176 — Different selection modes given a lens — should the active lens change what a click selects?
-*question · raised 2026-08-12 · from Ben, 2026-08-12 — raised directly, filed for his own later expansion*
-
-Ben's idea, recorded as raised: the active map lens could change what clicking the canvas selects. Today selection is lens-blind. The Planetary canvas registers marker_hit_zone entries each frame and resolves a click by a FIXED priority — building > market_centre > tile (src/ui/ui_state.hpp, the marker_hit_zone comment) — and overlay_mode (the same header, 14 modes) feeds only the draw pass. So under the Resource lens a click still lands on whatever building sits on the deposit, not on the deposit; under Country it lands on the tile, not the nation; under Reach or Supply-routes, whose subject is a body-pair edge rather than anything on the tile grid, there is no corresponding selectable at all. The proposal is that the lens declares the selection subject, so what the player is LOOKING at is what a click GRABS. The specific per-lens mapping is Ben's to fill in — this entry captures the question, not an answer.
-
-**Why it matters.** It is the one place the lens family stops short of being a mode. A lens today changes the wash and the legend but nothing about interaction, which means the player reads at one altitude and clicks at another — they switch to Corporation to see the ownership pattern, click the pattern, and get a tile. It also bears on SELECTION.md's click model (single-click selects, double-click navigates) and on the ACTIONS dictionary: every canvas click action currently has one meaning, and a lens-keyed selection subject makes that meaning conditional, which the AI player reads through ACTIONS.json. Cheap to answer, awkward to retrofit once more lenses land.
-
-- Lens declares the selection subject — each overlay_mode names what a click resolves to, overriding the fixed marker priority while that lens is active (Resource → deposit, Country → nation, Corporation → corp, Market → market centre, none → today's building > market_centre > tile).
-- Lens re-orders rather than replaces — the same hit-test candidates, but the lens promotes its own subject to the top of the priority list, so a click still falls through to the tile when the lens has nothing there. Preserves the invariant that every click selects something.
-- Leave selection lens-blind, and instead make the lens's subject reachable through the Selection panel (e.g. a click on a tile under Country offers its nation as a related-entity jump). Keeps one click model; adds a step.
-- No change — the lens is a rendering mode only.
-
-> **Recommendation:** None offered — this is Ben's design idea and the per-lens mapping is the substance of it. Worth noting for whichever way it goes: options 1 and 2 differ mainly in failure behaviour, and option 2's fall-through is the safer default under the lenses whose subject is not on the tile grid (Reach, Supply-routes, Scarcity), where option 1 would leave a click doing nothing. If it becomes work, it wants a backlog item against SELECTION.md + LENSES.md + the ACTIONS canvas family, not a patch to the hit-test.
-
-*Files: `src/ui/ui_state.hpp`, `src/ui/selection.hpp`, `docs/ui/SELECTION.md`, `docs/ui/LENSES.md`, `docs/ai/ACTIONS.json`*
 
 ---
 
@@ -2064,6 +1971,23 @@ tech_tree.hpp listed `era` among its six condition labels, so BL-342 promoted it
 
 *Files: `src/world/condition_set.cpp`, `docs/economy/ERAS.md`*
 
+### NR-118 — Is corporate focus diversity a guarantee, or a preference the generator states honestly?
+*question · raised 2026-08-10 · from BL-349 (S7d over-asserts), which offered this as its option 2*
+
+corporation_generation.cpp rerolls corp home provinces up to six times trying to represent all three focus classes, but only re-picks provinces INSIDE each corp's home nation -- so the floor is unmeetable when no corp's nation holds a processing-capable province. The code calls the unmet floor honest and lets the emergent set stand. BL-349 softened the test to match (option 1). Option 2 was to widen the reroll so the floor becomes meetable and keep the hard assertion.
+
+**Why it matters.** It is a design claim, not a test question: does a generated world PROMISE the player at least one rival of each focus, or does it promise only that focus follows from the ground each corp sits on? On the default seed, processing corps go 1 -> 0 as lowland_share moves, so a world with no processing rival is reachable today and nothing tells the player that is intentional.
+
+- Leave as is -- focus follows the ground, and an absent class is the ground speaking. Cheapest, and consistent with the specialists premise.
+- Widen the reroll beyond the home nation so the floor is meetable, then restore the hard assertion. Changes generated worlds.
+- Keep it emergent but SURFACE it -- if no rival of a class exists, say so somewhere the player reads, rather than leaving it silent.
+
+> **Recommendation:** Option 1 or 3. Option 2 buys a guarantee by letting a corp anchor outside its own nation, which fights BL-219's whole argument that a corp's focus is a consequence of the province it anchors to.
+
+> **RESOLVED.** ANSWERED (Ben, 2026-08-12, Q&A form): **option 1 — emergent and silent.** Focus follows the ground; a world with no processing rival is the ground speaking, not a generation failure. No surfacing to the player (option 3 declined), and no widening of the reroll past the home nation (option 2 declined, which also preserves BL-219 argument that focus is a consequence of the anchored province). BL-349 softened test already matches this answer, so no work follows.
+
+*Files: `src/world/corporation_generation.cpp`, `tools/verify/settlement_harness.cpp`*
+
 ### NR-119 — Three new minors were named to absorb the post-v0.1.0 residue — v0.1.11 reshaped, v0.1.12 and v0.1.13 invented
 *decision taken on your behalf · raised 2026-08-10 · from NR-101 (the post-v0.1.0 sweep)*
 
@@ -2095,6 +2019,30 @@ Three consequences that are not restatements of BL-094:
 3. 'FOR SPACE' RE-ANCHORS THE ERA LADDER. The militia's procurement target is space equipment, so the Era 0 -> Era 1 gate (ERAS.md: rocketry + launchpad + propellant) stops being a distant unlock and becomes the thing the player is buying toward from the start.
 
 **Why it matters.** v0.3.0 carries 22 open items — the largest single block on the board — and every one of them was specified against 'governing body'. BL-315 (governing-body conflict spine) is design-owed and names the superseded framing in its own title. Planning five sprints without settling this would sequence work against an actor that no longer exists.
+
+### NR-126 — Do military_base / launchpad / inland_logistics_hub want terrain placement preferences at generation?
+*question · raised 2026-08-10 · from Hygiene audit / -Wswitch; corporation_generation.cpp:280 (tile_score_for)*
+
+The three newest building types fall through tile_score_for to a neutral 1.0, scoring like port/none. BL-355 makes the cases explicit (still 1.0) so the compiler tracks the enum, but whether they SHOULD carry a preference (base near borders? launchpad on flat dry terrain?) is a design call not taken.
+
+> **RESOLVED.** ANSWERED (Ben, 2026-08-12, Q&A form): **all three types get a preference**, with the shapes delegated — Ben: "For now, just lazily evaluate these however you like. Generation will be essentially play later...". Implemented the same session in corporation_generation.cpp tile_score_for, via two small table helpers (landform_lean / dryness_lean): launchpad wants flat dry ground (plains x1.6, mountain x0.35; barren/rocky/regolith x1.3, wetland x0.5), inland_logistics_hub wants flat peopled ground (plains x1.5, valley x1.3, scaled by habitability), military_base wants commanding ground near a population worth garrisoning (highland x1.5, mountain x1.2, mildly scaled by habitability). **No generated world changes today**: focus_asset_pattern only ever proposes extraction_site / processing_facility / port, so these branches are dormant and no golden or harness band moves. Recorded as tuning data, not settled design — the code comment says so.
+
+### NR-139 — BL-364 (corp borders on the hex grid) carries two open design questions before anyone builds it — and this entry cited the WRONG item id
+*decision-needed · raised 2026-08-08 · from Implementing BL-293 (order book unreachable by command), 2026-08-08.*
+
+Filed from Ben's 2026-08-08 steer that the corp border circle 'basically tells us nothing'. Q1: WHICH tile set is the border - (a) tiles within influence_range of the seat (the honest hex rendering of today's circle), (b) tiles inside the corp's logistics-reach budget (what 'a valid move' actually means once BL-323 lands), or (c) held tiles plus neighbours? Q2: always-on fill is heavy over a hex grid and will fight other overlays - outline always-on, fill only under the Corporation lens? [Renumbered from NR-089 on 2026-08-10: the BL-293 branch sat unmerged while main used that id for a different entry.] [2026-08-12 sweep — ID CORRECTION: every "BL-325" in this entry is wrong. BL-325 is MILITARY_BASE_AND_SUPPLY, a shipped v0.1.5 item; the corp-border work is **BL-364** (CORP_BORDER_HEXES, design-owed, v0.1.2), which was renumbered off BL-325 on 2026-08-10 precisely because that id was already taken — its own summary records the renumber. This entry was itself renumbered in the same collision (from NR-091) and kept the stale id, so it is a second-order instance of exactly the hazard NR-110 documents: with no next_id.js equivalent for NR ids, a concurrent-session renumber fixes the id on the entry but not the ids INSIDE it. No content change — Q1 and Q2 as written are still the open questions, and BL-364's design field already carries both verbatim, so nothing is lost, only mis-addressed.]
+
+**Why it matters.** Q1 decides whether BL-325 is a small independent reskin or a consumer of BL-323's reach field, which changes both its sequencing and its difficulty. Ben's own stated purpose - 'more easily see what is and isn't a valid move' - argues for (b), but (b) means the item cannot land before the buildings rework does. Worth answering before it is promoted.
+
+- Q1a - influence_range hexes: independent of BL-323, small, but still a picture of a scalar.
+- Q1b - logistics-reach budget: matches the stated purpose, depends on BL-323.
+- Q1c - held tiles + neighbours: cheapest to compute, weakest claim to meaning.
+
+> **Recommendation:** Q1b, sequenced after BL-323; Q2 outline-always / fill-on-lens, matching the Country lens's grammar.
+
+> **RESOLVED.** ANSWERED (Ben, 2026-08-12, Q&A form). **Q1: (b) the logistics-reach budget** — the border is what a valid move actually costs, matching the stated purpose, and BL-364 therefore sequences AFTER BL-323 rather than being an independent reskin. **Q2: fill and outline BOTH only under the Corporation lens** — Ben went further than the recommended outline-always/fill-on-lens: the border is not always-on chrome at all. That is a stronger read of the same objection that opened this entry — a border that tells you nothing should not be occupying the canvas full-time. BL-364 design field amended; blocked_on set to BL-323.
+
+*Files: `src/ui/body_surface_canvas.cpp`, `docs/development/backlog.json (BL-364)`*
 
 ### NR-141 — The app does not build at HEAD: tile_inspector.cpp includes a header that exists in no commit or branch
 *observation · raised 2026-08-08 · from Implementing BL-293, 2026-08-08 - hit when trying to build ProjectIo to verify the Market Ledger change.*
@@ -2144,6 +2092,42 @@ Ben's calls, recorded here as the durable summary (each also lives inline in its
 
 *Files: `docs/development/backlog.json`*
 
+### NR-163 — Room for ~10-20 private corporations per nation is a generation-density call, not yet designed
+*question · raised 2026-08-11 · from 2026-08-11 notes session with Ben.*
+
+Ben asked whether the game has room for roughly 10-20 private corporations per nation. NATION_GENERATION.md and GENERATION_STRATEGY.md do not fix a count - the premise is player + major AI as lean specialists against a saturated Nation-AI-owned economy - so this is an open density/perf question, not yet designed.
+
+> **RESOLVED.** ANSWERED (Ben, 2026-08-12, Q&A form): **~22 private corporations per nation** is the density target. Above the midpoint of the 10-20 he floated, so read it as "a crowded market, not a cast of named rivals". This is a target, not yet a measurement: it needs a perf check (NR-162 hardware question is the sibling) and a generation change to reach, since the current generator opens far leaner. Filed as BL-374 (corp density target).
+
+*Files: `docs/generation/NATION_GENERATION.md`, `docs/generation/GENERATION_STRATEGY.md`*
+
+### NR-165 — Laws/ideology system should feel distinct from the technology system
+*question · raised 2026-08-11 · from 2026-08-11 notes session with Ben.*
+
+Ben wants the laws/policy and ideology layer (BL-155, law/policy surface design) to feel mechanically distinct from technology, not a reskinned tech tree. Candidate lever: law costs compliance/enforcement, tech costs capability - worth pinning down when BL-155 is worked.
+
+> **RESOLVED.** ANSWERED (Ben, 2026-08-12, Q&A form) — and the question was reframed. He selected **all four levers** (compliance-vs-capability, reversible-vs-permanent, endured-vs-chosen, world-wide-vs-private) and then said the levers were never the issue: "By this, I meant we need to focus on how the player SEES laws rendered. I think each of these categories are important regardless." So the distinctness is a **presentation** problem, not a mechanics-selection one — all four distinctions hold, and the open work is finding the surface that makes them legible without reading as a tech tree. Routed into BL-155 design field (law/policy surface) rather than a new item; the four levers are recorded there as settled premises for that surface to express.
+
+*Files: `docs/lore/HISTORY.md`*
+
+### NR-166 — Time-to-space-industry has no real playtest number yet
+*question · raised 2026-08-11 · from 2026-08-11 notes session with Ben.*
+
+Ben asked how long a player should expect before starting on space industry. ERAS.md gates Era 1 on Rocketry research + Launchpad + propellant, but this is designed, not implemented, so there is no real playtest timing to answer with yet.
+
+> **RESOLVED.** ANSWERED (Ben, 2026-08-12, Q&A form, via the NR-168 answer): **about 20-40 years for a skilled player to reach space.** That is the first real number this question has had. Still a target rather than a measurement — Era 1 gating is designed, not implemented (ERAS.md) — but it now gives the eventual playtest something to fail against. Carried into the same tuning target as NR-168; see BL-375.
+
+*Files: `docs/economy/ERAS.md`*
+
+### NR-168 — Base-game international trade should reliably clear and beat Era 1, not stall the player
+*question · raised 2026-08-11 · from 2026-08-11 notes session with Ben.*
+
+Ben wants assurance the base game always has enough international trade that players do not stall, and it is quite likely a player can beat Era 1 on trade alone. No stated design invariant for this yet in MARKETS.md/FINANCE.md - it is currently an implicit hope, not a tuned target.
+
+> **RESOLVED.** ANSWERED (Ben, 2026-08-12, Q&A form): **a skilled player should reach space in about 20-40 years.** That is the invariant, and it is a stronger statement than the entry asked for: it converts the vague "trade should clear and plausibly beat Era 1" hope into a bounded, checkable pacing target with a floor as well as a ceiling — under 20 years the base game is too easy, over 40 it stalls. Also answers NR-166. Filed as BL-375 (pacing target) to carry the invariant into MARKETS/FINANCE/ERAS and a harness that measures it.
+
+*Files: `docs/economy/MARKETS.md`, `docs/economy/FINANCE.md`*
+
 ### NR-172 — nation.resource_abundance kept, not deleted, despite BL-365 design prose saying it would be — genuinely independent of the substrate mechanism
 *decision taken on your behalf · raised 2026-08-11 · from BL-365 (background industry keystone) T1 session, integration review.*
 
@@ -2159,4 +2143,40 @@ BL-365's design (Q3, 2026-08-11) stated nation.resource_abundance and the substr
 > **RESOLVED.** 2026-08-12 review-queue sweep: Option 1 taken, and the design prose amended so it stops contradicting the code. BL-365 has landed and its prose is now in the cold store, so the amendment went there (docs/development/archive/backlog-design-2026-Q3.json) per the "amend a landed item's prose in the cold file" rule — Q3's "dead substrate state is deleted, not kept" paragraph now carries a dated block recording that `nation.resource_abundance` was KEPT, what it actually is (a per-nation sum of owned-tile deposits, distinct from the substrate it sat beside), its two non-substrate readers, and that deleting it would have removed a working UI surface to satisfy a sentence rather than a dependency. Verified it resolves through `backlog_query BL-365 --full`. Reopen if you would rather the field went after all.
 
 *Files: `src/world/components.hpp`, `src/world/nation_generation.cpp`, `src/ui/entity_summary.cpp`*
+
+### NR-173 — The Industry lens now tints a field that nothing else reads — re-point it at real background firms, or retire it?
+*question · raised 2026-08-12 · from Review-queue sweep, 2026-08-12 — found while correcting the stale substrate premise for NR-150/NR-151*
+
+BL-365 replaced the abstract nation substrate with real background corporations, and `nation_generation.cpp` Pass 6 now describes `tile.substrate_density` in its own comment as "purely a rendering field now". The Industry lens (BL-084) is the only consumer left: it tints each tile by that generation-time ripple weighted by terrain deposit richness. So the lens still renders exactly as blessed, but what it MEANS has quietly changed — it draws where background industry plausibly would sit, while the real background firms are ordinary buildings sitting somewhere else on the same map. LENSES.md and `ACTIONS.json`'s lens.industry entry both still claimed the field 'injects background supply and demand into each market'; that claim is corrected as of this sweep, but the lens itself is untouched.
+
+**Why it matters.** A lens whose tint no longer answers its own question is worse than an absent one: it looks like evidence. The action dictionary's version of the fault is sharper still — an AI player reading the old `reason_to_select` would have treated the tint as a market signal and been wrong every time. Corrected in prose, but the surface remains a picture of a scalar, which is the same objection Ben raised against the corp border circle ('basically tells us nothing', NR-139).
+
+- Re-point it at real background-firm buildings — per-tile count/output of `is_background` corp buildings, which is what the lens name has always promised. Makes it a true lens again and gives the saturated world a surface of its own.
+- Retire `overlay_mode::industry` and let Production carry it — Production already tints real output intensity, and Industry is keyboard-cycle-only anyway, so the roster loses a lens nobody presses rather than a capability.
+- Keep as flavour, labelled — leave the vestigial field, and let the corrected docs stand as the whole fix.
+- Delete `tile.substrate_density` outright along with the lens — the field is BL-050's last remnant and costs a float per tile.
+
+> **Recommendation:** Option 1 or 2, not 3. The two are close: option 1 keeps a distinct question ('where is the industry I did not build?') that Production does not quite ask, since Production is body-relative intensity including the player's own; option 2 is honest about the fact that Industry was already trimmed off the visible bar the day it shipped. Option 3 leaves a surface that reads as evidence and is not, which is the thing worth avoiding. Option 4 only after 1 is ruled out — `substrate_density` is cheap and deleting it is a save-format touch for no gain.
+
+> **RESOLVED.** ANSWERED (Ben, 2026-08-12, Q&A form): **option 1 — re-point the Industry lens at real background-firm buildings.** Per-tile count/output of is_background corp buildings, which is what the lens name always promised, and which gives the saturated BL-365 world a surface of its own. tile.substrate_density is not deleted (option 4 declined by implication); it simply stops being the lens input. Filed as BL-373 (industry lens re-point).
+
+*Files: `docs/ui/LENSES.md`, `docs/ai/ACTIONS.json`, `src/ui/body_surface_canvas.cpp`, `src/world/nation_generation.cpp`, `src/world/components.hpp`*
+
+### NR-176 — Different selection modes given a lens — should the active lens change what a click selects?
+*question · raised 2026-08-12 · from Ben, 2026-08-12 — raised directly, filed for his own later expansion*
+
+Ben's idea, recorded as raised: the active map lens could change what clicking the canvas selects. Today selection is lens-blind. The Planetary canvas registers marker_hit_zone entries each frame and resolves a click by a FIXED priority — building > market_centre > tile (src/ui/ui_state.hpp, the marker_hit_zone comment) — and overlay_mode (the same header, 14 modes) feeds only the draw pass. So under the Resource lens a click still lands on whatever building sits on the deposit, not on the deposit; under Country it lands on the tile, not the nation; under Reach or Supply-routes, whose subject is a body-pair edge rather than anything on the tile grid, there is no corresponding selectable at all. The proposal is that the lens declares the selection subject, so what the player is LOOKING at is what a click GRABS. The specific per-lens mapping is Ben's to fill in — this entry captures the question, not an answer.
+
+**Why it matters.** It is the one place the lens family stops short of being a mode. A lens today changes the wash and the legend but nothing about interaction, which means the player reads at one altitude and clicks at another — they switch to Corporation to see the ownership pattern, click the pattern, and get a tile. It also bears on SELECTION.md's click model (single-click selects, double-click navigates) and on the ACTIONS dictionary: every canvas click action currently has one meaning, and a lens-keyed selection subject makes that meaning conditional, which the AI player reads through ACTIONS.json. Cheap to answer, awkward to retrofit once more lenses land.
+
+- Lens declares the selection subject — each overlay_mode names what a click resolves to, overriding the fixed marker priority while that lens is active (Resource → deposit, Country → nation, Corporation → corp, Market → market centre, none → today's building > market_centre > tile).
+- Lens re-orders rather than replaces — the same hit-test candidates, but the lens promotes its own subject to the top of the priority list, so a click still falls through to the tile when the lens has nothing there. Preserves the invariant that every click selects something.
+- Leave selection lens-blind, and instead make the lens's subject reachable through the Selection panel (e.g. a click on a tile under Country offers its nation as a related-entity jump). Keeps one click model; adds a step.
+- No change — the lens is a rendering mode only.
+
+> **Recommendation:** None offered — this is Ben's design idea and the per-lens mapping is the substance of it. Worth noting for whichever way it goes: options 1 and 2 differ mainly in failure behaviour, and option 2's fall-through is the safer default under the lenses whose subject is not on the tile grid (Reach, Supply-routes, Scarcity), where option 1 would leave a click doing nothing. If it becomes work, it wants a backlog item against SELECTION.md + LENSES.md + the ACTIONS canvas family, not a patch to the hit-test.
+
+> **RESOLVED.** ANSWERED (Ben, 2026-08-12, Q&A form): **the lens replaces the selection subject** — option 1. Each overlay_mode names what a click resolves to, overriding the fixed building > market_centre > tile marker priority while that lens is active (Resource -> deposit, Country -> nation, Corporation -> corp, Market -> market centre; none -> today behaviour). Note the fall-through caveat this entry raised is now a design constraint on the implementing item rather than an objection: the lenses with no tile-grid subject (Reach, Supply-routes, Scarcity) must each still name a subject or explicitly keep the default priority, or a click under them does nothing. Filed as BL-372 (lens-keyed selection subject).
+
+*Files: `src/ui/ui_state.hpp`, `src/ui/selection.hpp`, `docs/ui/SELECTION.md`, `docs/ui/LENSES.md`, `docs/ai/ACTIONS.json`*
 
