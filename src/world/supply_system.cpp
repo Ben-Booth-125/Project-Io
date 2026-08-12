@@ -349,6 +349,11 @@ void dispatch_convoys(world& w, const recipe_registry& reg,
                 float     best_cost        = std::numeric_limits<float>::max();
                 float     best_qty         = 0.0f;
                 convoy_mode best_mode      = convoy_mode::land;
+                /// Econ ticks the winning leg takes (Ben, 2026-08-12). Carried
+                /// out of the source loop because the intra-body branch is the
+                /// only place the terrain-weighted path is in scope, and the
+                /// reference it returns must not outlive a cache invalidation.
+                int       best_travel_ticks = 1;
 
                 for (auto& [src_key, src_pool] : w.corp_body_pools)
                 {
@@ -364,6 +369,7 @@ void dispatch_convoys(world& w, const recipe_registry& reg,
                     convoy_mode mode;
                     float       dist;
                     float       unit_cost;
+                    int         travel_ticks = 1;
                     float       node_discount = 0.0f; // BL-148/149: intra-body city/hub discount.
                     if (src_body == dest_body)
                     {
@@ -380,6 +386,11 @@ void dispatch_convoys(world& w, const recipe_registry& reg,
                         mode      = path.crosses_ocean ? convoy_mode::sea : convoy_mode::land;
                         dist      = path.cost;
                         unit_cost = reg.logistics_cost(mode);
+                        // Distance now costs TIME as well as money (Ben,
+                        // 2026-08-12). Computed here because `path` is a
+                        // reference into the A* cache and must be read before
+                        // anything can invalidate it.
+                        travel_ticks = convoy_travel_ticks(w, src_body, path);
                         // BL-148/149: discount the haul for the cities + hubs its path crosses.
                         node_discount = node_discount_fraction(path, nodes, node_params);
                     }
@@ -398,6 +409,11 @@ void dispatch_convoys(world& w, const recipe_registry& reg,
                         mode      = convoy_mode::space;
                         dist      = body_distance_au(w, src_body, dest_body, day_tick);
                         unit_cost = logistics_cost_space;
+                        // The space lane keeps its own calibration — roughly one
+                        // econ tick per AU. Unchanged deliberately: it is the
+                        // only leg the AU model was ever right for, and it is
+                        // parked with the space arc anyway (era/space).
+                        travel_ticks = (dist > 1.0f) ? static_cast<int>(dist + 0.999f) : 1;
                     }
 
                     const float cost = unit_cost * dist * qty * (1.0f - node_discount);
@@ -408,6 +424,7 @@ void dispatch_convoys(world& w, const recipe_registry& reg,
                         best_cost       = cost;
                         best_qty        = qty;
                         best_mode       = mode;
+                        best_travel_ticks = travel_ticks;
                     }
                 }
 
@@ -428,9 +445,16 @@ void dispatch_convoys(world& w, const recipe_registry& reg,
                     w.pool_for(corp_id, best_src_body).quantities[
                         static_cast<std::size_t>(resource_type::propellant)] -= propellant_per_launch;
 
-                // Speed: 1 / distance in AU gives roughly 1 tick per AU. Clamp to > 0.
-                const float dist = body_distance_au(w, best_src_body, dest_body, day_tick);
-                const float speed = (dist > 0.0f) ? (1.0f / dist) : 1.0f;
+                // Speed is progress-per-tick, so a leg taking N ticks advances
+                // 1/N each tick (Ben, 2026-08-12).
+                //
+                // WAS: `1 / distance_in_AU`, an interplanetary calibration.
+                // `body_distance_au` returns 0 for two markets on the same body,
+                // so it clamped to 1.0 and EVERY intra-body convoy arrived in a
+                // single econ tick regardless of how far it went — distance cost
+                // money and never cost time. `best_travel_ticks` now carries the
+                // terrain-weighted, physically-scaled figure for the winning leg.
+                const float speed = 1.0f / static_cast<float>(best_travel_ticks);
 
                 convoy_component c;
                 c.source_market  = best_src_market;

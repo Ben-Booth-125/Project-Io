@@ -106,3 +106,67 @@ inline void invalidate_logistics_caches(world& w)
     w.astar_cost_cache.clear();
     w.body_reach_cost.clear();
 }
+
+// ---------------------------------------------------------------------------
+// Physical scale and travel time (Ben, 2026-08-12)
+// ---------------------------------------------------------------------------
+//
+// WHAT WAS MISSING. Before this, the codebase had no tile scale at all and no
+// intra-body travel time. Convoy speed was `1 / distance_in_AU` — an
+// INTERPLANETARY calibration — and `body_distance_au` returns 0 for two markets
+// on the same body, so speed clamped to 1.0 and every intra-body convoy arrived
+// in exactly one econ tick (90 days) whether it crossed one tile or all 312.
+// Distance cost money and never cost time.
+//
+// That is why tripling the map (hard_coded_world.hpp) could not on its own make
+// distance feel bigger: with travel time constant, a bigger map means the same
+// 90 days buys three times the reach.
+
+/// Reference figures for an Earth-mass world. Named rather than inlined because
+/// they are the calibration this whole model hangs on.
+inline constexpr float earth_radius_km = 6371.0f;
+
+/// Kilometres across one tile on @p body — the physical scale the game has
+/// never had.
+///
+/// DERIVED, NOT AUTHORED. Planetology already generates `home_mass` in Earth
+/// masses; a rocky planet's radius follows its mass as roughly R ∝ M^0.27, so
+/// the circumference and therefore the tile width fall out of a scalar the
+/// generation chain already settled. That keeps this a *consequence* of an
+/// upstream stage rather than a magic number sitting beside it.
+///
+/// At Earth mass on the 312-column grid this is ~128 km per tile, which puts a
+/// day's march (~25 km) at about a fifth of a tile and makes a tile a
+/// province-sized unit rather than a field.
+///
+/// Returns 0 for an unknown body, which callers must treat as "no scale" rather
+/// than "instant".
+float body_km_per_tile(const world& w, entity_id body);
+
+/// Days a laden convoy takes to cross one *effective* tile — that is, one unit
+/// of `logistics_path::cost`, which is already terrain-weighted (plains 1.0,
+/// mountain 2.0). Terrain cost IS a time multiplier, so the existing A* weights
+/// do double duty here rather than needing a parallel table.
+///
+/// Two modes, because they differ by roughly five times and that difference is
+/// the whole reason coastal trade is worth designing (BL-188):
+///   - land: an ox-and-cart caravan, ~25 km/day
+///   - sea:  a coasting vessel, ~130 km/day
+inline constexpr float caravan_km_per_day = 25.0f;
+inline constexpr float coastal_km_per_day = 130.0f;
+
+/// Days in one econ tick. MIRRORS `sim_loop::econ_tick_days` (core/sim_loop.hpp,
+/// 30 × 3 = 90) and is restated here rather than included because `world/*` must
+/// not depend on `core/*` — the headless harnesses link the world layer alone.
+/// If the tick length ever changes, these two must change together; the
+/// stepped-clock harness asserts they agree.
+inline constexpr int econ_tick_days_world = 90;
+
+/// Econ ticks a convoy needs to traverse @p path on @p body, minimum 1.
+///
+/// The result is deliberately quantised to whole econ ticks: the economy
+/// resolves quarterly, so a convoy that would take 40 days still lands on the
+/// next clearing. What changes is that a long haul now takes MANY quarters and
+/// a short one takes a single quarter, where previously every haul took exactly
+/// one regardless of length.
+int convoy_travel_ticks(const world& w, entity_id body, const logistics_path& path);

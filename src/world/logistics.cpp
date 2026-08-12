@@ -2,6 +2,7 @@
 #include "river_generation.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <functional>
 #include <limits>
 #include <queue>
@@ -406,4 +407,55 @@ float tile_reach_cost(const world& w, entity_id tile)
     if (idx >= fit->second.size())
         return -1.0f;
     return fit->second[idx];
+}
+
+// ---------------------------------------------------------------------------
+// Physical scale and travel time (Ben, 2026-08-12)
+// ---------------------------------------------------------------------------
+
+float body_km_per_tile(const world& w, entity_id body)
+{
+    const auto bit = w.bodies.find(body);
+    if (bit == w.bodies.end())
+        return 0.0f;
+
+    const int gw = bit->second.grid_width;
+    if (gw <= 0)
+        return 0.0f;
+
+    // Rocky-planet mass-radius relation, R proportional to M^0.27. A generation
+    // -time constant, computed per call rather than cached because the callers
+    // are per-dispatch, not per-frame.
+    const float mass = (bit->second.mass_earths > 0.0f) ? bit->second.mass_earths : 1.0f;
+    const float radius_km = earth_radius_km * std::pow(mass, 0.27f);
+
+    // Columns wrap, so the grid width spans the full circumference.
+    constexpr float two_pi = 6.283185307f;
+    return (two_pi * radius_km) / static_cast<float>(gw);
+}
+
+int convoy_travel_ticks(const world& w, entity_id body, const logistics_path& path)
+{
+    if (!path.reachable)
+        return 1;
+
+    const float km_per_tile = body_km_per_tile(w, body);
+    if (km_per_tile <= 0.0f)
+        return 1; // No scale for this body — fall back to the old one-tick haul.
+
+    // `path.cost` is already terrain-weighted, so it is a count of EFFECTIVE
+    // tiles rather than raw ones: a mountain crossing costs two plains'
+    // traversal and therefore two plains' worth of days.
+    const float effective_tiles = (path.cost > 0.0f)
+                                      ? path.cost
+                                      : static_cast<float>(path.tiles.size());
+    const float km = effective_tiles * km_per_tile;
+
+    const float km_per_day = path.crosses_ocean ? coastal_km_per_day : caravan_km_per_day;
+    const float days       = km / km_per_day;
+
+    // Quantise up to whole econ ticks: the economy clears quarterly, so a haul
+    // lands on a clearing boundary or it does not land at all.
+    const int ticks = static_cast<int>(days / static_cast<float>(econ_tick_days_world) + 0.999f);
+    return ticks < 1 ? 1 : ticks;
 }

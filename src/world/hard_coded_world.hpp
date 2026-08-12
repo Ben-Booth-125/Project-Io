@@ -142,10 +142,22 @@ struct generation_report
 world make_hard_coded_world(world_params params = {}, generation_report* report = nullptr,
                             const world_gen_config& gen_cfg = {});
 
-/// The homeworld's tile grid dimensions — one authority for the 180×84 the
-/// build and the wizard preview both assume.
-inline constexpr int home_grid_width  = 180;
-inline constexpr int home_grid_height = 84;
+/// The homeworld's tile grid dimensions — one authority the build and the
+/// wizard preview both read.
+///
+/// **312×145 = 45,240 tiles since 2026-08-12 (Ben), three times the area of the
+/// old 180×84 = 15,120.** The aspect ratio is held at ~2.15:1 so the cylinder
+/// still maps a plausible globe: columns wrap as the equator, rows do not.
+///
+/// The scale-up is only half a change on its own. Travel time used to be
+/// `1 / distance_in_AU`, which is zero for two markets on the same body — so
+/// every intra-body convoy arrived in exactly one econ tick regardless of
+/// distance, and tripling the map would have made trade RELATIVELY faster
+/// rather than slower. The distance→time model in logistics.hpp
+/// (`body_km_per_tile`, `convoy_travel_ticks`) landed with this constant for
+/// that reason; changing one without the other is a regression.
+inline constexpr int home_grid_width  = 312;
+inline constexpr int home_grid_height = 145;
 
 /// Generate ONLY the homeworld tile surface into @p w (a scratch world), exactly
 /// as make_hard_coded_world builds Kepler's: same resolved preferences, same

@@ -287,6 +287,17 @@ struct body_component
     int         grid_width;           ///< Number of tile columns.
     int         grid_height;          ///< Number of tile rows.
 
+    /// Body mass in Earth masses, carried down from planetology's `home_mass`
+    /// (Ben, 2026-08-12). Added so the PHYSICAL tile scale can be derived from
+    /// the generation chain rather than authored beside it: a rocky planet's
+    /// radius follows its mass, the radius gives a circumference, and the
+    /// circumference over `grid_width` gives kilometres per tile
+    /// (`body_km_per_tile`, logistics.hpp).
+    ///
+    /// Defaults to Earth mass so a body built without one still has a sane
+    /// scale rather than a zero that would read as "instant travel".
+    float       mass_earths = 1.0f;
+
     /// Survey progress (BL-067). `home_body` is seeded `surveyed`; all others open
     /// `hidden` until the player dispatches a survey. Advanced by advance_surveys
     /// (survey_system.hpp); read by the Solar/Planetary canvases and the Selection panel.

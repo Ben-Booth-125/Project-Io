@@ -336,7 +336,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
 
     // -----------------------------------------------------------------------
     // Kepler — temperate home planet (Earth analogue, ~1.0 AU)
-    // 180×84 tile grid. Full climate gradient, 60% ocean, grassland and forest
+    // 312×145 tile grid (home_grid_width/height). Full climate gradient, 60% ocean, grassland and forest
     // belts. Two installations and a market authored after tile generation.
     // -----------------------------------------------------------------------
 
@@ -350,8 +350,17 @@ world make_hard_coded_world(world_params params, generation_report* report,
         .orbital_radius_au                    = rw.home_orbit_au,
         .orbital_angle_rad                    = 1.05f,
         .orbital_angular_velocity_rad_per_day = kepler_angular_velocity(rw.home_orbit_au),
-        .grid_width                           = 180,
-        .grid_height                          = 84,
+        // These were the literals 180 / 84 until 2026-08-12, which quietly made
+        // `home_grid_width`/`home_grid_height` a LIE: the header calls itself
+        // "one authority for the grid the build and the wizard preview both
+        // assume", and this site — the one that actually builds the homeworld —
+        // did not read it. Changing the constants moved the preview and left the
+        // world alone. Now genuinely one authority.
+        .grid_width                           = home_grid_width,
+        .grid_height                          = home_grid_height,
+        // Carried down so the physical tile scale is derived from the chain
+        // (body_km_per_tile, logistics.hpp) rather than authored beside it.
+        .mass_earths                          = rw.params.home_mass,
     };
 
     // Kepler is the corporation's home planet — the game opens on its surface.
@@ -363,7 +372,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // records its margin, and still writes its line.
     std::vector<float> kepler_bias;
     std::vector<uint8_t> kepler_convergent; // Pass 5 seeds mountain ranges along these
-    const planetology_state kepler_pl = plan(1, kepler, 180, 84, kepler_bias, &kepler_convergent);
+    const planetology_state kepler_pl = plan(1, kepler, home_grid_width, home_grid_height, kepler_bias, &kepler_convergent);
     // A non-null generation_record is requested here so the river pass below can read the
     // Pass-1 heightmap it captures; this is a pure capture (TILE_GENERATION.md § Generation
     // history hook) and does not perturb the deterministic tile surface itself.
@@ -375,13 +384,23 @@ world make_hard_coded_world(world_params params, generation_report* report,
     const uint32_t kepler_tile_seed = choose_home_tile_seed(
         kepler_pl, kepler_bias, kepler_convergent, params.seed, deposit_scalar);
 
-    auto kepler_tiles = generate_body_tiles(w, kepler, 180, 84, kepler_pl.profile,
+    // TWO MORE HARDCODED 180/84 LIVED HERE UNTIL 2026-08-12 (this call and the
+    // river pass below). They were the ones that actually mattered: setting
+    // body_component.grid_width to 312x145 while this still generated 15,120
+    // tiles produced an INTERNALLY INCONSISTENT world — a body claiming a grid
+    // it did not have. home_surface_bench caught it as "preview composition !=
+    // make_hard_coded_world Kepler, tile for tile", which is precisely the
+    // "the preview silently stops being the world" failure the preview's own
+    // header comment warns about.
+    auto kepler_tiles = generate_body_tiles(w, kepler, home_grid_width, home_grid_height,
+        kepler_pl.profile,
         kepler_tile_seed, deposit_scalar, &kepler_pl, &kepler_record, &kepler_bias, &kepler_convergent);
 
     // Rivers (BL-170) — sibling pass (BL-051 convention) over the same heightmap Pass 2
     // already thresholded; needs Kepler's ocean placement done, so it runs after
     // generate_body_tiles returns rather than being spliced into the six-pass core.
-    generate_rivers(w, kepler_tiles, 180, 84, kepler_record.height, /*seed=*/params.seed ^ 0x52490001u);
+    generate_rivers(w, kepler_tiles, home_grid_width, home_grid_height,
+                    kepler_record.height, /*seed=*/params.seed ^ 0x52490001u);
 
     // Kepler is the only body with a political layer in the prototype; its nation
     // count is derived, not authored. Selene/Cinder/Pallas stay unclaimed.
@@ -403,7 +422,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // budget the Voronoi pass grows from. The ladder does not narrate a map it
     // was handed — it is upstream of the map (Ben, 2026-07-30).
     history_ladder_state kepler_hist =
-        run_history_ladder(kepler_pl, w, kepler_tiles, 180, 84,
+        run_history_ladder(kepler_pl, w, kepler_tiles, home_grid_width, home_grid_height,
                            /*seed=*/params.seed ^ 0x5A11EDu);
 
     // Creeds (BL-235, docs/lore/CREEDS.md): one pantheon per cradle-culture,
@@ -412,7 +431,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // won wars weld cradles together and lower fragmentation_q before
     // nation_params_from_ladder reads it into the seed budget.
     creed_state kepler_creeds =
-        run_creeds(kepler_pl, kepler_hist, w, kepler_tiles, 180, 84,
+        run_creeds(kepler_pl, kepler_hist, w, kepler_tiles, home_grid_width, home_grid_height,
                    /*seed=*/params.seed ^ 0xC4EED5u);
     record_tribal_conflict(kepler_creeds, kepler_hist, /*seed=*/params.seed ^ 0xC4EED5u);
 
@@ -438,7 +457,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
         const int budget = std::max(1, kepler_land / std::max(1, kepler_np.land_tiles_per_seed));
 
         kepler_settlement = run_settlement(kepler_pl, kepler_hist, kepler_creeds, w,
-                                           kepler_tiles, 180, 84, budget,
+                                           kepler_tiles, home_grid_width, home_grid_height, budget,
                                            /*seed=*/params.seed ^ 0x5E77EDu,
                                            /*stop_year=*/params.epoch_year);
         kepler_np.seed_tiles = settlement_seed_tiles(kepler_settlement);
@@ -459,12 +478,12 @@ world make_hard_coded_world(world_params params, generation_report* report,
         // Same act for the cities: the placeholder names generate_population_
         // centres coined before there was any culture are replaced with names
         // in the nearest province's tongue.
-        name_population_centres(w, kepler, 180, kepler_settlement, kepler_creeds,
+        name_population_centres(w, kepler, home_grid_width, kepler_settlement, kepler_creeds,
                                 /*seed=*/params.seed ^ 0xC17910E6u);
     }
 
     const std::vector<entity_id> kepler_nations =
-        generate_nations(w, kepler, kepler_tiles, 180, 84, kepler_np,
+        generate_nations(w, kepler, kepler_tiles, home_grid_width, home_grid_height, kepler_np,
                          /*seed=*/params.seed ^ 0x4A71012u);
 
     // The political axes are OUTPUTS now (BL-218): expansionism from the
@@ -473,7 +492,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // industrialisation timing against neighbours. This overwrites the random
     // Pass 4 draw, which stays as the fallback for bodies with no settlement.
     derive_national_character(kepler_settlement, kepler_creeds, w,
-                              kepler_nations, kepler_tiles, 180, 84);
+                              kepler_nations, kepler_tiles, home_grid_width, home_grid_height);
 
     // Everything from here to globalisation is the 0-1960 story. An antiquity
     // start (BL-271: epoch_year < 1700) generates the world BEFORE it happens —
@@ -488,14 +507,14 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // destroyed rather than merely contradicted.
     if (!antiquity_start)
         resolve_historical_ruptures(kepler_settlement, kepler_creeds, w,
-                                    kepler_nations, kepler_tiles, 180, 84,
+                                    kepler_nations, kepler_tiles, home_grid_width, home_grid_height,
                                     /*seed=*/params.seed ^ 0x80174E5u);
 
     // Stages 1-2 can only be written now: the Charter Act names a nation and
     // the border accord counts them, and neither existed a moment ago. The
     // lines then merge into Kepler's biography, which the History ledger reads.
     if (!antiquity_start)
-        record_institutional_history(kepler_hist, w, kepler, kepler_tiles, 180);
+        record_institutional_history(kepler_hist, w, kepler, kepler_tiles, home_grid_width);
 
     // Globalisation closes the generated story: the common tongue line is the
     // hinge from the creeds' native record to the campaign epoch — rendered in
@@ -544,7 +563,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // reusing the same land-tile lookup rather than a second one.
     entity_id kepler_home_tile = null_entity;
     {
-        auto land = first_land_tiles(kepler_tiles, w, 180, 84, 2);
+        auto land = first_land_tiles(kepler_tiles, w, home_grid_width, home_grid_height, 2);
         kepler_home_tile = land.size() > 0 ? land[0] : null_entity;
 
         const entity_id kepler_extraction = w.create_entity();
@@ -690,7 +709,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
         // beats it (the common case away from a rich cluster, which keeps this
         // a proxy rather than a relocation of every market). Kepler's raster
         // grid, built once here rather than per-market.
-        constexpr int    market_gw = 180, market_gh = 84;
+        constexpr int    market_gw = home_grid_width, market_gh = home_grid_height;
         constexpr int    proxy_radius = 8; // tiles — a market's plausible catchment reach
         std::vector<entity_id> kepler_tile_ids(
             static_cast<std::size_t>(market_gw * market_gh), null_entity);
@@ -794,7 +813,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
         {
             const float source_price   = gen_cfg.endemic.source_price;  ///< Cheap where it grows.
             const float distance_gain  = gen_cfg.endemic.distance_gain; ///< Multiplier across the globe.
-            constexpr int   gw = 180, gh = 84;
+            constexpr int   gw = home_grid_width, gh = home_grid_height;
             const float half_diag = std::sqrt(static_cast<float>((gw / 2) * (gw / 2) + gh * gh));
 
             for (const endemic_good& e : kepler_pl.endemics)
