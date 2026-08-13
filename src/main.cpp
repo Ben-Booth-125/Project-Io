@@ -324,6 +324,12 @@ int run_serve(int ticks)
                     case survey_phase::scanning:   phase = "scanning";   break;
                     case survey_phase::surveyed:   phase = "surveyed";   break;
                 }
+                // NOTE for whoever reads this output: on a `hidden` body
+                // regions_total is 0, and that means NOT YET COMPUTED, not
+                // "nothing to survey" — the count is derived from the grid at
+                // dispatch (survey_system.cpp). Reading 0 as "empty" is exactly
+                // the misreading a pull-based fact interface invites, so the
+                // field is emitted with the phase beside it rather than alone.
                 std::cout << "{\"id\":" << static_cast<long>(id)
                           << ",\"name\":\"" << b.name << "\""
                           << ",\"survey\":\"" << phase << "\""

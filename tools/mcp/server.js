@@ -172,7 +172,8 @@ const TOOLS = [
       + 'scanning / surveyed) with its region progress. The sibling of list_corps, and needed '
       + 'for the same reason: survey, place_sell_order and request_quote all take a BODY id as '
       + 'their subject, and the blackboard keys its market facts by MARKET id, so nothing else '
-      + 'here yields one.',
+      + 'here yields one. NOTE: on a hidden body regions_total is 0 meaning NOT YET COMPUTED '
+      + '(the count is derived from the grid when a survey is dispatched), not "nothing to survey".',
     inputSchema: { type: 'object', properties: {} },
   },
   {
