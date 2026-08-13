@@ -140,6 +140,8 @@ private:
     void poll_worldgen();
     /// The loading screen: a progress bar over generation_progress.
     void draw_building_screen();
+    /// The live nation carve + charter marks drawn inside it (BL-305).
+    void draw_building_carve();
 
     /// Build the prototype world and frame the opening view. Shared by run() and
     /// run_verify() so both start from the same deterministic state. @p params is the
@@ -269,6 +271,14 @@ private:
     /// thread before launch, because sol2 is not thread-safe.
     world_gen_config    m_worldgen_cfg;
     world_params        m_worldgen_params;
+
+    /// The loading screen's own copy of the live carve (BL-305), pulled from
+    /// `m_worldgen_progress.owner` only when `m_carve_seen` falls behind the
+    /// sink's epoch. Holding a copy is what makes a still frame free: without
+    /// it the screen would issue 45,000 atomic loads a frame to redraw a map
+    /// that has not moved. Values are nation index + 1; 0 is unclaimed.
+    std::vector<int16_t> m_carve_view;
+    uint32_t             m_carve_seen = 0;
     std::vector<uint8_t> m_wiz_surface;       ///< Raster compositions; empty = not yet built.
     bool m_wiz_surface_stale = false;         ///< Params moved while a build was in flight.
     void launch_wizard_surface_build();       ///< Start the worker for the CURRENT pending params.

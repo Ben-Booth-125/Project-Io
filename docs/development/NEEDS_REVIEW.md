@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*189 entries — 65 open, 124 resolved.*
+*192 entries — 68 open, 124 resolved.*
 
 ---
 
@@ -604,6 +604,39 @@ The regenerate-on-demand rule needs the tile pass's exact arguments, and two of 
 > **Recommendation:** No action expected — flagged because it widens two structs Ben may consider settled, and because generation_report is now load-bearing for a second consumer.
 
 *Files: `src/world/tile_generation.hpp`, `src/world/tile_generation.cpp`, `src/world/hard_coded_world.hpp`, `src/world/hard_coded_world.cpp`*
+
+### NR-191 — BL-305 was ported onto main's existing loading screen, not merged as built
+*decision taken on your behalf · raised 2026-08-13 · from Porting worktree-agent-a06e732cbc6ad6282 (BL-305) onto main*
+
+The BL-305 worktree branched from a base five commits stale and could not see that main had already landed an async loading screen (6586b9b). It built a second one in parallel: its own src/ui/build_screen.cpp, its own app_screen::building, its own worker split, and a separate src/world/generation_progress.hpp. Merging it would have fought or reverted landed work. What was ported instead is only the genuinely new part: the publish hooks inside the Voronoi BFS and the corp asset/finance passes, the carve-map contract re-expressed as additional fields on main's existing generation_progress in hard_coded_world.hpp, and the run-length map drawing folded into main's draw_building_screen as a new draw_building_carve. Deliberately left behind: the second loading screen, the second progress struct, the gen_phase ladder with its labels and captions, and the worker/setup_world refactor.
+
+**Why it matters.** It is a divergence from what the other agent reported building, and the phase ladder in particular was real design work (an eight-step present-tense ladder with a why-this-phase-exists caption each). Main's screen narrates the same thing differently, through generation_stage_labels and an honest inner bar, so the ladder was redundant rather than wrong. If Ben wants the captions, they are recoverable from that branch's generation_progress.hpp.
+
+> **Recommendation:** No action expected. Recorded because a future reader comparing the branch to main will find most of it absent by choice.
+
+*Files: `src/world/hard_coded_world.hpp`, `src/world/nation_generation.cpp`, `src/world/corporation_generation.cpp`, `src/core/app.cpp`*
+
+### NR-192 — The live carve recolours once, when the nations become real entities
+*observation · raised 2026-08-13 · from Porting BL-305*
+
+ui::palette::nation_colour keys off a nation's entity id, but no nation entity exists while the BFS is carving - the entities are created only after the merge/compaction pass. So the loading-screen map is coloured by nation INDEX while it grows, and switches to the real ids once generate_nations publishes nation_id_base (ids come from one tight create_entity loop, so index i is base + i). The player sees one recolour, a frame or two after the borders settle.
+
+**Why it matters.** It is the price of the map matching the in-game Country lens exactly, which is the stated point of using that palette. The alternative - colouring by index throughout - never flickers but shows the player a set of hues they will not see again. The recolour lands on the same beat as the settle, so it reads as the borders hardening; if it reads as a glitch on real hardware, the fix is one line (drop nation_id_base and always use the index).
+
+> **Recommendation:** Worth an eyeball on the live loading screen. No code change proposed.
+
+*Files: `src/core/app.cpp`, `src/world/nation_generation.cpp`*
+
+### NR-193 — The carve sink puts ~92 KB of atomics inside app, which main.cpp builds on the stack
+*observation · raised 2026-08-13 · from Porting BL-305*
+
+generation_progress is a by-value member of app, and BL-305 grew it by a 312x145 array of atomic int16 owners plus the mark/row arrays - about 92 KB. main.cpp constructs app as a temporary (app{}.run()), so the whole object lives on the main thread's 1 MB stack. A static_assert(sizeof(app) < 512 KB) was added beside app::app to turn any future overrun into a compile error naming the cause rather than a startup crash.
+
+**Why it matters.** Heap-allocating the sink would be the cleaner shape, but it would change every m_worldgen_progress. use in the landed async-generation code for no present benefit. The assert makes the tradeoff self-policing.
+
+> **Recommendation:** None unless the assert trips; if it does, hold the sink in a unique_ptr rather than raising the bound.
+
+*Files: `src/core/app.cpp`, `src/core/app.hpp`, `src/world/hard_coded_world.hpp`*
 
 ---
 

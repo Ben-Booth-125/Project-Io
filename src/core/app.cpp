@@ -123,6 +123,14 @@ static const std::array<key_binding, 22> s_bindings = {{
     {SDL_SCANCODE_F10,          false, ui::canvas_command::options_toggle, "Options",         "F10"},
 }};
 
+// main.cpp constructs `app{}` as a temporary, so the whole object lives on the
+// main thread's 1 MB stack. BL-305's carve sink put ~92 KB of atomics inside it
+// (312 x 145 int16 owners), which is fine but is the kind of growth that ends
+// in a stack overflow at startup rather than a compile error. Half the stack is
+// the bar; if this ever trips, heap-allocate the sink rather than raising it.
+static_assert(sizeof(app) < 512u * 1024u,
+              "app is approaching the main thread's stack budget");
+
 app::app()
 {
     if (!SDL_Init(SDL_INIT_VIDEO))
@@ -386,6 +394,21 @@ void app::begin_new_game()
     m_worldgen_progress.sub_progress.store(0, std::memory_order_relaxed);
     m_worldgen_progress.sub_total.store(0, std::memory_order_relaxed);
 
+    // The carve sink is a member, so a SECOND campaign start would otherwise
+    // open on the previous world's borders and charter marks. begin_carve
+    // clears the map itself; these are the fields it does not own. The view is
+    // dropped too — the epoch is monotonic across runs, so a stale copy would
+    // survive until the worker's first publish.
+    m_worldgen_progress.grid_w.store(0, std::memory_order_relaxed);
+    m_worldgen_progress.grid_h.store(0, std::memory_order_relaxed);
+    m_worldgen_progress.nation_count.store(0, std::memory_order_relaxed);
+    m_worldgen_progress.nation_id_base.store(0, std::memory_order_relaxed);
+    m_worldgen_progress.asset_mark_count.store(0, std::memory_order_relaxed);
+    m_worldgen_progress.corp_row_count.store(0, std::memory_order_relaxed);
+    m_worldgen_progress.player_slot.store(-1, std::memory_order_relaxed);
+    m_carve_view.clear();
+    m_carve_seen = m_worldgen_progress.carve_epoch.load(std::memory_order_relaxed);
+
     // The worker writes only into locals plus the atomics; the finished world is
     // moved across by the future, so nothing is shared mutable state.
     m_worldgen_future = std::async(std::launch::async, [this] {
@@ -517,8 +540,153 @@ void app::draw_building_screen()
             ? "Twenty years of commerce settle the markets."
             : "Four hundred years of history are being lived through.");
         ImGui::PopStyleColor();
+
+        draw_building_carve();
     }
     ImGui::End();
+}
+
+/// The live carve (BL-305): the world's politics being DECIDED rather than
+/// handed over. It appears when generate_nations opens the carve and stays for
+/// the rest of the screen, so the borders grow, settle, and are then staked by
+/// the charters — all in the order the passes actually do it.
+///
+/// Reads `m_worldgen_progress` and NOTHING else. The world belongs to the
+/// worker thread until poll_worldgen adopts it, so every read here is an atomic
+/// load; there is no lock, no callback into the generation pass, and no
+/// re-entrancy. See generation_progress in world/hard_coded_world.hpp for the
+/// publish side and the encoding.
+void app::draw_building_carve()
+{
+    constexpr float map_w = 420.0f;
+
+    const int gw = m_worldgen_progress.grid_w.load(std::memory_order_relaxed);
+    const int gh = m_worldgen_progress.grid_h.load(std::memory_order_relaxed);
+    if (gw <= 0 || gh <= 0)
+        return; // planetology and deep time are not maps; nothing to show yet
+
+    // Adopt a moved carve at most once a frame. The epoch is the whole point of
+    // the copy: a still frame costs zero atomic loads rather than 45,000.
+    const uint32_t epoch = m_worldgen_progress.carve_epoch.load(std::memory_order_acquire);
+    if (epoch != m_carve_seen)
+    {
+        m_carve_seen = epoch;
+        m_carve_view.resize(static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh));
+        for (std::size_t i = 0; i < m_carve_view.size(); ++i)
+            m_carve_view[i] = m_worldgen_progress.owner[i].load(std::memory_order_relaxed);
+    }
+    if (m_carve_view.size() != static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh))
+        return;
+
+    // Index -> entity id once the nations exist (see nation_id_base); until then
+    // the index IS the key, which is the same palette in a different order.
+    const uint32_t id_base = m_worldgen_progress.nation_id_base.load(std::memory_order_relaxed);
+
+    const float cell = map_w / static_cast<float>(gw);
+    const float map_h = cell * static_cast<float>(gh);
+
+    ImGui::Dummy({map_w, 8.0f});
+    ImDrawList*  dl = ImGui::GetWindowDrawList();
+    const ImVec2 tl = ImGui::GetCursorScreenPos();
+    ImGui::Dummy({map_w, map_h});
+
+    // Unclaimed reads as sea: it is ocean, or land no seed has reached yet.
+    dl->AddRectFilled(tl, {tl.x + map_w, tl.y + map_h}, IM_COL32(22, 30, 44, 255));
+
+    // Run-length merged per row. The carve produces large contiguous
+    // territories, so one quad per tile would be 45,000 quads a frame to draw a
+    // few hundred distinct spans.
+    for (int row = 0; row < gh; ++row)
+    {
+        const std::size_t base = static_cast<std::size_t>(row) * static_cast<std::size_t>(gw);
+        int     run_start = 0;
+        int16_t run_val   = m_carve_view[base];
+        for (int col = 1; col <= gw; ++col)
+        {
+            // col == gw is a sentinel that always closes the last run.
+            const int16_t v = (col < gw)
+                ? m_carve_view[base + static_cast<std::size_t>(col)]
+                : static_cast<int16_t>(-1);
+            if (v == run_val)
+                continue;
+
+            if (run_val > 0) // 0 == unclaimed; the sink stores index + 1
+            {
+                // The SAME palette the in-game Country lens uses, so the map the
+                // player watches being carved is the map they meet again under
+                // the lens (ui/presentation.hpp).
+                dl->AddRectFilled(
+                    {tl.x + static_cast<float>(run_start) * cell,
+                     tl.y + static_cast<float>(row) * cell},
+                    {tl.x + static_cast<float>(col) * cell,
+                     tl.y + static_cast<float>(row + 1) * cell},
+                    ui::palette::nation_colour(
+                        static_cast<entity_id>(id_base + static_cast<uint32_t>(run_val - 1))));
+            }
+            run_start = col;
+            run_val   = v;
+        }
+    }
+
+    // The charters' holdings, as they are staked — over the finished carve, in
+    // the corporation palette, so a marker reads as a different KIND of claim
+    // from the territory under it.
+    const int marks = m_worldgen_progress.asset_mark_count.load(std::memory_order_acquire);
+    for (int i = 0; i < marks && i < generation_progress::max_asset_marks; ++i)
+    {
+        const uint32_t m =
+            m_worldgen_progress.asset_mark[static_cast<std::size_t>(i)].load(std::memory_order_relaxed);
+        const int mc   = static_cast<int>( m        & 0x1FFu);
+        const int mr   = static_cast<int>((m >>  9) & 0x1FFu);
+        const int slot = static_cast<int>((m >> 18) & 0x3Fu);
+        if (mc >= gw || mr >= gh) continue;
+
+        const ImVec2 ctr{tl.x + (static_cast<float>(mc) + 0.5f) * cell,
+                         tl.y + (static_cast<float>(mr) + 0.5f) * cell};
+        dl->AddCircleFilled(ctr, 3.5f, IM_COL32(10, 12, 18, 220), 8);
+        dl->AddCircleFilled(ctr, 2.5f, ui::palette::corp_colour(slot), 8);
+    }
+
+    dl->AddRect(tl, {tl.x + map_w, tl.y + map_h}, IM_COL32(52, 60, 76, 255));
+
+    // The carve's own count, stated only once it is true: before Pass 2c there
+    // is no final nation count, and the pre-merge seed count is a different
+    // (and misleading) number. It moves once, when the borders settle.
+    ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(120, 128, 142, 255));
+    ImGui::Text("%d nations", m_worldgen_progress.nation_count.load(std::memory_order_relaxed));
+    ImGui::PopStyleColor();
+
+    // The charter ledger — the NON-POSITIONAL half of the corporate pass. A
+    // capital figure has nowhere on a map to be, so it goes in a column rather
+    // than as an overlay, swatch-matched to its markers above. No name column:
+    // the generated name is a std::string decided in Pass 5 and does not cross
+    // the atomics-only seam; the names arrive with the finished world.
+    const int rows = m_worldgen_progress.corp_row_count.load(std::memory_order_acquire);
+    if (rows <= 0)
+        return;
+
+    static const char* const focus_name[3] = { "Extraction", "Processing", "Trade" };
+    const int player = m_worldgen_progress.player_slot.load(std::memory_order_relaxed);
+
+    ImGui::Dummy({map_w, 4.0f});
+    for (int c = 0; c < rows && c < generation_progress::max_corp_slots; ++c)
+    {
+        const int   f   = m_worldgen_progress.corp_focus  [static_cast<std::size_t>(c)].load(std::memory_order_relaxed);
+        const int   n   = m_worldgen_progress.corp_assets [static_cast<std::size_t>(c)].load(std::memory_order_relaxed);
+        const float cap = m_worldgen_progress.corp_capital[static_cast<std::size_t>(c)].load(std::memory_order_relaxed);
+
+        const ImVec2 sp = ImGui::GetCursorScreenPos();
+        dl->AddRectFilled({sp.x, sp.y + 4.0f}, {sp.x + 8.0f, sp.y + 12.0f},
+                          ui::palette::corp_colour(c));
+        ImGui::Dummy({14.0f, ImGui::GetTextLineHeightWithSpacing()});
+        ImGui::SameLine();
+        ImGui::PushStyleColor(ImGuiCol_Text, c == player ? IM_COL32(225, 230, 240, 255)
+                                                         : IM_COL32(120, 128, 142, 255));
+        ImGui::Text("%-11s %2d holdings  %8.0f cr%s",
+                    (f >= 0 && f < 3) ? focus_name[f] : "?",
+                    n, static_cast<double>(cap), c == player ? "   (you)" : "");
+        ImGui::PopStyleColor();
+    }
 }
 
 void app::start_new_game_prelude()

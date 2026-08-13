@@ -1,5 +1,7 @@
 #include "corporation_generation.hpp"
 
+#include "world/hard_coded_world.hpp" // generation_progress — the BL-305 tap
+
 #include "world/economy_system.hpp"
 #include "world/placement_rules.hpp"
 #include "world/settlement.hpp"
@@ -1097,7 +1099,8 @@ std::vector<entity_id> generate_corporations(
     world& w,
     const corporation_params& params,
     uint32_t seed,
-    const settlement_state* settle)
+    const settlement_state* settle,
+    generation_progress* progress)
 {
     if (w.nations.empty())
         return {};
@@ -1317,6 +1320,24 @@ std::vector<entity_id> generate_corporations(
         }
 
         corp_assets[static_cast<std::size_t>(c)] = std::move(assets);
+
+        // BL-305 — the POSITIONAL half. Asset placement has a place, so it goes
+        // on the map: each holding is published at the grid cell it just
+        // claimed, corp by corp, so the player watches charters stake ground on
+        // the political map the carve has only just finished drawing. (Every
+        // generated corp is registered in a Kepler nation, so every holding sits
+        // on the same grid the carve was published over.)
+        if (progress)
+        {
+            for (const entity_id bid : corp_assets[static_cast<std::size_t>(c)])
+            {
+                const auto bit = w.buildings.find(bid);
+                if (bit == w.buildings.end()) continue;
+                const auto tit = w.tiles.find(bit->second.tile);
+                if (tit == w.tiles.end()) continue;
+                progress->mark_asset(tit->second.grid_x, tit->second.grid_y, c);
+            }
+        }
     }
 
     // ---------------------------------------------------------------------------
@@ -1333,6 +1354,20 @@ std::vector<entity_id> generate_corporations(
             params.wealth_variance,
             corp_focuses[static_cast<std::size_t>(c)],
             capital_rng);
+
+        // BL-305 — the NON-POSITIONAL half. A financial profile is a derivation,
+        // not a location: there is nowhere on the map for it to be, so it goes
+        // to a ledger column instead of a canvas overlay. One row per corp as
+        // the capital resolves, so the ledger fills in step with the markers
+        // appearing beside it. Numbers only — the generated NAME is Pass 5's,
+        // and a std::string cannot cross an atomics-only seam without a lock;
+        // the names arrive with the finished world a moment later.
+        if (progress)
+            progress->add_corp_row(
+                c,
+                static_cast<int>(corp_focuses[static_cast<std::size_t>(c)]),
+                static_cast<int>(corp_assets[static_cast<std::size_t>(c)].size()),
+                corp_capitals[static_cast<std::size_t>(c)]);
     }
 
     // Independent stream for the generated starting stockpile (BL-116).
@@ -1431,6 +1466,12 @@ std::vector<entity_id> generate_corporations(
         const entity_id player_corp_id = corp_ids[static_cast<std::size_t>(player_idx)];
         w.corporations[player_corp_id].is_player = true;
         w.player_entity = player_corp_id;
+
+        // BL-305: which ledger row the player ends up as is only decided here,
+        // after every row is already published — so it is a separate field
+        // rather than a column on the row.
+        if (progress)
+            progress->player_slot.store(player_idx, std::memory_order_relaxed);
 
         // ---------------------------------------------------------------------
         // Player starting muster building + unit (BL-330) — player only. Rival

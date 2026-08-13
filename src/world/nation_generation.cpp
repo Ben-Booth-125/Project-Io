@@ -1,5 +1,7 @@
 #include "nation_generation.hpp"
 
+#include "hard_coded_world.hpp" // generation_progress — the BL-305 carve tap
+
 #include "tongue.hpp"
 
 #include <algorithm>
@@ -188,6 +190,10 @@ struct bfs_entry
 ///                     its weight, so high-weight seeds expand cheaper and claim
 ///                     larger territory (BL-053 — strongly varied nation sizes).
 /// @param rng          Seeded RNG for jitter.
+/// @param progress     Optional BL-305 tap: each settled tile is published as it
+///                     is claimed, so the loading screen shows the borders grow
+///                     in the order the pass actually grows them. Write-only —
+///                     never read back, never steers the BFS.
 /// @return             Per-tile nation index (-1 = unclaimed/ocean). Indexed as row*gw+col.
 std::vector<int> expand_territory(const std::vector<int>& seeds,
                                   const std::vector<bool>& is_ocean,
@@ -195,7 +201,8 @@ std::vector<int> expand_territory(const std::vector<int>& seeds,
                                   const std::vector<entity_id>& tile_ids,
                                   int gw, int gh,
                                   const std::vector<float>& weight,
-                                  std::mt19937& rng)
+                                  std::mt19937& rng,
+                                  generation_progress* progress)
 {
     const int total = gw * gh;
     std::vector<int>   owner(static_cast<std::size_t>(total), -1);
@@ -215,7 +222,11 @@ std::vector<int> expand_territory(const std::vector<int>& seeds,
         dist[static_cast<std::size_t>(s)]  = 0.0f;
         owner[static_cast<std::size_t>(s)] = ni;
         pq.push({ 0.0f, s % gw, s / gw, ni });
+        if (progress) progress->claim_tile(s, ni);
     }
+    if (progress) progress->publish_carve(); // the cores, before anything grows
+
+    int since_publish = 0;
 
     while (!pq.empty())
     {
@@ -227,6 +238,21 @@ std::vector<int> expand_territory(const std::vector<int>& seeds,
         if (settled[static_cast<std::size_t>(idx)])
             continue;
         settled[static_cast<std::size_t>(idx)] = true;
+
+        // BL-305 tap. `settled` is where a tile stops being contested, so this
+        // is the honest moment to show it claimed, and `cur.nation_idx` is the
+        // winner by the same comparison the pass itself trusts. Batched: an
+        // epoch bump per tile would be ~45,000 release fences for a screen that
+        // redraws 60 times a second.
+        if (progress)
+        {
+            progress->claim_tile(idx, cur.nation_idx);
+            if (++since_publish >= gen_carve_publish_interval)
+            {
+                since_publish = 0;
+                progress->publish_carve();
+            }
+        }
 
         // Expand into cardinal neighbours.
         std::pair<int,int> nbrs[4];
@@ -267,6 +293,7 @@ std::vector<int> expand_territory(const std::vector<int>& seeds,
         }
     }
 
+    if (progress) progress->publish_carve(); // the last partial batch
     return owner;
 }
 
@@ -621,7 +648,8 @@ std::vector<entity_id> generate_nations(
     const std::vector<entity_id>& tile_ids,
     int gw, int gh,
     const nation_params& params,
-    uint32_t seed)
+    uint32_t seed,
+    generation_progress* progress)
 {
     const int total = gw * gh;
 
@@ -721,10 +749,14 @@ std::vector<entity_id> generate_nations(
         }
     }
 
+    // BL-305: open the carve now the seed count is known, so the loading screen
+    // has a blank map of the right shape before the first tile lands.
+    if (progress) progress->begin_carve(gw, gh, seed_count);
+
     // --- Pass 2: territory expansion (weighted) ---
     std::mt19937 expand_rng(seed_expand);
     std::vector<int> owner_map = expand_territory(
-        seeds, is_ocean, w, tile_ids, gw, gh, weights, expand_rng);
+        seeds, is_ocean, w, tile_ids, gw, gh, weights, expand_rng, progress);
 
     // --- Pass 2b: orphan-island assignment (claim water-disconnected land) ---
     assign_orphan_islands(owner_map, is_ocean, gw, gh);
@@ -735,6 +767,19 @@ std::vector<entity_id> generate_nations(
     int nation_count = seed_count;
     if (params.min_nation_tiles > 0)
         nation_count = merge_undersized_nations(owner_map, seed_count, params.min_nation_tiles, gw, gh);
+
+    // BL-305: 2b and 2c both rewrite owner indices wholesale (the merge also
+    // COMPACTS them), so this is the one place the published map has to be
+    // restated rather than extended. One whole-map pass, and the recolour it
+    // causes is the point — the islands join, the small realms are absorbed,
+    // and the count the screen then reports is the final one.
+    if (progress)
+    {
+        for (int idx = 0; idx < total; ++idx)
+            progress->claim_tile(idx, owner_map[static_cast<std::size_t>(idx)]);
+        progress->nation_count.store(nation_count, std::memory_order_relaxed);
+        progress->publish_carve();
+    }
 
     // --- Allocate nation_component stubs (populated in Passes 3–5) ---
     std::vector<nation_component> nation_data(static_cast<std::size_t>(nation_count));
@@ -807,6 +852,13 @@ std::vector<entity_id> generate_nations(
         nation_ids.push_back(nid);
         w.nations[nid] = std::move(nation_data[static_cast<std::size_t>(ni)]);
     }
+
+    // BL-305: the ids exist now, so the loading screen can stop colouring the
+    // carve by index and colour it by the same key the Country lens uses. Ids
+    // come out of one tight create_entity loop, so index i is base + i.
+    if (progress && !nation_ids.empty())
+        progress->nation_id_base.store(static_cast<uint32_t>(nation_ids.front()),
+                                       std::memory_order_relaxed);
 
     // Write tile_to_nation entries now that entity IDs are known.
     for (int idx = 0; idx < total; ++idx)

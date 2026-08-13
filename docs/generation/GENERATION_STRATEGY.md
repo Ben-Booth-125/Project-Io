@@ -155,6 +155,49 @@ input to the staged-generation Tile Ledger ([[BL-100]]) as a tuning surface.
 
 ---
 
+## Visibility audit - which passes the player can watch (BL-305, 2026-08-13)
+
+BL-305 gave the **nation carve** and **corporate seeding** a live surface on the loading screen
+(`app_screen::building`, `app::draw_building_carve` in `src/core/app.cpp`), fed by the
+atomics-only `generation_progress` sink. Landing it demanded the obvious follow-on question:
+*which of the other passes still happen invisibly?* This walks the pass map in run order and
+answers it.
+
+Three verdicts are used. **Watched** - the player can see it happen, or can inspect its output
+in-game. **Owed** - it produces something a player would want to see and there is no surface for
+it; a real gap. **Invisible by design** - showing it would be noise, and its effect is legible
+through what it produced.
+
+| # | Pass | Surface today | Verdict |
+|---|---|---|---|
+| 1 | Body naming (BL-257) | Every label in the game | Invisible by design - the output *is* the surface |
+| 2 | Planetology, per body (BL-167) | Wizard stage folds + charts; History ledger | Watched |
+| 3 | Continents / drift (BL-226) | Continent lens; biography lines | Watched |
+| 4 | Tile generation, six passes | The planetary canvas; the wizard globe samples the real surface | Watched (outcome) / Owed (derivation - the Generation Ledger) |
+| 5 | Rivers (BL-170) | River edges on the planetary canvas | Watched |
+| 6 | Population centres | Population lens | Watched |
+| 7 | History ladder, Stages 0-2 (BL-221) | Dated lines in the body biography | Watched (as text) |
+| 8 | Creeds / pantheons (BL-235) | Biography lines; culture on provinces | Watched (as text) |
+| 9 | Settlement & industrialisation (BL-218/219) | `generation_report.settlement`; History ledger | **Owed** - provinces are the anchors the carve grows from and have no map surface of their own |
+| 10 | **Nation carve (Voronoi BFS)** | **Loading screen, live**; Country lens in play | Watched (BL-305) |
+| 11 | National character derivation | Nation detail in the Selection band | Watched |
+| 12 | Historical ruptures | Checkpoints + lacunae in the History ledger | Watched (as text) |
+| 13 | Institutional history / globalisation | Biography lines | Watched (as text) |
+| 14 | Roads (BL-146/172) | Road tiers on the planetary canvas | Watched |
+| 15 | Pre-authored Kepler installations | On-canvas buildings | Invisible by design - two authored stubs, not a generated fact |
+| 16 | **Corporations (placement + finance)** | **Loading screen, live** - map markers + charter ledger | Watched (BL-305) |
+| 17 | Market carving (BL-096/132) | Market lens; market ledger | Watched (outcome) / **Owed** (*why* a nation fractured into N markets is nowhere) |
+| 18 | Prototype laws (BL-343) | Law panel | Watched |
+| 19 | Background firms (BL-365) | Corporations panel, in play | **Owed** - runs on the main thread *after* the worker, so the loading screen cannot show it; it is the one generation pass with no live surface at all |
+| 20 | Pre-game warm start (80 econ ticks) | The inner bar and a caption only | Partly watched - the bar is honest, but the balances it produces are not shown |
+
+Four owed items, none of them blocking: the tile-derivation ledger (already designed in
+`GENERATION_LEDGER.md`), a province surface, a market-carving explanation, and background firms -
+which the current worker split puts out of the loading screen's reach. Recorded here rather than
+filed as items so the map stays in one place; promote from this table when one is picked up.
+
+---
+
 ## Real history in, invented names out (Ben, 2026-08-03)
 
 A standing constraint on every generation pass, stated here because it cuts across all of them.
