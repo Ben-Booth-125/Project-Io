@@ -29,7 +29,7 @@ class recipe_registry;
 /// stored command. New verbs go on the end.
 enum class corp_verb : uint8_t
 {
-    build = 0,     ///< construct_building(type, tile, target) — durative, pay-as-you-build.
+    build = 0,     ///< construct_building(type, tile, target, recipe) — durative, pay-as-you-build.
     demolish,      ///< demolish_building(building).
     set_recipe,    ///< building_component.recipe := recipe (BL-079 idiom, validated).
     set_workforce, ///< building_component.workforce_target := value (0–200); clears workforce_auto.
