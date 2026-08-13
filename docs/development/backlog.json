@@ -8767,6 +8767,104 @@
    ],
    "summary": "export_corp_blackboard emits price, supply and demand per (market, resource) but not base_price. A price of 3.2 is therefore uninterpretable to an out-of-process agent: it cannot tell whether that is a glut, a shortage, or ordinary. Found while checking BL-381's own premise -- the in-process scorer has base_price in hand and an external policy does not, so the two cannot reason alike.",
    "design": "DESIGNED 2026-08-13, found checking whether BL-381's proposed fix was computable by the audience it is meant to serve.\n\n## The gap\n\n`export_corp_blackboard`'s market section emits three facts per priced resource: `price`, `supply`, `demand`. It skips any resource whose `base_price` is zero (correctly — an untraded good has no public quote) and then never emits the base price it just tested.\n\nSo an agent reads `price:steel = 3.2` and has no way to know whether steel is cheap, dear or ordinary. Every price-based judgement an external policy might make — is this glutted, is this worth producing, is this a good moment to sell — needs a reference, and the reference is present in the market component and withheld from the export.\n\nIt is worse than a missing convenience: the two aggregates that ARE exported, supply and demand, are exactly the pair BL-381 establishes cannot be divided meaningfully. So the blackboard currently gives an agent two numbers it should not use and withholds the one it should.\n\n## Not a visibility question\n\nWorth stating so it is not re-litigated: `base_price` is a rarity-derived property of the market and the resource, not of any corporation. Exporting it reveals nothing about a rival, so BL-068 is not engaged. This is an omission, not a policy.\n\n## The fix\n\nEmit `base_price:<r>` alongside the existing three, with `public_market` provenance, in the same loop that already reads it. Two lines. Bump the blackboard `_v` and re-bless `blackboard_harness`'s fact counts, which is the only real cost.\n\n## Do it with BL-381, not before\n\nLanding this alone adds facts to every export for no consumer. Landing it WITH BL-381 means the scorer's new price-based gate and an external policy's view of the same decision are computed from the same public numbers — which is the property that makes the AI's reasoning reproducible from outside, and the one AI_OPPONENT.md section 6 claims for the export in the first place."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-13",
+   "created": "2026-08-13",
+   "id": "BL-386",
+   "short_name": "SELL_ORDER_FLOOR_PRINTS_MONEY",
+   "category": "Economy",
+   "title": "A sell order's floor price is paid in full by nobody — unbounded money printing, and it is what tripled the AI's net worth",
+   "priority": "S",
+   "difficulty": 4,
+   "version_goal": "v0.1.13",
+   "requires": [],
+   "authority_doc": "docs/economy/MARKETS.md",
+   "files": [
+    "src/world/market_clearing.cpp",
+    "src/world/corp_ai.cpp",
+    "tools/verify/order_book_harness.cpp",
+    "docs/economy/MARKETS.md"
+   ],
+   "summary": "clear_markets' unmatched-sell auto-clear computes `clearing = max(ref_price, floor_price)` and credits `income += rem * clearing` with NO counterparty debited and NO ceiling. A player listing at floor_price 1e12 reached cash 1.587e17 in eighteen ticks. Found by an agent playing the seam, confirmed independently by a second.",
+   "design": "DESIGNED 2026-08-13, found by AI play (two independent players, same conclusion).\n\n## The defect\n\nIn the auto-clear pass for unmatched standing sell supply: `const float clearing = std::max(rp, se.floor_price);` followed by `flows[se.corp].income += se.rem * clearing;`. Nothing debits a buyer, nothing caps the floor, and nothing checks the floor against the market's own price band. Income is exactly linear in the floor the seller names.\n\nMeasured by a player: baseline 5,535/tick; floor 2.0 gave 17,829/tick; floor 5 gave 44,654/tick; floor 1e6 gave 8.94 BILLION per tick; floor 1e12 reached cash 1.587e17 by tick 26. The market price of the good never moved off 0.625 in any run and no other corporation's balance was debited.\n\n## AND IT IS ALREADY FIRING, WHICH IS THE PART THAT MATTERS\n\nThis is not only an exploit a player could reach for. **The rival AI is doing it every time it trades**, and it resolves NR-144's open question about why rival trading tripled AI net worth.\n\nThe chain: a glutted good's price is pegged at `0.25 x base_price` (the band floor). `corp_ai` lists at `floor = base_price * trade_floor_multiple`, default 1.0, i.e. AT base_price. So `clearing = max(0.25*base, base) = base` — **every unit the AI lists earns four times the market rate, funded from nothing**. NR-144 recorded the tripling and reasoned it was 'corps converting idle stock to cash rather than a broken scorer'. It was a broken market, and the scorer was innocent.\n\n## Why the auto-surplus path is fine and this one is not\n\nThe auto-surplus path clears at `ref_price` — the price the market actually resolved — so 'the market is a perfect counterparty' costs the world goods at a fair price. That is a deliberate prototype simplification (MARKETS.md) and it is defensible. The order book path lets the SELLER name the price the perfect counterparty pays, which is a different thing entirely: it is not a simplification of a market, it is the absence of one.\n\n## PROPOSED FIX\n\nA floor price should DECLINE a sale, not raise its price. That is what a floor means and what the dictionary entry for `place_sell_order` already tells an agent it means ('minimum acceptable unit price'). Concretely, in the auto-clear pass:\n\n```\nif (se.floor_price > rp) continue;   // held back: the market will not meet the floor\nflows[se.corp].income += se.rem * rp;\n```\n\nso an order above the market clears NOTHING and the stock stays in the pool, and an order at or below the market clears at the market price. That makes a floor a genuine reservation price, makes `trade_floor_multiple` a real strategic dial rather than a money multiplier, and removes the free income without removing the buyer of last resort.\n\n**Expect this to move every economy golden and to CUT AI net worth by roughly the tripling NR-144 recorded.** That drop is the fix working, not a regression — re-bless with a note pointing here.\n\n## Guard it with a test that could have caught it\n\n`order_book_harness` must gain an assertion that no corporation's income from a clearing exceeds its cleared quantity times the market's resolved price. That is the invariant, it is one line to check, and it is the thing no existing assertion states."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-13",
+   "created": "2026-08-13",
+   "id": "BL-387",
+   "short_name": "SEAM_HAS_NO_ACTOR_AUTHORITY",
+   "category": "AI",
+   "title": "apply_corp_command never checks that the caller may act AS the corporation it names — through --serve, anyone can drive any corp",
+   "priority": "S",
+   "difficulty": 3,
+   "version_goal": "v0.1.13",
+   "requires": [],
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "files": [
+    "src/main.cpp",
+    "src/world/corp_command.cpp",
+    "tools/mcp/server.js",
+    "tools/mcp/smoke.js"
+   ],
+   "summary": "The only validation of cmd.corp is that the corporation EXISTS. A player driving the seam issued commands in rivals' names and moved their balances by tens of millions, and can suppress a rival's auto-surplus path permanently by placing a 0.001-unit order in their name. The owns() helper gates BUILDING ownership and nothing gates ACTOR identity.",
+   "design": "DESIGNED 2026-08-13, found by AI play.\n\n## The defect\n\n`apply_corp_command` begins with `if (w.corporations.find(cmd.corp) == w.corporations.end()) return rejected_no_corp;` and that is the whole of its actor validation. Per-verb checks use `owns(w, cmd.corp, cmd.subject)` to confirm the corp owns the BUILDING it names — but nothing confirms the CALLER may act as that corp.\n\nIn play: a player issued `COMMAND corp=<rival> verb=9 ...` and it returned `applied`. Rival balances moved by +57.9M, +50.1M, +25.7M over six ticks. The inverse is an attack rather than a gift — a 0.001-unit order placed in a rival's name permanently suppresses that rival's auto-surplus path for the triple (BL-380), throttling a competitor's entire income on that good.\n\n## Why this was never a defect before, and is now\n\nIn-process, `cmd.corp` is set by the scorer itself, so the field was never attacker-controlled and the missing check cost nothing. `--serve` turned the seam into an EXTERNAL input surface and the same field became caller-supplied. Nothing about apply_corp_command changed; its threat model did.\n\n**This is the second instance in one session of exactly that pattern** — the NaN float guard (NR-184) was the first. The AI-facing seam is an untrusted input boundary in a way the internal caller never was, and validation written for a trusted caller does not transfer. Two instances is enough to call it a rule rather than an incident, and it should go in the standing rules.\n\n## PROPOSED FIX\n\nAuthority belongs at the PROTOCOL layer, not in apply_corp_command — the in-process scorer legitimately commands every rival corp and must keep doing so. So:\n\n* `run_serve` gains a session actor: `--serve --as <corp>` (default: the player corp), and the `COMMAND` opcode refuses any `corp=` that is not the session actor, with a new `rejected_not_owner` at the opcode level.\n* For the research use where an agent legitimately drives several corps (bot-vs-bot, the BL-279 corpus), an explicit `--as any` opt-in, so the permissive mode exists but must be ASKED for and is visible in the invocation.\n* `tools/mcp/server.js` pins its actor at startup and never forwards a caller-supplied `corp` for writes.\n* `smoke.js` asserts that a command naming a corp other than the session actor is refused — replacing the assertion that currently only checks the reply is well-formed, which this session already flagged as overclaiming.\n\nNote the interaction with BL-386: with the floor-price fix in, driving a rival is no longer a route to printing money, but it is still a route to sabotaging one."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-13",
+   "created": "2026-08-13",
+   "id": "BL-388",
+   "short_name": "BUILD_DISCARDS_THE_RECIPE",
+   "category": "Economy",
+   "title": "The build verb silently discards its recipe argument — every processor built through the seam is a steel smelter",
+   "priority": "A",
+   "difficulty": 2,
+   "version_goal": "v0.1.13",
+   "requires": [],
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "src/world/corp_command.cpp",
+    "src/world/construction.cpp",
+    "docs/ai/ACTIONS.json"
+   ],
+   "summary": "apply_corp_command's build case calls construct_building without forwarding cmd.recipe, so a processing facility ordered with recipe=2 is built with recipe 0. The command answers `applied` and builds a different building than the one requested, with no diagnostic.",
+   "design": "DESIGNED 2026-08-13, found by AI play.\n\n## The defect\n\n`apply_corp_command`'s build case calls `construct_building(w, reg, cmd.corp, cmd.tile, cmd.type, cmd.target, built)`. `corp_command` carries a `recipe` field, documented in its own header as 'set_recipe (and build seed)', and the ACTIONS dictionary tells an agent that `build` takes a recipe. It is never passed.\n\nA player ordered a Food Processor with `recipe=2`, got `result=applied building=34631`, and the blackboard then reported `building_recipe = 0` — a steel smelter. Success reported; different building delivered.\n\n## Why it is worse than a dropped argument\n\nIt is silent, and it defeats the seam's whole self-correction story. A typed rejection teaches an agent what it did wrong; a success that builds something else teaches it something false. The player only noticed by reading the blackboard back and comparing — a check most callers will not make, because `applied` is supposed to mean applied.\n\nIt also compounds: because every seam-built processor runs recipe 0 (steel) and steel's coal reagent is unpriced in the served world (BL-389), no seam-built processor has ever produced a single unit. A player ran five campaigns and roughly eighty building-ticks of processing without one unit of output, and could not tell why.\n\n## PROPOSED FIX\n\nForward `cmd.recipe` to `construct_building`, and REJECT rather than silently coerce when the recipe is invalid for the type: a recipe on a non-processing type, or an id `get_recipe` does not resolve, should be `rejected_invalid`. Note `set_recipe` has the adjacent hole — it validates that the recipe resolves but not that it belongs to `processing_facility` — and both should be closed together, since a caller that can name a recipe at build time will name one at set time too.\n\nAdd an assertion that a building constructed through the seam carries the recipe it was asked for. Nothing currently checks that the command's arguments survive into the world it creates."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-13",
+   "created": "2026-08-13",
+   "id": "BL-389",
+   "short_name": "SERVE_PLAYS_A_DIFFERENT_ECONOMY",
+   "category": "AI",
+   "title": "--serve never loads world_gen.lua, so the AI seam plays a materially different economy than the GUI",
+   "priority": "A",
+   "difficulty": 3,
+   "version_goal": "v0.1.13",
+   "requires": [],
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "files": [
+    "src/main.cpp",
+    "src/world/world_gen_config.hpp",
+    "scripts/world_gen.lua"
+   ],
+   "summary": "run_serve loads recipes.lua and economy.lua and never constructs a world_gen_config, so make_hard_coded_world falls back to built-in defaults. Only 16 of 42 resources carry a price on any market; coal, silica, copper ore, rare earths and the rest are unpriced and unbuyable. Every conclusion drawn from the seam is a conclusion about a different game.",
+   "design": "DESIGNED 2026-08-13, found by AI play.\n\n## The defect\n\n`run_serve` loads `scripts/recipes.lua` and `scripts/economy.lua`. It never builds a `world_gen_config` from `scripts/world_gen.lua`, so world generation falls back to its built-in defaults. A player enumerated every `price:<r>` fact across all four markets and found 16 of 42 resources priced. Missing: coal, silica, copper ore, rare-earth ore, iron-nickel ore, platinum-group metals, and the rest.\n\n## Why it is the most quietly expensive of today's findings\n\nEvery other defect found by play is a defect in the game. This one means **the seam is not playing the game**. Any measurement taken through `--serve` — the trace corpus BL-279 wants, a skill benchmark, an agent's learned policy — describes a world the player never sees. It also silently explains the processing dead end: steel's coal reagent has no price and no stock, so a steel smelter cannot run, which is every processor the seam builds (BL-388).\n\n`--export-blackboard` shares `run_serve`'s setup and inherits the same divergence, so BL-206's exports have the same problem.\n\n## PROPOSED FIX\n\nFactor the world setup that `app::setup_world` performs into one function and call it from all three entry points — the GUI, `--serve` and `--export-blackboard`. The duplication is the bug: three call sites each assembling the world slightly differently is how one of them came to skip a config file. This session already collapsed the same shape once inside `run_serve` (the tick sequence was duplicated between the warm-up loop and the TICK opcode, which is how `advance_surveys` came to be missing from both).\n\nAdd an assertion that the served world prices the same resource set as the GUI world — a count comparison is enough and it would have caught this immediately."
   }
  ]
 }
