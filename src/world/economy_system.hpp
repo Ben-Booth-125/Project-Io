@@ -187,6 +187,29 @@ float extraction_nominal(const world& w, const recipe_registry& reg,
 ///                   exactly as `run_extraction` does — without it the dial was
 ///                   maximised against a curve a stacked site never realises
 ///                   (BL-346). 1 (the default) is a lone site.
+/// @param out_gain Optional. Receives the solver's OWN modelled net at the
+///                 returned target minus its modelled net at `b.workforce_target`
+///                 — i.e. what moving the dial is actually worth, in the same
+///                 units and from the same model that chose the target.
+///
+///                 Reported as >= 0, but NOT >= 0 by construction: the search
+///                 walks a step-10 grid while `b.workforce_target` may sit off
+///                 it (the player's `set_workforce` verb accepts any 0–200), so
+///                 an off-grid incumbent can genuinely out-score every grid
+///                 point. That case is a real "the solver's own answer is worse
+///                 than where you already are", and it is floored at 0 rather
+///                 than reported, because the caller's only use is a gain to
+///                 compare against a hysteresis margin and a negative one means
+///                 the same thing as zero there: do not move.
+///
+///                 It exists because the caller cannot reconstruct this. BL-202's
+///                 scorer approximated it as `variable * (proposed − target)/target`
+///                 with `variable = revenue − inputs − wages`, which takes its SIGN
+///                 from `variable` rather than from the model: a profitable building
+///                 could then only ever be scored for raising its target and a
+///                 loss-maker only for cutting, so every dial the solver found in
+///                 the other direction — the interior optimum it exists to find —
+///                 scored negative and was silently discarded.
 int solve_workforce_target(const world& w, const recipe_registry& reg,
                            const building_component& b, float contention,
-                           int stack_rank = 1);
+                           int stack_rank = 1, float* out_gain = nullptr);

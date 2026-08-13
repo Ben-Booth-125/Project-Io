@@ -66,7 +66,32 @@ building_profit estimate_building_profit(const world& w, const recipe_registry& 
 ///
 /// @param recipe_id Processing recipe to price (ignored for other types); `no_recipe`
 ///                  prices nothing and yields zero revenue.
+///
+/// @param existing  Optional. Names a building that ALREADY EXISTS and is the
+///                  subject of the estimate — the "what would this earn if it
+///                  ran again" case, as opposed to the "what would a new one
+///                  earn" case the defaults model. Two things change when it is
+///                  supplied, and both are wrong without it:
+///
+///                  * **Staffing comes from the real building**, not from the
+///                    0.5-assigned / 100-target pair `construct_building`
+///                    authors. A site the scorer has dialled to 200 (or to 0)
+///                    would otherwise be priced at a staffing level it will not
+///                    come back at, so the estimate answers a question nobody
+///                    asked.
+///                  * **It is not counted as an ADDITIONAL member of its own
+///                    stack.** `stack_members` filters on tile/type/target only
+///                    — it does not exclude a subject and does not skip
+///                    decommissioned members — so an existing building is
+///                    already in that list, and the default `size() + 1` rank
+///                    charges it one extra step of BL-193 decay against itself
+///                    (0.8x for a lone site, 0.512x at rank 3).
+///
+///                  Pass `nullptr` (the default) for a genuinely hypothetical
+///                  building; that is the construction ledger's case and its
+///                  numbers are unchanged.
 building_profit estimate_prospective_profit(const world& w, const recipe_registry& reg,
                                             entity_id tile_id, building_type type,
                                             resource_type target,
-                                            std::uint16_t recipe_id = no_recipe);
+                                            std::uint16_t recipe_id = no_recipe,
+                                            const building_component* existing = nullptr);

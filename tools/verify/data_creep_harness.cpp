@@ -519,21 +519,48 @@ int main(int argc, char* argv[])
 {
     // Tick ceiling is overridable so the instrument can be run harder by hand;
     // the default is the ROADMAP's "1000+".
-    std::vector<int> marks = { 100, 250, 500, 1000, 1500 };
+    // Default run extended 1500 -> 3000 on 2026-08-13, and the reason is the
+    // plateau window rather than coverage. R1 asks "do the counters stop
+    // climbing", which can only be answered from a window that sits AFTER the
+    // world finishes building out. Measured on the current tree, buildings reach
+    // 929 at t1000 and hold it at t1500, t2000 and t4000 — so the build-out
+    // completes around t1000 and a 1500-tick run has no settled half to measure.
+    // R1 was reporting the tail of the warm-up as unbounded growth (see NR-171,
+    // whose "climbs linearly, ~1.25/tick" framing the 4000-tick trace refutes).
+    //
+    // 3000 keeps the window rule principled — the second half of the run — rather
+    // than fitting a constant to where the ramp happens to end today. If a future
+    // change extends the build-out past t1500, R1 SHOULD fail again, and the fix
+    // then is to establish why the world is still growing, or to raise this
+    // number knowingly.
+    std::vector<int> marks = { 100, 250, 500, 1000, 1500, 2000, 3000 };
     if (argc > 1)
     {
         const int ceiling = std::max(100, std::atoi(argv[1]));
         marks.clear();
-        for (const int m : { 100, 250, 500, 1000, 1500, 2000, 4000 })
+        for (const int m : { 100, 250, 500, 1000, 1500, 2000, 3000, 4000 })
             if (m <= ceiling) marks.push_back(m);
         if (marks.empty() || marks.back() != ceiling) marks.push_back(ceiling);
     }
     const int total_ticks = marks.back();
 
-    // T_mid is the last mark at or below 500 (the plateau window's left edge).
+    // T_mid is the plateau window's left edge, and it MUST sit past the warm-up
+    // or the window measures growth rather than its absence.
+    //
+    // It was hard-pinned at 500 in this file and at line ~676 below, which was
+    // right when the world finished filling by then and wrong once BL-365's real
+    // background firms extended the build-out. Measured at 4000 ticks on the
+    // current tree: buildings go 160 (t100), 422 (t250), 757 (t500), 929 (t1000),
+    // then 929 at t1500, t2000 and t4000 — dead flat for 3000 consecutive ticks.
+    // The counters DO plateau; the window was just looking at the wrong half of
+    // the run, so R1 reported the tail of the warm-up as unbounded growth.
+    //
+    // Taking the midpoint of the run instead of a constant makes the window track
+    // the run length, so a longer run measures a later and more settled window
+    // rather than the same early one.
     int mid_tick = marks.front();
     for (const int m : marks)
-        if (m <= 500) mid_tick = m;
+        if (m <= total_ticks / 2) mid_tick = m;
 
     std::printf("BL-251 data-creep instrument (+BL-254 convoy traffic) — real generated world,"
                 " %d ticks\n", total_ticks);
@@ -670,10 +697,14 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    // Locate T_mid = 500 (or the sample nearest half the run if 500 is absent).
+    // Locate T_mid — the same midpoint-of-the-run rule as the mark list above.
+    // These two MUST agree: the printed trace and the asserted window are the
+    // same window, and pinning them to different constants is how a plateau can
+    // be reported and failed in one run.
+    const int mid_cut = samples.empty() ? 0 : samples.back().tick / 2;
     std::size_t mid_i = 0;
     for (std::size_t i = 0; i + 1 < samples.size(); ++i)
-        if (samples[i].tick <= 500) mid_i = i;
+        if (samples[i].tick <= mid_cut) mid_i = i;
     const std::size_t end_i = samples.size() - 1;
 
     struct climber { int c; long long mid, end; };

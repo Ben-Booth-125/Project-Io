@@ -334,8 +334,11 @@ float wf_target_price(float base, float supply, float demand)
 // (corp_ai.cpp) reuses the one solver. The anonymous namespace re-opens below.
 int solve_workforce_target(const world& w, const recipe_registry& reg,
                            const building_component& b, float contention,
-                           int stack_rank)
+                           int stack_rank, float* out_gain)
 {
+    if (out_gain)
+        *out_gain = 0.0f; // every early return below is "no move, so no gain"
+
     const entity_id body = building_body(w, b);
     if (body == null_entity)
         return b.workforce_target;
@@ -360,10 +363,11 @@ int solve_workforce_target(const world& w, const recipe_registry& reg,
 
     const auto tit = w.tiles.find(b.tile);
 
-    int   best_wt  = 0;
-    float best_net = -std::numeric_limits<float>::infinity();
-    for (int wt = 0; wt <= 200; wt += 10)
-    {
+    // The modelled net at one candidate target. Hoisted out of the search loop so
+    // the building's CURRENT target can be priced by the identical model — the
+    // caller needs the difference, and re-deriving it outside got the sign wrong
+    // (see the out_gain note in the header).
+    const auto net_at = [&](int wt) -> float {
         const float wts = wt / 100.0f;
 
         building_component probe = b;
@@ -401,8 +405,27 @@ int solve_workforce_target(const world& w, const recipe_registry& reg,
             }
         }
 
-        const float net = revenue - input_cost - opex.maintenance - opex.wages;
+        return revenue - input_cost - opex.maintenance - opex.wages;
+    };
+
+    int   best_wt  = 0;
+    float best_net = -std::numeric_limits<float>::infinity();
+    for (int wt = 0; wt <= 200; wt += 10)
+    {
+        const float net = net_at(wt);
         if (net > best_net) { best_net = net; best_wt = wt; }
+    }
+
+    if (out_gain)
+    {
+        // Price the incumbent through the same model. b.workforce_target is not
+        // necessarily on the step-10 grid (the player's set_workforce verb accepts
+        // any 0-200), so it is evaluated directly rather than looked up.
+        const float gain = best_net - net_at(b.workforce_target);
+        // Floored, not clamped-for-noise: an off-grid incumbent can legitimately
+        // beat every grid point, and a negative gain and a zero gain say the same
+        // thing to the only caller — the move is not worth making.
+        *out_gain = (gain > 0.0f) ? gain : 0.0f;
     }
     return best_wt;
 }
@@ -1159,6 +1182,22 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
                     if (++b.loss_streak >= loss_streak_to_idle)
                     {
                         b.decommissioned = true;
+                        // Hold the strategic tier off this building for the same
+                        // span its own state changes hold for (AI_OPPONENT.md
+                        // § "Hysteresis & action budget": a building that changed
+                        // state holds for C evals). This tier changed state and
+                        // used not to set the cooldown, so BL-202's resume
+                        // candidate could reverse an 8-tick-loss idling on the
+                        // very next evaluation — the two tiers owned the same flag
+                        // and neither knew the other existed. That was the larger
+                        // half of the measured idle/resume oscillation.
+                        // Default-constructed params, matching the default
+                        // argument run_corp_strategic_step is called with at the
+                        // bottom of this same function. If that call ever passes
+                        // tuned params, this needs the same object — the two
+                        // writers of this field must agree or the hold is
+                        // asymmetric.
+                        b.ai_cooldown = corp_ai_params{}.cooldown_evals;
                         // An idled port/hub stops anchoring supply — reach stale.
                         invalidate_logistics_caches(w);
                         report.agency_events.push_back(

@@ -107,7 +107,8 @@ building_profit estimate_building_profit(const world& w, const recipe_registry& 
 building_profit estimate_prospective_profit(const world& w, const recipe_registry& reg,
                                             entity_id tile_id, building_type type,
                                             resource_type target,
-                                            std::uint16_t recipe_id)
+                                            std::uint16_t recipe_id,
+                                            const building_component* existing)
 {
     building_profit out;
 
@@ -135,7 +136,10 @@ building_profit estimate_prospective_profit(const world& w, const recipe_registr
         return mkt->price[ri] > 0.0f ? mkt->price[ri] : mkt->base_price[ri];
     };
 
-    // The building construct_building would actually author for this candidate.
+    // The building construct_building would actually author for this candidate —
+    // unless the caller named a real one, in which case its own staffing is what
+    // it would come back at, and modelling the authored defaults instead would
+    // price a question nobody asked.
     building_component bc{};
     bc.tile               = tile_id;
     bc.type               = type;
@@ -143,6 +147,16 @@ building_profit estimate_prospective_profit(const world& w, const recipe_registr
         (type == building_type::port || type == building_type::inland_logistics_hub) ? 0.0f : 0.5f;
     bc.target_resource    = target;
     bc.recipe             = recipe_id;
+    if (existing)
+    {
+        bc.workforce_assigned = existing->workforce_assigned;
+        bc.workforce_target   = existing->workforce_target;
+    }
+    // `wt_scalar` is workforce_target/100 inside compute_building_opex, and the
+    // revenue terms below assume target 100 scales to 1. Carry the real scalar
+    // so revenue and wages move together rather than only the wages half.
+    const float wt_scalar =
+        existing ? std::clamp(existing->workforce_target / 100.0f, 0.0f, 2.0f) : 1.0f;
 
     out.has_data = true;
 
@@ -154,9 +168,10 @@ building_profit estimate_prospective_profit(const world& w, const recipe_registr
     out.maintenance = opex.maintenance;
     out.wages       = opex.wages;
 
-    // workforce_target 100 and contention 1.0 both scale to 1, so the only labour
-    // term left is the assigned fraction (economy_system.cpp § run_extraction).
-    const float wf = bc.workforce_assigned;
+    // Contention 1.0 scales to 1; the labour terms left are the assigned fraction
+    // and the target scalar (economy_system.cpp § run_extraction). For the
+    // default hypothetical, wt_scalar is 1 and this reduces to the old `wf`.
+    const float wf = bc.workforce_assigned * wt_scalar;
 
     if (type == building_type::extraction_site)
     {
@@ -176,7 +191,30 @@ building_profit estimate_prospective_profit(const world& w, const recipe_registr
         // its remaining life at once, which is the ranking the player builds off.
         const std::vector<entity_id> members = placement_rules::stack_members(
             w, tile_id, building_type::extraction_site, target);
-        const int rank = static_cast<int>(members.size()) + 1;
+        // An existing subject is ALREADY in `members` (stack_members filters on
+        // tile/type/target only). Ranking it at size()+1 would charge it a step of
+        // BL-193 decay against itself, so it takes the rank it actually holds and
+        // is removed from the combined-draw loop below, which adds `nominal`
+        // separately.
+        // `members` is left INTACT so every other member keeps the rank its
+        // index implies; the subject is identified by id and skipped in the
+        // combined-draw loop below instead of being erased, because erasing it
+        // would silently renumber everyone after it.
+        entity_id self_id = null_entity;
+        int       rank    = static_cast<int>(members.size()) + 1;
+        if (existing)
+        {
+            for (std::size_t k = 0; k < members.size(); ++k)
+            {
+                const auto it = w.buildings.find(members[k]);
+                if (it != w.buildings.end() && &it->second == existing)
+                {
+                    self_id = members[k];
+                    rank    = static_cast<int>(k) + 1;
+                    break;
+                }
+            }
+        }
 
         const float nominal = econ.base_rate * tc.resource_deposit[ri] * wf
                               * (1.0f - tc.hazard_level)
@@ -189,6 +227,8 @@ building_profit estimate_prospective_profit(const world& w, const recipe_registr
         float combined = nominal;
         for (std::size_t k = 0; k < members.size(); ++k)
         {
+            if (members[k] == self_id)
+                continue; // already counted as `nominal` above
             const auto mit = w.buildings.find(members[k]);
             if (mit == w.buildings.end())
                 continue;
