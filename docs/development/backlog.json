@@ -8938,6 +8938,78 @@
    ],
    "summary": "unit_price is the supplier's live market price with no commitment discount, and delivery credits pool_for(buyer, SUPPLIER's body). Absent a processor there to reserve the stock, market clearing liquidates it that same tick at that same price. The buyer pays a deposit, waits a lead time, and ends where it started minus the deposit. Also: lead time is derived from a global processing constant that ignores the supplier entirely, so 100,000 units quoted 25,000 ticks, clamped to 400.",
    "design": "DESIGNED 2026-08-13, found by a player who completed twenty contracts and could not detect a single delivery.\n\n## Two faults that compound\n\n**The goods arrive where they cannot be used.** Delivery credits `pool_for(c.buyer, c.body)` where `c.body` is the SUPPLIER's body. The auto-surplus path then sells any pool stock the buyer has no processor reservation against — which, on a body the buyer has no facilities on, is all of it. A player ran twenty contracts, took delivery of 200 units of iron ore, and never saw a single pool fact at any tick, because each delivery was liquidated in the tick it landed.\n\n**And the price makes the round trip a guaranteed loss.** `unit_price` is read off the supplier's own market with no discount for the commitment, and the liquidation happens at that same market's price. So the buyer pays market price plus a forfeitable deposit, waits a lead time, and receives goods that convert straight back to cash at market price. A measured 20-unit iron round trip settled at exactly -0.14 credits: break-even minus friction, by construction.\n\n**Separately, the lead time is not about the supplier at all.** It is `base_lead_ticks * ceil(quantity / processing_facility.base_rate)` — a GLOBAL constant. A supplier with ten facilities quotes the same lead time as one with a single stalled site, and 100,000 units quotes 25,000 ticks (clamped to 400 by this session's overflow guard — a century of quarters, committed to with one line and no way to see the term before accepting).\n\n## PROPOSED FIX\n\nThree changes, and the first is the one that makes contracts worth signing at all.\n\n1. **Deliver to the BUYER's body**, not the supplier's — the buyer's HQ body, or a body named in the contract. Freight cost is the natural price of the distance, and the logistics layer already exists to charge it.\n2. **Give the contract a price that differs from spot.** A commitment should buy something: a discount for volume, a premium for speed, or a fixed price that hedges the market's movement. Today it is spot plus a deposit, which is strictly worse than buying on the market, so a rational agent never contracts.\n3. **Derive lead time from the SUPPLIER's actual capacity** — their facilities' throughput for the good — so the number means something and shopping on lead time becomes possible once BL-390 makes it visible.\n\nNote this item is the economics; BL-390 is the visibility. Both are needed: a contract that is a bad deal is a design problem, and a contract whose terms you cannot see is a different one."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-13",
+   "created": "2026-08-13",
+   "id": "BL-393",
+   "short_name": "UNITS_ARE_WRITE_ONLY_AND_INERT",
+   "category": "AI",
+   "title": "Units can be raised and then neither seen, moved, used nor safely orphaned — the military road ends one verb after it starts",
+   "priority": "A",
+   "difficulty": 3,
+   "version_goal": "v0.1.15",
+   "requires": [],
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "files": [
+    "src/world/corp_ai.cpp",
+    "src/world/construction.cpp",
+    "src/world/corp_command.hpp"
+   ],
+   "summary": "A player raised 25 units including a full industrial roster and found nothing to do with any of them. No blackboard predicate mentions units, so they cannot be read back. No verb takes a unit as a subject, so they are pinned to the muster tile forever. And demolishing the muster base silently orphans every unit standing on it.",
+   "design": "DESIGNED 2026-08-13, from a play session whose entire second half was unreachable.\n\n## Three separate gaps that together make the verb pointless\n\n**1. Write-only.** `export_corp_blackboard` has four sections and none concerns units. A corp can raise a unit and then has no way to confirm it exists, where it is, or how many it has. The player verified their own force by reading source.\n\n**2. No verb takes a unit.** `hire_unit` names a TILE; every other verb names a building, a body or an order. So a unit cannot be moved, merged, disbanded, garrisoned or ordered. It is created at a tile and stays there for the rest of the campaign.\n\n**3. Demolish orphans them.** `demolish_building` erases the muster base and its stockpile without touching `w.units`, so the units standing on it survive with a `position` pointing at a tile that no longer carries their base. Nothing cleans them up and nothing reports it.\n\n## What this item is NOT\n\nIt is not 'build the conflict layer' — that is BL-315, and the fact that `resolve_battle`'s only caller is the Era -1 sim (BL-384) is a bigger and separate problem. This item is narrower: the units that CAN be raised today are unobservable and unmanageable, and two of the three gaps are cheap.\n\n## PROPOSED FIX, and it is deliberately partial\n\nDo (1) and (3) now, leave (2) to the conflict spine.\n\n* **Export units** as `own_asset` facts — unit id, tile, type, count, strength — in BL-390's self-state section. A corp reading its own force engages no visibility rule.\n* **Decide what demolish does to garrisoned units** and do it explicitly: refuse the demolish while units stand there (`rejected_state`, cheapest and most legible), or disband them with an agency event. Either is fine; silently orphaning them is not.\n* **Leave unit movement alone.** A `move_unit` verb without a conflict layer to move toward is scope creep, and BL-315 should own the shape of unit command when it lands."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-13",
+   "created": "2026-08-13",
+   "id": "BL-394",
+   "short_name": "HIRE_IS_FREE_AND_UNBOUNDED_ON_THE_SEAM",
+   "category": "AI",
+   "title": "hire_unit costs nothing for the cheapest roster row and has no cap outside the scorer — a seam player can raise an unlimited free army",
+   "priority": "B",
+   "difficulty": 2,
+   "version_goal": "v0.1.15",
+   "requires": [],
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "files": [
+    "src/world/corp_command.cpp",
+    "src/world/unit_roster.cpp",
+    "scripts/economy.lua"
+   ],
+   "summary": "Roster row 0 (Levy Spear) has an all-zero gate, so debit_hire_cost tests nothing and debits nothing: 500 manpower for zero credits with no upkeep. A player raised ten in one tick. The only brake in the game is corp_ai's own budget (one hire per evaluation, three units held), which is a scorer policy rather than a rule, so it binds the AI and not a player on the seam.",
+   "design": "DESIGNED 2026-08-13, found in play.\n\n## The gap\n\n`debit_hire_cost` charges a roster row's gate. Row 0's gate is `{0,0,0,0}`, so nothing is tested and nothing is debited. There is no cash cost anywhere in `hire_unit`'s path, and no per-tick upkeep is applied to a raised unit by anything in `apply_budget`. A player raised ten units in a single tick, for nothing, and could have raised a thousand.\n\nThe reason this has never shown up is that the only actor exercising the verb until now was `corp_ai`, which caps itself at one hire per evaluation and three units held. That is a SCORER POLICY, expressed in `corp_ai_params`, not a rule of the game — so it binds the AI and does not bind a player, and the seam has just acquired players.\n\n**Same shape as BL-387 and NR-184 — the third instance this session.** A constraint that lived in the only caller looked like a rule until a second caller appeared.\n\n## PROPOSED FIX\n\nGive the roster a real cost floor: no row should hire for nothing, and the classical rows in particular should cost SOMETHING even if the gate is meant to be permissive. Author it in `economy.lua` beside the other roster data so it is a tuning change.\n\nThen decide whether standing forces cost upkeep. They currently do not, which means an army is a one-off purchase with no carrying cost — a strange shape for a game whose player is about to become a MERCENARY COMPANY (NR-177), where the tension between force size and payroll is close to the whole point. Flagged rather than decided here; it belongs with BL-377's contract loop."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-13",
+   "created": "2026-08-13",
+   "id": "BL-395",
+   "short_name": "RESULT_LINE_IS_UNTYPED_AND_REJECTIONS_ARE_OVERLOADED",
+   "category": "AI",
+   "title": "The seam's response says `building=` for units and orders, and returns rejected_invalid for failures that need different fixes",
+   "priority": "B",
+   "difficulty": 3,
+   "version_goal": "v0.1.13",
+   "requires": [],
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "files": [
+    "src/main.cpp",
+    "src/world/corp_command.cpp",
+    "src/world/corp_command.hpp"
+   ],
+   "summary": "Every COMMAND answers `building=<n>`, but a hire returns a UNIT id there and a sell order returns 0 (a valid entity id, not an absence). Separately, rejected_invalid covers four distinct causes on place_sell_order, three on hire_unit, and on the order= verbs cannot distinguish 'never existed' from 'already gone' from 'that id is a quote not a contract'. Every player independently reported navigating by trial and error as a result.",
+   "design": "DESIGNED 2026-08-13, from four play sessions that each hit it.\n\n## Two faults in the same channel\n\n**The out-param is untyped.** `RESULT ... building=<n>` is the whole return surface. A `hire_unit` puts a UNIT entity id in that field; `place_sell_order` and `request_quote` put nothing and it reads 0, which is a syntactically valid entity id rather than a recognisable absence. An agent parsing this cannot tell what kind of thing it just made, or whether it made one.\n\n**The rejection is under-resolved.** `rejected_invalid` covers, on `place_sell_order` alone: no such body, that body has no market, that market does not price the resource, and malformed quantity/floor. On `hire_unit`: bad roster index, row not currently available, and non-existent tile — three different fixes, one code. On `accept_quote`/`cancel_contract`: the id never existed, the id names the other kind of record, and the contract completed and was erased.\n\nThat last one is the worst in practice. A player's id bookkeeping drifted by one, and the seam could not tell them the difference between 'wrong id' and 'already finished' — which are opposite situations calling for opposite responses.\n\n## Why it matters more here than in a UI\n\nAI_OPPONENT.md section 10a names typed, enumerated failure as the property that lets an out-of-process policy correct itself. A UI can render four different messages from one code because a human reads the surrounding screen; an agent has only the code. This session already fixed one instance of exactly this (the four BL-350 declines collapsed into rejected_invalid) and these are the remainder.\n\n## PROPOSED FIX\n\n* Replace `building=` with a typed pair — `result=applied kind=unit id=34912` / `kind=order id=42` / `kind=none` — so the response says what it made. This changes the wire format, so bump whatever the protocol's version marker becomes and update smoke.js and the dictionary together.\n* Split `rejected_invalid` where the causes call for different responses. `rejected_no_market`, `rejected_unpriced`, `rejected_not_found` and `rejected_unavailable` would cover every case reported above, and `corp_command_result` is append-only so adding them is safe.\n* Fold in the three smaller legibility findings while in here: `survey` accepts and CHARGES FOR the star (three players hit it; `dispatch_survey` never checks `body_type::star`), `set_workforce` is accepted on a military base that staffs at zero by design, and `request_quote`'s `subject` is accepted and never read."
   }
  ]
 }
