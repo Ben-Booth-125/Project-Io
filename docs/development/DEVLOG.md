@@ -178,8 +178,77 @@ was adjudicated the way SPRINTS.md prescribes rather than by inspection — a th
 no record anywhere before today; NR-186 now carries all of them, and argues the `history_sim` six
 are the priority, because NR-177's refocus makes that sim the ancient product's *generator*.
 
-**Runtime.** ~4.5 h, Full mode (research sweep, two strands, one new committed check, one hypothesis
-measured and discarded, one adversarial review pass that changed the outcome).
+---
+
+### Second phase, same session — the review queue, then AI play
+
+**The queue first.** Worked the AI/seam/tier cluster: open entries **64 → 49**. Five closed on work
+already done, two advanced as standing practices, three consolidated (NR-143/145/171 were one
+finding filed three times), and **two were refuted rather than resolved** — NR-129 asked for a guard
+that already existed in the very commit it reviewed, and NR-171's "climbs ~1.25/tick, possibly
+unbounded" is disproved by a 4000-tick trace showing dead-flat counters for 3000 ticks.
+
+**NR-180 was the priority and the answer was neither option it offered.** Supply and demand are not
+a stock/flow blunder — both are zeroed together each tick. The ratio is a non-measure anyway:
+`clear_markets` is an unconditional buyer of last resort so supply is unbounded by demand *by
+construction*; only 12 of 42 resources have a standing consumer and **no raw ore has one**; and the
+two sides are authored three orders of magnitude apart, with measured maximum demand (8.25) sitting
+at the population basket's structural ceiling (7.5). The gate is **inverted** — `demand <= 0` returns
+"no penalty", and those are the real gluts. It also suppresses inter-body **convoy dispatch**, which
+gates on `demand − supply > 0`, corroborated by `data_creep`'s own coverage note. Filed as **BL-381**
+with a proposed fix: score the glut off the resolved **price**, which is bounded, defined for every
+priced good, and already public.
+
+**The tier went four reds to one.** Three were stale harnesses encoding rules the code had
+deliberately changed; each is fixed and each restored a check that was testing nothing. The fourth
+is **BL-384**: `history_sim` fights 267 battles and takes **zero** provinces across 1960 years, with
+no assertion covering conquest count — which is exactly why six red assertions never surfaced it,
+and one of the six passes *vacuously*. NR-177 makes that sim the ancient product's generator.
+
+**Then Ben's steer, and it paid immediately.** *"Pushing for AI play will expose more bugs and give
+us actionable improvements now."* Recorded as § 10h and acted on: `tools/mcp/session.js` (the play
+driver — batch-shaped, because determinism makes appending a move and re-running a byte-identical
+replay), then five agents given the seam and an agenda.
+
+**Eleven of the session's seventeen filed items came from play**, on code that had already been read,
+instrumented, and put through four adversarial review lenses the same day.
+
+Two are priority **S**. **BL-386** — a sell order's floor price is `max(ref, floor)`, credited with
+no counterparty and no cap; listing at `1e12` reached cash 1.587e17. Independent triage found the
+matched-trade loop *twelve lines above* correctly debits the buyer: one path was written as a market
+and the other as a wish. It also **resolves NR-144** — the AI lists at `base_price` while the market
+sits pegged at `0.25 × base`, so every rival unit sold earns 4× the market rate from nothing. NR-144
+had concluded the scorer was probably innocent; it was, and the market was not. **BL-387** —
+`apply_corp_command` never checks the caller may act *as* the corp it names; a player drove rivals
+and moved their balances by tens of millions.
+
+**The pattern worth keeping.** Three findings are the same shape — a constraint that lived in the
+only caller and looked like a rule until a second caller appeared. NR-184 (float validation assumed
+a UI that cannot emit NaN), BL-387 (`cmd.corp` was never attacker-controlled because the scorer set
+it), BL-394 (`hire_unit` has no cost or cap; the only brake is `corp_ai_params`, a *scorer policy*).
+Three instances is a rule: **the AI-facing seam is an untrusted input boundary in a way the internal
+caller never was, and validation written for a trusted caller does not transfer.**
+
+**What the players could not do was as informative as what broke.** No processing facility produced
+a single unit across ~80 building-ticks — `--serve` never loads `world_gen.lua` so coal has no price
+(**BL-389**), and `build` silently discards its recipe so every seam-built processor is a steel
+smelter anyway (**BL-388**). The procurer swept 26 suppliers and could not *compare* them, because
+`request_quote` returns neither id nor price (**BL-390**). The militarist raised 25 units and found
+no verb that takes a unit as a subject (**BL-393**).
+
+**Play corrected two dictionary entries written earlier the same day** — `request_quote`'s `subject`
+is not "context rather than a constraint", it is not read at all; and `place_sell_order` was telling
+agents `floor_price` is a reservation price while the engine pays it as a bonus. Both now carry the
+defect and name the item that will remove the caveat.
+
+**Fixes were filed, not landed**, per Ben's instruction to propose in the backlog. BL-386 in
+particular will move every economy golden and should cut AI net worth by roughly the tripling NR-144
+recorded — that fall is the fix working.
+
+**Runtime.** ~7 h, Full mode (research sweep; two build strands; two committed checks; one hypothesis
+measured and discarded; an adversarial review pass that changed the outcome; a review-queue sweep
+taking open entries 64 → 49; and a five-agent play session that found eleven of the day's seventeen
+filed items).
 
 ---
 
