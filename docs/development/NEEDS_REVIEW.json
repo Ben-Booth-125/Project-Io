@@ -2956,6 +2956,113 @@
     "src/world/components.hpp"
    ],
    "resolution": "ANSWERED (Ben, 2026-08-12, Q&A form) — four rulings, plus his stated reason. REASON: 'When making your ideal game, you should first focus on a smaller project with similar design.' The ancient game is therefore a deliberate practice product, not an abandonment of the space game. (1) RELATIONSHIP: stash the space work on a branch, build ancient as its own product, merge back for DLC — NOT the recommended re-anchor. (2) PLAYER IDENTITY: a mercenary company — the militia ancestor, hired force plus its own supply. This is NOT a third identity pivot; it is BL-094's national private militia one era earlier, same shape (procure force, field it, be paid), so the identity settled on 2026-08-10 is being TESTED rather than replaced. (3) GRAIN: tile and fine tick — keep today's campaign grain and rebuild the ancient content onto it. CONSEQUENCE, and it is counterintuitive: history_sim does NOT become the play layer. It stays the GENERATOR with its stop_year moved from 1960 to ~0 CE, which makes generation cheaper rather than more expensive. (4) RELEASE BAR: commercial release, Steam or itch, paid, needing polish and content depth. CONSEQUENCES STILL OWED, none of them settled by this entry: the conflict spine (BL-315) moves from v0.3.0 groundwork onto the critical path, because a mercenary company's core loop is built entirely on the pillar CONCEPT.md still calls the least-designed and which nothing in the campaign layer commands; the mercenary SELL side (who contracts you, on what terms, win/lose consequences) has no item at all, where procurement.cpp is only the buy side; the product needs a name, since Io is a moon of Jupiter; and ROADMAP.md, CONCEPT.md and ERAS.md all still assert the current arc. Landing those is work, to be filed as backlog items rather than carried here."
+  },
+  {
+   "id": "NR-178",
+   "title": "The rival AI's idle/resume pair was a measured limit cycle — three fixes cut it ~30-56%, and the residual is a two-tier estimator disagreement",
+   "raised": "2026-08-13",
+   "kind": "observation",
+   "status": "open",
+   "source": "2026-08-13 AI gameplay session; measured with tools/verify/ai_skill_harness.cpp before and after.",
+   "what": "ai_skill_harness's action tally showed `resume` outnumbering every other verb roughly 10:1 (134-255 resumes per 30-tick rollout against 12-17 idles, 3-6 builds). Root cause: the BL-079 reflex tier (economy_system.cpp) and the BL-202 strategic tier (corp_ai.cpp) both own building_component.decommissioned, used DIFFERENT profit estimators, and the reflex tier set no ai_cooldown when it idled — so a resume could reverse an 8-tick-loss idling on the very next evaluation. Three fixes landed: (1) the resume candidate now scores with estimate_prospective_profit, the exact mirror of the idle candidate's estimate_building_profit, instead of a hand-rolled revenue-minus-wages formula that omitted maintenance, input cost, stack decay and the depletion taper; (2) the reflex tier now sets ai_cooldown when it idles, the hold AI_OPPONENT.md's hysteresis section already specifies for any state change; (3) the harness now counts the reflex tier's own idlings, which issue no command and so appeared in no action[] row. Measured effect across seeds 0-3: resume 134->59, 178->129, 193->126, 153->84 (-30% to -56%); set_workforce roughly doubled (10-18 -> 24-38) because fix (2) in NR-179 unblocked the other direction; net worth up 0.5-0.9%; solvency, survival and determinism unchanged (R0 byte-identical).",
+   "why_it_matters": "Two things Ben should see. First, the fix is real but PARTIAL — with the reflex tier's idlings now visible, resumes are still ~85% of total idlings (seed 1: 129 resumes against 137+6=143 idlings), so the cycle is damped, not broken. Breaking it means making the two tiers agree, which is a design call: either the reflex tier routes through apply_corp_command (it predates the seam and mutates components directly), or its realised-profit trigger and the strategic tier's modelled-profit trigger are reconciled. Both move every blessed golden, so neither belongs in a session that was not scoped for it. Second, this is what a legibility surface is for — the AI's dominant behaviour for an unknown number of sprints was reversing its own decisions, and nothing said so until the instrument was asked to name every verb.",
+   "options": [
+    "Route the BL-079 reflex tier through apply_corp_command so both tiers share one seam, one cooldown and one decision log — the largest fix, and the one that makes the AI's whole behaviour visible in the ring.",
+    "Reconcile the triggers instead: give the reflex tier the same estimator the strategic tier resumes on, so a building is never idled by one number and resumed on another.",
+    "Accept the damped cycle and band it — add a golden asserting resumes stay under some multiple of idlings, so the ratio cannot silently regress further.",
+    "Leave as landed and revisit when the 0 CE refocus settles what the rival AI is even for."
+   ],
+   "recommendation": "Option 3 now, option 1 when the corp-AI arc is next opened. The ratio band is cheap, it makes the residual a tracked number rather than a remembered anecdote, and it is the only one of the four that does not move goldens. Option 1 is the right structural answer but it is a corp-AI-arc-sized change, and NR-177's refocus means the arc's purpose is itself in question.",
+   "files": [
+    "src/world/corp_ai.cpp",
+    "src/world/economy_system.cpp",
+    "tools/verify/ai_skill_harness.cpp",
+    "docs/ai/AI_OPPONENT.md"
+   ]
+  },
+  {
+   "id": "NR-179",
+   "title": "The AI's workforce dial could only ever move in one direction per building — the gain estimate took its sign from the wrong quantity",
+   "raised": "2026-08-13",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "2026-08-13 AI gameplay session; found by reading corp_ai.cpp's dial block against solve_workforce_target.",
+   "what": "BL-202's set_workforce candidate estimated the gain of moving the dial as `variable * (proposed - target) / target`, where `variable = revenue - input_cost - wages`. That takes its SIGN from `variable`, not from the model: on a profitable building the term is positive so only proposed > target could clear the hysteresis gate, and on a loss-maker only proposed < target could. But solve_workforce_target (BL-181) grid-searches 0-200 for an INTERIOR optimum against the market's price response, and routinely returns a LOWER target for a profitable, overstaffed building — exactly the case the estimate discarded. DECISION TAKEN on Ben's behalf: solve_workforce_target gained an optional out_gain parameter reporting its own modelled net at the chosen target minus its modelled net at the building's current target, and the scorer now uses that. The solver already computed both numbers; nothing new was modelled, and the per-candidate net computation was hoisted into a lambda so the incumbent target is priced by the identical model.",
+   "why_it_matters": "It is a signature change on an exported function (economy_system.hpp), which is why it is recorded rather than treated as a one-line fix — the default argument keeps every existing caller source-compatible, and the player path (economy_system.cpp's BL-181 auto-solve) passes no out_gain and is unaffected. The behavioural effect is real: set_workforce roughly doubled across the benchmark seeds (10-18 -> 24-38 per rollout) as the previously-discarded direction became scoreable. Worth a second opinion on whether doubling the dial rate is desirable or whether the hysteresis margin should tighten to compensate — the thrash ceiling still passes, but it was blessed against the broken behaviour.",
+   "options": [
+    "Keep as landed — the solver's own objective is the honest gain and the ceiling still passes.",
+    "Keep the fix but raise theta for the workforce dial specifically, so the corrected estimate does not simply buy twice as many dial actions.",
+    "Revert and treat the one-directional dial as intended conservatism."
+   ],
+   "recommendation": "Keep as landed. The dial is now solving the problem BL-181 built the solver for, and a dial that moves twice as often but toward a real optimum is not thrash — the thrash number to watch is resume (NR-178), not this one.",
+   "files": [
+    "src/world/economy_system.hpp",
+    "src/world/economy_system.cpp",
+    "src/world/corp_ai.cpp"
+   ]
+  },
+  {
+   "id": "NR-180",
+   "title": "BL-203's predictive spending is bimodal in practice, not graded — the taper band has zero occupancy because market demand runs 2-3 orders of magnitude below supply",
+   "raised": "2026-08-13",
+   "kind": "question",
+   "status": "open",
+   "source": "2026-08-13 AI gameplay session; measured from --export-blackboard all --ticks 30 on the default seed.",
+   "what": "forecast_glut_multiplier is designed as a graded taper: no penalty at supply/demand <= glut_taper_ratio (1.0), linear taper to a veto at glut_veto_ratio (2.0). Measured against a real 30-tick rollout, it is a coin flip between OFF and VETO instead. Of one rival's 64 (market, resource) supply slots at tick 30: 6 carry both supply > 0 and demand > 0, and ALL SIX sit at supply/demand between 78 and 339 — every one at or past the veto threshold; 5 carry supply with demand == 0, where the design deliberately applies no penalty at all (the AI cannot forecast against a fact it cannot see); the taper band between 1.0 and 2.0 has ZERO occupancy. Across all corps the same shape holds: 1728 demand facts of which 324 are non-zero with a maximum of 8.25, against supply reaching 15,141. This was found by trying to damp the NR-178 idle/resume cycle with the same forecast and measuring no change whatsoever on any of the five benchmark seeds — the change was reverted rather than kept as an unverified behaviour change.",
+   "why_it_matters": "AI_OPPONENT.md section 4 calls the Victoria-3 predictive-spending model 'the single most important design import' and section 2B describes a taper. What is actually running is a binary gate, and which way it falls is decided by whether a demand aggregate happens to be non-zero rather than by any economic reasoning. That plausibly explains the AI's very low build rate (3-6 builds per 30-tick rollout across ten corps). The prior question is not an AI question at all: why does market demand max out around 8 while supply reaches 15,000? Either the two aggregates are not commensurable (a per-tick flow compared against a stock would produce exactly this), in which case the ratio is meaningless and the veto is firing on a unit error, or the world genuinely has almost no demand and the economy is the thing to look at. Both readings make the current veto wrong; they differ in what to fix.",
+   "options": [
+    "Check commensurability first — establish what market_component.supply and .demand each accumulate per tick before touching any AI threshold. If they are flow-vs-stock the fix is in market_clearing, not corp_ai.",
+    "Re-scale glut_taper_ratio / glut_veto_ratio to the observed distribution so the taper band actually spans real ratios.",
+    "Treat demand == 0 as a veto rather than a pass, inverting the current 'cannot see it, so no penalty' rule.",
+    "Leave it — the AI is solvent and survives, so the gate's shape is not currently costing anything visible."
+   ],
+   "recommendation": "Option 1, and nothing else until it is answered. Re-scaling thresholds against a ratio that may be a unit error would bake the error into the AI's tuning, and this is exactly the pattern SPRINTS.md records overturning four times last sprint — the plausible story (the AI is cautious) and the measured cause (the comparison may not be a comparison) point at different files.",
+   "files": [
+    "src/world/corp_ai.cpp",
+    "src/world/market_clearing.cpp",
+    "docs/ai/AI_OPPONENT.md",
+    "docs/economy/MARKETS.md"
+   ]
+  },
+  {
+   "id": "NR-181",
+   "title": "ai_skill_harness could not name six of the fifteen corp verbs, and its thrash ceilings were blessed against the thrashing behaviour they exist to catch",
+   "raised": "2026-08-13",
+   "kind": "observation",
+   "status": "open",
+   "source": "2026-08-13 AI gameplay session.",
+   "what": "The harness's verb_name switch stopped at hire_unit, so the BL-293 order-book verbs, set_workforce_auto and the three BL-350 procurement verbs all pooled into a single action[?] row — 7-8 actions per rollout that turned out to be place_sell_order, i.e. the AI's entire trading behaviour was unnamed in its own skill instrument. Fixed: the switch is now exhaustive over corp_verb, so -Wswitch guards it the next time the seam grows. Separately, the dial-thrash ceilings (230-410 per seed) pass comfortably against rollouts containing 134-255 resumes, because they were blessed FROM a run of the thrashing behaviour — the detector certifies the defect it was built to find.",
+   "why_it_matters": "Both are the same failure in different clothes: a golden blessed from observed behaviour encodes whatever the behaviour was, including its bugs, and a tally that cannot name a verb cannot band it either. The project's convention that goldens are disposable and re-blessed routinely is right, but it means the blessing moment is the only point where anyone asks whether the observed number is the number that SHOULD be observed, and for these ceilings nobody did. Worth a rule rather than a one-off fix: a thrash ceiling in particular should be argued from the action budget (corps x evals x max_dials) rather than blessed from a run.",
+   "options": [
+    "Derive the dial ceiling from the budget arithmetic instead of blessing it from a run, so it binds on the first regression rather than the second.",
+    "Add the resume-to-idle ratio as its own banded metric (see NR-178 option 3).",
+    "Leave the ceilings as observation-blessed and rely on the printed tally being read by a human each time."
+   ],
+   "recommendation": "Options 1 and 2 together, next time the corp-AI arc is opened. Neither is urgent, and both are cheap once someone is already re-blessing this file.",
+   "files": [
+    "tools/verify/ai_skill_harness.cpp"
+   ]
+  },
+  {
+   "id": "NR-182",
+   "title": "The action dictionary is four verbs behind the seam it is transcribed from — hire_unit and the three procurement verbs have no entry",
+   "raised": "2026-08-13",
+   "kind": "observation",
+   "status": "open",
+   "source": "2026-08-13 AI gameplay session, found while repairing the --serve seam.",
+   "what": "docs/ai/ACTIONS.json's gameplay family holds 11 entries against corp_command.hpp's 15 verbs. Missing: hire_unit (BL-324), request_quote, accept_quote and cancel_contract (BL-350). CLAUDE.md's own rule for this store is explicit — the gameplay entries are TRANSCRIBED from corp_command.hpp rather than authored, and 'where the dictionary and the seam disagree, the dictionary is wrong and the fix is mechanical'. Not fixed in this session because the entries are not in fact mechanical: each needs its real `press` (the UI path a player actually takes) and its `reason_to_select`, and writing those from the header alone would invent a UI that may not exist. The seam-side repair this session DID land, so all fifteen verbs are now reachable on the wire and only their documentation lags.",
+   "why_it_matters": "AI_OPPONENT.md section 10a names the dictionary as the MEANING leg of the word interface, next to the blackboard (read) and the command seam (write). A verb absent from it is a verb an out-of-process policy is never told exists — so the practical effect of this gap is identical to the wire-level gap that was just fixed, one layer up. It is also the second time the same failure has appeared in one session: the seam grew, and three separate consumers (the --serve parser, ai_skill_harness's verb tally, this dictionary) each silently kept describing the older, smaller seam.",
+   "options": [
+    "Write the four entries properly, which means first establishing whether hire_unit and the procurement verbs have a player-facing press at all — if they do not, that is itself the finding and the entries should say so.",
+    "Add a generated consistency check that fails when ACTIONS.json's gameplay family and corp_verb disagree — the mechanical half, without authoring prose.",
+    "Both: the check now, the prose when the verbs get their UI."
+   ],
+   "recommendation": "Option 3, and note that option 2 is deliberately a CHECK rather than a generator. Ben's standing ruling on this store is that enforcement is authorship, not machinery ('the docs are the audit, we don't need an audit method', 2026-08-01) — that ruling was about not auto-verifying the question_log's prose, and a count mismatch against an enum is a different thing from grading wording. Worth confirming he reads it the same way before building it.",
+   "files": [
+    "docs/ai/ACTIONS.json",
+    "docs/ai/ACTIONS.md",
+    "src/world/corp_command.hpp"
+   ]
   }
  ]
 }

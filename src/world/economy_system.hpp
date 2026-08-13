@@ -187,6 +187,20 @@ float extraction_nominal(const world& w, const recipe_registry& reg,
 ///                   exactly as `run_extraction` does — without it the dial was
 ///                   maximised against a curve a stacked site never realises
 ///                   (BL-346). 1 (the default) is a lone site.
+/// @param out_gain Optional. Receives the solver's OWN modelled net at the
+///                 returned target minus its modelled net at `b.workforce_target`
+///                 — i.e. what moving the dial is actually worth, in the same
+///                 units and from the same model that chose the target. >= 0 by
+///                 construction (the solver maximises).
+///
+///                 It exists because the caller cannot reconstruct this. BL-202's
+///                 scorer approximated it as `variable * (proposed − target)/target`
+///                 with `variable = revenue − inputs − wages`, which takes its SIGN
+///                 from `variable` rather than from the model: a profitable building
+///                 could then only ever be scored for raising its target and a
+///                 loss-maker only for cutting, so every dial the solver found in
+///                 the other direction — the interior optimum it exists to find —
+///                 scored negative and was silently discarded.
 int solve_workforce_target(const world& w, const recipe_registry& reg,
                            const building_component& b, float contention,
-                           int stack_rank = 1);
+                           int stack_rank = 1, float* out_gain = nullptr);

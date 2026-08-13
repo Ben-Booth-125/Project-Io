@@ -539,27 +539,72 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             if (b.decommissioned)
             {
                 // Resume: would this asset make money if it ran again?
-                if (b.type == building_type::extraction_site)
+                //
+                // This MUST use the same estimator the idle decision uses, or the
+                // two fight. It used to hand-roll revenue − wages: no maintenance,
+                // no input cost, no stack decay, no depletion taper, no supply
+                // response. That reads high on exactly the buildings the reflex
+                // tier (economy_system.cpp's BL-079 block) has just idled on
+                // `estimate_building_profit`'s fuller number, so the scorer
+                // resumed what the reflex had idled and the pair oscillated —
+                // measured at 134–255 resumes against 12–17 idles over 30 ticks
+                // in ai_skill_harness, ~10x every other verb combined.
+                //
+                // `estimate_prospective_profit` (BL-162) is the existing answer to
+                // "what would this earn if it ran": a pure read producing the same
+                // building_profit fields `estimate_building_profit` reports, so the
+                // two sides of the idle/resume pair finally compare like with like.
+                // No new oracle — the standing § 5 rule.
+                //
+                // The build candidate above deliberately does NOT use it (see its
+                // own note): there the divergence is cosmetic and switching would
+                // move every blessed golden for no behavioural gain. Here the
+                // divergence IS the defect, so the same argument points the other
+                // way. Processors are now resumable too — the old branch was
+                // extraction-only, so an idled processing facility stayed idled
+                // for the rest of the campaign.
+                //
+                // Dropping the type filter is safe by arithmetic, not by luck.
+                // estimate_prospective_profit models revenue for extraction_site
+                // and processing_facility only; every other type gets revenue 0,
+                // so the gain below reduces to −wages — zero for port and
+                // inland_logistics_hub (which staff at 0.0) and negative for the
+                // rest. Neither clears `margin_gate`, so no candidate is ever
+                // enumerated for a building whose output this estimator cannot
+                // price. Infrastructure therefore still cannot be resumed on
+                // profit grounds, exactly as before this change; that it also
+                // cannot be resumed on REACH grounds is a real gap, but an older
+                // and separate one.
+                const building_profit pp = estimate_prospective_profit(
+                    w, reg, b.tile, b.type, b.target_resource, b.recipe);
+                if (pp.has_data)
                 {
-                    const auto tit = w.tiles.find(b.tile);
-                    if (tit != w.tiles.end())
+                    // Exact mirror of the idle gain below. Idle is worth
+                    // −maintenance (maintenance is paid either way); running is
+                    // worth pp.net(). So resuming gains pp.net() − (−maintenance).
+                    const float gain = pp.net() + pp.maintenance;
+
+                    // NOT glut-forecast. Tried and reverted 2026-08-13: adding
+                    // forecast_glut_multiplier here (mirroring the build path)
+                    // moved not one number on any of the five benchmark seeds,
+                    // because the forecast is bimodal on this world rather than
+                    // graded — measured at tick 30, every (market, resource) slot
+                    // carrying a demand signal sits at supply/demand 78–339
+                    // against a veto ratio of 2.0, and the rest carry no demand
+                    // signal at all, so the taper band (1.0–2.0) has zero
+                    // occupancy. It would therefore hard-veto resumes wherever it
+                    // bound at all, which is a behaviour change with no evidence
+                    // behind it. See the review queue for the underlying
+                    // supply/demand question, which is the thing to settle first.
+                    if (gain > margin_gate)
                     {
-                        const std::size_t ri = static_cast<std::size_t>(b.target_resource);
-                        const building_economics& e = reg.economics(b.type);
-                        const float rev = e.base_rate * tit->second.resource_deposit[ri] *
-                                          b.workforce_assigned * (1.0f - tit->second.hazard_level) *
-                                          local_price(w, b.tile, ri);
-                        const float gain = rev - e.base_wage * b.workforce_assigned; // maint paid either way
-                        if (gain > margin_gate)
-                        {
-                            candidate c;
-                            c.cmd.tick = tick; c.cmd.corp = corp;
-                            c.cmd.verb = corp_verb::resume; c.cmd.subject = bid;
-                            c.score = gain * jitter;
-                            c.reason = corp_decision_reason::dial_resume;
-                            c.bucket = bucket_for_reason(c.reason);
-                            cands.push_back(c);
-                        }
+                        candidate c;
+                        c.cmd.tick = tick; c.cmd.corp = corp;
+                        c.cmd.verb = corp_verb::resume; c.cmd.subject = bid;
+                        c.score = gain * jitter;
+                        c.reason = corp_decision_reason::dial_resume;
+                        c.bucket = bucket_for_reason(c.reason);
+                        cands.push_back(c);
                     }
                 }
                 continue; // an idled building offers no other dial
@@ -588,14 +633,16 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             if (b.type == building_type::extraction_site ||
                 b.type == building_type::processing_facility)
             {
-                const int proposed = solve_workforce_target(w, reg, b, 1.0f);
+                // The solver reports its own gain (BL-181 model, both endpoints).
+                // The previous estimate took its sign from `revenue − inputs − wages`
+                // rather than from the model, so it could only ever score RAISING a
+                // profitable building's target and CUTTING a loss-maker's — the
+                // interior optimum the solver exists to find scored negative in both
+                // directions and was discarded.
+                float     gain     = 0.0f;
+                const int proposed = solve_workforce_target(w, reg, b, 1.0f, /*stack_rank=*/1, &gain);
                 if (proposed != b.workforce_target && bp.has_data)
                 {
-                    // The variable part of net (revenue − inputs − wages) scales
-                    // ~linearly with the target; maintenance's fixed part does not.
-                    const float variable = bp.revenue - bp.input_cost - bp.wages;
-                    const float cur      = std::max(10.0f, static_cast<float>(b.workforce_target));
-                    const float gain     = variable * (static_cast<float>(proposed) - static_cast<float>(b.workforce_target)) / cur;
                     if (gain > margin_gate)
                     {
                         candidate c;

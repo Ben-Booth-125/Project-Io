@@ -10,7 +10,108 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — BL-130 lands: BL-365's blocker chain closed, and a live crash caught in passing (2026-08-11, latest)
+## Session — AI gameplay: the word interface made runnable, and the rival's idle/resume oscillation measured (2026-08-13, latest)
+
+Full mode. Two strands, both under the v0.2.0 AI-opponent theme: the `--serve` word interface an
+out-of-process agent plays through, and the deterministic scorer that is the shipped rival.
+
+**Framing first, because it changed what was worth building.** A SOTA refresh (the last sweep was
+2026-08-03) found the external field essentially static for strategy-game agents in that window —
+Vox Deorum presented at FDG '26 and shipped a diplomacy layer over its planner, and no new 4X
+agent paper landed at all. What did move sits underneath: the **constraint-tax finding that
+§ 10g's ruling partly rests on has been reframed**. "Capacity, Not Format" locates the penalty in
+a model's *spare capacity* rather than in the output format, and reasoning-before-structure APIs
+largely remove it. The ruling stands, but on its other legs — the behavioural-cloning ceiling and
+legibility — and the stronger contemporary argument is **multi-turn** tool-call accuracy, where the
+small-model class Io targets still scores 35–56% on BFCL v4. Recorded so the ruling's basis stays
+honest rather than quietly resting on a superseded number.
+
+**Strand 1 — BL-278's seam was landed on paper and unrunnable in practice.** It was smoke-tested
+once by hand on the day it landed and never again, and five defects had accumulated since, none of
+which had ever failed a run because nothing re-ran it. `tools/mcp/server.js` spawned
+`build/ProjectIo.exe`, which the primary (Linux) target never produces — **the MCP server could not
+start on the main dev platform at all**. The `COMMAND` opcode parsed nine argument keys while the
+enum had grown three verb families past it (BL-324 hire, BL-293 order book, BL-350 procurement), so
+**six of fifteen verbs were unreachable**, not partly supported. `corp_command_result_name` had no
+cases for BL-350's four declines, so "the supplier holds no capacity" and "you are embargoed"
+both reached an agent as *your arguments are malformed* — which removes exactly the typed-failure
+property § 10a leans on. `run_serve` never called `advance_surveys`, so `survey` was an applicable
+verb whose effect never arrived and no tile was ever revealed for `build` to target; the tick
+sequence was duplicated verbatim between the warm-up loop and the `TICK` opcode, which is how the
+step came to be missing from *both*. And nothing on the protocol yielded a **body id**, though
+`survey`, `place_sell_order` and `request_quote` all take one — the blackboard keys market facts by
+*market* id, so an agent could read a price on a body it had no way to sell into.
+
+All five fixed. New `BODIES` opcode and `list_bodies` tool (seven tools now), the exact sibling of
+NR-061's `list_corps` and filed for the same reason. New **`tools/mcp/smoke.js`**, committed rather
+than run ad hoc: it drives the raw line protocol and asserts *shape* — every opcode answers, all
+fifteen verbs reach the seam and return a code that is genuinely in `corp_command_result`, a
+well-formed sell order is distinguishable from a malformed one. It found the body-id gap on its
+first run, which is the argument for having written it.
+
+**Strand 2 — the rival AI's dominant behaviour was reversing its own decisions.** `ai_skill_harness`
+could not name six of the fifteen verbs (its `verb_name` switch stopped at `hire_unit`, pooling the
+AI's entire trading behaviour into an unnamed `action[?]` row). Making it exhaustive exposed the
+real signal underneath: **`resume` outnumbered every other verb about 10:1** — 134–255 resumes per
+30-tick rollout against 12–17 idles and 3–6 builds.
+
+Two causes, both structural. The **reflex tier and the strategic tier own the same
+`decommissioned` flag and neither knew the other existed** — BL-079's block idles a building
+directly on the component and set no `ai_cooldown`, so BL-202's scorer could reverse an eight-tick-
+loss idling on its very next evaluation. And **the two sides used different estimators**: idle
+scored on `estimate_building_profit` while resume hand-rolled revenue-minus-wages with no
+maintenance, no input cost, no stack decay and no depletion taper, so it read high on precisely the
+buildings the reflex tier had just idled. Resume now scores on `estimate_prospective_profit`, the
+exact mirror — which also makes idled **processors** resumable, something the extraction-only
+branch never allowed — and the reflex tier sets the cooldown its own state change always warranted.
+
+A third, independent defect in the same block: **the workforce dial could only ever move one way per
+building.** Its gain was `variable × (proposed − target) / target` with `variable = revenue − inputs
+− wages`, taking its *sign* from `variable` rather than from the model — so a profitable building
+could only be scored for raising its target and a loss-maker only for cutting one, and the interior
+optimum `solve_workforce_target` exists to find scored negative in both directions and was
+discarded. The solver now reports its own modelled gain through an optional out-param; it already
+computed both endpoints.
+
+**Measured, across seeds 0–3:** resume 134→59, 178→129, 193→126, 153→84. Dial actions roughly
+doubled (10–18 → 24–38) as the unreachable direction became scoreable. Net worth up 0.5–0.9%,
+solvency and survival unchanged, determinism byte-identical (R0 green).
+
+**It is damped, not cured, and the harness now says so.** The reflex tier issues no commands, so its
+idlings appeared in no `action[]` row and the oscillation was unreadable from this instrument at
+all; counting them (`reflex_idles`, printed but deliberately unbanded) shows resumes are still ~85%
+of total idlings. Closing it means making the two tiers agree, which moves every blessed golden and
+is a corp-AI-arc-sized change, not a session one.
+
+**One hypothesis raised and killed by measurement.** The residual looked like a price-response limit
+cycle — idle, price recovers, resume, price collapses — so BL-203's glut forecast was applied to the
+resume candidate. It moved **not one number** on any of the five seeds. The reason is the finding:
+the forecast is **bimodal, not graded**. At tick 30 every `(market, resource)` slot carrying a demand
+signal sits at supply/demand between **78 and 339** against a veto ratio of 2.0, and the rest carry
+no demand signal at all, where the design deliberately applies no penalty — the taper band between
+1.0 and 2.0 has **zero occupancy**. So the Victoria-3 import § 4 calls "the single most important
+design import" is running as a coin flip between off and veto. The change was reverted rather than
+kept as an unverified behaviour change, and the prior question — why does market demand max out
+around 8 while supply reaches 15,000? — is filed as the thing to settle first, because it may be a
+commensurability error in `market_clearing` rather than an AI-tuning problem at all.
+
+**Deliberately not built.** Nothing frame-specific for the 0 CE mercenary refocus. BL-377
+(mercenary contracts) is design-only and requires BL-315 (conflict spine), which is design-owed at
+v0.3.0 behind BL-094 (governing body); anything built against that today is a bet on unlanded
+design. The seam repaired here is the frame-agnostic layer — opcodes, argument forwarding, typed
+rejections, a smoke check — that a mercenary verb plugs into when one exists.
+
+**Review queue.** Five entries filed as the work happened (NR-178 the oscillation and its residual,
+NR-179 the workforce-dial signature change taken on Ben's behalf, NR-180 the bimodal forecast and
+the supply/demand question under it, NR-181 goldens blessed from the behaviour they exist to catch,
+NR-182 the action dictionary running four verbs behind the seam it is transcribed from).
+
+**Runtime.** ~3 h, Full mode (research sweep, two strands, one new committed check, one hypothesis
+measured and discarded).
+
+---
+
+## Session — BL-130 lands: BL-365's blocker chain closed, and a live crash caught in passing (2026-08-11)
 
 Full mode, one item, continuing the same session as BL-263/BL-368/BL-366 below.
 

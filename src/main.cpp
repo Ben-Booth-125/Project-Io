@@ -1,4 +1,5 @@
 #include "core/app.hpp"
+#include "core/sim_loop.hpp"
 #include "scripting/lua_state.hpp"
 #include "world/budget_system.hpp"
 #include "world/corp_ai.hpp"
@@ -9,6 +10,7 @@
 #include "world/market_clearing.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/supply_system.hpp"
+#include "world/survey_system.hpp"
 #include "world/tech_gate.hpp"
 
 #include <algorithm>
@@ -49,6 +51,19 @@ long kv_get(const std::unordered_map<std::string, std::string>& kv, const char* 
     return std::atol(it->second.c_str());
 }
 
+/// Fractional sibling of kv_get. `quantity` and `floor_price` (BL-293) are real
+/// quantities and real prices — routed through the integer getter above they
+/// would silently truncate, so `floor_price=3.75` would list at 3 and undercut
+/// the floor the caller asked for. A rounding error in a price is not a rounding
+/// error, it is a different order.
+double kv_getf(const std::unordered_map<std::string, std::string>& kv, const char* key, double dflt)
+{
+    const auto it = kv.find(key);
+    if (it == kv.end())
+        return dflt;
+    return std::atof(it->second.c_str());
+}
+
 const char* corp_command_result_name(corp_command_result r)
 {
     switch (r)
@@ -61,6 +76,18 @@ const char* corp_command_result_name(corp_command_result r)
         case corp_command_result::rejected_funds:    return "rejected_funds";
         case corp_command_result::rejected_state:    return "rejected_state";
         case corp_command_result::rejected_tech_locked: return "rejected_tech_locked";
+        // BL-350's four distinguishable declines. Without these the switch fell
+        // through and reported every one of them as "rejected_invalid", which
+        // tells an agent its arguments were malformed when in fact they were
+        // fine and the SUPPLIER said no. Typed, enumerated failure is the whole
+        // reason an out-of-process policy can correct itself (AI_OPPONENT.md
+        // § 10a) — collapsing four business outcomes into a syntax error is the
+        // one thing that seam must not do. Exhaustive now, so -Wswitch catches
+        // the next verb family the way it did not catch this one.
+        case corp_command_result::rejected_no_capacity:     return "rejected_no_capacity";
+        case corp_command_result::rejected_no_input_access: return "rejected_no_input_access";
+        case corp_command_result::rejected_embargo:         return "rejected_embargo";
+        case corp_command_result::rejected_reputation:      return "rejected_reputation";
     }
     return "rejected_invalid";
 }
@@ -77,10 +104,19 @@ const char* corp_command_result_name(corp_command_result r)
 // Requests (space-separated `key=value` tokens after the opcode):
 //   TICK                                            -> advance one tick
 //   CORPS                                           -> one JSON line per corp, then END
+//   BODIES                                          -> one JSON line per body, then END
 //   BLACKBOARD corp=<id> ticks=<n>                  -> facts as BL-206 JSONL, then END
-//   COMMAND corp=<id> verb=<0-7> subject=<id> tile=<id> type=<0-4> target=<0-22>
-//           recipe=<id> workforce=<n> road_tier=<n>  -> apply_corp_command
+//   COMMAND corp=<id> verb=<0-14> subject=<id> tile=<id> type=<0-6> target=<0-30>
+//           recipe=<id> workforce=<n> road_tier=<n> unit_type=<n>
+//           quantity=<f> floor_price=<f> order=<n> counterparty=<id>
+//                                                   -> apply_corp_command
 //   SHUTDOWN                                        -> BYE, then exit
+//
+// Every `corp_verb` is reachable here; which keys a given verb reads is
+// `apply_corp_command`'s business, and unread keys cost nothing. Keep this list
+// in step with `corp_verb` — the last three verb families were added to the enum
+// without their arguments ever reaching this parser, which made them applicable
+// in the dictionary and inapplicable on the wire.
 // Responses are one line each except BLACKBOARD, which is N JSONL lines + END.
 int run_serve(int ticks)
 {
@@ -100,10 +136,10 @@ int run_serve(int ticks)
     // BL-365: real background corporations, generated now that reg is loaded.
     generate_background_firms(w, reg, /*seed=*/0x8A21F00Du);
 
-    int tick = 0;
-    for (int t = 1; t <= ticks; ++t)
-    {
-        tick = t;
+    // One econ tick, in one place. The warm-up loop and the TICK opcode used to
+    // carry byte-identical copies of this sequence, which is how the survey step
+    // came to be missing from BOTH rather than from one.
+    const auto step_one_tick = [&](int t) {
         w.current_day_tick = t;
         dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
                          reg.logistics_cost(convoy_mode::space));
@@ -114,6 +150,20 @@ int run_serve(int ticks)
                      &report.buildings); // BL-343: law enforcement seam
         advance_tech_gates(w); // BL-344: earn techs whose gate is now satisfied
         credit_arrived_convoys(w, t);
+        // Age any dispatched survey by the days this tick spans (app.cpp does the
+        // same on the day boundary). Without it the geographic fog never lifted
+        // here: `survey` was an applicable verb whose effect never arrived, so no
+        // tile ever became visible and `build` / `place_road` had no discoverable
+        // target on the one seam an out-of-process agent has. The agent could pay
+        // for discovery and then wait forever.
+        advance_surveys(w, sim_loop::econ_tick_days);
+    };
+
+    int tick = 0;
+    for (int t = 1; t <= ticks; ++t)
+    {
+        tick = t;
+        step_one_tick(t);
     }
 
     std::string line;
@@ -131,16 +181,7 @@ int run_serve(int ticks)
         else if (op == "TICK")
         {
             ++tick;
-            w.current_day_tick = tick;
-            dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
-                             reg.logistics_cost(convoy_mode::space));
-            advance_convoys(w);
-            economy_report report = run_economy_step(w, reg);
-            auto flows = clear_markets(w, reg, report);
-            apply_budget(w, reg, flows, report.workforce_contention, &report.budgets,
-                         &report.buildings); // BL-343: law enforcement seam
-            advance_tech_gates(w); // BL-344: earn techs whose gate is now satisfied
-            credit_arrived_convoys(w, tick);
+            step_one_tick(tick);
             std::cout << "OK tick=" << tick << std::endl;
         }
         else if (op == "BLACKBOARD")
@@ -168,6 +209,20 @@ int run_serve(int ticks)
             cmd.recipe    = static_cast<uint16_t>(kv_get(kv, "recipe", no_recipe));
             cmd.workforce = static_cast<int>(kv_get(kv, "workforce", 100));
             cmd.road_tier = static_cast<uint8_t>(kv_get(kv, "road_tier", 1));
+            // The seam grew three verb families past this parser — BL-324's
+            // hire_unit, BL-293's order book, BL-350's procurement — and each
+            // one's arguments went unread, so six of the fifteen verbs could
+            // only ever be applied with defaults. place_sell_order defaults to
+            // quantity 0, which apply_corp_command rejects outright; the three
+            // procurement verbs default to order 0 / counterparty null, which
+            // never names a real quote or supplier. They were not "partly
+            // supported" — they were unreachable, and the dictionary said
+            // otherwise.
+            cmd.unit_type    = static_cast<uint16_t>(kv_get(kv, "unit_type", 0));
+            cmd.quantity     = static_cast<float>(kv_getf(kv, "quantity", 0.0));
+            cmd.floor_price  = static_cast<float>(kv_getf(kv, "floor_price", 0.0));
+            cmd.order        = static_cast<uint32_t>(kv_get(kv, "order", 0));
+            cmd.counterparty = static_cast<entity_id>(kv_get(kv, "counterparty", 0));
 
             entity_id out_building = null_entity;
             const corp_command_result result = apply_corp_command(w, reg, cmd, &out_building);
@@ -176,6 +231,34 @@ int run_serve(int ticks)
                                                ? static_cast<long>(out_building)
                                                : -1)
                       << std::endl;
+        }
+        else if (op == "BODIES")
+        {
+            // What a body is called and whether it is surveyed yet. The sibling of
+            // CORPS, and needed for the same reason (NR-061): `survey`,
+            // `place_sell_order` and `request_quote` all take a BODY id as their
+            // subject, and nothing else on this protocol yields one. The
+            // blackboard's market facts are keyed by MARKET id, not by body, so an
+            // agent reading state could see prices on a body it had no way to
+            // name — it could know a market existed and could not sell into it.
+            for (const auto& [id, b] : w.bodies)
+            {
+                const char* phase = "hidden";
+                switch (b.survey.phase)
+                {
+                    case survey_phase::hidden:     phase = "hidden";     break;
+                    case survey_phase::in_transit: phase = "in_transit"; break;
+                    case survey_phase::scanning:   phase = "scanning";   break;
+                    case survey_phase::surveyed:   phase = "surveyed";   break;
+                }
+                std::cout << "{\"id\":" << static_cast<long>(id)
+                          << ",\"name\":\"" << b.name << "\""
+                          << ",\"survey\":\"" << phase << "\""
+                          << ",\"regions_done\":" << b.survey.regions_done
+                          << ",\"regions_total\":" << b.survey.regions_total
+                          << "}" << std::endl;
+            }
+            std::cout << "END" << std::endl;
         }
         else if (op == "CORPS")
         {

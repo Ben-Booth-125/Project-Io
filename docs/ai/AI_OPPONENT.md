@@ -350,9 +350,43 @@ threshold, never a duplicate, and never on the player's own corp.
 ### Hysteresis & action budget
 
 - **Do-nothing bias**: a candidate must beat the incumbent (or doing nothing) by a relative
-  margin θ (~15%) — the anti-thrash rule.
-- **Cooldowns**: a building that changed recipe/workforce/state holds for C ticks; reversals ride
-  loss/gain streaks (the BL-079 `loss_streak` idiom, generalised).
+  margin θ (~15%) — the anti-thrash rule. Applied inside the **dial** enumeration only; build,
+  survey, hire and trade candidates pass through no hysteresis test.
+- **Cooldowns**: a building that changed recipe/workforce/state holds for C evaluations; reversals
+  ride loss/gain streaks (the BL-079 `loss_streak` idiom, generalised).
+
+> **Measured 2026-08-13 — this section described an intent the code did not implement.**
+> `ai_skill_harness`'s action tally showed `resume` outnumbering every other verb about 10:1
+> (134–255 resumes per 30-tick rollout against 12–17 idles and 3–6 builds). The rule above was
+> being defeated in two places at once. First, the **reflex tier owns the same flag and set no
+> cooldown**: BL-079's block idles a building directly on `building_component`, so the strategic
+> tier could reverse an eight-tick-loss idling on its very next evaluation — two tiers owning
+> `decommissioned`, neither aware of the other. Second, **the two sides used different
+> estimators**: idle scored on `estimate_building_profit`, while resume hand-rolled
+> revenue-minus-wages with no maintenance, no input cost, no stack decay and no depletion taper,
+> so it read high on exactly the buildings the reflex tier had just idled.
+>
+> Both are fixed — resume now scores on `estimate_prospective_profit` (the exact mirror, and it
+> makes idled *processors* resumable, which the extraction-only branch never did), and the reflex
+> tier sets the cooldown its own state change always warranted. Measured effect: resume 134→59,
+> 178→129, 193→126, 153→84 across seeds 0–3, net worth up 0.5–0.9%, solvency, survival and
+> determinism unchanged.
+>
+> **It is damped, not cured, and the residual is the honest number to carry.** With the reflex
+> tier's own idlings now counted (they issue no command, so they appeared in no `action[]` row and
+> the oscillation was unreadable from this instrument), resumes are still ~85% of total idlings.
+> Closing it means making the two tiers agree — either the reflex tier routes through
+> `apply_corp_command`, or its realised-profit trigger is reconciled with the strategic tier's
+> modelled-profit one. Both move every blessed golden. See the review queue.
+
+**A separate defect in the same block, also fixed 2026-08-13: the workforce dial could only ever
+move one way per building.** Its gain was estimated as `variable × (proposed − target) / target`
+with `variable = revenue − inputs − wages`, which takes its **sign** from `variable` rather than
+from the model — so a profitable building could only be scored for *raising* its target and a
+loss-maker only for *cutting* one, and the interior optimum `solve_workforce_target` exists to
+find scored negative in both directions and was discarded. The solver now reports its own modelled
+gain (an optional out-param; it already computed both endpoints), and dial actions roughly doubled
+across the benchmark seeds as the previously-unreachable direction became scoreable.
 - **Budget**: per evaluation, at most **1 construction + a small number of dial changes + 1
   order-book command** per corp; total committed spend capped by the solvency gate.
 - **Determinism**: stable iteration (sorted `corp_ids`, stored asset order, tile-index order);
@@ -805,6 +839,43 @@ left as a follow-on rather than blocking the first attach.
 the player — `get_blackboard`/`issue_command` both require a corp id, and corp ids in a generated
 world are non-obvious. Read-only export from a new `CORPS` opcode in `run_serve`: one JSON line
 per corp (`id`, `name`, `is_player`, `home_nation`), then `END`. Six tools, not five (NR-061).
+
+**Repaired and made runnable 2026-08-13.** BL-278 was smoke-tested once by hand on the day it
+landed and never again, and by 2026-08-13 the seam it describes had drifted badly from the seam
+that existed. Five defects, none of which had ever failed a run because nothing re-ran it:
+
+- **Six of the fifteen verbs could not be issued at all.** The `COMMAND` opcode parsed nine
+  argument keys and the enum had grown three verb families past it — BL-324's `hire_unit`,
+  BL-293's order book, BL-350's procurement. Their arguments were never read, so
+  `place_sell_order` always arrived with `quantity = 0` (rejected outright) and the procurement
+  verbs always named quote `0` and supplier `null`. They were not partly supported; they were
+  unreachable, while `ACTIONS.json` and this document both described them as available.
+- **Four of the twelve result codes were reported as `rejected_invalid`.** `corp_command_result_name`
+  had no cases for BL-350's four declines, so "the supplier holds no capacity", "your inputs are
+  unreachable", "you are embargoed" and "your reputation is too low" all reached the agent as
+  *your arguments are malformed*. Typed, enumerated failure is the property § 10a leans on for
+  self-correction; collapsing four business outcomes into a syntax error removes it.
+- **The MCP wrapper could not start on Linux.** `tools/mcp/server.js` spawned
+  `build/ProjectIo.exe`; the primary dev target builds `ProjectIo`. It now resolves across the
+  Linux and MSVC layouts.
+- **`survey` was an applicable verb whose effect never arrived.** `run_serve` never called
+  `advance_surveys`, so a dispatched survey never progressed, no tile was ever revealed, and
+  `build` / `place_road` had no discoverable target. The tick sequence was also duplicated
+  verbatim between the warm-up loop and the `TICK` opcode, which is how the step came to be
+  missing from both; it is now one lambda.
+- **No body could be named.** `survey`, `place_sell_order` and `request_quote` all take a body id
+  as `subject`, and nothing on the protocol yielded one — the blackboard keys its market facts by
+  **market** id. An agent could read a price on a body it had no way to sell into. Fixed by a
+  `BODIES` opcode and a `list_bodies` tool, the exact sibling of NR-061's `list_corps`.
+
+**Seven tools now, and a committed check.** `tools/mcp/smoke.js` drives `--serve` over the raw
+line protocol and asserts the shape rather than the economics: every opcode answers, every one of
+the fifteen verbs reaches the seam and returns a code that is actually in `corp_command_result`,
+a well-formed sell order is distinguishable from a malformed one, and `SHUTDOWN` is acknowledged.
+It asserts nothing about whether a given command *should* succeed — that is the `tools/verify/`
+harnesses' business. Run it with `node tools/mcp/smoke.js`. The lesson is the general one: a seam
+nobody exercises is a seam nobody can trust, and all five defects above were found by reading
+rather than by failing.
 
 ### 10f. Sources added 2026-08-03
 

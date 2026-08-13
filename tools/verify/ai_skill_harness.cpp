@@ -157,10 +157,27 @@ recipe_registry make_registry()
 /// built and hire_unit silently zeroed out (caught rerunning this golden
 /// after S2 landed). main.cpp / core/app.cpp both call this every real tick;
 /// this brings the harness's rollout back in line with actual play.
-void run_tick(world& w, const recipe_registry& reg, int tick)
+/// @param out_idled_events Optional. Receives the count of `agency_event::kind::idled`
+///        reported this tick — BOTH tiers, since both narrate an idling that way.
+///        Subtracting the decision ring's own `corp_verb::idle` tally leaves the
+///        BL-079 REFLEX tier's idlings, which are otherwise invisible here: that
+///        tier mutates `building_component` directly rather than through
+///        apply_corp_command, so it never reaches the ring. Without the
+///        difference the oscillation is unreadable — `action[idle]` counts one
+///        tier's idlings while `action[resume]` counts reversals of both, so
+///        resume outnumbers idle by ~20:1 with no visible cause.
+void run_tick(world& w, const recipe_registry& reg, int tick, int* out_idled_events = nullptr)
 {
     w.current_day_tick = tick;
     const economy_report rep = run_economy_step(w, reg);
+    if (out_idled_events)
+    {
+        int n = 0;
+        for (const agency_event& ev : rep.agency_events)
+            if (ev.what == agency_event::kind::idled)
+                ++n;
+        *out_idled_events = n;
+    }
     const auto flows = clear_markets(w, reg, rep);
     apply_budget(w, reg, flows, rep.workforce_contention, nullptr);
     advance_tech_gates(w);
@@ -176,6 +193,7 @@ struct rollout_metrics
     float               survival_fraction         = 0.0f; ///< Fraction of AI corps with >=1 active (non-decommissioned) asset at the end.
     std::map<corp_verb, int> action_counts;        ///< Tally of every applied corp_command by verb.
     std::vector<uint64_t>    state_hashes;          ///< world::state_hash(tick) at every sample point.
+    int                      reflex_idles = 0;      ///< BL-079 reflex-tier idlings (idled events minus the ring's own idle commands).
 };
 
 constexpr int sample_every = 10;
@@ -190,13 +208,22 @@ rollout_metrics run_rollout(uint32_t seed, int ticks)
     rollout_metrics m;
     for (int t = 1; t <= ticks; ++t)
     {
-        run_tick(w, reg, t);
+        int idled_events = 0;
+        run_tick(w, reg, t, &idled_events);
 
         // Tally every decision applied THIS tick (the ring wraps at 256 entries
         // over a long rollout, so read it live rather than at the end).
+        int strategic_idles_this_tick = 0;
         for (const corp_decision& d : w.ai_decisions.entries)
             if (d.tick == t)
+            {
                 ++m.action_counts[d.command.verb];
+                if (d.command.verb == corp_verb::idle)
+                    ++strategic_idles_this_tick;
+            }
+
+        // What the reflex tier did on its own, in commands it never issued.
+        m.reflex_idles += (idled_events - strategic_idles_this_tick);
 
         if (t % sample_every == 0)
         {
@@ -243,6 +270,16 @@ const char* verb_name(corp_verb v)
         case corp_verb::place_road:    return "place_road";
         case corp_verb::survey:        return "survey";
         case corp_verb::hire_unit:     return "hire_unit";
+        // The seam grew past this instrument twice (BL-293 order book, BL-350
+        // procurement) and the tally silently pooled every new verb under "?".
+        // A skill instrument that cannot name what the AI did is measuring the
+        // wrong thing, so the switch is exhaustive and -Wswitch now guards it.
+        case corp_verb::place_sell_order:   return "place_sell_order";
+        case corp_verb::remove_sell_order:  return "remove_sell_order";
+        case corp_verb::set_workforce_auto: return "set_workforce_auto";
+        case corp_verb::request_quote:      return "request_quote";
+        case corp_verb::accept_quote:       return "accept_quote";
+        case corp_verb::cancel_contract:    return "cancel_contract";
     }
     return "?";
 }
@@ -457,12 +494,36 @@ const std::vector<seed_golden> goldens = {
 // BL-325's design record rather than forced to pass by tuning a score). If a
 // later run finds hire_unit consistently absent even after a genuine
 // steel-routing fix, treat that as the open question, not this band.
+// RE-BLESSED 2026-08-13. Two independent causes, and they are worth separating
+// because only one of them is this session's doing.
+//
+// (1) NET-WORTH FINAL had been failing on all five seeds for some time — the
+// bands sat 2.9-3.1x below the observed values, drift accumulated across
+// Sprint 10's landings (BL-365 background firms, BL-132 market cogeneration,
+// BL-130 market inventory) and flagged as a standing steward in the review
+// queue. Nothing in this session moved it materially: net worth rose 0.5-0.9%.
+// The bands below are re-centred on observation at roughly +/-35%. NET-WORTH
+// MIN and SOLVENCY were passing throughout and are UNCHANGED, deliberately —
+// re-blessing a band that was binding correctly only loosens it.
+//
+// (2) DIAL_MAX is TIGHTENED, not widened, and that is the point. The old
+// ceilings (230/290/315/240/410) were blessed from runs containing 134-255
+// `resume` actions per rollout, i.e. from the idle/resume oscillation they
+// exist to detect — a thrash detector calibrated on the thrash certifies it.
+// With the oscillation damped (resume 134->59, 178->129, 193->126, 153->84,
+// 255->190) dial totals are 99/169/177/114/241, and the ceilings are set at
+// ~1.3x observed so a regression back toward the old behaviour FAILS rather
+// than passing comfortably. These remain observation-blessed; deriving them
+// from the action budget (corps x evals x max_dials) instead is filed as
+// follow-up, and is the better answer.
+//
+// BUILD_MAX and SURVIVAL are unchanged; both still bind on observation.
 const std::vector<seed_golden> goldens = {
-    { 0, {141000.0f, 331000.0f}, { 45000.0f, 105000.0f}, 20, {0.45f, 0.95f},  5, 230 },
-    { 1, {112000.0f, 262000.0f}, { 42000.0f, 100000.0f}, 10, {0.45f, 1.00f},  5, 290 },
-    { 2, {194000.0f, 454000.0f}, { 59000.0f, 140000.0f}, 12, {0.45f, 0.95f},  5, 315 },
-    { 3, {100000.0f, 235000.0f}, { 34000.0f,  81000.0f}, 15, {0.45f, 0.95f},  5, 240 },
-    { 4, {207000.0f, 485000.0f}, { 73000.0f, 172000.0f},  8, {0.20f, 1.00f},  6, 410 },
+    { 0, {638000.0f, 1327000.0f}, { 45000.0f, 105000.0f}, 20, {0.45f, 0.95f},  5, 129 },
+    { 1, {512000.0f, 1063000.0f}, { 42000.0f, 100000.0f}, 10, {0.45f, 1.00f},  5, 220 },
+    { 2, {867000.0f, 1801000.0f}, { 59000.0f, 140000.0f}, 12, {0.45f, 0.95f},  5, 230 },
+    { 3, {481000.0f,  998000.0f}, { 34000.0f,  81000.0f}, 15, {0.45f, 0.95f},  5, 148 },
+    { 4, {924000.0f, 1919000.0f}, { 73000.0f, 172000.0f},  8, {0.20f, 1.00f},  6, 313 },
 };
 #else
 #error "ai_skill_harness: no blessed golden band set for this toolchain (BL-252). \
@@ -530,6 +591,12 @@ int main()
             else if (verb != corp_verb::survey && verb != corp_verb::hire_unit)
                 dial_total += count;
         }
+        // The other half of the idle/resume books: idlings the BL-079 reflex tier
+        // performed directly, which issue no command and so appear in no
+        // action[] row. Printed, deliberately NOT banded — this is a reading, and
+        // banding a number on its first observation freezes in whatever it
+        // happens to be rather than what it should be.
+        std::printf("    reflex_idles (BL-079 tier, no command issued) = %d\n", m.reflex_idles);
 
         char label[128];
         std::snprintf(label, sizeof label, "%s: net-worth final in golden band", hdr);

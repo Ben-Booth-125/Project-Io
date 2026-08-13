@@ -3,13 +3,14 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 157 entries across 2 volume(s).
+One line per session, newest first — 158 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
+| 2026-08-13 | [AI gameplay: the word interface made runnable, and the rival's idle/resume oscillation measured](DEVLOG.md) | BL-079 BL-094 BL-202 BL-203 BL-278 BL-293 BL-315 BL-324 BL-350 BL-377 | DEVLOG.md |
 | 2026-08-11 | [BL-130 lands: BL-365's blocker chain closed, and a live crash caught in passing](DEVLOG.md) | BL-078 BL-095 BL-130 BL-253 BL-263 BL-365 BL-366 BL-368 | DEVLOG.md |
 | 2026-08-11 | [BL-263 lands: BL-365's blocker chain, first link](DEVLOG.md) | BL-089 BL-096 BL-130 BL-263 BL-365 BL-366 BL-368 | DEVLOG.md |
 | 2026-08-11 | [BL-368 lands: Sprint 10's second foundation, and a stale bug claim corrected](DEVLOG.md) | BL-078 BL-130 BL-132 BL-190 BL-365 BL-366 BL-367 BL-368 BL-369 BL-370 BL-371 | DEVLOG.md |
