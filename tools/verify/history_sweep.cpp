@@ -156,7 +156,13 @@ int main(int argc, char** argv)
         if (n > 0) seed_count = n;
     }
 
-    std::printf("=== history sweep (BL-275) — %d seeds, 0 -> 1960 CE ===\n\n", seed_count);
+    // Label the span from the defaults rather than restating it, so the banner
+    // cannot drift from the run the way "0 -> 1960 CE" did.
+    const history_sim_params epoch;
+    std::printf("=== history sweep (BL-275) — %d seeds, %lld -> %lld ===\n\n",
+                seed_count,
+                static_cast<long long>(epoch.start_year),
+                static_cast<long long>(epoch.stop_year));
 
     std::vector<sweep_row> rows;
     rows.reserve(static_cast<std::size_t>(seed_count));
@@ -180,9 +186,15 @@ int main(int argc, char** argv)
         row.provinces_start = static_cast<int>(ss.provinces.size());
         row.lacunae         = k->settlement.lacunae;
 
+        // THE DEFAULT EPOCH IS THE ONE THE GAME RUNS. This was pinned to
+        // 0 -> 1960, which the 0 CE epoch change superseded: the sim runs
+        // 4000 BCE -> 0 CE now, under the stepped decision clock whose bands all
+        // sit below year 0. Pinned to 0..1960 the sweep ran 1960 FLAT ticks past
+        // the last band and measured neither the span nor the clock the game
+        // uses — so no calibration could be read off it. Every window below is
+        // derived from `params` for the same reason.
         history_sim_params params;
-        params.start_year = 0;
-        params.stop_year  = 1960;
+        const int64_t span = params.stop_year - params.start_year;
 
         // REAL TERRAIN (BL-316 S1). Kepler's own ground, so mountains cost what
         // mountains cost and terrain_combat is finally live. Grid dims come from
@@ -202,7 +214,7 @@ int main(int argc, char** argv)
             for (const owner_change& c : sim.owner_changes)
             {
                 if (c.year > row.last_change_year) row.last_change_year = c.year;
-                if (c.year <= 196) ++early;   // First tenth of a 0..1960 run.
+                if (c.year <= params.start_year + span / 10) ++early; // First tenth of the run.
             }
             if (!sim.owner_changes.empty())
                 row.early_change_pct =
@@ -222,11 +234,11 @@ int main(int argc, char** argv)
         // reached at any century — a world can form a hegemony and lose it
         // again, and only the peak shows that it happened at all.
         int dummy = 0;
-        slice_shape(owner_slice_at(sim, 0), row.powers_start, dummy);
-        slice_shape(owner_slice_at(sim, 1960), row.powers_end, row.top_share_q,
+        slice_shape(owner_slice_at(sim, params.start_year), row.powers_start, dummy);
+        slice_shape(owner_slice_at(sim, params.stop_year), row.powers_end, row.top_share_q,
                     &row.smallest_holding);
 
-        for (int64_t y = 0; y <= 1960; y += 100)
+        for (int64_t y = params.start_year; y <= params.stop_year; y += 100)
         {
             int p = 0, share = 0;
             slice_shape(owner_slice_at(sim, y), p, share);
@@ -376,7 +388,9 @@ int main(int argc, char** argv)
         const world w = make_hard_coded_world(wp, &rep);
         const generation_report::body_entry* k = kepler_of(rep);
         settlement_state ss = k->settlement;
-        history_sim_params params; params.start_year = 0; params.stop_year = 1960;
+        // Defaults, exactly as the sweep rows above use them — a recheck that
+        // ran a different span would not be a recheck.
+        history_sim_params params;
         // The re-run must be the SAME run: real terrain, real dims. The original
         // recheck passed an empty sim_terrain_view against real-terrain rows —
         // a guaranteed false FAIL the moment terrain changes any decision.

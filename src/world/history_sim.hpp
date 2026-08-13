@@ -148,10 +148,24 @@ struct history_sim_params
     int w_cult = 150; ///< Penalty for taking ground of a foreign culture.
 
     // --- Force commitment (BL-277 Q2) -------------------------------------
-    /// Power lost per tile of distance between capital and objective, in
-    /// per-mille of full supply. THE STALL MECHANISM: reach far enough and the
-    /// arriving force is below the defender's, so the frontier stops on
-    /// arithmetic rather than an explicit cap (BL-224 non-hegemony, emergent).
+    /// Power lost per tile between the STAGING HOLDING and the objective, in
+    /// per-mille of full supply. Local cost only — bounded by
+    /// `neighbour_radius`, so it does not scale with the map.
+    ///
+    /// THIS TERM ALONE DOES NOT STALL A FRONTIER, and the harness records it
+    /// rather than asserting it away: with the score's distance preference
+    /// zeroed, a province 34 tiles out was still taken despite every campaign
+    /// arriving under-supplied. The reason is upstream in combat.cpp — supply
+    /// only mitigates ATTRITION, and attrition is terrain x season, so on plains
+    /// the entire span from fully supplied to totally cut off is 10% of combat
+    /// power. That is noise.
+    ///
+    /// The stall is therefore the THREE terms together, which is what BL-316
+    /// added: this local decay, `terrain_reach_cost_q` (so the 10% span is only
+    /// the plains case — a mountain battle carries up to 900/1000 attrition and
+    /// supply matters enormously), and `holdings_burden_q` (so breadth costs
+    /// something at all). See `campaign_supply` in the .cpp, which is the one
+    /// place all three are priced.
     int supply_decay_per_tile_q = 28;
 
     /// Fraction of a province's banked manpower a campaign may raise.
@@ -202,21 +216,35 @@ struct history_sim_params
     /// Divisor turning holdings-value-at-risk into a comparable annual figure.
     int consolidate_divisor = 24;
 
-    // BL-309 ATTEMPTED AND REVERTED, 2026-08-04. Normalising each verb onto
-    // `(raw - threshold) / (ceiling - threshold)` and running the argmax over
-    // that margin does NOT fix this, and the reason is structural: dividing by
-    // each verb's own range systematically favours the verb with the NARROWEST
-    // range. Settle's usable span is 220 wide and Campaign's is ~540, so the
-    // same relative desirability gave Settle a far larger margin — the run went
-    // from Invest-dominated to Settle-dominated (82 -> 1532 provinces, 1450
-    // foundings, and conquests fell to ZERO), which is the same failure wearing
-    // a different verb.
+    // THE NORMALISED-MARGIN CUT WAS ATTEMPTED AND REVERTED, 2026-08-04, and the
+    // reason is worth keeping: dividing each verb by its own range structurally
+    // favours the verb with the NARROWEST range. Settle's usable span is 220
+    // wide and Campaign's ~540, so equal relative desirability gave Settle the
+    // larger margin — the run went from Invest-dominated to Settle-dominated
+    // (82 -> 1532 provinces, 1450 foundings, conquests ZERO). Same failure,
+    // different verb. Rescaling incommensurable numbers cannot make them
+    // commensurable.
     //
-    // The real fix is to score the verbs on ONE scale by construction — a
-    // common "value to this polity" quantity every verb expresses itself in —
-    // not to rescale four incommensurable numbers after the fact. That is a
-    // redesign of the scorer, so it stays with BL-309 rather than being
-    // half-done here.
+    // WHAT LANDED INSTEAD (BL-318): the verbs are scored on one scale BY
+    // CONSTRUCTION. `province_value_q` in the .cpp is the common unit — a
+    // province is worth the mean of its three endowment windows — and every
+    // verb answers the same question in it: what is this worth to me this year,
+    // in provinces-worth-of-endowment. Campaign values the ground taken times
+    // the odds of taking it, less supply; Settle values the daughter province
+    // times the pressure driving it; Invest values holdings times yield over the
+    // payback period; Consolidate values holdings at risk times the cohesion
+    // shortfall. The argmax is then an honest comparison rather than a
+    // coincidence of scales.
+    //
+    // THE COROLLARY, and the trap this item kept falling into: a term that is
+    // NOT in the currency must not be SUBTRACTED from something that is. Both
+    // `w_cult` and `w_dist` were flat subtractions from a province value of only
+    // ~200-300, so each acted as a veto rather than a preference — measured,
+    // w_cult 150 gave 0 battles and w_cult 0 gave 266. Both are now
+    // PROPORTIONAL (a per-mille discount on the prize), which says the same
+    // thing at any province value and at any map size. Supply is priced ONCE,
+    // by a single lambda both the scorer and the executed battle call, for the
+    // same reason — see `campaign_supply` in the .cpp.
 
     /// Decisiveness (0-1000) a victory must reach before territory changes
     /// hands. Below it the battle is a raid: losses and contest, no transfer.

@@ -3310,6 +3310,39 @@
     "docs/development/DEVELOPMENT_PRACTICES.md"
    ],
    "resolution": ""
+  },
+  {
+   "id": "NR-195",
+   "title": "Era -1 supply was priced twice, on two different scales - the scorer and the battle disagreed",
+   "raised": "2026-08-13",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-316 / BL-318 agent session, reading history_sim.cpp after fast-forwarding a stale worktree",
+   "what": "run_history_sim computed campaign supply in two separate places that did not agree. The SCORER measured from the staging holding (hub_dist, bounded by neighbour_radius, so at most ~250 per-mille of decay). The EXECUTED battle re-derived it from the CAPITAL (cap_dist, unbounded - on the 312-wide map routinely past the 1000 that clamps supply to zero). So the scorer chose campaigns it believed were nearly fully supplied and then fought them at nothing, which is why stalled_campaigns counted almost every launch. Fixed by pricing supply ONCE, in a single campaign_supply lambda both paths call. The two comments in the file asserted opposite intents; the newest-dated one (2026-08-12, Bens supply-hubs steer) was taken as authoritative per newest-dated-wins.",
+   "why_it_matters": "This is BL-318s own thesis - a cost authored on one scale and spent on another - found inside the code BL-318 landed. It also means every stall/conquest number measured since the hub_dist change described a sim whose estimate and outcome disagreed, so those numbers should not be used for calibration.",
+   "options": [],
+   "recommendation": "Re-run the sweep after this lands; expect stalled_campaigns to fall sharply and conquests to rise. Treat all pre-fix sweep evidence as void, the same way BL-318 voided pre-grid-fix evidence.",
+   "files": [
+    "src/world/history_sim.cpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-196",
+   "title": "Both Era -1 harnesses were pinned to the superseded 0->1960 epoch and the wrong grid width",
+   "raised": "2026-08-13",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Same session; found while adding assertions for the BL-316 slices",
+   "what": "history_sim_harness.cpp hardcoded start_year 0 / stop_year 1960 and a 168x90 grid; history_sweep.cpp hardcoded the same span plus year windows 196 and 1960. The sim runs 4000 BCE -> 0 CE now and Kepler is 312x145. Two consequences: (a) with every stepped-clock band sitting below year 0, a 0..1960 run falls past the last band and ticks FLAT for 1960 rounds, so neither instrument exercised the stepped clock the game uses; (b) gw is the cylinders circumference, so understating it at 168 made province_distance wrap columns that do not wrap, silently reporting provinces on opposite sides of the map as neighbours. Both now derive from history_sim_params defaults and home_grid_width/height. Separately, R3b2 asserted c.battles == 0 - that the scores distance penalty vetoes a far target outright. That was true of the flat w_dist and is deliberately no longer true (w_dist is a proportional discount now), so the assertion was relaxed to the direction (pricing distance never makes a far target more attractive) rather than left asserting the old bug back.",
+   "why_it_matters": "Same class as the sweeps 168x90-vs-180x84 terrain misalignment BL-318 already fixed: quiet, plausible, and it invalidates measurement rather than crashing. Any Era -1 number quoted from either harness before this is measuring a configuration the game does not run.",
+   "options": [],
+   "recommendation": "Ben to confirm the R3b2 relaxation is the reading he wants, and whether w_dist still earns its place now that the burden of breadth exists (BL-316 S3s stated follow-up).",
+   "files": [
+    "tools/verify/history_sim_harness.cpp",
+    "tools/verify/history_sweep.cpp"
+   ],
+   "resolution": null
   }
  ]
 }

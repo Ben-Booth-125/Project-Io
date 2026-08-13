@@ -446,6 +446,34 @@ history_sim_state run_history_sim(settlement_state&         ss,
             const int over = static_cast<int>(held.size()) - params.free_holdings;
             const int burden = over > 0 ? over * params.holdings_burden_q : 0;
 
+            // ONE PRICE FOR SUPPLY, PAID BY BOTH THE SCORER AND THE BATTLE
+            // (BL-318). These were two separate expressions, and they disagreed:
+            // the scorer measured the staging hub's distance (bounded by
+            // neighbour_radius, so at most ~250 per-mille of decay) while the
+            // executed battle re-derived it from the CAPITAL (unbounded, and on
+            // a 312-wide map routinely past the 1000 that clamps supply to
+            // zero). So the scorer chose campaigns it believed were nearly fully
+            // supplied and then fought them at nothing, which is why
+            // `stalled_campaigns` counted almost every launch.
+            //
+            // That is this item's whole thesis in miniature — a cost authored on
+            // one scale and spent on another — so the fix is not to pick the
+            // better of the two lines but to delete one of them. Priced here,
+            // once, the estimate and the outcome cannot drift again.
+            //
+            // The three terms are the three costs the design names: LOCAL
+            // staging distance, STRATEGIC terrain-weighted reach from the
+            // capital (BL-316 S2), and the BURDEN OF BREADTH (BL-316 S3).
+            const auto campaign_supply = [&](int hub_dist, std::size_t ti) {
+                const int reach_here = (ti < reach.size() && reach[ti] < (1 << 27))
+                                     ? static_cast<int>(reach[ti]) : hub_dist;
+                return clampi(1000
+                            - hub_dist * params.supply_decay_per_tile_q
+                            - reach_here * params.terrain_reach_cost_q / 100
+                            - clampi(burden, 0, 1000 - params.holdings_burden_floor_q),
+                            0, 1000);
+            };
+
             // ---- Build the bounded candidate set -------------------------
             //
             // Four verbs. The set is bounded by construction: neighbours only,
@@ -518,13 +546,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
                     // Odds from the power ratio the sim can actually estimate:
                     // levy x supply x cohesion against the defender's levy.
-                    const int reach_here = (ti < reach.size() && reach[ti] < (1 << 27))
-                                         ? static_cast<int>(reach[ti]) : hub_dist;
-                    const int supply_here = clampi(1000
-                                          - hub_dist * params.supply_decay_per_tile_q
-                                          - reach_here * params.terrain_reach_cost_q / 100
-                                          - clampi(burden, 0, 1000 - params.holdings_burden_floor_q),
-                                          0, 1000);
+                    const int supply_here = campaign_supply(hub_dist, ti);
 
                     int64_t atk_men = 0;
                     for (int hi2 : held)
@@ -718,24 +740,18 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const int64_t raised = raise_manpower(home, want);
                 if (raised <= 0) break;
 
-                // FORCE COMMITMENT (BL-277 Q2): supply decays with distance
-                // from the CAPITAL, not the staging province — an empire
-                // fighting at its rim is supplied from its centre. This is the
-                // stall: far enough out, the arriving force is under the
-                // defender's and the frontier stops on arithmetic alone.
-                const int cap_dist = province_distance(cap, tgt, gw);
-
-                // Terrain-weighted reach where it is known, straight-line
-                // otherwise (a target outside the connected component).
-                const int reach_cost = (static_cast<std::size_t>(best_target) < reach.size()
-                                        && reach[static_cast<std::size_t>(best_target)] < (1 << 27))
-                                     ? reach[static_cast<std::size_t>(best_target)] : cap_dist;
-
-                const int supply_raw = 1000
-                                     - cap_dist * params.supply_decay_per_tile_q
-                                     - reach_cost * params.terrain_reach_cost_q / 100
-                                     - clampi(burden, 0, 1000 - params.holdings_burden_floor_q);
-                const int atk_supply = clampi(supply_raw, 0, 1000);
+                // FORCE COMMITMENT (BL-277 Q2), priced by the SAME lambda the
+                // scorer used. `src_d` is the staging hub's distance — the army
+                // victuals at the frontier province it marched from, and the
+                // capital still bears on the result through the terrain-weighted
+                // reach term inside `campaign_supply`.
+                //
+                // Execute picks the NEAREST holding while the scorer scored one
+                // (hub, target) pair, so the fought supply is never worse than
+                // the scored estimate. Optimistic by a bounded amount, and in
+                // the right direction: the sim does not launch campaigns it then
+                // silently under-supplies.
+                const int atk_supply = campaign_supply(src_d, ti);
                 const int def_supply = 1000;
 
                 // The stall, counted where it actually happens (BL-312). The
