@@ -1922,10 +1922,10 @@
    "title": "BL-266 (selection always open): goldens need re-bless, and the Continent lens key now shares its corner with the always-open band",
    "raised": "2026-08-09",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "BL-266 worktree agent, 2026-08-09",
    "what": "Two things for your eye. (1) Goldens: sticky_card_00/02-05, new sticky_card_01_resting_corp (old sticky_card_01_dismissed.png orphaned - delete), continents_lens_kepler_key, and every golden showing the Selection band header (selection_band_*, selection_bar_*, selection_building_manage, selection_tile_*, walk_04_selection, v009_emblem_selection_and_markers) need re-blessing - the [x] dismiss control is gone and [>] moved. Not re-blessed this session: on the Linux box ALL goldens diff 20-35% even on untouched captures, so a bless here would be blind. (2) Layout call: the Continent lens key permanently overlaps the always-open band corner (see continents_lens_kepler_key capture) - does the key want a new home?",
-   "resolution": "PARTIALLY ANSWERED — layout half settled, golden half still open. ANSWERED (Ben, 2026-08-12, Q&A form) for the layout half: **the Continent lens key floats above the always-open Selection band** rather than moving corner or docking to the lens bar. So the key keeps its position and gains z-order over the band. The **golden re-bless half of this entry stays open** — it is unaffected by the layout call, and NR-130 records that the committed goldens are stale by ~119 commits of world drift regardless. Filed as BL-376 (lens key float)."
+   "resolution": "RULED 2026-08-13 (Ben, elicitation form): (1) re-bless the goldens now, on the Windows box - not held for the unexplained Linux 20-35% diff, which stays open as its own question. Filed as BL-402 (golden re-bless pass), which also absorbs NR-130's drift list. (2) The shared corner is NOT acceptable: move the Continent lens key - filed as BL-401 (continent key corner move), destination corner to be confirmed against the live app."
   },
   {
    "id": "NR-107",
@@ -2660,10 +2660,11 @@
    "title": "Hardware requirements and expected lag are unmeasured",
    "raised": "2026-08-11",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "2026-08-11 notes session with Ben.",
    "what": "Ben asked what hardware is needed to support the game in its current state, and how much lag to expect on this machine. No perf doc or profiling harness exists yet - this has never been measured, only guessed at. \n\nPARTIAL ANSWER 2026-08-13, from instruments that already exist rather than from new profiling. SIM SIDE: data_creep_harness reports world generation at 0.45 s and 1500 econ ticks in 49.60 s — 33.1 ms per tick on the real generated world with ~10 corps and the full scorer running. econ_stability asserts the prototype tick stays well under the 1 ms ROADMAP target on its small fixed world and runs a six-rung bodies x corps sweep asserting growth no worse than size^1.5; the exponent sitting above 1.0 is run_corp_strategic_step's O(corps x tiles) candidate scan (BL-253), not a regression. home_surface_bench carries a 1 s ceiling on the worst generation preview. AI SIDE (docs/ai/LANGUAGE_POLICY_FEASIBILITY.md section 5): a per-decision budget computed from sim_loop's own constants — ~90 s at 1x and ~5.6 s at 16x for 8 rivals — against 3-7 s of measured 8B-Q4 decode on consumer GPUs. WHAT IS STILL UNMEASURED is the thing Ben actually asked: frame time in the live app on THIS machine, which no harness touches because they are all headless. That is the gap, and it is a smaller one than 'never measured'.",
-   "files": []
+   "files": [],
+   "resolution": "RULED 2026-08-13 (Ben, elicitation form): the partial numbers are not enough - build a proper profiling harness. Filed as BL-403 (perf profiling harness): generation cost by stage, tick cost by phase, player-felt latency per game speed, diffable across commits."
   },
   {
    "id": "NR-163",
@@ -2686,7 +2687,7 @@
    "kind": "question",
    "status": "open",
    "source": "2026-08-11 notes session with Ben.",
-   "what": "Ben wants to re-stress-test world generation and the staged-generation time-lapse once the game is playable, to judge whether it feels alive rather than just correct.",
+   "what": "Ben wants to re-stress-test world generation and the staged-generation time-lapse once the game is playable, to judge whether it feels alive rather than just correct. RULING 2026-08-13 (Ben, elicitation form): keep open until playable - not scheduled, not folded into another item.",
    "files": [
     "docs/ui/STARTUP.md"
    ]
@@ -2722,7 +2723,7 @@
    "title": "AI capability / SOTA tracking is a standing practice, not a one-time task",
    "raised": "2026-08-11",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "2026-08-11 notes session with Ben.",
    "what": "Ben re-stressed the need to keep researching AI capability and follow the state of the art, relevant to the local-model AI opponent direction (AI_OPPONENT.md § 10). This is an ongoing watch item, not something that resolves once. \n\nFIRST SWEEP RUN 2026-08-13 (the window since the 2026-08-03 research pass). Findings, so the next sweep has a baseline to diff against rather than starting cold: the strategy-game-agent field produced essentially NOTHING in the window — no 4X, grand-strategy or economic-simulation benchmark appeared. Vox Deorum went preprint -> presented (FDG '26, 10-13 Aug) and shipped in-game diplomatic panels over its own MCP server, which is external confirmation of the section 10g shape rather than a challenge to it. Three adjacent items landed: The Horizon Gap (a 1,547-paper survey separating long-horizon as a TASK property from long-context as a MODEL property from long-term memory as a SYSTEM property — a taxonomy adoptable as-is), NCP-Bench (goal persistence measured, in interactive fiction), and Nemotron 3.5 Lightning (open 30B MoE, 3B active, marketed for always-on agents). One correction touches a ruling and is filed separately as NR-183: the constraint tax is reframed by 'Capacity, Not Format' and the stronger contemporary disqualifier is multi-turn tool-calling accuracy at our target size (xLAM-2-3B 55.6%, Qwen3-4B 35.3% on BFCL v4). Two protocol facts bear on BL-278 (MCP server): the 2026-07-28 spec went stateless and deprecated Sampling on a 12-month clock, and llama.cpp merged an MCP client so a local GGUF can drive our tools with no bridge.",
    "files": [
@@ -2734,7 +2735,8 @@
     "Sweep on a fixed calendar cadence (monthly) independent of release rhythm.",
     "Sweep only when a decision is pending that the field could change — i.e. lazily, driven by the question rather than the clock."
    ],
-   "recommendation": "Option 1. The 2026-08-13 sweep took a research agent about twenty minutes and returned four new items and one correction to a standing ruling — cheap enough to run often, but its value came entirely from having the 2026-08-03 baseline to diff against, which is what makes 'nothing happened in this window' a usable finding rather than an absence of effort. Tying it to the minor cut gives it a natural trigger and a natural home (the release's own notes), and AI_OPPONENT.md section 10 is already structured as dated sweeps. Note the standing caveat: arxiv.org and every paper mirror are egress-blocked from the cloud session environment, so sweeps run there are search-summary second-hand and their numbers should be re-checked before entering an authority doc."
+   "recommendation": "Option 1. The 2026-08-13 sweep took a research agent about twenty minutes and returned four new items and one correction to a standing ruling — cheap enough to run often, but its value came entirely from having the 2026-08-03 baseline to diff against, which is what makes 'nothing happened in this window' a usable finding rather than an absence of effort. Tying it to the minor cut gives it a natural trigger and a natural home (the release's own notes), and AI_OPPONENT.md section 10 is already structured as dated sweeps. Note the standing caveat: arxiv.org and every paper mirror are egress-blocked from the cloud session environment, so sweeps run there are search-summary second-hand and their numbers should be re-checked before entering an authority doc.",
+   "resolution": "RULED 2026-08-13 (Ben, elicitation form): sweep at each minor-version cut, diffing against the previous sweep's recorded baseline. The 2026-08-13 sweep is the current baseline. Recorded in DEVELOPMENT_PRACTICES.md's release-cut steps so the cadence is part of cutting a release, not a memory."
   },
   {
    "id": "NR-168",
@@ -3704,7 +3706,7 @@
    "title": "The campaign battle uncertainty band is narrow: past about 1.2:1 the stronger side effectively always wins",
    "raised": "2026-08-13",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "BL-315 first slice, measured by tools/verify/campaign_battle_harness.cpp",
    "what": "Measured over 200 seeds per ratio, attacker 500 infantry on open ground: 1.00:1 wins 47%, 1.10:1 wins 76%, 1.20:1 wins 94%, 1.40:1 wins 99%, 2.00:1 and above win 100%. The randomness is real and reaches the outcome, but only very near parity. The cause is structural, not a tuning slip: the fight runs up to six rounds and each round draws its own +/-30% swing, so the swings AVERAGE OUT - the longer a battle runs, the less chance can overturn a standing edge. A single-ratio assertion at 1.4:1 (most-but-not-all) failed on its first seed range for exactly this reason; it was replaced with the printed curve rather than lowered.",
    "why_it_matters": "This decides how a battle FEELS, which is the part you asked for. As it stands, committing force is a real decision only in a narrow band around parity; bring 20% more men and the fight is effectively decided before it starts, and the withdrawal window becomes a way to cut losses rather than a live judgement call. That may be exactly right - a 40% advantage arguably SHOULD be decisive, and upsets that ignore force make a war feel arbitrary. But it is a design choice, not an accident, and the two dials are visible: swing_permille (wider per-round variance) and the round count (fewer rounds = less averaging, more chance). Six rounds at +/-30% is what produced this curve.",
@@ -3720,7 +3722,7 @@
     "src/world/campaign_battle.hpp",
     "tools/verify/campaign_battle_harness.cpp"
    ],
-   "resolution": ""
+   "resolution": "RULED 2026-08-13 (Ben, elicitation form): widen the per-round swing so a 1.4:1 fight can still be lost, accepting that force matters somewhat less. Filed as BL-400 (widen battle swing) - re-measure the printed curve at the new swing_permille rather than asserting a target. The player-influenced swing (terrain/doctrine/surprise) remains a later deepening, not foreclosed."
   },
   {
    "id": "NR-215",

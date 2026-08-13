@@ -9111,6 +9111,96 @@
    ],
    "summary": "Split out of BL-315 (conflict spine) on Ben's 2026-08-13 ruling. BL-315 owns how force reaches an outcome; this owns what the company is ANSWERABLE TO while using it. The same law classes the militia framing named - embargo, basing rights, conscription - but with the direction of agency inverted: terms the company is subject to and must route around, not instruments it wields.",
    "design": "## Why it is its own item\n\nIt was BL-315's third strand, and it was blocking a buildable item behind an unbuilt one:\nat 0 CE there is no live law system to be subject to. Splitting it lets the conflict spine\nbe built now, and lets answerability arrive when there is law for it to read.\n\n## What it owns\n\nThe terms an armed trading house operates under, and the consequence of breaking them.\nThe direction of agency is the whole point - an embargo is something procurement must be\nrouted around, basing rights are granted rather than granted BY, a levy applies TO the\ncompany's recruitment pool.\n\nIt is also where BL-315's identity ruling cashes out. Ben, 2026-08-13: the same company\nreads as army, mercenary or pirate depending on policy - so the reading is a function of\nwhose terms it operates under, and which it has broken. That derivation belongs here, not\nin the conflict spine.\n\n## Design owed\n\nWhich law classes bind a company rather than a nation; what a breach costs (standing?\ncontract access? interdiction?); and whether the army/mercenary/pirate reading is\nper-polity (one nation's privateer is another's pirate) or global. The per-polity reading\nis the richer one and is probably right, but it is not settled."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-13",
+   "created": "2026-08-13",
+   "id": "BL-400",
+   "short_name": "WIDEN_BATTLE_SWING",
+   "category": "Military",
+   "title": "Widen the campaign battle per-round swing so a 1.4:1 fight can still be lost",
+   "priority": "B",
+   "difficulty": 1,
+   "version_goal": "v0.1.15",
+   "requires": [],
+   "authority_doc": "docs/SYSTEMS.md",
+   "files": [
+    "src/world/campaign_battle.hpp",
+    "src/world/campaign_battle.cpp",
+    "tools/verify/campaign_battle_harness.cpp"
+   ],
+   "summary": "Ben ruled (NR-204, 2026-08-13) the measured uncertainty band is too narrow: 1.2:1 wins 94%, 1.4:1 wins 99%. Widen swing_permille (currently 300) so a 1.4:1 attacker can still lose a meaningful fraction of fights, accepting that force matters somewhat less.",
+   "design": "RULED 2026-08-13 (NR-204). The measured curve at swing_permille=300: 1.00:1 -> 47%, 1.10:1 -> 76%, 1.20:1 -> 94%, 1.40:1 -> 99%, 2.00:1 -> 100%. Ben chose widening the swing over cutting rounds or leaving it.\n\nMethod: raise swing_permille and re-measure with campaign_battle_harness's printed curve - target a band where 1.4:1 loses a visible share (order 5-15%) while 2:1 stays near-certain. Measure, do not assert: pick the value from the printed curve, not from arithmetic. The six-round averaging structure stays; only the per-round amplitude moves. Note the harness's curve assertions may need re-deriving from the new measurement (honest re-measure, never a weakened test).\n\nThe player-influenced swing (terrain, doctrine, surprise) stays on the table as a later deepening once units exist on the map - it was option 4 in NR-204 and is not foreclosed by this tuning."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-13",
+   "created": "2026-08-13",
+   "id": "BL-401",
+   "short_name": "CONTINENT_KEY_CORNER_MOVE",
+   "category": "UI",
+   "title": "Move the Continent lens key out of the corner the always-open Selection band now occupies",
+   "priority": "B",
+   "difficulty": 1,
+   "version_goal": "v0.1.13",
+   "requires": [],
+   "authority_doc": "docs/ui/LENSES.md",
+   "files": [
+    "src/ui/body_surface_canvas.cpp"
+   ],
+   "summary": "Ben ruled (NR-104, 2026-08-13): the Continent lens key sharing its corner with the always-open Selection band is not acceptable - move the key. Pick the new anchor against the live app, per the open-the-game rule for visual calls.",
+   "design": "RULED 2026-08-13 (NR-104). BL-266 made the Selection band always open, and the Continent lens key (BL-226/BL-376 lineage) now shares that corner. Ben chose moving the key over keeping the shared corner.\n\nBefore building: report the current measurements (key size, corner offsets, band extents) and confirm the destination corner with Ben against the live app (Rule 0b + the open-the-game memory). Update the QUESTION_LOG entry for the lens key if its placement rationale changes, and expect the continents_lens goldens to need re-blessing - fold that into BL-402's pass if it has not yet run."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-13",
+   "created": "2026-08-13",
+   "id": "BL-402",
+   "short_name": "GOLDEN_REBLESS_PASS",
+   "category": "Testing",
+   "title": "Re-bless the visual goldens on the Windows box - Selection band set plus the ~119-commit drift backlog",
+   "priority": "B",
+   "difficulty": 2,
+   "version_goal": "v0.1.13",
+   "requires": [],
+   "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+   "files": [
+    "scripts/verify/"
+   ],
+   "summary": "Ben ruled (NR-104, 2026-08-13): re-bless now, on the Windows box - not held for the unexplained Linux 20-35% diff. Covers the BL-266 Selection-band set (sticky_card_*, selection_*, walk_04, v009_emblem, continents_lens_kepler_key), deletes the orphaned sticky_card_01_dismissed.png, and clears the ~119-commit drift NR-130 recorded.",
+   "design": "RULED 2026-08-13 (NR-104). Run every visual check on the Windows box, bless the diffs routinely (goldens are disposable - flag only unexplained diffs), delete sticky_card_01_dismissed.png. NR-130's drift list and NR-131's empty-tile pop_markers frame are in scope: fix the pop_markers framing rather than blessing an empty capture. Sequence after BL-401 (key move) if both run in the same block, so the continents goldens are blessed once, not twice. The Linux-box 20-35% universal diff stays open as its own question - a Windows bless is valid regardless."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-13",
+   "created": "2026-08-13",
+   "id": "BL-403",
+   "short_name": "PERF_PROFILING_HARNESS",
+   "category": "Tooling",
+   "title": "A profiling harness that measures tick cost, generation cost and frame headroom on the real world",
+   "priority": "B",
+   "difficulty": 2,
+   "version_goal": "v0.1.13",
+   "requires": [],
+   "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+   "files": [
+    "tools/verify/"
+   ],
+   "summary": "Ben ruled (NR-162, 2026-08-13): the partial numbers (33.1 ms/econ tick on the 3x world, 0.45 s generation) are not enough - build a proper profiling harness so hardware requirements and expected lag are measured, not inferred from other instruments.",
+   "design": "RULED 2026-08-13 (NR-162). What exists is incidental: data_creep_harness times ticks as a side effect, step_economy_phase_ms breaks down one phase family. What is owed is a dedicated tools/verify harness that reports, on the real generated 3x world: generation wall time by stage, econ tick cost by phase over a long run (warm-up vs settled), and the derived per-day/per-quarter latency a player feels at each game speed. Output a table diffable across commits so perf regressions are visible the way data creep is. Frame-side (render) cost stays out of scope for a headless harness - note the boundary; the live-app frame cost is a separate measurement. Push to the verifier-headless skill on landing."
   }
  ]
 }

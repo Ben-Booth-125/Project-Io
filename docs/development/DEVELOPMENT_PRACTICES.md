@@ -486,6 +486,8 @@ record is an annotated git tag (`vX.Y.Z`), recoverable forever with `git checkou
 Work starts on a `feature/*` branch. To cut version `vX.Y.Z`:
 
 1. **Finalize** — build green; fill the `[Unreleased]` section of `CHANGELOG.md`; pick the version.
+   For a **minor** cut, also run the AI SOTA sweep (NR-167, ruled 2026-08-13): a research agent
+   diffs the field against the previous sweep's recorded baseline — never a from-scratch survey.
 2. **Merge** the working branch into `main` locally.
 3. *(Retired 2026-07-31.)* The "copy `src/` to `backups/vX.Y.Z/`" step was never practised — no
    `backups/` directory exists, and the actual cut commits (e.g. 934a4e5, Cut v0.0.9) stamp
