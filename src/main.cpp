@@ -14,6 +14,7 @@
 #include "world/tech_gate.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <exception>
@@ -56,12 +57,28 @@ long kv_get(const std::unordered_map<std::string, std::string>& kv, const char* 
 /// would silently truncate, so `floor_price=3.75` would list at 3 and undercut
 /// the floor the caller asked for. A rounding error in a price is not a rounding
 /// error, it is a different order.
+///
+/// NON-FINITE INPUT IS REFUSED HERE, at the boundary, and this is load-bearing.
+/// `std::atof` happily parses "nan" and "inf", and the seam's own validation
+/// cannot catch them: `place_sell_order` guards `floor_price < 0.0f`, and every
+/// comparison against NaN is false, so a NaN price passes validation, is stored
+/// in `world.sell_orders`, is folded into `world::state_hash`, is written to the
+/// save stream — and reaches `clear_markets`' book sort, where a value that is
+/// neither less than, equal to, nor greater than any other stops the comparator
+/// being a strict weak ordering and makes `std::sort` undefined behaviour. An
+/// infinity is the same story one step later: it survives every `> 0.0f` guard
+/// and then overflows a `static_cast<int>` in the procurement lead-time
+/// derivation. Neither was reachable before this parser learned to read floats,
+/// which is exactly why the guard belongs in the same function.
 double kv_getf(const std::unordered_map<std::string, std::string>& kv, const char* key, double dflt)
 {
     const auto it = kv.find(key);
     if (it == kv.end())
         return dflt;
-    return std::atof(it->second.c_str());
+    const double v = std::atof(it->second.c_str());
+    if (!std::isfinite(v))
+        return dflt; // "nan" / "inf" / overflow — treat as if the key were absent
+    return v;
 }
 
 const char* corp_command_result_name(corp_command_result r)
@@ -241,8 +258,18 @@ int run_serve(int ticks)
             // blackboard's market facts are keyed by MARKET id, not by body, so an
             // agent reading state could see prices on a body it had no way to
             // name — it could know a market existed and could not sell into it.
-            for (const auto& [id, b] : w.bodies)
+            // Ascending id, not map order. `w.bodies` is an unordered_map, and
+            // an agent's transcript is a replay artifact — two runs of the same
+            // seed must produce the same bytes, or a trace corpus records the
+            // allocator's mood alongside the world's. CORPS has the same latent
+            // issue and is left alone here rather than fixed in passing.
+            std::vector<entity_id> body_ids;
+            body_ids.reserve(w.bodies.size());
+            for (const auto& [id, b] : w.bodies) body_ids.push_back(id);
+            std::sort(body_ids.begin(), body_ids.end());
+            for (const entity_id id : body_ids)
             {
+                const body_component& b = w.bodies.at(id);
                 const char* phase = "hidden";
                 switch (b.survey.phase)
                 {

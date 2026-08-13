@@ -1,5 +1,6 @@
 #include "corp_ai.hpp"
 
+#include "budget_system.hpp"  // compute_building_opex, body_mean_habitability
 #include "building_profit.hpp"
 #include "economy_system.hpp"  // economy_report, agency_event, solve_workforce_target
 #include "market_clearing.hpp" // market_for_tile
@@ -90,6 +91,13 @@ const char* corp_verb_label(corp_verb v)
         case corp_verb::place_sell_order:   return "sell order";
         case corp_verb::remove_sell_order:  return "sell-order withdrawal";
         case corp_verb::set_workforce_auto: return "workforce auto";
+        // BL-350's procurement trio. Absent, these fell through to the generic
+        // "action" below, so a contract decision would narrate itself into the
+        // world history log as "Corp 34590 ordered a action". Exhaustive now, so
+        // -Wswitch names the next omission at compile time.
+        case corp_verb::request_quote:      return "quote request";
+        case corp_verb::accept_quote:       return "quote acceptance";
+        case corp_verb::cancel_contract:    return "contract cancellation";
     }
     return "action";
 }
@@ -229,6 +237,24 @@ float focus_weight(industrial_focus f, corp_verb v)
         default:
             return 1.0f; // dials are focus-neutral corrections
     }
+}
+
+/// What a building costs per tick while it sits idle — the only outflow that
+/// survives decommissioning (BL-049's fixed material share of maintenance; the
+/// labour share and all wages stop).
+///
+/// This is the correct counterfactual for BOTH the idle and the resume gain, and
+/// it is deliberately obtained by asking `compute_building_opex` rather than by
+/// re-deriving it: the split lives in one place (budget_system.cpp), the budget
+/// charges exactly this figure, and a constant copied here would be a second
+/// definition to keep in step. Probes a copy so nothing is mutated.
+float idle_maintenance(const world& w, const recipe_registry& reg, const building_component& b)
+{
+    building_component probe = b;
+    probe.decommissioned     = true;
+    const entity_id body     = tile_body(w, b.tile);
+    const float     hab      = (body != null_entity) ? body_mean_habitability(w, body) : 1.0f;
+    return compute_building_opex(probe, reg.economics(b.type), 1.0f, hab).maintenance;
 }
 
 } // namespace
@@ -576,13 +602,23 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 // cannot be resumed on REACH grounds is a real gap, but an older
                 // and separate one.
                 const building_profit pp = estimate_prospective_profit(
-                    w, reg, b.tile, b.type, b.target_resource, b.recipe);
+                    w, reg, b.tile, b.type, b.target_resource, b.recipe, &b);
                 if (pp.has_data)
                 {
-                    // Exact mirror of the idle gain below. Idle is worth
-                    // −maintenance (maintenance is paid either way); running is
-                    // worth pp.net(). So resuming gains pp.net() − (−maintenance).
-                    const float gain = pp.net() + pp.maintenance;
+                    // Exact mirror of the idle gain below. An idled building is
+                    // worth −`idle_maintenance` per tick; a running one is worth
+                    // pp.net(). So resuming gains pp.net() − (−idle_maintenance).
+                    //
+                    // It is NOT `+ pp.maintenance`. "Maintenance is paid either
+                    // way" is the intuitive claim and it is false: BL-049 splits
+                    // maintenance into a fixed material share that survives
+                    // decommissioning and a labour share that does not, so idling
+                    // saves 70% of it. Crediting the full running figure
+                    // overstates every resume by 0.7 × maintenance — a
+                    // systematic bias toward running, in the one estimate whose
+                    // whole purpose is to stop the AI resuming things it should
+                    // leave idle.
+                    const float gain = pp.net() + idle_maintenance(w, reg, b);
 
                     // NOT glut-forecast. Tried and reverted 2026-08-13: adding
                     // forecast_glut_multiplier here (mirroring the build path)
@@ -610,13 +646,21 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 continue; // an idled building offers no other dial
             }
 
-            // Idle: sustained loss where stopping (wages saved, maintenance
-            // kept) beats running. Rides the BL-079 loss_streak; the 4-tick
-            // gate keeps "no idling without a sustained streak" true while
-            // letting the strategic tier act ahead of the 8-tick reflex.
+            // Idle: sustained loss where stopping (wages saved, the fixed share
+            // of maintenance still owed) beats running. Rides the BL-079
+            // loss_streak; the 4-tick gate keeps "no idling without a sustained
+            // streak" true while letting the strategic tier act ahead of the
+            // 8-tick reflex.
             if (bp.has_data && bp.net() < 0.0f && b.loss_streak >= 4)
             {
-                const float gain = -bp.net() - bp.maintenance; // net idle − net running
+                // net idle − net running. Same correction as the resume side
+                // above, in the opposite direction: subtracting the RUNNING
+                // maintenance understated the gain from idling by 0.7 × it,
+                // because BL-049's material share is owed whether the building
+                // runs or not. The two errors were mirror images and so never
+                // produced a single-tick flip — they just both leaned toward
+                // keeping loss-makers running.
+                const float gain = -bp.net() - idle_maintenance(w, reg, b);
                 if (gain > margin_gate)
                 {
                     candidate c;
@@ -1103,8 +1147,29 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     ev.value = w.buildings.count(c.cmd.subject)
                                    ? w.buildings.at(c.cmd.subject).workforce_target : 0;
                     break;
+                // BL-350's procurement trio. There is no agency_event::kind for a
+                // contract yet, and inventing one here would put a kind in the
+                // chat feed that nothing renders. What matters is that these no
+                // longer fall out of the switch UNHANDLED: `agency_event ev{}`
+                // zero-initialises, and kind 0 is `recipe_switch`, so an
+                // unhandled verb would have narrated a contract as "switched
+                // recipe" — a wrong statement rather than a missing one. The
+                // scorer does not emit these today; an agent on the MCP seam
+                // can, and this path runs for whatever the seam applies.
+                //
+                // Reported as a recipe_switch would be a lie, so instead the
+                // event is not pushed at all: `continue` past the feed for verbs
+                // the feed has no vocabulary for, leaving the world history log
+                // below (which narrates from the verb label, and now knows all
+                // fifteen) as the record.
+                case corp_verb::request_quote:
+                case corp_verb::accept_quote:
+                case corp_verb::cancel_contract:
+                    ev.corp = null_entity; // sentinel: "no feed event for this verb"
+                    break;
             }
-            report.agency_events.push_back(ev);
+            if (ev.corp != null_entity)
+                report.agency_events.push_back(ev);
 
             // World history log (BL-208): additive; economy_report's own
             // agency_events flow (chat feed, BL-205) is untouched.

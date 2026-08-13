@@ -2959,20 +2959,19 @@
   },
   {
    "id": "NR-178",
-   "title": "The rival AI's idle/resume pair was a measured limit cycle — three fixes cut it ~30-56%, and the residual is a two-tier estimator disagreement",
+   "title": "The rival AI's idle/resume pair was a measured limit cycle — three estimator errors, and fixing them stopped it outright",
    "raised": "2026-08-13",
    "kind": "observation",
    "status": "open",
    "source": "2026-08-13 AI gameplay session; measured with tools/verify/ai_skill_harness.cpp before and after.",
-   "what": "ai_skill_harness's action tally showed `resume` outnumbering every other verb roughly 10:1 (134-255 resumes per 30-tick rollout against 12-17 idles, 3-6 builds). Root cause: the BL-079 reflex tier (economy_system.cpp) and the BL-202 strategic tier (corp_ai.cpp) both own building_component.decommissioned, used DIFFERENT profit estimators, and the reflex tier set no ai_cooldown when it idled — so a resume could reverse an 8-tick-loss idling on the very next evaluation. Three fixes landed: (1) the resume candidate now scores with estimate_prospective_profit, the exact mirror of the idle candidate's estimate_building_profit, instead of a hand-rolled revenue-minus-wages formula that omitted maintenance, input cost, stack decay and the depletion taper; (2) the reflex tier now sets ai_cooldown when it idles, the hold AI_OPPONENT.md's hysteresis section already specifies for any state change; (3) the harness now counts the reflex tier's own idlings, which issue no command and so appeared in no action[] row. Measured effect across seeds 0-3: resume 134->59, 178->129, 193->126, 153->84 (-30% to -56%); set_workforce roughly doubled (10-18 -> 24-38) because fix (2) in NR-179 unblocked the other direction; net worth up 0.5-0.9%; solvency, survival and determinism unchanged (R0 byte-identical).",
-   "why_it_matters": "Two things Ben should see. First, the fix is real but PARTIAL — with the reflex tier's idlings now visible, resumes are still ~85% of total idlings (seed 1: 129 resumes against 137+6=143 idlings), so the cycle is damped, not broken. Breaking it means making the two tiers agree, which is a design call: either the reflex tier routes through apply_corp_command (it predates the seam and mutates components directly), or its realised-profit trigger and the strategic tier's modelled-profit trigger are reconciled. Both move every blessed golden, so neither belongs in a session that was not scoped for it. Second, this is what a legibility surface is for — the AI's dominant behaviour for an unknown number of sprints was reversing its own decisions, and nothing said so until the instrument was asked to name every verb.",
+   "what": "ai_skill_harness's action tally showed `resume` outnumbering every other verb roughly 10:1 (134-255 resumes per 30-tick rollout against 12-17 idles, 3-6 builds). Two structural causes and three arithmetic ones. STRUCTURAL: the BL-079 reflex tier (economy_system.cpp) and the BL-202 strategic tier (corp_ai.cpp) both own building_component.decommissioned, used DIFFERENT profit estimators, and the reflex tier set no ai_cooldown when it idled -- so a resume could reverse an eight-tick-loss idling on the very next evaluation. ARITHMETIC, all three found by adversarial review of the first fix and all three in how estimate_prospective_profit was being called: (a) it authors a hypothetical building at construct_building's defaults (0.5 assigned, target 100), so a site dialled to 200 or to 0 was priced at a staffing level it would not come back at; (b) stack_members filters on tile/type/target only, so the existing site was already in the list and the default size()+1 rank charged it an extra step of BL-193 decay against itself (0.8x lone, 0.512x at rank 3); (c) 'maintenance is paid either way' is false -- BL-049 splits it into a fixed material share that survives decommissioning and a labour share that does not, so idling saves 70% of it, and crediting the full running figure overstated every resume by 0.7 x maintenance. The idle candidate carried the mirror-image version of (c) and is corrected with it. Fixes: the reflex tier now sets the cooldown; estimate_prospective_profit gained an optional `existing` parameter carrying the real staffing and the real stack rank; both gain formulas now use the idle maintenance obtained from compute_building_opex rather than a copied constant. MEASURED: resume 134/178/193/153/255 -> 0/0/0/0/1; reflex-tier idlings 67/137/132/93/198 -> 9/8/7/6/7; net worth UP on every seed; solvency, survival and determinism unchanged. Dial-thrash ceilings tightened 230-410 -> 40-69.",
+   "why_it_matters": "Three things worth Ben's attention. First, the AI's single most frequent action for an unknown number of sprints was reversing its own decision, and nothing said so until the instrument was asked to name every verb -- the tally could not name six of fifteen, and the reflex tier's idlings issue no command so appeared in no row at all. Second, the first fix looked good and was wrong: it cut resumes 30-56% and read as a partial success, and only an adversarial review found that the estimator was being called with a hypothetical building's staffing and an inflated stack rank. A plausible improvement masked the real defect, which is the same pattern SPRINTS.md recorded overturning four times last sprint. Third, the thrash ceilings passed throughout, because they had been blessed FROM the thrashing behaviour -- see NR-181.",
    "options": [
-    "Route the BL-079 reflex tier through apply_corp_command so both tiers share one seam, one cooldown and one decision log — the largest fix, and the one that makes the AI's whole behaviour visible in the ring.",
-    "Reconcile the triggers instead: give the reflex tier the same estimator the strategic tier resumes on, so a building is never idled by one number and resumed on another.",
-    "Accept the damped cycle and band it — add a golden asserting resumes stay under some multiple of idlings, so the ratio cannot silently regress further.",
-    "Leave as landed and revisit when the 0 CE refocus settles what the rival AI is even for."
+    "Accept as landed; the loop is closed and the ceilings now bind.",
+    "Still route the BL-079 reflex tier through apply_corp_command so both tiers share one seam, one cooldown and one decision log -- now a legibility improvement rather than a bug fix, since the estimators agree.",
+    "Add the resume-to-idle ratio as its own banded metric so the shape cannot regress silently even if the ceilings drift."
    ],
-   "recommendation": "Option 3 now, option 1 when the corp-AI arc is next opened. The ratio band is cheap, it makes the residual a tracked number rather than a remembered anecdote, and it is the only one of the four that does not move goldens. Option 1 is the right structural answer but it is a corp-AI-arc-sized change, and NR-177's refocus means the arc's purpose is itself in question.",
+   "recommendation": "Accept, and keep option 2 on the list as legibility work rather than urgent repair. The reflex tier's direct mutation is still the reason half the AI's behaviour is invisible to the decision ring, and that will matter for BL-279's trace corpus (which reads the ring), but it is no longer causing wrong behaviour.",
    "files": [
     "src/world/corp_ai.cpp",
     "src/world/economy_system.cpp",
@@ -3031,8 +3030,8 @@
    "kind": "observation",
    "status": "open",
    "source": "2026-08-13 AI gameplay session.",
-   "what": "The harness's verb_name switch stopped at hire_unit, so the BL-293 order-book verbs, set_workforce_auto and the three BL-350 procurement verbs all pooled into a single action[?] row — 7-8 actions per rollout that turned out to be place_sell_order, i.e. the AI's entire trading behaviour was unnamed in its own skill instrument. Fixed: the switch is now exhaustive over corp_verb, so -Wswitch guards it the next time the seam grows. Separately, the dial-thrash ceilings (230-410 per seed) pass comfortably against rollouts containing 134-255 resumes, because they were blessed FROM a run of the thrashing behaviour — the detector certifies the defect it was built to find.",
-   "why_it_matters": "Both are the same failure in different clothes: a golden blessed from observed behaviour encodes whatever the behaviour was, including its bugs, and a tally that cannot name a verb cannot band it either. The project's convention that goldens are disposable and re-blessed routinely is right, but it means the blessing moment is the only point where anyone asks whether the observed number is the number that SHOULD be observed, and for these ceilings nobody did. Worth a rule rather than a one-off fix: a thrash ceiling in particular should be argued from the action budget (corps x evals x max_dials) rather than blessed from a run.",
+   "what": "The harness's verb_name switch stopped at hire_unit, so the BL-293 order-book verbs, set_workforce_auto and the three BL-350 procurement verbs all pooled into a single action[?] row — 7-8 actions per rollout that turned out to be place_sell_order, i.e. the AI's entire trading behaviour was unnamed in its own skill instrument. Fixed: the switch is now exhaustive over corp_verb, so -Wswitch guards it the next time the seam grows. Two further switches in corp_ai.cpp had the same omission and are also now exhaustive -- corp_verb_label was narrating a contract decision into the world history log as 'ordered a action', and the agency_event mapping had NO default at all, so an unhandled verb would have kept agency_event's zero-initialised kind and narrated a procurement as 'switched recipe' (a wrong statement rather than a missing one). Separately, the dial-thrash ceilings (230-410 per seed) pass comfortably against rollouts containing 134-255 resumes, because they were blessed FROM a run of the thrashing behaviour — the detector certifies the defect it was built to find.",
+   "why_it_matters": "Both are the same failure in different clothes: a golden blessed from observed behaviour encodes whatever the behaviour was, including its bugs, and a tally that cannot name a verb cannot band it either. The project's convention that goldens are disposable and re-blessed routinely is right, but it means the blessing moment is the only point where anyone asks whether the observed number is the number that SHOULD be observed, and for these ceilings nobody did. Worth a rule rather than a one-off fix: a thrash ceiling in particular should be argued from the action budget (corps x evals x max_dials) rather than blessed from a run. Update 2026-08-13: the ceilings have now been tightened from 230-410 to 40-69 against corrected behaviour, so this specific instance is closed; the RULE (derive a thrash ceiling from the action budget rather than blessing it from a run) is what remains open.",
    "options": [
     "Derive the dial ceiling from the budget arithmetic instead of blessing it from a run, so it binds on the first regression rather than the second.",
     "Add the resume-to-idle ratio as its own banded metric (see NR-178 option 3).",
@@ -3062,6 +3061,47 @@
     "docs/ai/ACTIONS.json",
     "docs/ai/ACTIONS.md",
     "src/world/corp_command.hpp"
+   ]
+  },
+  {
+   "id": "NR-183",
+   "title": "The constraint-tax leg of the 2026-08-08 C-route ruling has been superseded in framing — the ruling still holds, but on its other legs",
+   "raised": "2026-08-13",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "2026-08-13 AI gameplay session; SOTA refresh over the window since the 2026-08-03 sweep.",
+   "what": "AI_OPPONENT.md section 10g's ruling (Stage A/B stays the action generator; a language model must not emit corp_command as the shipped rival) rested on three arguments: (1) distilling corp_ai.cpp cannot exceed corp_ai.cpp, the behavioural-cloning ceiling; (2) legibility and determinism are named requirements; (3) the CONSTRAINT TAX -- small open-weight models measured dropping from 91.5% to 48.0% executable accuracy under a hard tool-call schema. Argument (3) has been reframed by later work. 'Capacity, Not Format' (arXiv 2606.09410) finds the penalty tracks a model's SPARE CAPACITY rather than the output format: Sonnet loses nothing under a hard schema, Haiku drops 36.2pp, GPT-4o-mini 28.0pp, and APIs that reason before serialising largely eliminate the tax. DECISION TAKEN on Ben's behalf: the ruling is left standing and NOT reopened, because arguments (1) and (2) are untouched and neither depends on a format penalty. What is recorded instead is the replacement: multi-turn tool-calling accuracy at Io's target model size is poor and is a STRONGER disqualifier than the constraint tax ever was -- xLAM-2-3B scores 55.62% multi-turn on BFCL v4 and Qwen3-4B 35.25%, against 62-66% single-turn, and one 4X turn is many sequential calls with compounding error.",
+   "why_it_matters": "A ruling that quietly rests on a superseded finding is a ruling nobody can re-examine honestly later. The correction does not change the outcome, which is exactly why it is worth writing down now rather than when someone tries to reopen the question and finds the cited evidence has moved. Ben should know the argument he ruled on has a weaker third leg and a stronger replacement available.",
+   "options": [
+    "Accept: amend section 10g's constraint-tax paragraph to cite the multi-turn tool-calling numbers instead, keeping the ruling.",
+    "Reopen the ruling on the grounds that one of its three legs weakened -- not recommended, since the other two are the load-bearing ones.",
+    "Leave both the ruling and its stated reasoning untouched and treat this entry as the record."
+   ],
+   "recommendation": "Option 1, next time section 10 is edited. It is a citation swap, not a re-argument, and it leaves the ruling stronger than it was.",
+   "files": [
+    "docs/ai/AI_OPPONENT.md",
+    "docs/ai/LANGUAGE_POLICY_FEASIBILITY.md"
+   ]
+  },
+  {
+   "id": "NR-184",
+   "title": "The --serve float parser admitted NaN and Inf into the order book, where a NaN price makes the market sort undefined behaviour",
+   "raised": "2026-08-13",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "2026-08-13 AI gameplay session; found by adversarial review of this session's own change, not by a failing test.",
+   "what": "Teaching --serve's COMMAND opcode to parse float arguments (needed to reach place_sell_order and the BL-350 procurement verbs at all) introduced a hole, because std::atof parses 'nan' and 'inf' happily and the seam's validation cannot catch either. place_sell_order's only price guard is `cmd.floor_price < 0.0f`, and every comparison against NaN is false, so a NaN price passed validation, entered world.sell_orders, was folded into world::state_hash, was written to the save stream, and reached clear_markets' book sort -- where a value that is neither less than, equal to nor greater than any other stops the comparator being a strict weak ordering, which makes std::sort undefined behaviour rather than merely wrong. An infinity survived every `> 0.0f` guard and then overflowed a static_cast<int> in request_quote's lead-time derivation. DECISIONS TAKEN: (1) non-finite values are refused at the parser and treated as if the key were absent, because the boundary is the only place that can distinguish 'the caller sent nonsense' from 'the value is legitimately zero'; (2) request_quote's lead time is clamped before narrowing, which protects every caller rather than just this one.",
+   "why_it_matters": "It is worth recording as a decision rather than a fix because of where the hole came from. Nothing in the diff was careless -- the parser was added to close a real gap, and its guard was the same `< 0.0f` the rest of the seam uses. What made it dangerous is that the AI-facing seam is an UNTRUSTED input boundary in a way the UI is not: the UI's controls cannot emit a NaN, so the validation downstream of them never had to. Every future verb added to this protocol inherits that property, and the general rule -- validate at the protocol edge, not at the seam that assumed a UI wrote it -- is the thing to carry, not the two specific guards.",
+   "options": [
+    "Accept as landed.",
+    "Go further and validate ranges (not just finiteness) at the protocol edge, so a caller cannot submit an absurd-but-finite quantity either.",
+    "Push the finiteness check down into apply_corp_command so every caller is covered, not just the --serve path."
+   ],
+   "recommendation": "Accept, and consider option 3 when the seam next grows a float argument. The lead-time clamp already went into apply_corp_command for exactly that reason; the finiteness check stayed at the parser only because the UI genuinely cannot produce a NaN and adding a guard there would be dead code with a misleading comment.",
+   "files": [
+    "src/main.cpp",
+    "src/world/corp_command.cpp",
+    "tools/mcp/smoke.js"
    ]
   }
  ]

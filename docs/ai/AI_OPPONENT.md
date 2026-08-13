@@ -366,18 +366,40 @@ threshold, never a duplicate, and never on the player's own corp.
 > revenue-minus-wages with no maintenance, no input cost, no stack decay and no depletion taper,
 > so it read high on exactly the buildings the reflex tier had just idled.
 >
-> Both are fixed — resume now scores on `estimate_prospective_profit` (the exact mirror, and it
-> makes idled *processors* resumable, which the extraction-only branch never did), and the reflex
-> tier sets the cooldown its own state change always warranted. Measured effect: resume 134→59,
-> 178→129, 193→126, 153→84 across seeds 0–3, net worth up 0.5–0.9%, solvency, survival and
-> determinism unchanged.
+> Both are fixed. The reflex tier sets the cooldown its own state change always warranted, and
+> resume now scores on `estimate_prospective_profit` — which also makes idled *processors*
+> resumable, something the extraction-only branch never allowed.
 >
-> **It is damped, not cured, and the residual is the honest number to carry.** With the reflex
-> tier's own idlings now counted (they issue no command, so they appeared in no `action[]` row and
-> the oscillation was unreadable from this instrument), resumes are still ~85% of total idlings.
-> Closing it means making the two tiers agree — either the reflex tier routes through
-> `apply_corp_command`, or its realised-profit trigger is reconciled with the strategic tier's
-> modelled-profit one. Both move every blessed golden. See the review queue.
+> **Reaching for that estimator was right; reaching for it naively was not.** An adversarial review
+> of the first cut found three compounding errors in how it was being called, and fixing them is
+> what actually closed the loop:
+>
+> 1. **It was pricing a hypothetical building, not this one.** The function authors a fresh probe
+>    at `construct_building`'s defaults (0.5 assigned, target 100). A site the scorer had dialled
+>    to 200 — or to 0 — was therefore priced at a staffing level it would not come back at. It now
+>    takes an optional `existing` building and reads the real dial.
+> 2. **It counted the building as an extra member of its own stack.** `stack_members` filters on
+>    tile/type/target only, so an existing site is already in that list, and the default
+>    `size() + 1` rank charged it one further step of BL-193 decay against itself — 0.8× for a lone
+>    site, 0.512× at rank 3. It now takes the rank it actually holds.
+> 3. **"Maintenance is paid either way" is false.** BL-049 splits maintenance into a fixed material
+>    share that survives decommissioning and a labour share that does not, so idling saves 70% of
+>    it. Crediting the full running figure overstated every resume by 0.7 × maintenance — a
+>    systematic bias toward running, in the one estimate whose purpose is to stop the AI resuming
+>    what it should leave idle. The idle side carried the mirror-image error and is corrected with
+>    it; the two were self-consistent, which is why neither ever produced a single-tick flip and
+>    why both went unnoticed.
+>
+> **Measured, and the result is categorical rather than incremental.** `resume` goes
+> 134/178/193/153/255 → **0/0/0/0/1** across the five benchmark seeds, and the reflex tier's own
+> idlings — the buildings it was idling only for the scorer to resume them straight back into
+> losses — go 67/137/132/93/198 → **9/8/7/6/7**. Net worth is **up on every seed**, so none of the
+> churn was profitable. Solvency, survival and determinism are unchanged (R0 byte-identical).
+>
+> The harness now also counts the reflex tier's idlings, which issue no command and so appeared in
+> no `action[]` row; without that the oscillation was not readable from this instrument at all.
+> The dial-thrash ceilings have been tightened from 230–410 to 40–69 accordingly — they had been
+> blessed from runs containing the very oscillation they exist to detect.
 
 **A separate defect in the same block, also fixed 2026-08-13: the workforce dial could only ever
 move one way per building.** Its gain was estimated as `variable × (proposed − target) / target`
@@ -880,7 +902,15 @@ rather than by failing.
 ### 10f. Sources added 2026-08-03
 
 - Vox Deorum — hybrid LLM architecture for 4X, 2,327 games, open-weight parity, per-game token cost. https://arxiv.org/abs/2512.18564 · https://github.com/CIVITAS-John/vox-deorum
-- CivBench — MCP-driven Civ VI benchmark; the sensorium effect and the knowing-doing gap. https://arxiv.org/html/2604.07733v1 · https://tasolabs.com/blog/ai/introducing-civbench-season-001
+- CivBench — MCP-driven Civ VI benchmark; the sensorium effect and the knowing-doing gap. https://tasolabs.com/blog/ai/introducing-civbench-season-001
+  > **Citation corrected 2026-08-13.** This line previously also carried
+  > `arxiv.org/html/2604.07733v1`, which is a **different project of the same name**:
+  > *CivBench: Progress-Based Evaluation for LLMs' Strategic Decision-Making in Civilization V*,
+  > from the Vox Deorum authors, which trains victory-probability estimators on turn-level state
+  > across 307 games. The sensorium-effect and knowing-doing-gap findings § 10c.4 attributes to
+  > "CivBench" come from the **Civ VI / `civ6-mcp`** one, not from that paper. Two unrelated works
+  > share the name; § 10b's table row conflates them under one heading and should be split when
+  > that section is next touched.
 - civ6-mcp — MCP server over Civ VI's FireTuner protocol; rule-enforcing API as the write channel. https://github.com/lmwilki/civ6-mcp
 - civStation — layered MCP, human-sets-strategy/agent-executes. https://github.com/NomaDamas/civStation
 - CivAgent — LLM digital player in Unciv; the data-flywheel framing. https://github.com/fuxiAIlab/CivAgent · https://arxiv.org/html/2502.20807v1

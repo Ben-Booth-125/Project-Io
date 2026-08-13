@@ -55,15 +55,33 @@ AI's entire trading behaviour into an unnamed `action[?]` row). Making it exhaus
 real signal underneath: **`resume` outnumbered every other verb about 10:1** — 134–255 resumes per
 30-tick rollout against 12–17 idles and 3–6 builds.
 
-Two causes, both structural. The **reflex tier and the strategic tier own the same
-`decommissioned` flag and neither knew the other existed** — BL-079's block idles a building
-directly on the component and set no `ai_cooldown`, so BL-202's scorer could reverse an eight-tick-
-loss idling on its very next evaluation. And **the two sides used different estimators**: idle
-scored on `estimate_building_profit` while resume hand-rolled revenue-minus-wages with no
-maintenance, no input cost, no stack decay and no depletion taper, so it read high on precisely the
-buildings the reflex tier had just idled. Resume now scores on `estimate_prospective_profit`, the
-exact mirror — which also makes idled **processors** resumable, something the extraction-only
-branch never allowed — and the reflex tier sets the cooldown its own state change always warranted.
+Two structural causes and three arithmetic ones. **Structural:** the reflex tier and the
+strategic tier own the same `decommissioned` flag and neither knew the other existed — BL-079's
+block idles a building directly on the component and set no `ai_cooldown`, so BL-202's scorer
+could reverse an eight-tick-loss idling on its very next evaluation. And the two sides used
+different estimators, idle scoring on `estimate_building_profit` while resume hand-rolled
+revenue-minus-wages with no maintenance, input cost, stack decay or depletion taper.
+
+Reaching for `estimate_prospective_profit` to close that was right. Reaching for it *naively* was
+not, and the first cut looked like a partial success — resume down 30–56% — which is exactly how a
+plausible fix hides a real defect. An **adversarial review of this session's own diff** found three
+compounding errors in how the estimator was being called:
+
+**It priced a hypothetical building, not this one.** The function authors a fresh probe at
+`construct_building`'s defaults (0.5 assigned, target 100), so a site the scorer had dialled to 200
+— or to 0 — was priced at a staffing level it would never come back at. It now takes an optional
+`existing` building.
+
+**It counted the building as an extra member of its own stack.** `stack_members` filters on
+tile/type/target only, so an existing site is already in that list; the default `size() + 1` rank
+charged it a further step of BL-193 decay against itself — 0.8× lone, 0.512× at rank 3.
+
+**"Maintenance is paid either way" is false.** BL-049 splits maintenance into a fixed material
+share that survives decommissioning and a labour share that does not, so idling saves 70% of it.
+Crediting the full running figure overstated every resume by 0.7 × maintenance — a systematic bias
+toward running, in the one estimate whose whole purpose is to stop the AI resuming what it should
+leave idle. The idle candidate carried the mirror-image error; the two were self-consistent, which
+is why neither ever produced a single-tick flip and why both went unseen.
 
 A third, independent defect in the same block: **the workforce dial could only ever move one way per
 building.** Its gain was `variable × (proposed − target) / target` with `variable = revenue − inputs
@@ -73,15 +91,15 @@ optimum `solve_workforce_target` exists to find scored negative in both directio
 discarded. The solver now reports its own modelled gain through an optional out-param; it already
 computed both endpoints.
 
-**Measured, across seeds 0–3:** resume 134→59, 178→129, 193→126, 153→84. Dial actions roughly
-doubled (10–18 → 24–38) as the unreachable direction became scoreable. Net worth up 0.5–0.9%,
-solvency and survival unchanged, determinism byte-identical (R0 green).
+**Measured, and the result is categorical rather than incremental.** `resume` goes
+134/178/193/153/255 → **0/0/0/0/1** across the five benchmark seeds. The reflex tier's own idlings —
+the buildings it was idling only for the scorer to resume straight back into losses — go
+67/137/132/93/198 → **9/8/7/6/7**. Net worth is **up on every seed**, so none of the churn was
+profitable. Solvency, survival and determinism unchanged (R0 byte-identical).
 
-**It is damped, not cured, and the harness now says so.** The reflex tier issues no commands, so its
-idlings appeared in no `action[]` row and the oscillation was unreadable from this instrument at
-all; counting them (`reflex_idles`, printed but deliberately unbanded) shows resumes are still ~85%
-of total idlings. Closing it means making the two tiers agree, which moves every blessed golden and
-is a corp-AI-arc-sized change, not a session one.
+The harness now counts those reflex-tier idlings too; they issue no command, so without that the
+oscillation was not readable from this instrument at all. Dial-thrash ceilings tightened 230–410 →
+40–69, because they had been blessed from runs containing the very oscillation they exist to catch.
 
 **One hypothesis raised and killed by measurement.** The residual looked like a price-response limit
 cycle — idle, price recovers, resume, price collapses — so BL-203's glut forecast was applied to the
@@ -101,13 +119,33 @@ v0.3.0 behind BL-094 (governing body); anything built against that today is a be
 design. The seam repaired here is the frame-agnostic layer — opcodes, argument forwarding, typed
 rejections, a smoke check — that a mercenary verb plugs into when one exists.
 
-**Review queue.** Five entries filed as the work happened (NR-178 the oscillation and its residual,
-NR-179 the workforce-dial signature change taken on Ben's behalf, NR-180 the bimodal forecast and
-the supply/demand question under it, NR-181 goldens blessed from the behaviour they exist to catch,
-NR-182 the action dictionary running four verbs behind the seam it is transcribed from).
+**The review pass earned its cost, and that is the session's real lesson.** Four adversarial lenses
+were run over this session's own uncommitted diff, and one of them found a **critical** defect the
+change had introduced: teaching the parser to read floats let `std::atof` admit `nan`, which passes
+`floor_price < 0.0f` (every comparison against NaN is false), enters `world.sell_orders`, is folded
+into `state_hash`, is written to the save stream, and reaches `clear_markets`' book sort — where it
+stops the comparator being a strict weak ordering and makes `std::sort` undefined behaviour. The
+same lens found an infinity overflowing a `static_cast<int>` in the procurement lead time. Both are
+now refused at the protocol edge, which is the general rule worth keeping: **the AI-facing seam is
+an untrusted input boundary in a way the UI is not**, because a control cannot emit a NaN and the
+validation downstream of it never had to.
 
-**Runtime.** ~3 h, Full mode (research sweep, two strands, one new committed check, one hypothesis
-measured and discarded).
+The same pass found the three estimator errors above, which is why the oscillation actually closed
+rather than merely damping. Two of the file's own new assertions were also flagged as **vacuous** —
+the survey check compared fact counts, which would have passed whether or not the survey ever
+advanced, and the result-code check could not detect the switch fall-through it claimed to detect
+because the fall-through returns a code that IS in the valid set. Both rewritten to assert the
+thing: the survey's own progress counters must move, and a BL-350-specific decline must be
+observable.
+
+**Review queue.** Seven entries filed as the work happened (NR-178 the oscillation and its five
+causes, NR-179 the workforce-dial signature change taken on Ben's behalf, NR-180 the bimodal
+forecast and the supply/demand question under it, NR-181 goldens blessed from the behaviour they
+exist to catch, NR-182 the action dictionary running four verbs behind the seam it transcribes,
+NR-183 the constraint-tax leg of the 10g ruling superseded in framing, NR-184 the NaN boundary).
+
+**Runtime.** ~4 h, Full mode (research sweep, two strands, one new committed check, one hypothesis
+measured and discarded, one adversarial review pass that changed the outcome).
 
 ---
 

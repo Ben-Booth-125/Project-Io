@@ -422,7 +422,10 @@ int solve_workforce_target(const world& w, const recipe_registry& reg,
         // necessarily on the step-10 grid (the player's set_workforce verb accepts
         // any 0-200), so it is evaluated directly rather than looked up.
         const float gain = best_net - net_at(b.workforce_target);
-        *out_gain = (gain > 0.0f) ? gain : 0.0f; // clamp float noise at the optimum
+        // Floored, not clamped-for-noise: an off-grid incumbent can legitimately
+        // beat every grid point, and a negative gain and a zero gain say the same
+        // thing to the only caller — the move is not worth making.
+        *out_gain = (gain > 0.0f) ? gain : 0.0f;
     }
     return best_wt;
 }

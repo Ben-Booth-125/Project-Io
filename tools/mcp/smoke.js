@@ -53,14 +53,29 @@ const VERBS = [
   'request_quote', 'accept_quote', 'cancel_contract',
 ];
 
-// Every code corp_command_result declares. A result outside this set means the
-// C++ switch fell through to its catch-all and the seam is lying about why.
+// Every code corp_command_result declares.
+//
+// NOTE ON WHAT THIS CAN AND CANNOT CATCH. A name outside this set means the seam
+// invented a code. It does NOT catch a missing switch case, because
+// corp_command_result_name's fall-through returns "rejected_invalid", which is
+// itself a legitimate member — the defect this file was written after was
+// precisely four codes collapsing into that one, and set membership is blind to
+// it. What catches that is the procurement probe below, which reaches a decline
+// the seam can only express with one of the four BL-350 names.
 const RESULT_CODES = new Set([
   'applied', 'rejected_no_corp', 'rejected_not_owner', 'rejected_invalid',
   'rejected_placement', 'rejected_funds', 'rejected_state', 'rejected_tech_locked',
   'rejected_no_capacity', 'rejected_no_input_access', 'rejected_embargo',
   'rejected_reputation',
 ]);
+
+// The four BL-350 declines. If NONE of these is ever observable across a sweep of
+// suppliers, either the world genuinely has no declining supplier, or the switch
+// is collapsing them — the check below reports which, rather than guessing.
+const PROCUREMENT_DECLINES = [
+  'rejected_no_capacity', 'rejected_no_input_access', 'rejected_embargo',
+  'rejected_reputation',
+];
 
 let failures = 0;
 function check(ok, label, detail) {
@@ -240,18 +255,34 @@ async function main() {
 
     // hire_unit reads unit_type; request_quote reads counterparty. Neither can
     // produce its own specific rejection if the argument never arrives.
-    const quote = resultOf(await io.send(
-      `COMMAND corp=${subject.id} verb=12 subject=${bodyId ?? 0} target=0 quantity=1 `
-      + `counterparty=${(ai[1] || subject).id}`));
-    check(quote !== null && RESULT_CODES.has(quote),
-          'request_quote reaches the procurement seam and returns a typed decline', quote);
-    // Not asserted: WHICH outcome request_quote gives. Whether a given supplier
-    // has capacity, input access, standing or an embargo against this buyer is
-    // world state, and pinning it here would make this file a fixture test of
-    // the generated economy rather than a protocol check. What IS asserted is
-    // that the answer is a real code — the four BL-350 declines used to arrive
-    // as `rejected_invalid`, and that IS a protocol defect.
-    console.log(`         (request_quote outcome on this world: ${quote})`);
+    // Sweep suppliers and resources looking for at least one of BL-350's four
+    // specific declines. This is the real test that the result switch is
+    // exhaustive: before the fix, every one of them arrived as
+    // `rejected_invalid`, so observing even one proves the seam can now say WHY
+    // a supplier said no. It is reported rather than asserted when the sweep
+    // finds only successes and generic rejections, because "no supplier on this
+    // world declines for these reasons" is a legitimate state of the economy and
+    // failing on it would make this a fixture test.
+    const seenCodes = new Set();
+    for (const supplier of ai.slice(0, 6)) {
+      for (const r of [0, 1, 2, 5, 9]) {
+        const res = resultOf(await io.send(
+          `COMMAND corp=${subject.id} verb=12 subject=${bodyId ?? 0} target=${r} `
+          + `quantity=1 counterparty=${supplier.id}`));
+        if (res) seenCodes.add(res);
+      }
+    }
+    check([...seenCodes].every((c) => RESULT_CODES.has(c)),
+          'every request_quote outcome is a declared corp_command_result',
+          [...seenCodes].join(', '));
+    const specific = PROCUREMENT_DECLINES.filter((c) => seenCodes.has(c));
+    if (specific.length > 0) {
+      check(true, `procurement declines are specific, not collapsed to rejected_invalid `
+                  + `(saw ${specific.join(', ')})`);
+    } else {
+      console.log('         (no BL-350-specific decline observed on this world; '
+                  + `outcomes seen: ${[...seenCodes].join(', ')})`);
+    }
 
     // --- the player corp is not commandable through the seam --------------
     // The standing rule: the player's corp is never auto-acted on. The seam is
@@ -269,20 +300,36 @@ async function main() {
     // --serve never called advance_surveys. Dispatch one, tick, and assert the
     // fact count moves — a survey that reveals nothing reveals the bug.
     console.log('\n  -- a dispatched survey progresses across ticks --');
-    const bodyFacts0 = facts.length;
-    let surveyed = null;
-    for (const c of [subject]) {
-      for (const b of [...bodies]) {
-        const r = resultOf(await io.send(`COMMAND corp=${c.id} verb=7 subject=${b}`));
-        if (r === 'applied') { surveyed = b; break; }
-      }
+    // This is the assertion the whole file exists for, so it has to be one the
+    // bug could actually fail. `advance_surveys` was missing from --serve's tick,
+    // and the symptom was NOT "fewer facts" — it was a survey that stayed frozen
+    // forever. So the check reads the survey's own progress counters out of
+    // BODIES before and after ticking, and requires them to MOVE. A fact-count
+    // comparison would pass whether or not the survey ever advanced.
+    const hidden = bodyRows.filter((b) => b.survey === 'hidden');
+    let surveyedId = null;
+    for (const b of hidden) {
+      const r = resultOf(await io.send(`COMMAND corp=${subject.id} verb=7 subject=${b.id}`));
+      if (r === 'applied') { surveyedId = b.id; break; }
     }
-    if (VERBOSE) console.log(`         survey dispatched on body ${surveyed}`);
-    for (let i = 0; i < 4; ++i) await io.send('TICK');
-    const after = (await io.send(`BLACKBOARD corp=${subject.id}`))
-      .filter((l) => l.startsWith('{')).length;
-    check(after >= bodyFacts0,
-          `the blackboard still resolves after ticking (${bodyFacts0} -> ${after} facts)`);
+    check(hidden.length === 0 || surveyedId !== null,
+          'a survey can be dispatched on an unsurveyed body',
+          hidden.length === 0 ? 'no hidden body on this world — check is vacuous here, and says so'
+                              : `body ${surveyedId}`);
+
+    if (surveyedId !== null) {
+      const before = bodyRows.find((b) => b.id === surveyedId);
+      for (let i = 0; i < 6; ++i) await io.send('TICK');
+      const nowRows = (await io.send('BODIES'))
+        .filter((l) => l.startsWith('{')).map((l) => JSON.parse(l));
+      const now = nowRows.find((b) => b.id === surveyedId);
+      const moved = now && before &&
+        (now.survey !== before.survey || now.regions_done > before.regions_done);
+      check(!!moved,
+            'the dispatched survey ACTUALLY progresses when the world ticks',
+            `${before && before.survey}/${before && before.regions_done} -> `
+            + `${now && now.survey}/${now && now.regions_done}`);
+    }
 
     const bye = await io.send('SHUTDOWN');
     check(bye[0] === 'BYE', 'SHUTDOWN is acknowledged', bye[0]);

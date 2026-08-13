@@ -190,8 +190,17 @@ float extraction_nominal(const world& w, const recipe_registry& reg,
 /// @param out_gain Optional. Receives the solver's OWN modelled net at the
 ///                 returned target minus its modelled net at `b.workforce_target`
 ///                 — i.e. what moving the dial is actually worth, in the same
-///                 units and from the same model that chose the target. >= 0 by
-///                 construction (the solver maximises).
+///                 units and from the same model that chose the target.
+///
+///                 Reported as >= 0, but NOT >= 0 by construction: the search
+///                 walks a step-10 grid while `b.workforce_target` may sit off
+///                 it (the player's `set_workforce` verb accepts any 0–200), so
+///                 an off-grid incumbent can genuinely out-score every grid
+///                 point. That case is a real "the solver's own answer is worse
+///                 than where you already are", and it is floored at 0 rather
+///                 than reported, because the caller's only use is a gain to
+///                 compare against a hysteresis margin and a negative one means
+///                 the same thing as zero there: do not move.
 ///
 ///                 It exists because the caller cannot reconstruct this. BL-202's
 ///                 scorer approximated it as `variable * (proposed − target)/target`

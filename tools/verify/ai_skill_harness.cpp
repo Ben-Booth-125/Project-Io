@@ -506,24 +506,35 @@ const std::vector<seed_golden> goldens = {
 // MIN and SOLVENCY were passing throughout and are UNCHANGED, deliberately —
 // re-blessing a band that was binding correctly only loosens it.
 //
-// (2) DIAL_MAX is TIGHTENED, not widened, and that is the point. The old
-// ceilings (230/290/315/240/410) were blessed from runs containing 134-255
-// `resume` actions per rollout, i.e. from the idle/resume oscillation they
-// exist to detect — a thrash detector calibrated on the thrash certifies it.
-// With the oscillation damped (resume 134->59, 178->129, 193->126, 153->84,
-// 255->190) dial totals are 99/169/177/114/241, and the ceilings are set at
-// ~1.3x observed so a regression back toward the old behaviour FAILS rather
-// than passing comfortably. These remain observation-blessed; deriving them
-// from the action budget (corps x evals x max_dials) instead is filed as
-// follow-up, and is the better answer.
+// (2) DIAL_MAX is TIGHTENED HARD, and that is the point. The old ceilings
+// (230/290/315/240/410) were blessed from runs containing 134-255 `resume`
+// actions per rollout — i.e. from the idle/resume oscillation they exist to
+// detect. A thrash detector calibrated on the thrash certifies it.
 //
-// BUILD_MAX and SURVIVAL are unchanged; both still bind on observation.
+// With the resume estimator corrected (real staffing rather than a hypothetical
+// building's, the site's true stack rank rather than one step below it, and the
+// fixed share of maintenance rather than all of it), the oscillation does not
+// merely damp — it STOPS. `resume` goes 134/178/193/153/255 -> 0/0/0/0/1, and
+// the BL-079 reflex tier's own idlings, which were reversing straight back into
+// losses, go 67/137/132/93/198 -> 9/8/7/6/7. Net worth is UP on every seed, so
+// none of this was profitable churn.
+//
+// Dial totals are now 40/42/51/31/53. The ceilings sit at ~1.3x that, which
+// means a regression anywhere near the old behaviour fails on the first run
+// rather than passing with 4x headroom. Still observation-blessed; deriving
+// them from the action budget (corps x evals x max_dials) is the better answer
+// and is filed as follow-up.
+//
+// NET-WORTH MIN, SOLVENCY, SURVIVAL and BUILD_MAX are unchanged and all still
+// bind on observation. The net-worth-final bands below are left as re-centred
+// above rather than re-tightened again — every seed sits comfortably inside
+// them, and narrowing a band twice in one session is fitting to noise.
 const std::vector<seed_golden> goldens = {
-    { 0, {638000.0f, 1327000.0f}, { 45000.0f, 105000.0f}, 20, {0.45f, 0.95f},  5, 129 },
-    { 1, {512000.0f, 1063000.0f}, { 42000.0f, 100000.0f}, 10, {0.45f, 1.00f},  5, 220 },
-    { 2, {867000.0f, 1801000.0f}, { 59000.0f, 140000.0f}, 12, {0.45f, 0.95f},  5, 230 },
-    { 3, {481000.0f,  998000.0f}, { 34000.0f,  81000.0f}, 15, {0.45f, 0.95f},  5, 148 },
-    { 4, {924000.0f, 1919000.0f}, { 73000.0f, 172000.0f},  8, {0.20f, 1.00f},  6, 313 },
+    { 0, {638000.0f, 1327000.0f}, { 45000.0f, 105000.0f}, 20, {0.45f, 0.95f},  5,  52 },
+    { 1, {512000.0f, 1063000.0f}, { 42000.0f, 100000.0f}, 10, {0.45f, 1.00f},  5,  55 },
+    { 2, {867000.0f, 1801000.0f}, { 59000.0f, 140000.0f}, 12, {0.45f, 0.95f},  5,  66 },
+    { 3, {481000.0f,  998000.0f}, { 34000.0f,  81000.0f}, 15, {0.45f, 0.95f},  5,  40 },
+    { 4, {924000.0f, 1919000.0f}, { 73000.0f, 172000.0f},  8, {0.20f, 1.00f},  6,  69 },
 };
 #else
 #error "ai_skill_harness: no blessed golden band set for this toolchain (BL-252). \
