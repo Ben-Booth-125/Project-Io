@@ -52,6 +52,12 @@ void post_nation_agency_comms(const world& w, const economy_report& report,
 /// boundary gets its seated bench's read of its own blackboard, posted to a
 /// per-corp Counsel channel (lazily created on first use). Advisory only.
 /// A pack that throws on live data clears the bench (BL-353) — hence non-const.
+///
+/// BL-379: the channel is created for every due corp, but only the corp whose
+/// channel is currently OPEN (`chat.active_channel`) is actually evaluated —
+/// the rest would write lines with no reader at ~1 s/tick. Presentation-only,
+/// so the skip touches no simulation state. Splits its own cost into
+/// step_economy_phase_ms()[9] (blackboard export) and [10] (pack evaluation).
 void post_persona_counsel(const world& w, std::vector<persona::pack>& bench,
                           std::unordered_map<entity_id, int>& counsel_channel,
                           ui::chat_state& chat, int day_tick);

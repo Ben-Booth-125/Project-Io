@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*186 entries — 62 open, 124 resolved.*
+*187 entries — 63 open, 124 resolved.*
 
 ---
 
@@ -563,6 +563,21 @@ scripts/verify/industry_lens.lua calls verify.econ_step(4), and a comment record
 > **Recommendation:** No action needed beyond the note, unless a verify-time assertion that the lens field is non-empty is wanted — which would close the class rather than this instance.
 
 *Files: `scripts/verify/industry_lens.lua`, `docs/ui/LENSES.md`*
+
+### NR-188 — Persona counsel now runs only for the corp whose channel is open — the player waits one cadence for a channel's first line
+*decision taken on your behalf · raised 2026-08-13 · from BL-379 (bound persona counsel), the ~1 s/tick live hitch NR-183 recorded*
+
+Two changes. (1) INSTRUMENTATION, deliverable on its own: post_persona_counsel now splits its cost into step_economy_phase_ms()[9] (the C++ blackboard export) and [10] (the sol2 pack evaluation), reported through the same warm-start phase dump as every other step_economy phase. [7] stays the total. (2) THE BOUND: a Counsel channel is still created for every due corp, so the channel roster and its indices are unchanged, but only the corp whose channel is currently open (chat.active_channel) is actually exported and evaluated. That makes the per-tick cap fall out for free — at most one channel is active, so at most one corp evaluates per tick — so no separate cap was added.
+
+**Why it matters.** The visible cost is that a Counsel channel fills from the tick the player OPENS it, not retroactively: open a channel and the first line arrives one cadence later (cadence_k ticks), and the quarters before that are silent rather than backfilled. That is the intended trade — the old behaviour wrote lines for every corp every eval and the player could only ever read one channel's worth. A second, smaller consequence: BL-353's live-pack failure guard now fires when the player first reads counsel rather than at tick one, so a pack that throws on live data is discovered later. Counsel is presentation-only (session_history.hpp's own header comment: it never touches the world), so the skip changes no simulation state and no determinism — the same tick replays identically whichever channel is open.
+
+- Accept (recommended).
+- Backfill on open — evaluate the newly-opened channel's corp at the next tick regardless of cadence, so the wait is one tick rather than one cadence.
+- Keep a small warm set — also evaluate the last N channels the player opened, if the split measurement shows one corp per tick is far under budget.
+
+> **Recommendation:** Accept, and let the [9]/[10] split decide what comes next: if the export dominates as expected, caching the blackboard between eval boundaries (BL-379 lever c) buys back headroom for a warm set; if the Lua half dominates, the pack budget is the dial instead.
+
+*Files: `src/core/session_history.cpp`, `src/core/session_history.hpp`, `src/core/app.hpp`, `src/core/app.cpp`*
 
 ---
 
