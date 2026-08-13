@@ -20,6 +20,7 @@
 #include "ui/text_fit.hpp"
 #include "ui/view_nav.hpp"
 #include "world/construction.hpp"
+#include "world/corporation_generation.hpp"
 #include "world/logistics.hpp"
 #include "world/placement_rules.hpp"
 #include "world/survey_system.hpp"
@@ -210,6 +211,20 @@ int app::run_verify(const std::string& script_path, bool bless)
     // advance between captures. The script drives view/overlay state directly.
     setup_world();
     load_economy();
+
+    // BL-365's background firms belong in the verified world too (added 2026-08-13).
+    //
+    // Without this the harness renders a world with NO background corporations,
+    // which is not the game — and it made the re-pointed Industry lens (BL-373)
+    // capture a picture of an EMPTY map that a golden would then have blessed as
+    // correct. A check that renders nothing still writes a PNG and still passes.
+    //
+    // Same ordering as start_new_game: after load_economy, because the firms' stop
+    // condition reads real recipe outputs. The seed fold matches the interactive
+    // path so the verified world is the world the player would get. NOT warmed up —
+    // run_verify stays deterministically cold, as its own comment below says.
+    generate_background_firms(m_world, m_registry, /*seed=*/0x8A21F00Du);
+
     m_sim_loop.set_speed(0);
 
     // The harness renders the live world, not the main menu — flip past the launch
