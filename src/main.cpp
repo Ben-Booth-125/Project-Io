@@ -307,8 +307,8 @@ int run_serve(int ticks)
             // Ascending id, not map order. `w.bodies` is an unordered_map, and
             // an agent's transcript is a replay artifact — two runs of the same
             // seed must produce the same bytes, or a trace corpus records the
-            // allocator's mood alongside the world's. CORPS has the same latent
-            // issue and is left alone here rather than fixed in passing.
+            // allocator's mood alongside the world's. CORPS sorts for the same
+            // reason.
             std::vector<entity_id> body_ids;
             body_ids.reserve(w.bodies.size());
             for (const auto& [id, b] : w.bodies) body_ids.push_back(id);
@@ -338,12 +338,22 @@ int run_serve(int ticks)
             // Who can act on this seam: one JSON line per corporation, then END.
             // An agent's first question is "who am I?" — nothing else on the
             // protocol answers it (NR-061).
-            for (const auto& [id, corp] : w.corporations)
+            // Ascending id, for the same reason BODIES sorts: a play transcript
+            // is a replay artifact, and two runs of the same seed must agree
+            // byte-for-byte or a trace corpus records the allocator's mood.
+            std::vector<entity_id> corp_ids;
+            corp_ids.reserve(w.corporations.size());
+            for (const auto& [id, corp] : w.corporations) corp_ids.push_back(id);
+            std::sort(corp_ids.begin(), corp_ids.end());
+            for (const entity_id id : corp_ids)
+            {
+                const corporation_component& corp = w.corporations.at(id);
                 std::cout << "{\"id\":" << static_cast<long>(id)
                           << ",\"name\":\"" << corp.name << "\""
                           << ",\"is_player\":" << (corp.is_player ? "true" : "false")
                           << ",\"home_nation\":" << static_cast<long>(corp.home_nation)
                           << "}" << std::endl;
+            }
             std::cout << "END" << std::endl;
         }
         else

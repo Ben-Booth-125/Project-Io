@@ -896,6 +896,45 @@ that existed. Five defects, none of which had ever failed a run because nothing 
   are keyed by **market** id, so a price is legible on a body the agent cannot address. Fixed by a
   `BODIES` opcode and a `list_bodies` tool, the sibling of NR-061's `list_corps`.
 
+### 10h. AI play as a bug-finding instrument (Ben, 2026-08-13)
+
+Ben, on reading the 2026-08-13 seam repair and its findings: *"It seems like pushing for AI play
+will expose more bugs and give us actionable improvements now."*
+
+**This is a reframe of why the word interface matters, and it is worth stating separately from
+§ 10d's runtime argument.** § 10d justifies MCP and a local model as the road to a *rival*. This
+says the interface pays before any of that ships, because **an agent playing the game is a test
+oracle no harness replicates**.
+
+The evidence for it is the session that prompted it. Every defect found on 2026-08-13 came from
+one of three sources, and they are in ascending order of yield:
+
+1. **Running an existing instrument** — the skill harness's action tally, once it could name every
+   verb, exposed the idle/resume oscillation that had been the AI's dominant behaviour for an
+   unknown number of sprints.
+2. **Reading the seam** — five defects in BL-278's protocol, none of which had ever failed a run,
+   because nothing re-ran it.
+3. **Asking what a player would actually try** — which is how the survey verb's missing effect, the
+   unnameable body, and the four collapsed decline codes surfaced. Nobody had played it.
+
+A harness asserts what its author already suspected. A player discovers what nobody thought to
+assert — and an *agent* player does it repeatably, at machine speed, and writes down what it tried.
+Io's determinism makes this unusually strong: the world rebuilds identically, so a play transcript
+is a replay artifact, and "append a move and re-run" reproduces the whole session byte-for-byte
+before extending it.
+
+**The instrument is `tools/mcp/session.js`**, alongside `smoke.js`. The division is deliberate:
+`smoke.js` asks whether the protocol *answers* (shape, every verb, typed results), `session.js`
+asks what happens when someone *plays* (agenda, consequence, surprise). Both are committed, because
+the standing lesson of BL-278 is that an unexercised seam is an untrusted one.
+
+**What this does NOT change.** The § 10g ruling stands unaltered: the deterministic scorer remains
+the action generator for the shipped rival, and an agent playing a corp is still the research use
+of BL-278 that § 10g explicitly preserved. What changes is the *value* assigned to that research
+use — it was filed as spectacle, and it is turning out to be diagnostics.
+
+---
+
 **Seven tools now, and a committed check.** `tools/mcp/smoke.js` drives `--serve` over the raw
 line protocol and asserts the shape rather than the economics: every opcode answers, every one of
 the fifteen verbs reaches the seam and returns a code that is actually in `corp_command_result`,
