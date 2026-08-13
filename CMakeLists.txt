@@ -601,6 +601,7 @@ set(IO_TEST_SWEEP_HARNESSES
     # point, exactly as for the two above, and it does not test the era so it
     # cannot opt out of the pre-epoch sim the way an ordinary harness can. Run it
     # by name when a seed is suspected.
+    seed_sweep_probe
 
     # PARKED FOR A DIFFERENT REASON (2026-08-12), and the distinction matters.
     #
