@@ -60,6 +60,13 @@ home body is the one market every outpost is presumed to ultimately feed, direct
 surplus between bodies — this mechanism only shapes the outpost's local *price*, it moves no
 goods itself).
 
+> **Dormant in the generated world (BL-382, the dead market writes, 2026-08-13).** The pull gates
+> on the home body's *unmet* demand (`demand − supply > 0`), and in the generated world home
+> supply exceeds home demand by two to three orders of magnitude for essentially every resource
+> (the BL-381 measurement of what supply and demand actually mean) — the shortfall is never
+> positive, so outpost markets currently receive zero pull. The mechanism is sound; the world
+> never satisfies its precondition. Re-check when BL-381 lands and demand carries real weight.
+
 ## What trades
 
 Only resources with a non-zero `base_price` on the market participate; everything else is
@@ -310,8 +317,12 @@ There is no abstract price coupling between bodies — **the convoy is the coupl
 (demand − supply per market) and hauls from the cheapest reachable corp pool — distances and
 haul prices read **tick-pure orbital angles** (`orbital_angle_at_tick`, BL-354), so dispatch is
 identical at any frame rate; the smoothly-advancing render angles are display-only. An arriving
-convoy credits the destination pool **and** injects its cargo into the destination market's
-supply, repricing it at the next clear. Since only Kepler has markets, a marketless body's
+convoy credits the destination pool **only** — the cargo reaches the market's supply through the
+ordinary auto-surplus path off that pool at the next clear. (BL-382, the dead market writes,
+removed a direct supply write on arrival: `credit_arrived_convoys` runs *after* `clear_markets`
+in the tick, so the write was zeroed before pricing ever read it — while the pre-clearing AI
+scorer *did* read it, a private signal nothing priced agreed with.) Since only Kepler has
+markets, a marketless body's
 processors fall back to the two-threshold pool model (PRODUCTION.md § Processing), and goods
 extracted there enter the economy only by convoy to a Kepler market.
 

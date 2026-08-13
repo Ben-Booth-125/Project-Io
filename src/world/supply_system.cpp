@@ -41,12 +41,16 @@ void credit_arrived_convoys(world& w, int tick)
             continue;
         const entity_id dest_body = mit->second.body;
 
-        // Credit the destination pool.
+        // Credit the destination pool. The credit is the whole delivery —
+        // deliberately NO direct write into market supply here. This runs after
+        // clear_markets in the tick, and clear_markets zeroes the supply/demand
+        // arrays at its top, so a supply += here would be erased before pricing
+        // ever read it — yet it WOULD be read pre-clearing by run_economy_step's
+        // consumers (the AI scorer's glut forecast among them): a private signal
+        // nothing priced ever agreed with. The cargo reaches pricing through the
+        // ordinary auto-surplus path off this pool at the next clear (BL-382).
         w.pool_for(convoy.corp, dest_body).quantities[
             static_cast<std::size_t>(convoy.cargo_resource)] += convoy.cargo_qty;
-
-        // Inject into market supply so the next clearing pass prices it.
-        mit->second.supply[static_cast<std::size_t>(convoy.cargo_resource)] += convoy.cargo_qty;
 
         // Record the persistent trade route this completed lane ran (BL-088). The
         // route is body-level, so collapse both market endpoints to their bodies;

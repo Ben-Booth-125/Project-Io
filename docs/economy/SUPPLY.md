@@ -18,7 +18,7 @@ A convoy is a world ECS component. Each active convoy carries:
 | `progress` | `0.0–1.0` | Fraction of route completed |
 | `speed` | progress/Tick | Fixed linear advance per economy Tick |
 
-The coupling is **market-to-market**, not body-to-body. A convoy is created when goods are dispatched toward a destination shortfall. It advances `progress` by `speed` each Tick (linear; no orbital mechanics in the prototype). On arrival (`progress >= 1.0`) it credits the destination `(corp, body)` pool and market supply, then is retired.
+The coupling is **market-to-market**, not body-to-body. A convoy is created when goods are dispatched toward a destination shortfall. It advances `progress` by `speed` each Tick (linear; no orbital mechanics in the prototype). On arrival (`progress >= 1.0`) it credits the destination `(corp, body)` pool, then is retired; the cargo reaches the destination market's supply through the ordinary auto-surplus path at the next clear (BL-382, the dead market writes, removed a direct supply write the clearing pass zeroed before pricing ever read it).
 
 Cargo leaves the source pool at **dispatch**, not arrival. Goods in transit are committed — the source pool shrinks immediately when a convoy departs.
 
@@ -114,7 +114,7 @@ still read "designed but not yet built"). `src/world/supply_system.cpp` (~340 li
 shipped layer.
 
 **Landed:**
-- Convoy component, per-Tick advance, destination crediting + market supply injection
+- Convoy component, per-Tick advance, destination pool crediting (the on-arrival market supply injection was removed by BL-382 — it was zeroed before pricing read it)
 - Terrain-weighted A* intra-body routing with roads and the node discount (BL-077 planetary logistics; BL-146–149; BL-172 road tiers)
 - River generation + logistics discount, stacking multiplicatively with the road ladder (BL-170)
 - Auto-dispatch of shortfall-filling convoys, intra- **and** inter-body (launchpad-gated)
