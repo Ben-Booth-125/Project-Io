@@ -389,6 +389,46 @@ See § Open items.
 
 ---
 
+## The carve is watched (BL-305, landed 2026-08-13)
+
+The territory carve has a **surface**: it is drawn live on the loading screen
+(`app::draw_building_carve` in `src/core/app.cpp`, `app_screen::building`), in the seconds
+between the New World wizard's "Begin" and the first frame of play. Pass 2's weighted Voronoi
+BFS publishes each tile **at the moment it settles**, so the player watches nations grow
+outward from their province anchors and stop where a mountain, a coast, or a rival stops them.
+Pass 2b and 2c rewrite indices wholesale, so the map is restated once when they finish - the
+islands join, the undersized realms are absorbed, and the final count is then reported.
+
+Live, **not a post-hoc replay**. There is no recording and no second pass: the screen is
+reading the carve as it happens.
+
+**The mechanism, and its one hard constraint.** Generation runs on a worker thread; the loading
+screen renders on the main thread. The only thing they share is `generation_progress`
+(`src/world/hard_coded_world.hpp`) - **atomics only**: the worker writes, the renderer reads,
+no mutex, no callback into UI code, no re-entrant rendering. `generate_nations` takes an
+optional `generation_progress*` and treats null as "publish nothing". The carve is published as
+a fixed-size array of per-cell relaxed atomics holding *nation index + 1*, with an epoch counter
+the renderer watches so a still frame costs nothing. Per-cell rather than double-buffered on
+purpose: each tile is claimed exactly once, so a half-observed publish is a valid **earlier
+frame of the animation**, not a torn read. The counter-guarded arrays (the charter marks and
+rows) do use release/acquire on their count, because there the reader must not read a slot
+before it was filled.
+
+**It is a pure tap.** The publish calls are write-only, consume no randomness, and change no
+branch, so a world generated with the screen watching is byte-identical to one generated
+headlessly - the standing determinism invariant is the binding constraint and the visualisation
+is subordinate to it. Every existing headless caller (harnesses, `--serve`, `--verify`) passes
+null and is unaffected.
+
+The carve is drawn in `ui::palette::nation_colour` - the same palette the in-game **Country
+lens** uses - so the map a player watches being carved is the map they meet again under the
+lens. The nation entities do not exist while the BFS runs, so the map is keyed by index until
+`nation_id_base` is published (ids come out of one tight `create_entity` loop, so index *i* is
+`base + i`); the borders have already settled by then, and the recolour reads as them becoming
+real nations.
+
+---
+
 ## Relationship to corporations
 
 Corporations are legally registered within a nation and operate within its territory by default.

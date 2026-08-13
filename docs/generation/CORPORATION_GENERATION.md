@@ -264,6 +264,36 @@ nation-with-chartered-corps, this screen's subject changes with it.
 
 ---
 
+## Corporate seeding is watched - split by kind (BL-305, landed 2026-08-13)
+
+Corporation generation has a **surface**: it is shown live on the loading screen
+(`app::draw_building_carve` in `src/core/app.cpp`, `app_screen::building`), immediately after
+the nation carve it sits on. `generate_corporations` takes an optional `generation_progress*`
+(`src/world/hard_coded_world.hpp`) and publishes into it as it works.
+
+**The split is by kind, and it is the point of the item.** Two of this pipeline's passes produce
+very different sorts of fact, and they get different surfaces:
+
+| Pass | Kind | Surface |
+|---|---|---|
+| **Pass 3 - starting asset placement** | *Positional.* A holding is somewhere. | The **map**: each holding is marked at its grid position as it is staked, over the carve, in `ui::palette::corp_colour`. |
+| **Pass 4/5 - financial profile** | *Non-positional.* A capital figure is a derivation. | A **ledger column**: focus, holdings placed, opening capital, one row per charter, swatch-matched to its markers on the map. |
+
+A financial profile has nowhere on a map to be. Rendering it as a canvas overlay would be
+decoration pretending to be information, so it is a ledger line instead.
+
+**Names are deliberately absent from the ledger.** The generated name is a `std::string` decided
+in Pass 5, and a string cannot cross an atomics-only seam without a lock. The loading screen
+therefore shows the *derivation* (what kind of firm, how much ground, how much money) and the
+names arrive with the finished world one frame later. This is a real limit of the publish
+contract, stated rather than worked around.
+
+Like the carve, this is a **pure tap**: write-only, no randomness consumed, no branch changed,
+null for every headless caller. See `NATION_GENERATION.md` § The carve is watched for the
+threading contract in full.
+
+---
+
 ## Prototype scope
 
 > **Superseded (2026-07-31).** This section used to claim corporations take no autonomous

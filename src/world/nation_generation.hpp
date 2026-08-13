@@ -98,6 +98,13 @@ struct nation_params
 /// @param gh       Grid height (rows).
 /// @param params   Tunable generation parameters.
 /// @param seed     Per-run RNG seed for independent, reproducible results.
+/// @param progress Optional progress sink (BL-305). When non-null, Pass 2
+///                 publishes each tile as it is claimed and Pass 2c republishes
+///                 the merged map, so a loading screen can show the carve
+///                 happening. A pure TAP: write-only, consumes no randomness,
+///                 changes no branch — passing null (the default, and every
+///                 headless caller) produces a byte-identical political map.
+///                 Defined in world/hard_coded_world.hpp.
 /// @return         Nation entity IDs in seed-placement order (one per nation created).
 std::vector<entity_id> generate_nations(
     world& w,
@@ -105,4 +112,5 @@ std::vector<entity_id> generate_nations(
     const std::vector<entity_id>& tile_ids,
     int gw, int gh,
     const nation_params& params,
-    uint32_t seed);
+    uint32_t seed,
+    struct generation_progress* progress = nullptr);

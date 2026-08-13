@@ -612,7 +612,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
     bump(9);
     const std::vector<entity_id> kepler_nations =
         generate_nations(w, kepler, kepler_tiles, home_grid_width, home_grid_height, kepler_np,
-                         /*seed=*/params.seed ^ 0x4A71012u);
+                         /*seed=*/params.seed ^ 0x4A71012u, progress);
 
     // The political axes are OUTPUTS now (BL-218): expansionism from the
     // border-contest integral, economic_focus from the resource class of the
@@ -723,7 +723,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // the player's (which sets w.player_entity). See CORPORATION_GENERATION.md.
     bump(11);
     generate_corporations(w, corporation_params{ .corporation_count = gen_cfg.corporation_count },
-        /*seed=*/params.seed ^ 0x4A71012u, &kepler_settlement);
+        /*seed=*/params.seed ^ 0x4A71012u, &kepler_settlement, progress);
 
     // Kepler markets — population-anchored but RESOURCE-CARVED (BL-096). Markets
     // still anchor to population-centre tiles (catchment routing via market_for_tile

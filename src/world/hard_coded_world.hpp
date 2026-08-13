@@ -6,7 +6,9 @@
 #include "world.hpp"
 #include "world_gen_config.hpp"
 
+#include <array>
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -95,7 +97,154 @@ struct generation_progress
     /// writes, renderer reads, relaxed atomics, no mutex.
     std::atomic<int> sub_progress{0};
     std::atomic<int> sub_total{0};
+
+    // --- The territory carve, live (BL-305) ---------------------------------
+    //
+    // The two passes that decide the world's POLITICS — the nation carve and
+    // corporate asset placement — are the most interesting thing generation
+    // does, and until now they happened behind a progress bar. These fields let
+    // the loading screen show them: the map fills in the order the BFS actually
+    // claims ground, then charter marks land on the finished borders.
+    //
+    // Same contract as everything above it. A pure TAP: every publish below is
+    // write-only, is never read back, consumes no randomness and changes no
+    // branch, so a world built with the screen watching is byte-identical to
+    // one built headlessly. Every producer takes `generation_progress*`
+    // defaulted to null and treats null as "publish nothing".
+    //
+    // WHY PER-CELL ATOMICS AND NOT A DOUBLE BUFFER. The obvious shape for
+    // publishing a growing map is a back buffer plus a flip counter, so the
+    // reader always sees one internally-consistent frame. The carve does not
+    // need that and would pay ~90 KB of copy per publish for it: each tile is
+    // claimed exactly once and never re-claimed, so a cell only ever goes from
+    // unclaimed to claimed. A renderer that observes half of one publish sees a
+    // map with slightly fewer tiles filled — a valid EARLIER FRAME of the very
+    // animation being shown, not a torn read. The one place indices genuinely
+    // change under the reader (the merge + compaction in Pass 2c) is restated
+    // as a single whole-map pass, so the recolour reads as "the borders
+    // settled". The counter-guarded array below (asset marks) DOES need
+    // ordering, and uses the release/acquire pair on its count.
+
+    /// The homeworld grid the carve is published over. static_assert'd against
+    /// home_grid_width/height below — begin_carve publishes a zero grid rather
+    /// than truncating if a bigger body ever arrives.
+    static constexpr int carve_capacity = 312 * 145;
+
+    /// Asset markers plotted on the carve. Each corp stakes a small cluster, so
+    /// this bounds the ~8 generated charters at a comfortable ceiling. Overflow
+    /// is DROPPED, not wrapped: a missing marker is a cosmetic loss, a wrapped
+    /// one would make the map lie.
+    static constexpr int max_asset_marks = 512;
+
+    /// Corporation ledger rows. `corporation_count` is 8; background firms
+    /// (BL-365) generate outside make_hard_coded_world and are not published.
+    static constexpr int max_corp_slots = 64;
+
+    std::atomic<int> grid_w{0}; ///< 0 until begin_carve; 0 also means "no carve to draw".
+    std::atomic<int> grid_h{0};
+    std::atomic<int> nation_count{0}; ///< Seeds placed (pre-merge), then survivors after Pass 2c.
+
+    /// Entity id of nation index 0, published once the nations are actually
+    /// created — which is AFTER the carve is drawn, because the carve works in
+    /// indices and the entities do not exist until the borders settle. It is
+    /// what lets the screen key `nation_colour` off the real id, so the map the
+    /// player watches being carved is coloured the same as the map they meet
+    /// again under the in-game Country lens. Ids are allocated in one tight
+    /// `create_entity` loop, so index i is `nation_id_base + i`. 0 = not yet
+    /// known; the screen falls back to the index, which is the same palette in
+    /// a different order rather than a wrong-looking map.
+    std::atomic<uint32_t> nation_id_base{0};
+
+    /// Bumped on every publish. The renderer keeps its own copy of the map and
+    /// re-reads only when this moves, so a still frame costs nothing.
+    std::atomic<uint32_t> carve_epoch{0};
+
+    /// Per-tile owner in raster order (`row * grid_w + col`), stored as
+    /// **nation index + 1** so the zero-initialised state already means
+    /// "unclaimed" and no init loop is needed at construction.
+    std::array<std::atomic<int16_t>, carve_capacity> owner{};
+
+    /// Release-stored AFTER the marker it counts, so an acquire-load here is
+    /// the reader's guarantee that slots [0, count) are filled.
+    std::atomic<int> asset_mark_count{0};
+
+    /// Packed marker: bits 0-8 col, bits 9-17 row, bits 18-23 corp slot. Nine
+    /// bits per axis covers any grid this sink can hold (312 x 145 < 512).
+    std::array<std::atomic<uint32_t>, max_asset_marks> asset_mark{};
+
+    // Numbers, not prose. A corp's generated NAME is a std::string decided in
+    // Pass 5, and pushing a string across an atomics-only seam would need a
+    // lock for no gain — the moment the worker returns, the app owns the whole
+    // world and can print real names. So the screen shows the derivation live
+    // and the names arrive with the finished world.
+    std::atomic<int> corp_row_count{0};                            ///< Release-stored, as above.
+    std::array<std::atomic<int32_t>, max_corp_slots> corp_focus{};   ///< industrial_focus as int.
+    std::array<std::atomic<int32_t>, max_corp_slots> corp_assets{};  ///< Holdings placed in Pass 3.
+    std::array<std::atomic<float>,   max_corp_slots> corp_capital{}; ///< Pass 4 capital.
+    std::atomic<int32_t> player_slot{-1};                          ///< Which row is the player's; -1 until known.
+
+    // --- Publishing (worker side; every one of these is write-only) ---------
+
+    /// Open the carve for a body of @p gw x @p gh, clearing the map. A grid this
+    /// sink cannot hold publishes nothing rather than a truncated lie.
+    void begin_carve(int gw, int gh, int seeds)
+    {
+        if (gw <= 0 || gh <= 0 || gw > 511 || gh > 511 || gw * gh > carve_capacity)
+        {
+            grid_w.store(0, std::memory_order_relaxed);
+            grid_h.store(0, std::memory_order_relaxed);
+            return;
+        }
+        for (int i = 0; i < gw * gh; ++i)
+            owner[static_cast<std::size_t>(i)].store(0, std::memory_order_relaxed);
+        nation_count.store(seeds, std::memory_order_relaxed);
+        grid_w.store(gw, std::memory_order_relaxed);
+        grid_h.store(gh, std::memory_order_relaxed);
+        carve_epoch.fetch_add(1, std::memory_order_release);
+    }
+
+    /// One tile settled. Called from the BFS's settle point, so the map fills in
+    /// exactly the order the pass claims ground.
+    void claim_tile(int raster_index, int nation_idx)
+    {
+        if (raster_index < 0 || raster_index >= carve_capacity) return;
+        owner[static_cast<std::size_t>(raster_index)]
+            .store(static_cast<int16_t>(nation_idx + 1), std::memory_order_relaxed);
+    }
+
+    /// Tell the renderer the map moved. Called every N claims, not every claim:
+    /// the renderer redraws at most once a frame anyway, and an epoch bump per
+    /// tile would be 45,000 needless release fences.
+    void publish_carve() { carve_epoch.fetch_add(1, std::memory_order_release); }
+
+    void mark_asset(int col, int row, int corp_slot)
+    {
+        const int n = asset_mark_count.load(std::memory_order_relaxed);
+        if (n >= max_asset_marks) return;
+        if (col < 0 || row < 0 || col > 511 || row > 511 || corp_slot < 0 || corp_slot > 63) return;
+        asset_mark[static_cast<std::size_t>(n)].store(
+            static_cast<uint32_t>(col)
+                | (static_cast<uint32_t>(row) << 9)
+                | (static_cast<uint32_t>(corp_slot) << 18),
+            std::memory_order_relaxed);
+        asset_mark_count.store(n + 1, std::memory_order_release); // publishes the store above
+    }
+
+    void add_corp_row(int slot, int focus, int assets, float capital)
+    {
+        if (slot < 0 || slot >= max_corp_slots) return;
+        corp_focus  [static_cast<std::size_t>(slot)].store(focus,   std::memory_order_relaxed);
+        corp_assets [static_cast<std::size_t>(slot)].store(assets,  std::memory_order_relaxed);
+        corp_capital[static_cast<std::size_t>(slot)].store(capital, std::memory_order_relaxed);
+        if (slot + 1 > corp_row_count.load(std::memory_order_relaxed))
+            corp_row_count.store(slot + 1, std::memory_order_release); // publishes the stores above
+    }
 };
+
+/// How many tiles the carve settles between epoch bumps. One publish per frame
+/// is all a 60 Hz screen can show, so this is tuned to give the eye roughly a
+/// hundred frames of growth rather than to keep up with the pass.
+inline constexpr int gen_carve_publish_interval = 384;
 
 /// Human labels for `generation_progress::label`, in pass order.
 inline const char* const generation_stage_labels[] = {
@@ -270,6 +419,13 @@ world make_hard_coded_world(world_params params = {}, generation_report* report 
 /// that reason; changing one without the other is a regression.
 inline constexpr int home_grid_width  = 312;
 inline constexpr int home_grid_height = 145;
+
+// The carve sink is sized for exactly this grid. Declared up beside the struct
+// (which precedes these constants) and tied back here, so a future map resize
+// fails to compile rather than silently publishing a blank map — begin_carve's
+// capacity guard would otherwise turn the regression into a missing screen.
+static_assert(generation_progress::carve_capacity == home_grid_width * home_grid_height,
+              "generation_progress::carve_capacity must match the homeworld grid");
 
 /// Generate ONLY the homeworld tile surface into @p w (a scratch world), exactly
 /// as make_hard_coded_world builds Kepler's: same resolved preferences, same

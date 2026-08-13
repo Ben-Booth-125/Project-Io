@@ -73,6 +73,14 @@ struct corporation_params
 ///               diversity-without-quota property survives the rewrite. Null
 ///               (the default) keeps the pre-BL-219 authored table, so a body
 ///               with no settlement pass generates exactly as before.
+/// @param progress Optional progress sink (BL-305). When non-null, Pass 3
+///               publishes each holding's grid position as it is staked (the
+///               POSITIONAL half — it lands on the loading screen's carve map)
+///               and Pass 5's assembly publishes each corp's focus / holdings /
+///               capital (the NON-POSITIONAL half — a financial profile has
+///               nowhere on a map to be, so it goes to a ledger column). A pure
+///               TAP: write-only, consumes no randomness, changes no branch.
+///               Defined in world/hard_coded_world.hpp.
 /// @return       Corporation entity IDs in generation order (one per corporation
 ///               created). The entry whose corporation_component::is_player is
 ///               true equals w.player_entity.
@@ -80,7 +88,8 @@ std::vector<entity_id> generate_corporations(
     world& w,
     const corporation_params& params,
     uint32_t seed,
-    const struct settlement_state* settle = nullptr);
+    const struct settlement_state* settle = nullptr,
+    struct generation_progress* progress = nullptr);
 
 /// BL-365 — generate REAL background corporations (`is_background = true`) that
 /// produce and consume through the normal recipe/workforce/market pipeline,
