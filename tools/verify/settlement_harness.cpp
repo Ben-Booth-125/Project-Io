@@ -358,6 +358,12 @@ int main()
         {
             world_params p;
             p.seed = 0xB2180000u + static_cast<uint32_t>(s) * 0x9E37u;
+            // Ruptures (S8b) are a 1960-era ladder event: the settlement pass has
+            // to reach the industrial centuries to resolve one. The DEFAULT epoch
+            // became 0 CE with the ancient refocus (NR-177), which stops the pass
+            // ~1900 years before any rupture — so ask for the era under test, as
+            // creeds_harness and history_ladder_harness now do.
+            p.epoch_year = 1960;
             generation_report rr;
             make_hard_coded_world(no_prehistory(p), &rr);
             const generation_report::body_entry* k = kepler_of(rr);

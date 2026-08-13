@@ -595,6 +595,13 @@ set(IO_TEST_SWEEP_HARNESSES
     history_sim_harness
     history_sweep
 
+    # CATEGORY (1), added 2026-08-13. seed_sweep_probe generates a full world PER
+    # SEED across a spread, to catch a seed-dependent generation failure — the
+    # instrument written to chase the startup "crash" (NR-182). Its cost is the
+    # point, exactly as for the two above, and it does not test the era so it
+    # cannot opt out of the pre-epoch sim the way an ordinary harness can. Run it
+    # by name when a seed is suspected.
+
     # PARKED FOR A DIFFERENT REASON (2026-08-12), and the distinction matters.
     #
     # The two above are open-ended exploration tools whose cost IS the point.
