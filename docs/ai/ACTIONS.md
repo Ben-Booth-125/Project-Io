@@ -48,7 +48,9 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 | `tile` | `entity_id` | The selected tile the building goes on. |
 | `type` | `building_type` | Which building — extraction_site, processing_facility, port, launchpad, inland_logistics_hub, military_base. Set by which row is pressed. |
 | `target` | `resource_type` | Extraction rows only: the deposited resource the site extracts. Ignored for other types. |
-| `recipe` | `uint16 recipe id` | Processing rows only: the recipe the facility is seeded with (the row it was priced on). no_recipe elsewhere; a recipe-less processor seeds the default steel recipe. |
+| `recipe` | `uint16 recipe id` | Processing rows only: the recipe the facility is seeded with (the row it was priced on). no_recipe elsewhere; a recipe-less processor seeds the default steel recipe.
+
+**KNOWN DEFECT, BL-388 — this argument is DISCARDED.** `apply_corp_command` calls `construct_building` without forwarding it, so every processing facility built through the seam gets recipe 0 (steel) whatever you ask for, and the command still answers `applied`. A player ordered a Food Processor with recipe=2 and got a steel smelter. Until BL-388 lands, build the facility and then issue `set_recipe` as a separate command, which does work. |
 
 **Valid when:**
 - The acting corporation exists (rejected_no_corp otherwise).
@@ -58,6 +60,8 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 - The corporation's balance covers the full capex: registry build_cost plus the material costs priced at the tile's local market (rejected_funds). The UI shows this one credit total and disables Build with 'Can't afford' when short.
 
 **Expected output.** The press enqueues a construction request; the app's mutable pass executes construct_building the same frame. On success a building entity exists immediately — staffed at 50% workforce (0 for a port), a processing facility seeded with the pressed row's recipe — and the capex is debited up front. Construction is then DURATIVE and material-gated: each economy tick (one quarter) it advances at a rate in [0,1] set by how much of its per-tick material need the local market can supply; scarce materials stretch the ETA and total shortage shows 'Paused - market can't supply materials'. Management controls unlock only when construction completes. A rejected attempt mutates nothing; the reason string appears at the top of the ledger (construction.last_message), and invalid rows already show reason-coded text in place of the Build button ('Cannot build on water', 'A port must sit on the coast', ...).
+
+NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT scripts/world_gen.lua, so only 16 of 42 resources carry a market price and coal is not among them. Since steel's recipe needs coal, a processing facility built through the seam has never produced a unit in any recorded session. Extraction works; processing does not, and the cause is configuration rather than the verb.
 
 **Reason to select.** The only way to add productive capacity. Extraction turns a tile deposit into pool stock to sell; processing turns inputs into higher-margin outputs; ports/hubs move goods cheaper, a launchpad gates space access, and a military base is where units muster (BL-325; hire moves onto it in S2 — until then it is positioning ahead of that change). The ledger ranks candidates by expected net per quarter and prints payback, so build is the press when a candidate's expected profit beats holding the cash.
 
@@ -159,7 +163,9 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 | `body` | `entity_id` | The body whose market the order lists on — the ledger's currently selected body. Carried in the command's `subject` field (the survey verb's convention: subject IS the body). |
 | `resource` | `resource_type` | What to sell. Carried in the command's `target` field, shared with build's extraction target. Must have a positive base price on this market. |
 | `quantity` | `float > 0` | Maximum units offered per quarter, capped each tick by what the (corp, body) pool actually holds. |
-| `floor_price` | `float >= 0` | Minimum acceptable unit price. 0 means sell at the market price. |
+| `floor_price` | `float >= 0` | Minimum acceptable unit price. 0 means sell at the market price.
+
+**KNOWN DEFECT, BL-386 — the engine does not treat this as a minimum.** `clear_markets` computes `clearing = max(reference_price, floor_price)` and credits the seller `quantity x clearing` with NO buyer debited and NO cap. So a floor ABOVE the market does not hold stock back — it is PAID, in full, by nobody. Listing at floor 1e12 reached cash 1.587e17 in eighteen ticks in play. Until BL-386 lands, a floor above the market price is an exploit rather than a reservation price, and an agent that sets one is printing money whether or not it intended to. Set 0 (accept the market) unless you are deliberately testing this. |
 
 **Valid when:**
 - The acting corporation exists (rejected_no_corp otherwise).
@@ -170,6 +176,8 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 - The corporation holds fewer than `max_sell_orders_per_corp` (64) standing orders (rejected_state otherwise — the book is capped, and a placement past the cap is refused rather than silently dropped).
 
 **Expected output.** A STANDING order in WORLD state — `world::sell_orders`, not a UI list — carrying a stable nonzero `id` that `remove_sell_order` later names. It persists until removed, survives a save (the order book is on the flat-binary serialisation seam, order_book.hpp), and is evaluated every economy tick by clear_markets itself, with no caller handing it over. Each tick it lists up to `quantity` from the corp's pool on that body (an empty pool lists nothing, silently); it clears at max(resolved market price, floor) — with no matching buyer it still auto-clears at that price, so offered supply always clears in the prototype, but a floor above what the resolution supports means less or nothing sells that tick. CRITICAL side effect, unchanged: the (corp, body, resource) triple leaves the automatic surplus-selling path — the auto path yields to the standing order — so a too-high floor does not just fail to sell, it stops that resource selling AT ALL on that body and the stock piles up. Orders append, so position in the book is time priority; a rejected command mutates nothing.
+
+WHAT ACTUALLY HAPPENS TO YOUR THROUGHPUT, learned in play and not obvious from the verb: a standing order makes the auto-surplus path YIELD for that (corp, body, resource), and the order then sells at most its own listed `quantity` per tick where the auto path sold the whole pool. Listing at floor 0 with a large quantity is therefore not equivalent to not listing — one player measured 2,557,231 credits against 9,613,476 for the same campaign with no order at all, with 15 million unsold units piled in the pool. The listed quantity is frozen at listing time and the scorer never revises it (BL-380), and a second order on the same triple sells nothing because time priority gives the first one the whole pool. Also: the response does NOT return the order's id, which `remove_sell_order` requires (BL-390).
 
 **Reason to select.** Price and quantity control the auto-sell path lacks: floor-protect against dumping stock into a crashed price, or meter quantity to ration a stockpile toward a construction project or a better market. The manual side of the trade loop — the press when 'sell everything at whatever it fetches' is the wrong answer. The rival-corp scorer reaches for it on exactly one signal: stock past a hold threshold, listed at a floor over the rarity price.
 
