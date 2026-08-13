@@ -8684,7 +8684,7 @@
     "src/world/market_clearing.cpp",
     "docs/economy/MARKETS.md"
    ],
-   "summary": "Found while establishing what market supply and demand actually mean (BL-381). The convoy supply injection is not dead as first written -- it is invisible to pricing but VISIBLE TO THE SCORER, which is worse. The inter-body demand pull is genuinely inert.",
+   "summary": "Found while establishing what market supply and demand actually mean (BL-381). The convoy supply injection is not dead as first written -- it is invisible to pricing but VISIBLE TO THE SCORER, which is worse. The inter-body demand pull is genuinely inert. Sequenced against BL-381: while the glut gate stays non-discriminating this costs little, but the convoy write must not survive a fix that makes the numerator mean something.",
    "design": "DESIGNED 2026-08-13, from the NR-180 investigation. Two independent findings, filed together because they are the same class: a write that looks like a mechanism and is not.\n\n**1. `supply_system.cpp`'s convoy injection is unpriced — and asymmetrically visible, which is the real finding.** The line adds arrived convoy cargo to `market.supply` and its comment says 'Inject into market supply so the next clearing pass prices it'. But `credit_arrived_convoys` runs AFTER `clear_markets` in the tick, and `clear_markets` zeroes both arrays at its top — so the value written is erased before any clearing pass ever reads it. The pool credit beside it IS live and does real work; only the supply write is inert. So far, so harmless. But it is NOT unread. `run_corp_strategic_step` is the last thing `run_economy_step` does, and `run_economy_step` runs BEFORE `clear_markets` in the tick — so the scorer reads the inflated `supply` that the clearing pass will shortly zero without ever pricing. The convoy write is therefore invisible to price resolution, to the ledgers and to the player, and visible to exactly one consumer: `forecast_glut_multiplier`'s numerator. A write that only the AI can see is a worse defect than a dead one, because it gives the rival a private and arbitrary signal that nothing else in the game agrees with.\n\nEither move the call, or delete the write and correct the comment. Deleting is probably right: the cargo lands in the pool, and the pool's surplus reaches supply through the ordinary auto-surplus path next tick anyway. Note the interaction with BL-381 — while the glut gate stays non-discriminating this costs little, but it must not survive the fix that makes the numerator mean something.\n\n**2. `inject_interbody_demand` can never fire in the generated world.** It gates on `home_shortfall = home.demand[r] - home.supply[r]; if (home_shortfall <= 0.0f) continue;`. Home supply exceeds home demand by two to three orders of magnitude for essentially every resource (see BL-381), so the shortfall is always negative and outpost markets receive zero pull. The mechanism is sound and the world simply never satisfies its precondition — so this is NOT a delete: it is a note in MARKETS.md saying the pull is dormant until demand means something, and a natural thing to re-check when BL-381 lands.\n\nNeither is urgent. Both are the kind of thing that costs an hour of confusion to the next person who reads the file believing the comment."
   },
   {
@@ -8753,7 +8753,9 @@
    "difficulty": 2,
    "parked": false,
    "version_goal": "v0.2.0",
-   "requires": [],
+   "requires": [
+    "BL-381"
+   ],
    "blocked_on": [],
    "written": "2026-08-13",
    "created": "2026-08-13",
