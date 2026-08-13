@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*193 entries — 69 open, 124 resolved.*
+*194 entries — 70 open, 124 resolved.*
 
 ---
 
@@ -652,6 +652,21 @@ CMakeLists labels history_sim_harness, history_sweep and data_creep_harness `swe
 > **Recommendation:** Option 1 now, and consider 2 later. A label that only works if the caller remembers a flag is documentation wearing machinery's clothes.
 
 *Files: `CMakeLists.txt`, `docs/development/DEVELOPMENT_PRACTICES.md`*
+
+### NR-195 — Two combat paths, on Ben's ruling - this reverses BL-315's engine-parity strand, and the reversal should be visible later
+*decision taken on your behalf · raised 2026-08-13 · from Ben's elicitation Q&A, 2026-08-13, designing the conflict spine for the ancient arc*
+
+BL-315 (conflict spine) said from its 2026-08-07 filing through its 2026-08-10 rephrase: 'engine parity - the 1960 roster as the last UNITS.json rows, NO SECOND COMBAT PATH.' Ben ruled the opposite: campaign battles get their own resolver, separate from the Era -1 sim's resolve_battle. Also settled in the same pass: the player is an ARMED TRADING HOUSE (not a militia, and 'mercenary' is explicitly too strict a term - army and pirate are readings of the same object, decided by policy); command grain is UNITS AS TOKENS ON THE TILE MAP fighting directly; battle resolution carries randomness plus the option to withdraw after a short time; the law strand splits out to BL-380 (company answerability). BL-315 is now `designed`, no longer requires the parked BL-094, and is retitled.
+
+**Why it matters.** Recorded because a reversal that leaves no trace looks like an oversight to the next session, and because the cost is real: two resolvers can drift. The reason the reversal is right - the Era -1 sim resolves province-vs-province in a year tick, the campaign resolves tokens on tiles with position and withdrawal and a player watching - is now in the item, along with the mitigation: the ROSTER stays single-sourced, and any divergence in outcome between the two resolvers is a finding to explain rather than a fact to accept. Second thing worth your eye: 'randomness' and the determinism invariant are reconciled by seeding the draw from the battle's own identity - the same save replays the same battle while the player still faces an uncertain fight. If you meant randomness the player could re-roll by reloading, say so, because that is a different design.
+
+- Accept as written (recommended).
+- Keep one resolver after all, and accept a flattened campaign fight.
+- Confirm that battle randomness should NOT be re-rollable by reloading (my assumption).
+
+> **Recommendation:** Accept. The precondition clause is the part I would watch: the item now says explicitly that the conflict spine is worth nothing on an empty map, so before it is promoted, walk the homeworld at 0 CE and confirm there is a worked, populated civilisation there to fight over. That is your 'tiles suitably worked' steer turned into a gate.
+
+*Files: `docs/development/backlog.json`*
 
 ---
 

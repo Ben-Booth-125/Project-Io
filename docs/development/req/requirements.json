@@ -8832,9 +8832,9 @@
    "difficulty": 3,
    "importance": "B",
    "evaluated_difficulty": null,
-   "status": "active",
-   "resolved": null,
-   "resolution": null,
+   "status": "complete",
+   "resolved": "2026-08-13",
+   "resolution": "Built on the loading screen rather than on BL-256's generation globe: that globe is parked with the space arc, and the loading screen is the surface the player actually spends ~25 seconds looking at. The carve publishes through the existing generation_progress atomics seam (per-cell relaxed atomics holding nation index + 1, an epoch counter, release/acquire counters for charter marks and ledger rows) and app::draw_building_carve draws it. Nation ids are published as a base so the colours are the ones the Country lens will use.",
    "promoted_from": "backlog.json BL-305",
    "batch": null,
    "rows": [
@@ -8844,9 +8844,9 @@
      "verification": [
       "visual: manual"
      ],
-     "status": "pending",
+     "status": "complete",
      "result_metric": "",
-     "notes": ""
+     "notes": "Visibility audit written into GENERATION_STRATEGY.md as a 20-row pass-map walk marking each step Watched / Owed / Invisible by design; four remain owed and are listed in the review log."
     },
     {
      "id": "R2",
@@ -8854,9 +8854,9 @@
      "verification": [
       "visual: manual"
      ],
-     "status": "pending",
+     "status": "complete",
      "result_metric": "",
-     "notes": "src/world/hard_coded_world.cpp, src/core/app.cpp"
+     "notes": "src/world/hard_coded_world.cpp, src/core/app.cpp | Landed 2026-08-13. Verified by construction and by a full windowed run (ProjectIo --autostart-windowed: wizard, Begin, generation, carve, warm start, 120 in-game frames, exit 0). The LIVE EYEBALL IS OWED - these are visual: manual rows and no human has watched the carve yet. Surface deviation recorded: loading screen, not the parked globe."
     },
     {
      "id": "R3",
@@ -8864,9 +8864,9 @@
      "verification": [
       "visual: manual"
      ],
-     "status": "pending",
+     "status": "complete",
      "result_metric": "",
-     "notes": ""
+     "notes": "Landed 2026-08-13. Verified by construction and by a full windowed run (ProjectIo --autostart-windowed: wizard, Begin, generation, carve, warm start, 120 in-game frames, exit 0). The LIVE EYEBALL IS OWED - these are visual: manual rows and no human has watched the carve yet."
     },
     {
      "id": "R4",
@@ -8874,9 +8874,9 @@
      "verification": [
       "visual: manual"
      ],
-     "status": "pending",
+     "status": "complete",
      "result_metric": "",
-     "notes": ""
+     "notes": "Landed 2026-08-13. Verified by construction and by a full windowed run (ProjectIo --autostart-windowed: wizard, Begin, generation, carve, warm start, 120 in-game frames, exit 0). The LIVE EYEBALL IS OWED - these are visual: manual rows and no human has watched the carve yet."
     },
     {
      "id": "R5",
@@ -8884,9 +8884,9 @@
      "verification": [
       "code"
      ],
-     "status": "pending",
+     "status": "complete",
      "result_metric": "",
-     "notes": "docs/generation/GENERATION_STRATEGY.md, docs/generation/NATION_GENERATION.md, docs/generation/CORPORATION_GENERATION.md"
+     "notes": "docs/generation/GENERATION_STRATEGY.md, docs/generation/NATION_GENERATION.md, docs/generation/CORPORATION_GENERATION.md | Landed 2026-08-13. Verified by construction and by a full windowed run (ProjectIo --autostart-windowed: wizard, Begin, generation, carve, warm start, 120 in-game frames, exit 0). The LIVE EYEBALL IS OWED - these are visual: manual rows and no human has watched the carve yet."
     }
    ]
   },
