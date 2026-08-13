@@ -52,3 +52,24 @@ std::vector<const work_row*> works_registry::available(const province& p, roster
                      { return gate_burden(a->gate) < gate_burden(b->gate); });
     return out;
 }
+
+bool apply_work_to_province(province& p, const works_registry& reg, int id)
+{
+    if (id < 0) return false;
+    const std::size_t i = static_cast<std::size_t>(id);
+    if (i >= reg.size() || i >= works_mask_bits) return false;
+
+    const uint32_t bit = uint32_t{1} << i;
+    if ((p.works_built & bit) != 0) return false; // Already standing.
+
+    const work_row* r = reg.row_at(i);
+    if (r == nullptr) return false;
+
+    p.works_built |= bit;
+    p.work_capacity_mod   += r->effect.capacity_mod;
+    p.work_manpower_mod   += r->effect.manpower_mod;
+    p.work_reach_mod      += r->effect.reach_mod;
+    p.work_defence_mod    += r->effect.defence_mod;
+    p.work_industrial_mod += r->effect.industrial_mod;
+    return true;
+}

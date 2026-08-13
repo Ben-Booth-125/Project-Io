@@ -320,6 +320,120 @@ nations, so their count is a property of the design rather than of the map size.
 
 ---
 
+## Implementation — the Era −1 works roster *(BL-321, S1 2026-08-07; S2–S4 2026-08-13)*
+
+**What a pre-history polity builds, and what those works do.** The Era −1 layer had a noun axis
+with one half built: `unit_roster` said what a polity could **field**, and nothing said what it
+could **build**. This is the other half — an authored, endowment-gated table of works, each a
+small id held by the **province**.
+
+**It is not `building_component`.** That struct is the campaign-era building: a tile entity with a
+recipe index, a workforce target, credit and resource build costs, per-tick maintenance and wages,
+decommission state. Era −1 has no credits, no market, no recipe registry and no economy tick — it
+has a year loop over provinces. Sharing the struct would have dragged the campaign economy into
+the generation layer to satisfy fields nothing sets.
+
+**Where the table lives.** In `scripts/works.lua`, loaded by `src/world/works_registry.cpp` — the
+one translation unit that pulls sol2 for it (Ben's call, 2026-08-07). `works_roster.hpp` stays
+pure data and `works_roster.cpp` stays Lua-free, so the headless harnesses that are this sim's
+only verification still link without Lua. Validation moved **into the loader**, because moving the
+table out of the compiler's reach meant a typo'd band or a duplicated name became runtime data;
+the loader throws at startup instead.
+
+**The consequence for the sim: the registry is a parameter, not a global.** `run_history_sim`
+takes `const works_registry*`, null meaning works disabled. The app passes its startup-loaded
+table; a harness hand-builds one. Same dependency-injection seam `clear_markets` already uses for
+the recipe registry.
+
+### The rows
+
+Twenty-one, across the four `roster_band` values (cumulative — nothing un-invents a granary):
+
+| Band | Rows |
+|---|---|
+| Classical | Granary · Channel Works · Ore Pits · Wall Circuit · Way Station · Harbour Mole |
+| Medieval | Water Mill · Stone Fortress · Guild Quarter · Deepwater Wharf · Span Bridge |
+| Gunpowder | Bastion Fort · Powder Mill · Counting House · Cut Canal · Naval Yard |
+| Industrial | Blast Works · Rail Head · Signal Line · Arsenal · Coaling Station |
+
+Availability is **derived from the ground** — a row is offered when the province's endowment
+windows and population clear its gate. No research, no unlock events, no player choice. Names are
+generic mechanism nouns; the standing rule that real history is a *mechanism* reference and never
+a name source applies here as everywhere.
+
+The band a province builds at is keyed off the polity's **materials** capacity, not its military
+one. The unit roster reads the military column because that is the column whose rows turn over at
+a roster boundary; a Blast Works turns over with metallurgy instead. Two tables, one band enum,
+different columns.
+
+### Reach is the row that matters
+
+BL-314 charged a polity supply for every province held past `free_holdings` — **the burden of
+breadth**. Before this item there was nothing to buy with it, so the only answer to the charge was
+to stop expanding, which makes the frontier stall a **ceiling**. Works make it a **decision**: a
+polity that spends its rounds on Way Stations and Cut Canals administers the same breadth more
+cheaply.
+
+Relief is proportional and capped below 1000 in both places it applies, so building buys a
+discount and never an exemption. The stall still arrives; it arrives later, and by the polity's
+own choice. BL-224's non-hegemony stays emergent.
+
+### Where each effect lands
+
+| Effect | Consumer |
+|---|---|
+| `capacity_mod` | `province_carrying_capacity(farm_q, mod)` — raises the **asymptote** the logistic growth term climbs toward, so it changes trajectory rather than granting a step growth would re-flatten. Read by `advance_province_demography` and by the Settle verb's pressure test, which must divide by the same K. |
+| `manpower_mod` | `manpower_ceiling(population, mod)`, read by `replenish_manpower` — so every existing caller gets the effect without being told works exist. |
+| `reach_mod` | Two places: the **staging hub's** own works discount the terrain-weighted term of `supply_here` (scorer) and `supply_raw` (execution) — the two must agree, or a polity decides on one supply figure and fights on another — and the polity's **mean** reach relieves the burden of breadth. Mean, not total, so conquest alone cannot make an empire count itself as well-roaded. |
+| `defence_mod` | Readiness on the defender's stack, which `roster_stack` turns into an additive per-mille offset on `type_power_mod` — the same channel cohesion uses, and for the reason `combat.hpp` gives: the engine scores whatever stack it is handed and knows nothing about walls. Also visible to the **scorer**, so a polity does not walk into a bastion it could not see. A Bastion Fort at +640 is worth ~+64 against row power values of 90–380: it tilts a fight, never decides one. |
+| `industrial_mod` | **A recorded divergence from the item's own words.** The design calls it a pull-forward on the Stage 4 furnace date — but Stage 4 runs inside `run_settlement`, which has finished before this loop starts, so there is no furnace date left to pull. What the sim *has* as an industrial clock is the capacity ladder, so the polity's mean industrial investment accelerates Invest's progress up it. Same claim, expressed against the mechanism that exists. |
+
+### The verb
+
+`build_work` is the fifth scored candidate, priced in BL-309's shared currency alongside campaign,
+settle, invest and consolidate — **not in a treasury Era −1 does not have, but in the round it
+consumes**. Building a Way Station competes directly with raising an army because both spend the
+polity's one action that round, which is the whole point of putting it on the shared scale rather
+than beside it.
+
+A work's benefit splits honestly by who receives it: local effects are valued against the
+province's own endowment, reach against the polity's **mean** holding. Scoring reach against the
+*total* made it worth ~40× every local effect and reduced the roster to its five road rows.
+
+**Bounded by construction**, like the other four verbs. Two candidate provinces per polity per
+round — the capital, plus one rotated through the holdings by a hash of (polity, year, slot).
+Scoring every holding would be O(held × rows) inside a pass already costing ~23 s of a ~25 s
+world; the rotation still reaches every province over a run, because the round count (136 on the
+default stepped-clock ladder) is large against any one polity's holdings.
+
+**A work saturates.** `apply_work_to_province` refuses to build the same row twice, so a
+province's works are a finite investment and the polity is eventually forced to spend its rounds
+on something else. Without that refusal the scorer would re-raise the same Granary every round it
+stayed the best candidate.
+
+### Storage
+
+`province::works_built` is a **32-bit mask** plus five plain-int accumulators — no heap ownership,
+because the struct is copied on every Settle and lives in a vector that grows past 400 entries.
+The accumulators are maintained incrementally, so every read is O(1) against a write that happens
+at most once per polity per round. The mask imposes a hard 32-row ceiling on the table, which the
+loader checks: a 33rd row would otherwise be authored, validated, offered — and silently
+impossible to build.
+
+Works are **physical**: conquest transfers them with the province rather than razing them, which
+is what makes a developed province worth taking.
+
+### Honest scope
+
+The magnitudes in `works.lua` and every `w_work_*` weight in `history_sim_params` are **authored
+by judgement, not calibrated** — placeholders in the same sense as the surrounding `w_*` weights,
+put at plausible magnitudes so works land in the same band as the other verbs. Calibrating them is
+BL-275's sweep. `history_sweep` now carries the roster on every run and reports works raised per
+world, which is what makes that calibration possible; whether the frontier stall actually moved
+from ceiling to decision is a question for that sweep's numbers, not for this doc.
+
+---
+
 ## The compact thesis
 
 > **Markets scale where no one can dominate, and no one dominates where exit is cheap** — a

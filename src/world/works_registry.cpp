@@ -138,6 +138,16 @@ void works_registry::load_from_lua(lua_state& lua)
     if (m_rows.empty())
         throw std::runtime_error("works.lua: the works table is empty");
 
+    // A province records its works as a 32-bit mask (settlement.hpp § Era -1
+    // works), so a 33rd row would be authored, validated, offered by
+    // `available` — and then silently impossible to build, because
+    // `apply_work_to_province` cannot address its bit. Caught here, where the
+    // author is looking, rather than becoming a row that mysteriously never
+    // appears in any world.
+    if (m_rows.size() > works_mask_bits)
+        throw std::runtime_error("works.lua: more than 32 works — province::works_built is a "
+                                 "32-bit mask and could not address the extra rows");
+
     // --- table-level invariant -------------------------------------------
     // Every reach-bearing work must be raisable by SOME ground, and at least one
     // must be raisable by poor ground. reach_mod is how a polity buys its way

@@ -154,6 +154,16 @@ private:
     /// generation). Shared by run() and run_verify().
     void load_economy();
 
+    /// Load scripts/works.lua into `m_works` if it is not loaded already
+    /// (BL-321). IDEMPOTENT AND CALLED EARLY, because the works table is now an
+    /// INPUT TO WORLD GENERATION — the Era -1 sim builds from it — while
+    /// `load_economy` deliberately runs AFTER `setup_world` (the recipe
+    /// registry is not needed to generate a world, and the corp pass needs a
+    /// generated world to read). Left inside load_economy, the table would have
+    /// been empty for the run that needed it and full for nothing, and the only
+    /// symptom would have been a pre-history with no works in it.
+    void ensure_works_loaded();
+
     /// Run one economy tick: production → market clearing → budget, storing the
     /// per-building report for the economy panel. Driven by the econ-tick boundary
     /// in run() and by the verify API.

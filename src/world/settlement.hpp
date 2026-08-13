@@ -124,6 +124,38 @@ struct province
     /// the loop with. A bounded fraction of `population` (`manpower_ceiling`),
     /// refilled gradually by `replenish_manpower`, spent by `raise_manpower`.
     int64_t manpower_stock = 0;
+
+    // --- Era -1 works (BL-321) --------------------------------------------
+    // What this province has BUILT, and what those works are worth. The works
+    // TABLE lives in works_roster.hpp/works.lua; only the per-province record
+    // lives here, and deliberately as plain integers rather than a
+    // `work_effect` member: works_roster.hpp already forward-declares
+    // `province`, so including it back here would close a cycle to store five
+    // ints. The accumulators below are the same five fields by another name.
+    //
+    // A BITMASK, NOT A VECTOR. The design offered either; the mask wins because
+    // this struct is copied on every settle (the Settle verb push_backs a whole
+    // province) and lives in a vector that grows past 400 entries inside a pass
+    // already costing ~23 s of a ~25 s world. A mask keeps `province` free of
+    // heap ownership and makes "have I already built this?" one AND.
+    //
+    // The consequence is a hard 32-row ceiling on the works table, which
+    // `works_registry::load_from_lua` checks so a 33rd row fails at startup
+    // rather than silently becoming unbuildable.
+
+    /// Bit `i` set = row `i` of `works_registry::rows()` stands here. Works are
+    /// PHYSICAL: conquest transfers them with the province rather than razing
+    /// them, which is what makes a developed province worth taking.
+    uint32_t works_built = 0;
+
+    /// Accumulated per-mille effects of `works_built`, maintained incrementally
+    /// by `apply_work_to_province` so every read is O(1). Re-derivable from the
+    /// mask at any time via `works_registry::total_effect_mask`.
+    int work_capacity_mod   = 0; ///< Raises `province_carrying_capacity`.
+    int work_manpower_mod   = 0; ///< Raises `manpower_ceiling`.
+    int work_reach_mod      = 0; ///< Discounts terrain-weighted supply cost.
+    int work_defence_mod    = 0; ///< Readiness this province adds when DEFENDING.
+    int work_industrial_mod = 0; ///< Pull-forward on the industrial clock.
 };
 
 /// What the settlement pass computed for one body.
@@ -262,6 +294,17 @@ industrial_focus focus_from_province(const province& p, int64_t median);
 /// item can add an industrial-era term without changing this signature.
 int64_t province_carrying_capacity(int farm_q);
 
+/// The same ceiling raised by a province's WORKS (BL-321). `capacity_mod_q` is
+/// per-mille — a Granary at +180 feeds 18% more people off the same ground.
+///
+/// This is the promised industrialisation-aware term the one-argument overload
+/// says a future item can add "without changing this signature", and it is
+/// added exactly that way: the old signature still exists and still means what
+/// it meant, so every caller that has no works to account for is untouched.
+/// Clamped at the bottom so a (currently impossible) negative modifier cannot
+/// drive the ceiling under the subsistence floor.
+int64_t province_carrying_capacity(int farm_q, int capacity_mod_q);
+
 /// Advance one province's population by `years` simulated years: logistic
 /// growth toward `province_carrying_capacity(p.farm_q)`, war drawdown scaled
 /// by `war_pressure_q`, then a manpower-stock replenishment pass. Integer
@@ -284,6 +327,10 @@ void advance_province_demography(province& p, int years, int war_pressure_q);
 /// bounded fraction (`manpower_ceiling`'s own constant), not additive, so a
 /// province cannot bank more than its living population could ever field.
 int64_t manpower_ceiling(int64_t population);
+
+/// The same ceiling raised by a province's WORKS (BL-321) — an Arsenal at +320
+/// lets the same population field 32% more. Per-mille, clamped non-negative.
+int64_t manpower_ceiling(int64_t population, int manpower_mod_q);
 
 /// Move `manpower_stock` a fraction of the way toward its ceiling. Called
 /// once per `advance_province_demography` step (after growth/drawdown update

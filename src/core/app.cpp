@@ -409,11 +409,17 @@ void app::begin_new_game()
     m_carve_view.clear();
     m_carve_seen = m_worldgen_progress.carve_epoch.load(std::memory_order_relaxed);
 
+    // The works table is an input to generation now (BL-321), so it must be
+    // loaded on THIS thread before the worker starts reading it.
+    ensure_works_loaded();
+
     // The worker writes only into locals plus the atomics; the finished world is
     // moved across by the future, so nothing is shared mutable state.
     m_worldgen_future = std::async(std::launch::async, [this] {
+        // m_works is loaded once at startup and never mutated after, so handing
+        // the worker a pointer to it shares nothing mutable (BL-321).
         return make_hard_coded_world(m_worldgen_params, &m_generation_report,
-                                     m_worldgen_cfg, &m_worldgen_progress);
+                                     m_worldgen_cfg, &m_worldgen_progress, &m_works);
     });
 
     m_screen = app_screen::building;
@@ -809,6 +815,16 @@ void app::finish_new_game()
     m_screen = app_screen::in_game;
 }
 
+void app::ensure_works_loaded()
+{
+    if (m_works.size() > 0) return;
+    // A malformed works.lua fails HERE, alongside the other data-layer errors,
+    // rather than midway through world generation. load_from_lua validates the
+    // table and throws; works_registry.cpp says what it enforces.
+    m_lua.load("scripts/works.lua");
+    m_works.load_from_lua(m_lua);
+}
+
 void app::load_economy()
 {
     // Load the Lua data layer, then build the registry from it (protected calls).
@@ -822,12 +838,10 @@ void app::load_economy()
     // would offer tiles construct_building then refuses.
     m_ui.max_logistics_reach = m_registry.construction().max_logistics_reach;
 
-    // BL-321 Era -1 works table. Loaded here rather than at generation time so a
-    // malformed works.lua fails at startup, alongside every other data-layer
-    // error, instead of midway through world generation. load_from_lua validates
-    // the table and throws; see works_registry.cpp for what it enforces.
-    m_lua.load("scripts/works.lua");
-    m_works.load_from_lua(m_lua);
+    // BL-321 Era -1 works table. Usually already loaded by now — world
+    // generation needs it and runs first — but kept here so the ordering is
+    // stated in both places and neither can quietly stop loading it.
+    ensure_works_loaded();
 
     // BL-087 mock tech/quest tree — display data for the F9 viewer only; no
     // simulation system reads it (the tech system is post-prototype).
@@ -955,7 +969,9 @@ void app::setup_world(world_params params)
         m_lua.load("scripts/world_gen.lua");
         gen_cfg.load_from_lua(m_lua);
         m_generation_report = generation_report{};
-        m_world = make_hard_coded_world(params, &m_generation_report, gen_cfg);
+        ensure_works_loaded(); // BL-321: an input to generation, not to the economy.
+        m_world = make_hard_coded_world(params, &m_generation_report, gen_cfg,
+                                        nullptr, &m_works);
     }
 
     // Bridge PLANETOLOGY's per-body dated history + checkpoints into the world

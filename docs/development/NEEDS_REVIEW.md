@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*193 entries — 69 open, 124 resolved.*
+*197 entries — 73 open, 124 resolved.*
 
 ---
 
@@ -652,6 +652,54 @@ CMakeLists labels history_sim_harness, history_sweep and data_creep_harness `swe
 > **Recommendation:** Option 1 now, and consider 2 later. A label that only works if the caller remembers a flag is documentation wearing machinery's clothes.
 
 *Files: `CMakeLists.txt`, `docs/development/DEVELOPMENT_PRACTICES.md`*
+
+### NR-195 — BL-321 works: industrial_mod wired to the capacity ladder, not the Stage 4 furnace date
+*decision taken on your behalf · raised 2026-08-13 · from Session 2026-08-13, BL-321 (Era -1 works roster) S2-S4*
+
+The item's design says work_effect::industrial_mod is 'a pull-forward on the Stage 4 furnace date'. That is not implementable as written: Stage 4 industrialisation runs inside run_settlement, which completes BEFORE run_history_sim starts, so by the time a work exists there is no furnace date left to pull. Rather than leave the field inert or run settlement twice, I wired it to what the sim actually uses as its industrial clock - the per-domain capacity ladder. A polity's MEAN industrial investment across its held provinces now multiplies the progress its Invest verb accrues. Blast Works still makes a polity industrialise sooner; the date it moves is a band crossing rather than a furnace year.
+
+**Why it matters.** It is a divergence from settled design prose, taken without asking, in the one effect axis whose consumer did not already exist. The alternative readings are both defensible - leave it inert and say so, or restructure the passes so settlement's Stage 4 runs after the sim - and the second is a much larger change than this item. If you would rather the field stayed inert until that restructure, it is a two-line revert.
+
+- Keep it: industrial_mod accelerates the capacity ladder (what landed).
+- Revert it to inert, and file the pass-ordering restructure that would let it hit a real furnace date.
+- Restructure now so run_settlement Stage 4 runs after the year loop.
+
+> **Recommendation:** Keep it. The capacity ladder IS the sim industrial clock, so this is the same claim expressed against the mechanism that exists rather than the one the prose assumed.
+
+*Files: `src/world/history_sim.cpp`, `docs/lore/HISTORY.md`*
+
+### NR-196 — The works table had to load BEFORE world generation, so its Lua load moved out of load_economy
+*decision taken on your behalf · raised 2026-08-13 · from Session 2026-08-13, BL-321 wiring*
+
+app::load_economy loaded scripts/works.lua, and load_economy runs AFTER setup_world by design (the recipe registry is not needed to generate a world). Once the Era -1 sim consumes the works table, that ordering means generation would have run with an EMPTY registry and the table would have been loaded for nothing - a pre-history with no works in it, and no error anywhere. Extracted into an idempotent app::ensure_works_loaded(), now called before both generation paths (the async worker in begin_new_game and the inline fallback in setup_world) and still called from load_economy.
+
+**Why it matters.** It changes app startup ordering, which is outside BL-321 file list, and the failure it prevents is silent - the only symptom would have been a pre-history that never built anything. Worth your eye because startup ordering is the kind of thing another item can quietly undo.
+
+> **Recommendation:** No action expected; recorded because it is a startup-ordering change made on your behalf.
+
+*Files: `src/core/app.cpp`, `src/core/app.hpp`*
+
+### NR-197 — BL-321 landed outside its declared file scope, in four files
+*observation · raised 2026-08-13 · from Session 2026-08-13, BL-321 S2-S4*
+
+The item names works_roster.{hpp,cpp}, settlement.hpp, history_sim.{hpp,cpp}, history_sweep.cpp and HISTORY.md. Four more were touched, each for a stated reason: settlement.cpp (the capacity/manpower overloads that make the effects reach a consumer - a header-only change would have left them inert); works_registry.cpp (a 32-row ceiling check, because province::works_built is a 32-bit mask and a 33rd row would validate and then be unbuildable); hard_coded_world.{hpp,cpp} (a defaulted passthrough parameter, so generation can hand the sim a table); app.{hpp,cpp} (the load-ordering fix in NR-196, plus actually passing the registry). Without the last three the feature compiles, passes its harness, and does nothing in a real world.
+
+**Why it matters.** The alternative was to land the mechanism unwired and report it as done, which is the failure mode the item own effects-must-have-consumers rule exists to prevent. Flagging it so the scope change is visible rather than discovered.
+
+> **Recommendation:** No action expected.
+
+*Files: `src/world/settlement.cpp`, `src/world/works_registry.cpp`, `src/world/hard_coded_world.cpp`, `src/core/app.cpp`*
+
+### NR-198 — history_sweep now measures a works-enabled world, so its distributions are not comparable to earlier runs
+*observation · raised 2026-08-13 · from Session 2026-08-13, BL-321 S4*
+
+Every sweep run now carries a works registry and the table gains a works(prov) column. That is deliberate - the item claim is that works move the frontier stall from a ceiling to a decision, and a sweep without them could not show whether they did - but it means any BL-275 numbers recorded before today describe a different simulation. The registry the sweep uses is a small hand-built FIXTURE, not works.lua: the harness is Lua-free like every world/* check, and the checks assert the mechanism (gates fire on the ground, effects reach a consumer, replays agree) rather than any authored magnitude.
+
+**Why it matters.** Two things follow. Old sweep output should not be diffed against new. And the authored magnitudes in works.lua are still uncalibrated placeholders - the sweep can now report on them, but nobody has tuned them, and the item own honest-scope note says so.
+
+> **Recommendation:** Re-baseline the BL-275 sweep numbers before drawing any conclusion about whether the stall moved.
+
+*Files: `tools/verify/history_sweep.cpp`, `scripts/works.lua`*
 
 ---
 

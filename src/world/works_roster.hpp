@@ -97,6 +97,12 @@ struct work_row
     int weight = 0;
 };
 
+/// How many rows `province::works_built` can address. The province records its
+/// works as a 32-bit mask rather than a heap-owning vector (settlement.hpp
+/// § Era -1 works), so this is a hard ceiling on the table — enforced by the
+/// loader, because a 33rd row would otherwise be silently unbuildable forever.
+inline constexpr std::size_t works_mask_bits = 32;
+
 /// The works table, loaded from scripts/works.lua.
 ///
 /// Every accessor is inline and Lua-free; only `load_from_lua` lives in the
@@ -137,6 +143,21 @@ public:
         return -1;
     }
 
+    /// Id of a row `available()` returned, in O(1). `available` hands back
+    /// pointers INTO `rows()`, so the id is the offset — no lookup needed.
+    ///
+    /// Exists because the obvious call is `id_of(row->name)`, and that is a
+    /// linear scan with a string compare at every step, run once per available
+    /// row per candidate province per polity per decision round. Cheap-looking
+    /// and quadratic; this is the same answer without the scan. Returns -1 for
+    /// a pointer that is not one of ours.
+    int index_of(const work_row* r) const
+    {
+        if (r == nullptr || m_rows.empty()) return -1;
+        if (r < m_rows.data() || r >= m_rows.data() + m_rows.size()) return -1;
+        return static_cast<int>(r - m_rows.data());
+    }
+
     /// The works @p p's ground and @p band make available, cheapest gate first.
     /// Two provinces at the same date offer different works because their ground
     /// differs — the asymmetry the roster pair exists to make visible.
@@ -164,6 +185,29 @@ public:
         return t;
     }
 
+    /// `total_effect`'s bitmask sibling — the form the sim actually uses, since
+    /// `province::works_built` is a mask rather than a list (settlement.hpp
+    /// § Era -1 works). Bits past `works_mask_bits` and past the table's end
+    /// are SKIPPED for the same reason unknown ids are: a record written
+    /// against a different table shrinks gracefully instead of reading a
+    /// neighbouring row's effects as if they were its own.
+    work_effect total_effect_mask(uint32_t mask) const
+    {
+        work_effect t;
+        const std::size_t n = m_rows.size() < works_mask_bits ? m_rows.size() : works_mask_bits;
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            if ((mask & (uint32_t{1} << i)) == 0) continue;
+            const work_effect& e = m_rows[i].effect;
+            t.capacity_mod   += e.capacity_mod;
+            t.manpower_mod   += e.manpower_mod;
+            t.reach_mod      += e.reach_mod;
+            t.defence_mod    += e.defence_mod;
+            t.industrial_mod += e.industrial_mod;
+        }
+        return t;
+    }
+
     // --- direct construction for tests (headless harness builds these by hand) ---
     void add_row(const work_row& r) { m_rows.push_back(r); }
     void clear() { m_rows.clear(); }
@@ -175,3 +219,19 @@ private:
 /// True iff @p p clears @p g. Free function rather than a member so the gate
 /// rule can be asserted directly by a harness without a registry.
 bool work_gate_met(const work_gate& g, const province& p);
+
+/// Raise work @p id on @p p: set its bit and fold its effect into the
+/// province's accumulators. Returns false — changing nothing — when the id is
+/// out of range, unaddressable by the mask, or ALREADY BUILT.
+///
+/// The refusal to double-build is the load-bearing half. Without it the scorer
+/// would happily re-raise the same Granary every round it stayed the best
+/// candidate, and a province's capacity would compound without bound; with it,
+/// a province's works are a finite, saturating investment and the polity is
+/// eventually forced to spend its rounds on something else.
+///
+/// Incremental rather than a recompute from the mask because the sim reads
+/// these accumulators every decision round and writes them at most once per
+/// polity per round — an O(1) write against an O(rows) read is the wrong way
+/// round for a pass costing ~23 s of a ~25 s world.
+bool apply_work_to_province(province& p, const works_registry& reg, int id);
