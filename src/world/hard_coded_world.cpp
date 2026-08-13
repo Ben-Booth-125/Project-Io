@@ -189,7 +189,8 @@ std::vector<entity_id> generate_home_surface_preview(world& w, entity_id body,
 
 world make_hard_coded_world(world_params params, generation_report* report,
                             const world_gen_config& gen_cfg,
-                            generation_progress* progress)
+                            generation_progress* progress,
+                            const works_registry* works)
 {
     world w;
 
@@ -561,7 +562,8 @@ world make_hard_coded_world(world_params params, generation_report* report,
                                 home_grid_width, home_grid_height, hp,
                                 /*seed=*/params.seed ^ 0x415C1E17u,
                                 progress != nullptr ? &progress->sub_progress
-                                                    : nullptr);
+                                                    : nullptr,
+                                works); // BL-321: the Era -1 works table, or null.
 
             if (progress != nullptr)
                 progress->sub_total.store(0, std::memory_order_relaxed);

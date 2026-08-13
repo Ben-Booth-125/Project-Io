@@ -52,6 +52,7 @@
 #include "combat.hpp"
 #include "creeds.hpp"
 #include "settlement.hpp"
+#include "works_roster.hpp"
 
 #include <atomic>
 #include <cstdint>
@@ -313,6 +314,57 @@ struct history_sim_params
     /// it do — battles outnumbered conquests by up to 1000:1.
     int contest_transfer_relief_q = 400;
 
+    // --- Works (BL-321) ---------------------------------------------------
+    //
+    // THE COUNTER-MOVE TO THE BURDEN OF BREADTH. BL-314 charges a polity supply
+    // for every province past `free_holdings`, and before this item there was
+    // nothing to buy with: the only answer to the charge was to stop expanding,
+    // which makes the frontier stall a CEILING. Works make it a DECISION —
+    // spend a round on a Way Station and the same breadth costs less.
+    //
+    // The verb is priced the way the other four are: not in a treasury Era -1
+    // does not have, but in the ROUND it consumes. Building competes directly
+    // with raising an army because both spend the polity's one action, which is
+    // the whole point of putting it on the shared scale rather than beside it.
+    //
+    // EVERY WEIGHT BELOW IS A PLACEHOLDER, like the `w_*` weights above and for
+    // the same reason: the magnitudes are authored by judgement to put works in
+    // the same band as the other verbs, and calibrating them is BL-275's sweep,
+    // not this file's.
+
+    /// Per-mille value of each effect axis when scoring a candidate work. Reach
+    /// is weighted highest because it is the axis with an emergent consequence
+    /// (the stall) rather than merely a local one.
+    int w_work_capacity   = 900;
+    int w_work_manpower   = 700;
+    int w_work_reach      = 1200;
+    int w_work_defence    = 600;
+    int w_work_industrial = 500;
+
+    /// Payback horizon turning a work's permanent benefit into the annual
+    /// figure the shared currency is denominated in.
+    int work_amortise_years = 4;
+
+    /// Minimum in the shared currency, like the four thresholds above.
+    /// Deliberately LOW: a Way Station on poor ground is a marginal choice and
+    /// should be able to win a quiet round, which is exactly the round a young
+    /// polity has and a fighting one does not.
+    int work_threshold_q = 8;
+
+    /// Ceiling on the reach discount a single supply hub may apply to the
+    /// terrain-weighted cost, and on the relief a polity's mean reach may apply
+    /// to the burden of breadth. Below 1000 so no amount of building makes
+    /// distance or breadth free — works buy a discount, never an exemption,
+    /// which is what keeps BL-224's non-hegemony emergent.
+    int work_reach_relief_cap_q = 800;
+
+    /// How many held provinces a polity considers building on per round. Two:
+    /// its capital, and one rotated deterministically through its holdings.
+    /// Scoring every holding would be O(held x rows) inside a pass already
+    /// costing ~23 s of a ~25 s world; rotating spreads works across the empire
+    /// over a run without paying for a full scan every round.
+    int work_candidate_provinces = 2;
+
     // --- Great-power seed (BL-299) ----------------------------------------
     /// Seed two opposed majors: one preserving, one expansionist. Off by
     /// default so the ordinary sweep measures an unseeded world.
@@ -405,6 +457,7 @@ enum class sim_verb : uint8_t
     campaign,
     invest,
     consolidate,
+    build_work, ///< Raise an Era -1 work on a held province (BL-321).
 };
 
 // ---------------------------------------------------------------------------
@@ -471,6 +524,10 @@ struct history_sim_state
     /// — launched, but arriving too thin for the distance. The supply-decay
     /// stall, counted where it happens rather than after the battle resolved.
     int64_t stalled_campaigns = 0;
+    /// Works raised over the run (BL-321). Counted because "did the roster fire
+    /// at all" and "did it fire so much nothing else happened" are the two ways
+    /// this item fails, and neither is visible in the battle/founding counts.
+    int64_t works_raised = 0;
 
     /// Battles in each century of the run, index 0 = the first hundred years.
     /// The sweep reports war frequency PER CENTURY rather than as a total,
@@ -522,6 +579,15 @@ inline constexpr std::size_t owner_index_limit = 0xFFFEu;
 ///                loading screen polling from another thread. Null (the default,
 ///                and every headless caller) costs nothing and changes nothing —
 ///                the sim never reads it back, so determinism is untouched.
+/// @param works   The Era -1 works table (BL-321), or null to run with works
+///                DISABLED — no `build_work` candidate is scored and no province
+///                gains one. Injected rather than fetched from a global for the
+///                reason works_roster.hpp gives: the table is authored in Lua,
+///                and a sim that reached for a Lua-loaded global could not be
+///                verified by the headless harnesses that are its only
+///                verification. The app passes its startup-loaded registry, a
+///                harness hand-builds one, and a caller that does not care
+///                passes nothing and pays nothing.
 history_sim_state run_history_sim(settlement_state&         ss,
                                   const creed_state*        cs,
                                   const sim_terrain_view&   terrain,
@@ -529,7 +595,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                   int                       gh,
                                   const history_sim_params& params,
                                   uint32_t                  seed,
-                                  std::atomic<int>*         year_progress = nullptr);
+                                  std::atomic<int>*         year_progress = nullptr,
+                                  const works_registry*     works         = nullptr);
 
 /// Tile distance between two provinces on the cylinder — column difference
 /// wraps, row difference does not. Exposed because the harness asserts the

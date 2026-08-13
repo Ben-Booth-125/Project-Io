@@ -8,6 +8,11 @@
 
 #include <array>
 #include <atomic>
+
+// Forward-declared rather than included (BL-321): this header is included very
+// widely, and the works table is only ever passed through it by pointer.
+class works_registry;
+
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -399,9 +404,15 @@ struct generation_report
 /// @return A fully populated world ready to drive the simulation.
 /// @param progress Optional coarse progress sink for a caller drawing a loading
 ///               screen from another thread. Null for every headless caller.
+/// @param works  The Era -1 works table (BL-321), forwarded to the history sim.
+///               Null — the default, and every headless caller that does not
+///               care — runs the pre-history with works disabled. Defaulted for
+///               the same reason `gen_cfg` is: a caller that never touches Lua
+///               still builds a world, it just builds one without works.
 world make_hard_coded_world(world_params params = {}, generation_report* report = nullptr,
                             const world_gen_config& gen_cfg = {},
-                            generation_progress* progress = nullptr);
+                            generation_progress* progress = nullptr,
+                            const works_registry* works = nullptr);
 
 /// The homeworld's tile grid dimensions — one authority the build and the
 /// wizard preview both read.

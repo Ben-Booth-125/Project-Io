@@ -19,10 +19,12 @@
 #include "world/history_sim.hpp"
 #include "world/sim_terrain_build.hpp"
 #include "world/settlement.hpp"
+#include "world/works_roster.hpp"
 #include "world/world.hpp"
 
 #include <algorithm>
 #include <chrono>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
@@ -44,6 +46,109 @@ const generation_report::body_entry* kepler_of(const generation_report& r)
     for (const generation_report::body_entry& b : r.bodies)
         if (b.is_homeworld) return &b; // identity, not display name (BL-257)
     return r.bodies.empty() ? nullptr : &r.bodies.front();
+}
+
+// ---------------------------------------------------------------------------
+// The works fixture (BL-321)
+// ---------------------------------------------------------------------------
+//
+// A HAND-BUILT REGISTRY, NOT A SECOND AUTHORING PATH. The real table lives in
+// scripts/works.lua and is loaded by works_registry.cpp, the one TU that pulls
+// sol2 — and this harness is Lua-free by design, because every `world/*` check
+// in the project is. So the fixture below is a small stand-in with the same
+// SHAPE as the real table: one ungated reach work, one endowment-gated work per
+// axis, one population-gated defence work.
+//
+// The distinction matters and is worth being explicit about. This is not
+// works.lua duplicated — it is deliberately different and deliberately smaller,
+// because what these checks assert is that the MECHANISM works (gates fire on
+// the ground, effects reach a consumer, two runs agree), never that a
+// particular authored magnitude is right. Magnitudes are the sweep's job to
+// report and Ben's to tune; a fixture that mirrored works.lua would silently
+// become a second copy to keep in step, which is exactly what moving the table
+// to Lua was meant to avoid.
+works_registry works_fixture()
+{
+    works_registry reg;
+
+    auto add = [&](const char* name, roster_band band, work_gate g, work_effect e, int weight) {
+        work_row r;
+        r.name = name; r.band = band; r.gate = g; r.effect = e; r.weight = weight;
+        reg.add_row(r);
+    };
+
+    // Ungated reach: the row poor ground can still raise. Its existence is the
+    // half of the invariant that keeps breadth a decision rather than a ceiling.
+    { work_gate g; g.population = 3000; work_effect e; e.reach_mod = 120;
+      add("Test Way", roster_band::classical, g, e, 240); }
+
+    { work_gate g; g.farm_q = 300; g.population = 4000; work_effect e;
+      e.capacity_mod = 180; e.manpower_mod = 40;
+      add("Test Granary", roster_band::classical, g, e, 220); }
+
+    { work_gate g; g.ore_q = 400; g.population = 5000; work_effect e;
+      e.manpower_mod = 60; e.industrial_mod = 120;
+      add("Test Pits", roster_band::classical, g, e, 170); }
+
+    { work_gate g; g.port_q = 400; g.population = 5000; work_effect e;
+      e.reach_mod = 200; e.capacity_mod = 120;
+      add("Test Mole", roster_band::classical, g, e, 150); }
+
+    { work_gate g; g.population = 8000; work_effect e;
+      e.capacity_mod = 40; e.defence_mod = 250;
+      add("Test Wall", roster_band::classical, g, e, 200); }
+
+    // A later band, to check that bands gate and that they are CUMULATIVE.
+    { work_gate g; g.ore_q = 350; g.population = 15000; work_effect e;
+      e.manpower_mod = 80; e.defence_mod = 480;
+      add("Test Fortress", roster_band::medieval, g, e, 210); }
+
+    return reg;
+}
+
+/// A minimal one-polity world of `n` provinces in a row, each with the ground
+/// the caller asks for. Cheap enough to run several of inside a sweep.
+settlement_state strip_world(int n, int farm_q, int ore_q, int port_q, int culture)
+{
+    settlement_state ss;
+    for (int i = 0; i < n; ++i)
+    {
+        province p;
+        p.col = i * 3; p.row = 0; p.anchor = i * 3;
+        p.culture = culture; p.founding_culture = culture;
+        p.farm_q = farm_q; p.ore_q = ore_q; p.port_q = port_q;
+        p.settle_score_q = 900 - i;
+        p.name = "Strip" + std::to_string(i);
+        ss.provinces.push_back(p);
+    }
+    return ss;
+}
+
+/// Two rival strips laid end to end — the smallest world in which a campaign
+/// has anywhere to go. `strip_world` alone is one culture, so it seeds ONE
+/// polity and the campaign verb never has a target; anything asserting about
+/// supply needs two.
+settlement_state rival_strip(int per_side, int farm_q, int ore_q, int port_q)
+{
+    settlement_state ss = strip_world(per_side, farm_q, ore_q, port_q, 0);
+    settlement_state b  = strip_world(per_side, farm_q, ore_q, port_q, 1);
+    for (province& p : b.provinces)
+    {
+        p.col += per_side * 3;      // Continue the row, so the two sides adjoin.
+        p.anchor = p.col;
+        p.name += "B";
+    }
+    ss.provinces.insert(ss.provinces.end(), b.provinces.begin(), b.provinces.end());
+    return ss;
+}
+
+/// One province's works mask, so a check can say WHICH works stand rather than
+/// only how many.
+uint32_t masks_of(const settlement_state& ss)
+{
+    uint32_t all = 0;
+    for (const province& p : ss.provinces) all |= p.works_built;
+    return all;
 }
 
 /// One world's row. Every field is a metric BL-275 named at filing.
@@ -68,6 +173,12 @@ struct sweep_row
     int64_t battles   = 0;
     int64_t conquests = 0;
     int64_t foundings = 0;
+    /// Works raised over the run (BL-321), and how many provinces ended the run
+    /// with at least one. Reported rather than gated, like every other metric
+    /// here — but a column of zeroes would mean the roster never fired at all,
+    /// which is the failure this item is most likely to have.
+    int64_t works_raised   = 0;
+    int     provinces_with_works = 0;
 
     int64_t peak_population  = 0;
     int64_t peak_year        = 0;
@@ -167,6 +278,13 @@ int main(int argc, char** argv)
     std::vector<sweep_row> rows;
     rows.reserve(static_cast<std::size_t>(seed_count));
 
+    // BL-321: every sweep run now carries the works roster, so the distributions
+    // below describe a world whose polities could BUILD. That is a deliberate
+    // change to what this harness measures — the item's whole claim is that
+    // works move the frontier stall from a ceiling to a decision, and a sweep
+    // run without them could not show whether they did.
+    const works_registry works = works_fixture();
+
     for (int i = 0; i < seed_count; ++i)
     {
         const auto t0 = std::chrono::steady_clock::now();
@@ -207,7 +325,8 @@ int main(int argc, char** argv)
 
         const history_sim_state sim =
             run_history_sim(ss, nullptr, terr.view(),
-                            home_grid_width, home_grid_height, params, wp.seed);
+                            home_grid_width, home_grid_height, params, wp.seed,
+                            nullptr, &works);
 
         {
             int64_t early = 0;
@@ -227,6 +346,10 @@ int main(int argc, char** argv)
         row.foundings     = sim.foundings;
         row.peak_population = sim.peak_population;
         row.peak_year       = sim.peak_year;
+
+        row.works_raised = sim.works_raised;
+        for (const province& p : ss.provinces)
+            if (p.works_built != 0) ++row.provinces_with_works;
 
         for (const province& p : ss.provinces) row.epoch_population += p.population;
 
@@ -265,23 +388,24 @@ int main(int argc, char** argv)
 
     // --- The table ---------------------------------------------------------
     std::printf("seed  prov(0>epoch)  powers(0>epoch)  top%%  hegem  battles  conq  "
-                "peak pop (yr)      epoch pop     ms\n");
+                "peak pop (yr)      epoch pop     ms   works(prov)\n");
     std::printf("----  -------------  ---------------  ----  -----  -------  ----  "
-                "-----------------  ------------  ----\n");
+                "-----------------  ------------  ----  -----------\n");
     for (const sweep_row& r : rows)
     {
         char heg[16];
         if (r.hegemony_year < 0) std::snprintf(heg, sizeof heg, "  -  ");
         else                     std::snprintf(heg, sizeof heg, "%5lld",
                                                static_cast<long long>(r.hegemony_year));
-        std::printf("%4u  %5d > %5d  %6d > %6d  %3d%%  %3d  %s  %7lld  %4lld  %11lld (%4lld)  %12lld  %4lld\n",
+        std::printf("%4u  %5d > %5d  %6d > %6d  %3d%%  %3d  %s  %7lld  %4lld  %11lld (%4lld)  %12lld  %4lld  %5lld (%4d)\n",
                     r.seed, r.provinces_start, r.provinces_end,
                     r.powers_start, r.powers_end,
                     r.top_share_q / 10, r.smallest_holding, heg,
                     static_cast<long long>(r.battles), static_cast<long long>(r.conquests),
                     static_cast<long long>(r.peak_population), static_cast<long long>(r.peak_year),
                     static_cast<long long>(r.epoch_population),
-                    static_cast<long long>(r.ms));
+                    static_cast<long long>(r.ms),
+                    static_cast<long long>(r.works_raised), r.provinces_with_works);
     }
 
     // --- The distributions -------------------------------------------------
@@ -397,10 +521,16 @@ int main(int argc, char** argv)
         const entity_id kepler_id = k->id; // the report entry names its own entity (BL-257)
         const sim_terrain_arrays terr = build_sim_terrain(w, kepler_id,
                                                           home_grid_width, home_grid_height);
+        // The re-run must carry the SAME works registry for the same reason it
+        // must carry the same terrain: a re-run that differs in an input is not
+        // a determinism check, it is a guaranteed false FAIL.
         const history_sim_state again =
             run_history_sim(ss, nullptr, terr.view(),
-                            home_grid_width, home_grid_height, params, wp.seed);
-        check(again.battles == rows.front().battles && again.conquests == rows.front().conquests,
+                            home_grid_width, home_grid_height, params, wp.seed,
+                            nullptr, &works);
+        check(again.battles == rows.front().battles
+           && again.conquests == rows.front().conquests
+           && again.works_raised == rows.front().works_raised,
               "S2   re-running a swept seed reproduces its row exactly");
     }
 
@@ -409,6 +539,227 @@ int main(int argc, char** argv)
         if (r.battles != rows.front().battles) { spread = true; break; }
     check(spread || rows.size() <= 1,
           "S3   seeds actually diverge — the sweep measures a spread, not one world N times");
+
+    // --- Works checks (BL-321) ---------------------------------------------
+    //
+    // These DO gate, unlike the distribution rows above, and the difference is
+    // principled: S1-S3 refuse to assert tuning targets nobody has chosen, but
+    // "the gate fires on the ground it names" and "the effect reaches a
+    // consumer" are not tuning — they are the mechanism either working or not.
+    std::printf("\n");
+    {
+        const sim_terrain_view no_terrain{};
+
+        // W1 — gates read the ground they name. An ore-gated work is offered on
+        // ore-rich land and withheld on ore-poor land, at the same population.
+        {
+            settlement_state rich = strip_world(1, 900, 900, 900, 0);
+            settlement_state poor = strip_world(1, 900,   0, 900, 0);
+            rich.provinces[0].population = 50000;
+            poor.provinces[0].population = 50000;
+
+            const auto ra = works.available(rich.provinces[0], roster_band::classical);
+            const auto pa = works.available(poor.provinces[0], roster_band::classical);
+
+            bool rich_has_pits = false, poor_has_pits = false;
+            for (const work_row* r : ra) if (r->name == "Test Pits") rich_has_pits = true;
+            for (const work_row* r : pa) if (r->name == "Test Pits") poor_has_pits = true;
+
+            check(rich_has_pits && !poor_has_pits,
+                  "W1   an ore-gated work is offered on ore-rich ground and withheld on ore-poor");
+
+            // The other half of the gate invariant: poor ground is not shut out
+            // entirely. If it were, breadth would be a ceiling again for exactly
+            // the polities that most need to buy their way past it.
+            bool poor_has_reach = false;
+            for (const work_row* r : pa) if (r->effect.reach_mod > 0) poor_has_reach = true;
+            check(poor_has_reach,
+                  "W1b  ore-poor ground can still raise a reach work — breadth stays a decision");
+        }
+
+        // W2 — the population floor gates independently of the endowment.
+        {
+            settlement_state small = strip_world(1, 900, 900, 900, 0);
+            small.provinces[0].population = 1000; // Under every population floor here.
+            const auto sa = works.available(small.provinces[0], roster_band::classical);
+            check(sa.empty(),
+                  "W2   a province under every population floor is offered nothing");
+        }
+
+        // W3 — bands gate, and are CUMULATIVE.
+        {
+            settlement_state p = strip_world(1, 900, 900, 900, 0);
+            p.provinces[0].population = 50000;
+            const auto classical = works.available(p.provinces[0], roster_band::classical);
+            const auto medieval  = works.available(p.provinces[0], roster_band::medieval);
+
+            bool cl_fortress = false, md_fortress = false, md_way = false;
+            for (const work_row* r : classical) if (r->name == "Test Fortress") cl_fortress = true;
+            for (const work_row* r : medieval)
+            {
+                if (r->name == "Test Fortress") md_fortress = true;
+                if (r->name == "Test Way")      md_way      = true;
+            }
+            check(!cl_fortress && md_fortress && md_way,
+                  "W3   a later-band work is withheld at classical and offered at medieval, "
+                  "and the earlier band's rows survive");
+        }
+
+        // W4 — the effect ACCUMULATORS are what the consumers read. Asserted on
+        // the pure functions, because an end-to-end population comparison would
+        // be measuring the scorer's choices as much as the effect itself.
+        {
+            works_registry r2 = works;
+            settlement_state p = strip_world(1, 900, 900, 900, 0);
+            p.provinces[0].population = 50000;
+
+            const int gid = r2.id_of("Test Granary");
+            const bool applied = gid >= 0 && apply_work_to_province(p.provinces[0], r2, gid);
+            const bool refused = gid >= 0 && !apply_work_to_province(p.provinces[0], r2, gid);
+
+            check(applied && refused,
+                  "W4   a work applies once and REFUSES to be built twice");
+            check(p.provinces[0].work_capacity_mod == 180
+               && p.provinces[0].work_manpower_mod == 40,
+                  "W4b  the province's accumulators carry the row's effect");
+
+            const work_effect derived = r2.total_effect_mask(p.provinces[0].works_built);
+            check(derived.capacity_mod == p.provinces[0].work_capacity_mod
+               && derived.manpower_mod == p.provinces[0].work_manpower_mod,
+                  "W4c  the accumulators agree with a fresh recompute from the mask");
+
+            check(province_carrying_capacity(900, 180) > province_carrying_capacity(900)
+               && manpower_ceiling(100000, 40) > manpower_ceiling(100000),
+                  "W4d  the capacity and manpower effects reach their consumers");
+        }
+
+        // W5 — the effect is observable IN A RUN, not merely in the arithmetic.
+        // Same world, same seed, works on and off: the capacity works must leave
+        // the world carrying more people than it otherwise would.
+        {
+            history_sim_params wp2;
+            wp2.start_year = -400;
+            wp2.stop_year  = 0;
+            // Settle OFF (an unreachable pressure threshold), so the province
+            // count is fixed and the comparison isolates the capacity effect.
+            // Left on, a works run would found a different number of provinces
+            // from the plain one and the population totals would be measuring
+            // that instead — a true-for-the-wrong-reason check either way.
+            wp2.settle_pressure_q = 1001;
+
+            settlement_state on  = strip_world(6, 800, 600, 500, 0);
+            settlement_state off = strip_world(6, 800, 600, 500, 0);
+
+            const history_sim_state a =
+                run_history_sim(on, nullptr, no_terrain, 60, 30, wp2, 4242u, nullptr, &works);
+            const history_sim_state b =
+                run_history_sim(off, nullptr, no_terrain, 60, 30, wp2, 4242u, nullptr, nullptr);
+
+            int64_t pop_on = 0, pop_off = 0;
+            for (const province& p : on.provinces)  pop_on  += p.population;
+            for (const province& p : off.provinces) pop_off += p.population;
+
+            std::printf("      works on: %lld raised, pop %lld   |   off: %lld raised, pop %lld\n",
+                        static_cast<long long>(a.works_raised), static_cast<long long>(pop_on),
+                        static_cast<long long>(b.works_raised), static_cast<long long>(pop_off));
+
+            check(a.works_raised > 0, "W5   the roster actually fires in a run");
+            check(b.works_raised == 0,
+                  "W5b  a null registry disables works entirely — no verb, no effect");
+            check(pop_on > pop_off,
+                  "W5c  capacity works leave the world carrying more people than without them");
+            check(masks_of(on) != 0 && masks_of(off) == 0,
+                  "W5d  the works land on provinces, and only when a registry was supplied");
+        }
+
+        // W6 — determinism, the binding invariant. Two runs at one seed must
+        // produce not merely the same counts but the same works on the same
+        // provinces: a roster that chose differently on a replay would make
+        // every downstream generation pass irreproducible.
+        {
+            history_sim_params wp2;
+            wp2.start_year = -400;
+            wp2.stop_year  = 0;
+
+            settlement_state s1 = strip_world(6, 800, 600, 500, 0);
+            settlement_state s2 = strip_world(6, 800, 600, 500, 0);
+
+            const history_sim_state a =
+                run_history_sim(s1, nullptr, no_terrain, 60, 30, wp2, 77u, nullptr, &works);
+            const history_sim_state b =
+                run_history_sim(s2, nullptr, no_terrain, 60, 30, wp2, 77u, nullptr, &works);
+
+            bool identical = a.works_raised == b.works_raised
+                          && s1.provinces.size() == s2.provinces.size();
+            if (identical)
+                for (std::size_t i = 0; i < s1.provinces.size(); ++i)
+                    if (s1.provinces[i].works_built     != s2.provinces[i].works_built
+                     || s1.provinces[i].work_reach_mod  != s2.provinces[i].work_reach_mod
+                     || s1.provinces[i].work_capacity_mod != s2.provinces[i].work_capacity_mod)
+                    { identical = false; break; }
+
+            check(identical,
+                  "W6   two runs at one seed raise the same works on the same provinces");
+        }
+
+        // W7 — the reach effect reaches the supply path. Pre-seed every province
+        // with the reach work and the polity's campaigns are supplied better, so
+        // the run DIVERGES from the unseeded one.
+        //
+        // Divergence rather than a signed inequality on stalled_campaigns is the
+        // honest claim here: better supply means more campaigns are launched as
+        // well as better supplied, so the count can move either way for the right
+        // reason. What must be true is that the discount is READ at all — an
+        // inert field would leave the two runs byte-identical.
+        {
+            history_sim_params wp2;
+            wp2.start_year = -400;
+            wp2.stop_year  = 0;
+
+            // THE COEFFICIENTS ARE AMPLIFIED ON PURPOSE, and the amplification
+            // is the reason this check is trustworthy rather than a reason to
+            // doubt it. At the authored values the terrain term on a ten-province
+            // strip is worth a couple of points of supply out of 1000, so a 12%
+            // discount on it truncates to zero and an inert field would pass.
+            // Scaling the coefficient scales the thing being discounted, not the
+            // discount rule, so what is asserted is still exactly the rule.
+            wp2.terrain_reach_cost_q = 800;
+            wp2.holdings_burden_q    = 40;
+            wp2.free_holdings        = 2; // Bite the burden of breadth at this scale.
+
+            works_registry r2 = works;
+            const int way  = r2.id_of("Test Way");
+            const int mole = r2.id_of("Test Mole");
+
+            settlement_state seeded = rival_strip(5, 800, 600, 500);
+            settlement_state plain  = rival_strip(5, 800, 600, 500);
+            for (province& p : seeded.provinces)
+            {
+                p.population = 60000;
+                apply_work_to_province(p, r2, way);
+                apply_work_to_province(p, r2, mole);
+            }
+            for (province& p : plain.provinces) p.population = 60000;
+
+            // Works OFF in both runs, so the only difference is the reach the
+            // provinces already carry — otherwise the scorer's own building
+            // would confound the comparison.
+            const history_sim_state a =
+                run_history_sim(seeded, nullptr, no_terrain, 60, 30, wp2, 909u, nullptr, nullptr);
+            const history_sim_state b =
+                run_history_sim(plain,  nullptr, no_terrain, 60, 30, wp2, 909u, nullptr, nullptr);
+
+            std::printf("      reach seeded: %lld battles / %lld stalled   |   plain: %lld / %lld\n",
+                        static_cast<long long>(a.battles), static_cast<long long>(a.stalled_campaigns),
+                        static_cast<long long>(b.battles), static_cast<long long>(b.stalled_campaigns));
+
+            check(way >= 0 && mole >= 0, "W7   the fixture carries reach works to seed");
+            check(a.battles != b.battles || a.stalled_campaigns != b.stalled_campaigns
+               || a.conquests != b.conquests || a.foundings != b.foundings
+               || a.owner_changes.size() != b.owner_changes.size(),
+                  "W7b  pre-built reach changes the supply path — reach_mod is read, not inert");
+        }
+    }
 
     std::printf("\n%s (%d failure%s)\n",
                 g_failures == 0 ? "ALL PASS" : "FAILURES",

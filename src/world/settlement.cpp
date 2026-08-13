@@ -1164,15 +1164,34 @@ int64_t province_carrying_capacity(int farm_q)
     return demog_capacity_floor + static_cast<int64_t>(q) * demog_capacity_per_q;
 }
 
+int64_t province_carrying_capacity(int farm_q, int capacity_mod_q)
+{
+    const int64_t base = province_carrying_capacity(farm_q);
+    // Clamped at -999 so the multiplier stays positive: a modifier of -1000
+    // would zero the ceiling and make the logistic term divide by zero.
+    const int m = clampi(capacity_mod_q, -999, 100000);
+    return base + (base * m) / 1000;
+}
+
 int64_t manpower_ceiling(int64_t population)
 {
     if (population <= 0) return 0;
     return (population * demog_manpower_frac_q) / 1000;
 }
 
+int64_t manpower_ceiling(int64_t population, int manpower_mod_q)
+{
+    const int64_t base = manpower_ceiling(population);
+    const int m = clampi(manpower_mod_q, -1000, 100000);
+    return base + (base * m) / 1000;
+}
+
 void replenish_manpower(province& p)
 {
-    const int64_t ceiling = manpower_ceiling(p.population);
+    // Reads the province's own works (BL-321) rather than taking the modifier
+    // as an argument: an Arsenal is a property of the place, and every existing
+    // caller should get its effect without being told the works exist.
+    const int64_t ceiling = manpower_ceiling(p.population, p.work_manpower_mod);
     if (p.manpower_stock > ceiling) { p.manpower_stock = ceiling; return; } // Losses shrink the ceiling too.
     const int64_t gap = ceiling - p.manpower_stock;
     p.manpower_stock += (gap * demog_manpower_recover_q) / 1000;
@@ -1191,7 +1210,12 @@ void advance_province_demography(province& p, int years, int war_pressure_q)
 {
     if (years <= 0) return;
     const int wq = clampi(war_pressure_q, 0, 1000);
-    const int64_t K = province_carrying_capacity(p.farm_q);
+    // The ceiling the province's WORKS raised (BL-321). A Granary is a change
+    // to how many people the ground feeds, so it belongs in K rather than in a
+    // one-off population grant: it lifts the asymptote the logistic term is
+    // growing toward, which is a permanent change in trajectory rather than a
+    // step that growth would simply re-flatten.
+    const int64_t K = province_carrying_capacity(p.farm_q, p.work_capacity_mod);
 
     for (int y = 0; y < years; ++y)
     {

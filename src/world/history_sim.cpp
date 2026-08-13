@@ -68,6 +68,41 @@ int province_value_q(const province& p)
     return (p.farm_q + p.ore_q + p.port_q) / 3;
 }
 
+/// What a candidate work is worth this year, IN THE SHARED CURRENCY (BL-321).
+///
+/// The split between the two terms is the honest part. A Granary feeds THIS
+/// province and nowhere else, so it is valued against this province's own
+/// endowment. A Way Station shortens marches across the whole polity, so reach
+/// is valued against the polity's MEAN holding — mean, not total, because a
+/// road through one province does not carry the empire's entire traffic, and
+/// scoring it against the total made reach worth ~40x every local effect and
+/// reduced the roster to its five road rows.
+///
+/// The row's authored `weight` then shapes the choice between rows that score
+/// alike, as a 0.65x-1.3x multiplier over the table's 130-260 weight range. It
+/// is a pull, not a cost — works.lua says so at the point of authoring.
+int work_score_q(const work_row&           r,
+                 const province&           p,
+                 int                       mean_holding_value,
+                 const history_sim_params& params)
+{
+    const work_effect& e = r.effect;
+
+    const int local_q = (e.capacity_mod   * params.w_work_capacity
+                       + e.manpower_mod   * params.w_work_manpower
+                       + e.defence_mod    * params.w_work_defence
+                       + e.industrial_mod * params.w_work_industrial) / 1000;
+    const int empire_q = (e.reach_mod * params.w_work_reach) / 1000;
+
+    const int64_t gain = (static_cast<int64_t>(province_value_q(p)) * local_q
+                        + static_cast<int64_t>(mean_holding_value)  * empire_q) / 1000;
+
+    const int years = params.work_amortise_years > 0 ? params.work_amortise_years : 1;
+    int64_t s = gain / years;
+    s = (s * clampi(r.weight, 0, 1000)) / 200;
+    return static_cast<int>(clampi64(s, 0, 100000));
+}
+
 terrain_composition comp_at(const sim_terrain_view& t, int idx)
 {
     if (!t.composition || idx < 0 || idx >= static_cast<int>(t.composition->size()))
@@ -181,7 +216,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                   int                       gh,
                                   const history_sim_params& params,
                                   uint32_t                  seed,
-                                  std::atomic<int>*         year_progress)
+                                  std::atomic<int>*         year_progress,
+                                  const works_registry*     works)
 {
     history_sim_state out;
     if (ss.provinces.empty() || params.stop_year <= params.start_year)
@@ -441,10 +477,49 @@ history_sim_state run_history_sim(settlement_state&         ss,
             if (reach_capital != q.capital || reach.size() != ss.provinces.size())
                 rebuild_reach(q.capital);
 
+            // ---- What this polity's WORKS are worth it (BL-321) -----------
+            //
+            // One pass over `held`, producing the three aggregates the round
+            // needs: the mean holding value (the denominator a work's
+            // empire-wide benefit is scored against), the mean reach investment
+            // (what relieves the burden of breadth), and the mean industrial
+            // investment (what accelerates the tech ladder).
+            //
+            // MEANS, NOT TOTALS, throughout. A total would make every aggregate
+            // grow with conquest alone, so a large empire would count itself as
+            // well-roaded for having many unroaded provinces — the opposite of
+            // what the burden of breadth is measuring.
+            int64_t holdings_value_sum = 0;
+            int64_t works_reach_sum    = 0;
+            int64_t works_ind_sum      = 0;
+            for (int hi : held)
+            {
+                const province& hp = ss.provinces[static_cast<std::size_t>(hi)];
+                holdings_value_sum += province_value_q(hp);
+                works_reach_sum    += hp.work_reach_mod;
+                works_ind_sum      += hp.work_industrial_mod;
+            }
+            const int n_held = static_cast<int>(held.size()); // >= 1: empty held returned above.
+            const int mean_holding_value = static_cast<int>(holdings_value_sum / n_held);
+            const int mean_reach_q       = static_cast<int>(works_reach_sum / n_held);
+            const int mean_industrial_q  = static_cast<int>(works_ind_sum / n_held);
+
             // THE BURDEN OF BREADTH (BL-314 S3). Every province held past
             // `free_holdings` costs supply on every campaign this polity runs.
             const int over = static_cast<int>(held.size()) - params.free_holdings;
-            const int burden = over > 0 ? over * params.holdings_burden_q : 0;
+            int burden = over > 0 ? over * params.holdings_burden_q : 0;
+
+            // AND THE COUNTER-MOVE (BL-321). A polity that spent its rounds on
+            // roads and wharves administers its breadth more cheaply. Relief is
+            // proportional and capped below 1000, so building buys a discount
+            // and never an exemption: the stall still arrives, just later and
+            // by the polity's own choice rather than by arithmetic it could do
+            // nothing about. That difference — ceiling to decision — is the
+            // whole reason this item exists.
+            {
+                const int relief = clampi(mean_reach_q, 0, params.work_reach_relief_cap_q);
+                burden = burden - (burden * relief) / 1000;
+            }
 
             // ONE PRICE FOR SUPPLY, PAID BY BOTH THE SCORER AND THE BATTLE
             // (BL-318). These were two separate expressions, and they disagreed:
@@ -464,12 +539,27 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // The three terms are the three costs the design names: LOCAL
             // staging distance, STRATEGIC terrain-weighted reach from the
             // capital (BL-316 S2), and the BURDEN OF BREADTH (BL-316 S3).
-            const auto campaign_supply = [&](int hub_dist, std::size_t ti) {
+            // `hub` is the province the campaign is STAGED FROM, and it is a
+            // parameter rather than a capture because its works discount the
+            // terrain cost (BL-321): reach_mod is authored as a discount on the
+            // supply cost through/from a province, so it is the staging
+            // holding's roads and wharves doing the carrying, not the capital's.
+            //
+            // The discount applies to the TERRAIN term alone. A span bridge
+            // makes a mountain cheaper to cross; it does not shorten the march,
+            // which is what supply_decay_per_tile_q charges for.
+            const auto campaign_supply = [&](int hub_dist, std::size_t ti, int hub) {
                 const int reach_here = (ti < reach.size() && reach[ti] < (1 << 27))
                                      ? static_cast<int>(reach[ti]) : hub_dist;
+                const int hub_reach_q = (hub >= 0)
+                    ? clampi(ss.provinces[static_cast<std::size_t>(hub)].work_reach_mod,
+                             0, params.work_reach_relief_cap_q)
+                    : 0;
+                const int terrain_cost = reach_here * params.terrain_reach_cost_q / 100;
+                const int terrain_paid = terrain_cost - (terrain_cost * hub_reach_q) / 1000;
                 return clampi(1000
                             - hub_dist * params.supply_decay_per_tile_q
-                            - reach_here * params.terrain_reach_cost_q / 100
+                            - terrain_paid
                             - clampi(burden, 0, 1000 - params.holdings_burden_floor_q),
                             0, 1000);
             };
@@ -482,6 +572,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
             int      best_score = 0;
             int      best_target = -1;
             bool     best_winter = false;
+            // Which works row `build_work` chose. A second field rather than an
+            // overload of `best_target`, because build_work needs BOTH a
+            // province and a row and the other verbs' single target already
+            // means three different things (province, parent, domain).
+            int      best_work_row = -1;
 
             // -- Campaign --------------------------------------------------
             for (int hi : held)
@@ -514,9 +609,17 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     const int hub_dist =
                         province_distance(ss.provinces[static_cast<std::size_t>(hi)], tgt, gw);
 
-                    // Defender's fielded power, as a headcount proxy.
+                    // Defender's fielded power, as a headcount proxy, raised by
+                    // whatever the target has BUILT (BL-321). A Wall Circuit
+                    // has to be visible to the scorer, not only to
+                    // resolve_battle: a polity that walked into a bastion it
+                    // could not see would be making the decision on stale
+                    // information every time, and the work would read as bad
+                    // luck rather than as the defender's choice it is.
                     const int64_t def_men = (tgt.manpower_stock * params.levy_fraction_q) / 1000;
-                    const int def_scaled  = static_cast<int>(clampi64(def_men / 64, 0, 1000));
+                    const int def_works   = clampi(tgt.work_defence_mod, 0, 1000);
+                    const int def_scaled  = static_cast<int>(clampi64(
+                        (def_men / 64) * (1000 + def_works) / 1000, 0, 1000));
 
                     // Three DIFFERENT axes, so a polity can prize farmland and
                     // shrug at ore rather than merely valuing everything alike.
@@ -546,7 +649,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
                     // Odds from the power ratio the sim can actually estimate:
                     // levy x supply x cohesion against the defender's levy.
-                    const int supply_here = campaign_supply(hub_dist, ti);
+                    const int supply_here = campaign_supply(hub_dist, ti, hi);
 
                     int64_t atk_men = 0;
                     for (int hi2 : held)
@@ -643,7 +746,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 for (int hi : held)
                 {
                     const province& p = ss.provinces[static_cast<std::size_t>(hi)];
-                    const int64_t K = province_carrying_capacity(p.farm_q);
+                    // The works-aware ceiling (BL-321), matching what
+                    // `advance_province_demography` actually grows toward. The
+                    // plain overload would have read a Granary province as far
+                    // more crowded than it is and sent it out to settle land it
+                    // did not need — the settle pressure and the growth model
+                    // must divide by the same K or the verb fires on a fiction.
+                    const int64_t K = province_carrying_capacity(p.farm_q, p.work_capacity_mod);
                     if (K <= 0) continue;
                     const int pressure = static_cast<int>(clampi64((p.population * 1000) / K, 0, 1000));
                     if (pressure > pressure_best) { pressure_best = pressure; pressure_src = hi; }
@@ -717,6 +826,76 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     best_target = -1; best_winter = false;
                 }
             }
+            // -- Build a work (BL-321) -------------------------------------
+            //
+            // Scored LAST, and that ordering carries a small contract: because
+            // every earlier verb uses `>` against `best_score`, a work must
+            // strictly beat them, and `best_work_row` is only ever read on the
+            // one path that just wrote it.
+            //
+            // BOUNDED BY CONSTRUCTION, like the other four. Two candidate
+            // provinces — the capital, and one rotated through the holdings by
+            // the year — rather than every holding. Scoring all of them would be
+            // O(held x rows) per polity per round inside a pass already costing
+            // ~23 s of a ~25 s world; the rotation still reaches every province
+            // over a run, because the round count (136 on the default ladder) is
+            // large against any one polity's holdings.
+            if (works != nullptr && works->size() > 0)
+            {
+                // Keyed off MATERIALS, not military. The unit roster reads the
+                // military column because that is the column whose rows turn
+                // over at a roster boundary; a Blast Works turns over with
+                // metallurgy instead. Same band enum, different column — which
+                // is the point of the two tables sharing `roster_band` rather
+                // than one deriving from the other.
+                const roster_band band =
+                    roster_band_for_capacity(clampi(q.capacity[static_cast<int>(sim_domain::materials)], 1, 6));
+
+                for (int slot = 0; slot < clampi(params.work_candidate_provinces, 0, 8); ++slot)
+                {
+                    int pi = -1;
+                    if (slot == 0)
+                    {
+                        pi = q.capital;
+                    }
+                    else
+                    {
+                        // Rotation is a hash of (polity, year, slot), not a
+                        // counter: nothing is carried between rounds, so
+                        // inserting or removing a decision cannot shift which
+                        // province a later round looks at. Same reason the rest
+                        // of this file uses `salt` rather than a generator.
+                        const uint32_t h = salt(qs, static_cast<uint32_t>(y) * 977u
+                                                    + static_cast<uint32_t>(slot));
+                        pi = held[static_cast<std::size_t>(h % static_cast<uint32_t>(n_held))];
+                    }
+                    if (pi < 0 || pi >= static_cast<int>(ss.provinces.size())) continue;
+
+                    const province& bp = ss.provinces[static_cast<std::size_t>(pi)];
+                    const std::vector<const work_row*> avail = works->available(bp, band);
+
+                    for (const work_row* r : avail)
+                    {
+                        const int id = works->index_of(r);
+                        if (id < 0 || static_cast<std::size_t>(id) >= works_mask_bits) continue;
+                        // Already standing here: a work is a finite, saturating
+                        // investment, not a dial a polity can keep turning.
+                        if ((bp.works_built & (uint32_t{1} << id)) != 0) continue;
+
+                        int s = work_score_q(*r, bp, mean_holding_value, params);
+                        s += static_cast<int>(salt(qs, static_cast<uint32_t>(id) * 31u
+                                                      + static_cast<uint32_t>(pi))
+                                              % 8u); // Stable tie-break, as elsewhere.
+
+                        if (s > best_score && s >= params.work_threshold_q)
+                        {
+                            best_score = s; best_verb = sim_verb::build_work;
+                            best_target = pi; best_work_row = id; best_winter = false;
+                        }
+                    }
+                }
+            }
+
             if (best_verb == sim_verb::none) best_verb = sim_verb::consolidate;
 
             // ---- Execute -------------------------------------------------
@@ -751,7 +930,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // the scored estimate. Optimistic by a bounded amount, and in
                 // the right direction: the sim does not launch campaigns it then
                 // silently under-supplies.
-                const int atk_supply = campaign_supply(src_d, ti);
+                const int atk_supply = campaign_supply(src_d, ti, src);
                 const int def_supply = 1000;
 
                 // The stall, counted where it actually happens (BL-312). The
@@ -760,7 +939,18 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // than stalls and measured a constant zero in every run.
                 if (atk_supply < params.stalled_supply_q) ++out.stalled_campaigns;
 
-                const int def_ready = best_winter ? (1000 - params.winter_readiness_penalty_q) : 1000;
+                // THE DEFENCE WORKS LAND HERE (BL-321), as readiness on the
+                // defender's stack — which `roster_stack` turns into an
+                // additive per-mille offset on each unit's `type_power_mod`.
+                // That is deliberately the same channel cohesion uses, and for
+                // the same reason combat.hpp gives: the engine scores whatever
+                // stack it is handed and knows nothing about walls. A Bastion
+                // Fort at +640 is worth about +64 against row power values of
+                // 90..380 — it tilts a fight rather than deciding one, so a
+                // fortress buys the defender an edge and never immunity.
+                const int def_works_q = clampi(tgt.work_defence_mod, 0, 1000);
+                const int def_ready = (best_winter ? (1000 - params.winter_readiness_penalty_q) : 1000)
+                                    + def_works_q;
 
                 const polity* dq = nullptr;
                 for (const polity& o : out.polities)
@@ -922,7 +1112,22 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // credit the whole interval. Without this a 100-year band would
                 // advance tech exactly as far as a 1-year one and the ladder
                 // would never leave band 1 (history_sim.hpp § stepped clock).
-                q.progress_q[d] += clampi(best_score, 0, 1000) * step_years;
+                //
+                // THE INDUSTRIAL WORKS LAND HERE (BL-321), and this is a
+                // deliberate divergence from the item's own words, recorded
+                // rather than hidden. The design says `industrial_mod` is a
+                // "pull-forward on the Stage 4 furnace date" — but Stage 4 runs
+                // inside `run_settlement`, which has already finished before
+                // this loop starts, so there is no furnace date left to pull.
+                // What the sim actually has as its industrial clock is the
+                // capacity ladder, and a Blast Works accelerating a polity's
+                // progress up that ladder is the same claim expressed against
+                // the mechanism that exists. Wiring it to Stage 4 instead would
+                // mean either running settlement twice or leaving the field
+                // inert; this reads as the honest third option.
+                const int ind_boost = clampi(mean_industrial_q, 0, 1000);
+                const int progress  = clampi(best_score, 0, 1000) * step_years;
+                q.progress_q[d] += progress + (progress * ind_boost) / 1000;
                 // A band costs more the higher it sits — capacity follows the
                 // map, and it never runs away (ANCIENT_TECH_LADDER § diffusion).
                 const int cost = 4000 * q.capacity[d];
@@ -931,6 +1136,29 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     q.progress_q[d] -= cost;
                     ++q.capacity[d];
                 }
+                break;
+            }
+            case sim_verb::build_work:
+            {
+                if (works == nullptr || best_target < 0
+                 || best_target >= static_cast<int>(ss.provinces.size())) break;
+
+                province& bp = ss.provinces[static_cast<std::size_t>(best_target)];
+                const work_row* r = works->row_at(static_cast<std::size_t>(best_work_row));
+                if (r == nullptr) break;
+                if (!apply_work_to_province(bp, *works, best_work_row)) break;
+
+                // The manpower ceiling just moved, so the stock's headroom did
+                // too. Without this the Arsenal a polity built this round would
+                // not be worth anything until the next demography step happened
+                // to top the stock up — a work with a visible delay nobody
+                // asked for.
+                replenish_manpower(bp);
+
+                ++out.works_raised;
+                out.history.push_back(history_event{
+                    years_from_calendar_year(y), chain_stage::legacy,
+                    bp.name + " raises a " + r->name, std::string{}});
                 break;
             }
             case sim_verb::consolidate:
