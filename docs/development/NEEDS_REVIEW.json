@@ -3123,6 +3123,26 @@
     "docs/development/DELIVERY.md",
     ".claude/skills/verifier-review/SKILL.md"
    ]
+  },
+  {
+   "id": "NR-186",
+   "title": "stack_capacity_harness S.R3 has been failing since BL-366 changed the non-extraction cap, and nothing recorded it",
+   "raised": "2026-08-13",
+   "kind": "observation",
+   "status": "open",
+   "source": "2026-08-13 AI gameplay session; found running the ctest tier over an unrelated change.",
+   "what": "stack_capacity_harness asserts 'S.R3 non-extraction type stays capacity 1 on a rich tile' and gets 4. The assertion encodes the pre-BL-366 rule; BL-366 (aa42da2, multi-building tile stack cap + urban transform) made the non-extraction cap a function of tile COMPOSITION via non_extraction_stack_cap(tc.composition), so 4 is the intended answer on the composition the harness uses. The harness was not updated with the change. Confirmed pre-existing rather than caused by this session: placement_rules.cpp is not in this session's diff at all (git diff --name-only over the session's three commits lists main.cpp, corp_ai.cpp, corp_command.cpp, economy_system.*, building_profit.*, and tools/docs only).",
+   "why_it_matters": "It is the third stale-or-failing harness found sitting green-adjacent in the tier this session (NR-170 population_mvp R4, NR-171 data_creep R1, and now this), and it is the only one of the three with no entry at all -- so a full ctest run currently reports three failures of which one was, until now, entirely unrecorded. That is the state SPRINTS.md described as 'the gate went from lying to green' regressing: a tier with known-failing tests trains everyone to read past red, and the next real regression lands in the same noise. Deciding what to do with the three is more valuable than fixing this one.",
+   "options": [
+    "Update S.R3 to assert the BL-366 rule (cap is a function of composition), which is what the code now means.",
+    "Re-tier the three known failures the way v0.1.8 re-tiered the gate -- either fix them or mark them expected-failing with the entry that explains why, so a red tier means something again.",
+    "Fix this one and leave the other two, since both already have entries."
+   ],
+   "recommendation": "Option 2, as a small dedicated pass rather than folded into feature work. The v0.1.8 re-tier is the precedent and it is the reason the tier was trustworthy for a while; three unexplained reds is how that erodes. Option 1 is the right fix for this specific assertion once that pass happens.",
+   "files": [
+    "tools/verify/stack_capacity_harness.cpp",
+    "src/world/placement_rules.cpp"
+   ]
   }
  ]
 }
