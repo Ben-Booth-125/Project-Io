@@ -516,8 +516,18 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                        : w.markets.at(mid).base_price[static_cast<std::size_t>(cmd.target)])
                 : 0.0f;
             const float throughput = std::max(1.0f, reg.economics(building_type::processing_facility).base_rate);
-            const int lead_time = static_cast<int>(reg.procurement().base_lead_ticks *
-                                                    std::ceil(cmd.quantity / throughput));
+            // Clamp before narrowing. A float-to-int conversion whose value does
+            // not fit the destination is undefined, not saturating, and
+            // `quantity` is caller-supplied — the only guard above is
+            // `> 0.0f`, which an arbitrarily large order passes. A quote whose
+            // lead time is INT_MIN would then be paced every tick for the rest
+            // of the campaign. The ceiling is a century of quarters: far past any
+            // real contract, and finite.
+            constexpr double max_lead_ticks = 400.0;
+            const double raw_lead = static_cast<double>(reg.procurement().base_lead_ticks) *
+                                    std::ceil(static_cast<double>(cmd.quantity) / throughput);
+            const int lead_time =
+                static_cast<int>(std::clamp(raw_lead, 0.0, max_lead_ticks));
 
             procurement_quote q;
             q.id              = w.allocate_procurement_id();

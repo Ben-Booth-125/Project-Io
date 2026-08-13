@@ -597,7 +597,7 @@ set(IO_TEST_SWEEP_HARNESSES
 
     # CATEGORY (1), added 2026-08-13. seed_sweep_probe generates a full world PER
     # SEED across a spread, to catch a seed-dependent generation failure — the
-    # instrument written to chase the startup "crash" (NR-182). Its cost is the
+    # instrument written to chase the startup "crash" (NR-209). Its cost is the
     # point, exactly as for the two above, and it does not test the era so it
     # cannot opt out of the pre-epoch sim the way an ordinary harness can. Run it
     # by name when a seed is suspected.
@@ -621,7 +621,7 @@ set(IO_TEST_SWEEP_HARNESSES
     # That is a real hole, accepted only because the alternative was a test that
     # passes without checking anything.
     #
-    # TO RESTORE IT: fix the tick cost, not this list. NR-180 records that
+    # TO RESTORE IT: fix the tick cost, not this list. NR-207 records that
     # run_economy_step is 89.7% of the tick (measured by tools/verify/tick_profile.cpp),
     # that these are Debug-tree figures whose Release equivalent is unknown, and
     # that econ_stability sweeps bodies x corps and can never see a tile-count term

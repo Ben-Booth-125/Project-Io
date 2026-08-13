@@ -350,9 +350,65 @@ threshold, never a duplicate, and never on the player's own corp.
 ### Hysteresis & action budget
 
 - **Do-nothing bias**: a candidate must beat the incumbent (or doing nothing) by a relative
-  margin θ (~15%) — the anti-thrash rule.
-- **Cooldowns**: a building that changed recipe/workforce/state holds for C ticks; reversals ride
-  loss/gain streaks (the BL-079 `loss_streak` idiom, generalised).
+  margin θ (~15%) — the anti-thrash rule. Applied inside the **dial** enumeration only; build,
+  survey, hire and trade candidates pass through no hysteresis test.
+- **Cooldowns**: a building that changed recipe/workforce/state holds for C evaluations; reversals
+  ride loss/gain streaks (the BL-079 `loss_streak` idiom, generalised).
+
+> **Measured 2026-08-13 — this section described an intent the code did not implement.**
+> `ai_skill_harness`'s action tally showed `resume` outnumbering every other verb about 10:1
+> (134–255 resumes per 30-tick rollout against 12–17 idles and 3–6 builds). The rule above was
+> being defeated in two places at once. First, the **reflex tier owns the same flag and set no
+> cooldown**: BL-079's block idles a building directly on `building_component`, so the strategic
+> tier could reverse an eight-tick-loss idling on its very next evaluation — two tiers owning
+> `decommissioned`, neither aware of the other. Second, **the two sides used different
+> estimators**: idle scored on `estimate_building_profit`, while resume hand-rolled
+> revenue-minus-wages with no maintenance, no input cost, no stack decay and no depletion taper,
+> so it read high on exactly the buildings the reflex tier had just idled.
+>
+> Both are fixed. The reflex tier sets the cooldown its own state change always warranted, and
+> resume now scores on `estimate_prospective_profit` — which also makes idled *processors*
+> resumable, something the extraction-only branch never allowed.
+>
+> **Reaching for that estimator was right; reaching for it naively was not.** An adversarial review
+> of the first cut found three compounding errors in how it was being called, and fixing them is
+> what actually closed the loop:
+>
+> 1. **It was pricing a hypothetical building, not this one.** The function authors a fresh probe
+>    at `construct_building`'s defaults (0.5 assigned, target 100). A site the scorer had dialled
+>    to 200 — or to 0 — was therefore priced at a staffing level it would not come back at. It now
+>    takes an optional `existing` building and reads the real dial.
+> 2. **It counted the building as an extra member of its own stack.** `stack_members` filters on
+>    tile/type/target only, so an existing site is already in that list, and the default
+>    `size() + 1` rank charged it one further step of BL-193 decay against itself — 0.8× for a lone
+>    site, 0.512× at rank 3. It now takes the rank it actually holds.
+> 3. **"Maintenance is paid either way" is false.** BL-049 splits maintenance into a fixed material
+>    share that survives decommissioning and a labour share that does not, so idling saves 70% of
+>    it. Crediting the full running figure overstated every resume by 0.7 × maintenance — a
+>    systematic bias toward running, in the one estimate whose purpose is to stop the AI resuming
+>    what it should leave idle. The idle side carried the mirror-image error and is corrected with
+>    it; the two were self-consistent, which is why neither ever produced a single-tick flip and
+>    why both went unnoticed.
+>
+> **Measured, and the result is categorical rather than incremental.** `resume` goes
+> 134/178/193/153/255 → **0/0/0/0/1** across the five benchmark seeds, and the reflex tier's own
+> idlings — the buildings it was idling only for the scorer to resume them straight back into
+> losses — go 67/137/132/93/198 → **9/8/7/6/7**. Net worth is **up on every seed**, so none of the
+> churn was profitable. Solvency, survival and determinism are unchanged (R0 byte-identical).
+>
+> The harness now also counts the reflex tier's idlings, which issue no command and so appeared in
+> no `action[]` row; without that the oscillation was not readable from this instrument at all.
+> The dial-thrash ceilings have been tightened from 230–410 to 40–69 accordingly — they had been
+> blessed from runs containing the very oscillation they exist to detect.
+
+**A separate defect in the same block, also fixed 2026-08-13: the workforce dial could only ever
+move one way per building.** Its gain was estimated as `variable × (proposed − target) / target`
+with `variable = revenue − inputs − wages`, which takes its **sign** from `variable` rather than
+from the model — so a profitable building could only be scored for *raising* its target and a
+loss-maker only for *cutting* one, and the interior optimum `solve_workforce_target` exists to
+find scored negative in both directions and was discarded. The solver now reports its own modelled
+gain (an optional out-param; it already computed both endpoints), and dial actions roughly doubled
+across the benchmark seeds as the previously-unreachable direction became scoreable.
 - **Budget**: per evaluation, at most **1 construction + a small number of dial changes + 1
   order-book command** per corp; total committed spend capped by the solvency gate.
 - **Determinism**: stable iteration (sorted `corp_ids`, stored asset order, tile-index order);
@@ -806,10 +862,100 @@ the player — `get_blackboard`/`issue_command` both require a corp id, and corp
 world are non-obvious. Read-only export from a new `CORPS` opcode in `run_serve`: one JSON line
 per corp (`id`, `name`, `is_player`, `home_nation`), then `END`. Six tools, not five (NR-061).
 
+**Repaired and made runnable 2026-08-13.** BL-278 was smoke-tested once by hand on the day it
+landed and never again, and by 2026-08-13 the seam it describes had drifted badly from the seam
+that existed. Five defects, none of which had ever failed a run because nothing re-ran it:
+
+- **Five of the fifteen verbs could not be issued at all, and a sixth only ever did one thing.**
+  The `COMMAND` opcode parsed nine argument keys and the enum had grown three verb families past
+  it — BL-324's `hire_unit`, BL-293's order book, BL-350's procurement. Their arguments were never
+  read, so `place_sell_order` always arrived with `quantity = 0` (rejected outright) and
+  `remove_sell_order` / `accept_quote` / `cancel_contract` always named order `0`, while
+  `request_quote` named a null supplier. `hire_unit` is the partly-supported sixth: `unit_type`
+  defaulted to 0, a valid roster index, so it worked but could only ever raise roster row 0.
+  `ACTIONS.json` and this document described all of them as available.
+- **Four of the twelve result codes were reported as `rejected_invalid`.** `corp_command_result_name`
+  had no cases for BL-350's four declines, so "the supplier holds no capacity", "your inputs are
+  unreachable", "you are embargoed" and "your reputation is too low" all reached the agent as
+  *your arguments are malformed*. Typed, enumerated failure is the property § 10a leans on for
+  self-correction; collapsing four business outcomes into a syntax error removes it.
+- **The MCP wrapper could not start on Linux.** `tools/mcp/server.js` spawned
+  `build/ProjectIo.exe`; the primary dev target builds `ProjectIo`. It now resolves across the
+  Linux and MSVC layouts.
+- **`survey` was an applicable verb whose effect never arrived.** `run_serve` never called
+  `advance_surveys`, so a dispatched survey never progressed, no tile was ever revealed, and
+  `build` / `place_road` had no discoverable target. The tick sequence was also duplicated
+  verbatim between the warm-up loop and the `TICK` opcode, which is how the step came to be
+  missing from both; it is now one lambda.
+- **A body could not be named unless the agent was already there.** `survey`, `place_sell_order`
+  and `request_quote` all take a body id as `subject`. The blackboard is not silent about bodies —
+  `pool:<resource>` facts are keyed by the corp's own `(corp, body)` pool and `body_activity` by a
+  known body — so an agent could recover the ids of bodies it already trades on. What it could not
+  do is name a body it has no pool and no activity on, which is **every body worth surveying**, and
+  it could never recover a name or a survey phase for any of them. Market facts do not help: they
+  are keyed by **market** id, so a price is legible on a body the agent cannot address. Fixed by a
+  `BODIES` opcode and a `list_bodies` tool, the sibling of NR-061's `list_corps`.
+
+### 10h. AI play as a bug-finding instrument (Ben, 2026-08-13)
+
+Ben, on reading the 2026-08-13 seam repair and its findings: *"It seems like pushing for AI play
+will expose more bugs and give us actionable improvements now."*
+
+**This is a reframe of why the word interface matters, and it is worth stating separately from
+§ 10d's runtime argument.** § 10d justifies MCP and a local model as the road to a *rival*. This
+says the interface pays before any of that ships, because **an agent playing the game is a test
+oracle no harness replicates**.
+
+The evidence for it is the session that prompted it. Every defect found on 2026-08-13 came from
+one of three sources, and they are in ascending order of yield:
+
+1. **Running an existing instrument** — the skill harness's action tally, once it could name every
+   verb, exposed the idle/resume oscillation that had been the AI's dominant behaviour for an
+   unknown number of sprints.
+2. **Reading the seam** — five defects in BL-278's protocol, none of which had ever failed a run,
+   because nothing re-ran it.
+3. **Asking what a player would actually try** — which is how the survey verb's missing effect, the
+   unnameable body, and the four collapsed decline codes surfaced. Nobody had played it.
+
+A harness asserts what its author already suspected. A player discovers what nobody thought to
+assert — and an *agent* player does it repeatably, at machine speed, and writes down what it tried.
+Io's determinism makes this unusually strong: the world rebuilds identically, so a play transcript
+is a replay artifact, and "append a move and re-run" reproduces the whole session byte-for-byte
+before extending it.
+
+**The instrument is `tools/mcp/session.js`**, alongside `smoke.js`. The division is deliberate:
+`smoke.js` asks whether the protocol *answers* (shape, every verb, typed results), `session.js`
+asks what happens when someone *plays* (agenda, consequence, surprise). Both are committed, because
+the standing lesson of BL-278 is that an unexercised seam is an untrusted one.
+
+**What this does NOT change.** The § 10g ruling stands unaltered: the deterministic scorer remains
+the action generator for the shipped rival, and an agent playing a corp is still the research use
+of BL-278 that § 10g explicitly preserved. What changes is the *value* assigned to that research
+use — it was filed as spectacle, and it is turning out to be diagnostics.
+
+---
+
+**Seven tools now, and a committed check.** `tools/mcp/smoke.js` drives `--serve` over the raw
+line protocol and asserts the shape rather than the economics: every opcode answers, every one of
+the fifteen verbs reaches the seam and returns a code that is actually in `corp_command_result`,
+a well-formed sell order is distinguishable from a malformed one, and `SHUTDOWN` is acknowledged.
+It asserts nothing about whether a given command *should* succeed — that is the `tools/verify/`
+harnesses' business. Run it with `node tools/mcp/smoke.js`. The lesson is the general one: a seam
+nobody exercises is a seam nobody can trust, and all five defects above were found by reading
+rather than by failing.
+
 ### 10f. Sources added 2026-08-03
 
 - Vox Deorum — hybrid LLM architecture for 4X, 2,327 games, open-weight parity, per-game token cost. https://arxiv.org/abs/2512.18564 · https://github.com/CIVITAS-John/vox-deorum
-- CivBench — MCP-driven Civ VI benchmark; the sensorium effect and the knowing-doing gap. https://arxiv.org/html/2604.07733v1 · https://tasolabs.com/blog/ai/introducing-civbench-season-001
+- CivBench — MCP-driven Civ VI benchmark; the sensorium effect and the knowing-doing gap. https://tasolabs.com/blog/ai/introducing-civbench-season-001
+  > **Citation corrected 2026-08-13.** This line previously also carried
+  > `arxiv.org/html/2604.07733v1`, which is a **different project of the same name**:
+  > *CivBench: Progress-Based Evaluation for LLMs' Strategic Decision-Making in Civilization V*,
+  > from the Vox Deorum authors, which trains victory-probability estimators on turn-level state
+  > across 307 games. The sensorium-effect and knowing-doing-gap findings § 10c.4 attributes to
+  > "CivBench" come from the **Civ VI / `civ6-mcp`** one, not from that paper. Two unrelated works
+  > share the name; § 10b's table row conflates them under one heading and should be split when
+  > that section is next touched.
 - civ6-mcp — MCP server over Civ VI's FireTuner protocol; rule-enforcing API as the write channel. https://github.com/lmwilki/civ6-mcp
 - civStation — layered MCP, human-sets-strategy/agent-executes. https://github.com/NomaDamas/civStation
 - CivAgent — LLM digital player in Unciv; the data-flywheel framing. https://github.com/fuxiAIlab/CivAgent · https://arxiv.org/html/2502.20807v1

@@ -19,7 +19,7 @@ generation stack can hang dated history lines off. Companion to `../generation/P
 >
 > The one-shot pass this document describes is now driven by the stepped year-tick sim
 > (`src/world/history_sim.{hpp,cpp}`), 4000 BCE → 0 CE, stepping 100 → 50 → 20 → 10 → 5 → 1
-> years. A settle-dominated deep prehistory is the intended shape (NR-178, ruled 2026-08-12).
+> years. A settle-dominated deep prehistory is the intended shape (NR-205, ruled 2026-08-12).
 
 ## Purpose
 

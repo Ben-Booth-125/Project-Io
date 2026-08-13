@@ -42,7 +42,7 @@ async loading screen, and the startup-hang fix. SPRINTS.md § Sprint 15 is the r
   **BL-377** (mercenary contract seam — a polity pays the company to make a fact about the world
   true), **BL-315** (conflict spine — pulled from v0.3.0 groundwork onto the critical path: a
   mercenary company's core loop is built entirely on Conflict), **BL-378** (the minimap becomes a
-  fixed max-zoom render of the player's base), and **BL-379** (persona counsel's ~1 s/tick cost).
+  fixed max-zoom render of the player's base), and **BL-398** (persona counsel's ~1 s/tick cost).
   Cut by **Sprint 16**; done-definition owed at the cut, per NR-103.
 - **v0.1.16 — Ancient conflict & seams.** *Theme: the Era −1 machinery graduates from generator
   to gameplay.* The whole Era −1 cluster, pulled from v0.3.0 on Ben's 2026-08-12 ruling (the

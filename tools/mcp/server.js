@@ -27,17 +27,44 @@
 //     ProjectIo process, not in the conversation.
 
 const { spawn } = require('child_process');
+const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 const { execFileSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const EXE = path.join(ROOT, 'build', 'ProjectIo.exe');
 const ACTIONS_QUERY = path.join(ROOT, 'tools', 'session', 'actions_query.js');
 
+// The built binary. Linux (the primary dev target, DEVELOPMENT_PRACTICES.md)
+// produces `ProjectIo`; MSVC produces `ProjectIo.exe`, sometimes under a
+// per-config subdirectory. This used to be the hard-coded .exe path alone,
+// which meant the MCP server could not start AT ALL on the primary platform —
+// BL-278 read as landed in two authority docs while being unrunnable here.
+const EXE_CANDIDATES = [
+  path.join(ROOT, 'build', 'ProjectIo'),
+  path.join(ROOT, 'build', 'ProjectIo.exe'),
+  path.join(ROOT, 'build', 'Release', 'ProjectIo.exe'),
+  path.join(ROOT, 'build', 'Debug', 'ProjectIo.exe'),
+];
+
+function resolveExe() {
+  for (const p of EXE_CANDIDATES) if (fs.existsSync(p)) return p;
+  throw new Error(
+    'ProjectIo binary not found. Looked in:\n  ' + EXE_CANDIDATES.join('\n  ') +
+    '\nBuild it first: cmake --build build --target ProjectIo');
+}
+
 // corp_command.hpp's corp_verb, in declaration order — the tool schema names
-// these; the wire protocol to ProjectIo --serve still sends the integer.
-const VERBS = ['build', 'demolish', 'set_recipe', 'set_workforce', 'idle', 'resume', 'place_road', 'survey'];
+// these; the wire protocol to ProjectIo --serve still sends the integer, so the
+// INDEX of each name here is its enum value and the order is load-bearing.
+// corp_verb is append-only, so new verbs go on the end here too.
+const VERBS = [
+  'build', 'demolish', 'set_recipe', 'set_workforce', 'idle', 'resume',
+  'place_road', 'survey',
+  'hire_unit',                                         // BL-324
+  'place_sell_order', 'remove_sell_order', 'set_workforce_auto', // BL-293
+  'request_quote', 'accept_quote', 'cancel_contract',  // BL-350
+];
 
 // ---------------------------------------------------------------------------
 // The ProjectIo --serve child process
@@ -49,7 +76,7 @@ let pending = null; // {resolve, reject, lines: string[]} for the in-flight requ
 
 function ensureChild() {
   if (child) return;
-  child = spawn(EXE, ['--serve', '--ticks', '12'], { cwd: ROOT });
+  child = spawn(resolveExe(), ['--serve', '--ticks', '12'], { cwd: ROOT });
   childRl = readline.createInterface({ input: child.stdout });
   child.on('exit', () => { child = null; childRl = null; });
   childRl.on('line', (line) => {
@@ -112,13 +139,22 @@ const TOOLS = [
       properties: {
         corp: { type: 'integer', description: 'Acting corporation entity id.' },
         verb: { type: 'string', enum: VERBS },
-        subject: { type: 'integer', description: 'Building (demolish/set_recipe/set_workforce/idle/resume) or body (survey) entity id.' },
-        tile: { type: 'integer', description: 'Target tile entity id (build / place_road).' },
-        type: { type: 'integer', description: 'building_type (build only): 0 none, 1 extraction_site, 2 processing_facility, 3 port, 4 launchpad, 5 inland_logistics_hub.' },
-        target: { type: 'integer', description: 'resource_type index (build/extraction only) — see docs/economy/RESOURCES.md.' },
+        subject: { type: 'integer', description: 'Building (demolish/set_recipe/set_workforce/idle/resume/set_workforce_auto), or body (survey / place_sell_order / request_quote) entity id.' },
+        tile: { type: 'integer', description: 'Target tile entity id (build / place_road / hire_unit muster tile).' },
+        type: { type: 'integer', description: 'building_type (build only): 0 none, 1 extraction_site, 2 processing_facility, 3 port, 4 launchpad, 5 inland_logistics_hub, 6 military_base.' },
+        target: { type: 'integer', description: 'resource_type index — the extracted good (build), the good offered (place_sell_order) or the good sought (request_quote). See docs/economy/RESOURCES.md.' },
         recipe: { type: 'integer', description: 'Recipe id (set_recipe, and build seed).' },
         workforce: { type: 'integer', description: 'set_workforce value, 0-200.' },
         road_tier: { type: 'integer', description: 'place_road tier, 1-3.' },
+        // Everything below was missing, which is why six of the fifteen verbs
+        // could not be issued at all: the dispatch forwards args generically, so
+        // an argument absent from THIS schema is an argument the model is never
+        // told exists and never sends.
+        unit_type: { type: 'integer', description: 'hire_unit: index into unit_roster_table() (BL-324).' },
+        quantity: { type: 'number', description: 'place_sell_order: max units offered per tick (> 0). request_quote: units sought.' },
+        floor_price: { type: 'number', description: 'place_sell_order: minimum unit price (>= 0; 0 means accept the market price).' },
+        order: { type: 'integer', description: 'remove_sell_order: the sell_order id to erase. accept_quote / cancel_contract: the procurement quote / contract id.' },
+        counterparty: { type: 'integer', description: 'request_quote: the supplier corporation being asked (BL-350).' },
       },
       required: ['corp', 'verb'],
     },
@@ -128,6 +164,16 @@ const TOOLS = [
     description: 'List every corporation on the seam — entity id, generated name, is_player, '
       + 'home nation. The answer to an agent\'s first question ("who am I?"); ids feed '
       + 'get_blackboard and issue_command.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'list_bodies',
+    description: 'List every body — entity id, name, and survey phase (hidden / in_transit / '
+      + 'scanning / surveyed) with its region progress. The sibling of list_corps, and needed '
+      + 'for the same reason: survey, place_sell_order and request_quote all take a BODY id as '
+      + 'their subject, and the blackboard keys its market facts by MARKET id, so nothing else '
+      + 'here yields one. NOTE: on a hidden body regions_total is 0 meaning NOT YET COMPUTED '
+      + '(the count is derived from the grid when a survey is dispatched), not "nothing to survey".',
     inputSchema: { type: 'object', properties: {} },
   },
   {
@@ -174,6 +220,11 @@ async function callTool(name, args) {
     const lines = await sendRequest('CORPS');
     const corps = lines.filter((l) => l !== 'END').map((l) => JSON.parse(l));
     return { corps };
+  }
+  if (name === 'list_bodies') {
+    const lines = await sendRequest('BODIES');
+    const bodies = lines.filter((l) => l !== 'END').map((l) => JSON.parse(l));
+    return { bodies };
   }
   if (name === 'advance_tick') {
     const lines = await sendRequest('TICK');

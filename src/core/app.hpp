@@ -367,7 +367,7 @@ ui::frame_stats& frame_stats_instance();
 /// [8] history recorders. Dumped by start_new_game's warm-start timing
 /// (the 2026-08-12 stall hunt).
 ///
-/// [9] and [10] SPLIT [7] into its two candidate halves (BL-379): the C++
+/// [9] and [10] SPLIT [7] into its two candidate halves (BL-398): the C++
 /// blackboard export and the sol2 pack evaluation. [7] stays the total, so
 /// [9] + [10] ~= [7] and the residue is the counsel loop's own bookkeeping.
 /// The split exists because "counsel is slow" names a phase, not a cause —

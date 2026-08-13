@@ -7,7 +7,7 @@
 --
 -- Run with: ProjectIo --verify scripts/verify/industry_lens.lua
 
--- LOAD-BEARING, and it stopped being vestigial when BL-373 landed (NR-187): the
+-- LOAD-BEARING, and it stopped being vestigial when BL-373 landed (NR-214): the
 -- field is read off the economy report, so with zero ticks the lens renders an
 -- EMPTY map — and an empty map still captures a PNG and still blesses clean.
 verify.econ_step(4)

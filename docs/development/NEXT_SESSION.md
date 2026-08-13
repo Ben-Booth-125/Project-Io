@@ -11,8 +11,8 @@ session's transcript.
 > export per due corp per tick, 35 corps since BL-365). Landed: counsel skipped
 > during the warm start, the warm start sliced across loading-screen frames
 > (un-hangable by construction), a reach-field seeding fix and narrowed
-> logistics invalidation. Warm start ~90 s → ~6.5 s. Records: **NR-182**
-> (resolved, full diagnosis), **NR-183** (the two behaviour notes), **BL-379**
+> logistics invalidation. Warm start ~90 s → ~6.5 s. Records: **NR-209**
+> (resolved, full diagnosis), **NR-210** (the two behaviour notes), **BL-398**
 > (persona counsel's remaining ~1 s/tick cost in live play). The sections
 > below are amended in place.
 
@@ -130,7 +130,7 @@ transition, injects synthetic centre-screen clicks on the first five in-game
 frames (the queued impatient-player clicks), and renders 120 in-game frames.
 Four variants, all exit 0, no crash.
 
-What is now in place for the next manual repro (**read NR-182 first**):
+What is now in place for the next manual repro (**read NR-209 first**):
 
 - **`build/crash.log`** — every death shape now lands there: the fatal-error
   catch mirrors its message (stderr was invisible on double-click), an SEH
@@ -222,19 +222,19 @@ the honesty is the point.
   its header comment before blessing again — it records why each earlier bless was
   wrong (stale binary, then a half-applied map change).
 - **Two pre-existing gate failures**, diagnosed from source and unrelated to any
-  of this — see **NR-179**. `stack_capacity_harness` in particular should **not**
+  of this — see **NR-206**. `stack_capacity_harness` in particular should **not**
   be "fixed" without reading BL-193's intent first; it may be catching a real
   defect rather than being stale.
 - **Settling still dominates** the pre-epoch era (1107 foundings vs 16
-  conquests). Left deliberately — see **NR-181**: Ben ruled procedural generation
+  conquests). Left deliberately — see **NR-208**: Ben ruled procedural generation
   a stepping stone toward AI players starting worlds, so the scorer is explicitly
   not to be gold-plated.
 
 ## Review entries worth reading first
 
-`NR-177` (the refocus ruling), `NR-178` (the stepped clock is not
-behaviour-neutral), `NR-179` (the two pre-existing failures), `NR-180`
-(BL-253 was already fixed; the tick cost is `run_economy_step`), `NR-181`
+`NR-177` (the refocus ruling), `NR-205` (the stepped clock is not
+behaviour-neutral), `NR-206` (the two pre-existing failures), `NR-207`
+(BL-253 was already fixed; the tick cost is `run_economy_step`), `NR-208`
 (stepping stone → AI players start worlds).
 
 Query them with `node tools/session/backlog_query.js` or read

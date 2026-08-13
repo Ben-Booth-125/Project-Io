@@ -10,7 +10,249 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — BL-130 lands: BL-365's blocker chain closed, and a live crash caught in passing (2026-08-11, latest)
+## Session — AI gameplay: the word interface made runnable, and the rival's idle/resume oscillation measured (2026-08-13, latest)
+
+Full mode. Two strands, both under the v0.2.0 AI-opponent theme: the `--serve` word interface an
+out-of-process agent plays through, and the deterministic scorer that is the shipped rival.
+
+**Framing first, because it changed what was worth building.** A SOTA refresh (the last sweep was
+2026-08-03) found the external field essentially static for strategy-game agents in that window —
+Vox Deorum presented at FDG '26 and shipped a diplomacy layer over its planner, and no new 4X
+agent paper landed at all. What did move sits underneath: the **constraint-tax finding that
+§ 10g's ruling partly rests on has been reframed**. "Capacity, Not Format" locates the penalty in
+a model's *spare capacity* rather than in the output format, and reasoning-before-structure APIs
+largely remove it. The ruling stands, but on its other legs — the behavioural-cloning ceiling and
+legibility — and the stronger contemporary argument is **multi-turn** tool-call accuracy, where the
+small-model class Io targets still scores 35–56% on BFCL v4. Recorded so the ruling's basis stays
+honest rather than quietly resting on a superseded number.
+
+**Strand 1 — BL-278's seam was landed on paper and unrunnable in practice.** It was smoke-tested
+once by hand on the day it landed and never again, and five defects had accumulated since, none of
+which had ever failed a run because nothing re-ran it. `tools/mcp/server.js` spawned
+`build/ProjectIo.exe`, which the primary (Linux) target never produces — **the MCP server could not
+start on the main dev platform at all**. The `COMMAND` opcode parsed nine argument keys while the
+enum had grown three verb families past it (BL-324 hire, BL-293 order book, BL-350 procurement), so
+**six of fifteen verbs were unreachable**, not partly supported. `corp_command_result_name` had no
+cases for BL-350's four declines, so "the supplier holds no capacity" and "you are embargoed"
+both reached an agent as *your arguments are malformed* — which removes exactly the typed-failure
+property § 10a leans on. `run_serve` never called `advance_surveys`, so `survey` was an applicable
+verb whose effect never arrived and no tile was ever revealed for `build` to target; the tick
+sequence was duplicated verbatim between the warm-up loop and the `TICK` opcode, which is how the
+step came to be missing from *both*. And nothing on the protocol yielded a **body id**, though
+`survey`, `place_sell_order` and `request_quote` all take one — the blackboard keys market facts by
+*market* id, so an agent could read a price on a body it had no way to sell into.
+
+All five fixed. New `BODIES` opcode and `list_bodies` tool (seven tools now), the exact sibling of
+NR-061's `list_corps` and filed for the same reason. New **`tools/mcp/smoke.js`**, committed rather
+than run ad hoc: it drives the raw line protocol and asserts *shape* — every opcode answers, all
+fifteen verbs reach the seam and return a code that is genuinely in `corp_command_result`, a
+well-formed sell order is distinguishable from a malformed one. It found the body-id gap on its
+first run, which is the argument for having written it.
+
+**Strand 2 — the rival AI's dominant behaviour was reversing its own decisions.** `ai_skill_harness`
+could not name six of the fifteen verbs (its `verb_name` switch stopped at `hire_unit`, pooling the
+AI's entire trading behaviour into an unnamed `action[?]` row). Making it exhaustive exposed the
+real signal underneath: **`resume` outnumbered every other verb about 10:1** — 134–255 resumes per
+30-tick rollout against 12–17 idles and 3–6 builds.
+
+Two structural causes and three arithmetic ones. **Structural:** the reflex tier and the
+strategic tier own the same `decommissioned` flag and neither knew the other existed — BL-079's
+block idles a building directly on the component and set no `ai_cooldown`, so BL-202's scorer
+could reverse an eight-tick-loss idling on its very next evaluation. And the two sides used
+different estimators, idle scoring on `estimate_building_profit` while resume hand-rolled
+revenue-minus-wages with no maintenance, input cost, stack decay or depletion taper.
+
+Reaching for `estimate_prospective_profit` to close that was right. Reaching for it *naively* was
+not, and the first cut looked like a partial success — resume down 30–56% — which is exactly how a
+plausible fix hides a real defect. An **adversarial review of this session's own diff** found three
+compounding errors in how the estimator was being called:
+
+**It priced a hypothetical building, not this one.** The function authors a fresh probe at
+`construct_building`'s defaults (0.5 assigned, target 100), so a site the scorer had dialled to 200
+— or to 0 — was priced at a staffing level it would never come back at. It now takes an optional
+`existing` building.
+
+**It counted the building as an extra member of its own stack.** `stack_members` filters on
+tile/type/target only, so an existing site is already in that list; the default `size() + 1` rank
+charged it a further step of BL-193 decay against itself — 0.8× lone, 0.512× at rank 3.
+
+**"Maintenance is paid either way" is false.** BL-049 splits maintenance into a fixed material
+share that survives decommissioning and a labour share that does not, so idling saves 70% of it.
+Crediting the full running figure overstated every resume by 0.7 × maintenance — a systematic bias
+toward running, in the one estimate whose whole purpose is to stop the AI resuming what it should
+leave idle. The idle candidate carried the mirror-image error; the two were self-consistent, which
+is why neither ever produced a single-tick flip and why both went unseen.
+
+A third, independent defect in the same block: **the workforce dial could only ever move one way per
+building.** Its gain was `variable × (proposed − target) / target` with `variable = revenue − inputs
+− wages`, taking its *sign* from `variable` rather than from the model — so a profitable building
+could only be scored for raising its target and a loss-maker only for cutting one, and the interior
+optimum `solve_workforce_target` exists to find scored negative in both directions and was
+discarded. The solver now reports its own modelled gain through an optional out-param; it already
+computed both endpoints.
+
+**Measured, and the result is categorical rather than incremental.** `resume` goes
+134/178/193/153/255 → **0/0/0/0/1** across the five benchmark seeds. The reflex tier's own idlings —
+the buildings it was idling only for the scorer to resume straight back into losses — go
+67/137/132/93/198 → **9/8/7/6/7**. Net worth is **up on every seed**, so none of the churn was
+profitable. Solvency, survival and determinism unchanged (R0 byte-identical).
+
+The harness now counts those reflex-tier idlings too; they issue no command, so without that the
+oscillation was not readable from this instrument at all. Dial-thrash ceilings tightened 230–410 →
+40–69, because they had been blessed from runs containing the very oscillation they exist to catch.
+
+**One hypothesis raised and killed by measurement.** The residual looked like a price-response limit
+cycle — idle, price recovers, resume, price collapses — so BL-203's glut forecast was applied to the
+resume candidate. It moved **not one number** on any of the five seeds. The reason is the finding:
+the forecast is **bimodal, not graded**. At tick 30 every `(market, resource)` slot carrying a demand
+signal sits at supply/demand between **78 and 339** against a veto ratio of 2.0, and the rest carry
+no demand signal at all, where the design deliberately applies no penalty — the taper band between
+1.0 and 2.0 has **zero occupancy**. So the Victoria-3 import § 4 calls "the single most important
+design import" is running as a coin flip between off and veto. The change was reverted rather than
+kept as an unverified behaviour change, and the prior question — why does market demand max out
+around 8 while supply reaches 15,000? — is filed as the thing to settle first, because it may be a
+commensurability error in `market_clearing` rather than an AI-tuning problem at all.
+
+**Deliberately not built.** Nothing frame-specific for the 0 CE mercenary refocus. BL-377
+(mercenary contracts) is design-only and requires BL-315 (conflict spine), which is design-owed at
+v0.3.0 behind BL-094 (governing body); anything built against that today is a bet on unlanded
+design. The seam repaired here is the frame-agnostic layer — opcodes, argument forwarding, typed
+rejections, a smoke check — that a mercenary verb plugs into when one exists.
+
+**The review pass earned its cost, and that is the session's real lesson.** Four adversarial lenses
+were run over this session's own uncommitted diff, and one of them found a **critical** defect the
+change had introduced: teaching the parser to read floats let `std::atof` admit `nan`, which passes
+`floor_price < 0.0f` (every comparison against NaN is false), enters `world.sell_orders`, is folded
+into `state_hash`, is written to the save stream, and reaches `clear_markets`' book sort — where it
+stops the comparator being a strict weak ordering and makes `std::sort` undefined behaviour. The
+same lens found an infinity overflowing a `static_cast<int>` in the procurement lead time. Both are
+now refused at the protocol edge, which is the general rule worth keeping: **the AI-facing seam is
+an untrusted input boundary in a way the UI is not**, because a control cannot emit a NaN and the
+validation downstream of it never had to.
+
+The same pass found the three estimator errors above, which is why the oscillation actually closed
+rather than merely damping. Two of the file's own new assertions were also flagged as **vacuous** —
+the survey check compared fact counts, which would have passed whether or not the survey ever
+advanced, and the result-code check could not detect the switch fall-through it claimed to detect
+because the fall-through returns a code that IS in the valid set. Both rewritten to assert the
+thing: the survey's own progress counters must move, and a BL-350-specific decline must be
+observable.
+
+**A fourth lens read the prose rather than the logic, and that was the one that paid oddest.**
+Pointed at the session's own *claims* instead of its code, it found four assertions that did not
+survive contact with the source — all now corrected. "Six verbs could not be issued at all" was
+five, because `hire_unit`'s `unit_type` defaults to 0, a valid roster index, so it worked and could
+only ever raise row 0 — and the comment had explicitly denied exactly that reading. "Nothing else
+yields a body id" was false: the blackboard keys pool facts by `(corp, body)`, so the real gap is
+narrower and better stated. "-Wswitch catches the next one the way it did not catch this one" was
+backwards — the flag was on and had been warning on every compile, under `-Wall` without `-Werror`,
+and the warnings were ignored. And "resume at ~10x every other verb combined" was ~2.7x combined,
+~10x the next single verb. None changed what the code does; every one would have entered the
+permanent record as fact, in a project whose documents are its audit. Filed as NR-185.
+
+**Review queue.** Eight entries filed as the work happened (NR-178 the oscillation and its five
+causes, NR-179 the workforce-dial signature change taken on Ben's behalf, NR-180 the bimodal
+forecast and the supply/demand question under it, NR-181 goldens blessed from the behaviour they
+exist to catch, NR-182 the action dictionary running four verbs behind the seam it transcribes,
+NR-183 the constraint-tax leg of the 10g ruling superseded in framing, NR-184 the NaN boundary,
+NR-185 the four overstated claims and the claims-lens practice that caught them).
+
+**The review's verification pass then caught the fix itself.** 38 findings were raised across four
+lenses and 36 were refuted under adversarial verification; the two that survived were both in this
+session's own work, and one of them was the NaN guard. Returning the *default* on malformed input
+is not the same as refusing it: `quantity`'s default of 0 is rejected downstream, so substituting
+it refuses by accident — but `floor_price`'s default of 0 is **meaningful**, read by the seam as
+"accept the market price". So `floor_price=inf` turned "sell only above this floor" into "sell at
+market, every tick", answered `applied`, and said nothing. A worse failure mode than the crash it
+replaced, and it took a verifier reading the downstream *meaning* of a default to see it. The
+parser now reports malformation and the handler answers `rejected_invalid`; the smoke check asserts
+it for `nan`, `inf` and `1e400`. The second survivor was `smoke.js` hard-coding `r < 31` for
+`resource_count` (42) — the exact stale-literal defect the commit before it set out to remove — now
+read off the blackboard's own `price:<n>` facts instead.
+
+**Full tier: 64/68, and the four reds are all pre-existing.** `ai_skill_harness` is green across the
+complete run. The failures are `data_creep_harness` (NR-171), `population_mvp` (NR-170),
+`stack_capacity_harness` (stale since BL-366) and `history_sim_harness` (six assertions). The last
+was adjudicated the way SPRINTS.md prescribes rather than by inspection — a throwaway worktree at
+`4e0118d`, configured and built from cold, produced the identical six failures. Two of the four had
+no record anywhere before today; NR-186 now carries all of them, and argues the `history_sim` six
+are the priority, because NR-177's refocus makes that sim the ancient product's *generator*.
+
+---
+
+### Second phase, same session — the review queue, then AI play
+
+**The queue first.** Worked the AI/seam/tier cluster: open entries **64 → 49**. Five closed on work
+already done, two advanced as standing practices, three consolidated (NR-143/145/171 were one
+finding filed three times), and **two were refuted rather than resolved** — NR-129 asked for a guard
+that already existed in the very commit it reviewed, and NR-171's "climbs ~1.25/tick, possibly
+unbounded" is disproved by a 4000-tick trace showing dead-flat counters for 3000 ticks.
+
+**NR-180 was the priority and the answer was neither option it offered.** Supply and demand are not
+a stock/flow blunder — both are zeroed together each tick. The ratio is a non-measure anyway:
+`clear_markets` is an unconditional buyer of last resort so supply is unbounded by demand *by
+construction*; only 12 of 42 resources have a standing consumer and **no raw ore has one**; and the
+two sides are authored three orders of magnitude apart, with measured maximum demand (8.25) sitting
+at the population basket's structural ceiling (7.5). The gate is **inverted** — `demand <= 0` returns
+"no penalty", and those are the real gluts. It also suppresses inter-body **convoy dispatch**, which
+gates on `demand − supply > 0`, corroborated by `data_creep`'s own coverage note. Filed as **BL-381**
+with a proposed fix: score the glut off the resolved **price**, which is bounded, defined for every
+priced good, and already public.
+
+**The tier went four reds to one.** Three were stale harnesses encoding rules the code had
+deliberately changed; each is fixed and each restored a check that was testing nothing. The fourth
+is **BL-384**: `history_sim` fights 267 battles and takes **zero** provinces across 1960 years, with
+no assertion covering conquest count — which is exactly why six red assertions never surfaced it,
+and one of the six passes *vacuously*. NR-177 makes that sim the ancient product's generator.
+
+**Then Ben's steer, and it paid immediately.** *"Pushing for AI play will expose more bugs and give
+us actionable improvements now."* Recorded as § 10h and acted on: `tools/mcp/session.js` (the play
+driver — batch-shaped, because determinism makes appending a move and re-running a byte-identical
+replay), then five agents given the seam and an agenda.
+
+**Eleven of the session's seventeen filed items came from play**, on code that had already been read,
+instrumented, and put through four adversarial review lenses the same day.
+
+Two are priority **S**. **BL-386** — a sell order's floor price is `max(ref, floor)`, credited with
+no counterparty and no cap; listing at `1e12` reached cash 1.587e17. Independent triage found the
+matched-trade loop *twelve lines above* correctly debits the buyer: one path was written as a market
+and the other as a wish. It also **resolves NR-144** — the AI lists at `base_price` while the market
+sits pegged at `0.25 × base`, so every rival unit sold earns 4× the market rate from nothing. NR-144
+had concluded the scorer was probably innocent; it was, and the market was not. **BL-387** —
+`apply_corp_command` never checks the caller may act *as* the corp it names; a player drove rivals
+and moved their balances by tens of millions.
+
+**The pattern worth keeping.** Three findings are the same shape — a constraint that lived in the
+only caller and looked like a rule until a second caller appeared. NR-184 (float validation assumed
+a UI that cannot emit NaN), BL-387 (`cmd.corp` was never attacker-controlled because the scorer set
+it), BL-394 (`hire_unit` has no cost or cap; the only brake is `corp_ai_params`, a *scorer policy*).
+Three instances is a rule: **the AI-facing seam is an untrusted input boundary in a way the internal
+caller never was, and validation written for a trusted caller does not transfer.**
+
+**What the players could not do was as informative as what broke.** No processing facility produced
+a single unit across ~80 building-ticks — `--serve` never loads `world_gen.lua` so coal has no price
+(**BL-389**), and `build` silently discards its recipe so every seam-built processor is a steel
+smelter anyway (**BL-388**). The procurer swept 26 suppliers and could not *compare* them, because
+`request_quote` returns neither id nor price (**BL-390**). The militarist raised 25 units and found
+no verb that takes a unit as a subject (**BL-393**).
+
+**Play corrected two dictionary entries written earlier the same day** — `request_quote`'s `subject`
+is not "context rather than a constraint", it is not read at all; and `place_sell_order` was telling
+agents `floor_price` is a reservation price while the engine pays it as a bonus. Both now carry the
+defect and name the item that will remove the caveat.
+
+**Fixes were filed, not landed**, per Ben's instruction to propose in the backlog. BL-386 in
+particular will move every economy golden and should cut AI net worth by roughly the tripling NR-144
+recorded — that fall is the fix working.
+
+**Runtime.** ~7 h, Full mode (research sweep; two build strands; two committed checks; one hypothesis
+measured and discarded; an adversarial review pass that changed the outcome; a review-queue sweep
+taking open entries 64 → 49; and a five-agent play session that found eleven of the day's seventeen
+filed items).
+
+---
+
+## Session — BL-130 lands: BL-365's blocker chain closed, and a live crash caught in passing (2026-08-11)
 
 Full mode, one item, continuing the same session as BL-263/BL-368/BL-366 below.
 

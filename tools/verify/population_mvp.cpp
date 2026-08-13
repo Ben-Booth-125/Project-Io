@@ -95,7 +95,25 @@ static void test_population_on_kepler()
     // -------------------------------------------------------------------------
     std::printf("--- R4: agricultural demand non-zero after econ step + clearing ---\n");
 
-    recipe_registry reg; // empty -- population injection runs unconditionally
+    // The comment here used to read "empty -- population injection runs
+    // unconditionally", and that premise died with BL-368. inject_population_demand
+    // now reads reg.population_demand().demand_basket, which on a default-
+    // constructed registry is all zeroes — so this assertion has been measuring an
+    // empty basket rather than an absent population, and failing for a reason that
+    // had nothing to do with what it tests.
+    //
+    // Authoring the basket here rather than loading scripts/economy.lua is
+    // deliberate and forced: recipe_registry.cpp is not linked into this harness
+    // (it pulls sol2/Lua — see the note at the top of this file), so the Lua route
+    // is unavailable. The weight below mirrors economy.lua's agricultural_produce
+    // row so the check stays anchored to the shipped value rather than an invented
+    // one.
+    recipe_registry reg;
+    {
+        population_demand_params pd; // defaults for elasticity/scale, as economy.lua has them
+        pd.demand_basket[ri(resource_type::agricultural_produce)] = 0.20f; // economy.lua's row
+        reg.set_population_demand(pd);
+    }
     const economy_report report = run_economy_step(w, reg);
     clear_markets(w, reg, report);
 

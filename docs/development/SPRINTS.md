@@ -79,11 +79,11 @@ DLC.
   travel time; the Era −1 sim wired into campaign generation (400 pre-epoch years — 62 battles,
   16 conquests, ~1100 foundings); the stepped decision clock; three scorer fixes including the
   supply-hubs change; async generation + the loading screen with its inner bars; the
-  startup-"crash" diagnosis (AppHangB1, never a crash — NR-182) and its fix package (persona
+  startup-"crash" diagnosis (AppHangB1, never a crash — NR-209) and its fix package (persona
   counsel out of the warm start, the warm start sliced across frames, two logistics scaling
   fixes — warm start ~90 s → ~6.5 s); crash logging; the zoom-out cap; **BL-377** (mercenary
   contract seam, designed) and **BL-378** (minimap base render, designed).
-- **Filed:** BL-379 (persona counsel tick cost), NR-177–NR-183.
+- **Filed:** BL-398 (persona counsel tick cost), NR-177, NR-205–NR-210.
 - **Slipped:** nothing — but only because nothing was planned, which is the point of recording
   this entry at all.
 - **Runtime:** not tracked (fourth consecutive entry; the format's Runtime line remains
@@ -108,7 +108,7 @@ fights, the company is paid — playable end-to-end, however rough. Cuts **v0.1.
   the campaign layer commands `resolve_battle` today. Design first, against the Era −1 machinery
   that already fights wars in generation.
 - **BL-378 — minimap base render** (`designed`): the company's home, always on screen.
-- Riders as room allows: **BL-379** (persona counsel tick cost — the live-play hitch).
+- Riders as room allows: **BL-398** (persona counsel tick cost — the live-play hitch).
 
 **Risk.** BL-315 is the unknown: it is design-owed, priority A, and the item the whole sprint
 leans on. If it sprawls, the fallback is BL-377 against the *existing* battle resolution with the

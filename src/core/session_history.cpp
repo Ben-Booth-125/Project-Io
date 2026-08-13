@@ -131,7 +131,7 @@ void post_persona_counsel(const world& w, std::vector<persona::pack>& bench,
     {
         const int tick = day_tick;
 
-        // BL-379 instrumentation: split this phase's cost into its two halves —
+        // BL-398 instrumentation: split this phase's cost into its two halves —
         // the C++ blackboard export and the sol2 pack evaluation — through the
         // same accumulator surface the other step_economy phases report on
         // ([9] and [10]; [7] remains the total). Naming the slow PHASE was never
@@ -173,7 +173,7 @@ void post_persona_counsel(const world& w, std::vector<persona::pack>& bench,
                 counsel_channel[corp] = channel;
             }
 
-            // BL-379: evaluate only the corp whose counsel channel is OPEN. The
+            // BL-398: evaluate only the corp whose counsel channel is OPEN. The
             // player reads one channel at a time, so benching every due corp
             // wrote lines nobody would ever scroll to — ~1 s/tick of hitch for
             // output with no reader. Counsel is presentation (see the header):
@@ -220,7 +220,7 @@ void post_persona_counsel(const world& w, std::vector<persona::pack>& bench,
                 // surface as std::runtime_error) disables counsel rather than
                 // killing the session mid-tick. One visible line in the counsel
                 // channel; the detail goes to stderr like the load failure does.
-                // Since BL-379 only an open channel evaluates, so a bad pack now
+                // Since BL-398 only an open channel evaluates, so a bad pack now
                 // surfaces when the player first reads counsel, not at tick one.
                 std::fprintf(stderr, "ProjectIo: persona counsel packs disabled: %s\n", e.what());
                 ui::chat_post(chat, tick, corp, channel,

@@ -698,7 +698,7 @@ void app::draw_building_carve()
 void app::start_new_game_prelude()
 {
     // Phase timing, printed once per campaign start. Added while diagnosing the
-    // AppHangB1 kills (NR-182/NR-183): this whole function runs on the main
+    // AppHangB1 kills (NR-209/NR-210): this whole function runs on the main
     // thread with the UI frozen, so its wall clock IS the unresponsive window
     // Windows judges the app by. Keep it — the cost moves as the world grows.
     const auto t0 = std::chrono::steady_clock::now();
@@ -789,7 +789,7 @@ void app::finish_new_game()
             std::chrono::steady_clock::now() - m_warm_begin).count();
         std::printf("[start_new_game] %-24s %6lld ms\n", "warm_start_80_ticks",
                     static_cast<long long>(warm_ms));
-        // The last two are the BL-379 split of persona_counsel; they are
+        // The last two are the BL-398 split of persona_counsel; they are
         // sub-totals of it, not additional phases, hence the indented names.
         static const char* const phase_names[11] = {
             "convoys", "run_economy_step", "clear_markets", "apply_budget",
@@ -927,7 +927,7 @@ void app::step_economy()
         // against ~80 ms for everything else combined, and what it buys there
         // is advisory chat for quarters the player never saw, all stamped on
         // the same pre-game day. Live play keeps it (and inherits its cost;
-        // NR-183 records the open in-game hitch).
+        // NR-210 records the open in-game hitch).
         if (!m_warm_starting)
             session_history::post_persona_counsel(m_world, m_persona_bench,
                                                   m_counsel_channel, m_chat, day);

@@ -16,11 +16,28 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*120 entries — 11 gameplay · 24 canvas · 15 lens · 41 ledger · 29 chrome.*
+*124 entries — 15 gameplay · 24 canvas · 15 lens · 41 ledger · 29 chrome.*
 
 ---
 
 ## Gameplay — presses that mutate the world
+
+### `gameplay.accept_quote` — No UI. SEAM-ONLY: this verb has NO player-facing press. A grep of src/ui for it returns nothing — BL-350 landed the procurement seam, its world state, its serialisation and its harness, but no UI. It is reachable ONLY through the corp-command seam: an out-of-process agent via ProjectIo --serve / the MCP server's issue_command, or a harness. The rival scorer does not emit it either (corp_ai.cpp enumerates no procurement candidate). Recorded rather than omitted, because an entry that says 'no human can press this, you can' is exactly the information a language policy needs — and because omitting it is how this dictionary fell four verbs behind the enum it transcribes.
+
+**Press.** None. `COMMAND corp=<you> verb=13 order=<quote id>` on the --serve line protocol, or issue_command with verb 'accept_quote'.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `order` | `uint32 (procurement_quote id)` | The live quote to convert into a contract. Reuses the command's `order` field, shared with remove_sell_order and cancel_contract. |
+
+**Valid when:**
+- `order` is non-zero and names a quote still in world.procurement_quotes (rejected_invalid otherwise — a quote already accepted has been erased, so accepting twice fails here).
+- You are that quote's buyer (rejected_not_owner otherwise).
+- Your balance covers the deposit — quantity x unit_price x deposit_fraction (rejected_funds otherwise).
+
+**Expected output.** A procurement_contract appended to world.procurement_contracts carrying a fresh id and the quote's terms, with ticks_elapsed 0 and deposit_paid recorded. Your balance is debited the DEPOSIT only; the remainder is paced across lead_time_ticks as the contract runs. The quote is erased — consumed, not marked — so it cannot be accepted twice.
+
+**Reason to select.** Convert a price you have been offered into a delivery you are owed, accepting a deposit you will forfeit if you cancel. Weigh it against simply buying on the open market: a contract fixes a price and a schedule where the market fixes neither, which is worth most when the good's price is volatile or its local supply is thin — exactly the case where request_quote's no_input_access decline would have warned you off. Note there is no verb to renegotiate: the only exits are letting it run or cancel_contract, which forfeits.
 
 ### `gameplay.build` — Tile construction ledger (fold-out column), opened from the Selection band of a selected tile; a shortcut lives on a selected owned building ('Build another here').
 
@@ -31,7 +48,9 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 | `tile` | `entity_id` | The selected tile the building goes on. |
 | `type` | `building_type` | Which building — extraction_site, processing_facility, port, launchpad, inland_logistics_hub, military_base. Set by which row is pressed. |
 | `target` | `resource_type` | Extraction rows only: the deposited resource the site extracts. Ignored for other types. |
-| `recipe` | `uint16 recipe id` | Processing rows only: the recipe the facility is seeded with (the row it was priced on). no_recipe elsewhere; a recipe-less processor seeds the default steel recipe. |
+| `recipe` | `uint16 recipe id` | Processing rows only: the recipe the facility is seeded with (the row it was priced on). no_recipe elsewhere; a recipe-less processor seeds the default steel recipe.
+
+**KNOWN DEFECT, BL-388 — this argument is DISCARDED.** `apply_corp_command` calls `construct_building` without forwarding it, so every processing facility built through the seam gets recipe 0 (steel) whatever you ask for, and the command still answers `applied`. A player ordered a Food Processor with recipe=2 and got a steel smelter. Until BL-388 lands, build the facility and then issue `set_recipe` as a separate command, which does work. |
 
 **Valid when:**
 - The acting corporation exists (rejected_no_corp otherwise).
@@ -42,7 +61,25 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 
 **Expected output.** The press enqueues a construction request; the app's mutable pass executes construct_building the same frame. On success a building entity exists immediately — staffed at 50% workforce (0 for a port), a processing facility seeded with the pressed row's recipe — and the capex is debited up front. Construction is then DURATIVE and material-gated: each economy tick (one quarter) it advances at a rate in [0,1] set by how much of its per-tick material need the local market can supply; scarce materials stretch the ETA and total shortage shows 'Paused - market can't supply materials'. Management controls unlock only when construction completes. A rejected attempt mutates nothing; the reason string appears at the top of the ledger (construction.last_message), and invalid rows already show reason-coded text in place of the Build button ('Cannot build on water', 'A port must sit on the coast', ...).
 
+NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT scripts/world_gen.lua, so only 16 of 42 resources carry a market price and coal is not among them. Since steel's recipe needs coal, a processing facility built through the seam has never produced a unit in any recorded session. Extraction works; processing does not, and the cause is configuration rather than the verb.
+
 **Reason to select.** The only way to add productive capacity. Extraction turns a tile deposit into pool stock to sell; processing turns inputs into higher-margin outputs; ports/hubs move goods cheaper, a launchpad gates space access, and a military base is where units muster (BL-325; hire moves onto it in S2 — until then it is positioning ahead of that change). The ledger ranks candidates by expected net per quarter and prints payback, so build is the press when a candidate's expected profit beats holding the cash.
+
+### `gameplay.cancel_contract` — No UI. SEAM-ONLY: this verb has NO player-facing press. A grep of src/ui for it returns nothing — BL-350 landed the procurement seam, its world state, its serialisation and its harness, but no UI. It is reachable ONLY through the corp-command seam: an out-of-process agent via ProjectIo --serve / the MCP server's issue_command, or a harness. The rival scorer does not emit it either (corp_ai.cpp enumerates no procurement candidate). Recorded rather than omitted, because an entry that says 'no human can press this, you can' is exactly the information a language policy needs — and because omitting it is how this dictionary fell four verbs behind the enum it transcribes.
+
+**Press.** None. `COMMAND corp=<you> verb=14 order=<contract id>` on the --serve line protocol, or issue_command with verb 'cancel_contract'.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `order` | `uint32 (procurement_contract id)` | The in-flight contract to terminate. Reuses the command's `order` field. |
+
+**Valid when:**
+- `order` is non-zero and names a contract still in world.procurement_contracts (rejected_invalid otherwise).
+- You are that contract's buyer (rejected_not_owner otherwise).
+
+**Expected output.** The contract is ERASED, not flagged — a cancelled contract has nothing left to pace. The deposit already paid is forfeit: there is no refund. Your (buyer, supplier) reputation moves DOWN by reputation_on_cancel, which is the same figure request_quote's reputation floor is checked against, so cancelling enough contracts with one supplier will eventually make that supplier refuse to quote you at all.
+
+**Reason to select.** Cut a commitment whose remaining payments cost more than the goods are now worth to you — a price collapse, a chain you have abandoned, or cash needed elsewhere this quarter. The cost is deliberately two-sided and the second side is the one to reason about: the forfeited deposit is a one-off you can price, but the reputation move is persistent and compounds, and it is checked at request_quote time. A policy that cancels freely will find its supplier list shrinking for reasons that surface much later, as rejected_reputation on a supplier it had been relying on.
 
 ### `gameplay.demolish` — Selection band, player-owned building layout, bottom action row.
 
@@ -60,6 +97,26 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 **Expected output.** Enqueued at confirm; executed against the mutable world after the draw. The building's components are erased, its id is removed from the corporation's assets, and the tile slot is freed for something else. NO refund — the build cost is not returned; demolition destroys the asset outright. A rejected attempt changes nothing and shows nothing beyond the world staying identical.
 
 **Reason to select.** Frees a capacity-capped tile for a better use — the press when the tile is worth more re-purposed than the building is worth running. For a merely loss-making building, idle is the better press: demolition is irreversible and refundless.
+
+### `gameplay.hire_unit` — The 'Hire' block of the Selection info element, shown when the selected tile carries the player's own COMPLETED military base (src/ui/selection_panel.cpp). Also a corp_verb, so an agent issues it against the corp-command seam and a rival corp's scorer issues it too (BL-324, widened by the standing-rules exception).
+
+**Press.** Select a tile carrying your completed military base. The Selection band shows a 'Hire' list, one row per roster row currently available to your corporation under the campaign roster band (industrial). Click 'Hire' on a row. The button queues a corp_command applied at the frame's end through apply_corp_command — the same call an agent makes, with the same re-validation.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `tile` | `entity_id` | The muster tile — must carry the acting corporation's own completed, non-decommissioned military_base. Carried in the command's `tile` field, the build/place_road convention. |
+| `unit_type` | `uint16 (index into unit_roster_table())` | Which roster row to raise. Validated against the LIVE availability list, not a caller's cached one. |
+
+**Valid when:**
+- `unit_type` is a valid index into unit_roster_table() (rejected_invalid otherwise).
+- That row is currently available to this corporation under the campaign roster band — re-checked against available_rows() at apply time, so a stale list is refused (rejected_invalid otherwise).
+- `tile` names a real tile (rejected_invalid otherwise).
+- That tile carries a military_base owned by the acting corporation, COMPLETE (ticks_remaining <= 0) and not decommissioned. A base still under construction does not qualify — BL-325 S2 moved hire onto the base and superseded BL-324's hire-anywhere (rejected_placement otherwise).
+- The corporation can pay the row's hire cost (rejected_funds otherwise).
+
+**Expected output.** A new unit entity at the muster tile, owned by the acting corporation, with count and strength both set to hire_batch_manpower and `type` set to the roster index. The corporation's balance is debited the row's cost. The new entity id is returned through apply_corp_command's out-param (the same channel a `build` uses). An `agency_event::kind::hired` is reported for the chat feed and an `agency` entry is appended to the world history log.
+
+**Reason to select.** You want force in the field, and this is currently the only verb that creates any. Two honest caveats an agent should weigh. First, it is gated behind infrastructure: you need a completed military_base on the tile, which is itself a build gated behind the E0-ML-01 tech, so hiring is the END of a chain rather than a quick move. Second — and this is the one that should hold most policies back — the 1960 campaign has NO CONSUMER for units. resolve_battle's only caller is the Era -1 history simulation, and the two condition subjects that read w.units (military_units, military_strength) have no authored producers. A hired unit today is an entity that costs money, sits on a tile, and does nothing. Raise them to satisfy a condition_set that counts them, or because a future conflict layer will want them; do not raise them expecting to fight.
 
 ### `gameplay.idle` — The 'Idle' button on the Selection band's building layout, bottom row (paired with Demolish). The Building panel's inline detail carries a one-way 'Decommission' button with the same effect; Resume lives only on the band.
 
@@ -106,7 +163,9 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 | `body` | `entity_id` | The body whose market the order lists on — the ledger's currently selected body. Carried in the command's `subject` field (the survey verb's convention: subject IS the body). |
 | `resource` | `resource_type` | What to sell. Carried in the command's `target` field, shared with build's extraction target. Must have a positive base price on this market. |
 | `quantity` | `float > 0` | Maximum units offered per quarter, capped each tick by what the (corp, body) pool actually holds. |
-| `floor_price` | `float >= 0` | Minimum acceptable unit price. 0 means sell at the market price. |
+| `floor_price` | `float >= 0` | Minimum acceptable unit price. 0 means sell at the market price.
+
+**KNOWN DEFECT, BL-386 — the engine does not treat this as a minimum.** `clear_markets` computes `clearing = max(reference_price, floor_price)` and credits the seller `quantity x clearing` with NO buyer debited and NO cap. So a floor ABOVE the market does not hold stock back — it is PAID, in full, by nobody. Listing at floor 1e12 reached cash 1.587e17 in eighteen ticks in play. Until BL-386 lands, a floor above the market price is an exploit rather than a reservation price, and an agent that sets one is printing money whether or not it intended to. Set 0 (accept the market) unless you are deliberately testing this. |
 
 **Valid when:**
 - The acting corporation exists (rejected_no_corp otherwise).
@@ -116,7 +175,13 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 - Quantity is strictly positive and floor_price is not negative (rejected_invalid otherwise).
 - The corporation holds fewer than `max_sell_orders_per_corp` (64) standing orders (rejected_state otherwise — the book is capped, and a placement past the cap is refused rather than silently dropped).
 
-**Expected output.** A STANDING order in WORLD state — `world::sell_orders`, not a UI list — carrying a stable nonzero `id` that `remove_sell_order` later names. It persists until removed, survives a save (the order book is on the flat-binary serialisation seam, order_book.hpp), and is evaluated every economy tick by clear_markets itself, with no caller handing it over. Each tick it lists up to `quantity` from the corp's pool on that body (an empty pool lists nothing, silently); it clears at max(resolved market price, floor) — with no matching buyer it still auto-clears at that price, so offered supply always clears in the prototype, but a floor above what the resolution supports means less or nothing sells that tick. CRITICAL side effect, unchanged: the (corp, body, resource) triple leaves the automatic surplus-selling path — the auto path yields to the standing order — so a too-high floor does not just fail to sell, it stops that resource selling AT ALL on that body and the stock piles up. Orders append, so position in the book is time priority; a rejected command mutates nothing.
+**Expected output.** A STANDING order in WORLD state — `world::sell_orders`, not a UI list — carrying a stable nonzero `id` that `remove_sell_order` later names. It persists until removed, survives a save (the order book is on the flat-binary serialisation seam, order_book.hpp), and is evaluated every economy tick by clear_markets itself, with no caller handing it over. Each tick it lists up to `quantity` from the corp's pool on that body (an empty pool lists nothing, silently); it clears at max(resolved market price, floor).
+
+**THIS ENTRY USED TO CONTRADICT ITSELF HERE, and the contradiction is why the defect below went unseen for so long.** It said in one breath that the order clears at `max(price, floor)` AND that 'a floor above what the resolution supports means less or nothing sells that tick'. Those cannot both be true. At HEAD the max() wins: a floor ABOVE the market sells the whole listed quantity AT THE FLOOR, paid by nobody — see BL-386. The second half described the behaviour everyone assumed and nobody checked.
+
+So, precisely, TODAY: a high floor does not hold stock back; it raises what you are paid. When BL-386 lands, a floor above the market will clear nothing and the stock will stay in the pool, which is what the second half always meant. CRITICAL side effect, unchanged either way: the (corp, body, resource) triple leaves the automatic surplus-selling path — the auto path yields to the standing order — so once BL-386 lands, a too-high floor will stop that resource selling AT ALL on that body and the stock will pile up. Orders append, so position in the book is time priority; a rejected command mutates nothing.
+
+WHAT ACTUALLY HAPPENS TO YOUR THROUGHPUT, learned in play and not obvious from the verb: a standing order makes the auto-surplus path YIELD for that (corp, body, resource), and the order then sells at most its own listed `quantity` per tick where the auto path sold the whole pool. Listing at floor 0 with a large quantity is therefore not equivalent to not listing — one player measured 2,557,231 credits against 9,613,476 for the same campaign with no order at all, with 15 million unsold units piled in the pool. The listed quantity is frozen at listing time and the scorer never revises it (BL-380), and a second order on the same triple sells nothing because time priority gives the first one the whole pool. Also: the response does NOT return the order's id, which `remove_sell_order` requires (BL-390).
 
 **Reason to select.** Price and quantity control the auto-sell path lacks: floor-protect against dumping stock into a crashed price, or meter quantity to ration a stockpile toward a construction project or a better market. The manual side of the trade loop — the press when 'sell everything at whatever it fetches' is the wrong answer. The rival-corp scorer reaches for it on exactly one signal: stock past a hold threshold, listed at a floor over the rarity price.
 
@@ -136,6 +201,31 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 **Expected output.** The order is erased from `world::sell_orders` immediately, at no cost; every surviving order keeps its id. From the next economy tick that quantity is no longer listed. Routing consequence, unchanged: if this was the LAST remaining order for that (corp, body, resource) triple, the triple returns to the automatic surplus-selling path — each tick the pool's surplus above processor reservation auto-sells at the market's reference price, with no floor protection. If another order for the same triple still stands, manual control persists. Nothing else changes; already-cleared past sales are untouched. A rejected removal mutates nothing.
 
 **Reason to select.** Ends manual control over a resource's sales: hand it back to the auto-surplus path when floor-pricing or rationing is no longer wanted (e.g. the price crash passed, or a too-high floor was silently stockpiling the resource instead of selling it). Also the only way to correct a mistyped order — there is no edit; remove and re-add.
+
+### `gameplay.request_quote` — No UI. SEAM-ONLY: this verb has NO player-facing press. A grep of src/ui for it returns nothing — BL-350 landed the procurement seam, its world state, its serialisation and its harness, but no UI. It is reachable ONLY through the corp-command seam: an out-of-process agent via ProjectIo --serve / the MCP server's issue_command, or a harness. The rival scorer does not emit it either (corp_ai.cpp enumerates no procurement candidate). Recorded rather than omitted, because an entry that says 'no human can press this, you can' is exactly the information a language policy needs — and because omitting it is how this dictionary fell four verbs behind the enum it transcribes.
+
+**Press.** None. Issue the corp_command directly: `COMMAND corp=<you> verb=12 subject=<body> target=<resource> quantity=<n> counterparty=<supplier corp>` on the --serve line protocol, or issue_command with verb 'request_quote' through the MCP server.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `counterparty` | `entity_id` | The supplier corporation being asked. May not be yourself. |
+| `target` | `resource_type` | The good sought. Shares the command's `target` field with build's extraction target. |
+| `quantity` | `float > 0` | Units sought. Also drives the derived lead time — a bigger order takes longer. |
+| `subject` | `entity_id` | NOT READ. Documented as 'the body the contract would fulfil at', and this entry previously said the seam resolves the body from the supplier's capacity so the field is 'context rather than a constraint'. That understated it: `cmd.subject` appears nowhere in request_quote's implementation. Passing a garbage id is indistinguishable from passing the right one. Send it for readability if you like; it has no effect, and you cannot choose which of a multi-body supplier's bodies fulfils. |
+
+**Valid when:**
+- `counterparty` names a real corporation, and is not the acting corporation — no self-contracting (rejected_invalid otherwise).
+- Quantity is strictly positive (rejected_invalid otherwise).
+- The supplier holds a completed building that can produce the good (rejected_no_capacity otherwise).
+- The supplier's local market can supply that recipe's inputs (rejected_no_input_access otherwise).
+- The supplier's embargo condition_set, if it has one, evaluates true against you (rejected_embargo otherwise).
+- Your (buyer, supplier) reputation is at or above the standing floor (rejected_reputation otherwise).
+
+**Expected output.** A procurement_quote appended to world.procurement_quotes, carrying a fresh id, the resolved body, a unit price read from the supplier's local market (live price, else base price) and a DERIVED lead time — base_lead_ticks x ceil(quantity / processing throughput), clamped to 400 ticks. Nothing is debited: a quote is an offer, not a commitment. AND HERE IS THE PROBLEM: the response tells you NEITHER the id NOR the price. `RESULT result=applied building=0` is the whole of it — `building` is an out-param request_quote never writes. So the one number a quote exists to communicate is withheld, and the id `accept_quote` requires is withheld too. There is no opcode listing outstanding quotes and no blackboard predicate for them. An agent must infer ids by counting its own successful commands against a shared counter that starts at 1, which a player did for forty commands before miscounting once and silently corrupting every id after. See BL-390.
+
+**Reason to select.** The four decline reasons are the point of this verb, not the quote. Each is a different fact about the world that nothing else on the seam will tell you: rejected_no_capacity means this supplier cannot make the good at all, rejected_no_input_access means it could but its market cannot feed it, rejected_embargo means it has a standing policy against you specifically, and rejected_reputation means you have burned this relationship. Sweeping suppliers with a small quantity is therefore a cheap intelligence probe as well as a purchase route — it costs nothing and mutates nothing on a decline, and a player who did exactly that mapped the entire procurable market in one session (iron ore 20 sellers, agricultural produce 8, water 3, petroleum 2, and no processed good from anyone).
+
+USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no price and no lead time, so twenty suppliers who all say yes are indistinguishable, and the only way to learn what you agreed to is to accept and difference your cash. Until BL-390 lands, treat `applied` as 'this supplier is willing' and nothing more.
 
 ### `gameplay.resume` — The 'Resume' button on the Selection band's building layout — it renders in place of 'Idle' when the building is idled.
 
@@ -802,22 +892,6 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 
 **Reason to select.** Will eventually set corporate wage policy; today it is display-only.
 
-### `ledger.law_enact_toggle` — Balance Ledger (Budget), 'Laws' section beneath the two policy-tier stubs
-
-**Press.** Click the checkbox beside a law's name to enact it, or click it again to repeal it (the standing toggle rule)
-
-| Arg | Type | Meaning |
-|---|---|---|
-| `law_index` | `int index into world::laws` | Which law on the books to flip. The prototype ships one: Extraction Levy. |
-
-**Valid when:**
-- Balance Ledger is open
-- At least one law is on the books (seed_prototype_laws appends the Extraction Levy at world setup, un-enacted)
-
-**Expected output.** The law's enacted flag flips on the next mutable pass, and a toast names it ('Extraction Levy enacted.' / '... repealed.'). It takes effect from the NEXT economy tick, never retroactively on the quarter already accounted. While enacted, every unit of RAW output the corporation extracts is charged rate x units and the total appears on the Levies bar of the Corporations dashboard's Finance card. Prices do not move: a law is a modifier over the market, never an override of it, so the levy is a separate accounted cost rather than a worse sale price. Repeal restores the previous arithmetic exactly. Unlike ledger.budget_tax_tier and ledger.budget_wage_tier, this control is NOT a stub.
-
-**Reason to select.** The only law lever that does anything today, and the one press that demonstrates the governing-body seam end to end. For a corporation SUBJECT to the levy it is pure cost, so a corp-side agent has no reason to enact it; it is here because the pivot's legislator needs the instrument to exist and to be observable before it can be negotiated (BL-280) or politicked over (BL-186, BL-345).
-
 ### `ledger.build_ledger_close` — Tile construction ledger (the 'Construct · [x, y]' fold-out, BL-162), header
 
 **Press.** Click the 'x' button at the right of the header
@@ -1048,6 +1122,22 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 **Expected output.** Switches the view. Re-clicking the currently-active tab closes the whole History ledger (toggle rule); switching tabs is an ordinary view change. Story is about one body (see the Body selector); Chain compares every body side by side and hides the selector. A third tab, Tiles, was retired 2026-08-03 (BL-281) - it was a current-state readout in a ledger about the past; its buildings list is on the canvas and in the Selection element, its market data in the market surfaces.
 
 **Reason to select.** Story answers 'what is this body's biography?'; Chain answers 'how do the bodies compare through the generation stages?' - the two halves of how this world came to be.
+
+### `ledger.law_enact_toggle` — Balance Ledger (Budget), 'Laws' section beneath the two policy-tier stubs
+
+**Press.** Click the checkbox beside a law's name to enact it, or click it again to repeal it (the standing toggle rule)
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `law_index` | `int index into world::laws` | Which law on the books to flip. The prototype ships one: Extraction Levy. |
+
+**Valid when:**
+- Balance Ledger is open
+- At least one law is on the books (seed_prototype_laws appends the Extraction Levy at world setup, un-enacted)
+
+**Expected output.** The law's enacted flag flips on the next mutable pass, and a toast names it ('Extraction Levy enacted.' / '... repealed.'). It takes effect from the NEXT economy tick, never retroactively on the quarter already accounted. While enacted, every unit of RAW output the corporation extracts is charged rate x units and the total appears on the Levies bar of the Corporations dashboard's Finance card. Prices do not move: a law is a modifier over the market, never an override of it, so the levy is a separate accounted cost rather than a worse sale price. Repeal restores the previous arithmetic exactly. Unlike ledger.budget_tax_tier and ledger.budget_wage_tier, this control is NOT a stub.
+
+**Reason to select.** The only law lever that does anything today, and the one press that demonstrates the governing-body seam end to end. For a corporation SUBJECT to the levy it is pure cost, so a corp-side agent has no reason to enact it; it is here because the pivot's legislator needs the instrument to exist and to be observable before it can be negotiated (BL-280) or politicked over (BL-186, BL-345).
 
 ### `ledger.market_body_selector` — Market Ledger, 'Body' combo
 
@@ -1340,18 +1430,6 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 
 **Reason to select.** The universal step-out key: back out of a confirmation, close the menu, unwind a drill, fold an overlay, dismiss the card — or, with nothing open, reach the session menu.
 
-### `chrome.f1_help` — Keyboard; opens a centred Key Bindings window
-
-**Press.** Press F1 (press again, or click the window's X, to close).
-
-**Valid when:**
-- App is in game (the binding table is gated off on the menu and wizard).
-- Not while an ImGui widget owns the keyboard (typing in a text field suppresses it).
-
-**Expected output.** Toggles a two-column Action/Key cheat-sheet, generated from the same binding table the key handler loops over, so it can never drift from the real bindings. F11 and F12 sit outside that table and are appended to the sheet by hand.
-
-**Reason to select.** To look up every keyboard shortcut without leaving the game.
-
 ### `chrome.f10_options` — Keyboard; opens the centred Options window
 
 **Press.** Press F10 (press again, click Close, or click the window's X to dismiss).
@@ -1386,6 +1464,18 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 
 **Reason to select.** To record what is on screen — evidence for a bug report, a layout question, or a state worth keeping.
 
+### `chrome.f1_help` — Keyboard; opens a centred Key Bindings window
+
+**Press.** Press F1 (press again, or click the window's X, to close).
+
+**Valid when:**
+- App is in game (the binding table is gated off on the menu and wizard).
+- Not while an ImGui widget owns the keyboard (typing in a text field suppresses it).
+
+**Expected output.** Toggles a two-column Action/Key cheat-sheet, generated from the same binding table the key handler loops over, so it can never drift from the real bindings. F11 and F12 sit outside that table and are appended to the sheet by hand.
+
+**Reason to select.** To look up every keyboard shortcut without leaving the game.
+
 ### `chrome.f9_tech_tree` — Keyboard; opens the mock tech-tree viewer
 
 **Press.** Press F9 (press again to close).
@@ -1397,21 +1487,6 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 **Expected output.** Toggles a read-only viewer over scripts/tech_tree.lua, tabbed by era: Era -1 Antiquity (placeholder pointing at the BL-307 ladder store), Era 0, Era 1, and Standing lines; eras with no authored quests show a placeholder. Honest status: this is a mock — a design aid with no simulation coupling; nothing can be researched and nothing in the world reads it.
 
 **Reason to select.** To browse the drafted tech-tree content; of no strategic use to an AI player yet.
-
-### `chrome.tech_tree_era_tab` — Tech-tree viewer (F9), era tab strip
-
-**Press.** Click the 'Era -1 Antiquity', 'Era 0 — Terrestrial', 'Era 1 — Early Space' or 'Standing lines' tab button
-
-| Arg | Type | Meaning |
-|---|---|---|
-| `view` | `enum` | 'Era -1 Antiquity' (placeholder pointing at the BL-307 ladder store) / 'Era 0 — Terrestrial' (the default) / 'Era 1 — Early Space' / 'Standing lines' (span eras, never gate one) |
-
-**Valid when:**
-- Tech-tree viewer is open (F9)
-
-**Expected output.** Switches which era's tree is shown — each era carries its own tree; eras with no authored quests show a placeholder. Re-clicking the currently-active tab closes the viewer (toggle rule); switching tabs is an ordinary view change.
-
-**Reason to select.** To browse a specific era's drafted content; of no strategic use to an AI player yet — the viewer is a mock with no simulation coupling.
 
 ### `chrome.gear_toggle` — In-game chrome, top-right gear button just left of the time column
 
@@ -1612,6 +1687,21 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 **Expected output.** Toggles simulation pause via the same pause_toggle path as the Space hotkey. Resuming restores the previous speed tier. The button label flips accordingly.
 
 **Reason to select.** To halt or resume the simulation clock from the mouse-driven session menu.
+
+### `chrome.tech_tree_era_tab` — Tech-tree viewer (F9), era tab strip
+
+**Press.** Click the 'Era -1 Antiquity', 'Era 0 — Terrestrial', 'Era 1 — Early Space' or 'Standing lines' tab button
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `view` | `enum` | 'Era -1 Antiquity' (placeholder pointing at the BL-307 ladder store) / 'Era 0 — Terrestrial' (the default) / 'Era 1 — Early Space' / 'Standing lines' (span eras, never gate one) |
+
+**Valid when:**
+- Tech-tree viewer is open (F9)
+
+**Expected output.** Switches which era's tree is shown — each era carries its own tree; eras with no authored quests show a placeholder. Re-clicking the currently-active tab closes the viewer (toggle rule); switching tabs is an ordinary view change.
+
+**Reason to select.** To browse a specific era's drafted content; of no strategic use to an AI player yet — the viewer is a mock with no simulation coupling.
 
 ### `chrome.wizard_back` — New World wizard, footer button row
 

@@ -37,7 +37,7 @@ Only Era 0 and Era 1 are designed for the prototype. Later eras are stubbed.
 > The 4000-year prehistory is a **generator**, not a play layer: it produces the 0 CE world the
 > campaign opens on. Its clock steps 100 → 50 → 20 → 10 → 5 → 1 years so resolution concentrates
 > near the epoch, and a settle-dominated deep prehistory is the intended shape, not a defect
-> (NR-178, ruled 2026-08-12).
+> (NR-205, ruled 2026-08-12).
 
 ## Era 0 — Terrestrial
 

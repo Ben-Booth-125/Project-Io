@@ -217,7 +217,7 @@ int main()
                     static_cast<long long>(pc), static_cast<long long>(pf));
 
         // MEASURED AND REPORTED, NOT ASSERTED — and the reason is a finding in
-        // its own right (NR-178).
+        // its own right (NR-205).
         //
         // This assertion was originally written as "the two credits stay within
         // an order of magnitude", on the assumption that scaling each round by
