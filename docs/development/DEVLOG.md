@@ -157,7 +157,15 @@ exist to catch, NR-182 the action dictionary running four verbs behind the seam 
 NR-183 the constraint-tax leg of the 10g ruling superseded in framing, NR-184 the NaN boundary,
 NR-185 the four overstated claims and the claims-lens practice that caught them).
 
-**Runtime.** ~4 h, Full mode (research sweep, two strands, one new committed check, one hypothesis
+**Full tier: 64/68, and the four reds are all pre-existing.** `ai_skill_harness` is green across the
+complete run. The failures are `data_creep_harness` (NR-171), `population_mvp` (NR-170),
+`stack_capacity_harness` (stale since BL-366) and `history_sim_harness` (six assertions). The last
+was adjudicated the way SPRINTS.md prescribes rather than by inspection — a throwaway worktree at
+`4e0118d`, configured and built from cold, produced the identical six failures. Two of the four had
+no record anywhere before today; NR-186 now carries all of them, and argues the `history_sim` six
+are the priority, because NR-177's refocus makes that sim the ancient product's *generator*.
+
+**Runtime.** ~4.5 h, Full mode (research sweep, two strands, one new committed check, one hypothesis
 measured and discarded, one adversarial review pass that changed the outcome).
 
 ---
