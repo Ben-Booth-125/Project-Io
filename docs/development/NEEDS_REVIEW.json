@@ -3739,6 +3739,22 @@
     "tools/verify/data_creep_harness.cpp"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-216",
+   "title": "Retire-triage sweep: nothing retired, four metadata calls taken",
+   "raised": "2026-08-13",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "14-item code-verified retire triage (adversarially checked), 2026-08-13",
+   "what": "A sweep to retire obsolete backlog items found ZERO safe retirements - every suspect is real open work; the one retire proposal (BL-158, politics stub, as superseded by BL-345) was refuted because its character_preset strand would be orphaned. Four calls taken instead: (1) BL-158 narrowed to the character_preset strand only (sentiment axis owned by BL-345); (2) BL-364 (corp border hexes) retargeted v0.1.2 -> v0.1.7 and unblocked (BL-323 complete); (3) BL-264 (wizard layout) unparked - directions 1+4 landed with BL-256, whose requires-entry is satisfied; (4) BL-175 (supply lens) unparked - BL-088 landed, slice 2 has its substrate. Plus dated code-verified progress notes on BL-274 (roster merge still owed), BL-325 (S3 sole remainder), BL-304 (lens half remains), BL-317 (S1 landed via BL-271 wiring).",
+   "why_it_matters": "The narrowing and the retarget change what those items mean; if the sentiment/preset split or the v0.1.7 aim reads wrong, say so and the notes reverse cleanly - each is a dated addendum, no prose was deleted.",
+   "options": [],
+   "recommendation": "Skim the four calls; the code evidence is in each item's 2026-08-13 triage note.",
+   "files": [
+    "docs/development/backlog.json"
+   ],
+   "resolution": null
   }
  ]
 }

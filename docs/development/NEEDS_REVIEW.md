@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*213 entries — 69 open, 144 resolved.*
+*214 entries — 70 open, 144 resolved.*
 
 ---
 
@@ -767,6 +767,17 @@ Both sides recalibrated tools/verify/data_creep_harness.cpp independently. Local
 > **Recommendation:** Accept the local calibration; re-run the harness on the merged tree to confirm the plateau window sits past build-out.
 
 *Files: `tools/verify/data_creep_harness.cpp`*
+
+### NR-216 — Retire-triage sweep: nothing retired, four metadata calls taken
+*decision taken on your behalf · raised 2026-08-13 · from 14-item code-verified retire triage (adversarially checked), 2026-08-13*
+
+A sweep to retire obsolete backlog items found ZERO safe retirements - every suspect is real open work; the one retire proposal (BL-158, politics stub, as superseded by BL-345) was refuted because its character_preset strand would be orphaned. Four calls taken instead: (1) BL-158 narrowed to the character_preset strand only (sentiment axis owned by BL-345); (2) BL-364 (corp border hexes) retargeted v0.1.2 -> v0.1.7 and unblocked (BL-323 complete); (3) BL-264 (wizard layout) unparked - directions 1+4 landed with BL-256, whose requires-entry is satisfied; (4) BL-175 (supply lens) unparked - BL-088 landed, slice 2 has its substrate. Plus dated code-verified progress notes on BL-274 (roster merge still owed), BL-325 (S3 sole remainder), BL-304 (lens half remains), BL-317 (S1 landed via BL-271 wiring).
+
+**Why it matters.** The narrowing and the retarget change what those items mean; if the sentiment/preset split or the v0.1.7 aim reads wrong, say so and the notes reverse cleanly - each is a dated addendum, no prose was deleted.
+
+> **Recommendation:** Skim the four calls; the code evidence is in each item's 2026-08-13 triage note.
+
+*Files: `docs/development/backlog.json`*
 
 ---
 
