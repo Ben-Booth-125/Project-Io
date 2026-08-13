@@ -766,7 +766,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
 
         // ---- Muster-base build candidate: BL-325 S2 made hire depend on a ---
         // completed military_base, but the ordinary build-candidate loop above
-        // only ever proposes extraction_site/processing_facility — it never
+        // only ever proposes extraction_site — it never
         // proposed military_base, so no rival corp could ever satisfy the new
         // hire precondition (caught by ai_skill_harness: hire_unit dropped
         // from 21/seed to 0 the moment S2 landed without this). One flat,
