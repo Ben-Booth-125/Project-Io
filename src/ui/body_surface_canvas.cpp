@@ -125,15 +125,18 @@ ImU32 production_colour(float ratio);
 /// clear of the Selection panel, the header/comms log, and the lens control strip.
 /// Returns the inner top-left and the inner content width via @p out_x/@p out_y/
 /// @p out_w. Pure ImDrawList — no ImGui widget state.
+/// @p bg is the panel fill; a key that floats over a *window* rather than the
+/// canvas passes an opaque one (BL-376 — see draw_continent_key's call site).
 void begin_lens_key(ImDrawList* dl, ImVec2 anchor, float box_w,
-                    float body_h, float pad, float& out_x, float& out_y, float& out_w)
+                    float body_h, float pad, float& out_x, float& out_y, float& out_w,
+                    ImU32 bg = IM_COL32(18, 18, 24, 210))
 {
     // Anchored so the box's RIGHT edge sits at anchor.x (the minimap's left edge) and
     // the box is vertically centred on anchor.y — it reads as a drawer folding out from
     // the left side of the minimap. anchor is passed in from app.cpp (lens_key_anchor).
     const ImVec2 p0 = { anchor.x - box_w, anchor.y - body_h * 0.5f };
     const ImVec2 p1 = { p0.x + box_w, p0.y + body_h };
-    dl->AddRectFilled(p0, p1, IM_COL32(18, 18, 24, 210), 4.0f);
+    dl->AddRectFilled(p0, p1, bg, 4.0f);
     dl->AddRect      (p0, p1, IM_COL32(80, 80, 90, 255), 4.0f);
     out_x = p0.x + pad;
     out_y = p0.y + pad * 0.5f;
@@ -511,9 +514,6 @@ void draw_population_key(ImDrawList* dl, ImVec2 anchor)
     dl->AddText({x + bar_w - hts.x, y}, IM_COL32(170, 175, 185, 255), "high"); // fit-exempt: legend box sized to its measured entries (container 2)
 }
 
-/// On-canvas legend for the Industry lens (BL-084): a low→high amber gradient bar
-/// mapping the substrate-throughput tint (terrain hue → industrial amber), so the
-/// field reads as "where the existing industry is densest". Same placement as the others.
 /// Colour for tectonic plate @p index (Continent lens, BL-226). A dedicated
 /// palette rather than palette::nation_colour, because plates are substrate and
 /// not identity — but a *categorical* palette all the same, so the first draft's
@@ -543,6 +543,13 @@ ImU32 plate_colour(int index)
 /// The Continent lens key. Unlike the gradient keys, this legend has no scale to
 /// explain — the tint is categorical — so it explains the one thing that is not
 /// self-evident: that the BRIGHT tiles are plate boundaries, and why they matter.
+///
+/// BL-376: the key keeps this position but is drawn on the FOREGROUND list by its
+/// caller, so it floats over the always-open Selection band instead of being buried
+/// by it. Purely a draw-order fix — nothing here moves. Because the band, not the
+/// canvas, is now what sits underneath, the panel takes an opaque fill: the 210-alpha
+/// default let the band's own background bleed through and muddy the plate swatches,
+/// which are the one thing this key exists to show.
 void draw_continent_key(ImDrawList* dl, ImVec2 anchor, const continent_state* plates)
 {
     const float pad    = 8.0f;
@@ -551,7 +558,8 @@ void draw_continent_key(ImDrawList* dl, ImVec2 anchor, const continent_state* pl
 
     const float body_h = pad + line_h + 6.0f + sw + 4.0f + sw + 4.0f + line_h + pad;
     float x, y, inner_w;
-    begin_lens_key(dl, anchor, 176.0f, body_h, pad, x, y, inner_w);
+    begin_lens_key(dl, anchor, 176.0f, body_h, pad, x, y, inner_w,
+                   IM_COL32(18, 18, 24, 255));
     (void)inner_w;
 
     dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Tectonic plates"); // fit-exempt: legend box sized to its measured entries (container 2)
@@ -596,6 +604,10 @@ void draw_continent_key(ImDrawList* dl, ImVec2 anchor, const continent_state* pl
     dl->AddText({x, y}, IM_COL32(170, 170, 180, 255), buf); // fit-exempt: legend box sized to its measured entries (container 2)
 }
 
+/// On-canvas legend for the Industry lens (BL-084; re-pointed BL-373): a low→high
+/// amber gradient bar mapping the tile tint, so the field reads as "where the
+/// industry I did not build is densest". Same placement as the others. (This
+/// comment previously drifted onto plate_colour, which it does not describe.)
 void draw_industry_key(ImDrawList* dl, ImVec2 anchor)
 {
     const float pad    = 8.0f;
@@ -606,7 +618,7 @@ void draw_industry_key(ImDrawList* dl, ImVec2 anchor)
     float x, y, bar_w;
     begin_lens_key(dl, anchor, 156.0f, body_h, pad, x, y, bar_w);
 
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Industry throughput"); // fit-exempt: legend box sized to its measured entries (container 2)
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Background industry"); // fit-exempt: legend box sized to its measured entries (container 2)
     y += line_h + 4.0f;
 
     // Gradient mirrors the tile tint lerp (terrain hue -> industrial amber at
@@ -1313,43 +1325,47 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             plates = nullptr;
     }
 
-    // Industry lens pre-pass (BL-084): render the already-live nation-owned
-    // substrate (tile.substrate_density, injected as background supply/demand each
-    // tick) as an economic-throughput field. Raw density ripples out from population
-    // centres and so reads collinear with the Population lens; weighting occupation
-    // by the tile's terrain resource richness decouples it — the field reads "where
-    // the existing *industry* is", brightest where dense occupation meets rich
-    // terrain. Pure rendering: no change to substrate_density or the market maths.
+    // Industry lens pre-pass (BL-084; re-pointed BL-373). The lens used to tint by
+    // tile.substrate_density — an abstract occupation scalar left over from the
+    // nation-substrate injection. BL-365 replaced that substrate with REAL background
+    // corporations that own real buildings, so the lens now reads the thing its name
+    // always promised: the background firms' plant standing on each tile. The question
+    // it answers is "where is the industry I did not build?" — deliberately distinct
+    // from the Production lens, which ranks output intensity INCLUDING the player's own
+    // holdings. substrate_density survives untouched; it just stops feeding this lens.
+    //
+    // Per tile: Σ over background-owned buildings of (0.5 + 0.5 × output share). The
+    // 0.5 floor keeps an idle or still-building background plant visible — its presence
+    // is the fact the lens reports — while output separates a token works from a real
+    // one, and two buildings on a tile stack.
     std::unordered_map<entity_id, float> industry_field;
     float industry_max = 0.0f;
     if (state.overlay == overlay_mode::industry)
     {
-        // BL-362: walk the active body's raster (BL-268) rather than filtering
-        // every body's tiles twice — same tile set, same field, no global scan.
-        float max_dep = 0.0f;
-        for (const entity_id tid : raster)
+        const auto background_owned = [&w](entity_id corp) {
+            const auto cit = w.corporations.find(corp);
+            return cit != w.corporations.end() && cit->second.is_background;
+        };
+
+        // Body-local output ceiling, so the share term is relative to this body's own
+        // background industry rather than a cross-body absolute.
+        float max_out = 0.0f;
+        for (const building_report& br : report.buildings)
+            if (br.body == state.active_body && background_owned(br.corp))
+                max_out = std::max(max_out, br.output_quantity);
+
+        for (const building_report& br : report.buildings)
         {
-            if (tid == null_entity)
+            if (br.body != state.active_body || !background_owned(br.corp))
                 continue;
-            const auto tit = w.tiles.find(tid);
-            if (tit == w.tiles.end())
+            const auto bld_it = w.buildings.find(br.building);
+            if (bld_it == w.buildings.end())
                 continue;
-            float ds = 0.0f;
-            for (const float d : tit->second.resource_deposit) ds += d;
-            max_dep = std::max(max_dep, ds);
-        }
-        for (const entity_id tid : raster)
-        {
-            if (tid == null_entity)
-                continue;
-            const auto tit = w.tiles.find(tid);
-            if (tit == w.tiles.end() || tit->second.substrate_density <= 0.0f)
-                continue;
-            float ds = 0.0f;
-            for (const float d : tit->second.resource_deposit) ds += d;
-            const float dep_norm = (max_dep > 0.0f) ? ds / max_dep : 0.0f;
-            const float thr = tit->second.substrate_density * (0.35f + 0.65f * dep_norm);
-            industry_field[tid] = thr;
+            const float share = (max_out > 0.0f)
+                                    ? std::clamp(br.output_quantity / max_out, 0.0f, 1.0f)
+                                    : 0.0f;
+            float& thr = industry_field[bld_it->second.tile];
+            thr += 0.5f + 0.5f * share;
             industry_max = std::max(industry_max, thr);
         }
     }
@@ -1672,10 +1688,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 fill = lerp_colour(fill, hot, 0.6f * scar);
             }
         }
-        // Industry lens (BL-084): tint a tile by the nation-substrate throughput field
-        // (occupation weighted by terrain richness, pre-pass above), normalised to the
-        // body max — brightest amber where the existing industry is densest. Tiles with
-        // no substrate keep their terrain hue.
+        // Industry lens (BL-084/BL-373): tint a tile by the background-firm plant
+        // standing on it (pre-pass above), normalised to the body max — brightest amber
+        // where the industry the player did not build is densest. Tiles carrying no
+        // background building keep their terrain hue.
         else if (state.overlay == overlay_mode::industry)
         {
             const auto it = industry_field.find(id);
@@ -2587,8 +2603,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         draw_scarcity_key(dl, lens_key_anchor, state);
     else if (state.overlay == overlay_mode::industry)
         draw_industry_key(dl, lens_key_anchor);
+    // BL-376: foreground list, not `dl` (background) — the Selection band is an ImGui
+    // window and always open, so a background-list key at this anchor is drawn under
+    // it. Same position, higher z-order.
     else if (state.overlay == overlay_mode::continent)
-        draw_continent_key(dl, lens_key_anchor, plates);
+        draw_continent_key(ImGui::GetForegroundDrawList(), lens_key_anchor, plates);
     else if (state.overlay == overlay_mode::reach)
         draw_reach_key(lens_key_anchor, key_top, key_bot, w, reach_links);
     else if (state.overlay == overlay_mode::supply_routes)
