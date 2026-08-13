@@ -4,6 +4,7 @@
 
 #include "core/session_history.hpp"
 
+#include "core/app.hpp"      // step_economy_phase_ms — the shared phase accumulators
 #include "core/sim_loop.hpp"
 #include "ui/balance_ledger.hpp"
 #include "ui/ui_state.hpp"
@@ -12,6 +13,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cstdio>
 #include <string>
 #include <utility>
@@ -128,6 +130,19 @@ void post_persona_counsel(const world& w, std::vector<persona::pack>& bench,
     if (!bench.empty())
     {
         const int tick = day_tick;
+
+        // BL-379 instrumentation: split this phase's cost into its two halves —
+        // the C++ blackboard export and the sol2 pack evaluation — through the
+        // same accumulator surface the other step_economy phases report on
+        // ([9] and [10]; [7] remains the total). Naming the slow PHASE was never
+        // the hard part — naming which half of it is the cost is, and bounding
+        // the other half is a fix that measures as no fix at all.
+        using clk = std::chrono::steady_clock;
+        auto& acc = step_economy_phase_ms();
+        auto add_lap = [&acc](std::size_t slot, clk::time_point from) {
+            acc[slot] += std::chrono::duration_cast<std::chrono::microseconds>(
+                             clk::now() - from).count() / 1000.0;
+        };
         std::vector<entity_id> corp_ids;
         corp_ids.reserve(w.corporations.size());
         for (const auto& [id, cc] : w.corporations)
@@ -139,7 +154,10 @@ void post_persona_counsel(const world& w, std::vector<persona::pack>& bench,
             if (!corp_strategic_eval_due(w, corp, tick))
                 continue;
 
-            const corp_blackboard bb = export_corp_blackboard(w, corp, tick);
+            // Channel first, and for EVERY due corp — it is a name and two ids,
+            // and creating it here keeps the channel roster (and its indices)
+            // identical to what the unbounded version produced, so the combo
+            // still lists every corp whose counsel the player could read.
             int channel = -1;
             if (const auto it = counsel_channel.find(corp); it != counsel_channel.end())
                 channel = it->second;
@@ -155,6 +173,27 @@ void post_persona_counsel(const world& w, std::vector<persona::pack>& bench,
                 counsel_channel[corp] = channel;
             }
 
+            // BL-379: evaluate only the corp whose counsel channel is OPEN. The
+            // player reads one channel at a time, so benching every due corp
+            // wrote lines nobody would ever scroll to — ~1 s/tick of hitch for
+            // output with no reader. Counsel is presentation (see the header):
+            // it reads the world and writes the chat log, nothing else, so
+            // skipping a corp changes no simulation state and no determinism —
+            // the same tick replays identically whichever channel is open.
+            //
+            // This also IS the per-tick cap: at most one channel is active, so
+            // at most one corp is evaluated per tick, no separate backstop.
+            //
+            // Cost: a channel fills from the tick it is opened, not
+            // retroactively — the player waits one cadence for the first line.
+            if (channel != chat.active_channel)
+                continue;
+
+            const auto t_bb = clk::now();
+            const corp_blackboard bb = export_corp_blackboard(w, corp, tick);
+            add_lap(9, t_bb); // blackboard export (C++ world scan)
+
+            const auto t_eval = clk::now();
             try
             {
                 for (const persona::pack& p : bench)
@@ -171,14 +210,18 @@ void post_persona_counsel(const world& w, std::vector<persona::pack>& bench,
                     ui::chat_post(chat, tick, corp, channel,
                                  p.id() + ": " + p.phrase_for(*top));
                 }
+                add_lap(10, t_eval); // sol2 pack evaluation (per pack, per corp)
             }
             catch (const std::exception& e)
             {
+                add_lap(10, t_eval);
                 // BL-353: same policy as the load-time guard in load_economy — a
                 // pack that loads clean but throws on live data (sol2 errors
                 // surface as std::runtime_error) disables counsel rather than
                 // killing the session mid-tick. One visible line in the counsel
                 // channel; the detail goes to stderr like the load failure does.
+                // Since BL-379 only an open channel evaluates, so a bad pack now
+                // surfaces when the player first reads counsel, not at tick one.
                 std::fprintf(stderr, "ProjectIo: persona counsel packs disabled: %s\n", e.what());
                 ui::chat_post(chat, tick, corp, channel,
                               "The counsel bench has been dismissed: an advisory pack failed.");

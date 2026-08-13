@@ -614,10 +614,12 @@ void app::finish_new_game()
             std::chrono::steady_clock::now() - m_warm_begin).count();
         std::printf("[start_new_game] %-24s %6lld ms\n", "warm_start_80_ticks",
                     static_cast<long long>(warm_ms));
-        static const char* const phase_names[9] = {
+        // The last two are the BL-379 split of persona_counsel; they are
+        // sub-totals of it, not additional phases, hence the indented names.
+        static const char* const phase_names[11] = {
             "convoys", "run_economy_step", "clear_markets", "apply_budget",
             "tech_gates", "standings_credit", "agency_comms", "persona_counsel",
-            "history_recorders" };
+            "history_recorders", "  ..bb_export", "  ..pack_eval" };
         const auto& acc = step_economy_phase_ms();
         for (std::size_t i = 0; i < acc.size(); ++i)
             std::printf("[warm phases] %-18s %9.1f ms\n", phase_names[i], acc[i]);
@@ -919,9 +921,9 @@ ui::frame_stats& frame_stats_instance()
     return s;
 }
 
-std::array<double, 9>& step_economy_phase_ms()
+std::array<double, 11>& step_economy_phase_ms()
 {
-    static std::array<double, 9> acc{};
+    static std::array<double, 11> acc{};
     return acc;
 }
 
