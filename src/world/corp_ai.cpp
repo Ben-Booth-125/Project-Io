@@ -1068,6 +1068,23 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             if (apply_corp_command(w, reg, c.cmd, &built) != corp_command_result::applied)
                 continue; // a seam rejection mutates nothing; just skip it
 
+            // APPLY THEN COUNT, and the order is load-bearing rather than
+            // incidental. Every budget counter below is incremented only after
+            // the seam has actually applied the command, so a rejected candidate
+            // consumes no action slot and the next-best candidate is still tried
+            // in the same evaluation.
+            //
+            // This is what makes every enumeration/seam disagreement in this file
+            // BENIGN instead of a stall. Enumeration re-checks placement itself,
+            // but not always with the seam's exact budget — the muster-base
+            // candidate above disables the logistics-reach rule that
+            // construct_building enforces — so a candidate the seam refuses is a
+            // thing that can happen by construction. Counting first would let one
+            // such candidate spend the corp's single build slot every evaluation
+            // and starve genuine economic builds indefinitely.
+            //
+            // Nothing asserts this ordering. Reordering these lines, or moving the
+            // increments above the apply, reintroduces that starvation silently.
             committed += c.spend;
             if (is_build)  ++builds;
             if (is_dial)   ++dials;
