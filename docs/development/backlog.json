@@ -8865,6 +8865,79 @@
    ],
    "summary": "run_serve loads recipes.lua and economy.lua and never constructs a world_gen_config, so make_hard_coded_world falls back to built-in defaults. Only 16 of 42 resources carry a price on any market; coal, silica, copper ore, rare earths and the rest are unpriced and unbuyable. Every conclusion drawn from the seam is a conclusion about a different game.",
    "design": "DESIGNED 2026-08-13, found by AI play.\n\n## The defect\n\n`run_serve` loads `scripts/recipes.lua` and `scripts/economy.lua`. It never builds a `world_gen_config` from `scripts/world_gen.lua`, so world generation falls back to its built-in defaults. A player enumerated every `price:<r>` fact across all four markets and found 16 of 42 resources priced. Missing: coal, silica, copper ore, rare-earth ore, iron-nickel ore, platinum-group metals, and the rest.\n\n## Why it is the most quietly expensive of today's findings\n\nEvery other defect found by play is a defect in the game. This one means **the seam is not playing the game**. Any measurement taken through `--serve` — the trace corpus BL-279 wants, a skill benchmark, an agent's learned policy — describes a world the player never sees. It also silently explains the processing dead end: steel's coal reagent has no price and no stock, so a steel smelter cannot run, which is every processor the seam builds (BL-388).\n\n`--export-blackboard` shares `run_serve`'s setup and inherits the same divergence, so BL-206's exports have the same problem.\n\n## PROPOSED FIX\n\nFactor the world setup that `app::setup_world` performs into one function and call it from all three entry points — the GUI, `--serve` and `--export-blackboard`. The duplication is the bug: three call sites each assembling the world slightly differently is how one of them came to skip a config file. This session already collapsed the same shape once inside `run_serve` (the tick sequence was duplicated between the warm-up loop and the TICK opcode, which is how `advance_surveys` came to be missing from both).\n\nAdd an assertion that the served world prices the same resource set as the GUI world — a count comparison is enough and it would have caught this immediately."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-13",
+   "created": "2026-08-13",
+   "id": "BL-390",
+   "short_name": "THE_SEAM_HAS_NO_READ_BACK",
+   "category": "AI",
+   "title": "The seam mints ids and prices it never discloses, and exports no state for orders, quotes, contracts or units — a player cannot see what it has done",
+   "priority": "A",
+   "difficulty": 4,
+   "version_goal": "v0.1.13",
+   "requires": [],
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "files": [
+    "src/main.cpp",
+    "src/world/corp_ai.cpp",
+    "src/world/corp_command.cpp",
+    "tools/mcp/server.js"
+   ],
+   "summary": "Three players independently hit the same wall. place_sell_order and request_quote allocate ids and return `building=0`; request_quote also withholds the PRICE, which is the one thing a quote exists to communicate. No opcode and no blackboard predicate lists a corp's own orders, quotes, contracts, units or reputation. One player recovered an order id by sweeping 600 values; another counted commands for forty turns, miscounted once, and silently corrupted every id afterwards.",
+   "design": "DESIGNED 2026-08-13, from three independent play sessions that each stalled on it.\n\n## The write channel answers, and then forgets\n\n`apply_corp_command`'s out-param is written by exactly two verbs: `build` and `hire_unit`. `place_sell_order`, `request_quote` and `accept_quote` all allocate ids and return `building=0`. Yet `remove_sell_order`, `accept_quote` and `cancel_contract` all REQUIRE those ids. The seam hands out handles through a channel it does not have.\n\nObserved consequences, all from real sessions: one player swept `order=1..600` reading rejection codes to locate their own order. Another derived ids from `next_procurement_id` by reading the source, counted `applied` results for forty commands, forgot one, and every id after that was silently wrong — `rejected_invalid` cannot distinguish 'wrong id' from 'already gone'.\n\n## And request_quote withholds the price\n\nThis is the sharpest instance. A quote's entire purpose is to communicate a price and a lead time so a buyer can COMPARE. The response is `RESULT result=applied building=0`. A player swept 26 suppliers, got 20 willing on iron ore, and had no way to tell them apart; they accepted arbitrarily and learned the price afterwards by differencing their cash balance. 'Sweep suppliers, compare, accept the best' is not expressible.\n\n## The read channel has no vocabulary for any of it\n\n`export_corp_blackboard`'s predicates are cash, building_type/tile/recipe/workforce/decommissioned, pool, price, supply, demand, rival_building_*, tile_deposit, body_activity, route, survey. There is NO predicate for sell orders, buy orders, quotes, contracts, reputation or units. A corp cannot see its own commitments.\n\nThree further gaps in the same vocabulary, each independently reported: a corp cannot see its own extraction sites' TARGET RESOURCE (so it cannot tell what it produces — one player reverse-engineered it from tile deposits); pools are emitted only when non-zero, and auto-sell drains them every tick, so a player sees no inventory ever; and 66,995 tile_deposit facts carry no body, no coordinate and no terrain, so they can be ranked but not located.\n\n## PROPOSED FIX, in two halves\n\n**Half 1, cheap and immediate — return what you mint.** Widen the RESULT line beyond `building=`: report the allocated id for `place_sell_order` / `request_quote` / `accept_quote`, and report `unit_price` and `lead_time_ticks` for `request_quote`. The out-param is already threaded; this is a wider response record, not new mechanism. It removes the brute-force sweep and makes quotes comparable.\n\n**Half 2 — give the blackboard a self-state section.** Own orders, quotes, contracts (with ticks_elapsed), units, reputation, and the extraction target on own buildings, all `own_asset` provenance. This is strictly a corp reading ITS OWN state, so BL-068 is not engaged. Emit pools unconditionally including zeroes, since 'I have none' is information and its absence is currently indistinguishable from 'not exported'. Bump the schema version and re-bless blackboard_harness.\n\nFold BL-385 (the missing reference price) in here if both land together — it is the same defect one aisle over."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-13",
+   "created": "2026-08-13",
+   "id": "BL-391",
+   "short_name": "REPUTATION_FLOOR_IS_A_DEADLOCK",
+   "category": "Economy",
+   "title": "Falling below the procurement reputation floor is permanent — the only way to raise reputation requires a contract you can no longer get",
+   "priority": "A",
+   "difficulty": 3,
+   "version_goal": "v0.1.14",
+   "requires": [],
+   "authority_doc": "docs/economy/FINANCE.md",
+   "files": [
+    "src/world/corp_command.cpp",
+    "src/world/economy_system.cpp",
+    "scripts/economy.lua"
+   ],
+   "summary": "Reputation rises only via reputation_on_complete, which fires when a contract completes. A contract requires accept_quote, which requires a quote, which request_quote refuses below the reputation floor. So a corp that cancels its way past the floor with one supplier is blacklisted by that supplier forever, with no mechanic anywhere that can undo it.",
+   "design": "DESIGNED 2026-08-13, found by a player who cancelled contracts until a supplier refused them and then looked for the way back.\n\n## The deadlock\n\nThere are exactly two writers to `w.corp_reputation`: `+reputation_on_complete` when a contract completes, and `reputation_on_cancel` (negative) when one is cancelled. `request_quote` refuses below `reputation_floor`.\n\nSo the recovery path from below the floor runs: raise reputation -> complete a contract -> accept a quote -> obtain a quote -> be above the floor. It is a cycle with no entry. The player measured it at reputation -6 against a floor of -5 and found no mechanic anywhere that could move it back up.\n\n## Why it is a design fault rather than harsh balance\n\nA permanent, unrecoverable, per-counterparty blacklist earned by an ordinary in-game action is not a difficulty setting; it is a state the player cannot reason about, because nothing tells them the floor exists until they hit it and nothing tells them it is final. It is also invisible: no blackboard predicate exports reputation (BL-390), so a corp cannot see its standing with anyone either before or after.\n\nThe mercenary refocus (NR-177) makes this worse rather than academic — BL-377's contract loop is built on exactly this reputation axis, and a loss-spiral that cannot be exited is a much bigger problem for a company whose whole livelihood is being hired.\n\n## PROPOSED FIX — decay toward neutral\n\nReputation drifts back toward 0 by a small amount per tick, so a burned relationship heals with time rather than never. That is one line in the tick, it needs no new verb, it makes the floor a TEMPORARY consequence with a natural duration, and it gives 'wait' a legitimate strategic use. Author the rate in economy.lua so it is a data change.\n\nAlternatives, both worse: a reparations verb (new mechanism, and a player below the floor has no way to learn it exists), or flooring reputation at the refusal threshold so it can never go below (removes the consequence rather than bounding it).\n\nWhichever is chosen, the floor and the current standing must be VISIBLE — pair this with BL-390's blackboard section, or the player is still reasoning about a number they cannot see."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-13",
+   "created": "2026-08-13",
+   "id": "BL-392",
+   "short_name": "PROCUREMENT_CONTRACTS_DESTROY_VALUE",
+   "category": "Economy",
+   "title": "A procurement contract delivers to the supplier's body at the supplier's price, where it is immediately auto-sold — the buyer pays a deposit for nothing",
+   "priority": "A",
+   "difficulty": 4,
+   "version_goal": "v0.1.14",
+   "requires": [],
+   "authority_doc": "docs/economy/MARKETS.md",
+   "files": [
+    "src/world/corp_command.cpp",
+    "src/world/economy_system.cpp",
+    "docs/economy/MARKETS.md"
+   ],
+   "summary": "unit_price is the supplier's live market price with no commitment discount, and delivery credits pool_for(buyer, SUPPLIER's body). Absent a processor there to reserve the stock, market clearing liquidates it that same tick at that same price. The buyer pays a deposit, waits a lead time, and ends where it started minus the deposit. Also: lead time is derived from a global processing constant that ignores the supplier entirely, so 100,000 units quoted 25,000 ticks, clamped to 400.",
+   "design": "DESIGNED 2026-08-13, found by a player who completed twenty contracts and could not detect a single delivery.\n\n## Two faults that compound\n\n**The goods arrive where they cannot be used.** Delivery credits `pool_for(c.buyer, c.body)` where `c.body` is the SUPPLIER's body. The auto-surplus path then sells any pool stock the buyer has no processor reservation against — which, on a body the buyer has no facilities on, is all of it. A player ran twenty contracts, took delivery of 200 units of iron ore, and never saw a single pool fact at any tick, because each delivery was liquidated in the tick it landed.\n\n**And the price makes the round trip a guaranteed loss.** `unit_price` is read off the supplier's own market with no discount for the commitment, and the liquidation happens at that same market's price. So the buyer pays market price plus a forfeitable deposit, waits a lead time, and receives goods that convert straight back to cash at market price. A measured 20-unit iron round trip settled at exactly -0.14 credits: break-even minus friction, by construction.\n\n**Separately, the lead time is not about the supplier at all.** It is `base_lead_ticks * ceil(quantity / processing_facility.base_rate)` — a GLOBAL constant. A supplier with ten facilities quotes the same lead time as one with a single stalled site, and 100,000 units quotes 25,000 ticks (clamped to 400 by this session's overflow guard — a century of quarters, committed to with one line and no way to see the term before accepting).\n\n## PROPOSED FIX\n\nThree changes, and the first is the one that makes contracts worth signing at all.\n\n1. **Deliver to the BUYER's body**, not the supplier's — the buyer's HQ body, or a body named in the contract. Freight cost is the natural price of the distance, and the logistics layer already exists to charge it.\n2. **Give the contract a price that differs from spot.** A commitment should buy something: a discount for volume, a premium for speed, or a fixed price that hedges the market's movement. Today it is spot plus a deposit, which is strictly worse than buying on the market, so a rational agent never contracts.\n3. **Derive lead time from the SUPPLIER's actual capacity** — their facilities' throughput for the good — so the number means something and shopping on lead time becomes possible once BL-390 makes it visible.\n\nNote this item is the economics; BL-390 is the visibility. Both are needed: a contract that is a bad deal is a design problem, and a contract whose terms you cannot see is a different one."
   }
  ]
 }
