@@ -8686,6 +8686,37 @@
    ],
    "summary": "Found while establishing what market supply and demand actually mean (BL-381). Both are small, both are inert, and both currently read as live mechanisms to anyone reading the file.",
    "design": "DESIGNED 2026-08-13, from the NR-180 investigation. Two independent findings, filed together because they are the same class: a write that looks like a mechanism and is not.\n\n**1. `supply_system.cpp`'s convoy injection is unpriced.** The line adds arrived convoy cargo to `market.supply` and its comment says 'Inject into market supply so the next clearing pass prices it'. But `credit_arrived_convoys` runs AFTER `clear_markets` in the tick, and `clear_markets` zeroes both arrays at its top — so the value written is erased before any clearing pass ever reads it. The pool credit beside it IS live and does real work; only the supply write is inert. Either move the call, or delete the write and correct the comment. Deleting is probably right: the cargo lands in the pool, and the pool's surplus reaches supply through the ordinary auto-surplus path next tick anyway.\n\n**2. `inject_interbody_demand` can never fire in the generated world.** It gates on `home_shortfall = home.demand[r] - home.supply[r]; if (home_shortfall <= 0.0f) continue;`. Home supply exceeds home demand by two to three orders of magnitude for essentially every resource (see BL-381), so the shortfall is always negative and outpost markets receive zero pull. The mechanism is sound and the world simply never satisfies its precondition — so this is NOT a delete: it is a note in MARKETS.md saying the pull is dormant until demand means something, and a natural thing to re-check when BL-381 lands.\n\nNeither is urgent. Both are the kind of thing that costs an hour of confusion to the next person who reads the file believing the comment."
+  },
+  {
+   "id": "BL-383",
+   "short_name": "REMOVE_DORMANT_BUY_SIDE",
+   "category": "Economy",
+   "title": "Remove the dormant buy side of the order book, and the unreachable matching pass it alone feeds",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 4,
+   "parked": false,
+   "version_goal": "v0.1.15",
+   "requires": [],
+   "blocked_on": [],
+   "written": "2026-08-13",
+   "created": "2026-08-13",
+   "authority_doc": "docs/economy/MARKETS.md",
+   "files": [
+    "src/world/components.hpp",
+    "src/world/world.hpp",
+    "src/world/world.cpp",
+    "src/world/order_book.hpp",
+    "src/world/order_book.cpp",
+    "src/world/market_clearing.hpp",
+    "src/world/market_clearing.cpp",
+    "tools/verify/order_book_harness.cpp",
+    "tools/verify/econ_harness.cpp",
+    "docs/economy/MARKETS.md"
+   ],
+   "summary": "Resolves NR-125. The buy side is read-but-never-written: no corp_verb authors a buy_order, no UI does, and clear_markets' explicit matching pass therefore iterates an always-empty vector. It is also semantically STALE rather than merely unused -- a matched trade debits the seller's pool and charges the buyer's expenditure but never credits the buyer's pool and never decrements market inventory, so reviving it as-is would take money and deliver nothing.",
+   "design": "DESIGNED 2026-08-13, from the NR-125 investigation.\n\n## Why remove rather than finish\n\nThe buy-side ROLE has already shipped, in a better shape. BL-350's procurement seam is a named-counterparty buy side with quotes, contracts, paced delivery, reputation and four typed declines — and crucially it DOES deliver goods (`pool_for(c.buyer, c.body).quantities[...] += c.quantity`), which is exactly the step the order book's buy path lacks. The 2026-08-12 mercenary refocus (NR-177) makes 'procure force and supply' the player's core loop, and procurement-by-named-supplier is the right shape for that, not an anonymous price-time book.\n\nThe dormant code is not neutral. A matched buy would charge `flows[t.buyer].expenditure` and debit the seller's pool without ever crediting the buyer's — under BL-130's real-inventory model that is goods vanishing and money spent for nothing. So this is not 'harmless dead weight we may want later': it is a trap for whoever revives it, and if it is ever wanted it should be re-derived against the inventory model rather than switched back on.\n\n## Cut list\n\nNARROW (~106 lines): `buy_order` + its static_assert (components.hpp); `world::buy_orders` (world.hpp); the buy legs of write/read_order_book (order_book.cpp) and of the world hash (world.cpp); the buy ingestion in clear_markets. Harness fixtures in order_book_harness.cpp and econ_harness.cpp. Header/doc prose.\n\nCASCADE, deletable because nothing else can reach it (~173 lines): `ob_buy_entry` and `matched_trade`; the explicit matching pass including its preferred-seller two-pass and both sorts; matched-trade settlement; the VWAP branch collapsing to a plain `mc.price[r] = ref_price[mid][r]`; `ob_sell_entry::rem` folding back into `qty`.\n\nTOTAL about 280 lines, roughly a third of market_clearing.cpp.\n\n## What survives, untouched\n\n`sell_orders`, both sell verbs, the Market Ledger's sell tab, auto-surplus listing, auto-demand billing, BL-130 real inventory, BL-351's per-order pool reservation, the auto-clear-at-max(ref, floor) path, and price resolution. `clear_markets` reduces to: accumulate supply/demand, resolve price, clear everything at the reference price.\n\n## Acceptance test, and it is a strong one\n\nEvery econ_harness expectation EXCEPT the three explicit-matching assertions (BL351.4/.5/.6) must be bit-identical afterwards — because those paths never fired. If anything else moves, the cut removed something live and the diff is wrong. The three matching assertions are retired with the feature.\n\n## Sequencing\n\nIts OWN commit, not folded into anything. Two reasons: the world hash changes (buy_orders is folded into it) and `order_book_version` must go to 2, with `read_order_book` REJECTING v1 rather than reinterpreting a stream whose shape moved. Amend BL-160's design prose with a supersession note.\n\n## One open dependency, stated rather than assumed\n\nWhether the 0 CE product keeps a resource market at all is owed by the refocus items and cannot be answered from source. It cuts the same way though: a market that may not survive the refocus is the last place to invest in a dormant feature."
   }
  ]
 }
