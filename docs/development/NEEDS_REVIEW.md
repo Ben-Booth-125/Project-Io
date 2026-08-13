@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*192 entries — 68 open, 124 resolved.*
+*193 entries — 69 open, 124 resolved.*
 
 ---
 
@@ -637,6 +637,21 @@ generation_progress is a by-value member of app, and BL-305 grew it by a 312x145
 > **Recommendation:** None unless the assert trips; if it does, hold the sink in a unique_ptr rather than raising the bound.
 
 *Files: `src/core/app.cpp`, `src/core/app.hpp`, `src/world/hard_coded_world.hpp`*
+
+### NR-194 — Plain `ctest` runs the excluded sweeps — the gate invocation is `ctest -LE sweep`, and nothing says so
+*observation · raised 2026-08-13 · from Measured this session: two gate runs wedged, and a third sat at 32/71 for ~25 minutes*
+
+CMakeLists labels history_sim_harness, history_sweep and data_creep_harness `sweep` and documents them as EXCLUDED FROM THE ROUTINE GATE — but a label excludes nothing on its own. `ctest` with no arguments still runs them. This session two orphaned history_sim_harness processes were found burning 5,200 CPU-seconds EACH, left over from killed runs; they starved the machine and made every other harness look slow, which is how a gate run sat apparently stuck at 32/71. The invocation that matches the documented intent is `ctest -LE sweep`.
+
+**Why it matters.** Same class as BL-288's re-tiering and the same cost: a gate that reports timeouts as failures trains sessions to ignore red. Here it is worse than noise — the sweeps do not finish at all, so a bare `ctest` never completes and a session either kills it (leaving orphans) or draws conclusions from a partial run. The fix belongs somewhere authoritative rather than in each session's memory.
+
+- Document `ctest -LE sweep` as the gate command in DEVELOPMENT_PRACTICES (recommended, cheapest).
+- Stop registering sweep harnesses as ctest tests at all — they become named targets you run deliberately.
+- Give them finite timeouts so a bare ctest at least terminates.
+
+> **Recommendation:** Option 1 now, and consider 2 later. A label that only works if the caller remembers a flag is documentation wearing machinery's clothes.
+
+*Files: `CMakeLists.txt`, `docs/development/DEVELOPMENT_PRACTICES.md`*
 
 ---
 
