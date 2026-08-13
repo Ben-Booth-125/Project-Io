@@ -3103,6 +3103,26 @@
     "src/world/corp_command.cpp",
     "tools/mcp/smoke.js"
    ]
+  },
+  {
+   "id": "NR-185",
+   "title": "Four claims written into code comments and docs this session were overstated, and the review that caught them is the practice worth keeping",
+   "raised": "2026-08-13",
+   "kind": "observation",
+   "status": "open",
+   "source": "2026-08-13 AI gameplay session; adversarial review lens run over the session's own diff, specifically tasked with checking whether the change's claims were supportable.",
+   "what": "A review lens was pointed at the session's own assertions rather than at its code, and found four that did not survive contact with the source. All are now corrected in place. (1) 'Six of the fifteen verbs could not be issued at all' -- five were unreachable; hire_unit's unit_type defaults to 0, a VALID roster index, so it worked and could only ever raise row 0. The comment had explicitly denied the partly-supported reading that was in fact correct for that one verb. (2) 'Nothing else on this protocol yields a body id' -- the blackboard keys pool facts by (corp, body) and body_activity by body, so an agent could name bodies it already traded on; the true gap is narrower and more useful to state precisely (it cannot name a body it has no presence on, which is every body worth surveying). (3) 'Exhaustive now, so -Wswitch catches the next one the way it did not catch this one' -- -Wswitch was already enabled and HAD been warning on every compile; the build runs -Wall without -Werror and the warnings were simply ignored. The guard is the reader, not the flag. (4) 'resume at ~10x every other verb combined' -- it was ~2.7x combined and ~10x the next single verb. Separately, the protocol header comment rewritten to be 'in step with the enums' still gave wrong numeric ranges for building_type and resource_type, and now names the enums instead of hard-coding ranges that go stale.",
+   "why_it_matters": "None of these changed what the code does, and every one of them would have entered the permanent record as fact. This project's documents ARE its audit (Ben, 2026-08-01), so an overstated claim in a comment is not a cosmetic problem -- it is a false entry in the only record anyone will read later, and three of these four were the kind of confident specific number that nobody re-derives. The practice that caught them was cheap and mechanical: a review lens given the diff and the single instruction to check whether each stated claim was supportable from the source, with no authoring context. It found things the correctness lens did not, because it was reading the prose rather than the logic. Worth repeating on any change that writes numbers into an authority doc.",
+   "options": [
+    "Adopt a claims lens as a standing part of the review pass for changes that touch an authority doc or write measured figures into comments.",
+    "Rely on the existing verifier-review skill, extending its lens list to include claim-checking.",
+    "Treat this as a one-off and move on."
+   ],
+   "recommendation": "Option 2 -- fold it into verifier-review as a named lens rather than standing up a separate practice, since that skill is already the pre-compile gate and already has a lens list. The instruction that worked was narrow: check every stated claim against the source, and report the ones that cannot be substantiated, including claims about what a compiler flag or a test would have caught.",
+   "files": [
+    "docs/development/DELIVERY.md",
+    ".claude/skills/verifier-review/SKILL.md"
+   ]
   }
  ]
 }

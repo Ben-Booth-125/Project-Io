@@ -866,12 +866,14 @@ per corp (`id`, `name`, `is_player`, `home_nation`), then `END`. Six tools, not 
 landed and never again, and by 2026-08-13 the seam it describes had drifted badly from the seam
 that existed. Five defects, none of which had ever failed a run because nothing re-ran it:
 
-- **Six of the fifteen verbs could not be issued at all.** The `COMMAND` opcode parsed nine
-  argument keys and the enum had grown three verb families past it — BL-324's `hire_unit`,
-  BL-293's order book, BL-350's procurement. Their arguments were never read, so
-  `place_sell_order` always arrived with `quantity = 0` (rejected outright) and the procurement
-  verbs always named quote `0` and supplier `null`. They were not partly supported; they were
-  unreachable, while `ACTIONS.json` and this document both described them as available.
+- **Five of the fifteen verbs could not be issued at all, and a sixth only ever did one thing.**
+  The `COMMAND` opcode parsed nine argument keys and the enum had grown three verb families past
+  it — BL-324's `hire_unit`, BL-293's order book, BL-350's procurement. Their arguments were never
+  read, so `place_sell_order` always arrived with `quantity = 0` (rejected outright) and
+  `remove_sell_order` / `accept_quote` / `cancel_contract` always named order `0`, while
+  `request_quote` named a null supplier. `hire_unit` is the partly-supported sixth: `unit_type`
+  defaulted to 0, a valid roster index, so it worked but could only ever raise roster row 0.
+  `ACTIONS.json` and this document described all of them as available.
 - **Four of the twelve result codes were reported as `rejected_invalid`.** `corp_command_result_name`
   had no cases for BL-350's four declines, so "the supplier holds no capacity", "your inputs are
   unreachable", "you are embargoed" and "your reputation is too low" all reached the agent as
@@ -885,10 +887,14 @@ that existed. Five defects, none of which had ever failed a run because nothing 
   `build` / `place_road` had no discoverable target. The tick sequence was also duplicated
   verbatim between the warm-up loop and the `TICK` opcode, which is how the step came to be
   missing from both; it is now one lambda.
-- **No body could be named.** `survey`, `place_sell_order` and `request_quote` all take a body id
-  as `subject`, and nothing on the protocol yielded one — the blackboard keys its market facts by
-  **market** id. An agent could read a price on a body it had no way to sell into. Fixed by a
-  `BODIES` opcode and a `list_bodies` tool, the exact sibling of NR-061's `list_corps`.
+- **A body could not be named unless the agent was already there.** `survey`, `place_sell_order`
+  and `request_quote` all take a body id as `subject`. The blackboard is not silent about bodies —
+  `pool:<resource>` facts are keyed by the corp's own `(corp, body)` pool and `body_activity` by a
+  known body — so an agent could recover the ids of bodies it already trades on. What it could not
+  do is name a body it has no pool and no activity on, which is **every body worth surveying**, and
+  it could never recover a name or a survey phase for any of them. Market facts do not help: they
+  are keyed by **market** id, so a price is legible on a body the agent cannot address. Fixed by a
+  `BODIES` opcode and a `list_bodies` tool, the sibling of NR-061's `list_corps`.
 
 **Seven tools now, and a committed check.** `tools/mcp/smoke.js` drives `--serve` over the raw
 line protocol and asserts the shape rather than the economics: every opcode answers, every one of

@@ -1191,6 +1191,12 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
                         // very next evaluation — the two tiers owned the same flag
                         // and neither knew the other existed. That was the larger
                         // half of the measured idle/resume oscillation.
+                        // Default-constructed params, matching the default
+                        // argument run_corp_strategic_step is called with at the
+                        // bottom of this same function. If that call ever passes
+                        // tuned params, this needs the same object — the two
+                        // writers of this field must agree or the hold is
+                        // asymmetric.
                         b.ai_cooldown = corp_ai_params{}.cooldown_evals;
                         // An idled port/hub stops anchoring supply — reach stale.
                         invalidate_logistics_caches(w);

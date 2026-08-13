@@ -6,8 +6,9 @@
 // hand, once. Nothing re-ran it, so three separate regressions accumulated
 // silently and all three were found by reading rather than by failing:
 //
-//   * six of the fifteen `corp_verb` values could not be issued at all, because
-//     the COMMAND opcode never parsed their arguments;
+//   * five of the fifteen `corp_verb` values could not be issued at all, because
+//     the COMMAND opcode never parsed their arguments (and a sixth, hire_unit,
+//     could only ever raise roster row 0);
 //   * four of the twelve `corp_command_result` codes were reported as
 //     `rejected_invalid`, telling an agent its syntax was wrong when a supplier
 //     had simply declined;
@@ -60,8 +61,13 @@ const VERBS = [
 // corp_command_result_name's fall-through returns "rejected_invalid", which is
 // itself a legitimate member — the defect this file was written after was
 // precisely four codes collapsing into that one, and set membership is blind to
-// it. What catches that is the procurement probe below, which reaches a decline
-// the seam can only express with one of the four BL-350 names.
+// it. The procurement probe below is the best available substitute: it sweeps
+// suppliers looking for a decline only the four BL-350 names can express. It
+// REPORTS rather than fails when it finds none, because "no supplier on this
+// world declines for these reasons" is a legitimate state of the economy and
+// failing on it would turn this file into a fixture test. So: observing one
+// proves the switch is exhaustive; observing none proves nothing either way,
+// and says so.
 const RESULT_CODES = new Set([
   'applied', 'rejected_no_corp', 'rejected_not_owner', 'rejected_invalid',
   'rejected_placement', 'rejected_funds', 'rejected_state', 'rejected_tech_locked',
@@ -284,10 +290,13 @@ async function main() {
                   + `outcomes seen: ${[...seenCodes].join(', ')})`);
     }
 
-    // --- the player corp is not commandable through the seam --------------
-    // The standing rule: the player's corp is never auto-acted on. The seam is
-    // shared with the AI, so this is worth asserting on the wire, not just in
-    // the scorer.
+    // --- a command naming the player corp is still well-formed ------------
+    // NOT a safety assertion, and the header used to overclaim that it was.
+    // apply_corp_command has NO player guard — the standing "never auto-act on
+    // the player's corp" rule is enforced in the SCORER (run_corp_strategic_step
+    // skips the player), not at the seam, because the seam is also how the
+    // player's own presses are applied. What this checks is only that the seam
+    // does not fall over on a corp id it does not expect to see here.
     if (player) {
       const asPlayer = resultOf(await io.send(
         `COMMAND corp=${player.id} verb=7 subject=0`));

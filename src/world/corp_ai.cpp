@@ -93,8 +93,9 @@ const char* corp_verb_label(corp_verb v)
         case corp_verb::set_workforce_auto: return "workforce auto";
         // BL-350's procurement trio. Absent, these fell through to the generic
         // "action" below, so a contract decision would narrate itself into the
-        // world history log as "Corp 34590 ordered a action". Exhaustive now, so
-        // -Wswitch names the next omission at compile time.
+        // world history log as "Corp 34590 ordered a action". Exhaustive now —
+        // though -Wswitch had been warning about it all along, under -Wall
+        // without -Werror, so the omission was visible on every build.
         case corp_verb::request_quote:      return "quote request";
         case corp_verb::accept_quote:       return "quote acceptance";
         case corp_verb::cancel_contract:    return "contract cancellation";
@@ -574,7 +575,8 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 // `estimate_building_profit`'s fuller number, so the scorer
                 // resumed what the reflex had idled and the pair oscillated —
                 // measured at 134–255 resumes against 12–17 idles over 30 ticks
-                // in ai_skill_harness, ~10x every other verb combined.
+                // in ai_skill_harness, more than every other verb put together
+                // and around 10x the next single verb.
                 //
                 // `estimate_prospective_profit` (BL-162) is the existing answer to
                 // "what would this earn if it ran": a pure read producing the same
@@ -593,11 +595,11 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 // Dropping the type filter is safe by arithmetic, not by luck.
                 // estimate_prospective_profit models revenue for extraction_site
                 // and processing_facility only; every other type gets revenue 0,
-                // so the gain below reduces to −wages — zero for port and
-                // inland_logistics_hub (which staff at 0.0) and negative for the
-                // rest. Neither clears `margin_gate`, so no candidate is ever
-                // enumerated for a building whose output this estimator cannot
-                // price. Infrastructure therefore still cannot be resumed on
+                // so the gain below is −wages − (running maintenance − idle
+                // maintenance), i.e. −wages − 0.7 × maintenance: strictly
+                // negative for every type, and never clearing `margin_gate`. No
+                // candidate is ever enumerated for a building whose output this
+                // estimator cannot price. Infrastructure therefore still cannot be resumed on
                 // profit grounds, exactly as before this change; that it also
                 // cannot be resumed on REACH grounds is a real gap, but an older
                 // and separate one.

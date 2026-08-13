@@ -138,11 +138,24 @@ because the fall-through returns a code that IS in the valid set. Both rewritten
 thing: the survey's own progress counters must move, and a BL-350-specific decline must be
 observable.
 
-**Review queue.** Seven entries filed as the work happened (NR-178 the oscillation and its five
+**A fourth lens read the prose rather than the logic, and that was the one that paid oddest.**
+Pointed at the session's own *claims* instead of its code, it found four assertions that did not
+survive contact with the source — all now corrected. "Six verbs could not be issued at all" was
+five, because `hire_unit`'s `unit_type` defaults to 0, a valid roster index, so it worked and could
+only ever raise row 0 — and the comment had explicitly denied exactly that reading. "Nothing else
+yields a body id" was false: the blackboard keys pool facts by `(corp, body)`, so the real gap is
+narrower and better stated. "-Wswitch catches the next one the way it did not catch this one" was
+backwards — the flag was on and had been warning on every compile, under `-Wall` without `-Werror`,
+and the warnings were ignored. And "resume at ~10x every other verb combined" was ~2.7x combined,
+~10x the next single verb. None changed what the code does; every one would have entered the
+permanent record as fact, in a project whose documents are its audit. Filed as NR-185.
+
+**Review queue.** Eight entries filed as the work happened (NR-178 the oscillation and its five
 causes, NR-179 the workforce-dial signature change taken on Ben's behalf, NR-180 the bimodal
 forecast and the supply/demand question under it, NR-181 goldens blessed from the behaviour they
 exist to catch, NR-182 the action dictionary running four verbs behind the seam it transcribes,
-NR-183 the constraint-tax leg of the 10g ruling superseded in framing, NR-184 the NaN boundary).
+NR-183 the constraint-tax leg of the 10g ruling superseded in framing, NR-184 the NaN boundary,
+NR-185 the four overstated claims and the claims-lens practice that caught them).
 
 **Runtime.** ~4 h, Full mode (research sweep, two strands, one new committed check, one hypothesis
 measured and discarded, one adversarial review pass that changed the outcome).

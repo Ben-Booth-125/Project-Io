@@ -99,8 +99,12 @@ const char* corp_command_result_name(corp_command_result r)
         // fine and the SUPPLIER said no. Typed, enumerated failure is the whole
         // reason an out-of-process policy can correct itself (AI_OPPONENT.md
         // § 10a) — collapsing four business outcomes into a syntax error is the
-        // one thing that seam must not do. Exhaustive now, so -Wswitch catches
-        // the next verb family the way it did not catch this one.
+        // one thing that seam must not do.
+        //
+        // Exhaustive now — but note that -Wswitch was ALREADY enabled and had
+        // already been warning about exactly this. The build runs -Wall without
+        // -Werror, so the warning was emitted on every compile and ignored. The
+        // guard is the reader, not the flag.
         case corp_command_result::rejected_no_capacity:     return "rejected_no_capacity";
         case corp_command_result::rejected_no_input_access: return "rejected_no_input_access";
         case corp_command_result::rejected_embargo:         return "rejected_embargo";
@@ -123,11 +127,18 @@ const char* corp_command_result_name(corp_command_result r)
 //   CORPS                                           -> one JSON line per corp, then END
 //   BODIES                                          -> one JSON line per body, then END
 //   BLACKBOARD corp=<id> ticks=<n>                  -> facts as BL-206 JSONL, then END
-//   COMMAND corp=<id> verb=<0-14> subject=<id> tile=<id> type=<0-6> target=<0-30>
+//   COMMAND corp=<id> verb=<0-14> subject=<id> tile=<id> type=<building_type>
+//           target=<resource_type>
 //           recipe=<id> workforce=<n> road_tier=<n> unit_type=<n>
 //           quantity=<f> floor_price=<f> order=<n> counterparty=<id>
 //                                                   -> apply_corp_command
 //   SHUTDOWN                                        -> BYE, then exit
+//
+// `type` and `target` carry the raw enum values of `building_type` and
+// `resource_type`; deliberately NOT written out as numeric ranges here, because
+// a hard-coded range is a second definition that goes stale the moment either
+// enum grows. This block previously claimed `verb=<0-7>` while the enum held
+// fifteen, and `type=<0-4>` while it held seven.
 //
 // Every `corp_verb` is reachable here; which keys a given verb reads is
 // `apply_corp_command`'s business, and unread keys cost nothing. Keep this list
@@ -228,13 +239,17 @@ int run_serve(int ticks)
             cmd.road_tier = static_cast<uint8_t>(kv_get(kv, "road_tier", 1));
             // The seam grew three verb families past this parser — BL-324's
             // hire_unit, BL-293's order book, BL-350's procurement — and each
-            // one's arguments went unread, so six of the fifteen verbs could
-            // only ever be applied with defaults. place_sell_order defaults to
-            // quantity 0, which apply_corp_command rejects outright; the three
-            // procurement verbs default to order 0 / counterparty null, which
-            // never names a real quote or supplier. They were not "partly
-            // supported" — they were unreachable, and the dictionary said
-            // otherwise.
+            // one's arguments went unread, so those verbs could only ever be
+            // applied with defaults.
+            //
+            // FIVE were unreachable outright: place_sell_order defaulted to
+            // quantity 0, which apply_corp_command rejects before anything else;
+            // remove_sell_order/accept_quote/cancel_contract defaulted to order
+            // 0, naming no real order; request_quote defaulted to a null
+            // counterparty. `hire_unit` is the SIXTH and is the genuinely
+            // partly-supported case — unit_type 0 is a valid roster index, so it
+            // worked, but only ever raised roster row 0 and no caller could
+            // choose otherwise.
             cmd.unit_type    = static_cast<uint16_t>(kv_get(kv, "unit_type", 0));
             cmd.quantity     = static_cast<float>(kv_getf(kv, "quantity", 0.0));
             cmd.floor_price  = static_cast<float>(kv_getf(kv, "floor_price", 0.0));
@@ -254,10 +269,17 @@ int run_serve(int ticks)
             // What a body is called and whether it is surveyed yet. The sibling of
             // CORPS, and needed for the same reason (NR-061): `survey`,
             // `place_sell_order` and `request_quote` all take a BODY id as their
-            // subject, and nothing else on this protocol yields one. The
-            // blackboard's market facts are keyed by MARKET id, not by body, so an
-            // agent reading state could see prices on a body it had no way to
-            // name — it could know a market existed and could not sell into it.
+            // subject, and the protocol had no direct way to enumerate them.
+            //
+            // Precisely: the blackboard is not silent about bodies — `pool:<res>`
+            // facts are keyed by the corp's own (corp, body) pool, and
+            // `body_activity` by a known body — so an agent could recover the ids
+            // of bodies it already trades on or already sees. What it could NOT
+            // do is name a body it has no pool and no activity on, which is every
+            // body worth SURVEYING, and it could never recover a name or a survey
+            // phase for any of them. The market facts do not help: they are keyed
+            // by MARKET id, so a price is legible on a body the agent cannot
+            // address.
             // Ascending id, not map order. `w.bodies` is an unordered_map, and
             // an agent's transcript is a replay artifact — two runs of the same
             // seed must produce the same bytes, or a trace corpus records the
