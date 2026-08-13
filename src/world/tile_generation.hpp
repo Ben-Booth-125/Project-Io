@@ -70,6 +70,15 @@ struct generation_record
     std::vector<float>   moisture; ///< [row*gw+col] normalised moisture (Pass 3).
     std::vector<uint8_t> band;     ///< [row*gw+col] latitude band index (Pass 3).
 
+    /// [row*gw+col] the value Pass 2 actually COMPARED against `ocean_threshold` —
+    /// the heightmap after the equatorial down-bias. Captured rather than left to the
+    /// reader to recompute: `height` alone cannot answer "did this tile clear the
+    /// threshold", so a breadcrumb built from it would have to re-derive the bias
+    /// constant, and a second copy of that constant is a copy that drifts. Empty on a
+    /// body that runs no ocean pass (hydrology != liquid), where the question has no
+    /// meaning. Pure capture — Pass 2's own arithmetic is untouched.
+    std::vector<float>   ocean_score;
+
     float ocean_threshold = 0.0f;  ///< Latitude-biased height percentile used for ocean (Pass 2).
     int   ocean_tiles     = 0;     ///< Tiles assigned the ocean composition (Pass 2).
 };

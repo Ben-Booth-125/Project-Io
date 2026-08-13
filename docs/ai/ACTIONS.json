@@ -1115,6 +1115,54 @@
    "reason_to_select": "The table gives one number per rival; selecting a row is how to ask 'tell me more about this one'."
   },
   {
+   "id": "ledger.nav_generation",
+   "family": "ledger",
+   "surface": "Nav rail, slot 10 (plate/continent glyph)",
+   "press": "Click the plate glyph at the bottom of the left icon rail",
+   "args": [],
+   "preconditions": [
+    "In-game"
+   ],
+   "expected_output": "Toggles the Generation Ledger open in the fold-out column; re-click closes; opening closes any other ledger. Open, it explains why the surface generated as it did, split into Body (histograms, thresholds, profile echo) and Tile (the per-tile derivation breadcrumb) views. Opening or switching body REGENERATES that body's per-pass record from the recorded tile-pass inputs - a deterministic replay costing one tile pass, cached while the body stays the subject. Nothing it shows is stored on the world or in the save.",
+   "reason_to_select": "A DEVELOPER TUNING surface, not a play read: it answers why a tile or a whole body came out as it did. An AI player has no strategic use for it - the deposits and terrain it would act on are already on the tile."
+  },
+  {
+   "id": "ledger.generation_view_tab",
+   "family": "ledger",
+   "surface": "Generation Ledger, view tab strip",
+   "press": "Click the 'Body' or 'Tile' tab button",
+   "args": [
+    {
+     "name": "view",
+     "type": "enum",
+     "meaning": "'Body' (composition/landform histograms, ocean threshold, latitude bands, profile echo) or 'Tile' (the five-pass derivation breadcrumb for the selected tile)"
+    }
+   ],
+   "preconditions": [
+    "Generation Ledger is open"
+   ],
+   "expected_output": "Switches the view. Re-clicking the currently-active tab closes the whole Generation Ledger (toggle rule); switching tabs is an ordinary view change. The Tile view reads the shared selection: with no tile selected, or a tile on another body, it says so rather than showing a stale breadcrumb.",
+   "reason_to_select": "Body answers 'what shape did this generation come out, and which input made it that shape?'; Tile answers 'why is THIS tile what it is?'"
+  },
+  {
+   "id": "ledger.generation_body_selector",
+   "family": "ledger",
+   "surface": "Generation Ledger, 'Body' combo",
+   "press": "Open the Body combo and pick a body",
+   "args": [
+    {
+     "name": "body",
+     "type": "entity",
+     "meaning": "Which body to explain"
+    }
+   ],
+   "preconditions": [
+    "Generation Ledger is open"
+   ],
+   "expected_output": "Repoints both views at the chosen body and regenerates its per-pass record (one deterministic tile pass, then cached). Defaults to the canvas's active body. Cross-cutting selector - exempt from the toggle rule.",
+   "reason_to_select": "Chooses which body's generation to inspect."
+  },
+  {
    "id": "ledger.history_body_selector",
    "family": "ledger",
    "surface": "History ledger, 'Body' combo (Story view only)",

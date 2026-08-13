@@ -16,7 +16,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*117 entries — 11 gameplay · 24 canvas · 15 lens · 38 ledger · 29 chrome.*
+*120 entries — 11 gameplay · 24 canvas · 15 lens · 41 ledger · 29 chrome.*
 
 ---
 
@@ -948,6 +948,47 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 **Expected output.** Sets that corporation as the current selection: the Selection band at the bottom fills with its detail (name, home nation; corporations are non-spatial, so its go-to routes to a ledger). The table stays open - selection does not close ledgers.
 
 **Reason to select.** The table gives one number per rival; selecting a row is how to ask 'tell me more about this one'.
+
+### `ledger.nav_generation` — Nav rail, slot 10 (plate/continent glyph)
+
+**Press.** Click the plate glyph at the bottom of the left icon rail
+
+**Valid when:**
+- In-game
+
+**Expected output.** Toggles the Generation Ledger open in the fold-out column; re-click closes; opening closes any other ledger. Open, it explains why the surface generated as it did, split into Body (histograms, thresholds, profile echo) and Tile (the per-tile derivation breadcrumb) views. Opening or switching body REGENERATES that body's per-pass record from the recorded tile-pass inputs - a deterministic replay costing one tile pass, cached while the body stays the subject. Nothing it shows is stored on the world or in the save.
+
+**Reason to select.** A DEVELOPER TUNING surface, not a play read: it answers why a tile or a whole body came out as it did. An AI player has no strategic use for it - the deposits and terrain it would act on are already on the tile.
+
+### `ledger.generation_view_tab` — Generation Ledger, view tab strip
+
+**Press.** Click the 'Body' or 'Tile' tab button
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `view` | `enum` | 'Body' (composition/landform histograms, ocean threshold, latitude bands, profile echo) or 'Tile' (the five-pass derivation breadcrumb for the selected tile) |
+
+**Valid when:**
+- Generation Ledger is open
+
+**Expected output.** Switches the view. Re-clicking the currently-active tab closes the whole Generation Ledger (toggle rule); switching tabs is an ordinary view change. The Tile view reads the shared selection: with no tile selected, or a tile on another body, it says so rather than showing a stale breadcrumb.
+
+**Reason to select.** Body answers 'what shape did this generation come out, and which input made it that shape?'; Tile answers 'why is THIS tile what it is?'
+
+### `ledger.generation_body_selector` — Generation Ledger, 'Body' combo
+
+**Press.** Open the Body combo and pick a body
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `body` | `entity` | Which body to explain |
+
+**Valid when:**
+- Generation Ledger is open
+
+**Expected output.** Repoints both views at the chosen body and regenerates its per-pass record (one deterministic tile pass, then cached). Defaults to the canvas's active body. Cross-cutting selector - exempt from the toggle rule.
+
+**Reason to select.** Chooses which body's generation to inspect.
 
 ### `ledger.history_body_selector` — History ledger, 'Body' combo (Story view only)
 

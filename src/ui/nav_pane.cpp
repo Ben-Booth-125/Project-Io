@@ -45,6 +45,7 @@ void close_all_panels(ui_state& state)
     state.show_market_ledger     = false;
     state.show_construction_panel = false;
     state.show_tile_ledger       = false;
+    state.show_generation_ledger = false;
     state.show_economy_panel     = false;
     state.show_build_ledger      = false; // tile build ledger (BL-162) is a column occupant too
     // BL-310 round 4: the tech-tree era-selector menu is now a real shell-
@@ -59,7 +60,7 @@ bool any_panel_open(const ui_state& state)
            state.show_balance_ledger    ||
            state.show_market_ledger     || state.show_construction_panel ||
            state.show_tile_ledger       || state.show_economy_panel ||
-           state.show_tech_tree;
+           state.show_generation_ledger || state.show_tech_tree;
 }
 
 void draw_nav_pane(ui_state& state, float top_offset)
@@ -93,7 +94,13 @@ void draw_nav_pane(ui_state& state, float top_offset)
     //
     // BL-174 dropped the former slot 10 — a disabled placeholder with no glyph
     // and no tooltip, so it was pure noise a new player could not interpret.
-    constexpr int tab_count = 9;
+    //
+    // Slot 10 is BACK, but as the opposite of what BL-174 removed: a LIVE slot
+    // with its own glyph and tooltip, hosting the Generation Ledger (BL-303).
+    // It sits last deliberately — it is a developer tuning surface rather than a
+    // player system, so it takes the tail of the rail instead of displacing any
+    // of MENU.md's curated nine.
+    constexpr int tab_count = 10;
 
     // Square slots; Selectable treats a nonzero size as literal, so derive the
     // rail width explicitly rather than passing -1.
@@ -198,7 +205,15 @@ void draw_nav_pane(ui_state& state, float top_offset)
             }
             slot_tooltip("History", "How this world was generated - its biography and its numbers.", false);
             break;
-        default: // Unreachable — tab_count is 9 and every slot is handled above.
+        case 10: // Generation Ledger (BL-303) — the developer tuning surface
+            if (ImGui::Selectable(id, state.show_generation_ledger, 0, {slot_size, slot_size})) {
+                const bool was_open = state.show_generation_ledger;
+                close_all_panels(state);
+                state.show_generation_ledger = !was_open;
+            }
+            slot_tooltip("Generation Ledger", "Why a tile generated as it did - the per-pass derivation and the body's histograms.", false);
+            break;
+        default: // Unreachable — tab_count is 10 and every slot is handled above.
             break;
         }
 
@@ -240,6 +255,10 @@ void draw_nav_pane(ui_state& state, float top_offset)
         // like any other live slot rather than staying dim.
         case 8: icons::diplomacy(dl, centre, r, lit(state.show_corporations_table)); break;
         case 9: icons::history(dl, centre, r, lit(state.show_tile_ledger));            break;
+        // The plate glyph: this ledger's subject is the generated ground itself,
+        // and the Continent lens already teaches that shape as "how the surface
+        // came to be" rather than as a live economic read.
+        case 10: icons::continent(dl, centre, r, lit(state.show_generation_ledger));   break;
         default: icons::placeholder(dl, centre, r, dim); break;
         }
     }

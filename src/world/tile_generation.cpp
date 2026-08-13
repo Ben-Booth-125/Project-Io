@@ -1032,6 +1032,9 @@ std::vector<entity_id> generate_body_tiles(
     // --- Pass 2: ocean placement ---
     float ocean_threshold = 0.0f;
     int   ocean_tiles     = 0;
+    // The biased heights the threshold is tested against, kept only when a record
+    // was asked for (BL-303). Stays empty on a body with no ocean pass.
+    std::vector<float> ocean_score;
     // Poorly-drained ground: the lowest slice of LAND, measured against this
     // body's own sea level rather than an absolute height. Filled by Pass 2 and
     // consumed by Pass 4b (drainage). Empty on a body with no standing water,
@@ -1103,6 +1106,10 @@ std::vector<entity_id> generate_body_tiles(
                 if (!is_ocean[idx] && biased[idx] <= lowland_threshold)
                     lowland[static_cast<std::size_t>(idx)] = 1u;
         }
+
+        // Last use of `biased`, so the capture costs a move rather than a copy.
+        if (record)
+            ocean_score = std::move(biased);
     }
 
     // --- Pass 3: latitude bands ---
@@ -1448,6 +1455,7 @@ std::vector<entity_id> generate_body_tiles(
         record->band.resize(static_cast<std::size_t>(total));
         for (int idx = 0; idx < total; ++idx)
             record->band[static_cast<std::size_t>(idx)] = static_cast<uint8_t>(band[idx]);
+        record->ocean_score     = std::move(ocean_score);
         record->ocean_threshold = ocean_threshold;
         record->ocean_tiles     = ocean_tiles;
     }

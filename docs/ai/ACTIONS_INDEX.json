@@ -250,6 +250,18 @@
    "All-corporations balance table (nav slot 8)"
   ],
   [
+   "ledger.nav_generation",
+   "Nav rail, slot 10 (plate/continent glyph)"
+  ],
+  [
+   "ledger.generation_view_tab",
+   "Generation Ledger, view tab strip"
+  ],
+  [
+   "ledger.generation_body_selector",
+   "Generation Ledger, 'Body' combo"
+  ],
+  [
    "ledger.history_body_selector",
    "History ledger, 'Body' combo (Story view only)"
   ],

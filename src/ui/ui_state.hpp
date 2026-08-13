@@ -173,6 +173,17 @@ struct ui_state
     bool show_market_ledger = false; ///< Whether the Market Ledger is open.
     bool show_balance_ledger = false; ///< Whether the Balance Ledger is open.
 
+    /// Whether the Generation Ledger is open (BL-303). A DEVELOPER TUNING surface,
+    /// not shipped chrome — it explains why a tile generated as it did — so like
+    /// every other ledger it starts closed and nothing opens it but a deliberate
+    /// press. See ui/generation_ledger.hpp, docs/generation/GENERATION_LEDGER.md.
+    bool show_generation_ledger = false;
+
+    /// Generation Ledger: 0=Body (histograms, thresholds, profile echo),
+    /// 1=Tile (the per-tile derivation breadcrumb). In ui_state, like every other
+    /// panel view index, so a verify script can park the ledger on a view.
+    int  generation_ledger_view = 0;
+
     // --- Budget ledger stubbed policy levers (BL-171 UI; mechanics owed to BL-155) ---
     // The Tax and Wages tier selectors are drawn and selectable, but have NO economic
     // effect yet — they carry the intended player levers (Tax = a player-set policy;
