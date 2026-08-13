@@ -251,19 +251,45 @@ int main()
     // than answers, and richness must not leak into that answer.
     // ---------------------------------------------------------------------
     {
-        tile_component tc{};
-        tc.composition = terrain_composition::rocky;
-        tc.resource_deposit[ri(resource_type::iron_ore)] = 250.0f; // richest band
+        // RE-AUTHORED 2026-08-13. This block asserted `cap == 1`, which BL-366
+        // superseded: a non-extraction cap is now a function of the tile's
+        // COMPOSITION (non_extraction_stack_cap), and rocky returns 4. The
+        // constant was stale from the day BL-366 landed and the assertion had
+        // been failing since, unrecorded, in a tier nobody read.
+        //
+        // The INVARIANT the block was written for survives the change intact and
+        // is what it now tests: richness must not leak into a non-extraction
+        // capacity. So the check is that the cap equals the composition's own
+        // ceiling AND is identical on a barren tile and the richest band — which
+        // is a strictly stronger statement than the constant ever made, and one
+        // BL-366 cannot silently invalidate again.
         const building_type others[] = { building_type::processing_facility,
                                          building_type::port,
                                          building_type::launchpad,
                                          building_type::inland_logistics_hub,
                                          building_type::none };
-        for (const building_type t : others)
+        for (const terrain_composition comp : { terrain_composition::rocky,
+                                                terrain_composition::grassland,
+                                                terrain_composition::icy })
         {
-            const int cap = placement_rules::stack_capacity(tc, t, resource_type::iron_ore);
-            check(cap == 1, "S.R3 non-extraction type stays capacity 1 on a rich tile",
-                  static_cast<float>(cap), 1.0f);
+            tile_component barren{};
+            barren.composition = comp;
+            tile_component rich{};
+            rich.composition = comp;
+            rich.resource_deposit[ri(resource_type::iron_ore)] = 250.0f; // richest band
+
+            const int expected = placement_rules::non_extraction_stack_cap(comp);
+            for (const building_type t : others)
+            {
+                const int cap_barren = placement_rules::stack_capacity(barren, t, resource_type::iron_ore);
+                const int cap_rich   = placement_rules::stack_capacity(rich,   t, resource_type::iron_ore);
+                check(cap_rich == cap_barren,
+                      "S.R3 non-extraction capacity is invariant to deposit richness",
+                      static_cast<float>(cap_rich), static_cast<float>(cap_barren));
+                check(cap_rich == expected,
+                      "S.R3 non-extraction capacity is the composition's own ceiling",
+                      static_cast<float>(cap_rich), static_cast<float>(expected));
+            }
         }
     }
 
