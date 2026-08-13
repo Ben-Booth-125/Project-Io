@@ -227,17 +227,30 @@ async function main() {
     check(bodyLines[bodyLines.length - 1] === 'END', 'BODIES terminates with END');
     check(bodyRows.every((b) => typeof b.id === 'number' && typeof b.survey === 'string'),
           'every body row carries an id and a survey phase');
-    const bodies = new Set(bodyRows.map((b) => b.id));
     const bodyId = bodyRows[0] && bodyRows[0].id;
     check(bodyId !== undefined, 'at least one body is nameable on the seam', String(bodyId));
 
     // Find a body whose market prices the good we intend to list — the seam
     // rejects an unpriced resource before it ever looks at quantity, so picking
     // blindly would test the wrong rejection.
+    //
+    // The candidate resources are READ OFF THE BLACKBOARD (`price:<n>` facts)
+    // rather than swept over a hard-coded count. A literal here would be a
+    // second definition of `resource_type` living in a file whose whole purpose
+    // is catching consumers that lag the enum they transcribe — and it had
+    // already gone stale at 31 against a resource_count of 42.
+    const pricedResources = [...new Set(
+      facts.filter((f) => f.predicate.startsWith('price:'))
+           .map((f) => Number(f.predicate.slice('price:'.length)))
+           .filter((n) => Number.isInteger(n)))].sort((a, b) => a - b);
+    check(pricedResources.length > 0,
+          'the blackboard names priced resources to probe with',
+          `${pricedResources.length} distinct`);
+
     let listBody, listRes;
     outer:
     for (const b of bodyRows) {
-      for (let r = 0; r < 31; ++r) {
+      for (const r of pricedResources) {
         const probe = resultOf(await io.send(
           `COMMAND corp=${subject.id} verb=9 subject=${b.id} target=${r} quantity=5 floor_price=0.5`));
         if (probe !== 'rejected_invalid') { listBody = b.id; listRes = r; break outer; }
@@ -257,6 +270,26 @@ async function main() {
         `COMMAND corp=${subject.id} verb=9 subject=${listBody} target=${listRes}`));
       check(bad === 'rejected_invalid',
             'place_sell_order with no quantity is rejected as invalid (the control)', bad);
+
+      // A malformed float must be REFUSED, not silently replaced by the default.
+      // This is the regression an adversarial review caught in the first cut of
+      // the non-finite guard: `floor_price` defaults to 0, which the seam reads
+      // as "accept the market price", so substituting it turned "sell only above
+      // this floor" into "sell at market every tick" and answered `applied`. The
+      // caller would have had no way to know its order was not the one it placed.
+      for (const bad_price of ['nan', 'inf', '1e400']) {
+        const r = resultOf(await io.send(
+          `COMMAND corp=${subject.id} verb=9 subject=${listBody} target=${listRes} `
+          + `quantity=5 floor_price=${bad_price}`));
+        check(r === 'rejected_invalid',
+              `place_sell_order with floor_price=${bad_price} is refused, not defaulted`, r);
+      }
+      // Same for quantity, where the default happens to be rejected downstream
+      // anyway — asserted so the two keys cannot drift apart silently.
+      const badQty = resultOf(await io.send(
+        `COMMAND corp=${subject.id} verb=9 subject=${listBody} target=${listRes} quantity=nan`));
+      check(badQty === 'rejected_invalid',
+            'place_sell_order with quantity=nan is refused', badQty);
     }
 
     // hire_unit reads unit_type; request_quote reads counterparty. Neither can

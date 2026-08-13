@@ -157,6 +157,19 @@ exist to catch, NR-182 the action dictionary running four verbs behind the seam 
 NR-183 the constraint-tax leg of the 10g ruling superseded in framing, NR-184 the NaN boundary,
 NR-185 the four overstated claims and the claims-lens practice that caught them).
 
+**The review's verification pass then caught the fix itself.** 38 findings were raised across four
+lenses and 36 were refuted under adversarial verification; the two that survived were both in this
+session's own work, and one of them was the NaN guard. Returning the *default* on malformed input
+is not the same as refusing it: `quantity`'s default of 0 is rejected downstream, so substituting
+it refuses by accident — but `floor_price`'s default of 0 is **meaningful**, read by the seam as
+"accept the market price". So `floor_price=inf` turned "sell only above this floor" into "sell at
+market, every tick", answered `applied`, and said nothing. A worse failure mode than the crash it
+replaced, and it took a verifier reading the downstream *meaning* of a default to see it. The
+parser now reports malformation and the handler answers `rejected_invalid`; the smoke check asserts
+it for `nan`, `inf` and `1e400`. The second survivor was `smoke.js` hard-coding `r < 31` for
+`resource_count` (42) — the exact stale-literal defect the commit before it set out to remove — now
+read off the blackboard's own `price:<n>` facts instead.
+
 **Full tier: 64/68, and the four reds are all pre-existing.** `ai_skill_harness` is green across the
 complete run. The failures are `data_creep_harness` (NR-171), `population_mvp` (NR-170),
 `stack_capacity_harness` (stale since BL-366) and `history_sim_harness` (six assertions). The last

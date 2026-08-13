@@ -58,26 +58,40 @@ long kv_get(const std::unordered_map<std::string, std::string>& kv, const char* 
 /// the floor the caller asked for. A rounding error in a price is not a rounding
 /// error, it is a different order.
 ///
-/// NON-FINITE INPUT IS REFUSED HERE, at the boundary, and this is load-bearing.
-/// `std::atof` happily parses "nan" and "inf", and the seam's own validation
-/// cannot catch them: `place_sell_order` guards `floor_price < 0.0f`, and every
-/// comparison against NaN is false, so a NaN price passes validation, is stored
-/// in `world.sell_orders`, is folded into `world::state_hash`, is written to the
-/// save stream — and reaches `clear_markets`' book sort, where a value that is
-/// neither less than, equal to, nor greater than any other stops the comparator
-/// being a strict weak ordering and makes `std::sort` undefined behaviour. An
-/// infinity is the same story one step later: it survives every `> 0.0f` guard
-/// and then overflows a `static_cast<int>` in the procurement lead-time
-/// derivation. Neither was reachable before this parser learned to read floats,
-/// which is exactly why the guard belongs in the same function.
-double kv_getf(const std::unordered_map<std::string, std::string>& kv, const char* key, double dflt)
+/// NON-FINITE INPUT IS REJECTED, and `ok` is how — not by substituting the
+/// default, which is a different order rather than a refused one.
+///
+/// `std::atof` happily parses "nan", "inf" and an overflowing "1e400", and the
+/// seam's own validation cannot catch them: `place_sell_order` guards
+/// `floor_price < 0.0f`, and every comparison against NaN is false, so a NaN
+/// price passes validation, is stored in `world.sell_orders`, is folded into
+/// `world::state_hash`, is written to the save stream — and reaches
+/// `clear_markets`' book sort, where a value neither less than, equal to, nor
+/// greater than any other stops the comparator being a strict weak ordering and
+/// makes `std::sort` undefined behaviour. An infinity is the same story one step
+/// later, overflowing a `static_cast<int>` in the procurement lead time.
+///
+/// The first cut of this guard returned the default instead, and that was wrong
+/// for a reason worth keeping: the two keys sharing this getter have defaults
+/// that mean OPPOSITE things downstream. `quantity`'s 0 is rejected by the seam,
+/// so substituting it is a refusal by accident. `floor_price`'s 0 is meaningful
+/// — the seam reads it as "accept the market price" — so substituting it turns
+/// "sell only above this floor" into "sell at market, every tick", answers
+/// `applied`, and issues no diagnostic. That is precisely the silent
+/// order-substitution the truncation note above argues against, arrived at by a
+/// different route.
+double kv_getf(const std::unordered_map<std::string, std::string>& kv, const char* key,
+               double dflt, bool* ok = nullptr)
 {
     const auto it = kv.find(key);
     if (it == kv.end())
-        return dflt;
+        return dflt; // absent is not malformed — the default stands
     const double v = std::atof(it->second.c_str());
     if (!std::isfinite(v))
-        return dflt; // "nan" / "inf" / overflow — treat as if the key were absent
+    {
+        if (ok) *ok = false;
+        return dflt;
+    }
     return v;
 }
 
@@ -251,10 +265,20 @@ int run_serve(int ticks)
             // worked, but only ever raised roster row 0 and no caller could
             // choose otherwise.
             cmd.unit_type    = static_cast<uint16_t>(kv_get(kv, "unit_type", 0));
-            cmd.quantity     = static_cast<float>(kv_getf(kv, "quantity", 0.0));
-            cmd.floor_price  = static_cast<float>(kv_getf(kv, "floor_price", 0.0));
+            bool floats_ok   = true;
+            cmd.quantity     = static_cast<float>(kv_getf(kv, "quantity", 0.0, &floats_ok));
+            cmd.floor_price  = static_cast<float>(kv_getf(kv, "floor_price", 0.0, &floats_ok));
             cmd.order        = static_cast<uint32_t>(kv_get(kv, "order", 0));
             cmd.counterparty = static_cast<entity_id>(kv_get(kv, "counterparty", 0));
+
+            // A malformed float is a malformed COMMAND, answered as one. Falling
+            // through with the default would answer `applied` to an order the
+            // caller did not place.
+            if (!floats_ok)
+            {
+                std::cout << "RESULT result=rejected_invalid building=-1" << std::endl;
+                continue;
+            }
 
             entity_id out_building = null_entity;
             const corp_command_result result = apply_corp_command(w, reg, cmd, &out_building);
