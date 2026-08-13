@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*187 entries — 63 open, 124 resolved.*
+*189 entries — 65 open, 124 resolved.*
 
 ---
 
@@ -578,6 +578,32 @@ Two changes. (1) INSTRUMENTATION, deliverable on its own: post_persona_counsel n
 > **Recommendation:** Accept, and let the [9]/[10] split decide what comes next: if the export dominates as expected, caching the blackboard between eval boundaries (BL-379 lever c) buys back headroom for a warm set; if the Lua half dominates, the pack budget is the dial instead.
 
 *Files: `src/core/session_history.cpp`, `src/core/session_history.hpp`, `src/core/app.hpp`, `src/core/app.cpp`*
+
+### NR-189 — Generation Ledger took nav rail slot 10, which BL-174 had deliberately removed
+*decision taken on your behalf · raised 2026-08-13 · from Taken while building BL-303 (Generation Ledger), no instruction either way*
+
+GENERATION_LEDGER.md calls for a dedicated ledger window 'reached from the navigation rail', and all nine curated MENU.md slots are spoken for (three of them already hosting provisional occupants). I added a tenth slot rather than displacing one or hiding the ledger behind a function key. BL-174 had dropped the former slot 10 for being a disabled placeholder with no glyph and no tooltip; the new one is live, carries the plate glyph and a tooltip, and sits last because it is a developer tuning surface rather than a player system.
+
+**Why it matters.** The rail is the game's primary menu and MENU.md curates it at nine. Growing it for a developer instrument is a precedent — the alternative reading is that tuning surfaces should be key-toggled like the F11 frame HUD and never occupy a player-facing slot. At the 1280x720 floor ten 44px slots still fit the full-height rail, so this is a design call, not a layout constraint.
+
+- Keep slot 10 as a live developer slot (what was built).
+- Move the ledger to a key toggle (F-key) with no rail slot, like the frame-budget HUD.
+- Fold it into the History slot as a fourth view.
+
+> **Recommendation:** Keep it. It is one press away while tuning and costs a player nothing, since it starts closed like every other ledger. If the rail is later to stay at nine on principle, the F-key route is the cheap retreat — the draw call and toggle flag are already independent of the slot.
+
+*Files: `src/ui/nav_pane.cpp`, `src/ui/generation_ledger.cpp`, `docs/ui/MENU.md`*
+
+### NR-190 — Two additive capture fields were added so the Generation Ledger can replay a body exactly
+*decision taken on your behalf · raised 2026-08-13 · from Taken while building BL-303 (Generation Ledger)*
+
+The regenerate-on-demand rule needs the tile pass's exact arguments, and two of them were unrecoverable. Added (1) generation_record::ocean_score — the latitude-biased height Pass 2 actually tests against ocean_threshold, filled only when a record is requested; and (2) generation_report::body_entry::tiles — the seed, deposit scalar, grid dims and whether the convergent mask was passed, stamped at each generate_body_tiles call site. Both are pure captures: the generated surface is bit-for-bit unchanged, and neither reaches the world struct or the save.
+
+**Why it matters.** The alternatives were worse in ways worth recording. Recomputing the sea bias in the UI would put a second copy of a tuning constant outside the generator, where it drifts silently. Re-deriving the homeworld's tile seed from world_params is impossible without re-running the BL-276 acceptance gate — a second implementation of a reject-and-reroll loop, which is exactly the fork choose_home_tile_seed was extracted to prevent. The cost is one extra float array per requested record (60 KB on the homeworld, discarded with the record) and a small struct on a presentation-only report.
+
+> **Recommendation:** No action expected — flagged because it widens two structs Ben may consider settled, and because generation_report is now load-bearing for a second consumer.
+
+*Files: `src/world/tile_generation.hpp`, `src/world/tile_generation.cpp`, `src/world/hard_coded_world.hpp`, `src/world/hard_coded_world.cpp`*
 
 ---
 

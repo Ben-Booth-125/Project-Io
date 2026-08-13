@@ -15,7 +15,31 @@ no longer all-design:
 |---|---|
 | **Chain half — player-facing** (History slot: Story / Chain / Tiles views; stage charts redrawn from the persisted `generation_report`) | **Built** (BL-211, landed 2026-07-29 — `src/ui/generation_charts.{hpp,cpp}`) |
 | **Field lenses** (heightmap / moisture / band painted over the Planetary canvas) | **Partial substrate** — the `generation_record` seam exists and is filled on demand; no lens built |
-| **Per-tile derivation breadcrumb + per-body summary ledger** | **Unbuilt** — design only, below |
+| **Per-tile derivation breadcrumb + per-body summary ledger** | **Built** (BL-303 — `src/ui/generation_ledger.{hpp,cpp}`, nav rail slot 10) |
+
+**How it is reached and what it holds (BL-303).** Nav rail slot 10 (the plate glyph)
+toggles it into the shell fold-out column, alongside every other ledger. Two views,
+obeying the standing toggle rule: **Body** (composition and landform histograms over
+the live tiles, the ocean threshold and resulting water fraction against the profile's
+target, the latitude-band row ranges read back off the record, and the profile echo)
+and **Tile** (the five-step breadcrumb for the shared selection, exported as
+`ui::draw_tile_derivation` so the hover card and Selection element can wrap the same
+content later). The record is regenerated into a scratch world on open and on a body
+switch, cached on `(body, tile seed)`, and never stored — § Data lifetime, unchanged.
+
+Two additive taps made this possible, both pure captures that leave the generated
+surface bit-for-bit identical:
+
+- `generation_record::ocean_score` — the latitude-biased height Pass 2 actually
+  compares against `ocean_threshold`. Without it the breadcrumb would have to
+  re-derive the bias constant, and a second copy of a tuning constant is a copy that
+  drifts. Filled only when a record is requested.
+- `generation_report::body_entry::tiles` — the arguments `generate_body_tiles` was
+  called with (seed, deposit scalar, grid, whether the convergent mask was passed).
+  The homeworld's seed comes out of the BL-276 acceptance gate, so it is not
+  re-derivable from `world_params`; recording it at the call site is what makes the
+  replay exact rather than approximate. Presentation data, off the save seam like the
+  rest of the report.
 
 **Player-facing relation — the History slot.** The nav rail's **History** slot
 ([`../ui/MENU.md`](../ui/MENU.md) § Menu set and ordering, slot 9) is the *player-facing*

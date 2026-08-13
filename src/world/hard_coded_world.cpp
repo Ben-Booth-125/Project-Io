@@ -299,6 +299,25 @@ world make_hard_coded_world(world_params params, generation_report* report,
         return st;
     };
 
+    // Stamp the tile pass's own arguments onto the body's report entry (BL-303).
+    // Deliberately recorded at the CALL SITE rather than derived later: the
+    // homeworld's seed is chosen by the acceptance gate, and the convergent mask is
+    // passed for the homeworld alone, so any attempt to reconstruct these from
+    // world_params would be a second implementation waiting to disagree with this
+    // one. The Generation Ledger replays the pass from exactly these.
+    auto record_tile_inputs = [&](entity_id body_id, uint32_t tile_seed,
+                                  int gw, int gh, bool used_convergent) {
+        if (!report)
+            return;
+        for (generation_report::body_entry& be : report->bodies)
+            if (be.id == body_id)
+            {
+                be.tiles = generation_report::body_entry::tile_inputs{
+                    true, tile_seed, deposit_scalar, gw, gh, used_convergent };
+                break;
+            }
+    };
+
     // Nation seeding is no longer parameterised here: generate_nations derives its own
     // seed budget from the body's habitable land area and merges on a minimum-viable
     // territory floor, so the nation count is an outcome rather than a target
@@ -348,8 +367,10 @@ world make_hard_coded_world(world_params params, generation_report* report,
     std::vector<float> cinder_bias;
     bump(1);
     const planetology_state cinder_pl = plan(0, cinder, 180, 84, cinder_bias);
+    const uint32_t cinder_tile_seed = params.seed ^ 0xC1D0001u;
     generate_body_tiles(w, cinder, 180, 84, cinder_pl.profile,
-        /*seed=*/params.seed ^ 0xC1D0001u, deposit_scalar, &cinder_pl, nullptr, &cinder_bias);
+        cinder_tile_seed, deposit_scalar, &cinder_pl, nullptr, &cinder_bias);
+    record_tile_inputs(cinder, cinder_tile_seed, 180, 84, /*used_convergent=*/false);
 
     // -----------------------------------------------------------------------
     // Kepler — temperate home planet (Earth analogue, ~1.0 AU)
@@ -414,6 +435,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
     auto kepler_tiles = generate_body_tiles(w, kepler, home_grid_width, home_grid_height,
         kepler_pl.profile,
         kepler_tile_seed, deposit_scalar, &kepler_pl, &kepler_record, &kepler_bias, &kepler_convergent);
+    record_tile_inputs(kepler, kepler_tile_seed, 180, 84, /*used_convergent=*/true);
 
     // Rivers (BL-170) — sibling pass (BL-051 convention) over the same heightmap Pass 2
     // already thresholded; needs Kepler's ocean placement done, so it runs after
@@ -1001,8 +1023,10 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // drives the tidal term.
     std::vector<float> selene_bias;
     const planetology_state selene_pl = plan(2, selene, 90, 42, selene_bias);
+    const uint32_t selene_tile_seed = params.seed ^ 0x5E1E001u;
     generate_body_tiles(w, selene, 90, 42, selene_pl.profile,
-        /*seed=*/params.seed ^ 0x5E1E001u, deposit_scalar, &selene_pl, nullptr, &selene_bias);
+        selene_tile_seed, deposit_scalar, &selene_pl, nullptr, &selene_bias);
+    record_tile_inputs(selene, selene_tile_seed, 90, 42, /*used_convergent=*/false);
 
     // -----------------------------------------------------------------------
     // Asteroid belt — a band beyond Kepler. The belt itself is not a body; it
@@ -1042,8 +1066,10 @@ world make_hard_coded_world(world_params params, generation_report* report,
         // exits the chain at accretion and the whole object becomes the deposit.
         std::vector<float> ast_bias;
         const planetology_state ast_pl = plan(a.proto_index, id, 30, 14, ast_bias);
+        const uint32_t ast_tile_seed = params.seed ^ a.seed;
         generate_body_tiles(w, id, 30, 14, ast_pl.profile,
-            params.seed ^ a.seed, deposit_scalar, &ast_pl, nullptr, &ast_bias);
+            ast_tile_seed, deposit_scalar, &ast_pl, nullptr, &ast_bias);
+        record_tile_inputs(id, ast_tile_seed, 30, 14, /*used_convergent=*/false);
     }
 
     // Freeze each body's authored phase as its epoch angle, so the econ tick can

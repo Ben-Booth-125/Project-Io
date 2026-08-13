@@ -22,6 +22,7 @@
 #include "ui/chat_panel.hpp"
 #include "ui/fonts.hpp"
 #include "ui/generation_charts.hpp" // the shared chain-stage charts (BL-211)
+#include "ui/generation_ledger.hpp" // the generation tuning ledger (BL-303)
 #include "ui/generation_preview.hpp" // the wizard's painted right pane
 #include "ui/format.hpp"
 #include "ui/frame_stats.hpp" // frame-budget HUD (BL-249, v0.1.0 quality audit)
@@ -1314,6 +1315,9 @@ void app::render()
     }
 
     ui::draw_tile_inspector(m_world, m_ui, m_generation_report, &m_ui.show_tile_ledger);
+    // Generation Ledger (BL-303) — regenerates the per-pass record on demand from
+    // the report's tile-pass inputs; nothing it reads is held on the world.
+    ui::draw_generation_ledger(m_world, m_ui, m_generation_report, &m_ui.show_generation_ledger);
     {
         const ui::player_plot_history phist{m_balance_history, m_income_history, m_expenditure_history};
         ui::draw_economy_panel(m_world, m_registry, m_last_econ_report, phist, m_ui, &m_ui.show_economy_panel);

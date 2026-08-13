@@ -174,6 +174,30 @@ struct generation_report
         /// struct: it never enters `world`, so it stays off the serialisation
         /// seam.
         settlement_state settlement;
+
+        /// Exactly what `generate_body_tiles` was called with for this body — the
+        /// arguments that are NOT recoverable from anything else the report or the
+        /// world holds (the seed above all: Kepler's is chosen by the BL-276
+        /// reject-and-reroll gate, so it cannot be re-derived from world_params).
+        ///
+        /// The Generation Ledger (BL-303) regenerates a body's `generation_record`
+        /// on demand from these rather than the world storing one per tile — the
+        /// derivation is deterministic and cheap, so keeping it is bloat
+        /// (GENERATION_LEDGER.md § Data lifetime). Presentation data like the rest
+        /// of this struct: it never enters `world` and never reaches the save.
+        struct tile_inputs
+        {
+            bool     valid           = false; ///< False on a report built without a tile pass.
+            uint32_t seed            = 0;     ///< The per-body tile seed actually used.
+            float    deposit_scalar  = 1.0f;  ///< The abundance multiplier the deposits were scaled by.
+            int      gw              = 0;     ///< Grid width the pass ran at.
+            int      gh              = 0;     ///< Grid height the pass ran at.
+            /// Whether the Continents convergent mask was passed in. `continents`
+            /// above holds the mask for every body, but only the homeworld's Pass 5
+            /// was given it — regenerating with it where generation did not would
+            /// silently produce a DIFFERENT surface from the one on screen.
+            bool     used_convergent = false;
+        } tiles;
     };
 
     world_preferences       preferences{}; ///< What the player asked for.
