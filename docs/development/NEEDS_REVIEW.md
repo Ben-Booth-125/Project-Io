@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*194 entries — 70 open, 124 resolved.*
+*196 entries — 72 open, 124 resolved.*
 
 ---
 
@@ -433,7 +433,7 @@ ROADMAP.md carries "## Done-definition — v0.1.5 (military systems, cut by Spri
 
 *Files: `docs/development/ROADMAP.md`, `CHANGELOG.md`, `README.md`, `docs/development/backlog.json`*
 
-### NR-173 — BL-367 (multi-building management surface) landed without a live side-by-side screenshot of the grouped-stack list and the +N badge
+### NR-198 — BL-367 (multi-building management surface) landed without a live side-by-side screenshot of the grouped-stack list and the +N badge
 *observation · raised 2026-08-12 · from BL-367 delivery session.*
 
 Implemented the grouped-by-stack list (construction_panel.cpp draw_tile_stack_list), the Manage-button/canvas-marker tile-routing fix, and the on-canvas +N badge (body_surface_canvas.cpp), per the item's 2026-08-11 settled design. Verified: ProjectIo builds clean, launches without crash (Lua loads, no render error in the startup log). NOT verified: an actual screenshot of a real multi-building tile showing the grouped list and the badge rendered correctly (correct stagger vs the corp-identity tag, correct text fit) — building a multi-building save state and driving the UI to it was out of scope for this pass.
@@ -667,6 +667,28 @@ BL-315 (conflict spine) said from its 2026-08-07 filing through its 2026-08-10 r
 > **Recommendation:** Accept. The precondition clause is the part I would watch: the item now says explicitly that the conflict spine is worth nothing on an empty map, so before it is promoted, walk the homeworld at 0 CE and confirm there is a worked, populated civilisation there to fight over. That is your 'tiles suitably worked' steer turned into a gate.
 
 *Files: `docs/development/backlog.json`*
+
+### NR-196 — Era -1 supply was priced twice, on two different scales - the scorer and the battle disagreed
+*decision taken on your behalf · raised 2026-08-13 · from BL-316 / BL-318 agent session, reading history_sim.cpp after fast-forwarding a stale worktree*
+
+run_history_sim computed campaign supply in two separate places that did not agree. The SCORER measured from the staging holding (hub_dist, bounded by neighbour_radius, so at most ~250 per-mille of decay). The EXECUTED battle re-derived it from the CAPITAL (cap_dist, unbounded - on the 312-wide map routinely past the 1000 that clamps supply to zero). So the scorer chose campaigns it believed were nearly fully supplied and then fought them at nothing, which is why stalled_campaigns counted almost every launch. Fixed by pricing supply ONCE, in a single campaign_supply lambda both paths call. The two comments in the file asserted opposite intents; the newest-dated one (2026-08-12, Bens supply-hubs steer) was taken as authoritative per newest-dated-wins.
+
+**Why it matters.** This is BL-318s own thesis - a cost authored on one scale and spent on another - found inside the code BL-318 landed. It also means every stall/conquest number measured since the hub_dist change described a sim whose estimate and outcome disagreed, so those numbers should not be used for calibration.
+
+> **Recommendation:** Re-run the sweep after this lands; expect stalled_campaigns to fall sharply and conquests to rise. Treat all pre-fix sweep evidence as void, the same way BL-318 voided pre-grid-fix evidence.
+
+*Files: `src/world/history_sim.cpp`*
+
+### NR-197 — Both Era -1 harnesses were pinned to the superseded 0->1960 epoch and the wrong grid width
+*decision taken on your behalf · raised 2026-08-13 · from Same session; found while adding assertions for the BL-316 slices*
+
+history_sim_harness.cpp hardcoded start_year 0 / stop_year 1960 and a 168x90 grid; history_sweep.cpp hardcoded the same span plus year windows 196 and 1960. The sim runs 4000 BCE -> 0 CE now and Kepler is 312x145. Two consequences: (a) with every stepped-clock band sitting below year 0, a 0..1960 run falls past the last band and ticks FLAT for 1960 rounds, so neither instrument exercised the stepped clock the game uses; (b) gw is the cylinders circumference, so understating it at 168 made province_distance wrap columns that do not wrap, silently reporting provinces on opposite sides of the map as neighbours. Both now derive from history_sim_params defaults and home_grid_width/height. Separately, R3b2 asserted c.battles == 0 - that the scores distance penalty vetoes a far target outright. That was true of the flat w_dist and is deliberately no longer true (w_dist is a proportional discount now), so the assertion was relaxed to the direction (pricing distance never makes a far target more attractive) rather than left asserting the old bug back.
+
+**Why it matters.** Same class as the sweeps 168x90-vs-180x84 terrain misalignment BL-318 already fixed: quiet, plausible, and it invalidates measurement rather than crashing. Any Era -1 number quoted from either harness before this is measuring a configuration the game does not run.
+
+> **Recommendation:** Ben to confirm the R3b2 relaxation is the reading he wants, and whether w_dist still earns its place now that the burden of breadth exists (BL-316 S3s stated follow-up).
+
+*Files: `tools/verify/history_sim_harness.cpp`, `tools/verify/history_sweep.cpp`*
 
 ---
 
@@ -2363,7 +2385,7 @@ BL-365 replaced the abstract nation substrate with real background corporations,
 
 > **Recommendation:** Option 1 or 2, not 3. The two are close: option 1 keeps a distinct question ('where is the industry I did not build?') that Production does not quite ask, since Production is body-relative intensity including the player's own; option 2 is honest about the fact that Industry was already trimmed off the visible bar the day it shipped. Option 3 leaves a surface that reads as evidence and is not, which is the thing worth avoiding. Option 4 only after 1 is ruled out — `substrate_density` is cheap and deleting it is a save-format touch for no gain.
 
-> **RESOLVED.** ANSWERED (Ben, 2026-08-12, Q&A form): **option 1 — re-point the Industry lens at real background-firm buildings.** Per-tile count/output of is_background corp buildings, which is what the lens name always promised, and which gives the saturated BL-365 world a surface of its own. tile.substrate_density is not deleted (option 4 declined by implication); it simply stops being the lens input. Filed as BL-373 (industry lens re-point).
+> **RESOLVED.** RESOLVED 2026-08-13 by BL-373 landing: the Industry lens now reads is_background corp buildings. The field formula taken (a 0.5 presence floor plus output share) and the econ_step that stopped being vestigial are NR-186 and NR-187.
 
 *Files: `docs/ui/LENSES.md`, `docs/ai/ACTIONS.json`, `src/ui/body_surface_canvas.cpp`, `src/world/nation_generation.cpp`, `src/world/components.hpp`*
 

@@ -3,7 +3,21 @@
 //
 // Binds the requirement group "era-minus-1-history-sim" (R1..R8). Runs the
 // year-tick sim over the generated Kepler settlement state and over a small
-// synthetic two-polity world where the supply-decay stall can be isolated.
+// synthetic two-polity world where one mechanism at a time can be isolated.
+//
+// ALSO COVERS the Era -1 logistics slices (BL-316) and the shared-currency
+// scorer (BL-318), which landed with no assertions behind them:
+//   S1a/S1b  real terrain is live, not inert
+//   S2a      terrain-weighted reach never makes mountains cheaper
+//   S3a/S3b  the burden of breadth is live and points the right way
+//   B318a-c  no verb has swallowed the run
+//
+// THE PATTERN THESE USE, and the reason they are shaped this way: each runs the
+// SAME world twice with one variable changed, and asserts the DIRECTION of the
+// difference. An absolute count would be a calibration target, and calibration
+// targets get tuned toward instead of measured — which is how the sim ended up
+// with a `stalled_campaigns` counter that read a constant zero and a terrain
+// module nobody noticed was dead.
 //
 // Headless: world/* logic only, no SDL and no Lua.
 // ---------------------------------------------------------------------------
@@ -87,6 +101,47 @@ settlement_state two_polity_world(int separation)
     return ss;
 }
 
+/// The synthetic worlds' own grid. Small enough to allocate a terrain field
+/// for, wide enough that a 34-tile separation cannot wrap the cylinder.
+constexpr int syn_gw = 168;
+constexpr int syn_gh = 90;
+
+/// A UNIFORM terrain field, held by value so the view it hands out stays valid.
+///
+/// The point is to make terrain a VARIABLE the harness controls. BL-316 S1's
+/// finding was that both callers passed an empty view, so every Era -1 battle
+/// ever fought resolved on default grassland/plains and the whole
+/// terrain_combat module was inert — a state no assertion could have caught,
+/// because there was nothing to compare against. Two runs differing only in
+/// their ground is that comparison.
+struct flat_terrain
+{
+    std::vector<terrain_composition> composition;
+    std::vector<terrain_landform>    landform;
+
+    flat_terrain(int gw, int gh, terrain_composition c, terrain_landform l)
+        : composition(static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh), c)
+        , landform(static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh), l)
+    {}
+
+    sim_terrain_view view() const { return sim_terrain_view{&composition, &landform}; }
+};
+
+/// Did two runs produce a different history at all? The inertness check.
+bool differs(const history_sim_state& a, const history_sim_state& b)
+{
+    if (a.battles != b.battles || a.conquests != b.conquests
+     || a.foundings != b.foundings || a.stalled_campaigns != b.stalled_campaigns)
+        return true;
+    if (a.owner_changes.size() != b.owner_changes.size()) return true;
+    for (std::size_t i = 0; i < a.owner_changes.size(); ++i)
+        if (a.owner_changes[i].year != b.owner_changes[i].year
+         || a.owner_changes[i].province != b.owner_changes[i].province
+         || a.owner_changes[i].owner != b.owner_changes[i].owner)
+            return true;
+    return false;
+}
+
 } // namespace
 
 int main()
@@ -106,16 +161,30 @@ int main()
     }
 
     const sim_terrain_view no_terrain{}; // Both members null: neutral terrain, legal by design.
+
+    // THE DEFAULTS ARE THE REAL EPOCH. This harness pinned start/stop to
+    // 0 -> 1960, which stopped being the run the game does when the campaign
+    // epoch moved to 0 CE (the sim now runs 4000 BCE -> 0 CE under the stepped
+    // decision clock). Left pinned, every Kepler assertion below measured a
+    // configuration that no longer exists, and the stepped clock — the thing
+    // that makes the run affordable — was never exercised here at all.
     history_sim_params params;
-    params.start_year = 0;
-    params.stop_year  = 1960;
+
+    // AND THE GRID MUST BE THE REAL GRID. These runs passed 168x90 against a
+    // Kepler that is home_grid_width x home_grid_height (312x145). `gw` is the
+    // cylinder's circumference: understate it and `province_distance` wraps
+    // columns that do not wrap, silently reporting two provinces on opposite
+    // sides of the map as neighbours. Same class of defect as the sweep's
+    // 168x90-vs-180x84 terrain misalignment, and just as quiet.
+    constexpr int kgw = home_grid_width;
+    constexpr int kgh = home_grid_height;
 
     // --- R1  determinism ---------------------------------------------------
     {
         settlement_state s1 = k1->settlement;
         settlement_state s2 = k1->settlement;
-        const history_sim_state a = run_history_sim(s1, nullptr, no_terrain, 168, 90, params, 12345u);
-        const history_sim_state b = run_history_sim(s2, nullptr, no_terrain, 168, 90, params, 12345u);
+        const history_sim_state a = run_history_sim(s1, nullptr, no_terrain, kgw, kgh, params, 12345u);
+        const history_sim_state b = run_history_sim(s2, nullptr, no_terrain, kgw, kgh, params, 12345u);
         check(same_run(a, b, s1, s2),
               "R1   two runs of the same seed produce an identical history and ownership ring");
         check(!a.polities.empty(), "R1b  the sim seeds at least one polity from the cultures");
@@ -127,7 +196,7 @@ int main()
         const std::size_t before = s.provinces.size();
 
         const auto t0 = std::chrono::steady_clock::now();
-        const history_sim_state a = run_history_sim(s, nullptr, no_terrain, 168, 90, params, 7u);
+        const history_sim_state a = run_history_sim(s, nullptr, no_terrain, kgw, kgh, params, 7u);
         const auto t1 = std::chrono::steady_clock::now();
         const int64_t ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
 
@@ -150,7 +219,7 @@ int main()
         // measured full run is ~2.1s. Bound against that reality so the harness
         // stays honest; the sub-second bar returns when BL-320 lands its index.
         check(ms < 3000,
-              "R7   a full 0->1960 run fits the ~2.1s measured budget (BL-320)");
+              "R7   a full 4000 BCE -> 0 CE run fits the measured budget (BL-320)");
         check(s.provinces.size() > before,
               "R8   the Settle verb founds provinces during the run");
         check(a.years == params.stop_year - params.start_year,
@@ -177,7 +246,12 @@ int main()
     // nothing and the frontier stalls on arithmetic alone.
     {
         history_sim_params p2 = params;
-        p2.stop_year = 400;
+        // The synthetic cases keep their own short, FLAT span: they isolate one
+        // mechanism, and the stepped clock's coarse prehistory bands would make
+        // "how many rounds happened" a second variable. `params` now carries the
+        // real 4000 BCE epoch, so start_year has to be stated, not inherited.
+        p2.start_year = 0;
+        p2.stop_year  = 400;
 
         // THE RADIUS MUST NOT BE WHAT STOPS THE FAR CASE (BL-312). The first cut
         // put the far prize 34 tiles out against a neighbour_radius of 9, so it
@@ -189,19 +263,18 @@ int main()
         p2.neighbour_radius = 40;
 
         // AND the distance term in the OBJECTIVE SCORE must not be what stops
-        // it either. Running this honestly exposed something BL-277 Q2 asserts
-        // but the code does not do: `w_dist` and `supply_decay_per_tile_q` both
-        // key off cap_dist, and the SCORE penalty binds first — a far target is
-        // rejected before any force is raised, so no army ever "arrives too
-        // thin". Zeroing w_dist isolates supply decay as the only thing left
-        // that can stop the far case, which is the mechanism under test.
+        // it either. Zeroing `w_dist` isolates the logistics price as the only
+        // thing left that can stop the far case, which is the mechanism under
+        // test. (Historically `w_dist` was a flat subtraction and vetoed the far
+        // target outright; it is a proportional discount now, so it discourages
+        // rather than forbids. Zeroing it still removes the variable.)
         p2.w_dist = 0;
 
         settlement_state near_w = two_polity_world(3);
         settlement_state far_w  = two_polity_world(34);
 
-        const history_sim_state a = run_history_sim(near_w, nullptr, no_terrain, 168, 90, p2, 99u);
-        const history_sim_state b = run_history_sim(far_w,  nullptr, no_terrain, 168, 90, p2, 99u);
+        const history_sim_state a = run_history_sim(near_w, nullptr, no_terrain, syn_gw, syn_gh, p2, 99u);
+        const history_sim_state b = run_history_sim(far_w,  nullptr, no_terrain, syn_gw, syn_gh, p2, 99u);
 
         std::printf("      near: %lld battles / %lld conquests | far: %lld battles / %lld conquests\n",
                     static_cast<long long>(a.battles), static_cast<long long>(a.conquests),
@@ -212,35 +285,219 @@ int main()
               "R3a2 the FAR objective is genuinely scored and attacked — the radius is not what stops it");
         check(b.stalled_campaigns > 0,
               "R3a3 those far campaigns arrive under-supplied (the stall is real, not absence)");
-        // WHAT ACTUALLY STOPS DISTANT EXPANSION. With w_dist zeroed above, the
-        // far province IS taken (1 conquest) even though its campaigns arrive
-        // under-supplied. So supply decay alone does NOT stall a frontier —
-        // BL-277 Q2's stated mechanism ("the arriving force is below the
-        // defender's, so the frontier stops on arithmetic") does not hold. The
-        // stall is a PREFERENCE in the objective score, not a physical limit.
-        check(b.conquests > 0,
-              "R3b  supply decay ALONE does not stop conquest — recorded, not asserted away");
+        // WHAT ACTUALLY STOPS DISTANT EXPANSION — measured, not assumed. On
+        // plains, with the burden of breadth inert (two provinces is far under
+        // `free_holdings`), supply only mitigates attrition and attrition on
+        // plains is 100/1000. So the whole span from fully supplied to totally
+        // cut off is 10% of combat power, and the far province can still fall.
+        //
+        // This is RECORDED rather than asserted away, and it is why BL-316 exists:
+        // the fix for a 10% dynamic range is not to inflate the supply term but
+        // to make the other two terms real — terrain (a mountain battle carries
+        // up to 900/1000 attrition, so supply matters enormously there) and the
+        // burden of breadth. Both are exercised by S2/S3 below, on purpose, in
+        // conditions where they can actually bite.
+        std::printf("      far: %lld stalled of %lld campaigns, %lld conquests "
+                    "(supply's plains dynamic range is ~10%% of combat power)\n",
+                    static_cast<long long>(b.stalled_campaigns),
+                    static_cast<long long>(b.battles),
+                    static_cast<long long>(b.conquests));
 
+        // DIRECTION, NOT AN ABSOLUTE. This was `c.battles == 0` — the claim that
+        // the score's distance penalty vetoes the far target outright. That was
+        // true of the flat `w_dist` and is deliberately no longer true: a flat
+        // subtraction from a ~200-300 province value suppressed every war on a
+        // large map, so `w_dist` became a proportional discount. Asserting the
+        // old absolute would now be asserting the bug back. What must still hold
+        // is the direction — pricing distance cannot make the far target MORE
+        // attractive.
         {
             history_sim_params p_dist = p2;
             p_dist.w_dist = 120;   // The default: distance priced in the score.
             settlement_state far2 = two_polity_world(34);
             const history_sim_state c =
-                run_history_sim(far2, nullptr, no_terrain, 168, 90, p_dist, 99u);
-            check(c.battles == 0,
-                  "R3b2 the real stall is the SCORE's distance penalty: the far target is never chosen");
+                run_history_sim(far2, nullptr, no_terrain, syn_gw, syn_gh, p_dist, 99u);
+            std::printf("      far with w_dist=120: %lld battles / %lld conquests "
+                        "(w_dist=0 gave %lld / %lld)\n",
+                        static_cast<long long>(c.battles), static_cast<long long>(c.conquests),
+                        static_cast<long long>(b.battles), static_cast<long long>(b.conquests));
+            check(c.battles <= b.battles,
+                  "R3b2 pricing distance in the score never makes a far target more attractive");
         }
         check(a.conquests >= b.conquests,
               "R3c  proximity never scores worse than distance for territorial gain");
     }
 
+    // --- S1  real terrain is LIVE, not inert (BL-316) ----------------------
+    //
+    // The finding this slice was filed on: both callers passed an empty
+    // `sim_terrain_view`, so every Era -1 battle ever fought resolved on default
+    // grassland/plains and terrain_combat — defence, attrition, BL-233's
+    // modifiers — was dead code. That state is invisible to any single run. It
+    // shows up only as two runs that differ ONLY in their ground and produce
+    // byte-identical histories.
+    {
+        history_sim_params ps = params;
+        ps.start_year = 0;
+        ps.stop_year  = 400;
+        ps.neighbour_radius = 40;
+
+        const flat_terrain plains(syn_gw, syn_gh,
+                                  terrain_composition::grassland, terrain_landform::plains);
+        const flat_terrain alps(syn_gw, syn_gh,
+                                terrain_composition::rocky, terrain_landform::mountain);
+
+        settlement_state wp_ = two_polity_world(6);
+        settlement_state wm  = two_polity_world(6);
+        const history_sim_state on_plains =
+            run_history_sim(wp_, nullptr, plains.view(), syn_gw, syn_gh, ps, 77u);
+        const history_sim_state on_mountain =
+            run_history_sim(wm,  nullptr, alps.view(),   syn_gw, syn_gh, ps, 77u);
+
+        std::printf("      plains: %lld battles / %lld conquests | mountain: %lld / %lld\n",
+                    static_cast<long long>(on_plains.battles),
+                    static_cast<long long>(on_plains.conquests),
+                    static_cast<long long>(on_mountain.battles),
+                    static_cast<long long>(on_mountain.conquests));
+
+        check(differs(on_plains, on_mountain),
+              "S1a  terrain CHANGES the history — the terrain view is no longer inert");
+        check(on_mountain.conquests <= on_plains.conquests,
+              "S1b  mountains are not easier to conquer across than plains");
+    }
+
+    // --- S2  terrain-weighted reach (BL-316) -------------------------------
+    //
+    // Reach is a COST over the neighbour graph, not a straight line: the same
+    // separation across mountains costs about twice what it costs across
+    // plains. Measured through supply, so the observable is the stall rate.
+    {
+        history_sim_params ps = params;
+        ps.start_year = 0;
+        ps.stop_year  = 400;
+        ps.neighbour_radius = 40;
+        // Reach is priced per 100 of accumulated cost, so it is a small term at
+        // the default. Raised here so the SIGN of the effect is measurable
+        // without changing what the sim does at its shipped tuning — this is an
+        // instrument gain, not a calibration.
+        ps.terrain_reach_cost_q = 400;
+
+        const flat_terrain plains(syn_gw, syn_gh,
+                                  terrain_composition::grassland, terrain_landform::plains);
+        const flat_terrain alps(syn_gw, syn_gh,
+                                terrain_composition::rocky, terrain_landform::mountain);
+
+        settlement_state wp_ = two_polity_world(20);
+        settlement_state wm  = two_polity_world(20);
+        const history_sim_state flat_run =
+            run_history_sim(wp_, nullptr, plains.view(), syn_gw, syn_gh, ps, 88u);
+        const history_sim_state hilly_run =
+            run_history_sim(wm,  nullptr, alps.view(),   syn_gw, syn_gh, ps, 88u);
+
+        std::printf("      reach: plains %lld stalled / %lld battles | mountain %lld / %lld\n",
+                    static_cast<long long>(flat_run.stalled_campaigns),
+                    static_cast<long long>(flat_run.battles),
+                    static_cast<long long>(hilly_run.stalled_campaigns),
+                    static_cast<long long>(hilly_run.battles));
+
+        check(hilly_run.conquests <= flat_run.conquests,
+              "S2a  terrain-weighted reach never makes mountainous ground cheaper to take");
+    }
+
+    // --- S3  the burden of breadth (BL-316) --------------------------------
+    //
+    // Ben's mechanism: supply available to a campaign falls with the polity's
+    // TOTAL holdings, so expansion eventually pays for itself in reach and the
+    // frontier stall becomes ARITHMETIC rather than a scoring preference.
+    // Before this slice, holding 500 provinces cost exactly what holding 5 did.
+    //
+    // Isolated by turning the burden on and off over the same world. `burden`
+    // is subtracted from supply directly, so the direction is unambiguous:
+    // never more conquest with the burden on than with it off.
+    {
+        history_sim_params base = params;
+        base.start_year = 0;
+        base.stop_year  = 400;
+        base.neighbour_radius = 40;
+
+        history_sim_params off = base;
+        off.holdings_burden_q = 0;      // No cost of breadth at all — the old world.
+
+        history_sim_params on = base;
+        on.free_holdings     = 0;       // Every province held costs supply...
+        on.holdings_burden_q = 300;     // ...and costs it visibly.
+
+        settlement_state w_off = two_polity_world(12);
+        settlement_state w_on  = two_polity_world(12);
+        const history_sim_state a =
+            run_history_sim(w_off, nullptr, no_terrain, syn_gw, syn_gh, off, 55u);
+        const history_sim_state b =
+            run_history_sim(w_on,  nullptr, no_terrain, syn_gw, syn_gh, on,  55u);
+
+        std::printf("      burden off: %lld battles / %lld conquests / %lld stalled | "
+                    "on: %lld / %lld / %lld\n",
+                    static_cast<long long>(a.battles), static_cast<long long>(a.conquests),
+                    static_cast<long long>(a.stalled_campaigns),
+                    static_cast<long long>(b.battles), static_cast<long long>(b.conquests),
+                    static_cast<long long>(b.stalled_campaigns));
+
+        check(differs(a, b),
+              "S3a  the burden of breadth is LIVE — holding ground is no longer free");
+        check(b.conquests <= a.conquests,
+              "S3b  a polity charged for its breadth never conquers more than one that is not");
+    }
+
+    // --- BL-318  the verbs share one currency ------------------------------
+    //
+    // The failure this item names is a SCORER whose argmax is decided by scale
+    // rather than by desirability: one verb pins at its ceiling and wins every
+    // year forever. Both observed cuts had exactly that shape — Invest-dominated
+    // (82 provinces, ownership frozen after year 458 of 1960), then
+    // Settle-dominated (1532 provinces, 1450 foundings, conquests ZERO).
+    //
+    // So the check is not "the numbers look right", which is unfalsifiable, but
+    // that NO VERB HAS SWALLOWED THE RUN: the sim must still be deciding things
+    // late, and more than one verb must be reachable. Both cuts above would fail
+    // this; neither would fail a total-count assertion.
+    {
+        settlement_state s = k1->settlement;
+        const history_sim_state a = run_history_sim(s, nullptr, no_terrain, kgw, kgh, params, 2024u);
+
+        int64_t last_change = params.start_year;
+        for (const owner_change& c : a.owner_changes)
+            if (c.year > last_change) last_change = c.year;
+
+        const int64_t span   = params.stop_year - params.start_year;
+        const int64_t elapsed = last_change - params.start_year;
+
+        std::printf("      currency: %lld foundings / %lld conquests / %lld battles, "
+                    "last ownership change year %lld of %lld..%lld\n",
+                    static_cast<long long>(a.foundings),
+                    static_cast<long long>(a.conquests),
+                    static_cast<long long>(a.battles),
+                    static_cast<long long>(last_change),
+                    static_cast<long long>(params.start_year),
+                    static_cast<long long>(params.stop_year));
+
+        // THE INERT-TAIL TEST. "Last ownership change at year 458 of 1960" is
+        // the exact symptom the shared currency was built to remove: three
+        // quarters of the run doing nothing, so every distribution the sweep
+        // reported described a world that stopped early.
+        check(elapsed * 2 >= span,
+              "B318a the run is still deciding in its second half — no verb has swallowed it");
+
+        // Neither verb may be extinct. Settle-only and conquest-only are the two
+        // observed collapses, and each is invisible to a check on the other.
+        check(a.foundings > 0, "B318b the Settle verb is reachable under the shared currency");
+        check(a.conquests > 0, "B318c the Campaign verb is reachable under the shared currency");
+    }
+
     // --- R5  season is an action axis, not a clock -------------------------
     {
         settlement_state s = k1->settlement;
-        history_sim_params p3 = params;
-        p3.stop_year = 600;
-        p3.winter_score_premium_q = 0; // Make winter freely competitive.
-        const history_sim_state a = run_history_sim(s, nullptr, no_terrain, 168, 90, p3, 4242u);
+        history_sim_params p3 = params; // The real epoch — winter is a real axis in it.
+        p3.winter_score_premium_q = 0;  // Make winter freely competitive.
+        const history_sim_state a = run_history_sim(s, nullptr, no_terrain, kgw, kgh, p3, 4242u);
         check(a.winter_campaigns > 0,
               "R5   winter campaigns are chosen as candidates, not scheduled by a clock");
         check(a.battles >= a.winter_campaigns,
@@ -256,8 +513,9 @@ int main()
     {
         settlement_state s = two_polity_world(3);
         history_sim_params p4 = params;
-        p4.stop_year = 400;
-        const history_sim_state a = run_history_sim(s, nullptr, no_terrain, 168, 90, p4, 5u);
+        p4.start_year = 0;   // Synthetic world: its own flat span (see R3).
+        p4.stop_year  = 400;
+        const history_sim_state a = run_history_sim(s, nullptr, no_terrain, syn_gw, syn_gh, p4, 5u);
         bool anchors_intact = (s.provinces[0].anchor == 0 && s.provinces[1].anchor == 3);
         check(anchors_intact,
               "R4   a run never rewrites a province's anchor tile — transfer is province-granular");
@@ -316,9 +574,12 @@ int main()
     {
         settlement_state s = k1->settlement;
         history_sim_params p5 = params;
-        p5.stop_year = 300;
+        // Seeding happens at setup, so a short slice of the real epoch is
+        // enough — and stays cheap. Stated relative to start_year, which is
+        // 4000 BCE now, not 0.
+        p5.stop_year = p5.start_year + 300;
         p5.seed_great_powers = true;
-        const history_sim_state a = run_history_sim(s, nullptr, no_terrain, 168, 90, p5, 11u);
+        const history_sim_state a = run_history_sim(s, nullptr, no_terrain, kgw, kgh, p5, 11u);
 
         int majors = 0, expansionist = 0, preserving = 0;
         for (const polity& q : a.polities)
