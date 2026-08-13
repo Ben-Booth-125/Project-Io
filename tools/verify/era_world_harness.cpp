@@ -138,12 +138,31 @@ int main()
     check(any_industrial_1960, "R5 the 1960 world still industrialises");
     check(k60->settlement.lacunae > 0 || !k60->settlement.checkpoints.empty(),
           "R5 the 1960 world still resolves ruptures");
-    check(ps60.size() >= ps.size(), "R5 the 1960 world holds at least as many provinces");
+    // R5's province-count comparison is against the SETTLEMENT PASS's 0 CE
+    // output, not against `ps`. Since the year-tick sim was wired into
+    // generation (2026-08-12) the 0 CE world keeps founding provinces for 400
+    // years after the settlement pass stops — 1107 of them on a measured run —
+    // so `ps` is no longer "what had been settled by year 0" and comparing 1960
+    // against it asks the wrong question. The claim worth checking is unchanged:
+    // the 1960 arc settles at least as much ground as the ancient stop did.
+    world_params antiq_settled = antiq;
+    antiq_settled.prehistory_years = 0;
+    generation_report rep_settled{};
+    make_hard_coded_world(antiq_settled, &rep_settled);
+    const auto* k_settled = kepler_entry(rep_settled);
+    check(k_settled != nullptr, "R5 the settlement-only 0 CE control generated");
+    if (k_settled != nullptr)
+        check(ps60.size() >= k_settled->settlement.provinces.size(),
+              "R5 the 1960 world holds at least as many provinces as the 0 CE settlement pass");
 
     // --- The dossier ---------------------------------------------------------
     std::printf("\n=== KEPLER AT 0 CE ===\n");
-    std::printf("provinces: %zu settled by year 0 (the 1960 arc reaches %zu — %zu founded later)\n",
-                ps.size(), ps60.size(), ps60.size() - ps.size());
+    // Signed difference deliberately: the 0 CE world now out-founds the 1960 one
+    // (the year-tick sim keeps settling for 400 years), so an unsigned subtraction
+    // here wrapped to a nonsense number.
+    std::printf("provinces: %zu at 0 CE (the 1960 arc reaches %zu — a difference of %" PRId64 ")\n",
+                ps.size(), ps60.size(),
+                static_cast<int64_t>(ps60.size()) - static_cast<int64_t>(ps.size()));
     std::printf("nations:   %zu\n", wa.nations.size());
     std::printf("people:    %" PRId64 " across all provinces; %" PRId64 " recruitable under arms\n",
                 total_pop, total_mp);

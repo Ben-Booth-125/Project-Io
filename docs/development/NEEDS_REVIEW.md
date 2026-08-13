@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*184 entries — 60 open, 124 resolved.*
+*186 entries — 62 open, 124 resolved.*
 
 ---
 
@@ -537,6 +537,32 @@ Wiring the Era -1 year-tick sim into generation added ~23 s to EVERY world any c
 > **Recommendation:** Accept, and treat BL-320 (Era -1 sim runtime) as the real fix: this restores the gate today but every no_prehistory() is a small blind spot, and they all disappear on their own once the sim is affordable.
 
 *Files: `src/world/hard_coded_world.hpp`, `src/world/hard_coded_world.cpp`, `tools/verify/harness_params.hpp`, `tools/verify/era_world_harness.cpp`, `CMakeLists.txt`*
+
+### NR-186 — The Industry lens's new field: a 0.5 presence floor plus output share, and a renamed key
+*decision taken on your behalf · raised 2026-08-13 · from BL-373 (Industry lens re-point) implementation — two calls the settled design left open*
+
+The design said tint by the 'count/output' of is_background corp buildings but did not weight the two. Taken: per tile, the sum of (0.5 + 0.5 x output_share), with output normalised body-locally. So a tile with any background plant on it reads at least half-lit even if that plant is idle, and output separates the rest. The key title also changed from 'Industry throughput' to 'Background industry', because throughput is no longer what the lens measures.
+
+**Why it matters.** The 0.5 floor is a claim about what the lens is FOR: presence is the fact it reports ('where is the industry I did not build?'), so an idle background plant should not vanish from the map. Weight it purely by output and the lens becomes a second Production lens, which is the exact collapse the design named as its fallback-to-retirement case. Ben should look at the two lenses side by side once this builds and confirm they read differently — if they do not, the settled fallback is to retire Industry in favour of Production.
+
+- Accept the floor and the rename (recommended).
+- Drop the floor — tint purely by output share, and accept that idle background plants disappear.
+- Raise the floor (e.g. 0.7) so the lens reads closer to a pure presence map.
+
+> **Recommendation:** Accept, then eyeball Industry against Production on the same body. The floor is one constant in one expression and is trivially re-tuned once you have seen both.
+
+*Files: `src/ui/body_surface_canvas.cpp`, `docs/ui/LENSES.md`*
+
+### NR-187 — industry_lens.lua's econ_step(4) was documented as vestigial and is load-bearing again
+*observation · raised 2026-08-13 · from BL-373 implementation*
+
+scripts/verify/industry_lens.lua calls verify.econ_step(4), and a comment recorded it as vestigial — the lens read tile.substrate_density, a generation-time field that needed no ticks. Now that the lens reads the economy report's buildings, zero ticks renders an EMPTY lens. Recorded in LENSES.md.
+
+**Why it matters.** A check that renders nothing still captures a PNG and still passes a re-bless. If someone deletes that call as dead setup, the golden silently becomes a picture of an empty map — the failure mode where a green check proves nothing. This is the same shape as NR-175's silently-failing third table.
+
+> **Recommendation:** No action needed beyond the note, unless a verify-time assertion that the lens field is non-empty is wanted — which would close the class rather than this instance.
+
+*Files: `scripts/verify/industry_lens.lua`, `docs/ui/LENSES.md`*
 
 ---
 

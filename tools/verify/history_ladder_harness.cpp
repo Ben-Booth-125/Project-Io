@@ -132,6 +132,9 @@ int main()
     // --- Generate the real world twice --------------------------------------
     world_params wp;
     wp.seed = 0xB221u;
+    // See creeds_harness: the ladder stages under test are 1960-era, and the
+    // default epoch is now 0 CE. Ask for the era explicitly (NR-177).
+    wp.epoch_year = 1960;
     generation_report r1, r2;
     const world w1 = make_hard_coded_world(no_prehistory(wp), &r1);
     const world w2 = make_hard_coded_world(no_prehistory(wp), &r2);
@@ -283,6 +286,8 @@ int main()
         for (uint32_t s = 0; s < 12; ++s)
         {
             world_params p; p.seed = 0xB2210000u + s * 0x9E37u;
+            p.epoch_year = 1960; // the ladder era under test, not the campaign default
+
             generation_report rr;
             make_hard_coded_world(no_prehistory(p), &rr);
             for (const auto& b : rr.bodies)

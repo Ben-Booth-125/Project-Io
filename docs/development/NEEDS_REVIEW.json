@@ -3138,6 +3138,44 @@
     "CMakeLists.txt"
    ],
    "resolution": ""
+  },
+  {
+   "id": "NR-186",
+   "title": "The Industry lens's new field: a 0.5 presence floor plus output share, and a renamed key",
+   "raised": "2026-08-13",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-373 (Industry lens re-point) implementation — two calls the settled design left open",
+   "what": "The design said tint by the 'count/output' of is_background corp buildings but did not weight the two. Taken: per tile, the sum of (0.5 + 0.5 x output_share), with output normalised body-locally. So a tile with any background plant on it reads at least half-lit even if that plant is idle, and output separates the rest. The key title also changed from 'Industry throughput' to 'Background industry', because throughput is no longer what the lens measures.",
+   "why_it_matters": "The 0.5 floor is a claim about what the lens is FOR: presence is the fact it reports ('where is the industry I did not build?'), so an idle background plant should not vanish from the map. Weight it purely by output and the lens becomes a second Production lens, which is the exact collapse the design named as its fallback-to-retirement case. Ben should look at the two lenses side by side once this builds and confirm they read differently — if they do not, the settled fallback is to retire Industry in favour of Production.",
+   "options": [
+    "Accept the floor and the rename (recommended).",
+    "Drop the floor — tint purely by output share, and accept that idle background plants disappear.",
+    "Raise the floor (e.g. 0.7) so the lens reads closer to a pure presence map."
+   ],
+   "recommendation": "Accept, then eyeball Industry against Production on the same body. The floor is one constant in one expression and is trivially re-tuned once you have seen both.",
+   "files": [
+    "src/ui/body_surface_canvas.cpp",
+    "docs/ui/LENSES.md"
+   ],
+   "resolution": ""
+  },
+  {
+   "id": "NR-187",
+   "title": "industry_lens.lua's econ_step(4) was documented as vestigial and is load-bearing again",
+   "raised": "2026-08-13",
+   "kind": "observation",
+   "status": "open",
+   "source": "BL-373 implementation",
+   "what": "scripts/verify/industry_lens.lua calls verify.econ_step(4), and a comment recorded it as vestigial — the lens read tile.substrate_density, a generation-time field that needed no ticks. Now that the lens reads the economy report's buildings, zero ticks renders an EMPTY lens. Recorded in LENSES.md.",
+   "why_it_matters": "A check that renders nothing still captures a PNG and still passes a re-bless. If someone deletes that call as dead setup, the golden silently becomes a picture of an empty map — the failure mode where a green check proves nothing. This is the same shape as NR-175's silently-failing third table.",
+   "options": [],
+   "recommendation": "No action needed beyond the note, unless a verify-time assertion that the lens field is non-empty is wanted — which would close the class rather than this instance.",
+   "files": [
+    "scripts/verify/industry_lens.lua",
+    "docs/ui/LENSES.md"
+   ],
+   "resolution": ""
   }
  ]
 }

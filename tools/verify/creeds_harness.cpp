@@ -127,6 +127,11 @@ int main()
     // --- Generate the real world twice --------------------------------------
     world_params wp;
     wp.seed = 0xB235u;
+    // The ladder this harness reads runs to 1960 (industrialisation, ruptures,
+    // the common tongue). The DEFAULT epoch became 0 CE with the ancient refocus
+    // (NR-177), which stops the settlement pass before any of it happens - so ask
+    // for the era under test rather than inheriting whatever the campaign wants.
+    wp.epoch_year = 1960;
     generation_report r1, r2;
     const world w1 = make_hard_coded_world(no_prehistory(wp), &r1);
     const world w2 = make_hard_coded_world(no_prehistory(wp), &r2);
