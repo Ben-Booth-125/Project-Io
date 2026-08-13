@@ -7,6 +7,7 @@
 #include <limits>
 #include <queue>
 #include <tuple>
+#include <unordered_set>
 #include <vector>
 
 namespace {
@@ -325,6 +326,27 @@ const std::vector<float>& body_reach_field(world& w, entity_id body)
     const int total = gw * gh;
     cost.assign(static_cast<std::size_t>(total), inf);
 
+    // Collect the anchor tile set ONCE, then seed by lookup. The seed loop used
+    // to call is_supply_anchor per grid cell, and that predicate walks every
+    // population centre and every building — O(tiles x (centres + buildings)),
+    // which the 0 CE world turned pathological: 45,240 cells x ~1,100 ancient-era
+    // centres was ~50M map probes per rebuild, and the rebuild fired every warm-
+    // start tick (2026-08-12, the AppHangB1 stall). Same predicate, same
+    // conditions, one linear pass — the seeded set is identical.
+    std::unordered_set<entity_id> anchor_tiles;
+    for (const auto& [centre, ctile] : w.population_centre_tile)
+    {
+        (void)centre;
+        anchor_tiles.insert(ctile);
+    }
+    for (const auto& [bid, bc] : w.buildings)
+    {
+        (void)bid;
+        if ((bc.type == building_type::port || bc.type == building_type::inland_logistics_hub)
+            && bc.ticks_remaining <= 0 && !bc.decommissioned)
+            anchor_tiles.insert(bc.tile);
+    }
+
     // Seed every anchor at zero. RASTER ORDER, never tiles-map order — this runs
     // inside a deterministic simulation and the seed order must not depend on
     // hash-map iteration.
@@ -332,7 +354,7 @@ const std::vector<float>& body_reach_field(world& w, entity_id body)
     for (int i = 0; i < total; ++i)
     {
         const entity_id tid = grid[static_cast<std::size_t>(i)];
-        if (tid == null_entity || !is_supply_anchor(w, tid))
+        if (tid == null_entity || anchor_tiles.find(tid) == anchor_tiles.end())
             continue;
         cost[static_cast<std::size_t>(i)] = 0.0f;
         open.push(pq_entry{ 0.0f, i % gw, i / gw });

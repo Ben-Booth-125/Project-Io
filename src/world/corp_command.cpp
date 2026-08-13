@@ -336,8 +336,11 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             b.decommissioned = want;
             b.loss_streak    = 0;
             // An idled port/hub stops anchoring supply (is_supply_anchor);
-            // resume restores it — either way the reach field is stale.
-            invalidate_logistics_caches(w);
+            // resume restores it — either way the reach field is stale. Other
+            // types change nothing cached, and the AI issues these at tick
+            // rate (2026-08-12 — see invalidate_logistics_caches).
+            if (building_affects_logistics(b.type))
+                invalidate_logistics_caches(w);
             return corp_command_result::applied;
         }
 

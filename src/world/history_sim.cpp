@@ -180,7 +180,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                   int                       gw,
                                   int                       gh,
                                   const history_sim_params& params,
-                                  uint32_t                  seed)
+                                  uint32_t                  seed,
+                                  std::atomic<int>*         year_progress)
 {
     history_sim_state out;
     if (ss.provinces.empty() || params.stop_year <= params.start_year)
@@ -381,6 +382,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
     for (int64_t y = params.start_year; y < params.stop_year; ++y)
     {
+        // Loading-screen sink only — never read back, so the sim stays pure.
+        if (year_progress != nullptr)
+            year_progress->store(static_cast<int>(y - params.start_year + 1),
+                                 std::memory_order_relaxed);
+
         const std::size_t century =
             static_cast<std::size_t>((y - params.start_year) / 100);
 
@@ -461,6 +467,25 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     const province& tgt = ss.provinces[ti];
                     const int cap_dist = province_distance(cap, tgt, gw);
 
+                    // SUPPLY PROJECTS FROM THE STAGING HOLDING, NOT THE CAPITAL
+                    // (Ben, 2026-08-12: "perhaps we can try instructing supply
+                    // hubs?").
+                    //
+                    // `hi` is already the polity's own province adjacent to the
+                    // target — it IS a supply hub, and the loop was standing in
+                    // it while measuring supply all the way back to the capital.
+                    // That made reach a property of empire SHAPE rather than of
+                    // frontier presence: a large polity could not attack its own
+                    // border because its capital was far away.
+                    //
+                    // Measuring from the staging province instead is both the
+                    // better model (armies victual at the frontier) and what
+                    // makes reach scale-free — hub_dist is bounded by
+                    // neighbour_radius, so it cannot blow up when the map does.
+                    // The capital still matters, as the preference term below.
+                    const int hub_dist =
+                        province_distance(ss.provinces[static_cast<std::size_t>(hi)], tgt, gw);
+
                     // Defender's fielded power, as a headcount proxy.
                     const int64_t def_men = (tgt.manpower_stock * params.levy_fraction_q) / 1000;
                     const int def_scaled  = static_cast<int>(clampi64(def_men / 64, 0, 1000));
@@ -494,9 +519,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // Odds from the power ratio the sim can actually estimate:
                     // levy x supply x cohesion against the defender's levy.
                     const int reach_here = (ti < reach.size() && reach[ti] < (1 << 27))
-                                         ? static_cast<int>(reach[ti]) : cap_dist;
+                                         ? static_cast<int>(reach[ti]) : hub_dist;
                     const int supply_here = clampi(1000
-                                          - cap_dist * params.supply_decay_per_tile_q
+                                          - hub_dist * params.supply_decay_per_tile_q
                                           - reach_here * params.terrain_reach_cost_q / 100
                                           - clampi(burden, 0, 1000 - params.holdings_burden_floor_q),
                                           0, 1000);
@@ -515,9 +540,47 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
                     // Costs, in the same unit: distance is a real logistics
                     // cost now (BL-314), not just a preference.
-                    value -= params.w_dist * cap_dist / 10;
+                    // DISTANCE IS A PREFERENCE HERE, NOT THE COST — and it must
+                    // be proportional for the same reason w_cult had to be
+                    // (2026-08-12).
+                    //
+                    // This was `value -= w_dist * cap_dist / 10`, flat. It was
+                    // survivable on a 180-wide map and fatal on a 312-wide one:
+                    // capital-to-frontier distances scale with the map, province
+                    // values do not, so tripling the grid tripled this penalty
+                    // against an unchanged prize and drove every campaign score
+                    // below threshold. Measured on the real world: 0 battles,
+                    // 1195 foundings — a completely peaceful 400 years.
+                    //
+                    // The REAL cost of distance is already modelled, twice, and
+                    // properly: supply_decay_per_tile_q and terrain_reach_cost_q
+                    // both feed `supply_here` below, which feeds both the odds
+                    // and an explicit supply cost. This term only ever expressed
+                    // "nearer is nicer", so as a per-mille discount it says that
+                    // at any map size instead of vetoing war on large ones.
+                    value = (value * clampi(1000 - params.w_dist * cap_dist / 100, 200, 1000)) / 1000;
                     value -= (1000 - supply_here) * params.campaign_supply_cost_q / 1000;
-                    if (tgt.culture != q.culture) value -= params.w_cult;
+                    // FOREIGN GROUND IS WORTH LESS, PROPORTIONALLY — not a flat
+                    // toll (2026-08-12).
+                    //
+                    // This was `value -= w_cult`, a flat 150 subtracted from a
+                    // province value that measures only ~200-300. It therefore
+                    // ate half to three quarters of the entire prize on every
+                    // cross-cultural target, which is nearly all of them, and it
+                    // alone suppressed EVERY war: measured across a 400-year run,
+                    // w_cult 150 -> 0 battles, and 0 -> 266 battles / 150
+                    // conquests, with w_dist and w_def making no difference at
+                    // all. A term meant to express a preference was acting as a
+                    // veto.
+                    //
+                    // That is BL-318's incommensurability in miniature: a cost
+                    // authored on one scale subtracted from a value on another.
+                    // As a fraction it means the same thing at any province
+                    // value — foreign ground is worth (1000 - w_cult)/1000 of
+                    // what home ground is — so the signal survives and the veto
+                    // does not.
+                    if (tgt.culture != q.culture)
+                        value = (value * (1000 - clampi(params.w_cult, 0, 1000))) / 1000;
 
                     // Season as an action axis: summer and winter are two
                     // candidates over the same objective, not two ticks.

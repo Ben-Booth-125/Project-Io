@@ -28,6 +28,7 @@
 #include "world/components.hpp"
 #include "world/economy_system.hpp"
 #include "world/hard_coded_world.hpp"
+#include "harness_params.hpp"
 #include "world/market_clearing.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/world.hpp"
@@ -62,7 +63,7 @@ static void test_population_on_kepler()
 {
     std::printf("--- R3: population centres on Kepler ---\n");
 
-    world w = make_hard_coded_world();
+    world w = make_hard_coded_world(no_prehistory());
     const entity_id kepler = w.home_body;
 
     // Count centres whose tile belongs to Kepler.

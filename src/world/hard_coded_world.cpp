@@ -6,6 +6,8 @@
 #include "corporation_generation.hpp"
 #include "creeds.hpp"
 #include "history_ladder.hpp"
+#include "history_sim.hpp"      // BL-271 wired into generation, 2026-08-12
+#include "sim_terrain_build.hpp" // build_sim_terrain for the sim's terrain view
 #include "law.hpp" // BL-343: seed_prototype_laws
 #include "nation_generation.hpp"
 #include "orbital_system.hpp"
@@ -186,9 +188,23 @@ std::vector<entity_id> generate_home_surface_preview(world& w, entity_id body,
 }
 
 world make_hard_coded_world(world_params params, generation_report* report,
-                            const world_gen_config& gen_cfg)
+                            const world_gen_config& gen_cfg,
+                            generation_progress* progress)
 {
     world w;
+
+    // Coarse progress for a caller drawing a loading screen on another thread.
+    // `bump` is the only writer and it only ever moves forward, so a reader
+    // never sees the fraction go backwards.
+    int gen_stage = 0;
+    if (progress != nullptr)
+        progress->stage_count.store(generation_stage_label_count, std::memory_order_relaxed);
+    const auto bump = [&](int label_index) {
+        if (progress == nullptr) return;
+        progress->label.store(label_index, std::memory_order_relaxed);
+        progress->stage.store(++gen_stage, std::memory_order_relaxed);
+    };
+    bump(0);
 
     // The resource-abundance multiplier every body's deposit pass is scaled by.
     // At the default `standard` tier this is 1.0f, so a default-params world is
@@ -330,6 +346,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
 
     // Mercury-analogue physical facts; everything else is derived by the chain.
     std::vector<float> cinder_bias;
+    bump(1);
     const planetology_state cinder_pl = plan(0, cinder, 180, 84, cinder_bias);
     generate_body_tiles(w, cinder, 180, 84, cinder_pl.profile,
         /*seed=*/params.seed ^ 0xC1D0001u, deposit_scalar, &cinder_pl, nullptr, &cinder_bias);
@@ -372,6 +389,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // records its margin, and still writes its line.
     std::vector<float> kepler_bias;
     std::vector<uint8_t> kepler_convergent; // Pass 5 seeds mountain ranges along these
+    bump(2);
     const planetology_state kepler_pl = plan(1, kepler, home_grid_width, home_grid_height, kepler_bias, &kepler_convergent);
     // A non-null generation_record is requested here so the river pass below can read the
     // Pass-1 heightmap it captures; this is a pure capture (TILE_GENERATION.md § Generation
@@ -392,6 +410,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // make_hard_coded_world Kepler, tile for tile", which is precisely the
     // "the preview silently stops being the world" failure the preview's own
     // header comment warns about.
+    bump(4);
     auto kepler_tiles = generate_body_tiles(w, kepler, home_grid_width, home_grid_height,
         kepler_pl.profile,
         kepler_tile_seed, deposit_scalar, &kepler_pl, &kepler_record, &kepler_bias, &kepler_convergent);
@@ -399,6 +418,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // Rivers (BL-170) — sibling pass (BL-051 convention) over the same heightmap Pass 2
     // already thresholded; needs Kepler's ocean placement done, so it runs after
     // generate_body_tiles returns rather than being spliced into the six-pass core.
+    bump(5);
     generate_rivers(w, kepler_tiles, home_grid_width, home_grid_height,
                     kepler_record.height, /*seed=*/params.seed ^ 0x52490001u);
 
@@ -430,6 +450,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // its tribal-conflict stage DRIVES the map the same way the ladder does:
     // won wars weld cradles together and lower fragmentation_q before
     // nation_params_from_ladder reads it into the seed budget.
+    bump(6);
     creed_state kepler_creeds =
         run_creeds(kepler_pl, kepler_hist, w, kepler_tiles, home_grid_width, home_grid_height,
                    /*seed=*/params.seed ^ 0xC4EED5u);
@@ -456,10 +477,94 @@ world make_hard_coded_world(world_params params, generation_report* report,
         }
         const int budget = std::max(1, kepler_land / std::max(1, kepler_np.land_tiles_per_seed));
 
+        bump(7);
         kepler_settlement = run_settlement(kepler_pl, kepler_hist, kepler_creeds, w,
                                            kepler_tiles, home_grid_width, home_grid_height, budget,
                                            /*seed=*/params.seed ^ 0x5E77EDu,
                                            /*stop_year=*/params.epoch_year);
+        // ------------------------------------------------------------------
+        // The year-tick sim, wired into generation (Ben, 2026-08-12).
+        //
+        // run_settlement founds provinces and stops. Below the industrial era
+        // it deliberately leaves the rest to "the year-tick sim", and that sim
+        // HAS EXISTED SINCE BL-271 WITHOUT EVER BEING CALLED HERE — its only
+        // caller was the tile inspector. So the campaign opened onto a world
+        // that had been settled and then stood perfectly still: no wars, no
+        // borders that had ever moved, nothing to inherit.
+        //
+        // Ben's ask, and the acceptance test for this block: "there is turmoil
+        // at the beginning of the campaign... some losing / winning bodies, and
+        // the game FEELS alive right from the first tick."
+        //
+        // 400 years at 4 years a tick — his figure. 100 decision rounds, ~110 ms
+        // measured, against a generation budget of one minute that the whole
+        // chain currently spends 2.4 s of.
+        bump(8);
+        if (params.epoch_year < 1700 && params.prehistory_years > 0
+            && !kepler_settlement.provinces.empty())
+        {
+            const sim_terrain_arrays terr =
+                build_sim_terrain(w, kepler, home_grid_width, home_grid_height);
+
+            history_sim_params hp;
+            hp.start_year      = params.epoch_year - params.prehistory_years;
+            hp.stop_year       = params.epoch_year;
+            hp.tick_bands[0]   = {params.epoch_year, 4};
+            hp.tick_band_count = 1;
+
+            // NO supply-decay override here, deliberately.
+            //
+            // An earlier cut of this block derived supply_decay_per_tile_q from
+            // the map width (2000/gw), because the authored 28 gave a maximum
+            // reach of 36 tiles and produced ZERO battles on a 312-wide map. That
+            // was a workaround for measuring supply from the CAPITAL. The sim now
+            // supplies a campaign from the staging holding next to the target
+            // (history_sim.cpp, `hub_dist`), so reach is bounded by
+            // neighbour_radius rather than by empire shape and does not need
+            // rescaling when the map does. The authored constant stands.
+
+            // The one pass long enough to earn the loading screen's inner bar
+            // (~23 s of the ~25 s total): announce the year span, hand the sim
+            // the year counter, and clear the announcement when the pass ends.
+            if (progress != nullptr)
+            {
+                progress->sub_progress.store(0, std::memory_order_relaxed);
+                progress->sub_total.store(
+                    static_cast<int>(hp.stop_year - hp.start_year),
+                    std::memory_order_relaxed);
+            }
+
+            const history_sim_state hs =
+                run_history_sim(kepler_settlement, &kepler_creeds, terr.view(),
+                                home_grid_width, home_grid_height, hp,
+                                /*seed=*/params.seed ^ 0x415C1E17u,
+                                progress != nullptr ? &progress->sub_progress
+                                                    : nullptr);
+
+            if (progress != nullptr)
+                progress->sub_total.store(0, std::memory_order_relaxed);
+
+            // The sim narrates through the same history_event shape the other
+            // generation passes use, so its wars join the world log without a
+            // new case anywhere.
+            kepler_settlement.history.insert(kepler_settlement.history.end(),
+                                             hs.history.begin(), hs.history.end());
+
+            // Report what the era actually produced, into the generation record
+            // rather than to stdout. The acceptance test for this block is
+            // behavioural ("turmoil... losing / winning bodies"), and a block
+            // that silently produced a peaceful world would otherwise look
+            // identical to one that was never called — which is exactly how
+            // this sim went unwired for so long.
+            if (report != nullptr)
+            {
+                report->prehistory_battles   = hs.battles;
+                report->prehistory_conquests = hs.conquests;
+                report->prehistory_foundings = hs.foundings;
+                report->prehistory_years     = hs.years;
+            }
+        }
+
         kepler_np.seed_tiles = settlement_seed_tiles(kepler_settlement);
 
         // Each anchor carries its province's tongue across into Pass 5, so a
@@ -482,6 +587,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
                                 /*seed=*/params.seed ^ 0xC17910E6u);
     }
 
+    bump(9);
     const std::vector<entity_id> kepler_nations =
         generate_nations(w, kepler, kepler_tiles, home_grid_width, home_grid_height, kepler_np,
                          /*seed=*/params.seed ^ 0x4A71012u);
@@ -556,6 +662,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // Road network (BL-146): stamp each nation's road lattice onto tile.road_level,
     // after nations + population centres exist. Deterministic; no seed of its own —
     // a pure function of the generated tiles/nations/centres.
+    bump(10);
     generate_roads(w, kepler);
 
     // Attach installations to the first two land tiles found in raster order.
@@ -592,6 +699,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // above are in w.buildings for corporate asset placement to collision-avoid.
     // Corporations: 6-10 actors registered in the generated nations, including
     // the player's (which sets w.player_entity). See CORPORATION_GENERATION.md.
+    bump(11);
     generate_corporations(w, corporation_params{ .corporation_count = gen_cfg.corporation_count },
         /*seed=*/params.seed ^ 0x4A71012u, &kepler_settlement);
 
@@ -1022,5 +1130,6 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // is unchanged until the player (or a harness) enacts it. See law.hpp.
     seed_prototype_laws(w);
 
+    bump(12);
     return w;
 }

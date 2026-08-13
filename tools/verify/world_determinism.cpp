@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // Headless world-determinism harness (BL-114; no SDL / Lua / ImGui)
 // ---------------------------------------------------------------------------
-// Proves make_hard_coded_world() is a pure function of its world_params:
+// Proves make_hard_coded_world(no_prehistory()) is a pure function of its world_params:
 //
 //   R1  Same seed + params -> a bit-identical world across repeated builds in
 //       this binary (equal tile count, per-composition histogram, summed deposit
@@ -18,6 +18,7 @@
 
 #include "world/components.hpp"
 #include "world/hard_coded_world.hpp"
+#include "harness_params.hpp"
 #include "world/world.hpp"
 
 #include <cstdio>
@@ -78,9 +79,9 @@ int main()
 
     // --- R1: same seed + params is bit-identical across two builds ---
     const world_metrics a1 = measure(make_hard_coded_world(
-        world_params{ .seed = seed_a, .abundance = abundance_level::standard }));
+        world_params{ .seed = seed_a, .abundance = abundance_level::standard, .prehistory_years = 0 }));
     const world_metrics a2 = measure(make_hard_coded_world(
-        world_params{ .seed = seed_a, .abundance = abundance_level::standard }));
+        world_params{ .seed = seed_a, .abundance = abundance_level::standard, .prehistory_years = 0 }));
 
     check(a1 == a2, "R1 same seed+params -> bit-identical world (tiles/hist/deposits/nations/corps/entities)");
     std::printf("     seed %08X: %zu tiles, %zu nations, %zu corps, deposits=%.3f\n",
@@ -88,7 +89,7 @@ int main()
 
     // --- R1: a different seed produces a demonstrably different world ---
     const world_metrics b = measure(make_hard_coded_world(
-        world_params{ .seed = seed_b, .abundance = abundance_level::standard }));
+        world_params{ .seed = seed_b, .abundance = abundance_level::standard, .prehistory_years = 0 }));
     const bool seed_matters = (b.comp_hist != a1.comp_hist) || (b.deposit_total != a1.deposit_total);
     check(seed_matters, "R1 different seed -> different world (composition histogram or deposit total differs)");
     std::printf("     seed %08X: %zu tiles, deposits=%.3f (vs %.3f)\n",
@@ -96,9 +97,9 @@ int main()
 
     // --- R2: abundance scales deposits monotonically at a fixed seed ---
     const double d_sparse = measure(make_hard_coded_world(
-        world_params{ .seed = seed_a, .abundance = abundance_level::sparse })).deposit_total;
+        world_params{ .seed = seed_a, .abundance = abundance_level::sparse, .prehistory_years = 0 })).deposit_total;
     const double d_lean = measure(make_hard_coded_world(
-        world_params{ .seed = seed_a, .abundance = abundance_level::lean })).deposit_total;
+        world_params{ .seed = seed_a, .abundance = abundance_level::lean, .prehistory_years = 0 })).deposit_total;
     const double d_standard = a1.deposit_total; // standard at seed_a, measured above
 
     check(d_sparse < d_lean && d_lean < d_standard,
@@ -111,10 +112,10 @@ int main()
           "R2 standard is the resource ceiling (no tier richer than earth-like)");
 
     // --- Sanity: the default descriptor equals seed 0 / standard (legacy world) ---
-    const world_metrics dflt   = measure(make_hard_coded_world());
+    const world_metrics dflt   = measure(make_hard_coded_world(no_prehistory()));
     const world_metrics zero_s = measure(make_hard_coded_world(
-        world_params{ .seed = 0, .abundance = abundance_level::standard }));
-    check(dflt == zero_s, "default make_hard_coded_world() == {seed 0, standard} (legacy world)");
+        world_params{ .seed = 0, .abundance = abundance_level::standard, .prehistory_years = 0 }));
+    check(dflt == zero_s, "default descriptor == {seed 0, standard} (legacy world)");
 
     std::printf("\n%s (%d failure%s)\n", failures == 0 ? "ALL PASS" : "FAILURES", failures,
                 failures == 1 ? "" : "s");

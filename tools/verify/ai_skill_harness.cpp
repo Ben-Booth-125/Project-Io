@@ -41,6 +41,7 @@
 #include "world/corp_command.hpp"
 #include "world/economy_system.hpp"
 #include "world/hard_coded_world.hpp"
+#include "harness_params.hpp"
 #include "world/market_clearing.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/tech_gate.hpp" // BL-325 S2: advance_tech_gates must run for military_base to ever unlock
@@ -184,7 +185,7 @@ rollout_metrics run_rollout(uint32_t seed, int ticks)
 {
     world_params params;
     params.seed = seed;
-    world w = make_hard_coded_world(params);
+    world w = make_hard_coded_world(no_prehistory(params));
     const recipe_registry reg = make_registry();
 
     rollout_metrics m;

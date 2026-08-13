@@ -58,10 +58,17 @@ int main(int argc, char* argv[])
 
     std::printf("tick_profile — real generated world, %d ticks\n", ticks);
 
-    world w = make_hard_coded_world();
+    const auto gen_t0 = clock_t_::now();
+    generation_report gen_report;
+    world w = make_hard_coded_world(world_params{}, &gen_report);
+    const double gen_ms = std::chrono::duration<double, std::milli>(clock_t_::now() - gen_t0).count();
+    std::printf("  WORLD GENERATION: %.0f ms\n", gen_ms);
     recipe_registry reg;
 
     std::size_t tile_count = w.tiles.size();
+    std::printf("  PRE-EPOCH ERA: %lld years, %lld battles, %lld conquests, %lld foundings\n",
+                (long long)gen_report.prehistory_years, (long long)gen_report.prehistory_battles,
+                (long long)gen_report.prehistory_conquests, (long long)gen_report.prehistory_foundings);
     std::printf("  tiles=%zu  corps=%zu  markets=%zu  bodies=%zu\n\n",
                 tile_count, w.corporations.size(), w.markets.size(), w.bodies.size());
 

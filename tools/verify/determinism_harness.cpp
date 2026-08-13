@@ -9,7 +9,7 @@
 // in any of these is a determinism regression — a clock/rand leak or an
 // unordered_map iteration-order dependence leaking into world generation.
 //
-// Scope: make_hard_coded_world() takes no seed (world-gen is not seedable today,
+// Scope: make_hard_coded_world(no_prehistory()) takes no seed (world-gen is not seedable today,
 // per corp_terrain_matrix), so this guards the canonical world's REPRODUCIBILITY
 // across two calls — the property that actually protects determinism now. It
 // widens to a true seed sweep unchanged once a seed is threaded through world
@@ -20,6 +20,7 @@
 
 #include "world/world.hpp"
 #include "world/hard_coded_world.hpp"
+#include "harness_params.hpp"
 #include "world/history_log.hpp"
 
 #include <algorithm>
@@ -64,8 +65,8 @@ sorted_pairs(const std::unordered_map<entity_id, entity_id>& m)
 
 int main()
 {
-    const world a = make_hard_coded_world();
-    const world b = make_hard_coded_world();
+    const world a = make_hard_coded_world(no_prehistory());
+    const world b = make_hard_coded_world(no_prehistory());
 
     // Well-known entities + asteroid belt.
     check(a.player_entity == b.player_entity, "player_entity identical");
@@ -129,8 +130,8 @@ int main()
     // (sorted_keys(a.bodies) == sorted_keys(b.bodies) etc.).
     {
         generation_report rep_a, rep_b;
-        world wa = make_hard_coded_world({}, &rep_a);
-        world wb = make_hard_coded_world({}, &rep_b);
+        world wa = make_hard_coded_world(no_prehistory(), &rep_a);
+        world wb = make_hard_coded_world(no_prehistory(), &rep_b);
         seed_genesis_history(wa, rep_a);
         seed_genesis_history(wb, rep_b);
 

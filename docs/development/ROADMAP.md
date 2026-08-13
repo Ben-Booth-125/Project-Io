@@ -1,14 +1,73 @@
 # Project Io — Roadmap
 
-The milestone map from the current state through the **v0.1.0** prototype cut, on through the
-**expanded prototype** (v0.1.x → v0.4.0), and out to **v1.0.0** — the playable-game cut, named
-2026-08-08 as the second (and for now last) milestone with its own done-definition. This document
-is **forward-facing and lean**: it names the version sequence, the *theme* of each minor, and the
-done-definitions for the two cuts. It deliberately does **not** enumerate individual items — that
-lives in the backlog
+**This roadmap carries TWO ARCS since 2026-08-12 (NR-177, the 0 CE refocus).** The **ancient
+arc** is live: a standalone commercial product set at 0 CE, the mercenary company as the player,
+built on the campaign engine as it stands. The **space arc** — everything from v0.2.0 through
+v1.0.0 below — is **parked for DLC**: kept intact as a destination, not deleted, per Ben's
+ruling (*stash the space work, build ancient as its own product, merge back for DLC*). § The two
+arcs, below, is the live map; the space-arc sections carry dated PARKED banners and are
+otherwise unrewritten history.
+
+The document remains **forward-facing and lean**: it names the version sequence, the *theme* of
+each minor, and the done-definitions for the cuts. It deliberately does **not** enumerate
+individual items — that lives in the backlog
 ([`backlog.json`](backlog.json), metadata + design prose; [`BACKLOG.md`](BACKLOG.md) is a legacy
 drain) and the active worklist [`REFINED.md`](REFINED.md). The roadmap sits *above* both: it says which theme each minor
 carries; the backlog and worklist say what work realises it.
+
+---
+
+## The two arcs (2026-08-12)
+
+**Why.** Ben, 2026-08-12 (NR-177): *"our project is too grand to be able to really feel out the
+gameplay"* — and, on the method: *"when making your ideal game, you should first focus on a
+smaller project with similar design."* The ancient product is deliberate practice for the space
+game, not an abandonment of it. Four rulings shape everything below: the space work is
+**stashed, not re-anchored**; the player is a **mercenary company** — BL-094's militia one era
+earlier, the same shape (procure force, field it, be paid), so the 2026-08-10 identity is being
+*tested*, not replaced; the grain is **tile and fine tick** — the campaign engine as-is, with
+`history_sim` staying the *generator* (stop year moved 1960 → 0 CE); and the release bar is
+**commercial** — Steam or itch, paid, polish and content depth required.
+
+### The ancient arc — live
+
+The v0.1.x band continues as the ancient product's band. Already landed under the refocus
+(2026-08-12, ahead of this rewrite): the 0 CE epoch default, the 3× map (312×145) with a physical
+tile scale and travel time, the Era −1 sim wired into generation (400 pre-epoch years — 62
+battles, 16 conquests, ~1100 foundings on the default seed), the stepped decision clock, the
+async loading screen, and the startup-hang fix. SPRINTS.md § Sprint 15 is the retro-record.
+
+- **v0.1.15 — The mercenary vertical slice.** *Theme: someone hires you, you fight, you are
+  paid.* The loop that makes it a game rather than an economy with a sword icon. Carries
+  **BL-377** (mercenary contract seam — a polity pays the company to make a fact about the world
+  true), **BL-315** (conflict spine — pulled from v0.3.0 groundwork onto the critical path: a
+  mercenary company's core loop is built entirely on Conflict), **BL-378** (the minimap becomes a
+  fixed max-zoom render of the player's base), and **BL-379** (persona counsel's ~1 s/tick cost).
+  Cut by **Sprint 16**; done-definition owed at the cut, per NR-103.
+- **v0.1.16 — Ancient conflict & seams.** *Theme: the Era −1 machinery graduates from generator
+  to gameplay.* The whole Era −1 cluster, pulled from v0.3.0 on Ben's 2026-08-12 ruling (the
+  sandbox's "groundwork" is now the live product's substance): era-keyed rosters (**BL-274**),
+  the strategic layer (**BL-277**), the ancient tech ladder (**BL-296**), the diplomacy seam and
+  its test battery (**BL-297**, **BL-298**), the great-power seed (**BL-299**), myth & theology
+  (**BL-300**), the unit verb family (**BL-314**), Era −1 logistics (**BL-316**), the
+  shared-currency scorer (**BL-318**), sim perf (**BL-320**), the works roster (**BL-321**), and
+  voice/unit calibration (**BL-337**). A holding assignment — sprints will promote and likely
+  split it; the theme is the claim, not the item count.
+- **Still live from the old band, arc-agnostic:** v0.1.5's remainder (BL-325 unit supply decay),
+  v0.1.6 (politics stub), v0.1.7 (generation visibility — generation is shared by both arcs),
+  v0.1.13's infra tail (BL-107 save format and friends), and the v0.1.2 UI leftovers.
+- **Owed, recorded in NR-177 and not yet items:** the mercenary *sell* side beyond BL-377's
+  seam (win/lose consequences, reputation), the product's **name** (Io is a moon of Jupiter),
+  and the commercial cut's own done-definition.
+
+### The space arc — parked for DLC
+
+**v0.2.0 (AI opponent), v0.3.0 (the militia refocus, minus the Era −1 cluster pulled above),
+v0.4.0 (politics + filter), v1.0.0 (the playable space game)** are parked whole: ~41 open items
+now carry `parked: true` in the backlog with their version goals intact, so the DLC resume is a
+flag-flip plus a re-triage, not an archaeology dig. Their sections below are **unrewritten** —
+they are the record of a settled design, and the refocus's own reasoning is that this design is
+practised for, not discarded. Do not build against them while parked; do not delete them either.
 
 **v0.1.0 validates the economy loop only** — its scope and exclusions (Conflict, Research, Policy,
 Diplomacy beyond a data-model stub) are owned by
@@ -35,6 +94,9 @@ where one is likely.
 ---
 
 ## Where we are — eight minors cut; the player is being redefined
+
+> **Overtaken 2026-08-12 (NR-177):** the section below is the 2026-08-10 status, kept as
+> record. The live status is § The two arcs above — the ancient product, Sprint 16, v0.1.15.
 
 *Status 2026-08-10. Latest tag `v0.1.4`. **Eight minors are cut**: v0.1.0 (2026-08-03), then
 v0.1.1, v0.1.2, v0.1.8, v0.1.9 (all 2026-08-09) and v0.1.10, v0.1.3, v0.1.4 (all 2026-08-10) —
@@ -158,8 +220,11 @@ everything after it by one.*
 | 9 | **v0.1.5** | **The militia takes the field.** ✅ Closed 2026-08-10. Military bases & supply, a starting base and unit; BL-332 designed and re-versioned. |
 | 10 | **v0.1.13** | **The living world** — real background industry replaces the abstract substrate, multi-building tiles, real population demand, and the O(corps × tiles) scan fixed ahead of it. |
 | 11 | **v0.1.14** | **Procurement & its goods** — the contract seam plus BL-340's resource tiers, landing into a market that now has real suppliers to choose between. |
-| 12 | **v0.1.11** | **Reconciled** — laws and tech surfaces reframed for an actor that is subject to law rather than the source of it, plus the minor's untouched remainder. |
-| 13 | **v0.1.7** | **Generation visibility** — the Generation Ledger, field-overlay lenses, the UX review, and BL-317's owed prehistory timelapse. |
+| ~~12~~ | ~~v0.1.11~~ | **Superseded 2026-08-12** — the policy-surfaces minor parked with the space arc (NR-177). Never opened. |
+| ~~13~~ | ~~v0.1.7~~ | **Superseded 2026-08-12** — v0.1.7 stays live (generation is shared) but is no longer the next cut. Never opened. |
+| ~~14~~ | ~~v0.2.0~~ | **Superseded 2026-08-12** — the AI opponent parked with the space arc after its third deferral. Never opened. |
+| 15 | *(no tag)* | **The 0 CE refocus.** ✅ Retro-recorded 2026-08-12 — the tangent that became the product; see SPRINTS.md § Sprint 15. |
+| 16 | **v0.1.15** | **The mercenary vertical slice** — BL-377 (contract seam) playable end-to-end, BL-315 (conflict spine) on the critical path. |
 
 **Why the living world was inserted (2026-08-10, Ben's call).** *"Replace the substrate entirely."*
 The saturation the economic premise assumes is currently an abstraction injected once per tick —
@@ -776,6 +841,11 @@ concrete, and the tail was named when `post-v0.1.0` was swept (NR-101, below).
 
 ### v0.2.0 — The AI opponent
 
+> **PARKED 2026-08-12 (NR-177) — space arc.** Deferred twice, now parked whole with the arc.
+> Its items carry `parked: true`; nothing here is committed scope until the DLC resume. The
+> word-interface and MCP machinery it rests on is landed and era-agnostic, so an *ancient*
+> opponent, if one is wanted, would be a new theme in the live arc, not this minor un-parked.
+
 *Versioned theme: the AI opponent.* The backlog's live v0.2.0 set is the corp-AI arc: stage A
 (**BL-202**) and stage B — predictive spending (**BL-203**) — are both **complete**
 (`src/world/corp_ai.{hpp,cpp}`), together with the skill-regression harness (**BL-204**,
@@ -807,6 +877,12 @@ O(corps × tiles) rescan, which belongs here because it is the *opponent's* scal
 general performance item.
 
 ### v0.3.0 — The national private militia (the refocus)
+
+> **PARKED 2026-08-12 (NR-177) — space arc, minus its Era −1 heart.** The militia identity is
+> being *tested* one era earlier as the ancient product's mercenary company, not replaced. The
+> Era −1 cluster this section calls "groundwork folded in" moved to **v0.1.16** in the live arc
+> on Ben's ruling — the sandbox is now the product. What stays parked here is the 1960-era
+> identity work itself (BL-094, BL-087, BL-333, BL-182) and the generation-flavour tail.
 
 *Theme: change who the player is.* **Versioned 2026-08-04** — Ben's answer to the sequencing
 question open since 2026-07-31 (NR-045): the pivot takes **its own minor**, not a share of
@@ -924,6 +1000,8 @@ while keeping BL-300/BL-301 as notes only. All three are Ben's to rule on.
 
 ### v0.4.0 — Politics + the filter system
 
+> **PARKED 2026-08-12 (NR-177) — space arc.** Items carry `parked: true`, version goals intact.
+
 *Theme: the political layer for real, and Era → Filter.* Two coupled deliverables:
 
 - **Politics.** Promote the v0.1.x political stub into a working layer — the nation's political
@@ -950,6 +1028,10 @@ while keeping BL-300/BL-301 as notes only. All three are Ben's to rule on.
   `LENSES.md`; confirm the two read as distinct before the rename lands.)*
 
 ### v1.0.0 — The playable game
+
+> **PARKED 2026-08-12 (NR-177) — space arc.** This remains the space game's bar, held for the
+> DLC resume. The **ancient product's** commercial bar (Steam/itch, paid — NR-177 ruling 4) is a
+> different cut whose done-definition is owed in the live arc, not a reading of this one.
 
 *Theme: everything above coheres into one game.* Named 2026-08-08, at Ben's direction, as the
 terminal cut past which the four minors above stop being separate arcs and become one playable

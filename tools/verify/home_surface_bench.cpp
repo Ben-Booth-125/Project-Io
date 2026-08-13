@@ -9,6 +9,7 @@
 //     Informational (machines differ) — the PASS bar is generous (< 1s).
 
 #include "world/hard_coded_world.hpp"
+#include "harness_params.hpp"
 #include "world/world.hpp"
 
 #include <chrono>
@@ -56,7 +57,7 @@ int main()
         // The full build, for the parity check. Slow (all bodies + political
         // layer), which is exactly why the wizard gets the carve-out instead.
         // Kepler's tiles are recovered raster-ordered from their grid coords.
-        world full = make_hard_coded_world(params);
+        world full = make_hard_coded_world(no_prehistory(params));
         std::vector<terrain_composition> full_comp(
             static_cast<std::size_t>(home_grid_width * home_grid_height),
             terrain_composition::ocean);

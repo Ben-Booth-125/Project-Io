@@ -46,6 +46,7 @@
 #include "world/components.hpp"
 #include "world/economy_system.hpp"
 #include "world/hard_coded_world.hpp"
+#include "harness_params.hpp"
 #include "world/market_clearing.hpp"
 #include "world/orbital_system.hpp"
 #include "world/recipe_registry.hpp"
@@ -570,7 +571,7 @@ int main(int argc, char* argv[])
                 "  reported but NOT asserted.\n\n");
 
     const auto t_build0 = std::chrono::steady_clock::now();
-    world w = make_hard_coded_world();
+    world w = make_hard_coded_world(no_prehistory());
     const recipe_registry reg = make_registry();
 
     // Author default recipes onto generated processors (mirrors app::load_economy

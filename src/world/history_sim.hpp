@@ -53,6 +53,7 @@
 #include "creeds.hpp"
 #include "settlement.hpp"
 
+#include <atomic>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -488,13 +489,19 @@ inline constexpr std::size_t owner_index_limit = 0xFFFEu;
 /// @param gh      Grid height in tiles (rows do not wrap).
 /// @param params  Scorer weights and loop bounds.
 /// @param seed    Deterministic weight perturbation and tie-break salt.
+/// @param year_progress Optional progress sink: each simulated year stores
+///                years-elapsed-so-far (1..span) with relaxed ordering, for a
+///                loading screen polling from another thread. Null (the default,
+///                and every headless caller) costs nothing and changes nothing —
+///                the sim never reads it back, so determinism is untouched.
 history_sim_state run_history_sim(settlement_state&         ss,
                                   const creed_state*        cs,
                                   const sim_terrain_view&   terrain,
                                   int                       gw,
                                   int                       gh,
                                   const history_sim_params& params,
-                                  uint32_t                  seed);
+                                  uint32_t                  seed,
+                                  std::atomic<int>*         year_progress = nullptr);
 
 /// Tile distance between two provinces on the cylinder — column difference
 /// wraps, row difference does not. Exposed because the harness asserts the

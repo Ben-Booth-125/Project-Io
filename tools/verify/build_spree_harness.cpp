@@ -22,6 +22,7 @@
 #include "world/components.hpp"
 #include "world/construction.hpp"
 #include "world/hard_coded_world.hpp"
+#include "harness_params.hpp"
 #include "world/market_clearing.hpp"
 #include "world/placement_rules.hpp"
 #include "world/recipe_registry.hpp"
@@ -53,7 +54,7 @@ int main()
         reg.set_economics(building_type::port, po);
     }
 
-    world w = make_hard_coded_world();
+    world w = make_hard_coded_world(no_prehistory());
     const entity_id corp = w.player_entity;
     const entity_id home = w.home_body;
 

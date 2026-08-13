@@ -1217,7 +1217,7 @@
    "glyph": "✓",
    "priority": "B",
    "difficulty": 5,
-   "parked": false,
+   "parked": true,
    "requires": [],
    "blocked_on": [],
    "written": "2026-07-01",
@@ -1628,7 +1628,7 @@
    "glyph": "✓",
    "priority": "A",
    "difficulty": 5,
-   "parked": false,
+   "parked": true,
    "requires": [],
    "blocked_on": [],
    "written": "2026-07-04",
@@ -3041,7 +3041,7 @@
    "glyph": "✓",
    "priority": "B",
    "difficulty": 3,
-   "parked": false,
+   "parked": true,
    "requires": [],
    "blocked_on": [],
    "written": "2026-07-09",
@@ -3089,7 +3089,7 @@
    "glyph": "✓",
    "priority": "B",
    "difficulty": 4,
-   "parked": false,
+   "parked": true,
    "requires": [],
    "blocked_on": [],
    "written": "2026-07-09",
@@ -3110,7 +3110,7 @@
    "glyph": "✓",
    "priority": "B",
    "difficulty": 3,
-   "parked": false,
+   "parked": true,
    "requires": [],
    "blocked_on": [],
    "written": "2026-07-09",
@@ -3201,7 +3201,7 @@
    "glyph": "✓",
    "priority": "B",
    "difficulty": 4,
-   "parked": false,
+   "parked": true,
    "requires": [],
    "blocked_on": [],
    "written": "2026-07-09",
@@ -3229,7 +3229,7 @@
    "glyph": "✓",
    "priority": "B",
    "difficulty": 2,
-   "parked": false,
+   "parked": true,
    "requires": [
     "BL-160"
    ],
@@ -3536,7 +3536,7 @@
    "glyph": "✓",
    "priority": "C",
    "version_goal": "v0.1.12",
-   "parked": false,
+   "parked": true,
    "requires": [
     "BL-172"
    ],
@@ -3586,7 +3586,7 @@
    "priority": "B",
    "difficulty": 3,
    "version_goal": "v0.1.12",
-   "parked": false,
+   "parked": true,
    "requires": [
     "BL-088"
    ],
@@ -3828,7 +3828,7 @@
    "priority": "B",
    "difficulty": 4,
    "version_goal": "v0.1.11",
-   "parked": false,
+   "parked": true,
    "requires": [
     "BL-155"
    ],
@@ -3857,7 +3857,7 @@
    "priority": "C",
    "difficulty": 4,
    "version_goal": "v0.1.12",
-   "parked": false,
+   "parked": true,
    "requires": [
     "BL-168"
    ],
@@ -4348,7 +4348,7 @@
    "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
-   "parked": false,
+   "parked": true,
    "blocked_on": [],
    "written": "2026-07-26",
    "id": "BL-207",
@@ -4439,7 +4439,8 @@
     "tools/verify/planetology_sweep.cpp"
    ],
    "summary": "DESIGNED 2026-07-28. Promotes the chemistry currently sitting in COMMENTS at planetology.cpp S5/S6 into a generated, branching, inspectable molecular event trace. S5 Spark today is one boolean emitting one history line; this decomposes it into seven independently-failing gates (Feedstock / Reductant / Phosphorylation / Concentration / Replicator / Compartment / Code) running chemical-synthesis -> RNA -> DNA, and puts a cofactor fork in front of S6's existing flux-balance test. The highest-value piece: the PHOTOSYSTEM FORK (anoxygenic photoferrotrophy vs oxygenic Z-scheme, gated on manganese for the Mn4CaO5 complex) converts PLANETOLOGY.md's own named 'Known weaknesses' uncertainty — whether banded iron gates on life or on oxygen — from a constant into a generated branch. Several gates reach BACK into S0-S4 rolls (S1's late veneer now feeds S5a's impact-reducing atmosphere and S5c's schreibersite phosphorus), which is what makes generation read as one causal system rather than ten independent dice. Adds 3 archetypes (Silent Eden, RNA Lock, Ferrotroph World). Storage is 8-byte fixed-width flat-binary events referencing compiled-in species/reaction tables — ids never strings, so hex is purely a dev display encoding and canonical chemical names resolve through the same table any player surface uses (~500 bytes/body). Q&A 2026-07-28 settled: generative full 7-gate chain (not explanatory-only), new archetypes, drill-down behind the untouched eight-line biography, and design-now/build-after-BL-208.",
-   "design": "DESIGNED 2026-07-28 (Ben, Q&A). Four calls settled: (a) GENERATIVE, FULL 7-GATE CHAIN - every sub-gate can fail independently and change the endowment, not merely narrate an existing verdict; (b) NEW ARCHETYPES added rather than folding new outcomes into the existing 13; (c) surfaced as a DRILL-DOWN behind the eight-line biography, which stays exactly as-is (PLANETOLOGY.md's eight-line cap is load-bearing - the brevity of a failed world IS its characterisation); (d) DESIGN NOW, BUILD AFTER BL-208, so the trace is authored as entries in the append-only world log rather than a parallel per-body structure.\n\n## The problem being solved\n\nS5 Spark is currently ONE BOOLEAN at planetology.cpp:780 - `cycling_venue && geology >= low && time_budget && rng < abiogenesis_ease` - emitting one history line. All the real chemistry (serpentinisation H2, the 0.1 M HCN threshold, Fe(Ni)S walls matching ferredoxin) lives in COMMENTS, not in data. This item promotes that chemistry into a generated, branching, inspectable trace.\n\n## S5 decomposed into seven gates\n\nEach reads inputs already computed by earlier stages, tests one threshold, and has a distinct failure state. Several reach BACK into S0-S4 rolls, which is the point: it makes generation read as one causal system rather than ten independent dice.\n\n| Gate | Question | Key chemistry | Reads from | Fails into |\n|---|---|---|---|---|\n| S5a Feedstock | Anything to build with? | HCN -> purines (adenine is literally (HCN)5); HCHO -> sugars via formose. Yield collapses orders of magnitude in an oxidised CO2/N2 atmosphere vs a reduced one. Modern resolution: IMPACT-GENERATED TRANSIENT REDUCING ATMOSPHERES - a large iron-rich impactor reduces H2O to H2 for ~10^5-10^6 yr (Zahnle, Genda). | S2 atmosphere class; **S1 late-veneer roll**; UV flux | sterile - no organic feedstock, ever |\n| S5b Reductant | Free energy of the right shape? | Serpentinisation: olivine + H2O -> serpentine + magnetite + H2, exothermic. Lost City runs 45-90 C, pH 9-11, up to 200 mM H2. Alkaline effluent into a CO2-acidified ocean = a 3-4 pH-unit gradient of the same polarity every living cell uses, across Fe(Ni)S walls. | S3 geology; S4 liquid water; ultramafic crust from S1 | prebiotic - feedstock present, nothing to cycle it |\n| S5c Phosphorylation | Could it make a nucleotide? | The genuinely hard one. Seawater P ~1 uM, locked in apatite. Two routes: SCHREIBERSITE (Fe3P from iron meteorites) corroding to reactive phosphite; or CARBONATE-RICH ALKALINE LAKES where Ca drops out as carbonate, freeing P to concentrate ~10^5-10^6x (Toner & Catling). | **S1 metallic impactors** (schreibersite); **S4 subaerial relief + evaporation** (lakes) | NEW: monomers, no nucleotides - sugars and bases exist, nothing links them |\n| S5d Concentration | Dense enough to polymerise? | HCN oligomerises above ~0.1 M, competes with hydrolysis at 0.01-0.1 M, loses below. Hadean ocean HCN was orders of magnitude under. 'The ocean was a soup' is chemically false. Venues: wet-dry cycling in subaerial pools (dehydration drives condensation - polymerisation in bulk water is uphill), or hydrothermal pore thermophoresis (~5000x, Braun & Mast), which works WITHOUT land. | S4 water_fraction, relief; S3 geology | prebiotic - today's outcome, now with a named cause |\n| S5e Replicator | Did a polymer copy itself AND survive? | THE NEW PHYSICS: an RNA temperature ceiling. The phosphodiester backbone hydrolyses, and the rate climbs steeply with temperature - order-of-magnitude, hours at ~100 C against years near 0 C; cytosine deamination is worse. This sets up a DIRECT ANTAGONISM WITH S5b: vents give the reductant and the gradient, and vents are hot. Lost City at 45-90 C is survivable; a black smoker at 350 C is not. | S4 surface_temp_k; vent temp from S3 theta; S5d venue | NEW: polymers, no replicator - 'chemistry got further here than anywhere else, and stopped' |\n| S5f Compartment | Did it become an individual? | Fatty-acid vesicles self-assemble above a critical concentration; without one, a useful ribozyme's benefit diffuses to its competitors and there is no Darwinian individuality. Known unresolved tension: fatty-acid membranes are destabilised by divalent cations, and RNA catalysis REQUIRES Mg2+. Chelators (citrate) are the proposed workaround. | ocean divalent-cation load, from S4 weathering + S1 crust | NEW: replicators, no cells |\n| S5g Code | Did it lift the genome ceiling? | RNA -> coded protein (the ribosome is itself a ribozyme) -> DNA via ribonucleotide reductase. The real constraint is EIGEN'S ERROR THRESHOLD: without proofreading, max genome length ~ 1/(per-base mutation rate), capping an RNA-only replicator near a few thousand bases. DNA plus a proofreading polymerase lifts that by orders of magnitude. | S5e fidelity; time budget; cofactors | NEW: RNA LOCK - real, metabolising, evolving life, permanently simple |\n\n**S5f is the weakest of the seven on the 'name the decision' test** - its failure state is exotic and its downstream endowment is identical to S5e's. It is included because Ben chose the full chain, but it is explicitly THE FIRST CANDIDATE TO CUT if tuning shows it never fires distinctly from S5e.\n\n## S6 - the photosystem fork (the highest-value piece)\n\nThis converts a named uncertainty in PLANETOLOGY.md's own 'Known weaknesses' into a GENERATED BRANCH instead of a constant. The doc says the BIF oxidant is 'genuinely unresolved between cyanobacterial O2, anoxygenic photoferrotrophy (which needs no free oxygen at all) and abiotic UV photo-oxidation, AND IT DECIDES WHETHER BIF GATES ON LIFE OR ON OXYGEN' - which is what the whole iron/coal antagonism hangs on.\n\n- **S6a Anoxygenic photosynthesis (photoferrotrophy).** One photosystem, Fe(II) as electron donor, no O2 produced. Cheap - fires on nearly any microbial world with dissolved iron. **Precipitates banded iron with NO free oxygen at all.**\n- **S6b Oxygenic photosynthesis.** Splitting water needs +1.23 V, more than any single photosystem delivers - which is why it needs TWO chained in series (the Z-scheme), and why it evolved exactly once in 4 Gyr on Earth. Its cofactor is the Mn4CaO5 oxygen-evolving complex, so it GATES ON MANGANESE. Requires the genome headroom from S5g (two photosystems + dozens of genes is not reachable under an RNA-world error threshold).\n- **S6c Nitrogen fixation.** N2's 941 kJ/mol triple bond yields only to nitrogenase, whose cofactor is Mo - soluble in oxic water, NOT in anoxic sulfidic water. Low Mo -> weak fixation -> capped productivity -> capped burial -> capped oxygen; and since S8 already states soil requires biological nitrogen fixation, **Mo gates arable_share through pure chemistry.**\n\nThe existing GOE / Boring Billion / NOE flux-balance structure runs UNDERNEATH this, unchanged. The cofactor gates sit in front of it.\n\n**Mo and P stay INTERNAL SCALARS, never resources** - this deliberately does not touch PLANETOLOGY.md open call 3 (resource-list expansion), which would shift resource_count and every std::array width in the model.\n\n## New archetypes (13 -> 16)\n\n| Archetype | Died at | Has | Lacks |\n|---|---|---|---|\n| **Silent Eden** | S5c or S5e, on an otherwise perfect world | oceans, continents, mild climate, pristine ore unweathered by life, clay, sand | ALL fossil carbon, all biology, and - via S8's nitrogen-fixation requirement - **soil: land you cannot farm despite perfect climate** |\n| **RNA Lock** | S5g | a real microbial biosphere, marine organics, some BIF | any complexity, any oxygen, any path forward |\n| **Ferrotroph World** | S6b (cofactor/genome), with S6a fired | colossal UNBOUNDED banded iron - the window never closes | oxygen, permanently and structurally |\n\n**Silent Eden is the most valuable of the three.** Today a perfect wet world that never sparked resolves to relict_wet, which is WRONG - relict_wet is Mars, a world that lost its air. A living-capable world that stayed silent is a different thing entirely and the current model cannot name it.\n\n**Honest risk on Ferrotroph World:** it may be indistinguishable from Mat World to a player. Both read iron-rich and anoxic. The real difference is causal - Mat World failed on FLUX BALANCE (the reductant flux won, and falling theta could in principle have fixed it), Ferrotroph failed on BIOCHEMISTRY (it never built the water-splitting complex; there is no path). Differentiate them mechanically by giving Ferrotroph a strictly higher, never-closing iron window, plus its own blurb. If tuning cannot separate them, fold Ferrotroph into Mat World rather than shipping two names for one feeling.\n\n## Data model\n\nThe compression insight is NOT hex - it is that an event stores IDs and the stoichiometry lives in a static compiled-in table. Hex text is ~2x the size of binary and buys nothing as storage; it is purely a DISPLAY encoding for the dev inspector.\n\n```\nstruct molecular_event   // 8 bytes, flat binary, fixed width\n{\n    uint16_t epoch_myr;  // Myr before present / 10 - covers 655 Gyr\n    uint8_t  process_id; // index into reaction_table\n    uint8_t  outcome;    // fired / marginal / failed / bypassed\n    uint16_t yield_q;    // fixed-point, 1/1000\n    uint8_t  venue_id;   // vent / pool / pore / lake / subsurface\n    uint8_t  flags;\n};\n```\n\nTwo tables in `src/world/chemistry_tables.{hpp,cpp}`, compiled in and NEVER serialised:\n- `species_table[]` - id, formula ('HCN'), canonical name ('hydrogen cyanide'), class (feedstock / reductant / monomer / polymer / cofactor / waste). ~35 entries.\n- `reaction_table[]` - id, name ('serpentinisation'), reactant ids, product ids, one prose line, owning sub-gate. ~25 entries.\n\n**An event never holds a string.** The hex inspector and any player-facing surface both decode through the SAME table, so names cannot drift from ids and raw bytes can never leak to display. Rendered form:\n\n```\n3F 0C 01 4E 20 02 00 00\n  3.90 Gya  serpentinisation   FIRED   yield 0.31   venue: alkaline vent\n            olivine + H2O -> serpentine + magnetite + H2\n```\n\nBudget: ~60 events on a living world, ~10 on a dead one -> **under 500 bytes per body**, comfortably inside the envelope PLANETOLOGY.md already reserves (~120 bytes + a <=64-byte event array).\n\n## Determinism\n\n- **Seven new stage tags** for the RNG sub-streams, plus 2-3 for the S6 sub-gates. Existing tags are tag_accretion 0x51A1, tag_breath 0xB6EA, tag_green 0x67EE, and an inline 0x5A4B at S5. Allocate FRESH constants; PLANETOLOGY.md warns 0x4A71012u is already folded twice in hard_coded_world.cpp.\n- **Per-sub-gate hashed sub-streams are load-bearing here**, more than anywhere else in the model: they are what lets a later gate be added or retuned without silently re-rolling every earlier one.\n- **The RNA hydrolysis temperature curve MUST be a lookup table**, not exp(). Arrhenius kinetics in a gate path is exactly the portability hazard PLANETOLOGY.md names - exp/log/pow are not bit-identical across compilers, libm versions or fast-math settings. Specify a 16-entry table over 0-160 C, on the precedent of the radiogenic decay already binned at 0.05 Gyr.\n- **This is also why the kinetic-network depth was rejected.** Integrating real concentrations over time is nothing BUT exponentials in gate paths; it would need every rate as a lookup, arriving at this design with ~200 free parameters and four calibration bodies.\n\n## Harness impact (tools/verify/planetology_harness.cpp)\n\n**Blast radius is smaller than it looks: three of the four prototype bodies die at S1-S3 and never reach S5, and the fourth (Kepler) is the constrained homeworld the strict floor forces through.**\n\n| Group | Risk |\n|---|---|\n| R2 four bodies land in stated archetypes | LOW - Kepler must still be Cradle; the floor enforces it |\n| R3 B->C joint | unchanged |\n| R4 iron/coal antagonism | **AT RISK** - the photosystem fork adds a second, independent iron pathway; re-assert both ends |\n| R5 homeworld corridor 100/100 | **AT RISK** - seven new gates the homeworld must clear; acceptance rate will fall, reject-and-reroll absorbs it, but planetology_sweep MUST re-measure per-lean cost so no preference becomes a dead end |\n| R7 every knob moves its outcome | new cofactor gates need their own assertions |\n| **R12 NEW - the trace** | event sequence is deterministic in (seed, body); and EVERY emitted species/reaction id resolves in the table (no orphan ids). The orphan-id check is the key new invariant, since ids and names are now decoupled |\n\n`abiogenesis_ease` should now bias the WHOLE chain rather than a single draw at S5. No new player knob is proposed - the existing eight preferences already cover the axes, and PLANETOLOGY.md's rule is that a knob must change something a player can read.\n\n## Cut, by the diagnostic test\n\nPLANETOLOGY.md: 'for every generated value, name the decision it changes. Anything that fails is deleted, not tuned.' Cut: **homochirality** (beautiful, names no decision); **nucleobase route** - formamide vs cyanosulfidic vs HCN (three paths, identical output; may survive as flavour naming only); **panspermia** (moves the question, changes nothing); **LUCA's gene set** (invisible downstream); **eukaryogenesis** (borderline - overlaps Boring Billion's 'oxygen present and useless'; revisit only if the Boring Billion outcome proves too rare).\n\n## Residual calls (implementation-time, with recommendations)\n\n1. **Manganese is not currently derived anywhere.** S6b needs it. Recommend a crustal-Mn scalar from metallicity x crustal reworking - cheap, and it reuses S0's one-nebula correlation.\n2. **S5f Compartment** - cut if it never fires distinctly from S5e (see above).\n3. **Ferrotroph vs Mat World separation** - fold if tuning cannot distinguish them.\n4. **Authority propagation:** PLANETOLOGY.md is deliberately NOT edited by this entry. Per the standing rule, a settled design for an open item lives in the item until the work lands, then propagates into the authority doc as part of landing it.\n\nRead PLANETOLOGY.md S5/S6/S8, 'Determinism & cost', 'Known weaknesses' and 'Presentation' in full before promoting."
+   "design": "DESIGNED 2026-07-28 (Ben, Q&A). Four calls settled: (a) GENERATIVE, FULL 7-GATE CHAIN - every sub-gate can fail independently and change the endowment, not merely narrate an existing verdict; (b) NEW ARCHETYPES added rather than folding new outcomes into the existing 13; (c) surfaced as a DRILL-DOWN behind the eight-line biography, which stays exactly as-is (PLANETOLOGY.md's eight-line cap is load-bearing - the brevity of a failed world IS its characterisation); (d) DESIGN NOW, BUILD AFTER BL-208, so the trace is authored as entries in the append-only world log rather than a parallel per-body structure.\n\n## The problem being solved\n\nS5 Spark is currently ONE BOOLEAN at planetology.cpp:780 - `cycling_venue && geology >= low && time_budget && rng < abiogenesis_ease` - emitting one history line. All the real chemistry (serpentinisation H2, the 0.1 M HCN threshold, Fe(Ni)S walls matching ferredoxin) lives in COMMENTS, not in data. This item promotes that chemistry into a generated, branching, inspectable trace.\n\n## S5 decomposed into seven gates\n\nEach reads inputs already computed by earlier stages, tests one threshold, and has a distinct failure state. Several reach BACK into S0-S4 rolls, which is the point: it makes generation read as one causal system rather than ten independent dice.\n\n| Gate | Question | Key chemistry | Reads from | Fails into |\n|---|---|---|---|---|\n| S5a Feedstock | Anything to build with? | HCN -> purines (adenine is literally (HCN)5); HCHO -> sugars via formose. Yield collapses orders of magnitude in an oxidised CO2/N2 atmosphere vs a reduced one. Modern resolution: IMPACT-GENERATED TRANSIENT REDUCING ATMOSPHERES - a large iron-rich impactor reduces H2O to H2 for ~10^5-10^6 yr (Zahnle, Genda). | S2 atmosphere class; **S1 late-veneer roll**; UV flux | sterile - no organic feedstock, ever |\n| S5b Reductant | Free energy of the right shape? | Serpentinisation: olivine + H2O -> serpentine + magnetite + H2, exothermic. Lost City runs 45-90 C, pH 9-11, up to 200 mM H2. Alkaline effluent into a CO2-acidified ocean = a 3-4 pH-unit gradient of the same polarity every living cell uses, across Fe(Ni)S walls. | S3 geology; S4 liquid water; ultramafic crust from S1 | prebiotic - feedstock present, nothing to cycle it |\n| S5c Phosphorylation | Could it make a nucleotide? | The genuinely hard one. Seawater P ~1 uM, locked in apatite. Two routes: SCHREIBERSITE (Fe3P from iron meteorites) corroding to reactive phosphite; or CARBONATE-RICH ALKALINE LAKES where Ca drops out as carbonate, freeing P to concentrate ~10^5-10^6x (Toner & Catling). | **S1 metallic impactors** (schreibersite); **S4 subaerial relief + evaporation** (lakes) | NEW: monomers, no nucleotides - sugars and bases exist, nothing links them |\n| S5d Concentration | Dense enough to polymerise? | HCN oligomerises above ~0.1 M, competes with hydrolysis at 0.01-0.1 M, loses below. Hadean ocean HCN was orders of magnitude under. 'The ocean was a soup' is chemically false. Venues: wet-dry cycling in subaerial pools (dehydration drives condensation - polymerisation in bulk water is uphill), or hydrothermal pore thermophoresis (~5000x, Braun & Mast), which works WITHOUT land. | S4 water_fraction, relief; S3 geology | prebiotic - today's outcome, now with a named cause |\n| S5e Replicator | Did a polymer copy itself AND survive? | THE NEW PHYSICS: an RNA temperature ceiling. The phosphodiester backbone hydrolyses, and the rate climbs steeply with temperature - order-of-magnitude, hours at ~100 C against years near 0 C; cytosine deamination is worse. This sets up a DIRECT ANTAGONISM WITH S5b: vents give the reductant and the gradient, and vents are hot. Lost City at 45-90 C is survivable; a black smoker at 350 C is not. | S4 surface_temp_k; vent temp from S3 theta; S5d venue | NEW: polymers, no replicator - 'chemistry got further here than anywhere else, and stopped' |\n| S5f Compartment | Did it become an individual? | Fatty-acid vesicles self-assemble above a critical concentration; without one, a useful ribozyme's benefit diffuses to its competitors and there is no Darwinian individuality. Known unresolved tension: fatty-acid membranes are destabilised by divalent cations, and RNA catalysis REQUIRES Mg2+. Chelators (citrate) are the proposed workaround. | ocean divalent-cation load, from S4 weathering + S1 crust | NEW: replicators, no cells |\n| S5g Code | Did it lift the genome ceiling? | RNA -> coded protein (the ribosome is itself a ribozyme) -> DNA via ribonucleotide reductase. The real constraint is EIGEN'S ERROR THRESHOLD: without proofreading, max genome length ~ 1/(per-base mutation rate), capping an RNA-only replicator near a few thousand bases. DNA plus a proofreading polymerase lifts that by orders of magnitude. | S5e fidelity; time budget; cofactors | NEW: RNA LOCK - real, metabolising, evolving life, permanently simple |\n\n**S5f is the weakest of the seven on the 'name the decision' test** - its failure state is exotic and its downstream endowment is identical to S5e's. It is included because Ben chose the full chain, but it is explicitly THE FIRST CANDIDATE TO CUT if tuning shows it never fires distinctly from S5e.\n\n## S6 - the photosystem fork (the highest-value piece)\n\nThis converts a named uncertainty in PLANETOLOGY.md's own 'Known weaknesses' into a GENERATED BRANCH instead of a constant. The doc says the BIF oxidant is 'genuinely unresolved between cyanobacterial O2, anoxygenic photoferrotrophy (which needs no free oxygen at all) and abiotic UV photo-oxidation, AND IT DECIDES WHETHER BIF GATES ON LIFE OR ON OXYGEN' - which is what the whole iron/coal antagonism hangs on.\n\n- **S6a Anoxygenic photosynthesis (photoferrotrophy).** One photosystem, Fe(II) as electron donor, no O2 produced. Cheap - fires on nearly any microbial world with dissolved iron. **Precipitates banded iron with NO free oxygen at all.**\n- **S6b Oxygenic photosynthesis.** Splitting water needs +1.23 V, more than any single photosystem delivers - which is why it needs TWO chained in series (the Z-scheme), and why it evolved exactly once in 4 Gyr on Earth. Its cofactor is the Mn4CaO5 oxygen-evolving complex, so it GATES ON MANGANESE. Requires the genome headroom from S5g (two photosystems + dozens of genes is not reachable under an RNA-world error threshold).\n- **S6c Nitrogen fixation.** N2's 941 kJ/mol triple bond yields only to nitrogenase, whose cofactor is Mo - soluble in oxic water, NOT in anoxic sulfidic water. Low Mo -> weak fixation -> capped productivity -> capped burial -> capped oxygen; and since S8 already states soil requires biological nitrogen fixation, **Mo gates arable_share through pure chemistry.**\n\nThe existing GOE / Boring Billion / NOE flux-balance structure runs UNDERNEATH this, unchanged. The cofactor gates sit in front of it.\n\n**Mo and P stay INTERNAL SCALARS, never resources** - this deliberately does not touch PLANETOLOGY.md open call 3 (resource-list expansion), which would shift resource_count and every std::array width in the model.\n\n## New archetypes (13 -> 16)\n\n| Archetype | Died at | Has | Lacks |\n|---|---|---|---|\n| **Silent Eden** | S5c or S5e, on an otherwise perfect world | oceans, continents, mild climate, pristine ore unweathered by life, clay, sand | ALL fossil carbon, all biology, and - via S8's nitrogen-fixation requirement - **soil: land you cannot farm despite perfect climate** |\n| **RNA Lock** | S5g | a real microbial biosphere, marine organics, some BIF | any complexity, any oxygen, any path forward |\n| **Ferrotroph World** | S6b (cofactor/genome), with S6a fired | colossal UNBOUNDED banded iron - the window never closes | oxygen, permanently and structurally |\n\n**Silent Eden is the most valuable of the three.** Today a perfect wet world that never sparked resolves to relict_wet, which is WRONG - relict_wet is Mars, a world that lost its air. A living-capable world that stayed silent is a different thing entirely and the current model cannot name it.\n\n**Honest risk on Ferrotroph World:** it may be indistinguishable from Mat World to a player. Both read iron-rich and anoxic. The real difference is causal - Mat World failed on FLUX BALANCE (the reductant flux won, and falling theta could in principle have fixed it), Ferrotroph failed on BIOCHEMISTRY (it never built the water-splitting complex; there is no path). Differentiate them mechanically by giving Ferrotroph a strictly higher, never-closing iron window, plus its own blurb. If tuning cannot separate them, fold Ferrotroph into Mat World rather than shipping two names for one feeling.\n\n## Data model\n\nThe compression insight is NOT hex - it is that an event stores IDs and the stoichiometry lives in a static compiled-in table. Hex text is ~2x the size of binary and buys nothing as storage; it is purely a DISPLAY encoding for the dev inspector.\n\n```\nstruct molecular_event   // 8 bytes, flat binary, fixed width\n{\n    uint16_t epoch_myr;  // Myr before present / 10 - covers 655 Gyr\n    uint8_t  process_id; // index into reaction_table\n    uint8_t  outcome;    // fired / marginal / failed / bypassed\n    uint16_t yield_q;    // fixed-point, 1/1000\n    uint8_t  venue_id;   // vent / pool / pore / lake / subsurface\n    uint8_t  flags;\n};\n```\n\nTwo tables in `src/world/chemistry_tables.{hpp,cpp}`, compiled in and NEVER serialised:\n- `species_table[]` - id, formula ('HCN'), canonical name ('hydrogen cyanide'), class (feedstock / reductant / monomer / polymer / cofactor / waste). ~35 entries.\n- `reaction_table[]` - id, name ('serpentinisation'), reactant ids, product ids, one prose line, owning sub-gate. ~25 entries.\n\n**An event never holds a string.** The hex inspector and any player-facing surface both decode through the SAME table, so names cannot drift from ids and raw bytes can never leak to display. Rendered form:\n\n```\n3F 0C 01 4E 20 02 00 00\n  3.90 Gya  serpentinisation   FIRED   yield 0.31   venue: alkaline vent\n            olivine + H2O -> serpentine + magnetite + H2\n```\n\nBudget: ~60 events on a living world, ~10 on a dead one -> **under 500 bytes per body**, comfortably inside the envelope PLANETOLOGY.md already reserves (~120 bytes + a <=64-byte event array).\n\n## Determinism\n\n- **Seven new stage tags** for the RNG sub-streams, plus 2-3 for the S6 sub-gates. Existing tags are tag_accretion 0x51A1, tag_breath 0xB6EA, tag_green 0x67EE, and an inline 0x5A4B at S5. Allocate FRESH constants; PLANETOLOGY.md warns 0x4A71012u is already folded twice in hard_coded_world.cpp.\n- **Per-sub-gate hashed sub-streams are load-bearing here**, more than anywhere else in the model: they are what lets a later gate be added or retuned without silently re-rolling every earlier one.\n- **The RNA hydrolysis temperature curve MUST be a lookup table**, not exp(). Arrhenius kinetics in a gate path is exactly the portability hazard PLANETOLOGY.md names - exp/log/pow are not bit-identical across compilers, libm versions or fast-math settings. Specify a 16-entry table over 0-160 C, on the precedent of the radiogenic decay already binned at 0.05 Gyr.\n- **This is also why the kinetic-network depth was rejected.** Integrating real concentrations over time is nothing BUT exponentials in gate paths; it would need every rate as a lookup, arriving at this design with ~200 free parameters and four calibration bodies.\n\n## Harness impact (tools/verify/planetology_harness.cpp)\n\n**Blast radius is smaller than it looks: three of the four prototype bodies die at S1-S3 and never reach S5, and the fourth (Kepler) is the constrained homeworld the strict floor forces through.**\n\n| Group | Risk |\n|---|---|\n| R2 four bodies land in stated archetypes | LOW - Kepler must still be Cradle; the floor enforces it |\n| R3 B->C joint | unchanged |\n| R4 iron/coal antagonism | **AT RISK** - the photosystem fork adds a second, independent iron pathway; re-assert both ends |\n| R5 homeworld corridor 100/100 | **AT RISK** - seven new gates the homeworld must clear; acceptance rate will fall, reject-and-reroll absorbs it, but planetology_sweep MUST re-measure per-lean cost so no preference becomes a dead end |\n| R7 every knob moves its outcome | new cofactor gates need their own assertions |\n| **R12 NEW - the trace** | event sequence is deterministic in (seed, body); and EVERY emitted species/reaction id resolves in the table (no orphan ids). The orphan-id check is the key new invariant, since ids and names are now decoupled |\n\n`abiogenesis_ease` should now bias the WHOLE chain rather than a single draw at S5. No new player knob is proposed - the existing eight preferences already cover the axes, and PLANETOLOGY.md's rule is that a knob must change something a player can read.\n\n## Cut, by the diagnostic test\n\nPLANETOLOGY.md: 'for every generated value, name the decision it changes. Anything that fails is deleted, not tuned.' Cut: **homochirality** (beautiful, names no decision); **nucleobase route** - formamide vs cyanosulfidic vs HCN (three paths, identical output; may survive as flavour naming only); **panspermia** (moves the question, changes nothing); **LUCA's gene set** (invisible downstream); **eukaryogenesis** (borderline - overlaps Boring Billion's 'oxygen present and useless'; revisit only if the Boring Billion outcome proves too rare).\n\n## Residual calls (implementation-time, with recommendations)\n\n1. **Manganese is not currently derived anywhere.** S6b needs it. Recommend a crustal-Mn scalar from metallicity x crustal reworking - cheap, and it reuses S0's one-nebula correlation.\n2. **S5f Compartment** - cut if it never fires distinctly from S5e (see above).\n3. **Ferrotroph vs Mat World separation** - fold if tuning cannot distinguish them.\n4. **Authority propagation:** PLANETOLOGY.md is deliberately NOT edited by this entry. Per the standing rule, a settled design for an open item lives in the item until the work lands, then propagates into the authority doc as part of landing it.\n\nRead PLANETOLOGY.md S5/S6/S8, 'Determinism & cost', 'Known weaknesses' and 'Presentation' in full before promoting.",
+   "parked": true
   },
   {
    "id": "BL-210",
@@ -4451,7 +4452,7 @@
    "glyph": "✓",
    "priority": "C",
    "difficulty": 2,
-   "parked": false,
+   "parked": true,
    "version_goal": "v0.4.0",
    "requires": [
     "BL-167",
@@ -4527,7 +4528,7 @@
    "glyph": "✓",
    "priority": "C",
    "difficulty": 4,
-   "parked": false,
+   "parked": true,
    "version_goal": "v0.1.11",
    "requires": [
     "BL-210"
@@ -4562,7 +4563,7 @@
    "glyph": "✓",
    "priority": "C",
    "difficulty": 3,
-   "parked": false,
+   "parked": true,
    "version_goal": "v0.1.11",
    "requires": [],
    "blocked_on": [],
@@ -4674,7 +4675,7 @@
    "glyph": "✓",
    "priority": "B",
    "difficulty": 5,
-   "parked": false,
+   "parked": true,
    "version_goal": "v0.4.0",
    "requires": [
     "BL-208",
@@ -4706,7 +4707,7 @@
    "glyph": "✓",
    "priority": "B",
    "difficulty": 5,
-   "parked": false,
+   "parked": true,
    "version_goal": "v0.4.0",
    "requires": [
     "BL-208",
@@ -4737,7 +4738,7 @@
    "glyph": "✓",
    "priority": "B",
    "difficulty": 4,
-   "parked": false,
+   "parked": true,
    "version_goal": "v0.4.0",
    "requires": [
     "BL-238",
@@ -4989,7 +4990,7 @@
    "glyph": "✓",
    "priority": "B",
    "difficulty": 4,
-   "parked": false,
+   "parked": true,
    "version_goal": "v0.4.0",
    "requires": [
     "BL-238",
@@ -5020,7 +5021,7 @@
    "glyph": "✓",
    "priority": "B",
    "difficulty": 4,
-   "parked": false,
+   "parked": true,
    "version_goal": "v0.4.0",
    "requires": [
     "BL-221",
@@ -5047,7 +5048,7 @@
    "glyph": "✓",
    "priority": "B",
    "difficulty": 3,
-   "parked": false,
+   "parked": true,
    "version_goal": "v0.4.0",
    "requires": [
     "BL-239",
@@ -5650,7 +5651,7 @@
   {
    "status": "designed",
    "glyph": "✓",
-   "parked": false,
+   "parked": true,
    "requires": [],
    "blocked_on": [],
    "written": "2026-08-01",
@@ -5701,7 +5702,7 @@
   {
    "status": "designed",
    "glyph": "✓",
-   "parked": false,
+   "parked": true,
    "requires": [
     "BL-214",
     "BL-256"
@@ -5981,7 +5982,7 @@
    "priority": "B",
    "difficulty": 3,
    "parked": false,
-   "version_goal": "v0.3.0",
+   "version_goal": "v0.1.16",
    "requires": [
     "BL-272"
    ],
@@ -6057,7 +6058,7 @@
    "priority": "B",
    "difficulty": 4,
    "parked": false,
-   "version_goal": "v0.3.0",
+   "version_goal": "v0.1.16",
    "requires": [
     "BL-271",
     "BL-272",
@@ -6103,7 +6104,7 @@
    "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
-   "parked": false,
+   "parked": true,
    "blocked_on": [],
    "written": "2026-08-03",
    "id": "BL-279",
@@ -6129,7 +6130,7 @@
    "resolution": null
   },
   {
-   "parked": false,
+   "parked": true,
    "blocked_on": [],
    "written": "2026-08-03",
    "requires": [
@@ -6357,7 +6358,8 @@
     "src/world/star_map.cpp",
     "docs/generation/PLANETOLOGY.md"
    ],
-   "design": "DEFERRED DELIBERATELY. Ben, 2026-08-04: \"just flavor, keep a deferred item with your thoughts\nfor if I decide to add more challenging aspects.\" The star map and its supernova/quasar lines\nlanded as pure narration — no gate reads them, no endowment moves. This item is the version\nwith teeth, recorded now while the reasoning is in hand.\n\nWHY IT IS TEMPTING. A nearby supernova is a real extinction mechanism, and it happens to be\nthe one kind of catastrophe this model has no way to express. Every existing failure in the\nchain is a property of the world itself — too little heat, too much ocean, the wrong oxygen\ntiming. All of them are things the player chose in the wizard, however indirectly. A supernova\nis the first cause that is NOT about the world: it arrives from outside, it is nobody's fault,\nand it is the only mechanism in the design that could make two otherwise-identical worlds\ndiverge. That is worth something narratively that no amount of knob-tuning provides.\n\nTHE MECHANISM, IF BUILT. Ozone is already modelled — ozone_du() in planetology.cpp, a lookup\nagainst O2 as a fraction of present level, used by the S7 land-colonisation gate at a 60 DU\nthreshold. A supernova within ~10 parsecs strips a large fraction of the ozone column for\nyears to decades. So the hook is exact and already present: temporarily depress the ozone\ncolumn at the moment the light arrives, and let the EXISTING S7 gate do the work. If the world\nhad only just cleared 60 DU, it loses its land biosphere and becomes a Graveyard; if it was\ncomfortably above, it survives with a scar in the biography. No new gate, no new archetype —\nthe graveyard mechanic (peak vs current life_stage) already models exactly this outcome, where\nthe coal survives and the forests do not.\n\nBL-217's checkpoint machinery is the natural home: a checkpoint_record at chain_stage::green\nwith branch_taken \"supernova at N pc - ozone stripped\" and viability_result set by whether the\nbiosphere held. That gets it into the replayable branch history for free.\n\nWHAT MAKES IT HARD, AND WHY IT IS NOT DEFAULT-ON.\n1. The star map is FIXED and the campaign is not. A supernova at a fixed sky position is at a\n   fixed DISTANCE only if every campaign system sits in the same place in the galaxy, which is\n   currently unstated. Either the campaign system gets a galactic position (new state), or the\n   distance is drawn per campaign and the fixed map becomes a fixed DIRECTION with a variable\n   range. The second is cheaper and probably right, but it means the sky lies slightly: the\n   same remnant is 8 pc away in one campaign and 300 in another.\n2. It reintroduces exactly the failure mode this session spent a day measuring away. A world\n   can now fail for a reason no wizard preference predicts, which is thrilling once and\n   infuriating on the fourth reroll. It wants a rate, and the rate wants measuring — the\n   earthlike battery (planetology_sweep C1, earthlike_tile_census) is the instrument, and the\n   question is what fraction of campaigns should lose their biosphere this way. My guess is\n   low single digits, and that it should never fire on the homeworld before civilisation\n   unless Ben wants Era -1 to be genuinely dangerous.\n3. The homeworld floor would have to decide whether it cares. homeworld_viability rejects\n   non-Cradles, so a supernova-killed homeworld is simply rerolled and the player never sees\n   it — the drama lands only on NON-homeworld bodies, or if the floor gains an exception. The\n   more interesting version is the latter: a Graveyard homeworld the player is told about and\n   must live with. That is a much bigger design decision than the mechanism.\n\nCHEAPER MIDDLE GROUND, if the full version is too much: let the supernova fire on non-homeworld\nbodies only. Cinder, Selene and Pallas have no biosphere to lose, so today it would be inert —\nbut it becomes live the moment the body count grows (PLANETOLOGY.md Open call 2), and it gives\nthe sky something to do without ever costing the player their own world.\n\nSEE ALSO: the quasar is deliberately excluded from all of this. It has been shining the whole\ntime, which is exactly why it makes a good fixed landmark and a bad event."
+   "design": "DEFERRED DELIBERATELY. Ben, 2026-08-04: \"just flavor, keep a deferred item with your thoughts\nfor if I decide to add more challenging aspects.\" The star map and its supernova/quasar lines\nlanded as pure narration — no gate reads them, no endowment moves. This item is the version\nwith teeth, recorded now while the reasoning is in hand.\n\nWHY IT IS TEMPTING. A nearby supernova is a real extinction mechanism, and it happens to be\nthe one kind of catastrophe this model has no way to express. Every existing failure in the\nchain is a property of the world itself — too little heat, too much ocean, the wrong oxygen\ntiming. All of them are things the player chose in the wizard, however indirectly. A supernova\nis the first cause that is NOT about the world: it arrives from outside, it is nobody's fault,\nand it is the only mechanism in the design that could make two otherwise-identical worlds\ndiverge. That is worth something narratively that no amount of knob-tuning provides.\n\nTHE MECHANISM, IF BUILT. Ozone is already modelled — ozone_du() in planetology.cpp, a lookup\nagainst O2 as a fraction of present level, used by the S7 land-colonisation gate at a 60 DU\nthreshold. A supernova within ~10 parsecs strips a large fraction of the ozone column for\nyears to decades. So the hook is exact and already present: temporarily depress the ozone\ncolumn at the moment the light arrives, and let the EXISTING S7 gate do the work. If the world\nhad only just cleared 60 DU, it loses its land biosphere and becomes a Graveyard; if it was\ncomfortably above, it survives with a scar in the biography. No new gate, no new archetype —\nthe graveyard mechanic (peak vs current life_stage) already models exactly this outcome, where\nthe coal survives and the forests do not.\n\nBL-217's checkpoint machinery is the natural home: a checkpoint_record at chain_stage::green\nwith branch_taken \"supernova at N pc - ozone stripped\" and viability_result set by whether the\nbiosphere held. That gets it into the replayable branch history for free.\n\nWHAT MAKES IT HARD, AND WHY IT IS NOT DEFAULT-ON.\n1. The star map is FIXED and the campaign is not. A supernova at a fixed sky position is at a\n   fixed DISTANCE only if every campaign system sits in the same place in the galaxy, which is\n   currently unstated. Either the campaign system gets a galactic position (new state), or the\n   distance is drawn per campaign and the fixed map becomes a fixed DIRECTION with a variable\n   range. The second is cheaper and probably right, but it means the sky lies slightly: the\n   same remnant is 8 pc away in one campaign and 300 in another.\n2. It reintroduces exactly the failure mode this session spent a day measuring away. A world\n   can now fail for a reason no wizard preference predicts, which is thrilling once and\n   infuriating on the fourth reroll. It wants a rate, and the rate wants measuring — the\n   earthlike battery (planetology_sweep C1, earthlike_tile_census) is the instrument, and the\n   question is what fraction of campaigns should lose their biosphere this way. My guess is\n   low single digits, and that it should never fire on the homeworld before civilisation\n   unless Ben wants Era -1 to be genuinely dangerous.\n3. The homeworld floor would have to decide whether it cares. homeworld_viability rejects\n   non-Cradles, so a supernova-killed homeworld is simply rerolled and the player never sees\n   it — the drama lands only on NON-homeworld bodies, or if the floor gains an exception. The\n   more interesting version is the latter: a Graveyard homeworld the player is told about and\n   must live with. That is a much bigger design decision than the mechanism.\n\nCHEAPER MIDDLE GROUND, if the full version is too much: let the supernova fire on non-homeworld\nbodies only. Cinder, Selene and Pallas have no biosphere to lose, so today it would be inert —\nbut it becomes live the moment the body count grows (PLANETOLOGY.md Open call 2), and it gives\nthe sky something to do without ever costing the player their own world.\n\nSEE ALSO: the quasar is deliberately excluded from all of this. It has been shining the whole\ntime, which is exactly why it makes a good fixed landmark and a bad event.",
+   "parked": true
   },
   {
    "id": "BL-290",
@@ -6502,7 +6504,7 @@
    "status": "designed",
    "priority": "B",
    "difficulty": "M",
-   "version_goal": "v0.3.0",
+   "version_goal": "v0.1.16",
    "created": "2026-08-04",
    "authority_doc": "docs/lore/HISTORY.md",
    "touches": [
@@ -6510,10 +6512,11 @@
     "docs/lore/HISTORY.md",
     "src/world/history_sim.{hpp,cpp} (future, with BL-271)"
    ],
-   "design": "MOCKED UP 2026-08-04 (Ben: 'mock up an ancient tech tree as a basis; consider the major advancements from 0 AD, and what differences are realistic by 1960 AD'). The full mockup lives in docs/research/ANCIENT_TECH_LADDER.md — this item is its tracked home; the design conversation happens against that doc.\n\nSHAPE, in one paragraph: six bands (T1 Classical -> T6 Machine Age) x seven domains (Agriculture / Materials / Energy / Transport / Institutions / Military / Medicine), ~60 load-bearing nodes with prereqs, endowment gates over settlement_state (ore_q / fuel / arable / coastal / grassland), and a three-class DIFFUSION axis (artifact / practice / capacity) that generates the realistic 1960 inequality: knowledge spread ~0 bands, capacity spread 3-4 bands, military-artifact spread 1-2 bands. Honours the BL-274 stance in full — derived availability, never a player-facing research tree; the tree structure is data the BL-271 year-tick sim evaluates.\n\nRELATION TO SIBLINGS: BL-271 (Era -1 sim) is the consumer of the acquisition model (invention at the frontier / practice diffusion by contact / artifact flow by trade / capacity regression on rupture). BL-274 (era-keyed rosters) reads the Military band boundaries plus the capacity-vs-artifact split (what a nation FIELDS vs what it can REPLACE under blockade). BL-273 (province demography) reads the Medicine and Agriculture bands. The T6 exit hands off to scripts/tech_tree.lua (BL-087) at the campaign epoch.\n\nOPEN QUESTIONS (in the doc, section-final): band-count reconciliation with BL-274 four-band lean; per-domain capacity + artifact-access state representation; C++ table vs Lua data home; whether the player ever sees a 1960 codex rendering. NR-054 / NR-055 record the two calls taken on Ben behalf.\n\nGEOMETRY SETTLED (2026-08-04, follow-up session, Ben): the constellation — see the docs § Geometry (rings = bands, sectors = domains, entry = endowment, travel-OR / meaning-AND, keystone exclusion via windows, tech fog). This overturns BL-087 Q1 (recorded there and in ERA1_TECH_LANDSCAPE.md § Q1). NEXT STEP, per Ben: test how much detail makes the game FUN against worked examples — the docs § Density test carries one slice (the steam transition) at three grains; recommendation medium (~100-150 nodes web-wide, fine grain only around keystones); NR-056 holds the call.\n\nSECOND DENSITY SLICE (2026-08-04, same day): Institutions at medium grain, as the contrast test — practice-class nodes, an ideological keystone (Sovereign Doctrine: Chartered Capital vs Command Estate — HISTORY.md Stage 3 turned into a choice, creed-picked for AI nations), and three invented VERTEX QUESTS (The Enforceable Promise / The Disciplined Sovereign / The Lettered Public). New geometry rule recorded same day: VERTICES ARE QUESTS — the BL-087 gate=quest=tech object placed at ring crossings, capstone carrying the economic conditions, completion opening the next ring region in that sector.\n\nGRAIN SETTLED: MEDIUM (Ben, 2026-08-04 — NR-056 resolved), and the RING-1-TO-2 NEIGHBOURHOOD is worked in full at that grain (docs § The ring-1-to-2 neighbourhood): 19 techs + 5 vertex quests (The Common Forge / The Tireless Wheel / All Roads Home / The Written Ledger / The Fed Village) + the GRANARY DOCTRINE keystone (Temple Stores vs Open Granaries — the campaigns markets-not-command premise made a ring-1 choice) + 2 roster regimes = 27 objects (count corrected 2026-08-04 against the BL-307 data store), extrapolating to ~130-150 web-wide. New rule adopted with the pass: the SPARSE-SECTOR RULE — a sector earns a vertex quest only at a genuine capability regime (Military crosses on the BL-274 roster turnover, Medicine on a plain edge). Visual sketch generated (scratchpad, session artifact).\n\nINDUSTRIAL NEIGHBOURHOOD (2026-08-05, Ben: 'another pre-game tech tree centred around the industrial revolution, to go alongside the pre-game early Civilisation tech tree'): the second complete region, worked at the settled medium grain in the doc's SS The industrial neighbourhood — rings T4-T5 and the T4/T5 crossings. Scope read as a second worked REGION of the one shared web, not a second web (NR-063). Content: 7 new techs (Coal Haulage & Urban Fuel, Patent Grants, Preventive Inoculation, High-Pressure & Compound Engines, Framed Construction & Cement, Soil Chemistry & Fertiliser Trade, General Incorporation), 4 new vertex quests (The Unwearied Fire / The Cheap Ton / The Scheduled World / The Freed Hands, joining the existing Disciplined Sovereign), and 2 new keystones — LABOUR DOCTRINE (Cleared Holdings vs Smallholder Tenure; the human price of the divergence, feeding BL-273 demography) and WORKS DOCTRINE (State Arsenal vs Private Works; who owns the heavy plant, and therefore the terms a player corporation operates on in 1960). Fuel Doctrine relocated ring T5 -> T4 so The Cheap Ton can require it taken (the ring-1 interlock, repeated — now the house rule). New authoring rule: FORK COUNT SCALES WITH THE BAND'S DIVERGENCE (ring 1 carries one keystone; this region carries four). Region totals 38 objects, 13 new here; web-wide 88 objects with two of five ring-crossings worked, extrapolating to ~120-135. ladder_lint.js generalised to print one line per worked region. Open: NR-064 asks whether Works Doctrine gates corporation generation (lean: yes, file an item when this lands) and whether the region earns its own viewer tab (lean: no — the era strip means eras). EFFECTS PASS (2026-08-05, Ben: 'let's map this to real buildings and units'): every tech, regime and keystone branch in rings T4-T5 now carries an `effects` array in the store - 62 effects, modifier 19 / institution 11 / unlock 10 / upgrade 5 / reach 4 / retire 4 / access 3 / intel 3 / resource 2 / doctrine 1, at shipped 15 / designed 29 / unbuilt 18. Taxonomy authored in docs/research/TECH_EFFECTS.md under BL-156. ladder_lint.js validates the kind/status vocabulary and enforces that no object in the typed region is left untyped."
+   "design": "MOCKED UP 2026-08-04 (Ben: 'mock up an ancient tech tree as a basis; consider the major advancements from 0 AD, and what differences are realistic by 1960 AD'). The full mockup lives in docs/research/ANCIENT_TECH_LADDER.md — this item is its tracked home; the design conversation happens against that doc.\n\nSHAPE, in one paragraph: six bands (T1 Classical -> T6 Machine Age) x seven domains (Agriculture / Materials / Energy / Transport / Institutions / Military / Medicine), ~60 load-bearing nodes with prereqs, endowment gates over settlement_state (ore_q / fuel / arable / coastal / grassland), and a three-class DIFFUSION axis (artifact / practice / capacity) that generates the realistic 1960 inequality: knowledge spread ~0 bands, capacity spread 3-4 bands, military-artifact spread 1-2 bands. Honours the BL-274 stance in full — derived availability, never a player-facing research tree; the tree structure is data the BL-271 year-tick sim evaluates.\n\nRELATION TO SIBLINGS: BL-271 (Era -1 sim) is the consumer of the acquisition model (invention at the frontier / practice diffusion by contact / artifact flow by trade / capacity regression on rupture). BL-274 (era-keyed rosters) reads the Military band boundaries plus the capacity-vs-artifact split (what a nation FIELDS vs what it can REPLACE under blockade). BL-273 (province demography) reads the Medicine and Agriculture bands. The T6 exit hands off to scripts/tech_tree.lua (BL-087) at the campaign epoch.\n\nOPEN QUESTIONS (in the doc, section-final): band-count reconciliation with BL-274 four-band lean; per-domain capacity + artifact-access state representation; C++ table vs Lua data home; whether the player ever sees a 1960 codex rendering. NR-054 / NR-055 record the two calls taken on Ben behalf.\n\nGEOMETRY SETTLED (2026-08-04, follow-up session, Ben): the constellation — see the docs § Geometry (rings = bands, sectors = domains, entry = endowment, travel-OR / meaning-AND, keystone exclusion via windows, tech fog). This overturns BL-087 Q1 (recorded there and in ERA1_TECH_LANDSCAPE.md § Q1). NEXT STEP, per Ben: test how much detail makes the game FUN against worked examples — the docs § Density test carries one slice (the steam transition) at three grains; recommendation medium (~100-150 nodes web-wide, fine grain only around keystones); NR-056 holds the call.\n\nSECOND DENSITY SLICE (2026-08-04, same day): Institutions at medium grain, as the contrast test — practice-class nodes, an ideological keystone (Sovereign Doctrine: Chartered Capital vs Command Estate — HISTORY.md Stage 3 turned into a choice, creed-picked for AI nations), and three invented VERTEX QUESTS (The Enforceable Promise / The Disciplined Sovereign / The Lettered Public). New geometry rule recorded same day: VERTICES ARE QUESTS — the BL-087 gate=quest=tech object placed at ring crossings, capstone carrying the economic conditions, completion opening the next ring region in that sector.\n\nGRAIN SETTLED: MEDIUM (Ben, 2026-08-04 — NR-056 resolved), and the RING-1-TO-2 NEIGHBOURHOOD is worked in full at that grain (docs § The ring-1-to-2 neighbourhood): 19 techs + 5 vertex quests (The Common Forge / The Tireless Wheel / All Roads Home / The Written Ledger / The Fed Village) + the GRANARY DOCTRINE keystone (Temple Stores vs Open Granaries — the campaigns markets-not-command premise made a ring-1 choice) + 2 roster regimes = 27 objects (count corrected 2026-08-04 against the BL-307 data store), extrapolating to ~130-150 web-wide. New rule adopted with the pass: the SPARSE-SECTOR RULE — a sector earns a vertex quest only at a genuine capability regime (Military crosses on the BL-274 roster turnover, Medicine on a plain edge). Visual sketch generated (scratchpad, session artifact).\n\nINDUSTRIAL NEIGHBOURHOOD (2026-08-05, Ben: 'another pre-game tech tree centred around the industrial revolution, to go alongside the pre-game early Civilisation tech tree'): the second complete region, worked at the settled medium grain in the doc's SS The industrial neighbourhood — rings T4-T5 and the T4/T5 crossings. Scope read as a second worked REGION of the one shared web, not a second web (NR-063). Content: 7 new techs (Coal Haulage & Urban Fuel, Patent Grants, Preventive Inoculation, High-Pressure & Compound Engines, Framed Construction & Cement, Soil Chemistry & Fertiliser Trade, General Incorporation), 4 new vertex quests (The Unwearied Fire / The Cheap Ton / The Scheduled World / The Freed Hands, joining the existing Disciplined Sovereign), and 2 new keystones — LABOUR DOCTRINE (Cleared Holdings vs Smallholder Tenure; the human price of the divergence, feeding BL-273 demography) and WORKS DOCTRINE (State Arsenal vs Private Works; who owns the heavy plant, and therefore the terms a player corporation operates on in 1960). Fuel Doctrine relocated ring T5 -> T4 so The Cheap Ton can require it taken (the ring-1 interlock, repeated — now the house rule). New authoring rule: FORK COUNT SCALES WITH THE BAND'S DIVERGENCE (ring 1 carries one keystone; this region carries four). Region totals 38 objects, 13 new here; web-wide 88 objects with two of five ring-crossings worked, extrapolating to ~120-135. ladder_lint.js generalised to print one line per worked region. Open: NR-064 asks whether Works Doctrine gates corporation generation (lean: yes, file an item when this lands) and whether the region earns its own viewer tab (lean: no — the era strip means eras). EFFECTS PASS (2026-08-05, Ben: 'let's map this to real buildings and units'): every tech, regime and keystone branch in rings T4-T5 now carries an `effects` array in the store - 62 effects, modifier 19 / institution 11 / unlock 10 / upgrade 5 / reach 4 / retire 4 / access 3 / intel 3 / resource 2 / doctrine 1, at shipped 15 / designed 29 / unbuilt 18. Taxonomy authored in docs/research/TECH_EFFECTS.md under BL-156. ladder_lint.js validates the kind/status vocabulary and enforces that no object in the typed region is left untyped.",
+   "parked": false
   },
   {
-   "parked": false,
+   "parked": true,
    "blocked_on": [],
    "written": "2026-08-04",
    "id": "BL-306",
@@ -6546,7 +6549,7 @@
    "glyph": "✓",
    "priority": "B",
    "difficulty": 4,
-   "version_goal": "v0.3.0",
+   "version_goal": "v0.1.16",
    "requires": [
     "BL-271",
     "BL-277"
@@ -6571,7 +6574,7 @@
    "glyph": "✓",
    "priority": "B",
    "difficulty": 3,
-   "version_goal": "v0.3.0",
+   "version_goal": "v0.1.16",
    "requires": [
     "BL-297"
    ],
@@ -6595,7 +6598,7 @@
    "glyph": "✓",
    "priority": "B",
    "difficulty": 3,
-   "version_goal": "v0.3.0",
+   "version_goal": "v0.1.16",
    "requires": [
     "BL-218"
    ],
@@ -6618,7 +6621,7 @@
    "glyph": "~",
    "priority": "B",
    "difficulty": 4,
-   "version_goal": "v0.3.0",
+   "version_goal": "v0.1.16",
    "requires": [
     "BL-218"
    ],
@@ -6631,7 +6634,7 @@
    "design": "## Intent (design-owed)\n\nQuestions the design must settle:\n\n1. **Myth-type banks, structurally faithful.** Creation, flood/deluge, culture-hero, ancestor cult, sky-father/earth-mother pairings, syncretism-on-conquest - the STRUCTURES are the transfer from real mythology (mechanism reference); every god, hero and place name is invented per the standing naming rule.\n2. **Derivation, not dice.** Per the generation rule (consequences of upstream scalars): a river-valley civilisation derives flood myths, a littoral one storm-and-sea cults, a forge-rich one smith gods - theology reads off terrain, biosphere history (BL-167 planetology outputs) and early economy.\n3. **Real veneration of old gods.** Conquest plants the victor's pantheon but does NOT erase the old one: old gods persist as substrate cults, syncretise (victor's war god acquires the local storm god's epithets), or go underground - interacting with the record-burning rule (a burned record does not unmake a venerated god; the cult remembers what the chronicle lost).\n4. **Consumers.** The oral-history pivot (BL-210) reads generated theology for dispatch idiom; BL-299's periphery-richness clause makes every civilisation's theology first-class, not just the two majors'; the mil-sim doctrine lean (BL-277 q5) reads creed weights that now have generated content behind them.\n5. **Scope guard.** Era -1 sandbox first; whether 1960-era Io surfaces any of this is a separate, later call."
   },
   {
-   "parked": false,
+   "parked": true,
    "blocked_on": [],
    "written": "2026-08-04",
    "id": "BL-301",
@@ -6802,7 +6805,7 @@
    "category": "Discovery",
    "status": "designed",
    "glyph": "✓",
-   "parked": false,
+   "parked": true,
    "priority": "C",
    "difficulty": 2,
    "version_goal": "v0.1.11",
@@ -6854,7 +6857,7 @@
    "category": "Generation",
    "status": "design-owed",
    "glyph": "~",
-   "parked": false,
+   "parked": true,
    "priority": "C",
    "difficulty": 3,
    "version_goal": "v0.4.0",
@@ -6936,7 +6939,7 @@
    "title": "Unit verb family for the action dictionary — levy/march/garrison/scout at unit grain, design-owed until a unit_command seam exists to transcribe from",
    "priority": "B",
    "difficulty": 3,
-   "version_goal": "v0.3.0",
+   "version_goal": "v0.1.16",
    "requires": [
     "BL-157",
     "BL-274"
@@ -6964,7 +6967,7 @@
    "title": "The militia's conflict spine — how procurement and force reach campaign outcomes for the 1960+ player (formerly \"the governing-body pivot's conflict spine\")",
    "priority": "A",
    "difficulty": 4,
-   "version_goal": "v0.3.0",
+   "version_goal": "v0.1.15",
    "requires": [
     "BL-094"
    ],
@@ -6987,8 +6990,8 @@
    "glyph": "✓",
    "priority": "A",
    "difficulty": 3,
-   "parked": true,
-   "version_goal": "v0.3.0",
+   "parked": false,
+   "version_goal": "v0.1.16",
    "requires": [],
    "blocked_on": [],
    "written": "2026-08-04",
@@ -7041,8 +7044,8 @@
    "glyph": "✓",
    "priority": "A",
    "difficulty": 3,
-   "parked": true,
-   "version_goal": "v0.3.0",
+   "parked": false,
+   "version_goal": "v0.1.16",
    "requires": [],
    "blocked_on": [],
    "written": "2026-08-07",
@@ -7091,8 +7094,8 @@
    "glyph": "✓",
    "priority": "B",
    "difficulty": 2,
-   "parked": true,
-   "version_goal": "v0.3.0",
+   "parked": false,
+   "version_goal": "v0.1.16",
    "requires": [],
    "blocked_on": [],
    "written": "2026-08-04",
@@ -7114,7 +7117,7 @@
    "priority": "A",
    "difficulty": 3,
    "parked": false,
-   "version_goal": "v0.3.0",
+   "version_goal": "v0.1.16",
    "requires": [
     "BL-271",
     "BL-316"
@@ -7420,7 +7423,7 @@
    "glyph": "~",
    "priority": "B",
    "difficulty": 3,
-   "parked": false,
+   "parked": true,
    "version_goal": "v0.3.0",
    "requires": [],
    "blocked_on": [],
@@ -7439,7 +7442,7 @@
    "glyph": "~",
    "priority": "B",
    "difficulty": 4,
-   "parked": false,
+   "parked": true,
    "version_goal": "v0.2.0",
    "requires": [
     "BL-278"
@@ -7464,7 +7467,7 @@
    "glyph": "~",
    "priority": "C",
    "difficulty": 1,
-   "parked": false,
+   "parked": true,
    "version_goal": "v0.2.0",
    "requires": [
     "BL-278"
@@ -7514,7 +7517,7 @@
    "parked": false,
    "blocked_on": [],
    "written": "2026-08-09",
-   "version_goal": "v0.3.0",
+   "version_goal": "v0.1.16",
    "requires": [
     "BL-271"
    ],
@@ -8366,7 +8369,7 @@
    "glyph": "~",
    "priority": "C",
    "difficulty": 2,
-   "parked": false,
+   "parked": true,
    "requires": [],
    "blocked_on": [],
    "written": "2026-08-11",
@@ -8386,7 +8389,7 @@
    "glyph": "~",
    "priority": "C",
    "difficulty": 2,
-   "parked": false,
+   "parked": true,
    "requires": [],
    "blocked_on": [],
    "written": "2026-08-11",
@@ -8476,7 +8479,7 @@
   {
    "glyph": "~",
    "status": "design-owed",
-   "parked": false,
+   "parked": true,
    "requires": [],
    "blocked_on": [],
    "written": "2026-08-12",
@@ -8589,6 +8592,31 @@
    "authority_doc": "docs/ui/MINIMAP.md",
    "summary": "Under the 0 CE refocus (NR-177) space is unreachable, so the minimap's circumplanetary rung shows a place the player can never act in. Ben, 2026-08-12: turn it into 'a max zoom canvas render, fixed on the player's starting base'. The inset stops being navigation and becomes identity — a persistent close-up of your camp, which is the right readout for a mercenary company that is structurally always away from home. Cheap by reuse: BL-194 already ships a zoomed tile-neighbourhood inset in the Selection band drawing through hex_render.hpp, so this is that renderer pointed at the player's military_base tile (BL-331, landed) at kMaxZoom (20.0, body_surface_canvas.cpp:44). The minimap box must keep its rect (336x252 at 1080p) because selection_band_height is derived from minimap_height. The navigable ladder collapses with it — solar and circumplanetary get gated off rather than deleted, so Ben's DLC merge-back is a flag flip and not a revert.",
    "design": "**Status:** designed 2026-08-12, from Ben's steer the same day. **Corrected mid-session** — the\nfirst cut of this item read his *\"change the canvas to a mini-map\"* as *the minimap becomes a world\noverview with a viewport rect and click-to-pan*. That was wrong. His actual meaning:\n\n> *\"I meant the circumplanetary mini-map to a max zoom canvas render, fixed on the player's starting\n> base.\"*\n\nNot an overview. A **fixed close-up of home**. The rest of this design is written against that.\n\n### The problem\n\n`canvas_level` (ui_state.hpp:16) has three rungs — `solar`, `circumplanetary`, `planetary` —\nand MINIMAP.md's model is *the minimap always shows the rung one step out*. With the primary canvas\non Planetary, the minimap therefore shows **Circumplanetary**: a planet with its moons and local\nspace.\n\nUnder the refocus that view is dead weight. There is one body, space is unreachable, and the inset\nspends 336 x 252 px of prime screen real estate showing somewhere the player can never go.\n\n### The replacement\n\n> The inset becomes the **Planetary canvas rendered at maximum zoom, camera locked to the player's\n> starting base.**\n\nIt is not a navigation control and not an overview. It is a **standing readout of home** — what your\ncamp looks like right now, at full detail, while the primary canvas is somewhere else entirely.\n\n**Why that is the right object for this game specifically.** A mercenary company is structurally\nalways away from home: the contracts (BL-377) are fought on someone else's ground, and the primary\ncanvas follows the fighting. The one thing the player has that is *theirs* is the base. Giving it\npermanent screen presence makes the company feel like a company rather than a cursor, and it costs\nno new interaction vocabulary at all.\n\nIt also quietly answers \"what do I own\" without a ledger round-trip, which is the same argument\nBL-194's Selection-band neighbourhood view already won.\n\n### Cheap by reuse — this is mostly wiring\n\nThree shipped pieces do the work:\n\n1. **BL-194's zoomed tile-neighbourhood view** already renders a small hex neighbourhood into an\n   inset rect in the Selection band. That is this feature, pointed somewhere else.\n2. **`hex_render.hpp`** is already the shared source of truth for the terrain palette\n   (`terrain_colour`), the landform relief channel (`landform_relief`) and hex geometry —\n   extracted precisely so the band inset and the main canvas do not diverge. A third consumer is\n   what it was built for.\n3. **BL-331 (landed)** seeds the player corp with one `military_base` on a home-province tile, so\n   the camera target is a real entity from turn one rather than something this item must invent.\n\nZoom bounds are already defined: `kMaxZoom = 20.0f`, `kMinZoom ~= 0.877`\n(body_surface_canvas.cpp:44-45). \"Max zoom\" is therefore a value, not a judgement call.\n\n### The layout constraint — the minimap box keeps its rect\n\n`selection_band_height = minimap_height + chrome_margin` (foldout_column.cpp:44-49), where\n`minimap_width = max(336, 0.28 x min(disp_x, disp_y))` and `minimap_height = 0.75 x width`.\nThat is **336 x 252 px at 1920x1080** and 403 x 302 at 2560x1440.\n\nThe Selection band's height is derived from the minimap's so the bottom strip's top edge lands\nexactly on the minimap's — the alignment BL-216 and BL-312 were written to fix. **Changing the\ninset's contents is free; changing its rect is not.** If a later item wants it resized, the\nderivation must be re-anchored first, as its own change.\n\n### The ladder collapses with it — by GATING, not deleting\n\nWith the inset no longer showing the rung above, nothing reaches `solar` or `circumplanetary`\nand the asymmetric descend-by-body / ascend-by-minimap model has no referent.\n\n**Do not delete them.** Ben's ruling (NR-177) is *stash the space work and merge it back for DLC*,\nwhich makes deletion the expensive path — resurrecting reverted code across months of divergence.\n`canvas_level` keeps all three enumerators behind a world-level capability flag (era, or an\nexplicit `space_reachable`). The ancient product ships with it false; the DLC merge is a flag flip\nplus content. SOLAR.md and CIRCUMPLANETARY.md then document a gated feature rather than rotting.\n\n### The three open calls\n\n**Q1 — Is the inset interactive at all?**\n\"Fixed\" is explicit, so **no pan and no zoom inside it**. But a single click is nearly free and\nobviously wanted: **recommend click-to-centre** — clicking the inset moves the *primary* canvas to\nthe base. That keeps the inset itself fixed (Ben's word) while giving \"go home\" a one-click home,\nwhich a player will otherwise want within about ten minutes.\n\n**Q2 — What is the target if the starting base is gone?**\nBases can be demolished, and a mercenary company plausibly relocates. `corporation_component`\nalready carries an **HQ** (BL-182 — the holding nearest the corp's holdings centroid, designated at\ngeneration), which is defined for every corp and survives any single building's loss.\n**Recommend: the starting base, falling back to the corp HQ**, so the inset always has a subject and\nnever renders empty.\n\n**Q3 — Does it show live activity, or just terrain?**\n**Recommend live** — units garrisoned, the building's own state, construction in progress. A static\nterrain thumbnail is a screenshot; the reason to give a readout permanent screen space is that it\n*changes*. This is the difference between the feature being loved and being ignored.\n\nAll three are recorded here as reversible rather than assumed settled.\n\n### The action dictionary must move with it\n\nEntries in the `canvas` family of ACTIONS.json are invalidated, and a stale entry misleads a\ntext-driven player exactly as a stale golden misleads a visual check (ACTIONS.md's own standing\nrule): `canvas.ascend_key`, `canvas.descend_key`, `canvas.minimap_ascend` retire while gated;\n`canvas.navigate`, `canvas.body_next`, `canvas.body_prev` lose their referent with one body.\nAdd the click-to-centre verb if Q1 is accepted. Re-render with\n`node tools/session/render_actions.js`.\n\n### Scope explicitly excluded\n\nAny change to the Planetary canvas's own draw pass, hit-testing or lens rendering. Resizing the\nminimap rect or re-anchoring `selection_band_height`. A second inset. Whether the base view earns\nits own lens treatment.\n\n### Requirement sketch (owed at promotion)\n\n`visual`, a new scripts/verify/minimap_base_render.lua: the inset renders the player's starting\nbase at max zoom, stays fixed while the primary canvas pans and zooms away from it, and survives the\nbase being demolished (Q2 fallback). Plus `headless`: with the gate false, no code path reaches\n`canvas_level::solar` or `canvas_level::circumplanetary`.",
+   "version_goal": "v0.1.15"
+  },
+  {
+   "id": "BL-379",
+   "short_name": "PERSONA_COUNSEL_TICK_COST",
+   "category": "AI",
+   "title": "Persona counsel costs ~1 s per econ tick — profile the blackboard export vs the Lua bench, then bound it",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 2,
+   "parked": false,
+   "requires": [],
+   "blocked_on": [],
+   "written": "2026-08-12",
+   "created": "2026-08-12",
+   "files": [
+    "src/core/session_history.cpp",
+    "src/world/corp_blackboard.cpp",
+    "src/scripting/persona_pack.cpp",
+    "src/core/app.cpp"
+   ],
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "summary": "Measured 2026-08-12 (Debug, 0 CE world, 35 corps): post_persona_counsel averages ~1,049 ms per econ tick — 93% of the tick — against ~80 ms for convoys + economy + clearing + budget + recorders combined. It was the whole AppHangB1 startup stall (the warm start now suppresses it, app.cpp m_warm_starting), but LIVE PLAY still pays it on every econ tick: a visible hitch at speed, growing with corp count. Cost = per due corp, export_corp_blackboard + every non-verdict pack's Lua evaluate.",
+   "design": "First profile WHICH half dominates: the C++ blackboard export (visibility-honest world scan per corp) or the sol2 pack evaluation (Lua per pack per corp). The step_economy phase accumulators (app.hpp step_economy_phase_ms, added 2026-08-12) give the total; add a lap inside post_persona_counsel to split it. Then bound whichever wins: cadence is already staggered (corp_strategic_eval_due), so candidate levers are (a) evaluate only corps whose counsel channel is OPEN in the chat panel (the player reads one channel at a time; benches for unwatched corps produce lines nobody sees), (b) cap due-corps-per-tick, (c) cache the blackboard between eval boundaries, (d) move evaluation off the tick onto a budgeted per-frame slice like the warm start. Lever (a) is the legible one: counsel is presentation (it never touches the world — session_history.cpp header), so skipping unwatched corps changes no simulation state and no determinism. Measure in Release before sizing the fix (NR-180's standing caveat: Debug amplifies).",
    "version_goal": "v0.1.15"
   }
  ]

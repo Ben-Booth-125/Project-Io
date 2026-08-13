@@ -546,7 +546,7 @@ void app::draw_generation_screen()
         if (ImGui::Button(last ? "Begin##wizgo" : "Continue##wizgo", {half, 34.0f}))
         {
             if (last)
-                start_new_game(); // the one and only generation call
+                begin_new_game(); // async since 2026-08-12 — see app::begin_new_game
             else
                 ++m_wiz_round;
         }
@@ -597,4 +597,35 @@ void app::draw_generation_screen()
         ImGui::EndChild();
     }
     ImGui::End();
+
+    // --autostart-windowed: walk the wizard as a player would — dwell ~20 frames
+    // a round (so refresh_wizard_preview and the async surface build both run for
+    // every round), then press Begin from HERE, inside the wizard's own frame,
+    // which is the call site the real button uses.
+    if (m_autostart_wizard >= 0)
+    {
+        ++m_autostart_wizard;
+        // A player rerolls; a walk that never does stays inside the default
+        // seed's resolved family and misses every reroll-dependent world.
+        if (m_autostart_wizard % 20 == 10)
+        {
+            ++m_pending_world_params.preferences.roll[m_wiz_round];
+            m_wiz_dirty = true;
+        }
+        if (m_autostart_wizard % 20 == 0)
+        {
+            if (m_wiz_round < wizard_round_count - 1)
+            {
+                ++m_wiz_round;
+                m_wiz_dirty = true;
+            }
+            else
+            {
+                std::printf("[autostart-windowed] wizard walked; pressing Begin\n");
+                std::fflush(stdout);
+                m_autostart_wizard = -1;
+                begin_new_game();
+            }
+        }
+    }
 }

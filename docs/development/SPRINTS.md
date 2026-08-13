@@ -45,7 +45,9 @@ and/or a version goal (v0.1.1 etc.).
 | 7 | The stub minors become releases | **Closed** — v0.1.3 and v0.1.4 cut; `post-v0.1.0` swept, every open item names a minor |
 | 8 | Who the player is (design only) | **Closed 2026-08-10** — BL-094 rewritten as the militia, BL-350 filed, v0.3.0 roster reconciled |
 | 9 | The militia takes the field | **Closed 2026-08-10** — v0.1.5 cut; BL-325/BL-331 landed, BL-332 designed and re-versioned |
-| 10–14 | Re-sequenced 2026-08-10 (the living world inserted) | **In progress** — Sprint 11 (procurement) closed 2026-08-11, all three landed; Sprint 10 (living world) resumed 2026-08-11, both foundations plus the full BL-365 blocker chain (BL-263, BL-130) landed — only the BL-365 keystone itself and three lower-priority items remain `designed` — see § Sprints 10–14 below |
+| 10–14 | Re-sequenced 2026-08-10 (the living world inserted) | **Overtaken** — Sprints 10/11 closed 2026-08-11; Sprints 12–14 superseded 2026-08-12 by the 0 CE refocus (NR-177), never opened — their minors parked with the space arc |
+| 15 | The 0 CE refocus (retro-recorded) | **Closed 2026-08-12** — the tangent that became the product; epoch 0, 3× map, Era −1 sim wired in, mercenary seam designed; see below |
+| 16 | The mercenary vertical slice | **Open 2026-08-12** — BL-377 playable end-to-end + BL-315 on the critical path; cuts v0.1.15 |
 
 **Next up (2026-08-10).** Sprint 5 is closed on Ben's call — *"I am happy with the generation
 progress we made"* — and the board went momentarily to zero goaled sprints. The plan for
@@ -59,7 +61,63 @@ nothing said in what order to build them.
 
 ---
 
-# Sprints 8–14 — the plan (written 2026-08-10, re-sequenced the same day)
+# Sprint 15 — The 0 CE refocus (retro-recorded 2026-08-12)
+
+**This entry is written after the fact, and that is its first finding.** The refocus work ran
+across three sessions (2026-08-12) with no sprint entry — the exact drift this file's standing
+caution names (*amend when the goal changes, not at the retro*), committed for a third time. The
+goal is reconstructed from NR-177's ruling; the retro is real.
+
+**Goal (reconstructed).** Refocus the game to 0 CE per Ben's ruling: *"our project is too grand
+to be able to really feel out the gameplay."* The ancient era becomes a standalone commercial
+product — the mercenary company as player, tile-and-fine-tick grain, the space work stashed for
+DLC.
+
+**Retro.**
+
+- **Landed:** the 0 CE epoch default; the 3× map (312×145) with a physical tile scale and
+  travel time; the Era −1 sim wired into campaign generation (400 pre-epoch years — 62 battles,
+  16 conquests, ~1100 foundings); the stepped decision clock; three scorer fixes including the
+  supply-hubs change; async generation + the loading screen with its inner bars; the
+  startup-"crash" diagnosis (AppHangB1, never a crash — NR-182) and its fix package (persona
+  counsel out of the warm start, the warm start sliced across frames, two logistics scaling
+  fixes — warm start ~90 s → ~6.5 s); crash logging; the zoom-out cap; **BL-377** (mercenary
+  contract seam, designed) and **BL-378** (minimap base render, designed).
+- **Filed:** BL-379 (persona counsel tick cost), NR-177–NR-183.
+- **Slipped:** nothing — but only because nothing was planned, which is the point of recording
+  this entry at all.
+- **Runtime:** not tracked (fourth consecutive entry; the format's Runtime line remains
+  uncollected).
+- **Feedback:** the tangent produced more product-defining change in one day than the two
+  planned sprints before it — which is fine exactly once. The two-arc rewrite (this entry's
+  sibling changes in ROADMAP.md and backlog.json) is what makes it fine: the tangent now has a
+  band, a next cut, and a parked counterpart, instead of being an ever-growing exception.
+
+---
+
+# Sprint 16 — The mercenary vertical slice (opened 2026-08-12)
+
+**Goal.** The loop that makes the ancient product a game: a polity hires the company, the company
+fights, the company is paid — playable end-to-end, however rough. Cuts **v0.1.15**.
+
+**Planned.**
+- **BL-377 — mercenary contract seam** (`designed`): offers, acceptance, the contracted fact,
+  payment. The buy side exists (`procurement.cpp`); this is the sell side's first surface.
+- **BL-315 — conflict spine** (`design-owed`, A): promoted from v0.3.0 groundwork onto the
+  critical path — a mercenary company's core loop is built entirely on Conflict, and nothing in
+  the campaign layer commands `resolve_battle` today. Design first, against the Era −1 machinery
+  that already fights wars in generation.
+- **BL-378 — minimap base render** (`designed`): the company's home, always on screen.
+- Riders as room allows: **BL-379** (persona counsel tick cost — the live-play hitch).
+
+**Risk.** BL-315 is the unknown: it is design-owed, priority A, and the item the whole sprint
+leans on. If it sprawls, the fallback is BL-377 against the *existing* battle resolution with the
+thinnest possible command surface — a contract you accept whose battle resolves itself is still a
+loop; a designed-but-unbuilt spine is not.
+
+---
+
+# Sprints 8–14 — the plan (written 2026-08-10, re-sequenced the same day; Sprints 12–14 superseded 2026-08-12 by NR-177 — their minors parked with the space arc, never opened)
 
 > **Re-sequenced 2026-08-10 (Ben).** Sprints 8 and 9 closed the same day they were planned. A new
 > **Sprint 10 — the living world** was then inserted ahead of procurement, on Ben's steer that the

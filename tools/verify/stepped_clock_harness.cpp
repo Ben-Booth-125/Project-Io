@@ -40,8 +40,8 @@ settlement_state make_world(int provinces)
     for (int i = 0; i < provinces; ++i)
     {
         province p;
-        p.col                = (i * 13) % 60;
-        p.row                = (i * 7) % 30;
+        p.col                = (i * 41) % 300;
+        p.row                = (i * 23) % 140;
         p.culture            = i % 4;
         p.nation             = -1;
         p.settle_score_q     = 400 + (i * 37) % 400;
@@ -269,6 +269,71 @@ int main()
         // into a real assertion — that is the moment it becomes meaningful.
         check(max_progress > 0,
               "R7 Invest is reached at least once and credits progress (ladder health: see BL-318)");
+    }
+
+    // -- R8: Ben's campaign-prehistory config — 400 years at 4 years/tick ----
+    //
+    // Ben, 2026-08-12: "4 years a tick for 400 years. The only important thing
+    // is that industries around ancient produce grow naturally, and there is
+    // turmoil at the beginning of the campaign. So we have some losing /
+    // winning bodies, and the game FEELS alive right from the first tick."
+    //
+    // This scenario measures whether that config actually delivers turmoil.
+    // It reports rather than asserts, because what it measures is a property of
+    // the SCORER (BL-318), not of the clock this harness owns.
+    {
+        history_sim_params p;
+        p.start_year      = -400;
+        p.stop_year       = 0;
+        p.tick_bands[0]   = {0, 4}; // one band, 4-year step -> 100 rounds
+        p.tick_band_count = 1;
+
+        settlement_state s = make_world(40); // nearer a real world's province count
+        const auto t0 = std::chrono::steady_clock::now();
+        const history_sim_state a = run_history_sim(s, nullptr, no_terrain, 100, 50, p, 31337u);
+        const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                            std::chrono::steady_clock::now() - t0).count();
+
+        int owners_lost = 0, owners_gained = 0;
+        for (const polity& q : a.polities)
+            if (!q.alive) ++owners_lost;
+
+        std::printf("      [R8] 400y @ 4y/tick, 40 provinces, %lld ms\n",
+                    static_cast<long long>(ms));
+        std::printf("      [R8] battles=%lld conquests=%lld foundings=%lld polities=%zu dead=%d\n",
+                    static_cast<long long>(a.battles), static_cast<long long>(a.conquests),
+                    static_cast<long long>(a.foundings), a.polities.size(), owners_lost);
+        (void)owners_gained;
+
+        check(a.years == 400, "R8 the campaign-prehistory config spans 400 years");
+
+        // EXPERIMENT: can PARAMETER TUNING produce turmoil, or does it need
+        // BL-318's scorer redesign? Settle appears to out-compete Campaign
+        // rather than Campaign being impossible, so raise Settle's bar and
+        // lower Campaign's defence penalty and see whether wars appear.
+        for (int variant = 0; variant < 4; ++variant)
+        {
+            history_sim_params v = p;
+            const char* label = "";
+            switch (variant)
+            {
+                case 0: v.supply_decay_per_tile_q = 28; v.neighbour_radius = 60; label = "decay 28 (default)"; break;
+                case 1: v.supply_decay_per_tile_q = 12; v.neighbour_radius = 60; label = "decay 12"; break;
+                case 2: v.supply_decay_per_tile_q = 6;  v.neighbour_radius = 60; label = "decay 6"; break;
+                case 3: v.supply_decay_per_tile_q = 3;  v.neighbour_radius = 60; label = "decay 3"; break;
+            }
+            settlement_state vs = make_world(40);
+            const history_sim_state r = run_history_sim(vs, nullptr, no_terrain, 312, 145, v, 31337u);
+            int dead = 0;
+            for (const polity& q : r.polities) if (!q.alive) ++dead;
+            std::printf("      [R8-exp] %-28s battles=%lld conquests=%lld foundings=%lld dead=%d\n",
+                        label, static_cast<long long>(r.battles),
+                        static_cast<long long>(r.conquests),
+                        static_cast<long long>(r.foundings), dead);
+        }
+        // The turmoil question is REPORTED above, deliberately. A polity that
+        // never fights and never loses ground cannot produce "losing / winning
+        // bodies", and whether it does is BL-318's scorer, not this clock.
     }
 
     std::printf("=== %s (%d failure(s)) ===\n", g_failures ? "FAIL" : "PASS", g_failures);

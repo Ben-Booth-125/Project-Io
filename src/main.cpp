@@ -11,6 +11,12 @@
 #include "world/supply_system.hpp"
 #include "world/tech_gate.hpp"
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#endif
+
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
@@ -271,10 +277,63 @@ int run_blackboard_export(const std::string& which, const std::string& out_dir, 
     return 0;
 }
 
+// ---------------------------------------------------------------------------
+// Crash reporting (2026-08-12)
+// ---------------------------------------------------------------------------
+//
+// A double-clicked exe has no console, so BOTH failure shapes died silently in
+// player hands: a std::exception lands in main's catch block whose message goes
+// to an invisible stderr, and a hardware fault (access violation, stack
+// overflow) never reaches C++ handling at all. Everything below funnels into
+// crash.log in the working directory — the first thing to read whenever "the
+// app just closed".
+
+/// Append one line to crash.log (working directory — next to the exe for a
+/// normal double-click launch) and mirror it to stderr for terminal runs.
+void crash_log(const char* what)
+{
+    if (std::FILE* f = std::fopen("crash.log", "a"))
+    {
+        std::fprintf(f, "%s\n", what);
+        std::fclose(f);
+    }
+    std::fprintf(stderr, "%s\n", what);
+}
+
+#ifdef _WIN32
+/// Last-chance SEH filter: names the fault and the address, then lets the
+/// process die. No unwinding, no allocation beyond fopen — by the time this
+/// runs the process state is not trustworthy.
+LONG WINAPI seh_crash_filter(EXCEPTION_POINTERS* ep)
+{
+    char buf[192];
+    const DWORD code = ep && ep->ExceptionRecord ? ep->ExceptionRecord->ExceptionCode : 0;
+    void* addr = ep && ep->ExceptionRecord ? ep->ExceptionRecord->ExceptionAddress : nullptr;
+    std::snprintf(buf, sizeof buf,
+                  "ProjectIo: fatal hardware exception 0x%08lX at %p%s",
+                  static_cast<unsigned long>(code), addr,
+                  code == 0xC0000005u ? " (access violation)"
+                  : code == 0xC00000FDu ? " (stack overflow)" : "");
+    crash_log(buf);
+    return EXCEPTION_CONTINUE_SEARCH; // still crash — this only reports
+}
+#endif
+
 } // namespace
 
 int main(int argc, char* argv[])
 {
+#ifdef _WIN32
+    SetUnhandledExceptionFilter(seh_crash_filter);
+#endif
+    // The third silent death shape: std::terminate (an exception escaping a
+    // noexcept boundary or a thread, a double-throw in unwind). Neither the
+    // catch below nor the SEH filter above sees it.
+    std::set_terminate([] {
+        crash_log("ProjectIo: std::terminate called (exception escaped a "
+                  "noexcept boundary or a thread)");
+        std::abort();
+    });
     try
     {
         // Headless visual-verification mode: `ProjectIo --verify [script.lua] [--bless]`
@@ -330,6 +389,19 @@ int main(int argc, char* argv[])
             }
         }
 
+        // --autostart: boot straight into a new campaign, headlessly, and exit.
+        // Added 2026-08-12 to reproduce a crash that appears ONLY on the
+        // interactive path: --verify calls setup_world directly and therefore
+        // never reaches generate_background_firms or the warm start, so the
+        // whole tail of start_new_game had no automated coverage at all.
+        for (int i = 1; i < argc; ++i)
+            if (std::string(argv[i]) == "--autostart-windowed")
+                return app{}.run(/*windowed_autostart=*/true);
+
+        for (int i = 1; i < argc; ++i)
+            if (std::string(argv[i]) == "--autostart")
+                return app{}.run_autostart();
+
         return app{}.run();
     }
     catch (const std::exception& e)
@@ -338,7 +410,8 @@ int main(int argc, char* argv[])
         // economy.lua / recipes.lua surfacing as a sol::error — throws rather than
         // aborting the process with an unhandled exception. Report and exit non-zero
         // (BL-110; the standing "no unprotected sol2 calls where errors can occur" rule).
-        std::fprintf(stderr, "ProjectIo: fatal error: %s\n", e.what());
+        const std::string msg = std::string("ProjectIo: fatal error: ") + e.what();
+        crash_log(msg.c_str());
         return 1;
     }
 }

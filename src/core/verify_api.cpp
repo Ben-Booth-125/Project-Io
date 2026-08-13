@@ -3,6 +3,9 @@
 /// Extracted verbatim from app.cpp (BL-361); behaviour and registered function
 /// names are unchanged (scripts/verify/*.lua call them by name).
 
+#include <cstdio>
+#include <chrono>
+#include <thread>
 #include "app.hpp"
 
 #include <imgui.h>
@@ -146,6 +149,59 @@ entity_id find_body(const world& w, const std::string& name)
 }
 
 } // namespace
+
+int app::run_autostart()
+{
+    // Headless coverage for the path --verify has never reached.
+    //
+    // run_verify (below) calls setup_world + load_economy and stops. It never
+    // calls start_new_game, so generate_background_firms and the pre-game warm
+    // start have NO automated coverage — which is how a crash in "placing
+    // companies" reached a player build. This runs the real interactive tail,
+    // headlessly, and reports which step it died on.
+    // run() loads init.lua before anything else; start_new_game reads `config`
+    // from it, so autostart has to do the same.
+    m_lua.load("scripts/init.lua");
+
+    std::printf("[autostart] step 1: generating world (this is the ~25s one)\n");
+    std::fflush(stdout);
+    m_pending_world_params = world_params{};
+
+    // Mirror the INTERACTIVE path, not a convenient synchronous stand-in.
+    // The wizard leaves its own surface build in flight when the player presses
+    // Begin, so generation runs alongside it — two concurrent world generations,
+    // which is the one structural difference between this and a plain
+    // setup_world call. Reproducing it here is the whole point.
+    std::printf("[autostart] step 2: wizard surface build (concurrent, as in the app)\n");
+    std::fflush(stdout);
+    launch_wizard_surface_build();
+
+    std::printf("[autostart] step 3: begin_new_game (async worker + poll)\n");
+    std::fflush(stdout);
+    begin_new_game();
+
+    // Poll on a wall clock, not a spin count — the interactive app polls once
+    // per frame, and a tight loop finishes 600k iterations long before a 25 s
+    // generation does (which is exactly how the first cut of this reported a
+    // false failure).
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(300);
+    while (m_screen != app_screen::in_game && std::chrono::steady_clock::now() < deadline)
+    {
+        poll_worldgen();
+        std::this_thread::sleep_for(std::chrono::milliseconds(16)); // ~60 Hz, as the app polls
+    }
+    if (m_screen != app_screen::in_game)
+    {
+        std::printf("[autostart] FAILED: generation did not complete within 300s\n");
+        return 1;
+    }
+
+    std::printf("[autostart] OK  bodies=%zu nations=%zu corps=%zu markets=%zu tiles=%zu\n",
+                m_world.bodies.size(), m_world.nations.size(), m_world.corporations.size(),
+                m_world.markets.size(), m_world.tiles.size());
+    std::fflush(stdout);
+    return 0;
+}
 
 int app::run_verify(const std::string& script_path, bool bless)
 {

@@ -20,6 +20,8 @@
 #include "world/planetology.hpp"
 #include "world/standing.hpp"
 
+#include <array>
+#include <chrono>
 #include <cstdint>
 #include <deque>
 #include <future>
@@ -40,7 +42,12 @@ public:
     /// Enter the main loop. Returns when the user closes the window.
     ///
     /// @return 0 on clean exit.
-    int run();
+    /// @param windowed_autostart Press "Begin" programmatically on the first frame
+    /// (--autostart-windowed): the real window, the real ImGui frame loop, the real
+    /// loading-screen -> in_game transition, then exit after a few in-game frames.
+    /// Exists to reproduce interactive-only startup crashes under a terminal where
+    /// main()'s catch block can actually report them.
+    int run(bool windowed_autostart = false);
 
     /// Run a non-interactive visual-verification session: set up a deterministic
     /// world (seeded, sim paused), expose the `verify` Lua API (which drives view
@@ -55,6 +62,12 @@ public:
     /// @return 0 on a clean run with no golden-diff failures; non-zero if the
     ///         script failed to load/execute or any capture failed its golden diff.
     int run_verify(const std::string& script_path, bool bless = false);
+
+    /// Headless: generate a world and run start_new_game's WHOLE tail, then
+    /// exit. Covers what run_verify never reaches — it calls setup_world +
+    /// load_economy and stops, so generate_background_firms and the pre-game
+    /// warm start had no automated coverage at all. Returns 0 on success.
+    int run_autostart();
 
 private:
     void process_events(bool& running);
@@ -111,7 +124,22 @@ private:
     /// Actually start the campaign, from the params the wizard settled: rebase the
     /// sim clock, build the world, load the economy, run the pre-game warm start,
     /// and hand over to play. The wizard's "Begin" button.
-    void start_new_game();
+    ///
+    /// SPLIT 2026-08-12 (the AppHangB1 stall): the tail no longer runs as one
+    /// synchronous block inside a frame. `start_new_game_prelude` does the cheap
+    /// main-thread setup (~20 ms), then poll_worldgen runs the 80 warm-start
+    /// ticks in time-boxed slices — one slice per loading-screen frame — and
+    /// `finish_new_game` rebases the clock and enters play. The UI repaints
+    /// between slices, so Windows never judges the app hung.
+    void start_new_game_prelude();
+    void finish_new_game();
+    /// Kick generation onto a worker and switch to the loading screen. Loads the
+    /// Lua world-gen config first, on this thread — sol2 is not thread-safe.
+    void begin_new_game();
+    /// Poll the worker; on completion finish setup and enter the campaign.
+    void poll_worldgen();
+    /// The loading screen: a progress bar over generation_progress.
+    void draw_building_screen();
 
     /// Build the prototype world and frame the opening view. Shared by run() and
     /// run_verify() so both start from the same deterministic state. @p params is the
@@ -181,7 +209,11 @@ private:
     /// straight to in_game (the harness renders the live world, not the menu, unless
     /// a script asks for it via verify.show_menu / verify.show_generation). Only
     /// `in_game` simulates.
-    enum class app_screen { menu, generating, in_game };
+    /// `building` (2026-08-12) is the async world-generation screen: generation
+    /// moved onto a worker thread because it takes ~25 s on the 312x145 grid and
+    /// was called from inside an ImGui frame, so the UI never pumped and Windows
+    /// reported the process as "not responding" — indistinguishable from a crash.
+    enum class app_screen { menu, generating, building, in_game };
     app_screen m_screen = app_screen::menu;
     bool       m_quit_requested = false;  ///< Set by the menu's Quit button; breaks the run() loop.
 
@@ -206,6 +238,11 @@ private:
     // changes. None of this touches m_world: the world is built once, on "Begin",
     // from m_pending_world_params.
     int  m_wiz_round = 0;    ///< Round the player is on, 0 .. wizard_round_count-1.
+    /// --autostart-windowed wizard driver: frames spent in the wizard so far, or
+    /// -1 when inactive (every interactive run). While >= 0 the wizard advances a
+    /// round every ~20 frames and presses Begin from inside its own draw — the
+    /// same mid-frame call site the real button uses.
+    int  m_autostart_wizard = -1;
     bool m_wiz_dirty = true; ///< A control moved (or the wizard just opened) — recompute the preview next frame.
     resolved_world m_wiz_resolved{};              ///< The pending preferences resolved against the seed — the params every preview chart is drawn from, plus the reroll cost (attempts / gave_up).
     body_naming m_wiz_names{};                    ///< The coined body catalogue for the pending seed (BL-257) — what the wizard's charts and orrery label bodies with.
@@ -222,10 +259,35 @@ private:
     // pending (std::async's dtor would block); a params move mid-build sets the
     // stale flag and the poll relaunches on arrival.
     std::future<std::vector<uint8_t>> m_wiz_surface_future;
+
+    // --- Async world generation (2026-08-12) --------------------------------
+    /// The worker running make_hard_coded_world. Valid only while `building`.
+    std::future<world>  m_worldgen_future;
+    /// Read every frame by the loading screen; written by the worker.
+    generation_progress m_worldgen_progress;
+    /// The config the worker was launched with — Lua is loaded on the MAIN
+    /// thread before launch, because sol2 is not thread-safe.
+    world_gen_config    m_worldgen_cfg;
+    world_params        m_worldgen_params;
     std::vector<uint8_t> m_wiz_surface;       ///< Raster compositions; empty = not yet built.
     bool m_wiz_surface_stale = false;         ///< Params moved while a build was in flight.
     void launch_wizard_surface_build();       ///< Start the worker for the CURRENT pending params.
     void poll_wizard_surface();               ///< Per-frame: adopt a finished build, relaunch if stale.
+
+    /// Pre-game warm start: 20 in-game years of quarterly econ ticks (Ben,
+    /// 2026-08-10) — see start_new_game_prelude's warm-start comment.
+    static constexpr int pre_game_ticks = 80;
+    /// Warm-start ticks completed so far, or -1 when no warm start is in
+    /// progress. >= 0 marks the sliced phase between generation finishing and
+    /// play starting: poll_worldgen runs a time-boxed batch per call and the
+    /// loading screen draws its inner bar from it (2026-08-12, the hang fix).
+    int m_warm_ticks_done = -1;
+    /// True while the warm-start ticks run. step_economy suppresses the persona
+    /// counsel while set: measured at ~1.05 s per tick against ~80 ms for the
+    /// whole rest of the tick (2026-08-12), it was 93% of the stall, and its
+    /// output is advisory chat for pre-game quarters the player never saw.
+    bool m_warm_starting = false;
+    std::chrono::steady_clock::time_point m_warm_begin; ///< Warm-start wall-clock start, for the timing report.
 
     ui_state        m_ui;
     recipe_registry m_registry;          ///< Recipes + economy constants, loaded from Lua at startup.
@@ -278,3 +340,10 @@ namespace ui { class frame_stats; }
 /// and the verify API's frame_reset/frame_csv tap (verify_api.cpp). Defined in
 /// app.cpp; declared here so both translation units reach the same instance.
 ui::frame_stats& frame_stats_instance();
+
+/// Process-lifetime per-phase accumulators for app::step_economy (ms):
+/// [0] convoys, [1] run_economy_step, [2] clear_markets, [3] apply_budget,
+/// [4] tech gates, [5] standings+credit, [6] agency comms, [7] persona counsel,
+/// [8] history recorders. Dumped by start_new_game's warm-start timing
+/// (the 2026-08-12 stall hunt).
+std::array<double, 9>& step_economy_phase_ms();

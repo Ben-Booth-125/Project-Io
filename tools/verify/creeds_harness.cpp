@@ -30,6 +30,7 @@
 #include "world/components.hpp"
 #include "world/creeds.hpp"
 #include "world/hard_coded_world.hpp"
+#include "harness_params.hpp"
 #include "world/history_ladder.hpp"
 #include "world/planetology.hpp"
 #include "world/world.hpp"
@@ -127,8 +128,8 @@ int main()
     world_params wp;
     wp.seed = 0xB235u;
     generation_report r1, r2;
-    const world w1 = make_hard_coded_world(wp, &r1);
-    const world w2 = make_hard_coded_world(wp, &r2);
+    const world w1 = make_hard_coded_world(no_prehistory(wp), &r1);
+    const world w2 = make_hard_coded_world(no_prehistory(wp), &r2);
 
     const generation_report::body_entry* k1 = nullptr;
     const generation_report::body_entry* k2 = nullptr;

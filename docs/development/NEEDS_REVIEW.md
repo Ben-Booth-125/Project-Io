@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*179 entries — 57 open, 122 resolved.*
+*184 entries — 60 open, 124 resolved.*
 
 ---
 
@@ -492,6 +492,51 @@ Asked to fix BL-253 (the O(corps x tiles) strategic scan), I found it ALREADY CO
 > **Recommendation:** Option 3 first, then 1. Optimising against Debug numbers risks tuning for an artefact, and it is the cheapest of the three to answer. Then extend econ_stability along the tile axis, because the blind spot is the reason a 50x real-world regression could sit behind a green performance gate at all — that is worth more than any single optimisation.
 
 *Files: `src/world/corp_ai.cpp`, `src/world/economy_system.cpp`, `tools/verify/tick_profile.cpp`, `tools/verify/econ_stability.cpp`*
+
+### NR-183 — The startup 'crash' was Windows killing a hung app; the warm start is now sliced and the loading screen honest — two behaviour notes for review
+*decision taken on your behalf · raised 2026-08-12 · from This session, after the AppHangB1 diagnosis (NR-182 resolution)*
+
+Two decisions taken in the fix, both reversible. (1) PERSONA COUNSEL IS SKIPPED during the 80-tick pre-game warm start (app.cpp, m_warm_starting): it was 83.9 s of the 90 s stall, and what it produced there was 80 quarters of advisory chat all stamped on the same pre-game day — counsel for events the player never saw. Live play still posts counsel every eval boundary. The Counsel channels therefore open EMPTY now rather than pre-filled with warm-up chatter; nation agency comms (cheap, 10 ms) still post through the warm start, unchanged. (2) INVALIDATION NARROWED (logistics.hpp): Ben's 2026-08-08 'clear on every event' rule assumed events are rare; the corp AI now builds/idles per tick, so the sim-rate call sites gate on building_affects_logistics (port/inland hub only — nothing else can change an anchor or a traversal cost). Road placement still clears unconditionally; player-rate UI sites keep the unconditional clear. Also: the reach-field seed no longer calls is_supply_anchor per grid cell (was O(tiles x (centres+buildings)) — ~50M probes per rebuild at 0 CE scale), it precomputes the identical anchor set once.
+
+**Why it matters.** Both change observable behaviour at the margins. (1) is visible in the chat panel: no pre-game counsel history. If Ben WANTS the bench to narrate the warm-up (it does establish voice), the flag is one condition — but then BL-379 must land first or the stall returns. (2) is the reversal of a recorded ruling, taken on Ben's own 'go for it from a code review angle' steer; the reasoning is in logistics.hpp's comment so the next reader sees why the simple rule bent. The narrowing is provably answer-preserving (no other building type can appear in the anchor set, and traversal cost reads only road_level/landform/composition), so the risk is a future building type that anchors supply and forgets to join building_affects_logistics.
+
+- Accept both as landed (recommended).
+- Restore warm-start counsel behind BL-379 once its cost is bounded.
+- Revert the invalidation narrowing if a future anchor-type building makes the type-gate fragile; the perf then rests on BL-379-class work instead.
+
+> **Recommendation:** Accept. The loading screen is now honest end-to-end: generation bar -> ancient-era year bar -> 'Letting the dust settle' year 0-20 -> play, with no window where the app stops pumping. Verify visually on the next launch (the visual eyeball this session could not do).
+
+*Files: `src/core/app.cpp`, `src/core/app.hpp`, `src/world/logistics.hpp`, `src/world/logistics.cpp`, `src/world/economy_system.cpp`, `src/world/construction.cpp`, `src/world/corp_command.cpp`*
+
+### NR-184 — The two-arc rewrite executed: 41 items parked with the space arc, the Era -1 cluster pulled live, Sprint 16 opened on the mercenary slice
+*decision taken on your behalf · raised 2026-08-12 · from Ben's four elicitation-form rulings, 2026-08-12, executing NR-177*
+
+Ben ruled: two-arc roadmap (ancient live, space parked for DLC); park the space backlog wholesale; pull the whole Era -1 cluster into the ancient arc; next sprint is the mercenary vertical slice. Executed: (1) backlog.json - 41 items set parked:true with version goals INTACT for the DLC resume (v0.2.0's 12, v0.4.0's 9, v0.1.11's 8, v0.1.12's 4, BL-375 time-to-space, and v0.3.0's space side: BL-094 militia pivot, BL-087 Era 1 tech, BL-333 nuclear arc, BL-182 corporate borders, BL-209/289/301 generation-flavour tail). BL-315 (conflict spine) moved to v0.1.15; thirteen Era -1 items (BL-274/277/296/297/298/299/300/314/316/318/320/321/337) moved to a new v0.1.16 (ancient conflict & seams, a holding minor). (2) ROADMAP.md - new 'The two arcs' section is the live map; dated PARKED banners on v0.2.0/v0.3.0/v0.4.0/v1.0.0; sprint table extended through Sprint 16. (3) SPRINTS.md - Sprint 15 retro-recorded (the tangent, owned after the fact), Sprint 16 opened (BL-377 contract seam end-to-end + BL-315 on the critical path, cuts v0.1.15).
+
+**Why it matters.** Judgement calls taken inside Ben's wholesale ruling, each reversible: which v0.3.0 items counted as 'the Era -1 cluster' (the roadmap's own list plus BL-314/BL-315) versus space-side (identity/tech/flavour); BL-341 (Windows cold-configure check) left unparked as arc-agnostic tooling; v0.1.12's coastal ports & sea trade (BL-188) parked despite obvious ancient relevance - the wholesale rule won, and the re-triage clause is how it comes back when a sprint wants sea trade. Also noted: BL-315's short_name still reads GOVERNING_BODY_CONFLICT_SPINE - two identities stale; Sprint 16's design pass owns the rewrite rather than a cosmetic rename now.
+
+- Accept as executed (recommended).
+- Rescue BL-188 (coastal ports / sea trade) into the ancient arc now rather than at re-triage.
+- Also park BL-341 for a fully uniform rule.
+
+> **Recommendation:** Accept. The one item worth a second look is BL-188 (sea trade) - the Mediterranean-shaped map makes it a likely early want, and pulling it later is one flag-flip. The product name and the ancient commercial cut's done-definition remain owed (NR-177); Sprint 16's retro is the natural deadline for the name.
+
+*Files: `docs/development/backlog.json`, `docs/development/ROADMAP.md`, `docs/development/SPRINTS.md`*
+
+### NR-185 — The gate is trustworthy again: harnesses that do not test the pre-epoch era now say so, rather than paying its ~23 s
+*decision taken on your behalf · raised 2026-08-13 · from NEXT_SESSION.md's own blocker — 'this needs deciding before the gate can be trusted again'*
+
+Wiring the Era -1 year-tick sim into generation added ~23 s to EVERY world any caller builds, and most harnesses build two or more; several ran past their ctest timeouts, and era_world_harness timed out at 60 s on a measured run this session. Three of NEXT_SESSION.md's options were on the table (pass an epoch that skips the sim, give harnesses a cheap sim config, re-tier them). Taken: a fourth, which is all three honestly. (1) world_params gains prehistory_years (default 400 — Ben's figure, unchanged for the campaign); 0 skips the pass. (2) tools/verify/harness_params.hpp adds no_prehistory(), one greppable word meaning 'this harness does not test the era'; applied to the 17 generation-touching harnesses that audit tiles, roads, corporations, economy or determinism. (3) era_world_harness moves to IO_TEST_TIMEOUT_LONG — it cannot opt out, the 0 CE world IS its subject, so it changes tier rather than thinning its check. Also fixed: era_world_harness's R5 control world was make_hard_coded_world({}), which stopped meaning 1960 when the default epoch became 0 — it now asks for 1960 explicitly.
+
+**Why it matters.** Two judgement calls. FIRST, prehistory_years is a scope knob on the params rather than a hidden process-global: determinism is untouched (same params, same world) and the opt-out is visible at every call site, which the global would not have been. SECOND, and this is the one worth Ben's eye: the 17 opted-out harnesses now audit a world WITHOUT the era's conquests, so their nations/provinces differ from the campaign's. That is the right trade for a tile or road audit and a real narrowing for anything that reasons about who owns what. If a harness should be seeing conquered borders, it must drop no_prehistory() and move tier instead.
+
+- Accept (recommended).
+- Name specific harnesses that should keep the era and pay the tier change (world_audit is the likeliest candidate).
+- Take the sim's cost down instead (BL-320, Era -1 sim runtime) and revert the opt-outs.
+
+> **Recommendation:** Accept, and treat BL-320 (Era -1 sim runtime) as the real fix: this restores the gate today but every no_prehistory() is a small blind spot, and they all disappear on their own once the sim is affordable.
+
+*Files: `src/world/hard_coded_world.hpp`, `src/world/hard_coded_world.cpp`, `tools/verify/harness_params.hpp`, `tools/verify/era_world_harness.cpp`, `CMakeLists.txt`*
 
 ---
 
@@ -2243,4 +2288,34 @@ The stepped clock was designed on the assumption that scaling each per-year RATE
 > **RESOLVED.** ANSWERED (Ben, 2026-08-12): option 3 — a settle-dominated deep prehistory is CORRECT and intended, not a defect to tune around. The band ladder stays as proposed (100/50/20/10/5/1 over 4000 BCE -> 0 CE), and the two coarsest bands spending 3000 of the 4000 years in a settle-only regime is the shape wanted: the neolithic-to-bronze-age stretch should be expansion into new ground rather than war or investment. RECORDED SO IT IS NOT SILENTLY OVERTURNED: when BL-318 (shared-currency scorer) lands and Invest can win the argmax on its own merits, the deep-prehistory bands must be re-checked against THIS ruling rather than allowed to drift into a war-and-invest early history by side effect. The stepped clock is therefore accepted as non-behaviour-neutral by design.
 
 *Files: `src/world/history_sim.hpp`, `src/world/history_sim.cpp`, `tools/verify/stepped_clock_harness.cpp`, `docs/lore/HISTORY.md`*
+
+### NR-181 — Generation is a stepping stone — AI players should start worlds, and the scorer should not be gold-plated until then
+*question · raised 2026-08-12 · from Ben, 2026-08-12, mid-session while tuning the Era -1 sim into generation*
+
+Ben, on being shown that the wired-in year-tick sim produced only modest turmoil: "Perhaps we can try instructing supply hubs? I think simplistic generation is just a stepping stone, we will want to use AI players to start worlds in the future." The supply-hub half was acted on immediately and is described in the resolution. The strategic half is the important part and is recorded here so it is not lost: procedural pre-history is EXPLICITLY temporary scaffolding, and the intended end state is AI players actually PLAYING the run-up to the campaign rather than a scored-utility loop approximating it.
+
+**Why it matters.** It sets the investment ceiling on a body of work that would otherwise absorb unbounded effort. The Era -1 scorer has now had three separate defects traced through it in one session (flat w_cult vetoing all war, flat w_dist not scaling with the map, capital-bound supply reach), and BL-318 names a fourth that is unresolved by design. Each is individually fixable and the pile has no natural end — because a utility scorer approximating a player is being asked to produce something only a player produces. Knowing the destination is AI players changes the correct response from "keep tuning" to "make it good enough to play against, then replace it". It also means the sim's ARCHITECTURE matters more than its constants, which is what BL-271's transfer contract already says.
+
+> **Recommendation:** Treat the current state as the stepping stone it is: 62 battles / 16 conquests over 400 years is alive rather than inert, and that is the bar it had to clear. Do NOT pursue BL-318 for its own sake. When the AI-player route is designed, it should read AI_OPPONENT.md § 10 (the small local model over the word interface) alongside BL-271's transfer contract — an AI player starting worlds is the same seam as an AI player contesting one, and building it twice would be the waste.
+
+> **RESOLVED.** ACTED ON, 2026-08-12. (1) SUPPLY HUBS, done: campaign supply was measured from the polity's CAPITAL, so reach was a property of empire shape rather than frontier presence and a large polity could not attack its own border. It now projects from the staging holding adjacent to the target - which the loop was already standing in - so reach is bounded by neighbour_radius and cannot blow up when the map does. Real world: 39 -> 62 battles. This also let an earlier map-width-derived supply_decay workaround be REMOVED rather than kept. (2) STEPPING-STONE FRAMING, recorded: no further scorer work is scheduled. Settling still dominates (1107 foundings against 16 conquests) and that is left standing deliberately, per this ruling, rather than tuned away. The AI-players-start-worlds direction is filed here as the successor rather than as an item, because it needs designing against AI_OPPONENT.md § 10 before it can be scoped.
+
+*Files: `src/world/history_sim.cpp`, `src/world/hard_coded_world.cpp`, `docs/ai/AI_OPPONENT.md`, `docs/lore/HISTORY.md`*
+
+### NR-182 — The startup crash resists four progressively faithful reproductions; permanent crash reporting added so the next manual repro names the fault
+*decision taken on your behalf · raised 2026-08-12 · from This session, working NEXT_SESSION.md Task 1 (the startup crash)*
+
+The handoff said: get the actual error before hypothesising. A double-clicked exe has no console, so DECISION 1: the app now writes every death shape to build/crash.log — the fatal-error catch in main() mirrors its message there (it previously went only to invisible stderr), a SetUnhandledExceptionFilter names hardware faults (access violation / stack overflow, code + address), and a std::set_terminate handler catches exceptions escaping noexcept boundaries or threads. DECISION 2: a new --autostart-windowed mode drives the REAL interactive path under a terminal — real SDL window, real ImGui frames, walks the wizard round by round (with rerolls, so resolved params leave the default family), presses Begin from inside the wizard frame (the exact button call site), rides the loading screen through the mid-frame start_new_game transition, then injects synthetic centre-screen clicks on the first five in-game frames (the impatient-player clicks Windows queues during the stall) and renders 120 in-game frames. RESULT: four runs — plain windowed Begin, walked wizard, walked wizard + first-frame clicks, walked wizard + rerolls + clicks — ALL complete clean, exit 0, no crash.log. Combined with the previous session (headless generation per seed, async worker, statics sweep, --autostart tail, concurrent generations all clean), the crash now has no reproduction on any automated path.
+
+**Why it matters.** The strongest lead in the handoff — start_new_game resetting app state mid-ImGui-frame — is now MEASURED CLEAN, not just reasoned about: the wizard-walking run makes exactly that transition with real frames and survives. What remains is only what automation cannot supply: Ben-specific wizard inputs (his particular leans/seed), sustained human mouse activity, or an EXTERNAL kill — and the last is a live hypothesis worth holding: Smart App Control / Defender terminating a fresh unsigned exe mid-run leaves no C++ trace at all, and this machine already blocks fresh harness exes (the WSL memory). crash.log disambiguates every case on the next manual repro: a fatal-error line means a data/logic throw, a hardware-exception line means a real fault with an address, a terminate line means a thread/noexcept escape, and an EMPTY crash.log beside a dead process now positively indicates external termination (or a Debug assert dialog) rather than a program bug.
+
+- Ben reproduces once from a terminal (or double-click, then reads build/crash.log) and hands back the one line — the intended next step.
+- Sweep wizard-preference combinations through --autostart-windowed (each run ~40 s) if the log implicates generation params.
+- If crash.log is empty at the next repro, check Windows Event Viewer (Application log) for the exit code and Defender/SAC history before touching the code.
+
+> **Recommendation:** Option 1. The reproduction battery is saved and cheap to rerun; guessing further without the log would repeat the exact mistake the handoff warns against. Note the loading screen now also draws the Task-2 inner year bar, so the next manual run doubles as its visual check.
+
+> **RESOLVED.** ROOT CAUSE FOUND, 2026-08-12, same session, after Ben reproduced a second time (died at Finishing). Windows Error Reporting held the answer the crash handlers could not: every death today (17:07, 17:15, 17:38, 20:16) is an AppHangB1 — 'stopped interacting with Windows and was closed'. It was never a crash: the post-generation tail froze the UI, the player clicked, Windows killed the process. The tail was measured (new per-phase accumulators, step_economy_phase_ms): the 80-tick warm start took ~90 s, of which persona counsel was 83.9 s (93%) — export_corp_blackboard + the Lua bench per due corp per tick, at 35 corps since BL-365. Fixes landed: (1) counsel suppressed during the warm start (m_warm_starting — its output was advisory chat for pre-game quarters, all stamped on one day); (2) the warm start now runs in 50 ms slices, one batch per loading-screen frame, with the inner bar showing year N/20 — the UI repaints throughout, so Windows can never judge the app hung, whatever a tick costs; (3) two logistics scaling fixes found on the way (reach-field anchor-set precompute; invalidation narrowed to port/hub/road events). Warm start: ~90 s -> ~6.5 s, and un-hangable. The in-game counsel cost remains open as BL-379 (persona counsel tick cost); the crash logger stays — it correctly proved by silence that no fault ever fired.
+
+*Files: `src/main.cpp`, `src/core/app.cpp`, `src/core/app.hpp`, `src/ui/startup_screens.cpp`*
 

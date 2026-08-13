@@ -561,8 +561,15 @@ file(GLOB IO_VERIFY_HARNESSES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/too
 set(IO_TEST_TIMEOUT_DEFAULT 60)
 set(IO_TEST_TIMEOUT_LONG 240)
 
+# RE-TIERED AGAIN 2026-08-13. Wiring the Era -1 year-tick sim into generation
+# added ~23 s to every generated world. Harnesses that do not test the era now
+# say so (tools/verify/harness_params.hpp, `no_prehistory()`) and pay nothing.
+# era_world_harness cannot: testing the 0 CE world IS its subject, and it builds
+# two of them for its determinism check. It is structurally long-running now,
+# not slow by accident, so it moves tier rather than having the check thinned.
 set(IO_TEST_LONG_HARNESSES
     corp_terrain_matrix
+    era_world_harness
     econ_stability
     earthlike_lean_trace
     earthlike_tile_census

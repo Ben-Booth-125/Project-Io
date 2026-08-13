@@ -42,6 +42,7 @@
 #include "world/corporation_generation.hpp"
 #include "world/economy_system.hpp"
 #include "world/hard_coded_world.hpp"
+#include "harness_params.hpp"
 #include "world/market_clearing.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/supply_system.hpp"
@@ -159,7 +160,7 @@ int real_main(int argc, char** argv)
     recipe_registry reg;
     reg.load_from_lua(lua);
 
-    world w = make_hard_coded_world();
+    world w = make_hard_coded_world(no_prehistory());
     seed_default_recipes(w, reg);
 
     // BL-365: real background corporations, mirroring app::run's own ordering
@@ -276,7 +277,7 @@ int real_main(int argc, char** argv)
     // Determinism — same seed -> identical home-market supply/demand after an equal
     // warm start (no RNG entered the tick path).
     {
-        world w2 = make_hard_coded_world();
+        world w2 = make_hard_coded_world(no_prehistory());
         seed_default_recipes(w2, reg);
         generate_background_firms(w2, reg, /*seed=*/0x8A21F00Du);
         for (int t = 1; t <= warm_start_ticks; ++t)

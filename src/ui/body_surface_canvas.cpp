@@ -40,9 +40,15 @@ constexpr float kPi    = 3.14159265f;
 // not guessed — at the minimum the viewport spans kMinZoomHeadroom of the grid
 // height (the full grid plus ~20% headroom), i.e. zoom = 1 / (headroom * margin).
 constexpr float kFitMargin       = 0.95f; // grid fills 95% of the canvas height at zoom = 1
-constexpr float kMinZoomHeadroom = 1.2f;  // at min zoom the viewport shows ~120% of the grid height
+constexpr float kMinZoomHeadroom = 1.2f;  // the old floor's viewport spanned ~120% of the grid height
+// Zoom-out cap (Ben, 2026-08-12): the full-grid view lags on the 3x map — 45,240
+// hexes in one draw pass — so the widest view is restricted to 0.7x the old
+// maximum extent (extent scales as 1/zoom, hence the division below). The
+// default framing (4/3, view_nav.cpp) sits above this floor, so only the last
+// stretch of zoom-out is lost, not any framing the app itself sets.
+constexpr float kMaxViewScale    = 0.7f;
 constexpr float kMaxZoom         = 20.0f;
-constexpr float kMinZoom         = 1.0f / (kMinZoomHeadroom * kFitMargin); // ~0.877
+constexpr float kMinZoom         = 1.0f / (kMaxViewScale * kMinZoomHeadroom * kFitMargin); // ~1.253
 
 // terrain_colour, hex_vertices, and hex_local_centre now live in ui/hex_render.hpp
 // (shared with the Selection band's zoomed tile-neighbourhood view, BL-194) so both

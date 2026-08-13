@@ -496,7 +496,11 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
             // COMPLETION is when a port/hub starts anchoring supply
             // (is_supply_anchor's ticks_remaining contract, 2026-08-08), so the
             // reach field goes stale at this moment too, not only at placement.
-            invalidate_logistics_caches(w);
+            // Port/hub ONLY (2026-08-12): a mine or farm completing changes no
+            // cached answer, and completions are per-tick events through the
+            // warm start — see invalidate_logistics_caches' narrowing note.
+            if (building_affects_logistics(b.type))
+                invalidate_logistics_caches(w);
             // BL-263: COMPLETION is also the spontaneous-market-emergence
             // trigger. No-op if the body already has a market (including an
             // instant build that already spawned one at placement, construction.cpp).
@@ -1160,7 +1164,9 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
                     {
                         b.decommissioned = true;
                         // An idled port/hub stops anchoring supply — reach stale.
-                        invalidate_logistics_caches(w);
+                        // Any other type idling changes nothing cached (2026-08-12).
+                        if (building_affects_logistics(b.type))
+                            invalidate_logistics_caches(w);
                         report.agency_events.push_back(
                             {corp, bid, agency_event::kind::idled, 0});
                         log_reflex_agency(w, corp, building_body(w, b), "idled a loss-making building");

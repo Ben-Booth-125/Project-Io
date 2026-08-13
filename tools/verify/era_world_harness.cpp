@@ -15,7 +15,7 @@
 //       the precondition for BL-309's two-great-powers seed to mean anything.
 //   R4  DETERMINISM. Two epoch-0 generations produce byte-identical province
 //       tables (the settlement pass's whole deterministic surface).
-//   R5  THE 1960 ARC IS UNTOUCHED. A default-params world still
+//   R5  THE 1960 ARC IS UNTOUCHED. An explicit epoch_year = 1960 world still
 //       industrialises, still resolves ruptures (lacunae or checkpoints
 //       present), and holds at least as many provinces as the 0 CE world.
 //
@@ -77,7 +77,14 @@ int main()
     generation_report rep_a{}, rep_b{}, rep_1960{};
     world wa = make_hard_coded_world(antiq, &rep_a);
     world wb = make_hard_coded_world(antiq, &rep_b);
-    world w60 = make_hard_coded_world({}, &rep_1960);
+
+    // R5's control world. NOT `{}` any more: the default epoch became 0 with the
+    // ancient refocus (NR-177), so default params now generate the SAME world as
+    // `antiq` and every R5 check would fail by construction rather than by
+    // regression. The 1960 arc is still reachable — it just has to be asked for.
+    world_params modern{};
+    modern.epoch_year = 1960;
+    world w60 = make_hard_coded_world(modern, &rep_1960);
 
     const auto* ka = kepler_entry(rep_a);
     const auto* kb = kepler_entry(rep_b);
@@ -128,9 +135,9 @@ int main()
     bool any_industrial_1960 = false;
     for (const province& p : ps60)
         if (p.industrialised) { any_industrial_1960 = true; break; }
-    check(any_industrial_1960, "R5 the default 1960 world still industrialises");
+    check(any_industrial_1960, "R5 the 1960 world still industrialises");
     check(k60->settlement.lacunae > 0 || !k60->settlement.checkpoints.empty(),
-          "R5 the default 1960 world still resolves ruptures");
+          "R5 the 1960 world still resolves ruptures");
     check(ps60.size() >= ps.size(), "R5 the 1960 world holds at least as many provinces");
 
     // --- The dossier ---------------------------------------------------------

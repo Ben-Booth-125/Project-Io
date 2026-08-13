@@ -51,6 +51,7 @@
 
 #include "world/components.hpp"
 #include "world/hard_coded_world.hpp"
+#include "harness_params.hpp"
 #include "world/settlement.hpp"
 #include "world/world.hpp"
 
@@ -111,8 +112,8 @@ int main()
 
     world_params wp;
     generation_report r1, r2;
-    const world w1 = make_hard_coded_world(wp, &r1);
-    const world w2 = make_hard_coded_world(wp, &r2);
+    const world w1 = make_hard_coded_world(no_prehistory(wp), &r1);
+    const world w2 = make_hard_coded_world(no_prehistory(wp), &r2);
 
     const generation_report::body_entry* k1 = kepler_of(r1);
     const generation_report::body_entry* k2 = kepler_of(r2);
@@ -358,7 +359,7 @@ int main()
             world_params p;
             p.seed = 0xB2180000u + static_cast<uint32_t>(s) * 0x9E37u;
             generation_report rr;
-            make_hard_coded_world(p, &rr);
+            make_hard_coded_world(no_prehistory(p), &rr);
             const generation_report::body_entry* k = kepler_of(rr);
             if (!k) continue;
             ++worlds;

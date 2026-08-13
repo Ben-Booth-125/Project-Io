@@ -12,6 +12,7 @@
 
 #include "world/components.hpp"
 #include "world/hard_coded_world.hpp"
+#include "harness_params.hpp"
 #include "world/world.hpp"
 
 #include <cstdio>
@@ -27,7 +28,7 @@ static void check(bool ok, const char* what)
 
 int main()
 {
-    world w = make_hard_coded_world();
+    world w = make_hard_coded_world(no_prehistory());
     const entity_id kepler = w.home_body;
     const auto bit = w.bodies.find(kepler);
     if (bit == w.bodies.end()) { std::printf("[FAIL] no home body\n"); return 1; }
@@ -80,7 +81,7 @@ int main()
         {
             world_params wp;
             wp.seed = s * 0x9E3779B1u;
-            const world ws = make_hard_coded_world(wp);
+            const world ws = make_hard_coded_world(no_prehistory(wp));
             for (const auto& [tid, tc] : ws.tiles)
                 if (tc.road_level == 3)
                 {
@@ -133,7 +134,7 @@ int main()
           "R3 every non-isolated population centre touches its road lattice");
 
     // R4 determinism — regenerate and compare the whole road_level field by tile.
-    world w2 = make_hard_coded_world();
+    world w2 = make_hard_coded_world(no_prehistory());
     int mismatches = 0;
     for (const auto& [tid, tc] : w.tiles)
     {

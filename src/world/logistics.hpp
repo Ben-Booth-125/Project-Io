@@ -94,17 +94,35 @@ const std::vector<float>& body_reach_field(world& w, entity_id body);
 /// UI surfaces hold a `const world&` and must not trigger the Dijkstra.
 float tile_reach_cost(const world& w, entity_id tile);
 
-/// Clear the path-cost and reach-field caches together. Call after ANY event
-/// that can change traversal cost or the anchor set: a building placed,
-/// demolished, completed, or decommissioned/resumed, or a road laid (Ben's
-/// 2026-08-08 ruling: the simple every-event rule over per-type cleverness —
-/// each of these is rare against the per-frame reads the caches serve). The
-/// caches rebuild lazily on next read, so an over-clear costs one Dijkstra,
-/// never a wrong answer; a MISSED clear is a reach field that lies.
+/// Clear the path-cost and reach-field caches together. Call after any event
+/// that can change traversal cost or the anchor set. The caches rebuild lazily
+/// on next read, so an over-clear costs one Dijkstra, never a wrong answer; a
+/// MISSED clear is a reach field that lies.
+///
+/// NARROWED 2026-08-12. Ben's 2026-08-08 ruling chose the simple every-event
+/// rule over per-type cleverness because "each of these is rare against the
+/// per-frame reads". The 0 CE world broke that premise: with the corp AI
+/// building/idling every tick and hundreds of generated sites completing
+/// through the warm start, the caches were cleared essentially every econ tick
+/// and the rebuilds (per-pair Dijkstras over 45,240 tiles, plus the reach
+/// field) became the tick — the AppHangB1 stall. The sim-rate call sites now
+/// gate on `building_affects_logistics`: only a port / inland hub can change
+/// the anchor set, and no building type changes traversal cost (that is
+/// road_level — place_road still clears unconditionally). Player-rate UI
+/// sites keep the unconditional clear; over-clearing at click rate is free.
 inline void invalidate_logistics_caches(world& w)
 {
     w.astar_cost_cache.clear();
     w.body_reach_cost.clear();
+}
+
+/// True when a state change on this building TYPE can alter a cached logistics
+/// answer — i.e. it can appear in the anchor set (is_supply_anchor: completed,
+/// non-idled ports and inland hubs). Every other type affects neither anchors
+/// nor traversal, so its completion/idle/demolition needs no cache clear.
+inline bool building_affects_logistics(building_type t)
+{
+    return t == building_type::port || t == building_type::inland_logistics_hub;
 }
 
 // ---------------------------------------------------------------------------

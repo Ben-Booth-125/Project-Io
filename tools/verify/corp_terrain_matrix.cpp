@@ -25,7 +25,7 @@
 // as WARN and do not affect the exit code. One PASS/FAIL/WARN line is printed per
 // (seed, corp) assertion, naming the failing assertion.
 //
-// Seed scope (MVP): make_hard_coded_world() takes no seed parameter — world-gen is
+// Seed scope (MVP): make_hard_coded_world(no_prehistory()) takes no seed parameter — world-gen is
 // not seedable today — so this checks the single canonical world. The harness is
 // structured with the seed count as a constant + loop (k_seed_count) so it widens
 // to a true seed sweep WITHOUT restructuring. FOLLOW-ON: making world-gen seedable
@@ -35,6 +35,7 @@
 
 #include "world/components.hpp"
 #include "world/hard_coded_world.hpp"
+#include "harness_params.hpp"
 #include "world/placement_rules.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/world.hpp"
@@ -457,7 +458,7 @@ int main()
 
     for (int seed_idx = 0; seed_idx < k_seed_count; ++seed_idx)
     {
-        world w = make_hard_coded_world();
+        world w = make_hard_coded_world(no_prehistory());
 
         // Deterministic corp order (unordered_map iteration is unspecified).
         std::vector<entity_id> corp_ids;

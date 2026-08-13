@@ -56,6 +56,7 @@
 
 #include "world/components.hpp"
 #include "world/hard_coded_world.hpp"
+#include "harness_params.hpp"
 #include "world/planetology.hpp"
 #include "world/world.hpp"
 
@@ -463,7 +464,7 @@ int main()
     // generated world rather than against the model in isolation.
     {
         world_params wp;
-        const world wr = make_hard_coded_world(wp);
+        const world wr = make_hard_coded_world(no_prehistory(wp));
 
         int priced_goods = 0;
         float best_ratio = 1.0f;
@@ -534,7 +535,7 @@ int main()
         {
             world_params wp;
             wp.seed = static_cast<uint32_t>(i) * 0x9E3779B1u;
-            const world wr = make_hard_coded_world(wp);
+            const world wr = make_hard_coded_world(no_prehistory(wp));
 
             const auto cit = wr.corporations.find(wr.player_entity);
             if (cit == wr.corporations.end()) continue;

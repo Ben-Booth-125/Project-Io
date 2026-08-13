@@ -177,9 +177,13 @@ construction_result construct_building(world& w, const recipe_registry& reg,
     // Before this clear existed, a newly placed port/hub extended the reach
     // field only when something unrelated (a road) happened to clear the cache —
     // the rule took effect at an arbitrary later moment. The anchor still waits
-    // on completion (is_supply_anchor's ticks_remaining contract); the clear
-    // just guarantees the field is honest whenever it is next read.
-    invalidate_logistics_caches(w);
+    // on completion (is_supply_anchor's ticks_remaining contract), so only an
+    // INSTANT-completing port/hub changes anything at placement; a durative one
+    // is caught by run_construction's completion clear. Any other type changes
+    // no cached answer, and the corp AI places buildings at tick rate
+    // (2026-08-12 — see invalidate_logistics_caches' narrowing note).
+    if (building_affects_logistics(type) && bc.ticks_remaining <= 0)
+        invalidate_logistics_caches(w);
 
     out_building = bld_id;
     return construction_result::placed;
@@ -203,13 +207,16 @@ bool demolish_building(world& w, entity_id corp, entity_id building)
     if (asset_it == cc.assets.end())
         return false;
 
+    const building_type demolished_type = bld_it->second.type;
     cc.assets.erase(asset_it);
     w.buildings.erase(bld_it);
     w.stockpiles.erase(building); // no-op if the building never had one
 
     // A demolished port/hub stops anchoring supply; before this clear the stale
-    // reach field kept offering tiles anchored on the ghost.
-    invalidate_logistics_caches(w);
+    // reach field kept offering tiles anchored on the ghost. Any other type
+    // anchors nothing, and the corp AI demolishes at tick rate (2026-08-12).
+    if (building_affects_logistics(demolished_type))
+        invalidate_logistics_caches(w);
 
     return true;
 }

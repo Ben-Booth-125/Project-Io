@@ -13,6 +13,7 @@
 
 #include "world/components.hpp"
 #include "world/hard_coded_world.hpp"
+#include "harness_params.hpp"
 #include "world/nation_generation.hpp"
 #include "world/placement_rules.hpp"
 #include "world/terrain_combat.hpp"
@@ -214,7 +215,7 @@ static frag_stats measure_fragmentation(const world& w, const generation_report&
 int main()
 {
     generation_report report;
-    world w = make_hard_coded_world({}, &report);
+    world w = make_hard_coded_world(no_prehistory(), &report);
 
     // --- BL-331: starting military presence (built under the BL-330 label,
     // 2eb8654 — a mislabeled commit; this is the first PASS/FAIL check the
@@ -692,7 +693,7 @@ int main()
 
     // --- BL-116 (generated corp starting stockpile): the opening stockpile is
     // generated from industrial focus + starting capital (replaces BL-115's
-    // fixed give). make_hard_coded_world() is the cold generation state (no
+    // fixed give). make_hard_coded_world(no_prehistory()) is the cold generation state (no
     // pre-game ticks), so pools equal the generated give exactly. Checks:
     //   R1 every corp with holdings opens with a non-empty stockpile on its home
     //      body, scoped to the seven prototype resources (nothing else stocked);
@@ -788,7 +789,7 @@ int main()
                     ext_n, trade_n);
     }
 
-    world w2 = make_hard_coded_world();
+    world w2 = make_hard_coded_world(no_prehistory());
     bool det_ok = (w.corp_body_pools.size() == w2.corp_body_pools.size());
     int det_bad = 0;
     for (const auto& [key, pool] : w.corp_body_pools)
@@ -914,7 +915,7 @@ int main()
     std::printf("  BL-096 R2 markets span >= 2 nations (nation-carved): %s\n",
                 cross_nation_ok ? "PASS" : "FAIL");
 
-    world wm2 = make_hard_coded_world();
+    world wm2 = make_hard_coded_world(no_prehistory());
     std::vector<entity_id> centre_tiles2;
     for (const auto& [mid, mc] : wm2.markets)
         if (mc.body == wm2.home_body)
@@ -1086,7 +1087,7 @@ int main()
             {
                 world_params      wp; wp.seed = s;
                 generation_report rp;
-                const world       sw = make_hard_coded_world(wp, &rp);
+                const world       sw = make_hard_coded_world(no_prehistory(wp), &rp);
                 fs = measure_fragmentation(sw, rp);
             }
             std::printf("  seed %u: %d nations, %d with an exclave | emergent %d (%d tiles), "

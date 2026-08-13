@@ -6,6 +6,7 @@
 #include "world.hpp"
 #include "world_gen_config.hpp"
 
+#include <atomic>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -34,7 +35,27 @@ struct world_params
     /// seeded at founding and grown to the start year. Sandbox-only: the
     /// 1960-era economy scaffolding (corps, markets, roads) still generates
     /// underneath and is out of frame; gating it is BL-271's build.
-    int64_t         epoch_year = 1960;
+    /// **0 CE since 2026-08-12 (Ben, NR-177).** The ancient refocus makes the
+    /// antiquity branch above the DEFAULT rather than a sandbox opt-in: the
+    /// campaign now opens at 0 CE, so the settlement pass stops there and the
+    /// year-tick sim produces the run-up. The 1960 arc is not deleted — pass
+    /// `epoch_year = 1960` and it still runs, which is what keeps the parked
+    /// space work (era/space) buildable.
+    int64_t         epoch_year = 0;
+
+    /// Years of year-tick pre-history the antiquity branch simulates before the
+    /// epoch (Ben's figure: 400 at 4 years a tick). SCOPE KNOB, not a tuning
+    /// dial — set it to 0 and the pass is skipped entirely.
+    ///
+    /// It exists because wiring the sim into generation added ~23 s to EVERY
+    /// world any caller builds, and the headless harnesses build several each.
+    /// Most of them (tile generation, placement audits, economy arithmetic) do
+    /// not test the era at all and were paying its whole cost, several past
+    /// their ctest timeouts. A harness that does not test the era sets 0; one
+    /// that does (era_world_harness, stepped_clock_harness) leaves it alone.
+    /// Determinism is untouched — the value is part of the params, so the same
+    /// params still give the same world.
+    int             prehistory_years = 400;
     int             body_count = 0;                         ///< Reserved — the body-count knob is PHASED to a follow-on (bodies are still hard-coded profiles).
     // Note: there is no nation-count knob. The number of nations on the home body is a
     // *consequence* of its habitable land area and the minimum-viable-territory floor
@@ -46,6 +67,54 @@ struct world_params
     /// floor — and the resolved values land in the generation_report.
     world_preferences preferences{};
 };
+
+/// Coarse progress sink for a caller drawing a loading screen (Ben, 2026-08-12).
+///
+/// WHY THIS EXISTS. Generation takes ~25 s on the 312x145 grid with the
+/// year-tick sim wired in, and `start_new_game` is called from inside an ImGui
+/// frame — so the UI never pumps and Windows marks the process "not responding".
+/// It looks exactly like a crash, and that is how it was first reported.
+///
+/// Deliberately atomic and deliberately dumb: the caller runs generation on a
+/// worker thread and reads these from the render thread every frame. No mutex,
+/// no callback, no re-entrant rendering. `stage` is monotonic and never exceeds
+/// `stage_count`, so a reader can always form a fraction.
+struct generation_progress
+{
+    std::atomic<int> stage{0};       ///< Passes completed so far.
+    std::atomic<int> stage_count{1}; ///< Total passes this run will report.
+    /// Index into `generation_stage_labels`, for the line under the bar.
+    std::atomic<int> label{0};
+
+    /// Progress WITHIN the current pass, for the loading screen's second bar.
+    /// The passes are wildly uneven — the ancient era is ~23 s of a ~25 s
+    /// generation — so the outer bar alone freezes on it for the whole wait.
+    /// A pass that can report honestly (the year loop) sets `sub_total` to its
+    /// span before starting and back to 0 when done; the renderer draws the
+    /// inner bar only while `sub_total > 0`. Same contract as above: worker
+    /// writes, renderer reads, relaxed atomics, no mutex.
+    std::atomic<int> sub_progress{0};
+    std::atomic<int> sub_total{0};
+};
+
+/// Human labels for `generation_progress::label`, in pass order.
+inline const char* const generation_stage_labels[] = {
+    "Preparing",            // 0
+    "Forming the system",   // 1
+    "Settling chemistry",   // 2
+    "Drifting continents",  // 3
+    "Raising terrain",      // 4
+    "Carving rivers",       // 5
+    "Seeding peoples",      // 6
+    "Founding provinces",   // 7
+    "Running the ancient era", // 8 — the long one
+    "Drawing borders",      // 9
+    "Laying roads",         // 10
+    "Placing companies",    // 11
+    "Finishing",            // 12
+};
+inline constexpr int generation_stage_label_count =
+    static_cast<int>(sizeof(generation_stage_labels) / sizeof(generation_stage_labels[0]));
 
 /// What the generation pass recorded about each body, for the staged generation
 /// screen and the planet report.
@@ -116,6 +185,22 @@ struct generation_report
     /// Per-stage one-line summary of what the chain did across the whole system,
     /// indexed by chain_stage. This is what the staged generation screen reveals.
     std::vector<std::string> stage_lines;
+
+    // --- The pre-epoch era (BL-271 wired into generation, 2026-08-12) --------
+    //
+    // What the year-tick sim actually produced in the run-up to the campaign.
+    // Reported rather than merely run, because the acceptance test for that pass
+    // is behavioural — Ben asked for "turmoil at the beginning of the campaign
+    // ... some losing / winning bodies" — and a pass that silently generated a
+    // PEACEFUL world would look identical to one that never ran at all. Which is
+    // exactly how this sim sat unwired: it existed, it was tested, and nothing
+    // in the campaign path called it.
+    //
+    // Zero on a 1960-era world, where the antiquity branch does not run.
+    int64_t prehistory_years     = 0; ///< Years simulated before the epoch.
+    int64_t prehistory_battles   = 0; ///< Battles fought in that span.
+    int64_t prehistory_conquests = 0; ///< Provinces that changed hands.
+    int64_t prehistory_foundings = 0; ///< Provinces founded by the sim.
 };
 
 /// Construct and return a world populated with the prototype's authored bodies.
@@ -139,8 +224,11 @@ struct generation_report
 /// @param gen_cfg Balance values authored in scripts/world_gen.lua (BL-236). Defaulted
 ///               so a headless caller that never touches Lua reproduces the same world.
 /// @return A fully populated world ready to drive the simulation.
+/// @param progress Optional coarse progress sink for a caller drawing a loading
+///               screen from another thread. Null for every headless caller.
 world make_hard_coded_world(world_params params = {}, generation_report* report = nullptr,
-                            const world_gen_config& gen_cfg = {});
+                            const world_gen_config& gen_cfg = {},
+                            generation_progress* progress = nullptr);
 
 /// The homeworld's tile grid dimensions — one authority the build and the
 /// wizard preview both read.

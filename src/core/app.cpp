@@ -59,6 +59,7 @@
 #include "world/supply_system.hpp"
 
 #include <algorithm>
+#include <future>
 #include <array>
 #include <cctype>
 #include <cmath>
@@ -227,7 +228,7 @@ app::~app()
     SDL_Quit();
 }
 
-int app::run()
+int app::run(bool windowed_autostart)
 {
     // Apply the player's persisted display settings before anything renders, so
     // the window opens at their last size/mode. Interactive-only: run_verify()
@@ -243,6 +244,20 @@ int app::run()
     // player finishes it (start_new_game), so nothing simulates behind either screen
     // and the clock starts when play does.
     m_screen = app_screen::menu;
+
+    // --autostart-windowed: press "Begin" as the wizard would — surface build left
+    // in flight, generation on the worker — but with the REAL frame loop below
+    // drawing the loading screen and making the mid-frame in_game transition. The
+    // headless --autostart passes; this covers what it cannot: the ImGui frames.
+    if (windowed_autostart)
+    {
+        m_pending_world_params = world_params{};
+        open_new_world_wizard();
+        m_autostart_wizard = 0; // the wizard's own draw advances rounds + presses Begin
+        std::printf("[autostart-windowed] walking the wizard, then Begin\n");
+        std::fflush(stdout);
+    }
+    int autostart_ingame_frames = 0;
 
     bool running = true;
     while (running && !m_quit_requested)
@@ -294,7 +309,45 @@ int app::run()
             ++m_last_econ_tick;
         }
 
+        // Windowed autostart: the impatient-player click. During the seconds
+        // start_new_game stalls the UI a real player clicks the frozen window;
+        // those queued clicks are delivered onto the FIRST in-game frames, at
+        // the screen centre where the loading bar was — i.e. onto the canvas.
+        // Synthesise exactly that: motion + a click on each of the first five
+        // in-game frames. SDL_PushEvent feeds the same queue real input uses.
+        if (windowed_autostart && autostart_ingame_frames < 5)
+        {
+            int ww = 0, wh = 0;
+            SDL_GetWindowSize(m_window, &ww, &wh);
+            const float cx = static_cast<float>(ww) * 0.5f;
+            const float cy = static_cast<float>(wh) * 0.5f;
+            SDL_Event ev{};
+            ev.type = SDL_EVENT_MOUSE_MOTION;
+            ev.motion.x = cx; ev.motion.y = cy;
+            SDL_PushEvent(&ev);
+            SDL_Event dn{};
+            dn.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
+            dn.button.button = SDL_BUTTON_LEFT; dn.button.clicks = 1;
+            dn.button.x = cx; dn.button.y = cy; dn.button.down = true;
+            SDL_PushEvent(&dn);
+            SDL_Event up = dn;
+            up.type = SDL_EVENT_MOUSE_BUTTON_UP;
+            up.button.down = false;
+            SDL_PushEvent(&up);
+        }
+
         render();
+
+        // Windowed autostart: a handful of real in-game frames is the coverage —
+        // the first frame builds the raster caches and every shell surface; if
+        // those survive, exit clean rather than sitting on an open window.
+        if (windowed_autostart && ++autostart_ingame_frames >= 120)
+        {
+            std::printf("[autostart-windowed] OK  %d in-game frames rendered\n",
+                        autostart_ingame_frames);
+            std::fflush(stdout);
+            break;
+        }
     }
 
     // Persist any free drag-resize captured this session (toggles/presets already
@@ -303,8 +356,186 @@ int app::run()
     return 0;
 }
 
-void app::start_new_game()
+// ---------------------------------------------------------------------------
+// Async world generation (2026-08-12)
+// ---------------------------------------------------------------------------
+//
+// Generation takes ~25 s on the 312x145 grid with the Era -1 sim wired in, and
+// `start_new_game` was called from inside an ImGui frame. The UI therefore never
+// pumped for the whole of it and Windows painted the spinner and reported "not
+// responding" — which is exactly how it was first reported: as a crash.
+//
+// The split is at the Lua boundary. sol2 is not thread-safe, so the world-gen
+// config is loaded HERE, on the render thread, and only make_hard_coded_world —
+// which is pure C++ — goes to the worker.
+
+void app::begin_new_game()
 {
+    m_lua.load("scripts/world_gen.lua");
+    m_worldgen_cfg = world_gen_config{};
+    m_worldgen_cfg.load_from_lua(m_lua);
+
+    m_worldgen_params = m_pending_world_params;
+    m_generation_report = generation_report{};
+
+    m_worldgen_progress.stage.store(0, std::memory_order_relaxed);
+    m_worldgen_progress.label.store(0, std::memory_order_relaxed);
+    m_worldgen_progress.stage_count.store(generation_stage_label_count,
+                                          std::memory_order_relaxed);
+    m_worldgen_progress.sub_progress.store(0, std::memory_order_relaxed);
+    m_worldgen_progress.sub_total.store(0, std::memory_order_relaxed);
+
+    // The worker writes only into locals plus the atomics; the finished world is
+    // moved across by the future, so nothing is shared mutable state.
+    m_worldgen_future = std::async(std::launch::async, [this] {
+        return make_hard_coded_world(m_worldgen_params, &m_generation_report,
+                                     m_worldgen_cfg, &m_worldgen_progress);
+    });
+
+    m_screen = app_screen::building;
+}
+
+void app::poll_worldgen()
+{
+    // Phase 2 — the warm start, sliced. One time-boxed batch of econ ticks per
+    // call: the loading screen calls this once per frame, so the window keeps
+    // repainting between batches. This is the fix for the AppHangB1 kills
+    // (2026-08-12): the tail used to run all 80 ticks inside one frame, the UI
+    // stopped pumping, the player clicked, and Windows closed the "hung" app —
+    // which read exactly like a crash at whatever the label last said.
+    if (m_warm_ticks_done >= 0)
+    {
+        const auto slice_begin = std::chrono::steady_clock::now();
+        constexpr auto slice_budget = std::chrono::milliseconds(50);
+        while (m_warm_ticks_done < pre_game_ticks &&
+               std::chrono::steady_clock::now() - slice_begin < slice_budget)
+        {
+            step_economy();
+            ++m_warm_ticks_done;
+            m_worldgen_progress.sub_progress.store(m_warm_ticks_done,
+                                                   std::memory_order_relaxed);
+        }
+        if (m_warm_ticks_done >= pre_game_ticks)
+        {
+            m_warm_ticks_done  = -1;
+            m_warm_starting    = false;
+            m_worldgen_progress.sub_total.store(0, std::memory_order_relaxed);
+            finish_new_game();
+        }
+        return;
+    }
+
+    if (!m_worldgen_future.valid())
+        return;
+    if (m_worldgen_future.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
+        return;
+
+    m_world = m_worldgen_future.get();
+
+    // Phase 1 — the cheap main-thread tail (~20 ms measured): setup_world,
+    // the Lua economy load, background firms. Then arm the sliced warm start
+    // above; play begins when finish_new_game runs.
+    start_new_game_prelude();
+    m_warm_starting   = true;
+    m_warm_ticks_done = 0;
+    m_warm_begin      = std::chrono::steady_clock::now();
+    m_worldgen_progress.sub_progress.store(0, std::memory_order_relaxed);
+    m_worldgen_progress.sub_total.store(pre_game_ticks, std::memory_order_relaxed);
+}
+
+void app::draw_building_screen()
+{
+    poll_worldgen();
+
+    const ImVec2 disp = ImGui::GetIO().DisplaySize;
+    ImGui::SetNextWindowPos({disp.x * 0.5f, disp.y * 0.5f}, ImGuiCond_Always, {0.5f, 0.5f});
+    constexpr ImGuiWindowFlags flags =
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
+        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_AlwaysAutoResize |
+        ImGuiWindowFlags_NoBackground;
+
+    if (ImGui::Begin("##building", nullptr, flags))
+    {
+        const int done  = m_worldgen_progress.stage.load(std::memory_order_relaxed);
+        const int total = std::max(1, m_worldgen_progress.stage_count.load(std::memory_order_relaxed));
+        int li = m_worldgen_progress.label.load(std::memory_order_relaxed);
+        if (li < 0 || li >= generation_stage_label_count) li = 0;
+
+        const char* title = "BUILDING THE WORLD";
+        const float tw = ImGui::CalcTextSize(title).x;
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (420.0f - tw) * 0.5f);
+        ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(225, 230, 240, 255));
+        ImGui::TextUnformatted(title);
+        ImGui::PopStyleColor();
+        ImGui::Dummy({420.0f, 10.0f});
+
+        // The bar is honest about being coarse: it advances a pass at a time, and
+        // one pass (the ancient era) is most of the wall clock. A smooth bar here
+        // would be a lie told at 60 Hz.
+        const float frac = std::clamp(static_cast<float>(done) / static_cast<float>(total), 0.0f, 1.0f);
+        ImGui::ProgressBar(frac, {420.0f, 18.0f}, "");
+        ImGui::Dummy({420.0f, 6.0f});
+
+        // After generation the sliced warm start takes over the screen
+        // (m_warm_ticks_done >= 0): same bars, its own label and units.
+        const bool warming = (m_warm_ticks_done >= 0);
+        ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(150, 158, 172, 255));
+        ImGui::TextUnformatted(warming ? "Letting the dust settle"
+                                       : generation_stage_labels[li]);
+        if (!warming)
+        {
+            ImGui::SameLine();
+            ImGui::Text("(%d/%d)", done, total);
+        }
+        ImGui::PopStyleColor();
+
+        // The inner bar: progress WITHIN the current pass, drawn only while a
+        // pass is reporting it (the ancient era during generation, then the
+        // warm start). Same honesty rule as the outer bar — it tracks the
+        // sim's own counter, not an animation.
+        const int sub_total = m_worldgen_progress.sub_total.load(std::memory_order_relaxed);
+        if (sub_total > 0)
+        {
+            const int sub_done = m_worldgen_progress.sub_progress.load(std::memory_order_relaxed);
+            const float sub_frac = std::clamp(
+                static_cast<float>(sub_done) / static_cast<float>(sub_total), 0.0f, 1.0f);
+            ImGui::Dummy({420.0f, 4.0f});
+            ImGui::ProgressBar(sub_frac, {420.0f, 10.0f}, "");
+            ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(120, 128, 142, 255));
+            if (warming)
+                ImGui::Text("year %d / %d", sub_done / 4, sub_total / 4);
+            else
+                ImGui::Text("%d / %d years", sub_done, sub_total);
+            ImGui::PopStyleColor();
+        }
+
+        ImGui::Dummy({420.0f, 8.0f});
+        ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(120, 128, 142, 255));
+        ImGui::TextUnformatted(warming
+            ? "Twenty years of commerce settle the markets."
+            : "Four hundred years of history are being lived through.");
+        ImGui::PopStyleColor();
+    }
+    ImGui::End();
+}
+
+void app::start_new_game_prelude()
+{
+    // Phase timing, printed once per campaign start. Added while diagnosing the
+    // AppHangB1 kills (NR-182/NR-183): this whole function runs on the main
+    // thread with the UI frozen, so its wall clock IS the unresponsive window
+    // Windows judges the app by. Keep it — the cost moves as the world grows.
+    const auto t0 = std::chrono::steady_clock::now();
+    auto mark = [last = t0](const char* phase) mutable {
+        const auto now = std::chrono::steady_clock::now();
+        std::printf("[start_new_game] %-24s %6lld ms\n", phase,
+                    static_cast<long long>(
+                        std::chrono::duration_cast<std::chrono::milliseconds>(now - last).count()));
+        std::fflush(stdout);
+        last = now;
+    };
+
     // Reset the sim clock so the campaign starts now, not at app construction —
     // constructing a fresh sim_loop rebases its internal timer to the current wall
     // clock. Speed comes from the Lua config loaded by init.lua in run().
@@ -324,7 +555,9 @@ void app::start_new_game()
     }
 
     setup_world(m_pending_world_params);
+    mark("setup_world");
     load_economy();
+    mark("load_economy");
 
     // BL-365: generate REAL background corporations now that the recipe registry
     // is loaded (their measured stop condition reads real recipe outputs, which
@@ -334,6 +567,7 @@ void app::start_new_game()
     // opening balances/pools get the same simulated operating history every
     // other generated corp receives.
     generate_background_firms(m_world, m_registry, m_active_world_params.seed ^ 0x8A21F00Du);
+    mark("background_firms");
 
     // Pre-game warm start ([C3] pre-game profit): seed the balance history with the
     // opening capital, then run the real economy loop forward a notional operating
@@ -357,18 +591,38 @@ void app::start_new_game()
     // asks for. Cost is ~3.5 ms/tick on the real generated world, so ~240 ms of extra
     // startup; the tick cost, not the count, is what the saturation work will move.
     //
-    // NOTE this does NOT move the campaign calendar. The clock is rebased to the
-    // epoch below, so the warm start consumes no in-game time and play still opens at
-    // `epoch_year` (1960). Making the warm start span 1940->1960 on the calendar is a
+    // NOTE this does NOT move the campaign calendar. The clock is rebased in
+    // finish_new_game, so the warm start consumes no in-game time and play still
+    // opens at `epoch_year`. Making the warm start span the calendar is a
     // separate, unfiled decision — see docs/development/pending/.
-    constexpr int pre_game_ticks = 80;
+    //
+    // The 80 ticks themselves do NOT run here (2026-08-12): poll_worldgen runs
+    // them in time-boxed slices, one per loading-screen frame, so the UI keeps
+    // pumping — see `m_warm_ticks_done` in app.hpp. This function only seeds
+    // the balance history the warm ticks then append to.
     {
         const auto pit = m_world.corporations.find(m_world.player_entity);
         ui::push_capped(m_balance_history,
             pit != m_world.corporations.end() ? pit->second.balance : 0.0f);
     }
-    for (int t = 0; t < pre_game_ticks; ++t)
-        step_economy();
+}
+
+void app::finish_new_game()
+{
+    {
+        const auto warm_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - m_warm_begin).count();
+        std::printf("[start_new_game] %-24s %6lld ms\n", "warm_start_80_ticks",
+                    static_cast<long long>(warm_ms));
+        static const char* const phase_names[9] = {
+            "convoys", "run_economy_step", "clear_markets", "apply_budget",
+            "tech_gates", "standings_credit", "agency_comms", "persona_counsel",
+            "history_recorders" };
+        const auto& acc = step_economy_phase_ms();
+        for (std::size_t i = 0; i < acc.size(); ++i)
+            std::printf("[warm phases] %-18s %9.1f ms\n", phase_names[i], acc[i]);
+        std::fflush(stdout);
+    }
 
     // Rebase the clock one last time. sim_loop measures from construction, so without
     // this the wall-clock cost of building the world and running the warm start would
@@ -435,25 +689,44 @@ void app::load_economy()
 
 void app::step_economy()
 {
+    // Per-phase accumulators over the process lifetime, dumped by the warm-start
+    // timing in start_new_game. File-local plumbing for the 2026-08-12 stall
+    // hunt; costs two clock reads per phase when nothing reads the totals.
+    using clk = std::chrono::steady_clock;
+    auto& acc = step_economy_phase_ms();
+    auto t = clk::now();
+    auto lap = [&](int i) {
+        const auto now = clk::now();
+        acc[static_cast<std::size_t>(i)] +=
+            std::chrono::duration_cast<std::chrono::microseconds>(now - t).count() / 1000.0;
+        t = now;
+    };
+
     dispatch_convoys(m_world, m_registry,
                      m_registry.logistics_cost(convoy_mode::land),
                      m_registry.logistics_cost(convoy_mode::space));
     advance_convoys(m_world);
+    lap(0); // convoys
     m_last_econ_report = run_economy_step(m_world, m_registry);
+    lap(1); // economy step (production + corp AI)
     auto flows = clear_markets(m_world, m_registry, m_last_econ_report);
+    lap(2); // market clearing
     apply_budget(m_world, m_registry, flows, m_last_econ_report.workforce_contention,
                  &m_last_econ_report.budgets,
                  &m_last_econ_report.buildings); // BL-343: law enforcement seam
+    lap(3); // budget
     // BL-344: evaluate the tech gates once per economy tick, after the money loop
     // has moved balances (a `surplus` gate should read this quarter's balance, not
     // last quarter's). Monotonic and deterministic; a no-op once everything
     // earnable is earned.
     advance_tech_gates(m_world);
 
+    lap(4); // tech gates
     // BL-262 first slice: cache this tick's standing profile for the Corporations panel
     // (transient runtime cache, not serialised — same treatment as m_last_econ_report).
     m_last_corp_standings = compute_corp_standings(m_world, flows);
     credit_arrived_convoys(m_world, static_cast<int>(m_sim_loop.day_tick()));
+    lap(5); // standings + convoy credit
 
     // Post-step presentation (BL-361: extracted to core/session_history.cpp):
     // the nation-voiced agency comms (BL-212), the persona counsel posts
@@ -463,8 +736,17 @@ void app::step_economy()
     {
         const int day = static_cast<int>(m_sim_loop.day_tick());
         session_history::post_nation_agency_comms(m_world, m_last_econ_report, m_chat, day);
-        session_history::post_persona_counsel(m_world, m_persona_bench, m_counsel_channel,
-                                              m_chat, day);
+        lap(6); // agency comms
+        // Persona counsel is suppressed through the pre-game warm start
+        // (2026-08-12): measured at ~1.05 s/tick — 93% of the AppHangB1 stall —
+        // against ~80 ms for everything else combined, and what it buys there
+        // is advisory chat for quarters the player never saw, all stamped on
+        // the same pre-game day. Live play keeps it (and inherits its cost;
+        // NR-183 records the open in-game hitch).
+        if (!m_warm_starting)
+            session_history::post_persona_counsel(m_world, m_persona_bench,
+                                                  m_counsel_channel, m_chat, day);
+        lap(7); // persona counsel
         session_history::history_stores h{
             m_balance_history, m_income_history, m_expenditure_history,
             m_market_history, m_building_rank_hist, m_body_resource_hist,
@@ -473,6 +755,7 @@ void app::step_economy()
         session_history::record_histories(m_world, m_registry, m_last_econ_report,
                                           flows, m_ui, h);
     }
+    lap(8); // history recorders
 }
 
 void app::setup_world(world_params params)
@@ -487,12 +770,22 @@ void app::setup_world(world_params params)
     // recipes/economy pass, since make_hard_coded_world runs before it. A missing
     // or malformed world_gen.lua throws (BL-110's protected-call-throws-on-error
     // rule), so a broken mod script fails loudly rather than silently reverting.
-    world_gen_config gen_cfg;
-    m_lua.load("scripts/world_gen.lua");
-    gen_cfg.load_from_lua(m_lua);
-
-    m_generation_report = generation_report{};
-    m_world = make_hard_coded_world(params, &m_generation_report, gen_cfg);
+    // GENERATION ITSELF NO LONGER HAPPENS HERE (2026-08-12). `begin_new_game`
+    // runs make_hard_coded_world on a worker thread and hands the finished world
+    // to `poll_worldgen`, which stores it in m_world before calling this. The
+    // Lua config load stays on the main thread either way — sol2 is not
+    // thread-safe — and is done by begin_new_game before the worker starts.
+    //
+    // A world is only absent here if a caller reached setup_world without going
+    // through begin_new_game (run_verify does), so generate inline in that case.
+    if (m_world.bodies.empty())
+    {
+        world_gen_config gen_cfg;
+        m_lua.load("scripts/world_gen.lua");
+        gen_cfg.load_from_lua(m_lua);
+        m_generation_report = generation_report{};
+        m_world = make_hard_coded_world(params, &m_generation_report, gen_cfg);
+    }
 
     // Bridge PLANETOLOGY's per-body dated history + checkpoints into the world
     // history log's genesis + checkpoint chapters (BL-208). generation_report is
@@ -624,6 +917,12 @@ ui::frame_stats& frame_stats_instance()
 {
     static ui::frame_stats s;
     return s;
+}
+
+std::array<double, 9>& step_economy_phase_ms()
+{
+    static std::array<double, 9> acc{};
+    return acc;
 }
 
 void app::process_events(bool& running)
@@ -786,7 +1085,9 @@ void app::render()
     // either is capturable like any frame.
     if (m_screen != app_screen::in_game)
     {
-        if (m_screen == app_screen::generating)
+        if (m_screen == app_screen::building)
+            draw_building_screen();
+        else if (m_screen == app_screen::generating)
             draw_generation_screen();
         else
             draw_main_menu();

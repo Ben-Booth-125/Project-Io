@@ -48,6 +48,7 @@
 #include "world/corp_command.hpp"
 #include "world/economy_system.hpp"
 #include "world/hard_coded_world.hpp"
+#include "harness_params.hpp"
 #include "world/history_log.hpp"
 #include "world/market_clearing.hpp"
 #include "world/planetology.hpp"
@@ -184,7 +185,7 @@ int main()
     world_params wp;
     wp.seed = 0xB208u;
     generation_report report;
-    world w = make_hard_coded_world(wp, &report);
+    world w = make_hard_coded_world(no_prehistory(wp), &report);
     seed_genesis_history(w, report);
 
     const generation_report::body_entry* kepler = nullptr;
@@ -258,7 +259,7 @@ int main()
     // =========================================================================
     {
         generation_report report2;
-        world w2 = make_hard_coded_world(wp, &report2);
+        world w2 = make_hard_coded_world(no_prehistory(wp), &report2);
         seed_genesis_history(w2, report2);
 
         auto genesis_of = [](const world& ww, entity_id body) {
