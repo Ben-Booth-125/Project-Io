@@ -134,6 +134,18 @@ economy = {
     military = {
         military_points_per_base_tick       = 1.0,
         science_per_research_institute_tick = 1.0,
+
+        -- BL-394: hire_unit's credit cost, debited from the corp's balance by
+        -- apply_corp_command: cost = hire_base_cost + hire_cost_per_power *
+        -- the roster row's power_mod. The base is a FLOOR — the cheapest
+        -- roster rows carry an all-zero resource gate, so without it a seam
+        -- player could raise an unlimited free army (found in play,
+        -- 2026-08-13). Levy Spear (power 0) costs 40; Rifle Regiment
+        -- (power 380) costs 230. First-cut authored constants; retune by
+        -- playtest. Standing-force UPKEEP is deliberately absent — flagged to
+        -- BL-377's contract loop, not decided here.
+        hire_base_cost      = 40.0,
+        hire_cost_per_power = 0.5,
     },
 
     -- BL-350: the procurement/contract seam — "a build order placed with

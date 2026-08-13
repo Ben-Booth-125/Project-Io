@@ -1185,7 +1185,9 @@ void app::render()
                 m_ui.selected_entity           = hired; // inspect the new unit
                 break;
             case corp_command_result::rejected_funds:
-                m_ui.construction.last_message = "Can't supply it."; break;
+                // Either leg: the BL-394 credit cost or the gated-axis
+                // resource draw — the seam refuses both through one result.
+                m_ui.construction.last_message = "Can't afford or supply it."; break;
             default:
                 m_ui.construction.last_message = "Hiring failed."; break;
         }

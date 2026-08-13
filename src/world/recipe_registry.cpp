@@ -229,6 +229,9 @@ void recipe_registry::load_from_lua(lua_state& lua)
         military_capability_params mp;
         mp.military_points_per_base_tick       = military->get_or("military_points_per_base_tick",       mp.military_points_per_base_tick);
         mp.science_per_research_institute_tick = military->get_or("science_per_research_institute_tick", mp.science_per_research_institute_tick);
+        // BL-394: hire_unit's credit cost (floor + power-scaled component).
+        mp.hire_base_cost      = military->get_or("hire_base_cost",      mp.hire_base_cost);
+        mp.hire_cost_per_power = military->get_or("hire_cost_per_power", mp.hire_cost_per_power);
         m_military = mp;
     }
 

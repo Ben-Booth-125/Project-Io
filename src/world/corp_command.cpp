@@ -35,6 +35,12 @@ bool owns(const world& w, entity_id corp, entity_id building)
 // hiring is a real spend rather than a free unlock. Two-phase (check every
 // axis affordable, THEN debit) so a mid-hire failure never leaves the corp
 // partially charged.
+//
+// BL-394: this leg alone was NOT enough — an ungated row (all-zero gate,
+// e.g. row 0) tested and debited nothing, so the cheapest units were free
+// and unbounded for any seam caller. A credit cost now sits alongside it,
+// computed in the verb from economy.lua's military table (recipe_registry's
+// military_capability_params) and debited from the corp's balance.
 // ---------------------------------------------------------------------------
 
 constexpr float hire_axis_cost = 5.0f;
@@ -395,8 +401,25 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                     return corp_command_result::rejected_placement;
             }
 
+            // BL-394: the credit cost. Row 0's gate is all-zero, so the
+            // resource debit below tested and spent nothing for the cheapest
+            // rows — a seam player raised ten free units in one tick (the
+            // scorer's one-hire-per-eval cap is corp_ai policy, not a rule of
+            // the game). Every row now costs credits: a floor plus a
+            // power-scaled component, authored in economy.lua (§ military).
+            // Checked BEFORE the resource debit so a refusal on either leg
+            // leaves the corp wholly uncharged, preserving debit_hire_cost's
+            // own all-or-nothing contract.
+            const military_capability_params& mil = reg.military();
+            const float hire_cost = mil.hire_base_cost
+                + mil.hire_cost_per_power * static_cast<float>(row.power_mod);
+            corporation_component& payer = w.corporations.at(cmd.corp);
+            if (payer.balance < hire_cost)
+                return corp_command_result::rejected_funds;
+
             if (!debit_hire_cost(w, cmd.corp, row))
                 return corp_command_result::rejected_funds;
+            payer.balance -= hire_cost;
 
             const entity_id unit = w.create_entity();
             w.units[unit] = unit_component{
