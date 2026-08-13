@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*185 entries — 48 open, 137 resolved.*
+*186 entries — 49 open, 137 resolved.*
 
 ---
 
@@ -473,6 +473,28 @@ CONFIRMED 2026-08-13 after the three fixes: the tier runs **59/60** (excluding t
 The known-failing LABEL (option 3) is deliberately NOT taken here, and the reason is worth stating rather than leaving as an omission. It is a change to how the project's gate reports, which is Ben's call and not a side effect of a triage pass. More pointedly: this session found that the AI's thrash detector had been certifying the very oscillation it existed to catch, because its ceilings were blessed from a run of the broken behaviour. Adding machinery that marks a red as expected, in the same session, would be the same mistake one level up. The argument FOR the label is real — a gate with an unexplained red cannot answer 'did I break something?' — but that argument is much weaker now that the red is attributed to a filed priority-A item. Recommend deciding it deliberately, and if taken, requiring that every entry on the known-failing list names the backlog item that owns it.
 
 *Files: `tools/verify/stack_capacity_harness.cpp`, `tools/verify/history_sim_harness.cpp`, `src/world/placement_rules.cpp`, `src/world/history_sim.cpp`*
+
+### NR-187 — A requirement can certify a defect, and then every downstream check confirms it — three instances of that shape in one day
+*observation · raised 2026-08-13 · from 2026-08-13 AI-play session; found triaging BL-386.*
+
+BL-386 (a sell order's floor price is paid in full by nobody, unbounded) is not code drifting from a specification. It IS the specification. requirements.json group `player-sell-orders` row R2, status COMPLETE, reads: 'A standing player sell order sells up to its quantity from the (corp, body) pool, valued at max(resolved_price, floor_price).' MARKETS.md step 11 states the same and calls it a prototype invariant. So the requirement was written, the code was built to match, the requirement was verified against the code, and the authority doc blessed the result — and the thing they all agreed on prints money.
+
+The action dictionary managed to hold BOTH readings at once: its place_sell_order entry asserted `max(price, floor)` in one clause and 'a floor above what the resolution supports means less or nothing sells' in the next. Nobody noticed the contradiction because each half reads correct on its own.
+
+THREE INSTANCES OF THE SAME SHAPE IN ONE SESSION, which is why this is filed as a pattern rather than as a note on BL-386: (1) this — a requirement that certifies the defect; (2) NR-181 — ai_skill_harness's thrash ceilings blessed FROM a run of the oscillation they exist to detect, so the detector certified it; (3) NR-185 — four confident measured claims in code comments and docs that nobody re-derived, plus a fifth found later. In every case the artifact that was supposed to catch the problem had been calibrated on the problem.
+
+**Why it matters.** The project's verification culture is unusually strong — requirements, goldens, harnesses, a review skill, a documented claim discipline — and all of it shares one blind spot: an artifact authored FROM observed behaviour inherits whatever that behaviour was, including its bugs, and thereafter defends it. A golden blessed from a broken run, a requirement written from what the code does, and a comment stating a number nobody re-derived are the same failure wearing three costumes. The common trigger is that the authoring moment is the ONLY point at which anyone asks whether the observed thing is the thing that should be observed, and at that moment the author is usually the same person who just wrote the behaviour.
+
+Worth noting what DID catch all three: an agent with no authoring context, either playing the game or reading the claims cold. That is a cheap and repeatable check, and it found in one session what the existing culture had been confirming for months.
+
+- Adopt the rule that a requirement is written BEFORE the behaviour it describes, never from it — the Delivery lifecycle already says step 0 comes first, so this is enforcement rather than new method.
+- Add a standing 'cold reader' pass to Full-mode delivery: one agent, no authoring context, asked only whether each stated claim and each blessed number is the one that SHOULD hold. Cheap, and it is what found all three.
+- Treat it as three separate fixes (rewrite R2, derive the ceilings, correct the claims) and not as a pattern.
+- Accept the blind spot as the cost of a fast prototype and rely on play sessions to surface it periodically.
+
+> **Recommendation:** Options 1 and 2 together, and 2 is the cheaper of the two to start. The cold-reader pass costs one agent and found a priority-S economy defect, a certifying golden and five overstated claims in a single session — better yield than any other check run today. Option 1 is right in principle but harder to enforce, because the pressure to write the requirement after the fact is strongest exactly when the work is nearly done. Option 3 misses that these keep recurring; option 4 is defensible only if play sessions become routine, which NR-167 and AI_OPPONENT.md section 10h now argue they should.
+
+*Files: `docs/development/req/requirements.json`, `docs/economy/MARKETS.md`, `docs/development/DELIVERY.md`, `.claude/skills/verifier-review/SKILL.md`*
 
 ---
 
