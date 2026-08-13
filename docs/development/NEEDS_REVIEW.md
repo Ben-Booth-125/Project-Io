@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*201 entries — 77 open, 124 resolved.*
+*202 entries — 78 open, 124 resolved.*
 
 ---
 
@@ -752,6 +752,22 @@ BL-316 (Era -1 logistics) and BL-318 (shared-currency scorer) were fully impleme
 > **Recommendation:** Option 2 is the one that would have caught this without discipline - backlog_lint already cross-checks requirement groups against item status, so the machinery exists. Option 1 is right but relies on remembering, which is what failed here.
 
 *Files: `docs/development/backlog.json`, `tools/session/backlog_lint.js`*
+
+### NR-204 — The campaign battle uncertainty band is narrow: past about 1.2:1 the stronger side effectively always wins
+*question · raised 2026-08-13 · from BL-315 first slice, measured by tools/verify/campaign_battle_harness.cpp*
+
+Measured over 200 seeds per ratio, attacker 500 infantry on open ground: 1.00:1 wins 47%, 1.10:1 wins 76%, 1.20:1 wins 94%, 1.40:1 wins 99%, 2.00:1 and above win 100%. The randomness is real and reaches the outcome, but only very near parity. The cause is structural, not a tuning slip: the fight runs up to six rounds and each round draws its own +/-30% swing, so the swings AVERAGE OUT - the longer a battle runs, the less chance can overturn a standing edge. A single-ratio assertion at 1.4:1 (most-but-not-all) failed on its first seed range for exactly this reason; it was replaced with the printed curve rather than lowered.
+
+**Why it matters.** This decides how a battle FEELS, which is the part you asked for. As it stands, committing force is a real decision only in a narrow band around parity; bring 20% more men and the fight is effectively decided before it starts, and the withdrawal window becomes a way to cut losses rather than a live judgement call. That may be exactly right - a 40% advantage arguably SHOULD be decisive, and upsets that ignore force make a war feel arbitrary. But it is a design choice, not an accident, and the two dials are visible: swing_permille (wider per-round variance) and the round count (fewer rounds = less averaging, more chance). Six rounds at +/-30% is what produced this curve.
+
+- Leave it - a 20% edge should decide a fight, and uncertainty near parity is enough (recommended until played).
+- Widen swing_permille so a 1.4:1 fight can still be lost, at the cost of force mattering less.
+- Cut the round count so less averaging happens - keeps force meaningful but makes each round swingier.
+- Make the swing depend on something the player controls (terrain, doctrine, surprise) rather than being flat.
+
+> **Recommendation:** Leave the numbers until you have watched a fight. The curve is printed by the harness on every run, so re-deciding later costs nothing, and option 4 is the interesting one once units exist on the map - it turns randomness into something the player can influence rather than endure, which is what makes a battle read as a decision rather than a dice roll.
+
+*Files: `src/world/campaign_battle.cpp`, `src/world/campaign_battle.hpp`, `tools/verify/campaign_battle_harness.cpp`*
 
 ---
 
