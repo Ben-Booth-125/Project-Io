@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*200 entries — 76 open, 124 resolved.*
+*201 entries — 77 open, 124 resolved.*
 
 ---
 
@@ -737,6 +737,21 @@ Every sweep run now carries a works registry and the table gains a works(prov) c
 > **Recommendation:** Re-baseline the BL-275 sweep numbers before drawing any conclusion about whether the stall moved.
 
 *Files: `tools/verify/history_sweep.cpp`, `scripts/works.lua`*
+
+### NR-203 — Three A-tier backlog items were already built and still listed as open work
+*observation · raised 2026-08-13 · from Two agent sessions today, each of which discovered it after fast-forwarding a stale worktree*
+
+BL-316 (Era -1 logistics) and BL-318 (shared-currency scorer) were fully implemented on main - all three S-slices, the Dijkstra reach, the holdings burden, the shared province_value_q currency - while backlog.json still carried them as designed/open at priority A. BL-321 (works) was half-built the same way: its 21 authored rows existed and its effects reached nothing. The status dashboard therefore reported roughly a day of A-tier work as still to do, and two agents were briefed to build things that existed.
+
+**Why it matters.** This is the same failure the standing memory names (backlog prose goes stale) but on the STATUS field rather than the design prose, and it costs more: a stale design misleads a reader, a stale status misdirects work. Both agents only caught it because they were told to check their base first - an agent that trusted its brief would have rebuilt three landed slices and produced a merge that silently reverted them. Worth noting that the landing commit ("Land the uncommitted generation-preview / Era -1 terrain work") is itself the tell: work that lands as a bundle of uncommitted changes does not pass through the step where its items get marked.
+
+- Add a landing check to the delivery lifecycle: no commit closes without ship_items for what it landed.
+- Add a lint that flags an open item whose declared files have changed since it was designed.
+- Accept it as the cost of the uncommitted-tree working style.
+
+> **Recommendation:** Option 2 is the one that would have caught this without discipline - backlog_lint already cross-checks requirement groups against item status, so the machinery exists. Option 1 is right but relies on remembering, which is what failed here.
+
+*Files: `docs/development/backlog.json`, `tools/session/backlog_lint.js`*
 
 ---
 
