@@ -3,6 +3,7 @@
 #include "budget_system.hpp"  // compute_building_opex, body_mean_habitability
 #include "building_profit.hpp"
 #include "economy_system.hpp"  // economy_report, agency_event, solve_workforce_target
+#include "logistics.hpp"       // body_reach_field (BL-379: warm before the reach-checked muster scan)
 #include "market_clearing.hpp" // market_for_tile
 #include "placement_rules.hpp"
 #include "recipe_registry.hpp"
@@ -534,6 +535,14 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             const building_economics& ex = reg.economics(building_type::extraction_site);
             for (const extraction_site& s : ranked_sites)
             {
+                // Deliberately checked WITHOUT the seam's logistics-reach budget
+                // (BL-379 gave the muster-base candidate parity; this site keeps
+                // the default-disabled reach on purpose): enforcing it here would
+                // reshuffle which economic builds every rival attempts, hence
+                // world evolution, hence every blessed golden — the same
+                // no-player-visible-gain call as the BL-162 note above. A pick
+                // the seam refuses as out_of_range costs one wasted seam call
+                // and no build slot (APPLY THEN COUNT, below).
                 if (!placement_rules::can_place_in_world(w, s.tile, building_type::extraction_site, s.target))
                     continue;
                 const tile_component& tc  = w.tiles.at(s.tile);
@@ -842,8 +851,20 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                             have_anchor = true;
                         }
                     }
+                    // BL-379: check with the SAME logistics-reach budget
+                    // construct_building enforces at apply time, so the scorer
+                    // never picks a best_tile the seam then refuses as
+                    // out_of_range (benign — see APPLY THEN COUNT below — but
+                    // one wasted seam call per eval for as long as the corp
+                    // held no base). The reach rule reads a lazily-built field
+                    // and treats not-built as pass, so it must be warmed here
+                    // exactly as construct_building warms it; the field is a
+                    // pure, cached per-body Dijkstra, so warming it at
+                    // enumeration time instead of apply time changes no value.
+                    const float reach_budget = reg.construction().max_logistics_reach;
                     for (const entity_id tid : nation_it->second.tiles)
                     {
+                        body_reach_field(w, tile_body(w, tid));
                         // Pass `corp` (unlike the un-owned tile-only checks
                         // elsewhere in this file) so BL-344's tech gate is
                         // live here: a corp that has not earned E0-ML-01 gets
@@ -853,7 +874,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                         // most corps in the golden seeds never earning the
                         // gate's 2-extraction-sites/Cr2000 condition at all).
                         if (!placement_rules::can_place_in_world(w, tid, building_type::military_base,
-                                                                  resource_type::iron_ore, -1.0f, corp))
+                                                                  resource_type::iron_ore, reach_budget, corp))
                             continue;
                         if (!have_anchor)
                         {
@@ -1102,9 +1123,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             //
             // This is what makes every enumeration/seam disagreement in this file
             // BENIGN instead of a stall. Enumeration re-checks placement itself,
-            // but not always with the seam's exact budget — the muster-base
-            // candidate above disables the logistics-reach rule that
-            // construct_building enforces — so a candidate the seam refuses is a
+            // but not always with the seam's exact budget — the extraction-site
+            // candidate above deliberately skips the logistics-reach rule that
+            // construct_building enforces (the muster-base candidate agreed with
+            // the seam's budget in BL-379) — so a candidate the seam refuses is a
             // thing that can happen by construction. Counting first would let one
             // such candidate spend the corp's single build slot every evaluation
             // and starve genuine economic builds indefinitely.
