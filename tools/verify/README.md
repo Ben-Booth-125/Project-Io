@@ -376,6 +376,34 @@ On Windows via CMake (no need to hand-list sources): `cmake --build build --targ
 then `.\build\history_log_harness.exe` — picked up by the generic `tools/verify/*.cpp` glob batch
 at the foot of `CMakeLists.txt`, the same path `creeds_harness`/`continents_harness` use.
 
+### interbody_pull_harness (BL-404 / BL-406) — one of three that need a live Lua state
+
+Measures what `inject_interbody_demand` actually reads, against the **real**
+`scripts/economy.lua` + `recipes.lua` rather than a hand-built registry — the
+question it asks is what the *authored* numbers do, so nothing may be authored
+locally. Declared explicitly in `CMakeLists.txt` (adds back `recipe_registry.cpp`
++ `scripting/lua_state.cpp`, the sol2 include dir, and links `lua54`), the same
+shape as `pregame_balance_harness` and `persona_counsel_harness`.
+
+```bat
+cmake --build build --target interbody_pull_harness
+.\build\interbody_pull_harness.exe
+```
+
+**It must run with the repo root as its working directory** — the script paths are
+relative. `IO_TEST_SCRIPT_ROOTED_HARNESSES` in `CMakeLists.txt` sets
+`WORKING_DIRECTORY` for the three harnesses in that position, and this one also
+hard-exits if it cannot open the scripts. Both guards exist because its first run
+measured a default registry with no demand baskets and reported a clean result
+about an economy that was not there.
+
+Reports: R1 the shortfall subtraction is a no-op at the injector's read point;
+R2 what a corrected netting would silence, per resource; R2a the anti-vacuity
+guard plus the market-selection finding (the home body carries many markets and
+the pull reads one of them). Deliberately asserts only the structural half —
+which market gets picked is not stable across standard libraries, so the varying
+numbers are printed rather than asserted.
+
 Each exits non-zero on a failed assertion. The economy *panel* (the visual class)
 is verified separately via `ProjectIo --verify scripts/verify/economy_panel.lua`
 (the `verifier-visual` skill).

@@ -489,6 +489,28 @@ target_link_libraries(persona_counsel_harness PRIVATE io_world_obj lua54)
 target_compile_features(persona_counsel_harness PRIVATE cxx_std_20)
 target_compile_options(persona_counsel_harness PRIVATE ${IO_WARNING_FLAGS})
 
+# interbody_pull_harness (BL-404) is the third live-Lua harness, and for the
+# same reason as pregame_balance_harness: the question it asks is what the
+# AUTHORED economy numbers do, so it must load scripts/economy.lua + recipes.lua
+# rather than hand-build a registry. A hand-built fixture is precisely how the
+# defect it measures went unnoticed under a green market_emergence_harness.
+#
+# It also needs WORKING_DIRECTORY at the add_test below: it resolves the script
+# paths relative to the repo root, and ctest otherwise runs it from the build
+# dir, where the load fails and every assertion passes VACUOUSLY.
+add_executable(interbody_pull_harness
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/interbody_pull_harness.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(interbody_pull_harness PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(interbody_pull_harness PRIVATE io_world_obj lua54)
+target_compile_features(interbody_pull_harness PRIVATE cxx_std_20)
+target_compile_options(interbody_pull_harness PRIVATE ${IO_WARNING_FLAGS})
+
 # font_glyph_harness (BL-234) is the one harness that links ImGui rather than
 # ${IO_WORLD_SOURCES}: the defect it guards is the ImFontConfig handed to
 # AddFontFromFileTTF, which lives in src/ui/fonts.cpp, not in world/*. It still
@@ -642,6 +664,14 @@ set(IO_TEST_BENCH_HARNESSES
     home_surface_bench
 )
 
+# Harnesses that load the real scripts/*.lua by relative path, and so must run
+# with the repo root as their working directory (see the foreach below).
+set(IO_TEST_SCRIPT_ROOTED_HARNESSES
+    interbody_pull_harness
+    pregame_balance_harness
+    persona_counsel_harness
+)
+
 foreach(harness_src ${IO_VERIFY_HARNESSES})
     get_filename_component(harness_name "${harness_src}" NAME_WE)
     if(NOT TARGET ${harness_name})
@@ -664,5 +694,12 @@ foreach(harness_src ${IO_VERIFY_HARNESSES})
     endif()
     if(harness_name IN_LIST IO_TEST_BENCH_HARNESSES)
         set_property(TEST ${harness_name} APPEND PROPERTY LABELS "bench")
+    endif()
+    # Harnesses that load the real scripts/*.lua resolve those paths relative to
+    # the repo root. Without this they run from the build dir, load nothing, and
+    # pass vacuously against a default registry (BL-404's own lesson).
+    if(harness_name IN_LIST IO_TEST_SCRIPT_ROOTED_HARNESSES)
+        set_tests_properties(${harness_name} PROPERTIES
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
     endif()
 endforeach()

@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*218 entries — 72 open, 146 resolved.*
+*220 entries — 74 open, 146 resolved.*
 
 ---
 
@@ -800,6 +800,33 @@ The AI skill harness reports 13 failures on the merged tree (net-worth final and
 > **Recommendation:** Fold the ai_skill_harness band re-bless into BL-402 (golden re-bless pass) rather than leaving it to drift further - the visual goldens and these bands have the same stewardship problem and the same fix.
 
 *Files: `tools/verify/ai_skill_harness.cpp`*
+
+### NR-221 — BL-404 was measured rather than implemented, and the measurement blocked it — a design call is owed
+*question · raised 2026-08-13 · from BL-404 (inter-body pull is un-netted), 2026-08-13*
+
+You asked for BL-404 next. It is NOT implemented, deliberately. Building the measurement first (tools/verify/interbody_pull_harness.cpp, now in the ctest tier) showed the fix I had recommended in the item cannot be written: `inject_interbody_demand` reads ONE of the home body's 17 markets as though it were the whole body. That market carries 12% of the body's demand, and a share of its supply that differs by toolchain — 1491 of 7498 on the MSVC build, 0 of 2863 on g++, same seed. So 'net against the previous tick's supply' silences 33% of the pull on one build and 0% on the other. Filed the underlying defect as BL-406 (the home market is an arbitrary pick) and made BL-404 require it.
+
+**Why it matters.** Three things need your call, and none of them are mine to take because they all move prices. (1) BL-406's fix: aggregate over the body (truest, multiplies the pull ~8x, needs pull_fraction re-tuned, outpost prices move), name a primary market per body (cheap, stable, keeps today's magnitude, but keeps 'the body's demand' meaning one market's), or pull per-counterpart-market (most faithful, largest, needs machinery that does not exist). (2) BL-404's own a/b/c, which should be decided in the same pass since aggregating changes what netting does. (3) Whether outpost prices are allowed to move now at all, or whether this waits behind BL-381 giving demand real weight. I have left both items open and resumable rather than picking.
+
+- BL-406 (a) aggregate over the home body + re-tune pull_fraction, and settle BL-404's netting in the same pass (recommended)
+- BL-406 (b) store a primary_market per body — cheap and stable, keeps current magnitudes, defers the meaning question
+- BL-406 (c) per-counterpart-market pull — most faithful to a trade model, largest change
+- Hold both until BL-381 (what supply and demand mean) lands, since the netting question is downstream of it
+
+> **Recommendation:** Option (a), with BL-404 decided alongside it. But if outpost prices moving is unwelcome right now, (b) is a clean stopgap that makes the pick authored instead of accidental and costs almost nothing.
+
+*Files: `src/world/market_clearing.cpp`, `tools/verify/interbody_pull_harness.cpp`*
+
+### NR-222 — Two harnesses load scripts by relative path and could pass vacuously from the wrong directory
+*observation · raised 2026-08-13 · from BL-404 measurement work, 2026-08-13*
+
+interbody_pull_harness loads scripts/economy.lua + recipes.lua by relative path. Its FIRST run used a default-constructed registry with no demand baskets authored, so every resource carried zero demand and the assertions passed VACUOUSLY — reporting a clean result about an economy that was not there. Fixed two ways: the harness now hard-exits if it cannot open the scripts, and a new IO_TEST_SCRIPT_ROOTED_HARNESSES list in CMakeLists sets WORKING_DIRECTORY to the repo root for the three harnesses that need it. pregame_balance_harness and persona_counsel_harness have the same relative-path dependency and had NO working-directory guarantee before this; they are now covered by the same list, but neither carries the hard-exit guard.
+
+**Why it matters.** This is the same failure the whole BL-404 investigation is about, reproduced by the instrument built to investigate it: a green result that measured nothing. It is worth a look at whether pregame_balance_harness has been reporting real numbers, since it asserts pre-game economic balance and would pass trivially against an empty registry. I did not audit it — flagging rather than widening the change.
+
+> **Recommendation:** Add the same cannot-open-the-script hard exit to pregame_balance_harness and persona_counsel_harness, and re-read their last reported numbers with that in mind.
+
+*Files: `tools/verify/interbody_pull_harness.cpp`, `CMakeLists.txt`, `tools/verify/pregame_balance_harness.cpp`*
 
 ---
 
