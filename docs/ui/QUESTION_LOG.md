@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**18 surfaces** — 3 settled, 15 awaiting Ben's wording.
+**19 surfaces** — 3 settled, 16 awaiting Ben's wording.
 
 ---
 
@@ -43,6 +43,14 @@ alphabetical order.
 **Because:** Placement carries terrain, deposit, slot and now logistics-reach rules (BL-323). A refusal the player cannot read is indistinguishable from a broken build, so the panel must state the reason, not merely deny.
 
 *Demanded by BL-029, BL-082, BL-095, BL-367 · `src/ui/construction_panel.cpp` · id `construction_panel`*
+
+### AI decision feed
+
+**Answers:** What did the rival corporations just decide, and how close was the call?
+
+**Because:** The scorer has recorded its own rationale since BL-202 - the winning score, the runner-up score and a reason code, into a 256-entry ring and permanently into the history log - and nothing has ever read either store. The reasoning accumulated every tick of every session and was shown to nobody. The margin is what earns the space: a command taken at 0.81 against a runner-up of 0.79 is a coin-flip the tuning could have gone either way on, one taken at 0.90 against 0.10 is a conviction, and nothing else in the game distinguishes them. That difference is most of what 'which strategy is it running' means. It also pays as diagnostics rather than spectacle (AI_OPPONENT.md 10h): the idle/resume oscillation that was the AI's dominant behaviour for an unknown number of sprints was invisible for exactly this reason.
+
+*Demanded by BL-407 · `src/ui/decision_feed.cpp` · id `decision_feed`*
 
 ### Economy panel (Corps / Holdings / Markets)
 

@@ -282,6 +282,18 @@
     "src/ui/generation_ledger.cpp"
    ],
    "status": "drafted"
+  },
+  "decision_feed": {
+   "surface": "AI decision feed",
+   "answers": "What did the rival corporations just decide, and how close was the call?",
+   "because": "The scorer has recorded its own rationale since BL-202 - the winning score, the runner-up score and a reason code, into a 256-entry ring and permanently into the history log - and nothing has ever read either store. The reasoning accumulated every tick of every session and was shown to nobody. The margin is what earns the space: a command taken at 0.81 against a runner-up of 0.79 is a coin-flip the tuning could have gone either way on, one taken at 0.90 against 0.10 is a conviction, and nothing else in the game distinguishes them. That difference is most of what 'which strategy is it running' means. It also pays as diagnostics rather than spectacle (AI_OPPONENT.md 10h): the idle/resume oscillation that was the AI's dominant behaviour for an unknown number of sprints was invisible for exactly this reason.",
+   "backlog_item": [
+    "BL-407"
+   ],
+   "files": [
+    "src/ui/decision_feed.cpp"
+   ],
+   "status": "drafted"
   }
  }
 }

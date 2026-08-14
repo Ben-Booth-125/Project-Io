@@ -496,6 +496,18 @@
   [
    "chrome.wizard_stage_fold",
    "New World wizard, the charts area of the current round"
+  ],
+  [
+   "ledger.decision_feed_open",
+   "Navigation rail slot 11, \"AI decisions\""
+  ],
+  [
+   "ledger.decision_feed_filter_corp",
+   "AI decision feed, corporation filter"
+  ],
+  [
+   "ledger.decision_feed_filter_reason",
+   "AI decision feed, reason filter"
   ]
  ]
 }

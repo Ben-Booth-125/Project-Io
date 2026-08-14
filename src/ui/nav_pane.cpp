@@ -48,6 +48,7 @@ void close_all_panels(ui_state& state)
     state.show_generation_ledger = false;
     state.show_economy_panel     = false;
     state.show_build_ledger      = false; // tile build ledger (BL-162) is a column occupant too
+    state.show_decision_feed     = false; // AI decision feed (BL-407)
     // BL-310 round 4: the tech-tree era-selector menu is now a real shell-
     // column occupant (draw_tech_tree_menu), so it must yield to every other
     // ledger the same way they yield to it — its canvas takeover closes with it.
@@ -60,7 +61,8 @@ bool any_panel_open(const ui_state& state)
            state.show_balance_ledger    ||
            state.show_market_ledger     || state.show_construction_panel ||
            state.show_tile_ledger       || state.show_economy_panel ||
-           state.show_generation_ledger || state.show_tech_tree;
+           state.show_generation_ledger || state.show_tech_tree ||
+           state.show_decision_feed;
 }
 
 void draw_nav_pane(ui_state& state, float top_offset)
@@ -100,7 +102,13 @@ void draw_nav_pane(ui_state& state, float top_offset)
     // It sits last deliberately — it is a developer tuning surface rather than a
     // player system, so it takes the tail of the rail instead of displacing any
     // of MENU.md's curated nine.
-    constexpr int tab_count = 10;
+    //
+    // Slot 11 (BL-407, the AI decision feed) follows the same precedent: an
+    // observability surface, not a player system, so it takes the tail rather
+    // than displacing any of the curated nine. The tail is now where the
+    // developer/observability surfaces live, which is a legible rule — keep new
+    // ones going there rather than interleaving them.
+    constexpr int tab_count = 11;
 
     // Square slots; Selectable treats a nonzero size as literal, so derive the
     // rail width explicitly rather than passing -1.
@@ -213,7 +221,15 @@ void draw_nav_pane(ui_state& state, float top_offset)
             }
             slot_tooltip("Generation Ledger", "Why a tile generated as it did - the per-pass derivation and the body's histograms.", false);
             break;
-        default: // Unreachable — tab_count is 10 and every slot is handled above.
+        case 11: // AI decisions (BL-407) — the scorer's rationale, finally readable
+            if (ImGui::Selectable(id, state.show_decision_feed, 0, {slot_size, slot_size})) {
+                const bool was_open = state.show_decision_feed;
+                close_all_panels(state);
+                state.show_decision_feed = !was_open;
+            }
+            slot_tooltip("AI decisions", "What the rival corporations decided, and how close the call was.", false);
+            break;
+        default: // Unreachable — tab_count is 11 and every slot is handled above.
             break;
         }
 
@@ -259,6 +275,12 @@ void draw_nav_pane(ui_state& state, float top_offset)
         // and the Continent lens already teaches that shape as "how the surface
         // came to be" rather than as a live economic read.
         case 10: icons::continent(dl, centre, r, lit(state.show_generation_ledger));   break;
+        // Slot 11 borrows the strategy glyph, which slot 7 draws DIM as its
+        // reserved Corp. Strategy placeholder. The two never collide visually —
+        // one is always dim, one lights — and the shape is right: this ledger's
+        // subject is exactly the strategic decision that slot is reserved for,
+        // read rather than set. Revisit if slot 7 is ever built.
+        case 11: icons::strategy(dl, centre, r, lit(state.show_decision_feed));        break;
         default: icons::placeholder(dl, centre, r, dim); break;
         }
     }

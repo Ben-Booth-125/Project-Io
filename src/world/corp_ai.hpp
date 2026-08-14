@@ -34,6 +34,17 @@ struct corp_ai_params
     int   max_dials       = 3;     ///< Dial changes (recipe/workforce/idle/resume) per evaluation.
     int   max_trades      = 1;     ///< Order-book commands per corp per evaluation (BL-293).
 
+    /// BL-409 — spectator mode: the session has no human seat.
+    ///
+    /// The standing prohibition on auto-acting strategically covers the
+    /// PLAYER'S corp, and it protects that corp *because a human owns it*.
+    /// Under spectate nobody does, so the rule's precondition is absent rather
+    /// than excepted, and every corp evaluates on the same staggered cadence —
+    /// including `world::player_entity`, which degrades to a camera/ledger
+    /// anchor with no ownership meaning. Default false: an ordinary played
+    /// session is unchanged, byte for byte.
+    bool  spectating      = false;
+
     // --- Trading (BL-293). DELIBERATELY CONSERVATIVE FIRST CUT, AND TUNABLE ---
     // "Can trade" is not "trades well": a scorer that dumps stock at the floor
     // price is worse than one that does not trade at all, because it drags the

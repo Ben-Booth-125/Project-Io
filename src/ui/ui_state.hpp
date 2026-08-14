@@ -184,6 +184,28 @@ struct ui_state
     /// panel view index, so a verify script can park the ledger on a view.
     int  generation_ledger_view = 0;
 
+    // --- AI decision feed (BL-407) ---
+    // A reader over stores that have always been populated and never surfaced:
+    // world::ai_decisions (the 256-entry strategic ring, with score margins) and
+    // world::history_log's `decision` / `agency` topics (permanent, prose, no
+    // margins). Like every ledger it starts closed. See ui/decision_feed.hpp.
+
+    bool show_decision_feed = false; ///< Whether the AI decision feed is open.
+
+    /// Corp filter: null_entity = every corporation. Set by the feed's own
+    /// selector, not by canvas selection — a spectator reading one corp's run
+    /// should not lose their filter by clicking a tile.
+    entity_id decision_feed_corp = null_entity;
+
+    /// Reason filter: -1 = every reason, otherwise a `corp_decision_reason`
+    /// value. Held as int so "all" has a home the enum does not have to invent.
+    int decision_feed_reason = -1;
+
+    /// Spectator mode (BL-409): no human seat. Presentation-side flag only —
+    /// `world/*` never reads it; the sim's copy travels as corp_ai_params
+    /// .spectating through run_economy_step's defaulted argument.
+    bool spectating = false;
+
     // --- Budget ledger stubbed policy levers (BL-171 UI; mechanics owed to BL-155) ---
     // The Tax and Wages tier selectors are drawn and selectable, but have NO economic
     // effect yet — they carry the intended player levers (Tax = a player-set policy;

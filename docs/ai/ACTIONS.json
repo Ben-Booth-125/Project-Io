@@ -2055,6 +2055,54 @@
    ],
    "expected_output": "The stage expands from its verdict line into its full chart-and-explanation view, or folds back. Purely presentational; no preference or preview state changes. This is the same fold idiom the in-game ledgers use — the wizard is where it is taught.",
    "reason_to_select": "To inspect what the current roll actually produced for a stage before setting or judging a preference; the charts are the only honest feedback (no raw values are printed)."
+  },
+  {
+   "id": "ledger.decision_feed_open",
+   "family": "ledger",
+   "surface": "Navigation rail slot 11, \"AI decisions\"",
+   "press": "Click nav rail slot 11 to open the AI decision feed; click it again to close",
+   "args": [],
+   "preconditions": [
+    "In game (not the menu or the generation screen)"
+   ],
+   "expected_output": "The AI decision feed opens in the shell fold-out column, closing whatever ledger was open (the column holds one occupant). It lists recent strategic decisions newest-first: date, corporation, verb and target, reason, and the winning/runner-up score pair. Clicking the slot while the feed is already open closes it (standing toggle rule).",
+   "reason_to_select": "To read WHY the rival corporations did what they did, and how close each call was - the only surface that exposes the scorer's rationale. A near-tied margin means the tuning could have gone the other way; a wide one means conviction."
+  },
+  {
+   "id": "ledger.decision_feed_filter_corp",
+   "family": "ledger",
+   "surface": "AI decision feed, corporation filter",
+   "press": "Select a corporation from the feed's corp selector, or \"All\"",
+   "args": [
+    {
+     "name": "corp",
+     "type": "entity id or \"all\"",
+     "meaning": "Which corporation's decisions to show; \"all\" clears the filter"
+    }
+   ],
+   "preconditions": [
+    "AI decision feed is open"
+   ],
+   "expected_output": "The list narrows to that corporation's decisions. The filter persists across selection changes elsewhere in the game - clicking a tile does not clear it.",
+   "reason_to_select": "To follow ONE competitor's run rather than the whole field. Reading a single corp's decisions in order is how a strategy becomes visible as a sequence rather than as noise."
+  },
+  {
+   "id": "ledger.decision_feed_filter_reason",
+   "family": "ledger",
+   "surface": "AI decision feed, reason filter",
+   "press": "Select a decision reason from the feed's reason selector, or \"All\"",
+   "args": [
+    {
+     "name": "reason",
+     "type": "corp_decision_reason or \"all\"",
+     "meaning": "best_build / dial_workforce / dial_recipe / dial_idle / dial_resume / survey_expand / hire_available / trade_surplus"
+    }
+   ],
+   "preconditions": [
+    "AI decision feed is open"
+   ],
+   "expected_output": "The list narrows to decisions taken for that reason, across every corporation unless the corp filter is also set.",
+   "reason_to_select": "To ask a specific question of the run rather than scroll it. 'Every solvency-defence idle' and 'every build' are different questions, and the reason code is what separates them."
   }
  ]
 }

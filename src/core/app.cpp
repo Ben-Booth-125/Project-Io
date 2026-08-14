@@ -22,6 +22,7 @@
 #include "ui/chat_panel.hpp"
 #include "ui/fonts.hpp"
 #include "ui/generation_charts.hpp" // the shared chain-stage charts (BL-211)
+#include "ui/decision_feed.hpp"     // the AI decision feed (BL-407)
 #include "ui/generation_ledger.hpp" // the generation tuning ledger (BL-303)
 #include "ui/generation_preview.hpp" // the wizard's painted right pane
 #include "ui/format.hpp"
@@ -892,7 +893,10 @@ void app::step_economy()
                      m_registry.logistics_cost(convoy_mode::space));
     advance_convoys(m_world);
     lap(0); // convoys
-    m_last_econ_report = run_economy_step(m_world, m_registry);
+    // BL-409: under spectate the session has no human seat, so the strategic
+    // tier evaluates every corp — the player's included. Default false, so an
+    // ordinary played session runs exactly as before.
+    m_last_econ_report = run_economy_step(m_world, m_registry, m_ui.spectating);
     lap(1); // economy step (production + corp AI)
     auto flows = clear_markets(m_world, m_registry, m_last_econ_report);
     lap(2); // market clearing
@@ -1502,6 +1506,10 @@ void app::render()
     // Generation Ledger (BL-303) — regenerates the per-pass record on demand from
     // the report's tile-pass inputs; nothing it reads is held on the world.
     ui::draw_generation_ledger(m_world, m_ui, m_generation_report, &m_ui.show_generation_ledger);
+    // AI decision feed (BL-407) — a reader over world::ai_decisions and the
+    // history log's decision/agency topics. Read-only: const world in, and it
+    // writes nothing but its own filters in ui_state.
+    ui::draw_decision_feed(m_world, m_ui, &m_ui.show_decision_feed);
     {
         const ui::player_plot_history phist{m_balance_history, m_income_history, m_expenditure_history};
         ui::draw_economy_panel(m_world, m_registry, m_last_econ_report, phist, m_ui, &m_ui.show_economy_panel);

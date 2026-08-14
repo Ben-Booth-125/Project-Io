@@ -156,8 +156,12 @@ struct economy_report
 ///
 /// @param w   World; the (corp, body) pools are mutated in place.
 /// @param reg Loaded recipe/economy registry.
+/// @param spectating BL-409: when true the session has no human seat, so the
+///        strategic tier evaluates EVERY corp including `w.player_entity`.
+///        Defaulted so no existing caller (harnesses included) changes.
 /// @return    The step report (building states + auto-bought shortfalls).
-economy_report run_economy_step(world& w, const recipe_registry& reg);
+economy_report run_economy_step(world& w, const recipe_registry& reg,
+                                bool spectating = false);
 
 /// The rate one extraction site would yield at full reserve, BEFORE its stack
 /// decay: base_rate × richness × effective workforce × workforce target ×

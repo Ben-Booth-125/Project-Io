@@ -10698,6 +10698,89 @@
      "notes": "FAILED first review, then fixed. The slice left candidate.spend at 0.0f, which short-circuits the gate (it tests spend > 0) and contributes nothing to committed - a rival just above its floor could hire for up to 230 and end below it, and a later build in the same evaluation was scored against a balance the hire had already spent. corp_ai.cpp now mirrors the seam formula into c.spend. Availability stays cash-free (which rows are offered still comes from stockpile/market access alone), so the standing-rules grant is respected; it is the SPEND that is gated, like every other spend."
     }
    ]
+  },
+  {
+   "brief": "ai-decision-feed",
+   "title": "BL-407 (the scorer's rationale has never been readable): every strategic decision is on screen with the margin that says how close the call was",
+   "difficulty": 2,
+   "importance": "A",
+   "status": "pending",
+   "promoted_from": "backlog.json BL-407, v0.1.16",
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "The feed lists recent strategic decisions newest-first, each row carrying date, corp, verb + target, reason, and the winning/runner-up score pair.",
+     "class": "visual",
+     "status": "pending",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "The corp filter and the reason filter each narrow the list, and clear back to \"all\"; a filter survives clicking elsewhere in the game.",
+     "class": "visual",
+     "status": "pending",
+     "notes": "The filter is the difference between a river and an answer - \"show me every solvency-defence idle\" is a different question from \"show me every build\"."
+    },
+    {
+     "id": "R3",
+     "requirement": "Decisions older than the 256-entry ring fall back to the history log and are marked as carrying no margin, rather than rendering a fabricated 0.00.",
+     "class": "visual",
+     "status": "pending",
+     "notes": "The ring wraps by design (corp_command.hpp: derived observability, bounded so the log can run forever). Widening it to dodge this is the wrong fix."
+    },
+    {
+     "id": "R4",
+     "requirement": "The feed is read-only: it takes world by const reference, and opening/filtering it changes no world state.",
+     "class": "review",
+     "status": "pending",
+     "notes": "Checked by inspection of the signature and body - a const& world cannot be written, so this is a compile-enforced property once the signature is right."
+    },
+    {
+     "id": "R5",
+     "requirement": "The ledger obeys the standing toggle rule: the rail slot closes it when clicked while active, and it is mutually exclusive with the other column occupants.",
+     "class": "visual",
+     "status": "pending",
+     "notes": "io-standing-rules.md § Toggle rule. close_all_panels/any_panel_open updated in the seam commit."
+    }
+   ]
+  },
+  {
+   "brief": "spectator-no-seat",
+   "title": "BL-409 (spectating shows a race with one runner standing still): under spectate every corp is scored, and the run stays deterministic",
+   "difficulty": 2,
+   "importance": "A",
+   "status": "pending",
+   "promoted_from": "backlog.json BL-409, v0.1.16",
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "With spectating on, the strategic tier evaluates the player corp on the same staggered cadence as every other corp - it builds, dials, surveys and trades like a rival.",
+     "class": "headless",
+     "status": "pending",
+     "notes": "The two guards are corp_ai.cpp:465 and :499, plus corp_strategic_eval_due's documented \"always false for the player corp\"."
+    },
+    {
+     "id": "R2",
+     "requirement": "With spectating OFF the run is unchanged byte-for-byte: same seed, same tick count, identical world::state_hash against the pre-BL-409 build.",
+     "class": "headless",
+     "status": "pending",
+     "notes": "The whole point of the defaulted argument. A regression here silently changes every existing harness and every saved campaign."
+    },
+    {
+     "id": "R3",
+     "requirement": "A spectated run is itself deterministic: same seed, spectating on, N ticks, run twice - identical state_hash both times.",
+     "class": "headless",
+     "status": "pending",
+     "notes": "Admitting one more corp must not perturb the cadence: the index is over the sorted corp set, which does not change."
+    },
+    {
+     "id": "R4",
+     "requirement": "Player-press affordances are disabled (not hidden) under spectate, so the mode reads as a window rather than as a broken game.",
+     "class": "visual",
+     "status": "pending",
+     "notes": ""
+    }
+   ]
   }
  ]
 }

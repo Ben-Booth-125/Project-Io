@@ -16,7 +16,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*124 entries — 15 gameplay · 24 canvas · 15 lens · 41 ledger · 29 chrome.*
+*127 entries — 15 gameplay · 24 canvas · 15 lens · 44 ledger · 29 chrome.*
 
 ---
 
@@ -1412,6 +1412,47 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Expected output.** Pages the accordion to the adjacent metric: one page per resource deposited on the tile (this tile's yield vs a top-10% tile), then the tile's Habitability and Hazard scalars (vs the body average). One titled chart shows at a time.
 
 **Reason to select.** Walks every measurable fact about the tile one chart at a time - the read that grades a prospective build site.
+
+### `ledger.decision_feed_open` — Navigation rail slot 11, "AI decisions"
+
+**Press.** Click nav rail slot 11 to open the AI decision feed; click it again to close
+
+**Valid when:**
+- In game (not the menu or the generation screen)
+
+**Expected output.** The AI decision feed opens in the shell fold-out column, closing whatever ledger was open (the column holds one occupant). It lists recent strategic decisions newest-first: date, corporation, verb and target, reason, and the winning/runner-up score pair. Clicking the slot while the feed is already open closes it (standing toggle rule).
+
+**Reason to select.** To read WHY the rival corporations did what they did, and how close each call was - the only surface that exposes the scorer's rationale. A near-tied margin means the tuning could have gone the other way; a wide one means conviction.
+
+### `ledger.decision_feed_filter_corp` — AI decision feed, corporation filter
+
+**Press.** Select a corporation from the feed's corp selector, or "All"
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `corp` | `entity id or "all"` | Which corporation's decisions to show; "all" clears the filter |
+
+**Valid when:**
+- AI decision feed is open
+
+**Expected output.** The list narrows to that corporation's decisions. The filter persists across selection changes elsewhere in the game - clicking a tile does not clear it.
+
+**Reason to select.** To follow ONE competitor's run rather than the whole field. Reading a single corp's decisions in order is how a strategy becomes visible as a sequence rather than as noise.
+
+### `ledger.decision_feed_filter_reason` — AI decision feed, reason filter
+
+**Press.** Select a decision reason from the feed's reason selector, or "All"
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `reason` | `corp_decision_reason or "all"` | best_build / dial_workforce / dial_recipe / dial_idle / dial_resume / survey_expand / hire_available / trade_surplus |
+
+**Valid when:**
+- AI decision feed is open
+
+**Expected output.** The list narrows to decisions taken for that reason, across every corporation unless the corp filter is also set.
+
+**Reason to select.** To ask a specific question of the run rather than scroll it. 'Every solvency-defence idle' and 'every build' are different questions, and the reason code is what separates them.
 
 ---
 

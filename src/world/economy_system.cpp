@@ -535,7 +535,7 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
 
 } // namespace
 
-economy_report run_economy_step(world& w, const recipe_registry& reg)
+economy_report run_economy_step(world& w, const recipe_registry& reg, bool spectating)
 {
     economy_report report;
 
@@ -1225,8 +1225,14 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
     // player-grade seams (apply_corp_command). The tick source is
     // w.current_day_tick, which drives the staggered cadence; callers (app's
     // sim loop, the harnesses) maintain it per tick. The player corp is never
-    // evaluated or commanded (io-standing-rules.md).
-    run_corp_strategic_step(w, reg, report, w.current_day_tick);
+    // evaluated or commanded (io-standing-rules.md) — EXCEPT under `spectating`
+    // (BL-409), where the session has no human seat at all, so the prohibition
+    // has no subject and every corp evaluates on the same cadence.
+    {
+        corp_ai_params p;
+        p.spectating = spectating;
+        run_corp_strategic_step(w, reg, report, w.current_day_tick, p);
+    }
 
     return report;
 }
