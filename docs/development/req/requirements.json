@@ -3249,6 +3249,220 @@
    "status": "complete",
    "promoted_from": "backlog.json BL-409, v0.1.16",
    "archived": "docs/development/archive/requirements-undated.json"
+  },
+  {
+   "brief": "sell-order-floor",
+   "title": "BL-386 — a sell order's floor price is a reservation price, not a money printer",
+   "difficulty": 4,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "resolution": "",
+   "promoted_from": "backlog.json BL-386",
+   "batch": "seam-batch-2026-08-14",
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "Item-spanning: order_book_harness proves the clearing invariant — no corporation's clearing income exceeds its cleared quantity times the market's resolved price; an order with floor above the resolved price clears nothing and retains its pool; at/below clears at the resolved price.",
+     "verification": [
+      "headless: tools/verify/order_book_harness.cpp"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "The auto-clear pass holds any order whose floor_price exceeds ref_price (clears nothing) and pays rem * ref_price otherwise — the max(rp, floor) crediting is gone.",
+     "verification": [
+      "code: market_clearing.cpp auto-clear",
+      "review"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "requirement": "trade_floor_multiple default re-tuned (1.0 -> 0.25) so a rival's standing orders still clear on a glutted market under the fixed rule; the reservation dial is real.",
+     "verification": [
+      "code: corp_ai.hpp trade_floor_multiple",
+      "headless"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R4",
+     "requirement": "The spec that certified the defect is corrected: MARKETS.md step 11 restates the reservation rule; the player-sell-orders R2 row is rewritten in its cold store.",
+     "verification": [
+      "doc: docs/economy/MARKETS.md",
+      "doc: archive/requirements-*.json § player-sell-orders"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "seam-actor-authority",
+   "title": "BL-387 — the serve seam knows which corp the session is",
+   "difficulty": 3,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "resolution": "",
+   "promoted_from": "backlog.json BL-387",
+   "batch": "seam-batch-2026-08-14",
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "Item-spanning: smoke.js asserts a COMMAND naming a corp other than the session actor is refused (rejected_not_owner) with the world unchanged, and that --as any permits it.",
+     "verification": [
+      "headless: tools/mcp/smoke.js"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "--serve gains --as <corp|any> (default player corp); the COMMAND opcode refuses a non-actor corp at the opcode level, before apply_corp_command.",
+     "verification": [
+      "code: main.cpp run_serve",
+      "review"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "requirement": "tools/mcp/server.js pins its actor at startup and never forwards a caller-supplied corp on writes.",
+     "verification": [
+      "code: tools/mcp/server.js"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R4",
+     "requirement": "The standing rules gain the untrusted-boundary invariant (trusted-caller validation does not transfer to an external surface); AI_OPPONENT.md records the session-actor model.",
+     "verification": [
+      "doc: .claude/rules/io-standing-rules.md",
+      "doc: docs/ai/AI_OPPONENT.md"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "wire-parser-validation",
+   "title": "BL-396 — the wire parser range-checks every field or rejects the command",
+   "difficulty": 3,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "resolution": "",
+   "promoted_from": "backlog.json BL-396",
+   "batch": "seam-batch-2026-08-14",
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "Item-spanning: smoke.js asserts out-of-range verb, type, target, road_tier, workforce, unit_type and quantity are each refused AND the world is unchanged after each refusal; type=200 (the segfault) is a refusal.",
+     "verification": [
+      "headless: tools/mcp/smoke.js"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "Every COMMAND field parses wide, range-checks against its destination's real domain, and any violation rejects the whole command rejected_invalid — no truncation, wrapping, or silent clamping remains.",
+     "verification": [
+      "code: main.cpp checked parse",
+      "review"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "requirement": "corp_verb_count is declared beside the corp_verb enum so the range check cannot drift.",
+     "verification": [
+      "code: corp_command.hpp corp_verb_count"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R4",
+     "requirement": "Float fields are validated as the float that lands in the field: 1e300 (finite double, infinite float) is refused.",
+     "verification": [
+      "code",
+      "headless: tools/mcp/smoke.js"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "seam-read-privacy",
+   "title": "BL-397 — the seam serves only the session actor's private view",
+   "difficulty": 2,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "pending",
+   "resolved": null,
+   "resolution": "",
+   "promoted_from": "backlog.json BL-397",
+   "batch": "seam-batch-2026-08-14",
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "Item-spanning: smoke.js asserts BLACKBOARD for a non-actor corp is refused (permitted under --as any), and that a foreign order id and a nonexistent order id are indistinguishable to remove_sell_order.",
+     "verification": [
+      "headless: tools/mcp/smoke.js"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "The BLACKBOARD opcode serves the session actor and refuses any other corp id except under --as any.",
+     "verification": [
+      "code: main.cpp BLACKBOARD gate"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "requirement": "remove_sell_order answers rejected_invalid for any order id not in the caller's own book, existing or not.",
+     "verification": [
+      "code: corp_command.cpp remove_sell_order",
+      "review"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    }
+   ]
   }
  ]
 }

@@ -118,6 +118,95 @@
 > § ui-frame-recompute-caches / § misc-hygiene-sweep. The review barrier caught three real
 > faults before close (NR-130/133/134 carry the residuals).
 
+## Sell-order floor fix (promoted from BL-386, seam batch 2026-08-14)
+
+Requirements: requirements.json § sell-order-floor
+
+- **[2] A — Make the floor a reservation price in the auto-clear pass.** An order whose
+  `floor_price` exceeds the resolved price clears NOTHING (stock stays in the pool); at or
+  below, it clears at the resolved price, never above. Update the pass comment and the
+  matching-pass header comment (both state `max(ref_price, floor)`). Files:
+  `src/world/market_clearing.cpp`. Deps: foundation. provides: auto-clear reservation
+  semantics. Satisfies: R2.
+- **[1] B — Re-tune `trade_floor_multiple` so rivals still trade.** Default 1.0 → 0.25 (the
+  price-band floor multiple): under the fixed rule a floor at base_price would never clear on
+  a glutted market. Note the candidate-score implication (`score = qty * floor`). Files:
+  `src/world/corp_ai.hpp` (+ a comment in `corp_ai.cpp`). Deps: none (independent file).
+  Satisfies: R3.
+- **[2] C — Guard it in `order_book_harness`.** New assertions: (i) no corp's clearing income
+  exceeds its cleared quantity × the market's resolved price; (ii) an order with floor above
+  the market clears nothing and retains the pool; (iii) at/below clears at market. Files:
+  `tools/verify/order_book_harness.cpp`. Deps: A. Satisfies: R1.
+- **[1] D — Correct the spec that certified the defect.** MARKETS.md step 11 restated to the
+  reservation rule; the `player-sell-orders` R2 row rewritten in its cold store (the
+  requirement, not the code, was wrong). Files: `docs/economy/MARKETS.md`,
+  `docs/development/archive/requirements-*.json`. Deps: A. **Main session.** Satisfies: R4.
+
+Parallelisation note: A is the foundation; B independent; C after A; D main-session at
+integration. A+B+C = one economy agent (worktree).
+
+## Seam actor authority (promoted from BL-387, seam batch 2026-08-14)
+
+Requirements: requirements.json § seam-actor-authority
+
+- **[2] A — Session actor at the protocol layer.** `--serve` gains `--as <corp-id|any>`
+  (default: `w.player_entity`); the COMMAND opcode refuses any `corp=` ≠ session actor with
+  `RESULT result=rejected_not_owner` **at the opcode level** (no world call). `--as any` is
+  the explicit research opt-in (bot-vs-bot, BL-279 corpus). Files: `src/main.cpp`. Deps:
+  foundation. provides: run_serve session-actor model. Satisfies: R2.
+- **[1] B — Pin the MCP server's actor.** `tools/mcp/server.js` resolves its actor at startup
+  and never forwards a caller-supplied `corp` on writes. Files: `tools/mcp/server.js`. Deps:
+  A. Satisfies: R3.
+- **[1] C — smoke.js actor assertions.** A COMMAND naming a corp other than the session actor
+  is refused and the world is unchanged; under `--as any` it applies. Replaces the
+  well-formed-only assertion previously flagged as overclaiming. Files: `tools/mcp/smoke.js`.
+  Deps: A. Satisfies: R1.
+- **[1] D — The rule this is the second instance of.** Standing rules gain the
+  untrusted-boundary invariant (validation written for a trusted in-process caller does not
+  transfer to an external surface); AI_OPPONENT.md's seam section records the session-actor
+  model. Files: `.claude/rules/io-standing-rules.md`, `docs/ai/AI_OPPONENT.md`. **Main
+  session.** Satisfies: R4.
+
+## Wire parser validation (promoted from BL-396, seam batch 2026-08-14)
+
+Requirements: requirements.json § wire-parser-validation
+
+- **[1] A — `corp_verb_count` beside the enum.** So the range check cannot drift from the
+  enum. Files: `src/world/corp_command.hpp`. Deps: foundation. provides: `corp_verb_count`.
+  Satisfies: R3.
+- **[3] B — Checked parsing for every COMMAND field.** Parse wide, range-check against the
+  destination's real domain, reject the whole command `rejected_invalid` on any violation —
+  never truncate, wrap, or clamp. Domains: `verb < corp_verb_count`; `type`/`target` declared
+  enum values; `road_tier` 1–3; `workforce` [0,200]; `unit_type` < roster size; floats finite
+  **as float** (1e300 must fail) and ≥ 0. Files: `src/main.cpp`. Deps: A. consumes:
+  `corp_verb_count`. Satisfies: R2, R4.
+- **[1] C — smoke.js range-violation class.** Out-of-range verb, type, target, road_tier,
+  workforce, unit_type, quantity each refused, and — load-bearing — the world UNCHANGED after
+  each refusal. The `type=200` segfault case must now be a refusal. Files:
+  `tools/mcp/smoke.js`. Deps: B. Satisfies: R1.
+
+## Seam read privacy (promoted from BL-397, seam batch 2026-08-14)
+
+Requirements: requirements.json § seam-read-privacy
+
+- **[1] A — BLACKBOARD actor gate.** The opcode serves the session actor's blackboard and
+  refuses any other corp id (except under `--as any`). Files: `src/main.cpp`. Deps:
+  BL-387 A (the session-actor model). Satisfies: R2.
+- **[1] B — Close the order-book oracle.** `remove_sell_order` answers `rejected_invalid` for
+  any order id not in the caller's own book — whether it exists elsewhere or not — so a
+  sweep cannot map the global book. Files: `src/world/corp_command.cpp`. Deps: none.
+  Satisfies: R3.
+- **[1] C — smoke.js privacy assertions.** BLACKBOARD for a non-actor corp refused;
+  foreign-vs-nonexistent order ids indistinguishable. Files: `tools/mcp/smoke.js`. Deps: A,
+  B. Satisfies: R1.
+
+Parallelisation note (whole batch): two agents. **Economy agent** = BL-386 A+B+C
+(`market_clearing.cpp`, `corp_ai.{hpp,cpp}`, `order_book_harness.cpp`). **Seam agent** =
+BL-387 A/B/C + BL-396 A/B/C + BL-397 A/B/C (`main.cpp`, `corp_command.{hpp,cpp}`,
+`tools/mcp/*`) — one agent because the four share `main.cpp`'s serve loop and smoke.js.
+File write-sets across the two agents are disjoint; no cross-agent `consumes`. Main session:
+BL-386 D, BL-387 D, integration, review barrier, build + harness suite, per-item commits.
+
 ## Nation/corp generation visibility (promoted from BL-305) — **PAUSED, no tasks started**
 
 **Resume here.** Paused 2026-08-08 before any code (see NR-085): task A's file scope
