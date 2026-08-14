@@ -21,6 +21,16 @@ promoted Brief; each carries a `rows[]` array of individual requirements. A grou
 on resolution (`status: "complete"` or `"cancelled"`) — records are **never deleted**, so
 the file is the project's complete requirement history.
 
+**The history is physically time-sliced (2026-08-14, BL-421 — mirroring the backlog's
+hot/cold split).** A resolved group's `rows` and `resolution` move to
+`docs/development/archive/requirements-<quarter>.json` via
+`tools/session/archive_requirements.js`; the group keeps its index fields plus an
+`archived` pointer in `requirements.json`. Nothing is deleted — the move is reversible
+(`--restore`), `tools/session/requirements_query.js` resolves archived groups
+transparently, and `story_check.js` reads through the pointer. **Amend a landed group's
+rows or resolution in the cold file**, not here. In-flight (`pending`) groups always stay
+hot and whole.
+
 ### Group object
 
 | Field | Meaning |
@@ -30,7 +40,7 @@ the file is the project's complete requirement history.
 | `difficulty` | declared difficulty (backlog 1–5 scale), or `null` |
 | `importance` | declared importance, or `null` |
 | `evaluated_difficulty` | retrospective second-guess at the real difficulty once the work landed, or `null` |
-| `status` | `pending` \| `complete` \| `cancelled` — corrected 2026-08-04: **`pending` is the in-flight word in practice, not `active`**, which zero groups use. `completed` also appears and is an undocumented duplicate of `complete`; normalise it rather than blessing it. |
+| `status` | `pending` \| `complete` \| `cancelled` — corrected 2026-08-04: **`pending` is the in-flight word in practice, not `active`**, which zero groups use. The legacy duplicates `completed` (9 groups) and `closed` (1, the NR-075 retroactive cut audit) were normalised to `complete` on 2026-08-14 by `archive_requirements.js`, which keeps normalising on sight. |
 | `resolved` | resolution date (`YYYY-MM-DD`), or `null` while in flight |
 | `resolution` | one-paragraph outcome (the old `Resolved:` line) |
 | `promoted_from` | backlog/TODO origin pointer, or `null` |
@@ -44,7 +54,7 @@ the file is the project's complete requirement history.
 | `id` | sequential within the Brief (`R1`, `R2`, …) — referenced by REFINED.md `Satisfies:` fields and DEVLOG status lines |
 | `requirement` | a single testable outcome, present tense |
 | `verification` | **always an array** of classes (below); a qualifier is kept inline as one element, e.g. `"code: diff_rgba"`, `"doc: docs/ui/LENSES.md"` |
-| `status` | `pending` \| `complete` \| `failed` — the data also carries `completed` (duplicate of `complete`), plus one `cancelled` and one `partial`. Normalise on sight rather than widening the enum. |
+| `status` | `pending` \| `complete` \| `failed` — the `completed` duplicates were normalised to `complete` on 2026-08-14 (`archive_requirements.js` keeps normalising on sight); one `cancelled` and one `partial` remain as recorded anomalies. Do not widen the enum. |
 | `result_metric` | the structured outcome (e.g. `"3/3 goldens PASS <=0.0082%"`), or `""` |
 | `notes` | iteration detail: date/reason of failure, or the change made before the next attempt |
 
@@ -127,7 +137,10 @@ JSON record — it does not need the full backlog or DEVLOG history in context.
 
 ### Querying
 
-Because the record is structured data, it can be queried directly for insight rather than
-read end to end — e.g. all `failed` rows, the count by verification class, every `visual`
-requirement and its golden, or all Briefs resolved on a given date. A standalone query tool
-is a candidate follow-on (a backlog item), not part of this file.
+Because the record is structured data, it is queried, not read end to end. The tool is
+**`node tools/session/requirements_query.js`** (BL-421): default output is the in-flight
+groups, index fields only; `--status`/`--grep`/`--batch` filter; a `<brief>` argument or
+`--full` fetches whole groups with archived rows resolved transparently; `--failed` and
+`--class <verification class>` are row-level sweeps over the whole history; `--count`,
+`--fields`, `--table` shape the output. Do not load `requirements.json` whole — the
+in-flight view is a few KB; the history answers through the tool.

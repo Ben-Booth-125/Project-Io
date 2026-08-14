@@ -1,0 +1,1647 @@
+{
+  "_schema": "requirements-archive/io-v1",
+  "_note": [
+    "Cold store for requirement groups resolved in undated.",
+    "Written by tools/session/archive_requirements.js; read by requirements_query.js.",
+    "Records here are FROZEN history. The live index is docs/development/req/",
+    "requirements.json, which points at this file via each group's `archived`",
+    "field. To amend a landed group's rows or resolution, edit them HERE — the",
+    "hot file no longer carries a copy."
+  ],
+  "bucket": "undated",
+  "records": {
+    "ai-decision-feed": {
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "The feed lists recent strategic decisions newest-first, each row carrying date, corp, verb + target, reason, and the winning/runner-up score pair.",
+          "class": "visual",
+          "status": "complete",
+          "notes": "Captured. CAVEAT, from cold review (NR-232): the score PAIR is rendered faithfully but `runner_up` is the next candidate in sort order, not the best rejected one, so the margin banding overstates how often a decision was genuinely close. R1's 'carries the score pair' is met; the interpretation the surface puts on that pair is not yet sound."
+        },
+        {
+          "id": "R2",
+          "requirement": "The corp filter and the reason filter each narrow the list, and clear back to \"all\"; a filter survives clicking elsewhere in the game.",
+          "class": "visual",
+          "status": "complete",
+          "notes": "The filter is the difference between a river and an answer - \"show me every solvency-defence idle\" is a different question from \"show me every build\". Reachable from a capture via verify.decision_filter(reason, corp) (added to verify_api.cpp alongside show_panel('decisions'))."
+        },
+        {
+          "id": "R3",
+          "requirement": "Decisions older than the 256-entry ring fall back to the history log and are marked as carrying no margin, rather than rendering a fabricated 0.00.",
+          "class": "visual",
+          "status": "complete",
+          "notes": "The ring wraps by design (corp_command.hpp: derived observability, bounded so the log can run forever). Widening it to dodge this is the wrong fix. NOT COVERED BY THE VISUAL CHECK, and deliberately so: the overflow leg was written, run, then cut (Ben, 2026-08-14) because scroll position is not scriptable - it more than doubled the script's runtime to capture the ring-fed HEAD, which the other captures already show, while the log-fed tail never entered frame. R3 is an EYEBALL item until a verify hook can park scroll offset."
+        },
+        {
+          "id": "R4",
+          "requirement": "The feed is read-only: it takes world by const reference, and opening/filtering it changes no world state.",
+          "class": "review",
+          "status": "complete",
+          "notes": "Checked by inspection of the signature and body - a const& world cannot be written, so this is a compile-enforced property once the signature is right."
+        },
+        {
+          "id": "R5",
+          "requirement": "The ledger obeys the standing toggle rule: the rail slot closes it when clicked while active, and it is mutually exclusive with the other column occupants.",
+          "class": "visual",
+          "status": "complete",
+          "notes": "VERIFIED BY INSPECTION ONLY, and the visual check does NOT cover it - found by cold review, 2026-08-14. verify.show_panel writes the ui_state flag directly and never routes through close_all_panels, and no verify hook simulates a rail click, so the mutual exclusion the script appears to demonstrate is arranged BY the script. Deleting both the show_decision_feed line from close_all_panels and the close_all_panels call from nav_pane's case 11 leaves the captures byte-identical. Closing this properly needs a verify hook that presses the rail slot."
+        },
+        {
+          "id": "R6",
+          "requirement": "The feed is reachable from a headless capture run: show_panel(\"decisions\"), decision_filter(reason, corp) and spectate(bool) exist in the verify API, and scripts/verify/decision_feed.lua exercises R1/R2/R5.",
+          "class": "visual",
+          "status": "complete",
+          "notes": "Authored in the main session (verify_api.cpp + the script), since neither implementation agent owned those files. Exercises R1 and R2 only - the earlier claim that it also exercised R5 was wrong and is corrected in R5's own notes. Runs CAPTURE-ONLY with no golden (Ben's call, 2026-08-14): a golden over a list of AI decisions would go red on every corp_ai tuning change, scorer candidate-set change and world-gen change, none of which are this surface, and an always-red golden teaches blessing without looking. The verifier-visual skill AUTO-DISCOVERS scripts/verify/*.lua, so the check is already reachable without a skill edit; it is deliberately left unnamed in the skill's prose."
+        }
+      ]
+    },
+    "background-industry-keystone": {
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Background firms are generated as real corporation_component entries (is_background=true) with real assets/buildings that produce and consume through the ordinary economy tick — not a substrate injection.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "corporation_generation.cpp generate_background_firms: real corporation_component (is_background=true) entries with real placed buildings, wired into app::start_new_game / --serve / --blackboard-export before the pre-game warm start."
+        },
+        {
+          "id": "R2",
+          "requirement": "Firm-generation calibration is measured, not authored: generation stops once real production meets ~90% (clearing_fraction) of real demand for the tradeable set, so the opportunity gap is preserved by construction.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "Measured stop condition: production_ratio() vs body_demand() >= 0.90 (clearing_fraction), not an authored count; capped at 40 firms/body as a hard bound."
+        },
+        {
+          "id": "R3",
+          "requirement": "Background firms run the full corp_ai scored-utility layer identically to rival corps (no reduced model) at the ~80-corp scale, without an unacceptable per-tick cost regression (BL-253 O(corps×tiles) fix load-bearing).",
+          "class": "headless",
+          "status": "complete",
+          "notes": "Background firms are ordinary w.corporations entries; corp_ai.cpp run_corp_strategic_step already iterates all non-player corps uniformly — no reduced model. pregame_balance_harness 80 (real world) runs clean."
+        },
+        {
+          "id": "R4",
+          "requirement": "nation.resource_abundance and the substrate capacity arrays (inject_substrate_demand and its call site) are deleted outright, not kept behind a flag.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "nation_substrate/w.nation_substrates/substrate_params/inject_substrate_demand deleted outright. nation.resource_abundance deliberately KEPT — independent of the substrate mechanism (UI + market-carving reads); see NEEDS_REVIEW NR-172."
+        },
+        {
+          "id": "R5",
+          "requirement": "BL-340s background-demand step for silicon, refined_copper, ree_alloy, machinery, alloys, electronics is implemented; spacecraft_components gets no background demand.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "inject_background_demand (market_clearing.cpp) — new background_demand_params, 6 processing resources, spacecraft_components excluded by construction (unlisted basket weight)."
+        },
+        {
+          "id": "R6",
+          "requirement": "pregame_balance_harness 80 (real generated world, 80-tick warm start) runs clean: no crash, no negative-balance runaway, sane trajectory with background firms active.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "pregame_balance_harness 80 against the real generated world: ALL PASS (0 failures), plateau ~42k cr, no crash, no negative-balance runaway."
+        },
+        {
+          "id": "R7",
+          "requirement": "MARKETS.md and GENERATION_STRATEGY.md (and CORPORATION_GENERATION.md if touched) describe the background-firm model in place of the substrate; no doc still asserts the old nation-substrate mechanism as current.",
+          "class": "visual",
+          "status": "complete",
+          "notes": "MARKETS.md, GENERATION_STRATEGY.md, CORPORATION_GENERATION.md, GLOSSARY.md updated to describe background firms in place of the substrate."
+        }
+      ]
+    },
+    "bl-133-134-135-136-137-lens-legibility-cluster-b": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING (BL-137): the Production-intensity tile tint recolours to a dedicated red->green ramp (red=low, green=high), independent of the shared diverging_colour used by the Market key.",
+          "verification": [
+            "code",
+            "visual"
+          ],
+          "result_metric": "",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING (BL-134): the shared lens-good selector moves from the minimap strip into the on-canvas legend as a scrollable ImGui BeginCombo, for the Resource/Market/Scarcity lenses.",
+          "verification": [
+            "code",
+            "visual"
+          ],
+          "result_metric": "",
+          "notes": "Legend becomes an interactive ImGui child; do this before adding BL-133's key so the new container shape is established."
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING (BL-133): draw_country_key renders one swatch+nation-name per nation present on the body, sorted by nation id, wired into the overlay_mode::country branch of the legend dispatch.",
+          "verification": [
+            "code",
+            "visual"
+          ],
+          "result_metric": "",
+          "notes": ""
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING (BL-136): the Opportunity lens metric becomes a body-relative, volume-weighted unmet-demand rank (mirrors the Scarcity lens's body-relative treatment) instead of a max-absolute price/base ratio; label drops the '(unmet demand)' qualifier.",
+          "verification": [
+            "code",
+            "visual"
+          ],
+          "result_metric": "",
+          "notes": "Must land before R5 (BL-135), which consumes this metric."
+        },
+        {
+          "id": "R5",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING (BL-135): the Workforce and Opportunity lenses replace full-tile tint with a red->green per-tile dot mark on every buildable tile, suppressing the building glyph on occupied tiles while the lens is active; legend re-keys to a red->green ramp.",
+          "verification": [
+            "code",
+            "visual"
+          ],
+          "result_metric": "",
+          "notes": "New dot glyph in ui::icons. Depends on R4 for the Opportunity metric."
+        }
+      ]
+    },
+    "bl-138-time-control-compact-redesign": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING: the app.cpp time panel renders the compact mockup layout — year on top, 'Mon Nth (Qn)' date line with ordinal day, progress bar directly below the date line, speed controls '> I II III IV V' compact on the right, tick-counter/paused-text readout dropped.",
+          "verification": [
+            "visual",
+            "code"
+          ],
+          "result_metric": "",
+          "notes": "New ordinal-day formatter in format.cpp/.hpp."
+        }
+      ]
+    },
+    "bl-139-selection-tile-ledger-building": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING: selecting a tile opens the tile ledger with tile detail (terrain/deposits/owner/habitability) as lead content; an occupying building appears as a sub-element (double-click navigates to its full detail); an empty tile carries a top-of-ledger navigation affordance toward a build ledger (stub target acceptable — the build ledger surface itself is out of scope here).",
+          "verification": [
+            "code",
+            "visual"
+          ],
+          "result_metric": "",
+          "notes": "selection_panel.cpp only."
+        }
+      ]
+    },
+    "bl-140-ui-text-image-containment": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING: every on-screen text/image across header/balance strip, time panel, on-canvas legends, selection element, ledgers, hover card, and ImGui tables is placed in a BL-141 container and takes that container's wrap-or-fit text policy, with no silent truncation down to the 1280x720 verify window.",
+          "verification": [
+            "code",
+            "visual"
+          ],
+          "result_metric": "",
+          "notes": "Requires BL-141 (container vocabulary) and runs LAST, after all other uxbatch items land, since it is a mechanical pass over the surfaces they just changed."
+        }
+      ]
+    },
+    "bl-141-ui-container-vocabulary": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING: LAYOUT.md documents the closed container vocabulary (9 containers, each with sizing/min-max/text-policy/overflow) that BL-140 applies mechanically.",
+          "verification": [
+            "code: docs/ui/LAYOUT.md section added"
+          ],
+          "result_metric": "",
+          "notes": "Doc-only; gates BL-140."
+        }
+      ]
+    },
+    "bl-142-budget-view-player-only": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING: the Balance Ledger drops the corporation selector and per-corp fallback, pinned to w.player_entity only (no rival treasury inspection); disabled 'Policies'/'Budget laws' TODO stub sections are signposted.",
+          "verification": [
+            "code",
+            "visual"
+          ],
+          "result_metric": "",
+          "notes": "Aligns with BL-068 competitor-privacy rule."
+        }
+      ]
+    },
+    "bl-144-tile-ledger-fold-out-standard": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING: the Tile Ledger is converted from a standalone ImGui::Begin window to ui::foldout_begin/foldout_end, matching market_ledger/balance_ledger/construction_panel, and becomes a mutually-exclusive column occupant.",
+          "verification": [
+            "code",
+            "visual"
+          ],
+          "result_metric": "",
+          "notes": "tile_inspector.cpp only; mirrors BL-122."
+        }
+      ]
+    },
+    "bl-145-corp-focus-invisible": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING: the corporation industrial_focus readout is hidden from all four UI surfaces (economy_panel, corporation_panel, entity_summary, profile_panel) while the underlying data stays intact; nation 'Economic focus' is left visible.",
+          "verification": [
+            "code",
+            "visual"
+          ],
+          "result_metric": "",
+          "notes": ""
+        }
+      ]
+    },
+    "bl-146-generated-road-network-a-cost-integration": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING: world generation deterministically stamps a road network onto tile.road_level after nations + population centres exist. Each nation's population centres are connected by a backbone (MST + relative-neighbour redundancy over terrain-weighted A* costs), two-tier (trunk road_level 2 between major centres scale>=3, else local road_level 1), rasterised along the A* path (max on overlap, ocean tiles skipped); territorially-adjacent nations get one local border link between their nearest centre pair. The generated field is reproducible across two generations, and the A* cost cache is invalidated so gameplay dispatch sees the roaded costs.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "8/8 checks",
+          "notes": "New src/world/road_generation.{hpp,cpp}, wired in hard_coded_world.cpp after generate_nations; clears world.astar_cost_cache after stamping. Verified via tools/verify/road_generation_harness.cpp (auto-built by the CTest world-superset block, registered as CTest test 'road_generation_harness'): R1 lattice exists + no ocean roads, R2 both tiers present + none exceed trunk, R3 14/14 non-isolated centres touch a road, R4 road_level identical across two generations. Regression: determinism_harness/logistics_harness/trade_routes_harness/econ_harness/world_audit all green. road_level determinism guard lives in this dedicated harness's R4 (stronger than a determinism_harness field add). Tuning settled with Ben: local=1/trunk=2, major=scale>=3."
+        }
+      ]
+    },
+    "bl-147-road-rendering-on-the-planetary-canvas-pl": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING: the generated road lattice renders always-on on the Planetary canvas as edges between adjacent road tiles, with trunk (road_level 2) visually distinct (thicker/brighter) from local (road_level 1).",
+          "verification": [
+            "visual"
+          ],
+          "result_metric": "",
+          "notes": "body_surface_canvas.cpp road-edge pass in the wrap-copy loop; scripts/verify/roads.lua captures the home body."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "requirement": "the player can place a road segment via the tile build front door on a valid non-ocean, road-free land tile, gated on balance >= build_cost + materials (materials priced from the local market); placing sets tile.road_level and invalidates the A* cost cache, lowering that tile's traversal cost.",
+          "verification": [
+            "visual",
+            "code"
+          ],
+          "result_metric": "",
+          "notes": "place_road in construction.{hpp,cpp}; can_place_road + already_road reason in placement_rules; pending_road_tile in ui_state; app.cpp branch; economy.lua roads cost + recipe_registry road_economics. Cost 40 cr + 5 steel; local road_level 1."
+        }
+      ]
+    },
+    "bl-148-cities-as-free-logistics-hubs-agglomerati": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING: an intra-body dispatch route whose A* path passes through population-centre tiles costs less than the same route with no population-centre tiles on it; the discount scales with the summed centre scale (tier) of the nodes on the path and is bounded (>= 0, capped). Determinism preserved.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "",
+          "notes": "supply_system.cpp discount over logistics_path.tiles; tunables in economy.lua (logistics.city_discount_per_scale / discount_cap). Verified by logistics_harness.cpp new city-discount assertions."
+        }
+      ]
+    },
+    "bl-149-inland-logistics-hub-building-land-mode-c": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING: a new inland_logistics_hub building_type exists (enum + econ entry + registry + placement rule + build-front-door affordance), places on non-ocean land, and its tile acts as a logistics node — an intra-body route whose A* path passes through a hub tile costs less than the same route without it, reusing the BL-148 node discount.",
+          "verification": [
+            "headless",
+            "visual"
+          ],
+          "result_metric": "",
+          "notes": "components.hpp enum; recipe_registry m_building_econ 5->6 + named_type; economy.lua econ entry + logistics.hub_discount; placement_rules case; selection_panel build front door; presentation building_type_name; icons hub glyph. Headless: logistics_harness hub-discount assertion. Visual: build front door lists + places the hub."
+        }
+      ]
+    },
+    "bl-152-convoy-vision-beam-a-live-convoy-lights-a": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING: a live player intra-body convoy lights a radius-2 vision pocket along its route on the Planetary canvas, brightening the fog there; the pocket ages to full fog over one econ tick (90 days) against sim_now_days, so it lags and dims behind the moving convoy.",
+          "verification": [
+            "visual: scripts/verify/intrabody_fog.lua (intrabody_fog_convoy_beam capture)",
+            "headless: convoy path reconstruction asserted ad hoc (intra_body_path returns a contiguous, canonical lo->hi tile sequence; single-tile when src==dst)"
+          ],
+          "result_metric": "Full build clean. Static capture shows the beam pocket lit on the fogged surface; the temporal fade is not capturable in a still. Path reconstruction verified by a throwaway headless probe (4 assertions PASS: reachable, 3-tile no-wrap path, canonical order under reverse query, single-tile src==dst) run 2026-07-09, then removed.",
+          "notes": "Beam illumination is derived VIEW state, refreshed via ui::update_body_vision, computed in the canvas — never serialised, no feedback into world/*, so determinism is preserved. The headless probe was run ad hoc, not saved as a tools/verify/*.cpp harness (candidate follow-up per DELIVERY.md tool-creation discipline). NOTE: the per-econ-step timestamp-fade mechanism named here was superseded same day by BL-154's render-time moving beam; the requirement (a convoy lights a radius-2 beam that lags and dims over one econ tick) still holds."
+        }
+      ]
+    },
+    "bl-154-moving-head-tail-convoy-beam-permanent-co": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING: on the Planetary canvas, the player's own building tiles + a 3-wide corridor from the corp centre of operation to each market centre it operates in read permanently lit; a live player intra-body convoy shows a radius-2 beam with a bright head that glides smoothly along its route (interpolated by the fraction through the current econ tick) and a tail that dims one econ tick's travel behind it; everything else reads fogged.",
+          "verification": [
+            "visual: scripts/verify/intrabody_fog.lua (default + wide captures show permanent pockets/corridors lit, globe fogged)"
+          ],
+          "result_metric": "Full build clean. Wide + default captures confirm the permanent building pockets + corridors render lit and the rest of the body fogged. The moving beam's smooth head/tail motion is verified by construction (render-time interpolation of stored path+progress+speed by econ-tick fraction) but not by a still — it only manifests with a live inter-market intra-body convoy, which the same-market verify seed does not produce; confirmed by live playtest.",
+          "notes": "All three vision layers are derived VIEW state (ui_state.permanent_vision + convoy_beams), rebuilt each frame in ui::update_body_vision, called from render()'s planetary branch so the --verify capture path and a live body-switch both get it. No serialisation, no world/* feedback; determinism preserved. Corp centre of operation = lowest-id player building tile on the body (mirrors market_clearing's file-local representative_tile)."
+        }
+      ]
+    },
+    "bl-159-bl-143-sell-orders-on-market-building-led": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING (BL-159, lands first): sell-order management moves to a Market Ledger tab, reachable via its tab button or by selecting a market; carries over the columns/actions from the old draw_sell_orders_section.",
+          "verification": [
+            "code",
+            "visual"
+          ],
+          "result_metric": "",
+          "notes": "market_ledger.cpp only; must land before/with BL-143's removal."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING (BL-143): the Construction fold-out is renamed 'Building' with two tabs — Construction (queue + per-quarter estimated cost) and Buildings (aggregate list: workforce/profit/status + policy-placeholder TODO stub); the Build front-door and Sell Orders tab are removed.",
+          "verification": [
+            "code",
+            "visual"
+          ],
+          "result_metric": "",
+          "notes": "construction_panel.cpp, nav_pane.cpp. Depends on R1 (BL-159) landing first."
+        }
+      ]
+    },
+    "bl-164-on-canvas-lens-legends-bounded-scrollable": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING: the count-driven on-canvas lens legends (Country, Market, Reach, Supply) never overrun the canvas. Their box height is capped to the canvas vertical span; when the entry list exceeds that height the rows live in a bounded, wheel/drag-scrolling ImGui child with a clean scrollbar while the header (and the Market lens's good-selector combo) stay fixed. A long list (e.g. the Country lens's full nation set) is fully reachable rather than clipped off the canvas bottom.",
+          "verification": [
+            "visual",
+            "code"
+          ],
+          "result_metric": "",
+          "notes": "body_surface_canvas.cpp only. New shared helper draw_scroll_list_key + key_row/key_marker vocabulary; the four count-driven keys converted onto it, vertical bounds [grid_top+8, canvas_bottom-8] passed from draw_body_surface_canvas. Verified by capture on this Windows box (software renderer, 1280x720): country_lens_full shows the full ~20-nation list bounded within the canvas (pre-fix it ran off the bottom); market_lens shows the Iron Ore combo + Market catchments swatch list intact. Goldens for country_lens/market_lens (and reach/supply where the key renders) need re-blessing on Linux CI — the legend change is intentional, so the raised diff is expected. Per the cross-platform-golden policy the re-bless is done on Linux, not blanket-blessed here."
+        }
+      ]
+    },
+    "blackboard-export": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "HEADLESS: two same-seed --export-blackboard runs produce byte-identical per-corp JSONL files; fact lines are sorted (corp, subject kind, entity id) and each carries {t, subject, predicate, value, confidence, provenance} plus a schema version stamp.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "tools/verify/blackboard_harness.cpp"
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "requirement": "HEADLESS: fairness — no rival internals (pools, cash, recipes) appear in another corp's file, checked against ground-truth world state; provenance is one of own-asset|public-market|rival-visible|survey|route.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "tools/verify/blackboard_harness.cpp"
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "requirement": "HEADLESS: a Known-but-unsurveyed body yields activity facts but no tile facts — the two fogs stay independent.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "tools/verify/blackboard_harness.cpp"
+        }
+      ]
+    },
+    "budget-ledger-redesign": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING: the Budget (Balance) ledger renders as a vertical stack — a centred corp-name header, a profit line chart (profit per econ tick = income − expenditure, gold polyline, zero baseline, K-formatted value axis), stubbed Taxes and Wages tier selectors ('– I II III IV V +', active tier green, no economic effect), an Assets block (Buildings Owned / Income / Cargo Value), and a top-8 buildings-by-profit table with a rank-change-vs-a-year-ago column (+N/-N/= vs the ranking 4 econ ticks ago). The former itemised cashflow table is intentionally removed from this surface.",
+          "verification": [
+            "visual"
+          ],
+          "result_metric": "",
+          "notes": "src/ui/balance_ledger.cpp; empty-state verified via scripts/verify/balance_ledger.lua, populated table via scripts/verify/budget_ledger_ranked.lua (builds producing extraction sites, then econ_step 24). Goldens blessed at 1280x720. Tax/Wages mechanics owed to BL-155. rank_player_buildings_by_profit shared with app (m_building_rank_hist snapshots per tick). player_stockpile_value exported from header_panel.cpp so Cargo Value + header STOCKPILE share one valuation. Also fixed: tier-control ImGui id collision (PushID) and a 1-frame ledger/selection double-draw (new-selection close moved before the ledger draws)."
+        }
+      ]
+    },
+    "build-forwards-recipe": {
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "apply_corp_command's build case forwards cmd.recipe to construct_building, so a processing facility built through the seam runs the requested recipe instead of the coerced default.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "corp_command.cpp. Previously every processor built through the seam was a steel smelter regardless of the argument - the AI player could name a recipe and be silently given another. Debug assert added: a placed build satisfies cmd.recipe == no_recipe || the built building carries cmd.recipe."
+        },
+        {
+          "id": "R2",
+          "requirement": "Reject, do not coerce: a stated recipe on a non-processing building type, or an id the registry cannot resolve, returns rejected_invalid BEFORE placement and mutates nothing.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "Pre-placement check. All current issuers audited (corp_ai, the --serve parser, the harnesses) - none state a recipe on a non-processing type, so nothing regresses today. ACTIONS.json updated and the generated mirror regenerated, so the dictionary no longer advertises the old DISCARDED defect to the AI player."
+        }
+      ]
+    },
+    "commercial-fog": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "Brief-spanning: a body-level activity fog renders on the Solar canvas — an unknown body shows only a dim astronomy dot; a body reached by a fresh player route shows 'known' with a coarse market pulse; a stale route greys it; a live lane or a player building shows 'visible'; an active lane draws a lit corridor and a completed lane marks a near-by frontier body with a faint proximity glimpse. The Selection panel and hover gain a body activity section keyed on activity_vis. Golden-verified.",
+          "verification": [
+            "visual: scripts/verify/commercial_fog.lua golden"
+          ],
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "requirement": "body_activity_visibility(const world&, entity_id) is a pure function returning {unknown, known_stale, known, visible} from trade_routes + live convoys + ownership + tick, with no stored state. Correct tier for each of {no route, fresh route, stale route, active lane, presence}; home_body and player-building bodies start visible; the state is independent of survey phase (a surveyed-but-unrouted body is still unknown for activity; an unsurveyed-but-routed body is known).",
+          "verification": [
+            "headless: tools/verify/commercial_fog_harness.cpp"
+          ],
+          "notes": "world.{hpp,cpp} or world/activity_visibility.*"
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "requirement": "The activity badge is visually distinct from BL-067's survey badge (two layered fogs — geographic vs activity — must be tellable apart); a body can be known-but-unsurveyed and render both states unambiguously. New glyph(s) in ui::icons, state colours in presentation.hpp.",
+          "verification": [
+            "code",
+            "visual"
+          ],
+          "notes": "icons.{hpp,cpp}, presentation.hpp, solar_system_canvas.cpp"
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "requirement": "Known/Visible bodies reveal only a coarse market pulse (public prices + supply/demand aggregate + a busy/quiet activity level) — no per-building production or stockpile detail (those stay BL-068-private / survey-gated). Unknown bodies show only type + orbital position.",
+          "verification": [
+            "code",
+            "visual"
+          ],
+          "notes": "Delivered via the Selection-panel activity section (draw_activity_section): unknown -> 'outside your trade network - no market data'; known/visible -> coarse public market pulse (busy/steady/quiet from market throughput); stale -> greyed note. No internals (BL-068 stays private). DEFERRED as documented follow-ups (not silently dropped): the hover_content body line, and R1's deterministic proximity 'glimpse' at convoy-completion tick. The core fog (Solar badges + corridors + unknown/known/stale/visible + panel read) is shipped and verified (visual golden + headless harness)."
+        }
+      ]
+    },
+    "corp-ai-enumeration-parity": {
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Corp AI candidate enumeration uses construction_params::max_logistics_reach - the same placement budget construct_building applies - so a candidate the scorer offers is one the seam will accept.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "corp_ai.cpp reads the same registry field and the same corp as construction.cpp. Reviewed for exact parity in the integrating session. corp_ai_harness PASS (0 failures), including the byte-identical decision log across two same-seed runs, so the determinism invariant holds."
+        }
+      ]
+    },
+    "corp-ai-scored-utility": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "HEADLESS: over a multi-corp warm world, AI corps emit corp_command records only through the scorer at their staggered cadence slot; every applied command passes the player-grade seam (construct_building/demolish/set_recipe/workforce/idle/place_road/survey validation), and a rejected command mutates nothing. Two same-seed runs produce byte-identical command logs.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "tools/verify/corp_ai_harness.cpp"
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "requirement": "HEADLESS: hysteresis holds — a candidate below the do-nothing margin theta does not fire; a building that just changed state holds its cooldown; per-eval budget caps at 1 construction per corp; the solvency gate vetoes spend below the reserve floor. Player corp receives no strategic command.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "tools/verify/corp_ai_harness.cpp"
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "requirement": "HEADLESS: the per-corp state export is visibility-honest — own buildings/pools/cash in full; public market prices; rival buildings present but rival internals (cash, pools, recipes, workforce) absent; checked against ground-truth world state.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "tools/verify/corp_ai_harness.cpp"
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "requirement": "VISUAL: after a warm-start run, the chat Public channel shows at least one templated strategic-command message (build/idle/recipe) from an AI corp alongside the BL-079 reflex messages.",
+          "verification": [
+            "visual"
+          ],
+          "result_metric": "scripts/verify/chat_panel.lua — golden blessed 2026-07-28; Public channel renders the built/idled/workforce_set command text correctly (agency_event switch fixed for all BL-202 kinds)."
+        }
+      ]
+    },
+    "corp-chat-log-slice1": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "VISUAL: the comms chat panel renders in the Explorer's shell slot (right band, below the time column, above the minimap) with the COMMS header, the Public channel tab plus the + group-create affordance, the deterministic epoch system line (d0, corporation count), and the message input. The Explorer placeholder text is gone.",
+          "verification": [
+            "visual"
+          ],
+          "result_metric": "scripts/verify/chat_panel.lua — golden blessed 2026-07-26 (software renderer); panel renders all four elements after a 12-tick run."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "requirement": "HEADLESS: every BL-079 agency action emits exactly one matching agency_event on economy_report (idled event for the idled background building; none for the player corp), deterministic across identical runs.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "corp_agency_harness: BL-205 R2 PASS x2 runs + determinism PASS (2026-07-26)."
+        }
+      ]
+    },
+    "corporate-border-foundation": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "HEADLESS: every corporation with holdings on its home body is assigned an hq_building that is one of its OWN buildings sited on the home body, and a strictly positive influence_range; the designation is a deterministic function of generation (identical hq_building + influence_range across two make_hard_coded_world() runs). A corp with no home-body holdings keeps {null_entity, 0}.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "world_audit: BL-182 R1 PASS (8 corps, 0 without a valid HQ); BL-182 R2 PASS (0 mismatched across two generations); all pre-existing world_audit checks still PASS; exit 0.",
+          "notes": "Verified in-session via verifier-headless on tools/verify/world_audit.cpp (BL-182 R1/R2 added). Compiled with cl /std:c++20 after fixing the stale README source list (added city_names/planetology/road_generation/logistics TUs)."
+        },
+        {
+          "id": "R2",
+          "status": "pending",
+          "requirement": "VISUAL: on the Planetary surface the corporate border is drawn from the persisted HQ + influence_range (not a render-time recompute) — the player's always-on home ring/HQ star on the home body, and every rival corp's ring/HQ star under the Corporation lens on that corp's home body — via one shared draw_corp_border path. The ring radius = influence_range * hex_size * zoom, cylinder-seam wrapped.",
+          "verification": [
+            "visual"
+          ],
+          "result_metric": "",
+          "notes": "Owed — the GUI build is blocked in-session (SDL FetchContent egress 403). Also flagged for Ben's eyeball: (1) the ring no longer grows as the player builds outward (range fixed at generation); (2) a single projected-range constant now sizes both player and rival rings. Same visual-verification posture as BL-183."
+        }
+      ]
+    },
+    "country-generation-variety": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "Nation generation produces a larger country count (~24) with a genuinely uneven size distribution, deterministically, via the existing merge_small_nations mechanism.",
+          "verification": [
+            "headless: world_audit nation-count + size-variance assertion"
+          ],
+          "result_metric": "PASS: Nations: 24 (min tiles 15, max tiles 1093) — count in [20,28] and max>=3x min both PASS.",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "requirement": "Determinism preserved: identical seed produces identical nation partition.",
+          "verification": [
+            "headless: world_determinism"
+          ],
+          "result_metric": "PASS: ALL PASS (0 failures), including the default-descriptor sanity check updated to 24 nations.",
+          "notes": ""
+        }
+      ]
+    },
+    "dead-market-writes": {
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "credit_arrived_convoys no longer writes market_component.supply on arrival; the pool credit and trade-route recording are unchanged, and the cargo still reaches supply through the ordinary auto-surplus path at the next clear.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "supply_system.cpp. Verified: the write landed AFTER clear_markets zeroed supply and BEFORE the next clear rewrote it, so pricing never read it - while the pre-clearing AI scorer did, a private signal nothing priced agreed with. supply_advance harness PASS (0 failures) on the merged tree."
+        },
+        {
+          "id": "R2",
+          "requirement": "The second finding (a demand pull claimed to be dormant) is documented truthfully rather than as dead code.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "FAILED first review, then corrected. The slice proposed a comment + MARKETS.md block saying the inter-body pull \"never opens\" because home supply exceeds home demand. Verified false in the integrating session: clear_markets zeroes supply at market_clearing.cpp:452 BEFORE inject_interbody_demand at :468, so home supply is identically 0 at the read and the gate opens for every resource with any demand. Comment and doc rewritten to state the real behaviour; the underlying defect filed as BL-404 (inter-body pull is un-netted)."
+        }
+      ]
+    },
+    "display-options": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "notes": "Delivered same-session; verified by manual smoke (interactive, not golden-diffable since window size is the variable).",
+          "requirement": "F10 opens an Options window (also listed in the F1 cheat-sheet). Choosing a resolution preset resizes the live SDL window; Fullscreen and VSync toggles apply live. Changes persist to options.cfg and a free drag-resize is remembered, so a relaunch reopens at the last size/mode. run_verify() is unaffected (fixed 1280x720).",
+          "verification": [
+            "manual: launch ProjectIo, F10, change resolution/fullscreen/vsync, relaunch and confirm restored; build green"
+          ]
+        }
+      ]
+    },
+    "hire-costs-credits": {
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "hire_unit debits a real credit cost (hire_base_cost + hire_cost_per_power x the roster row power_mod) authored in economy.lua, so tuning it is a data change.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "Levy Spear 40, Rifle Regiment 230. Fields on military_capability_params with defaults matching the Lua, so a hand-built harness registry charges the same. corp_ai_harness BL-352 R4 rows PASS."
+        },
+        {
+          "id": "R2",
+          "requirement": "A refusal on either leg (credits or gated-axis resources) leaves the corp wholly uncharged - no partial debit.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "Both checks run before either debit; both refuse through rejected_funds. corp_ai_harness asserts \"an unaffordable hire is refused whole - no partial debit\" PASS."
+        },
+        {
+          "id": "R3",
+          "requirement": "The rival scorer's solvency gate and its within-tick committed total both see the hire's credit cost, so a rival cannot hire itself below its own reserve floor.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "FAILED first review, then fixed. The slice left candidate.spend at 0.0f, which short-circuits the gate (it tests spend > 0) and contributes nothing to committed - a rival just above its floor could hire for up to 230 and end below it, and a later build in the same evaluation was scored against a balance the hire had already spent. corp_ai.cpp now mirrors the seam formula into c.spend. Availability stays cash-free (which rows are offered still comes from stockpile/market access alone), so the standing-rules grant is respected; it is the SPEND that is gated, like every other spend."
+        }
+      ]
+    },
+    "history-dated-epochs": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "HEADLESS: history_event carries an integer year before the 1960 campaign epoch; years_from_gya and years_from_calendar_year convert correctly, including the round-half-up path and its negative branch.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "tools/verify/planetology_harness.cpp R14 — ALL PASS, 2026-07-30."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "requirement": "HEADLESS: format_history_date picks its unit from magnitude across all five bands (Gya / Mya / interval / calendar year / now), asserted at BOTH EDGES of every band, and never renders a future date as a bare negative.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "tools/verify/planetology_harness.cpp R14 — 34 assertions, ALL PASS. Caught a real out-of-band \"1000 Mya\" defect at 999,999,999 that band-interior assertions had missed."
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "requirement": "HEADLESS: the biography is totally ordered oldest-first, and a historical line interleaves into the same list between deep time and the epoch — the property BL-221/BL-222 build on.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "tools/verify/planetology_harness.cpp R14 — ALL PASS."
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "requirement": "HEADLESS: generation stays deterministic — the twice-generated world is identical, and planetology R1 now compares timestamps exactly rather than only history length.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "determinism_harness 23/23, world_audit 19/19, planetology_harness 101/101 — all PASS, 2026-07-30. continents_harness went green pre-review but could not be re-confirmed (Smart App Control blocked the binary); continents.cpp is byte-identical to that run."
+        },
+        {
+          "id": "R5",
+          "status": "partial",
+          "requirement": "VISUAL: the History ledger renders each date in the correct unit for its magnitude.",
+          "verification": [
+            "visual"
+          ],
+          "result_metric": "scripts/verify/history_ledger_and_comms.lua — 6/6 goldens PASS, but coverage is PARTIAL and the 0.0000% diff is misleading: every visible line is >= 1 Gya, the one band where old and new formats are byte-identical. The sub-Gyr bands are clipped below the panel fold and the verify API has no scroll driver. Follow-up task raised."
+        }
+      ]
+    },
+    "history-ladder-prenational": {
+      "rows": [
+        {
+          "id": "H1",
+          "status": "complete",
+          "requirement": "HEADLESS: the ladder is a pure function of (seed, tiles) — the same world generated twice yields an identical biography, including every ladder line.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "tools/verify/history_ladder_harness.cpp H1 — PASS; determinism_harness 23/23 PASS."
+        },
+        {
+          "id": "H2",
+          "status": "complete",
+          "requirement": "HEADLESS: the ladder DRIVES the political map rather than narrating it — a fragmented state must produce different nation_params than a unifiable one, in the stated direction, and the modulation must stay inside its bounds at both extremes.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "H2 — 6 assertions PASS. Kepler nation count moved 14 -> 43 as a consequence."
+        },
+        {
+          "id": "H3",
+          "status": "complete",
+          "requirement": "HEADLESS: the causal chain holds — cradle count feeds fragmentation, and fragmentation reaches the political map, so the stages are a ladder rather than independent dice.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "H3 — PASS."
+        },
+        {
+          "id": "H4",
+          "status": "complete",
+          "requirement": "HEADLESS: every ladder line carries its consequence (PLANETOLOGY.md § Presentation), is dated inside recorded history, and sorts into the biography oldest-first with the stages strictly ordered.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "H4 — 4 assertions PASS. Kepler: -3843 granary cities / 1376 Charter Act / 1586 Great Accord."
+        },
+        {
+          "id": "H5",
+          "status": "complete",
+          "requirement": "HEADLESS: failure cases are output, not defects — a world below a land biosphere emits no ladder and no padding, and Stage 2 reports a hegemon rather than hiding one.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "H5 — PASS, with an honest gap recorded: across 12 seeds all produced the accord and none a hegemon, so the failure branch is written but unreached. Tuning target for BL-219."
+        },
+        {
+          "id": "H6",
+          "status": "pending",
+          "requirement": "VISUAL: the ladder lines render in the History ledger biography alongside the deep-time lines.",
+          "verification": [
+            "visual"
+          ],
+          "result_metric": "NOT RUN. The ledger clips below the fold and the verify API has no scroll driver — the same blind spot BL-220 raised; a follow-up task is open for it."
+        }
+      ]
+    },
+    "industry-lens": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "Brief-spanning: a new overlay_mode::industry lens tints the Planetary surface per-tile by the substrate's resource-weighted economic throughput (industrial intensity), with a distinct strip glyph and an on-canvas key. Reads as 'where the existing industry is', distinct from BL-083's population markers. Golden-verified.",
+          "verification": [
+            "visual: scripts/verify/industry_lens.lua golden"
+          ],
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "requirement": "The field is pure rendering — no change to substrate_density or the market arithmetic. Tint = per-tile substrate throughput (substrate_density × terrain-affinity resource weighting, i.e. the background_supply/demand contribution). If background_* is collapsed to a per-body aggregate before render, render the equivalent per-tile substrate_density × affinity(resource,terrain) product directly.",
+          "verification": [
+            "code",
+            "visual"
+          ],
+          "notes": "body_surface_canvas.cpp — confirm per-tile derivability at build (design caveat)"
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "requirement": "overlay_mode::industry is added to the enum, the lens control strip (name + short-name + glyph dispatch in overlay.cpp), and ui::icons (a throughput glyph). Catalogued in LENSES.md/ICONS.md on landing.",
+          "verification": [
+            "code",
+            "visual"
+          ],
+          "notes": "ui_state.hpp, overlay.cpp, icons.{hpp,cpp}"
+        }
+      ]
+    },
+    "landform-render": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "HEADLESS: the landform mix is MEASURED, not assumed — world_audit reports the per-body and system-wide landform distribution over land tiles, and asserts that every landform generation can produce appears somewhere. This is the gate on the render proportions and the standing guard against a tuning change silently flattening the mix.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "world_audit S3 — PASS. System (25536 land): plains 77.0%, valley 18.0%, highland 3.5%, crater 0.8%, mountain 0.6%, canyon 0.1%, rift 0.1%. Kepler (6216 land): plains 89.8%, highland 7.7%, mountain 1.5%, canyon 0.4%, crater 0.4%, rift 0.3%, valley 0.0%. Numbers moved the design: no continuous elevation gradient exists to contour, so relief collapsed to a two-step tint and the glyph set grew from 3 to 4."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "requirement": "VISUAL: on the plain canvas the four dramatic landforms — mountain, canyon, crater, rift — are individually distinguishable from plains and from each other at default zoom, on both a wet body (Kepler) and a dry one (Cinder).",
+          "verification": [
+            "visual"
+          ],
+          "result_metric": "scripts/verify/landform_relief.lua — PASS. landform_kepler_zoom + landform_kepler_relief show all four silhouettes simultaneously and mutually distinguishable (twin peaks / split rims / flattened bowl / jagged fissure); landform_cinder_zoom shows craters on the dry body. Density reads as scattered accents, not a rash, matching the measured <=1.5% per landform."
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "requirement": "VISUAL: the landform read SURVIVES AN ACTIVE LENS. Composition owns hue and lens tints composite over it at 0.6-0.80 alpha, so the landform channel must still be legible with a saturated lens active (BL-226 § the different-channel rule).",
+          "verification": [
+            "visual"
+          ],
+          "result_metric": "PASS. landform_cinder_lens_continent (0.80 alpha, the hardest case) and landform_cinder_lens_country both retain legible glyphs over the lens tint. Ordering verified in source: relief composites at body_surface_canvas.cpp:1617, after the last lens branch at 1556. Relief itself survives but is subtle under a saturated lens — noted, not a failure, since the glyphs carry the categorical read by design."
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "requirement": "VISUAL: highland and valley read as elevation, not as a different terrain type — the relief tint must modulate the composition hue without being mistakable for a change of composition, and plains must stay the untouched baseline.",
+          "verification": [
+            "visual"
+          ],
+          "result_metric": "PASS. Plains stays the untouched baseline; highland lifts (visible on landform_kepler_relief) and valley sinks (visible on landform_cinder_zoom/wide — Kepler has no valley at all, which is why the dry body is captured). The tint modulates luminance within a composition rather than crossing into another composition band, so it reads as elevation, not as a terrain-type change."
+        }
+      ]
+    },
+    "landform-spanning-markers": {
+      "rows": [
+        {
+          "id": "S1",
+          "status": "complete",
+          "requirement": "HEADLESS: contiguity is MEASURED before the render is built — world_audit reports, per linear landform, the share of tiles with 0 / 1 / 2+ same-landform cardinal neighbours and the fully-interior share, so a case that cannot fire is found before it is written.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "world_audit § S4 — PASS. mountain 142 tiles (isolated 28.9 / end 52.8 / in-run 18.3 / interior 0.0); rift 16 (18.8 / 56.2 / 25.0 / 0.0); canyon 24 (50.0 / 33.3 / 16.7 / 0.0). Interior 0.0% across all three cancelled the filled-interior case."
+        },
+        {
+          "id": "S2",
+          "status": "complete",
+          "requirement": "VISUAL: a contiguous run reads as ONE feature rather than a repeated icon, and a lone tile still reads as that landform — the span-vs-cap contrast must be legible side by side.",
+          "verification": [
+            "visual"
+          ],
+          "result_metric": "landform_span_mountain_run vs landform_span_mountain_lone: the run draws a continuous double-peak wave across the shared edge, the lone tile its centred twin-peak glyph. landform_span_rift_run shows one unbroken fissure across ~3 tiles. landform_span_canyon_run captured to keep its thinness (50% isolated) on the record."
+        },
+        {
+          "id": "S3",
+          "status": "complete",
+          "requirement": "VISUAL: the glyph vocabulary is LEARNABLE — hovering a tile names its landform and states a consequence, without the player having to click through to the Selection panel.",
+          "verification": [
+            "visual"
+          ],
+          "result_metric": "landform_tooltip_mountain / landform_tooltip_rift — PASS. Cards read \"Rocky · Mountain / Habitability: 13% / Convoys pay ×2.00 to cross\" and \"Barren · Rift / … / ×1.60\". Needed verify.frames(40) for BL-230's appear delay. The cost line deliberately says movement, not build cost — no build path reads landform."
+        }
+      ]
+    },
+    "main-menu": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "Launch (app::run) opens on a centred main-menu screen (title 'PROJECT IO' + New Game / Quit), with no world, economy, or sim clock built yet. 'New Game' calls start_new_game() - reset sim clock, setup_world, load_economy, pre-game warm start - and switches to the in-game screen; 'Quit' exits. run_verify() jumps straight to in_game so existing checks are unaffected; the menu is capturable via verify.show_menu.",
+          "verification": [
+            "visual: scripts/verify/main_menu.lua capture (verify.show_menu re-enters the menu)",
+            "manual: launch ProjectIo, click New Game, confirm transition into the world (confirmed live this session)"
+          ],
+          "notes": "No Load/Save - deliberately out of scope for the prototype (no saving yet). Menu folded into render()'s single capture/present tail so it is golden-verifiable."
+        }
+      ]
+    },
+    "market-cogeneration": {
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "generate_population_centres weights its candidate pool by nearby extractable-deposit richness (multiplicative with the existing adjacency weight), so population is more likely to spawn near rich resources without changing the RNG draw sequence (determinism preserved).",
+          "class": "headless",
+          "status": "complete",
+          "notes": "population_generation.cpp richness_weight(); verified via world_audit/settlement_harness/demography_harness, all pass, BL-096 R4 + BL-257 R2 determinism unaffected."
+        },
+        {
+          "id": "R2",
+          "requirement": "A market's centre_tile is a static resource<->population trade-flow proxy (a bounded-radius richness/(1+dist^2) gravity search from the anchoring population tile) rather than the population tile itself, falling back to the population tile when nothing nearby beats it.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "hard_coded_world.cpp trade_flow_proxy_site(); pure function of generation-time tile data, no RNG. BL-096 R1/R2/R4 hold."
+        },
+        {
+          "id": "R3",
+          "requirement": "generate_corporations runs before Kepler's market-seeding block (the reorder), and the market-carving gate's concentration term factors how many distinct corporations hold an asset in a nation's territory, not raw geology alone.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "hard_coded_world.cpp: generate_corporations moved before market block; corps_in_nation term with corp_presence_gain (world_gen.lua tunable, default 0.15). world_determinism R1 (bit-identical incl. corps/entities) and BL-182 R2 (HQ designation identical across generations) both hold."
+        },
+        {
+          "id": "R4",
+          "requirement": "Determinism is preserved end to end across all three changes: the same seed reproduces an identical world, including population placement, market map, and corp holdings.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "world_determinism R1 PASS; BL-096 R4, BL-257 R2, BL-182 R2 all PASS after all three slices landed together."
+        }
+      ]
+    },
+    "multi-building-management-surface": {
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "A tile with exactly one building still routes straight to its single-building detail view (construction_panel.cpp draw_selected_section), zero extra clicks — the pre-BL-367 behavior is unchanged for the common case.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "draw_selected_section: falls through to tile_stacks() only when the building-id lookup misses; the single-stack/single-member branch resolves directly to the one building, matching prior behavior."
+        },
+        {
+          "id": "R2",
+          "requirement": "A tile with more than one building (several stacks, or one stack with several members) shows a grouped-by-stack list (mirroring placement_rules::stack_members grouping) instead of silently landing on an arbitrary first match.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "tile_stacks()/draw_tile_stack_list() in construction_panel.cpp; selecting a row sets selected_entity to that stacks lowest-id member."
+        },
+        {
+          "id": "R3",
+          "requirement": "The Manage Buildings action (selection_panel.cpp) and the on-canvas building-marker click (body_surface_canvas.cpp) both route a multi-building tile to the tile (grouped list), not to whichever building an unordered_map iterates first.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "Both call sites now count buildings-per-tile before deciding whether to jump straight to a building id or fall through to the tile id."
+        },
+        {
+          "id": "R4",
+          "requirement": "The on-canvas marker for a multi-building tile carries a \"+N\" count badge (dominant-stack glyph unchanged, no new glyph shape), staggered from the existing corp-identity tag so the two never overlap.",
+          "class": "visual",
+          "status": "complete",
+          "notes": "body_surface_canvas.cpp hit-zone block; ICONS.md documents the badge. Live-app launch confirmed no crash/render error; a deliberate side-by-side multi-building screenshot is owed (NR-173)."
+        },
+        {
+          "id": "R5",
+          "requirement": "question_log.json carries the surface change (BL-260 mandate) and SELECTION.md documents the new click model + list.",
+          "class": "visual",
+          "status": "complete",
+          "notes": "BL-367 appended to the construction_panel and selection_panel entries; SELECTION.md gained a Multi-building tiles section; ICONS.md gained the badge catalogue row."
+        }
+      ]
+    },
+    "multi-building-tile-urban-transform": {
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "non_extraction_stack_cap returns the authored per-composition table (grassland/forest/wetland=6, tundra=3, barren/rocky/regolith/metallic=4, volcanic/icy=2, urban=12, ocean=0).",
+          "class": "headless",
+          "status": "complete",
+          "notes": "multi_building_tile_harness R1: 12/12 PASS."
+        },
+        {
+          "id": "R2",
+          "requirement": "Non-extraction occupancy is counted in AGGREGATE across every non-extraction type on a tile (not per type); filling the composition cap fires the one-way urban transform.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "multi_building_tile_harness R2/R7: mixed processing_facility/inland_logistics_hub/research_institute placements fire the transform on the 6th; a 2-building tile never transforms."
+        },
+        {
+          "id": "R3",
+          "requirement": "Once urban, new extraction/ambient placement is refused (no_deposit) even against a real seeded deposit; extraction sites standing before the transform are grandfathered and unaffected; the tile habitability floor is raised to >= 0.80 without ever being lowered.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "multi_building_tile_harness R3/R4/R5/R6/R6b: 6/6 PASS."
+        },
+        {
+          "id": "R4",
+          "requirement": "Extraction stacking (the pre-existing richness/k_richness_per_site rule) is unaffected by this item.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "multi_building_tile_harness R8: PASS."
+        },
+        {
+          "id": "R5",
+          "requirement": "No regression in the existing construction/placement/determinism/generation harness suite, and the real ProjectIo target still builds clean.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "construction_harness, determinism_harness, world_audit, construction_gate_harness, buildings_rework_harness all rerun clean; full ProjectIo build clean."
+        }
+      ]
+    },
+    "opportunity-ambient": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "Brief-spanning: the Opportunity lens's diverging profit→loss margin surface is fully readable at rest (not gated on an armed building type) and carries an on-canvas profit→loss key so growth headroom reads directly off the terrain. It is NOT auto-activated at campaign start (the canvas opens unskinned per the BL-013 reversal). Golden-verified with no build mode armed.",
+          "verification": [
+            "visual: scripts/verify/opportunity_ambient.lua golden"
+          ],
+          "notes": "Reuses the existing per-tile margin estimate; no new mechanics."
+        }
+      ]
+    },
+    "persona-counsel-slice1": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "HEADLESS: two corps, same seed, an alignment dilemma; two runs produce byte-identical opinion logs; opinion records follow the codebook grammar {p, m, on, c<=140, w 0-3, v?}.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "tools/verify/persona_counsel_harness.cpp — ALL PASS (12/12), 2026-07-28."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "requirement": "HEADLESS: blackboard-only reads — the persona Lua environment exposes no world pointer, no io/os/package; extractors receive only blackboard facts; a fixed per-eval budget bounds extractor work.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "persona_counsel_harness — sandbox is base/math/string/table only (no io/os/package); budget enforced in persona_pack.cpp before marshalling."
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "requirement": "HEADLESS: at least one inter-bench disagreement is resolved by an explicit verdict record (SUFF/INSF/AMMIT/NOTYET/UNWG against a named baseline), and the counsel nudge on strategy_weight is bounded and never bypasses command validation.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "persona_counsel_harness — scales-of-maat.aggregate() resolves a real sun-tzu opinion vs an opposing opinion into an explicit SUFF verdict with a named baseline; counsel takes no world& (structurally cannot bypass corp_command)."
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "requirement": "VISUAL: the chat panel shows a per-corp Counsel channel carrying phrase-bank counsel messages after a warm-start run.",
+          "verification": [
+            "visual"
+          ],
+          "result_metric": "scripts/verify/chat_panel.lua — golden blessed 2026-07-28; a per-corp Counsel channel tab renders (Counsel: <corp name>)."
+        }
+      ]
+    },
+    "player-presence": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "Brief-spanning: a persistent, always-on home marker reads 'you are here' — a ring around the player's starting-holdings cluster plus a distinct HQ pip on the origin building on the Planetary canvas, and a halo on home_body in the Solar canvas. Golden-verified. (Initial camera focus and the lens-independent ownership accent already shipped in start-framing and are NOT re-implemented here.)",
+          "verification": [
+            "visual: scripts/verify/player_presence.lua golden"
+          ],
+          "notes": "Reconciled with the 2026-07-01 start-framing QOL group."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "requirement": "The HQ pip distinguishes the player's headquarters building from ordinary player buildings (subsumes BL-092). Reuses the shipped ownership accent — no second identity outline is added; the ring/pip/halo compose with, not duplicate, the existing accent.",
+          "verification": [
+            "code",
+            "visual"
+          ],
+          "notes": "body_surface_canvas.cpp; folds BL-092"
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "requirement": "The Solar-canvas home halo is visually distinct from the survey badge and the selection/hover highlights, and persists across lenses.",
+          "verification": [
+            "code",
+            "visual"
+          ],
+          "notes": "solar_system_canvas.cpp + presentation.hpp"
+        }
+      ]
+    },
+    "pop-centre-markers": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "Brief-spanning: the Planetary canvas draws the generated population_centres as always-on (not lens-gated) tiered settlement markers keyed on scale, with contiguous centres clustered into named conurbations for display and only City+ tiers labelled. Golden-verified.",
+          "verification": [
+            "visual: scripts/verify/pop_markers.lua golden"
+          ],
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "requirement": "Contiguous centres cluster into named conurbations for display so 20–40 scale-1–5 centres read as a legible hierarchy (a handful of cities + towns), not a dust of villages. Generation/simulation data unchanged — presentation only.",
+          "verification": [
+            "code",
+            "visual"
+          ],
+          "notes": "body_surface_canvas.cpp"
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "requirement": "A tiered settlement glyph family in ui::icons (Outpost→Metropolis), carried by size/glyph; catalogued in ICONS.md on landing.",
+          "verification": [
+            "code",
+            "visual"
+          ],
+          "notes": "icons.{hpp,cpp}"
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "requirement": "Marker colour is civic-neutral (not a corp identity colour); the host-nation tint applies only under the Country lens, keeping colour out of the ownership channel.",
+          "verification": [
+            "code",
+            "visual"
+          ],
+          "notes": "presentation.hpp"
+        }
+      ]
+    },
+    "province-demography": {
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Each province (the BL-218 settlement unit) carries a population that grows logistically each year-tick in integer fixed-point, with carrying capacity derived from the province's existing farm_q endowment.",
+          "verification": [
+            "headless: demography_harness"
+          ],
+          "status": "complete",
+          "result_metric": "Met - province gains population (int64_t), last_demography_year, manpower_stock; province_carrying_capacity(farm_q) is linear off farm_q; advance_province_demography does integer fixed-point logistic growth. demography_harness 20/20 PASS, including growth ordering across two different farm_q values.",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "requirement": "Population is drawn down by war (battles fought on or by the province) and by rare plague events reusing BL-217's checkpoint-eligibility mechanism (eligibility-filtered and recorded, never a bare weighted roll).",
+          "verification": [
+            "headless: demography_harness"
+          ],
+          "status": "complete",
+          "result_metric": "Met - advance_province_demography takes war_pressure_q for drawdown; resolve_plague_event draws through resolve_checkpoint (planetology.hpp), asserted to actually filter ineligible candidates, not just reduce population. Plague-connectivity lean: grid (Chebyshev) proximity via existing col/row fields, not the full logistics/trade graph (not reachable at this generation stage) - noted in POPULATION.md and the header.",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "requirement": "A nation's recruitable manpower is a bounded fraction of its provinces' population; units raised deplete that stock, so sustained wars become self-limiting from the model rather than from an authored cap.",
+          "verification": [
+            "headless: demography_harness"
+          ],
+          "status": "complete",
+          "result_metric": "Met - manpower_ceiling/replenish_manpower/raise_manpower give a bounded stock; raise_manpower asserted to clamp rather than go negative/unbounded when raised past availability.",
+          "notes": "This is the mechanism that is meant to make 2000-year wars stall on manpower exhaustion, per the item's design rationale."
+        },
+        {
+          "id": "R4",
+          "requirement": "The function is a pure deterministic function of (seed, tiles, prior province state): two generations of the same seed produce identical population trajectories.",
+          "verification": [
+            "headless: demography_harness",
+            "headless: ctest full suite"
+          ],
+          "status": "complete",
+          "result_metric": "Met - S1a/S1b-style determinism pair test over N simulated years, all fields identical. settlement_harness re-verified clean against the extended province struct (21/21). Full CTest suite 41/41 green after merge to main.",
+          "notes": "Same determinism discipline as settlement_harness S1a/S1b."
+        }
+      ]
+    },
+    "real-market-inventory": {
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "A processor with zero pool and zero market inventory idles rather than auto-buying; ample market inventory yields a full batch and drains the market by exactly the drawn quantity; partial pool + market coverage still yields a full batch, drawing pool-first then the market remainder.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "market_inventory_harness R1/R2/R3: 7/7 PASS."
+        },
+        {
+          "id": "R2",
+          "requirement": "The two-threshold partial-run model applies uniformly whether or not a market backs the body — the old 'market body always full batch' special case is retired.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "market_inventory_harness R4: 3/3 PASS."
+        },
+        {
+          "id": "R3",
+          "requirement": "Inventory fills from real corp sales only (auto-surplus + standing sell orders), never from the BL-078 abstract nation-substrate supply.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "market_inventory_harness R5: 2/2 PASS."
+        },
+        {
+          "id": "R4",
+          "requirement": "run_construction (BL-095 pacing) reads and drains the same real inventory field, replacing its old recent-supply proxy.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "market_inventory_harness R6: 2/2 PASS."
+        },
+        {
+          "id": "R5",
+          "requirement": "No regression in the existing economy/construction/determinism/generation/supply harness suite (verified from a FRESH rebuild, not stale exes), and the real generated-world 80-tick warm start (pregame_balance_harness) stays sane — no crash, no negative balance, all dynamism/determinism assertions pass.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "15-harness suite all clean; pregame_balance_harness clean (also where a real pre-existing BL-368 bug — missing Lua resource-name registrations — was found and fixed). ai_skill_harness drift (8→9 failures) assessed and attributed, recorded in NR-169 rather than re-blessed."
+        }
+      ]
+    },
+    "real-population-demand-habitability-tranche": {
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "inject_population_demand pulls a price-elastic DEMAND (scale x demand_scale x basket[r] x (base/price)^elasticity) for every resource in the population_demand basket into a centre catchment market, with NO supply term (population is a pure consumer). Untradeable resources (base_price 0) are skipped regardless of basket weight.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "population_demand_harness R4: 4/4 PASS (suppression above base, boost below base, exact formula match, untradeable skip)."
+        },
+        {
+          "id": "R2",
+          "requirement": "The BL-190 ordering fix (injection after clear_markets reset) is preserved by the generalisation.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "population_demand_harness R1/R2/R3: 6/6 PASS, unchanged shape, updated to hand-configure a basket since the default registry basket is now empty (was implicitly flat 1.0 pre-BL-368)."
+        },
+        {
+          "id": "R3",
+          "requirement": "Three new resource_type values (clean_water, consumer_goods, medical_supplies) each have a real recipe on the generic processing_facility and a real base price, and are each produced at least once and never pegged at the market band ceiling over an 80-tick rollout.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "habitability_tranche_harness R1/R2: 6/6 PASS."
+        },
+        {
+          "id": "R4",
+          "requirement": "A population centre demand for the three new habitability goods reaches the market (survives clear_markets), matching the same ordering contract as R2.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "habitability_tranche_harness R3: 3/3 PASS."
+        },
+        {
+          "id": "R5",
+          "requirement": "No regression in the existing economy/construction/determinism/generation harness suite, and the real ProjectIo target still builds clean against the grown resource_type enum and new Lua tables.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "econ_harness, econ_stability, resource_chain_harness, determinism_harness, construction_harness, world_audit, construction_gate_harness, buildings_rework_harness, multi_building_tile_harness all rerun clean; full ProjectIo build clean."
+        }
+      ]
+    },
+    "road-tiers-span-fix": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING (visual): roads render as continuous, symmetric spans — each roaded tile draws its own half of the shared edge (centre → hex-edge midpoint) toward every roaded, survey-revealed, land hex-neighbour, so two roaded tiles meet at the midpoint as one line with no 'from vs to' asymmetry and no rectangular-offset gaps; the three tiers Track/Road/Highway (road_level 1/2/3) are visually distinct (increasing thickness + brightness); the build front door offers all three tiers as separate affordances with per-tier cost + validity.",
+          "verification": [
+            "visual"
+          ],
+          "result_metric": "",
+          "notes": "body_surface_canvas.cpp wrap-copy road block (6 hex neighbours, half-edge, per-tile-tier style, cylinder-seam wrap). selection_panel.cpp build front door lists Track/Road/Highway. scripts/verify/roads.lua captures the lattice + the front door."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "requirement": "generation assigns three tiers by centre scale — Highway (3) between two major centres (scale>=3), Road (2) when at least one endpoint is Town+ (scale>=2), else Track (1); cross-nation border links stay Track; no tile exceeds road_level 3; deterministic across two generations; roads never stamp on ocean.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "",
+          "notes": "road_generation.cpp edge_tier by scale; tools/verify/road_generation_harness.cpp R2 asserts Track+Road+Highway present and ceiling <=3, R4 determinism."
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "requirement": "the player places any tier from the build front door: place_road(tier) is valid on non-ocean land when tile.road_level < tier (upgrade-in-place: a Track can be raised to a Road/Highway), rejected when road_level >= tier (already at or above); the chosen tier's cost (road_econ(tier): Track 25 / Road 45 / Highway 90 cr + materials) is debited and the A* cost cache invalidated.",
+          "verification": [
+            "headless",
+            "code"
+          ],
+          "result_metric": "",
+          "notes": "placement_rules can_place_road(tc,tier); construction place_road(...,tier); recipe_registry road_econ(tier) over std::array<road_economics,3>; economy.lua roads.track/road/highway. tools/verify/logistics_harness.cpp T10 places Track, checks the Track default cost, upgrade-succeeds + same-tier-rejected."
+        }
+      ]
+    },
+    "settlement-history-rewrite": {
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "The settlement pass is a pure deterministic function of (seed, tiles, ladder, creeds): two generations of the same seed produce an identical province set, culture assignment, industrialisation dates, checkpoint list and lacuna count.",
+          "verification": [
+            "headless: settlement_harness S1a/S1b"
+          ],
+          "status": "complete",
+          "result_metric": "Met - S1b compares every province field plus checkpoints across two make_hard_coded_world runs. Integer scoring throughout, explicit index tie-breaks, fresh stage tags (0x5E77 / 0xF0F6 / 0x8017), no transcendentals.",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "requirement": "Belief is mapped onto ground: every province carries the culture of its NEAREST cradle (not a per-province re-roll), more than one pantheon reaches the map, and the ancient deposits separate provinces into more than one endowment class.",
+          "verification": [
+            "headless: settlement_harness S2a/S2b/S2c"
+          ],
+          "status": "complete",
+          "result_metric": "Met - seed 0 yields 27 farm / 20 ore / 8 energy / 20 port over 75 provinces across multiple cultures. Required a mid-build correction: the first absolute-gain scoring saturated all 75 provinces to `farm`, and was replaced with world-relative scoring (500 = the world's own mean), which is also immune to the deposit_scalar abundance tier.",
+          "notes": "The creed/endowment coupling is the point: a forge god only exists where the cradle window held ore, so its provinces industrialising early is one fact read twice."
+        },
+        {
+          "id": "R3",
+          "requirement": "The three political axes are OUTPUTS of the settlement record, not an independent draw: expansionism from the border-contest integral, economic_focus from the dominant class of provinces settled during industrialisation, ideology from industrialisation timing ranked against neighbours.",
+          "verification": [
+            "headless: settlement_harness S3a/S3b/S3c"
+          ],
+          "status": "complete",
+          "result_metric": "Met - all three axes vary across nations and the contest integral reaches the expansionism axis. The random Pass 4 draw survives only as the fallback for bodies with no settlement pass.",
+          "notes": "Asserted as variation rather than as a per-nation value, because the harness reads the generation_report and provinces store an index into generate_nations' return order that the report does not carry."
+        },
+        {
+          "id": "R4",
+          "requirement": "Seeding changes, expansion does not: nation_params::seed_tiles is filled from the province anchors and consumed verbatim, the BL-053-tuned growth machinery is unmodified, and the world stays multipolar.",
+          "verification": [
+            "headless: settlement_harness S4a/S4b",
+            "headless: world_audit",
+            "headless: world_determinism"
+          ],
+          "status": "complete",
+          "result_metric": "Met - the vast majority of province anchors end up owned, the political map stays multipolar, and both world_audit and world_determinism pass unchanged.",
+          "notes": "The cheap alternative (keep Voronoi, narrate over it) was surfaced and rejected per BL-210's discipline as the lying-figure problem."
+        },
+        {
+          "id": "R5",
+          "requirement": "Ruptures are transforms, not narration: collapse/war/revolution each mutate territory, character or abundance; every attempt appends a checkpoint_record (failures included); branch eligibility is a filter and never a weight; and no rupture leaves a nation with zero tiles.",
+          "verification": [
+            "headless: settlement_harness S6a/S6b"
+          ],
+          "status": "complete",
+          "result_metric": "Met - reuses planetology.hpp's class-agnostic resolve_checkpoint unchanged, which is exactly the second checkpoint class BL-217 was designed to serve. Six ruptures fire on seed 0; branch labels are drawn only from the three designed ones.",
+          "notes": "Bounded to the six most-contested nations so the rupture count is a property of the design rather than of the map size."
+        },
+        {
+          "id": "R6",
+          "requirement": "The record can be destroyed and the hole stays visible: a won war erases the lines naming the provinces it took, replaces them with a dated lacuna carrying a count of what was lost, plants the victor's pantheon on those provinces, and keeps the founders recorded in founding_culture.",
+          "verification": [
+            "headless: settlement_harness S5a/S5b/S5c"
+          ],
+          "status": "complete",
+          "result_metric": "Met - 4 of 6 worlds in the seed spread lost part of their record to a war. A conquered province is asserted to keep a founding_culture distinct from its (conquered) culture, so the erasure is of the record, never of the fact.",
+          "notes": "Ben, 2026-08-02: 'don't be afraid to have parts of the record erased when two nations go to war'."
+        },
+        {
+          "id": "R7",
+          "requirement": "Corporate focus derives from the corp's HOME PROVINCE (ancient endowment plus the movement up the value chain for early industrialisers), the authored focus-weighting table is retired on that path, and diversity is a world-level reject-and-reroll against a floor on the SET rather than a quota on any member.",
+          "verification": [
+            "headless: settlement_harness S7a/S7b/S7c/S7d",
+            "headless: corp_terrain_matrix"
+          ],
+          "status": "complete",
+          "result_metric": "Met - the three tier rules assert directly on focus_from_province, and the world-level floor holds across the generated corporation set (5 extraction / 1 processing / 2 trade on seed 0). corp_terrain_matrix passes, so every generated corp is still terrain-viable. Player-corp parity is unchanged - same province read, same reroll, no special case.",
+          "notes": "Per-province rather than per-nation deliberately: a nation average would make every corp in a nation alike and destroy the specialists premise."
+        },
+        {
+          "id": "R8",
+          "requirement": "No regression across the logic tier, and any divergence in the AI skill goldens is explained rather than suppressed.",
+          "verification": [
+            "headless: ctest full suite"
+          ],
+          "status": "complete",
+          "result_metric": "Met - 39/39 CTest green. Two harnesses needed work: history_ladder_harness's H4 stage-ordering assertion was NARROWED (it demanded every line in the recorded-history window be strictly older than the next, which only held while the ladder owned that window alone), and ai_skill_harness's MSVC golden set was RE-BLESSED. Every AI divergence was upward - net worth rose on seeds 0/2/4 while solvency and survival stayed in band - which is the intended consequence of corps anchoring to provinces that actually industrialised.",
+          "notes": "A pre-existing unrelated break was also fixed: trade_routes_harness's hand-declared CMake link set never picked up river_generation.cpp after BL-170 landed, so it failed to link. Removed the hand-declaration per the file's own guidance on that rot."
+        }
+      ]
+    },
+    "spectator-no-seat": {
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "With spectating on, the strategic tier evaluates the player corp on the same staggered cadence as every other corp - it builds, dials, surveys and trades like a rival.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "Asserted as a controlled A/B rather than literally, and the reason is a finding in its own right (NR-231): the generated player corp on seed 0 is insolvent with zero extractors, so a four-family bar there would have asserted that corp is rich rather than that the guard lifted. The harness instead seats the best-endowed corp - picked by a stable property, not by outcome - which reaches 4/4 verb families spectated and 0 decisions seated+played. Same corp, same world, same seed, only the seat varies."
+        },
+        {
+          "id": "R2",
+          "requirement": "With spectating OFF the run is unchanged byte-for-byte: same seed, same tick count, identical world::state_hash against the pre-BL-409 build.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "VERIFIED, not assumed. The guard changes were stashed and the harness run against the genuine pre-BL-409 corp_ai.cpp: pre-change unspectated state_hash 3CBAD1D44EE71EDE, post-change unspectated 3CBAD1D44EE71EDE - identical, and baked in as the harness golden. The same pre-change build also put the SPECTATED hash at 3CBAD1D44EE71EDE (the flag was inert), so R3's 'spectating moves the world' row correctly FAILED against it - both halves have teeth rather than passing vacuously."
+        },
+        {
+          "id": "R3",
+          "requirement": "A spectated run is itself deterministic: same seed, spectating on, N ticks, run twice - identical state_hash both times.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "Three rows: same seed + spectating + N ticks run twice gives an identical state_hash; the player corp's own decision stream is reproducible under spectate; and a spectated run diverges from a played one. Also asserted that admitting the player shifts NO rival's cadence slot, since the index is over the sorted corp set."
+        },
+        {
+          "id": "R4",
+          "requirement": "Player-press affordances are disabled (not hidden) under spectate, so the mode reads as a window rather than as a broken game.",
+          "class": "visual",
+          "status": "pending",
+          "notes": "NOT DONE. UI work in files the BL-409 agent did not own, and deliberately left rather than reached for. Player-press affordances (construction placement, order entry, workforce dials) still respond under spectate. Needs doing before spectator mode is usable, but it does not block the guard. Split out as BL-413 (2026-08-14 housekeeping) so this item's own scope can close."
+        }
+      ]
+    },
+    "spontaneous-market-emergence": {
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "maybe_spawn_market creates exactly one market on a body the first time any building on it completes (any corporation); a second completion on the same body creates no second market. Placement-time instant completion and the run_construction pacing-loop completion both fire the trigger.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "market_emergence_harness R1/R2/R4: 5/5 PASS."
+        },
+        {
+          "id": "R2",
+          "requirement": "The new market's centre_tile is the completed building's own tile; opening base_price is the home market's own base_price marked up by a distance-from-home-body factor, and price starts equal to base_price (no EMA history). A resource untradeable at home (base_price 0) stays untradeable at the new market.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "market_emergence_harness R2/R3: 5/5 PASS, exact formula match."
+        },
+        {
+          "id": "R3",
+          "requirement": "inject_interbody_demand pulls a distance-discounted slice of the home body's own unmet demand (demand - supply, when positive) onto every OTHER body's market per resource, exactly matching the authored formula; never pulls for an untradeable resource; never injects into the home market itself; is a clean no-op when the world has no home market.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "market_emergence_harness R5/R6/R7: 6/6 PASS."
+        },
+        {
+          "id": "R4",
+          "requirement": "No regression in the existing economy/construction/determinism/generation/supply harness suite, and the real ProjectIo target still builds clean.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "econ_harness, econ_stability, resource_chain_harness, determinism_harness, construction_harness, world_audit, construction_gate_harness, buildings_rework_harness, multi_building_tile_harness, population_demand_harness, habitability_tranche_harness, supply_advance, trade_routes_harness, commercial_fog_harness all rerun clean; full ProjectIo build clean."
+        },
+        {
+          "id": "R5",
+          "requirement": "ai_skill_harness golden-band impact assessed with a fresh rebuild (not a stale exe) to confirm this item does not introduce further drift beyond what BL-366 already caused.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "Identical 8 failures to the BL-366-only baseline — no further movement. NR-169 corrected accordingly."
+        }
+      ]
+    },
+    "start-framing": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "The Planetary surface opens framed on the player's holdings: setup_world centres the view on the centroid of the player corp's buildings on the start body and zooms to a regional framing (planetary_zoom 11). Falls back to the default whole-surface view when the player has no building there. A deliberate focus_on_surface (navigation) cancels the pending recentre (planetary_center_pending) so the start framing never bleeds into later navigation.",
+          "verification": [
+            "visual: scripts/verify/start_framing.lua 'start_default' capture (no goto - keeps the queued HQ framing)"
+          ],
+          "notes": "Shared by run() (via start_new_game) and run_verify(); a script that goto_surface-es first gets standard framing because focus_on_surface now clears the pending centre."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "requirement": "Player-owned tiles carry a persistent, lens-independent ownership accent: a subtle player-colour wash at the plain default (overlay none), plus a player-colour outline drawn under EVERY lens so 'these are mine' never disappears when a lens is picked. Rival tiles carry no ring. The wash is suppressed under any active lens (the outline carries identity there, without fighting the lens fill). The Corporation lens is unchanged - player tiles filled blue with the bright selection-accent ring.",
+          "verification": [
+            "visual: scripts/verify/start_framing.lua 'start_default' (wash + ring at plain default), 'start_under_production_lens' (ring persists over a value fill, wash suppressed), 'start_under_corp_lens' (unchanged blue fill + bright ring)"
+          ],
+          "notes": "Ring colour: player identity colour generally; the bright selection accent under the Corporation lens (where the fill is already the player colour). Selection highlight is a separate pass drawn on top, so it still outranks the ownership ring."
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "requirement": "The top-left player identity card (draw_profile_panel) reads live from the player corporation instead of the hardcoded 'Unnamed Corp' placeholder: the real generated corp name, 'Parent: <home nation name>', and 'Focus: <industrial focus>'. The dead 'Standing' line is dropped (reputation is not modeled yet). Falls back to placeholders only if the player corp lookup fails.",
+          "verification": [
+            "visual: scripts/verify/start_framing.lua 'start_default' capture shows the real corp name / parent nation / focus in the top-left card"
+          ],
+          "notes": "Data already existed (corporation_component.name/home_nation/focus, set at generation); this was pure display wiring. Known minor: long nation names clip at the fixed 200px panel width - ellipsis/width is a follow-up."
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "requirement": "The player identity card portrait slot renders a geometric corp emblem (one of 6 shapes: circle / square / triangle / diamond / hexagon / pentagon) filled in the player identity colour (corp slot 0), replacing the plain placeholder square. The shape is chosen deterministically from the corp entity id so it is stable per campaign and distinct between corps. The emblem colour matches the map ownership tint so card and canvas agree.",
+          "verification": [
+            "visual: scripts/verify/start_framing.lua 'start_default' capture shows a filled geometric emblem in the top-left card, in the player blue"
+          ],
+          "notes": "Prototype scope (player card only), per design call. Promotion to a shared ui::icons emblem family + map/selection/hover markers + the full shape/assignment system is a backlog follow-up. draw_corp_emblem is currently local to profile_panel.cpp."
+        }
+      ]
+    },
+    "sticky-detail-card": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING (visual): a single click on a canvas entity opens a click-opened detail card (binary open/closed, no animation) that persists until dismissed via the ✕ button or Esc; the card is confined within the canvas rect, drawn beside the unchanged 200px hover card, and coexists with (does not replace) hover/dwell glance behaviour; double-click still navigates unchanged; the mouse wheel remains canvas zoom, uninvolved in the card.",
+          "verification": [
+            "visual"
+          ],
+          "result_metric": "",
+          "notes": "New src/ui/selection_card.{hpp,cpp}, wired into app.cpp (drawn after the other chrome so it z-orders on top; positioned at the shared ledger_window_spawn anchor, clear of the shell column/profile/header chrome). Content is the shared draw_hover_content dispatch as a placeholder (BL-195 relocates the full Selection element here). scripts/verify/sticky_card.lua: 3/3 captures correct (open, dismissed via the new verify.dismiss_selection() test hook, reselect reopens). Full CTest 23/23 green."
+        }
+      ]
+    },
+    "tile-selection-layout": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING: a selected TILE renders as a vertical stack — a placeholder image + [x,y] coordinate caption at top, the tile's non-zero deposits as vertical bar charts each scaled to that resource's world-max deposit (nice-ceiling axis with dotted gridlines, scrollable list), and a 2x2 action button grid at the bottom (Construct Buildings, Manage Buildings, History, Supply). Manage Buildings is disabled when no building occupies the tile; History and Supply are drawn but unwired stubs. The old action|facts split and the BL-071 affordance readout no longer render for a tile; the other selection kinds keep the action|facts form.",
+          "verification": [
+            "code",
+            "visual"
+          ],
+          "result_metric": "",
+          "notes": "selection_panel.cpp only. Verified via scripts/verify/selection_tile_layout.lua (selection_tile_layout + selection_tile_layout_built), goldens blessed on the software renderer at 1280x720. NOTE: this work also fixed the verify capture resolution (it had drifted to 1720x1080 in commit 6a04ec9, size-mismatching every committed golden) — app.cpp now forces verify_w x verify_h (1280x720) in run_verify, and the whole golden set was re-blessed to current UI. 53/54 checks green (recipe_workforce.lua fails on a pre-existing content expectation, unrelated)."
+        }
+      ]
+    },
+    "trade-routes": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "Brief-spanning: a completed player convoy upserts exactly one persistent trade_route for the correct unordered body-pair with last_tick = completion tick; a second convoy on the same lane bumps convoy_count and last_tick without creating a duplicate; an intra-body convoy (source and dest resolve to the same body) records nothing; body_of_market resolves a market to its owning body. Headless-verified.",
+          "verification": [
+            "headless: tools/verify/trade_routes_harness.cpp"
+          ],
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "requirement": "world gains a trade_route struct {body_a, body_b, corp, last_tick, convoy_count} and a std::vector<trade_route> trade_routes (mirroring world.convoys). Routes are never erased by this item (aging is a read-time concern for BL-089). Flag the flat-binary serialisation seam at integration if/when one exists in world/* — do not invent a save path.",
+          "verification": [
+            "code"
+          ],
+          "notes": "components.hpp + world.hpp"
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "requirement": "body_of_market(const world&, entity_id market) accessor added as a sibling of owner_corp_of; used by the upsert to collapse market pairs to body pairs.",
+          "verification": [
+            "code",
+            "headless"
+          ],
+          "notes": "world.{hpp,cpp}"
+        }
+      ]
+    },
+    "unit-doctrine-combat": {
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "unit_component carries a type (era-agnostic for this item; BL-274 supplies the era-keyed roster later); an army is a stack of typed (type, count) pairs, never a battlefield of individual units.",
+          "verification": [
+            "headless: combat_harness"
+          ],
+          "status": "complete",
+          "result_metric": "Met - unit_component gained a uint16_t type field; army_stack_entry{type_id, unit_class, count, type_power_mod}, an army is a std::vector<army_stack_entry>. combat_harness 15/15 PASS.",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "requirement": "A battle is one deterministic evaluation of unit-type matchup x formation doctrine x BL-233's terrain scalars (terrain_defence/terrain_attrition/terrain_resistance) x supply state x season, over integer arithmetic with explicit index tie-breaks (no floats in the outcome path).",
+          "verification": [
+            "headless: combat_harness"
+          ],
+          "status": "complete",
+          "result_metric": "Met - resolve_battle takes both army stacks, doctrine rows, terrain, season and supply and returns a deterministic battle_outcome; tie broken toward defender. All-integer/per-mille arithmetic; harness asserts identical inputs -> identical outputs and a terrain-flips-the-outcome scenario.",
+          "notes": "This is BL-233's terrain scalars' intended consumer per HISTORY.md's BL-224 note - first real use, not a new terrain model."
+        },
+        {
+          "id": "R3",
+          "requirement": "Doctrine is expressed purely as modifier data against the matchup matrix and terrain scalars (a doctrine row, not procedural maneuver logic) - adding a doctrine never requires touching the resolve function.",
+          "verification": [
+            "headless: combat_harness"
+          ],
+          "status": "complete",
+          "result_metric": "Met - doctrine_row{frontal_bonus, flank_fragility, mountain_penalty, siege_stance} is pure data; harness instantiates two distinct doctrine_row values driving the same resolve_battle to opposite outcomes on different terrain.",
+          "notes": ""
+        },
+        {
+          "id": "R4",
+          "requirement": "The same resolve function is reachable from both the Era -1 sim path and the existing 1960+ era combat path (engine-parity contract) - no sandbox-only combat rule.",
+          "verification": [
+            "headless: combat_harness",
+            "headless: ctest full suite"
+          ],
+          "status": "complete",
+          "result_metric": "Met - resolve_battle carries no Era-(-1)-sim-only coupling; naval entries contribute zero tactical power (strategic-only lean). Full CTest suite 41/41 green after merge to main, including world_audit and the existing generation-tier harnesses.",
+          "notes": "Only the roster table (BL-274) and doctrine table are expected to differ by era, never the resolve function itself."
+        }
+      ]
+    },
+    "widen-battle-swing": {
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "campaign_battle_harness's printed ratio curve shows a 1.4:1 attacker losing a visible share of fights (target band 5-15%) while a 2:1 attacker stays near-certain, with the value picked from a measured sweep rather than asserted.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "swing_permille 300 -> 600, chosen from a WSL sweep (candidates 300..800, 1000 seeds/ratio). Verified independently in the integrating session: 200-seed harness curve reads 1.0:1 52%, 1.1:1 66%, 1.2:1 72%, 1.4:1 85%, 2:1 100%, 4.2:1 100%. 1.4:1 therefore loses 15%; the stabler 1000-seed measure puts it at 89.3% won / 10.7% lost. Both inside the ordered band."
+        },
+        {
+          "id": "R2",
+          "requirement": "The resolver stays deterministic: same battle identity replays byte-identically, per-round trace included.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "campaign_battle_harness C1 (3 assertions) PASS at the new swing. No new entropy source; the seeded stream is unchanged in kind, only its amplitude."
+        },
+        {
+          "id": "R3",
+          "requirement": "The withdrawal-pricing property is re-derived honestly at the new swing rather than relaxed to pass: any late exit that costs LESS than an early one must be explained by the withdrawing side's deficit narrowing.",
+          "class": "headless",
+          "status": "complete",
+          "notes": "C3 restructured from a blanket \"every seed strictly increasing\" (a property of the NARROW swing, not of the design) into two checks: a majority remain monotone, AND explained == inversions is a strict equality, so an unexplained inversion fails the harness. Net sharper, not looser. Measured: 8/9 seeds monotone, 2/2 inversions explained by a narrowed deficit. Reviewed in the integrating session and confirmed mathematically sound (withdrawal is checked before each round, so the trace index is the withdrawal-instant state)."
+        }
+      ]
+    }
+  }
+}

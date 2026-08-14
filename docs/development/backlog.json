@@ -9654,6 +9654,29 @@
    "authority_doc": "docs/ai/AI_OPPONENT.md",
    "summary": "Merges NR-228 and NR-233 S3 (2026-08-14 housekeeping). corp_ai.cpp carries corp_verb_label/corp_decision_reason_label in an anonymous namespace, so BL-407 duplicated both word-for-word rather than exporting them, plus a hand-set k_reason_count = 8 for the filter combo since corp_decision_reason has no count sentinel. Both enums are append-only and have already grown twice each (BL-293/BL-350 for the verb; none yet for the reason, but the pattern is established) - the next addition silently narrates two ways or vanishes from the filter unless both files are remembered.",
    "design": "Hoist both label functions into corp_ai.hpp (small, no behaviour change) and add a count sentinel to corp_decision_reason's definition so the filter combo derives its size instead of hand-mirroring it. Whoever next has corp_ai.cpp open for other reasons is the natural owner - it is a two-minute fix once that file is already in hand."
+  },
+  {
+   "id": "BL-421",
+   "short_name": "REQUIREMENTS_QUERY_AND_COLD_STORE",
+   "title": "Requirements ledger hot/cold split: requirements_query.js + archive_requirements.js",
+   "summary": "requirements.json was 556 KB / ~142K tokens with 223 of 232 groups frozen history and no query tool — the one canonical store still only reachable by loading it whole. Applied the backlog's own hot/cold split: resolved groups' rows+resolution move to archive/requirements-<quarter>.json, and a backlog_query-style retrieval tool serves the in-flight view, single groups (cold-resolved), and row-level sweeps (--failed, --class).",
+   "category": "Tooling",
+   "priority": "B",
+   "difficulty": 2,
+   "status": "complete",
+   "version_goal": "v0.1.16",
+   "files": [
+    "tools/session/req_store.js",
+    "tools/session/requirements_query.js",
+    "tools/session/archive_requirements.js",
+    "tools/session/story_check.js",
+    "docs/development/req/requirements.json",
+    "docs/development/req/REQUIREMENTS.md"
+   ],
+   "created": "2026-08-14",
+   "resolved": "2026-08-14",
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   }
  ]
 }

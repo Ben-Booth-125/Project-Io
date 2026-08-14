@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*2 entries — 2 open, 0 resolved.*
+*3 entries — 3 open, 0 resolved.*
 
 ---
 
@@ -52,6 +52,17 @@ You asked for BL-404 next. It is NOT implemented, deliberately. Building the mea
 > **Recommendation:** Option (a), with BL-404 decided alongside it. But if outpost prices moving is unwelcome right now, (b) is a clean stopgap that makes the pick authored instead of accidental and costs almost nothing.
 
 *Files: `src/world/market_clearing.cpp`, `tools/verify/interbody_pull_harness.cpp`*
+
+### NR-233 — Requirements history physically time-sliced (BL-421) — three data calls taken
+*decision taken on your behalf · raised 2026-08-14 · from Ben asked for doc-system improvements (2026-08-14 session); the split itself follows the established backlog pattern, but three data edits rode along.*
+
+(1) 219 resolved requirement groups' rows+resolution moved to archive/requirements-<quarter>.json — reversible via archive_requirements.js --restore. (2) Legacy statuses normalised: 9 group 'completed' + 1 'closed' (header-chrome-tightening, the NR-075 retroactive closure) -> 'complete'; row 'completed' -> 'complete'. (3) 16 legacy groups with brief:null got deterministic title-slug briefs so the cold store can key on them.
+
+**Why it matters.** All three are edits to permanent history records. The normalisation is blessed by REQUIREMENTS.md ('normalise on sight'), but 'closed'->'complete' flattens the nuance that that group closed retroactively with pending rows (the resolution text preserves it), and the synthesized briefs are new identifiers Ben never chose.
+
+> **Recommendation:** Accept; overturn via --restore plus git if any of the three reads wrong.
+
+*Files: `docs/development/req/requirements.json`, `docs/development/archive/requirements-2026-Q2.json`, `docs/development/archive/requirements-2026-Q3.json`, `docs/development/archive/requirements-undated.json`*
 
 ---
 

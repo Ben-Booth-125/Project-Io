@@ -72,6 +72,25 @@
     "tools/verify/interbody_pull_harness.cpp"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-233",
+   "title": "Requirements history physically time-sliced (BL-421) — three data calls taken",
+   "raised": "2026-08-14",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Ben asked for doc-system improvements (2026-08-14 session); the split itself follows the established backlog pattern, but three data edits rode along.",
+   "what": "(1) 219 resolved requirement groups' rows+resolution moved to archive/requirements-<quarter>.json — reversible via archive_requirements.js --restore. (2) Legacy statuses normalised: 9 group 'completed' + 1 'closed' (header-chrome-tightening, the NR-075 retroactive closure) -> 'complete'; row 'completed' -> 'complete'. (3) 16 legacy groups with brief:null got deterministic title-slug briefs so the cold store can key on them.",
+   "why_it_matters": "All three are edits to permanent history records. The normalisation is blessed by REQUIREMENTS.md ('normalise on sight'), but 'closed'->'complete' flattens the nuance that that group closed retroactively with pending rows (the resolution text preserves it), and the synthesized briefs are new identifiers Ben never chose.",
+   "options": [],
+   "recommendation": "Accept; overturn via --restore plus git if any of the three reads wrong.",
+   "files": [
+    "docs/development/req/requirements.json",
+    "docs/development/archive/requirements-2026-Q2.json",
+    "docs/development/archive/requirements-2026-Q3.json",
+    "docs/development/archive/requirements-undated.json"
+   ],
+   "resolution": null
   }
  ]
 }

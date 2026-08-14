@@ -55,7 +55,12 @@ const backlogIds = new Set((backlog.items || []).map((it) => it.id));
 const briefs = new Map();
 const RUNNABLE = /golden|visual|headless/i;
 const LUA = /(scripts\/verify\/[\w./-]+\.lua)/;
-for (const g of reqs.groups || []) {
+// Archived groups keep only index fields hot; their rows live in the cold store
+// (req_store.js), so resolve each group before reading verification off its rows.
+const reqStore = require('./req_store');
+const reqCache = new Map();
+for (const gHot of reqs.groups || []) {
+  const g = reqStore.resolve(gHot, ROOT, reqCache);
   if (!g.brief) continue;
   const verifications = [];
   const scripts = new Set();
