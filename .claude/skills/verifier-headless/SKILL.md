@@ -204,6 +204,30 @@ in `tools/verify/README.md`.
   floor, never under the hold threshold, never a duplicate, never on the player's corp (R5).
   Links the world superset; CMake target `order_book_harness` via the generic glob. 43
   assertions, ~instant.
+- **`interbody_pull_harness`** — The inter-body demand pull (BL-263) and whether its netting
+  means anything (BL-404/BL-406). **One of the three harnesses that needs a live Lua state**
+  (with `pregame_balance_harness` and `persona_counsel_harness`): the question it asks is what
+  the *authored* economy numbers do, so it loads the real `scripts/economy.lua` + `recipes.lua`
+  instead of hand-building a registry — a hand-built fixture is precisely how the defect it
+  measures survived a green `market_emergence_harness`. Reports **R1** the shortfall
+  subtraction (`home.demand − home.supply`) is a no-op at the injector's read point, because
+  `clear_markets` zeroes supply before it and writes supply after it; **R2** what a corrected
+  netting would silence, per resource; **R2a** the anti-vacuity guard, plus the finding it
+  turned up — the home body carries many carved markets (BL-096) and the pull reads exactly
+  one of them, holding ~12% of the body's demand. Deliberately asserts only the *structural*
+  half and **prints** the varying half: which market the lowest-id pick lands on is not stable
+  across standard libraries, so the same seed gives different supply figures under MSVC and
+  g++, and no assertion should pretend either is correct. Declared explicitly in
+  `CMakeLists.txt` (adds back `recipe_registry.cpp` + `scripting/lua_state.cpp`, the sol2
+  include dir, links `lua54`).
+
+  **Two guards worth copying to any harness that loads a script.** It resolves script paths
+  relative to the repo root, so `IO_TEST_SCRIPT_ROOTED_HARNESSES` in `CMakeLists.txt` sets
+  `WORKING_DIRECTORY` for it, and it **hard-exits if it cannot open the scripts**. Both exist
+  because its own first run measured a default registry with no demand baskets and passed
+  every assertion *vacuously* — a clean green result about an economy that was not there. A
+  harness that loads data by relative path and does not check the load can only ever report
+  that it found nothing wrong.
 
 ## Running the whole suite (CTest — BL-104)
 
@@ -264,8 +288,27 @@ only when building outside the CMake tree.
 - Deterministic: the harnesses build a fixed world (hand-authored or
   `make_hard_coded_world`), so results are reproducible.
 - Keep `recipe_registry.hpp` **pure data** (sol2 only in its `.cpp`) so economy
-  logic stays harness-buildable; a harness hand-builds a `recipe_registry` rather
-  than loading Lua. The Lua-loading + GUI path is covered by `verifier-visual`.
+  logic stays harness-buildable. **Most** harnesses hand-build a `recipe_registry`
+  rather than loading Lua; three do not — `pregame_balance_harness`,
+  `persona_counsel_harness` and `interbody_pull_harness` link `lua54` and load the
+  real scripts, and are declared explicitly in `CMakeLists.txt` above the glob.
+  The Lua-loading + **GUI** path is covered by `verifier-visual`.
+- **Hand-built or authored — choose by what the check is asking.** A hand-built
+  fixture is right when the question is *does this formula compute what it says*:
+  it isolates the arithmetic and cannot drift with the economy. It is wrong when
+  the question is *what do the shipped numbers actually do*, because it can only
+  ever confirm the formula you already wrote down. BL-404 is the worked example:
+  `market_emergence_harness` hand-set home demand to 100 against supply 20, called
+  the injector directly, and passed for months while the real sequencing made the
+  same subtraction a no-op on every tick of every real game.
+- **A harness that loads anything must fail loudly when the load fails.** Script
+  paths are relative to the repo root; a harness run from the build dir loads
+  nothing, measures a default registry, and passes *vacuously* — reporting a clean
+  result about a world that was not there. Two guards, both in
+  `interbody_pull_harness` and worth copying: `WORKING_DIRECTORY` via
+  `IO_TEST_SCRIPT_ROOTED_HARNESSES` in `CMakeLists.txt`, and an explicit
+  cannot-open-the-file hard exit. Vacuity is the failure mode this tier is least
+  able to see on its own, so it has to be designed against rather than noticed.
 - To author a new check: add `tools/verify/<name>.cpp` with `check(...)`-style
   assertions, record its build line in `tools/verify/README.md`, name it under
   **Available harnesses** above, then run it through this skill — that is how a
