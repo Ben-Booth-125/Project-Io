@@ -106,15 +106,15 @@ function makeClient(exe, ticks, extraArgs = []) {
   rl.on('line', (line) => {
     if (line.startsWith('[Lua]')) return; // world-build banner, not a response
     if (!pending) return;
-    // BLACKBOARD and CORPS stream N lines then END; everything else is one line.
-    if (line === 'END' || line.startsWith('OK ') || line.startsWith('RESULT ')
-        || line.startsWith('ERR ') || line === 'BYE') {
-      pending.lines.push(line);
+    pending.lines.push(line);
+    // BLACKBOARD / CORPS / BODIES stream rows then END, and since BL-397 a
+    // refused BLACKBOARD is `ERR ... END` — so END alone terminates them.
+    // Resolving on the ERR line would leave the trailing END to be read as
+    // the NEXT request's response. Every other op answers exactly one line.
+    if (pending.multi ? line === 'END' : true) {
       const p = pending;
       pending = null;
       p.resolve(p.lines);
-    } else {
-      pending.lines.push(line);
     }
   });
 
@@ -130,7 +130,8 @@ function makeClient(exe, ticks, extraArgs = []) {
   function send(line) {
     return new Promise((resolve, reject) => {
       if (pending) return reject(new Error('a request is already in flight'));
-      pending = { resolve, reject, lines: [] };
+      pending = { resolve, reject, lines: [],
+                  multi: /^(BLACKBOARD|CORPS|BODIES)\b/.test(line) };
       const timer = setTimeout(() => {
         if (pending) { const p = pending; pending = null; p.reject(new Error(`timeout waiting for: ${line}`)); }
       }, 120000);
@@ -425,6 +426,20 @@ async function main() {
     // default server refused above must reach the seam here — bot-vs-bot
     // corpus generation is the one caller that legitimately plays every corp,
     // and it has to ask for that mode explicitly.
+    // --- BL-397: reads serve only the session actor's private view ----------
+    // The blackboard is a corp's PRIVATE view (cash, pools, recipes); the
+    // opcode used to export whichever corp the request line named. The refusal
+    // must keep the lines-then-END shape or a streaming client's framing
+    // breaks — asserted literally.
+    console.log("\n  -- BL-397: reads serve only the session actor's private view --");
+    {
+      const bbRival = await io.send(`BLACKBOARD corp=${rival.id}`);
+      check(bbRival.length === 2 && bbRival[0] === 'ERR result=rejected_not_owner'
+            && bbRival[1] === 'END',
+            'BLACKBOARD for a non-actor corp answers ERR result=rejected_not_owner then END',
+            bbRival.join(' | '));
+    }
+
     console.log('\n  -- BL-387: --as any restores cross-corp reach (explicit opt-in) --');
     const io2 = makeClient(exe, 8, ['--as', 'any']);
     try {
@@ -433,6 +448,62 @@ async function main() {
       check(anyCross !== null && RESULT_CODES.has(anyCross) && anyCross !== 'rejected_not_owner',
             'under --as any the same cross-corp command is not refused for actor reasons',
             anyCross);
+
+      // Under --as any the same rival read serves.
+      const bbAny = await io2.send(`BLACKBOARD corp=${rival.id}`);
+      check(bbAny.filter((l) => l.startsWith('{')).length > 0
+            && !bbAny.some((l) => l.startsWith('ERR ')),
+            'under --as any a non-actor BLACKBOARD serves facts rather than refusing');
+
+      // --- BL-397: remove_sell_order no longer distinguishes foreign from
+      // nonexistent. It answered `rejected_not_owner` for someone else's order
+      // and `rejected_invalid` for no order — a perfect oracle: order ids are
+      // one global monotonic sequence, so sweeping the id space mapped the
+      // whole book. Build the two cases with KNOWN ids: place as the player
+      // (its id found by sweeping to the `applied` removal — the sweep itself
+      // must never surface rejected_not_owner), then place as a rival, whose
+      // order takes exactly the next id. Runs on the --as any server because
+      // constructing a foreign order requires acting as two corps.
+      if (listBody !== undefined) {
+        const placed = resultOf(await io2.send(
+          `COMMAND corp=${subject.id} verb=9 subject=${listBody} target=${listRes} `
+          + `quantity=5 floor_price=0.5`));
+        check(placed === 'applied', 'the player can place the probe order on the --as any server',
+              placed);
+
+        let foundId = null;
+        let sweepLeaked = false;
+        for (let id = 1; id <= 4096 && foundId === null; ++id) {
+          const r = resultOf(await io2.send(
+            `COMMAND corp=${subject.id} verb=10 order=${id}`));
+          if (r === 'applied') foundId = id;
+          else if (r === 'rejected_not_owner') sweepLeaked = true;
+        }
+        check(!sweepLeaked,
+              'sweeping the order-id space never surfaces rejected_not_owner (the oracle is gone)');
+        check(foundId !== null, 'the sweep finds and removes the player\'s own order',
+              String(foundId));
+
+        if (foundId !== null) {
+          const rivalPlaced = resultOf(await io2.send(
+            `COMMAND corp=${rival.id} verb=9 subject=${listBody} target=${listRes} `
+            + `quantity=5 floor_price=0.5`));
+          check(rivalPlaced === 'applied', 'a rival order exists to probe against', rivalPlaced);
+          const foreignId = foundId + 1; // next allocation of the monotonic counter
+
+          const foreign = resultOf(await io2.send(
+            `COMMAND corp=${subject.id} verb=10 order=${foreignId}`));
+          const nonexistent = resultOf(await io2.send(
+            `COMMAND corp=${subject.id} verb=10 order=4000000000`));
+          check(foreign === 'rejected_invalid' && nonexistent === 'rejected_invalid'
+                && foreign === nonexistent,
+                'a foreign order id and a nonexistent order id answer the SAME result string',
+                `foreign=${foreign} nonexistent=${nonexistent}`);
+        }
+      } else {
+        console.log('         (no priced (body, resource) pair found earlier; '
+                    + 'order-oracle check skipped and says so)');
+      }
     } finally {
       io2.close();
     }

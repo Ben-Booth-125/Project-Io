@@ -111,16 +111,21 @@ function ensureChild() {
   childRl.on('line', (line) => {
     if (line.startsWith('[Lua]')) return; // world-build startup banner, not a response
     if (!pending) return;
-    if (line === 'END' || line.startsWith('OK ') || line.startsWith('RESULT ')
-        || line.startsWith('ERR ') || line === 'BYE') {
-      pending.lines.push(line);
-      pending.resolve(pending.lines);
+    pending.lines.push(line);
+    // Multi-line ops (BLACKBOARD / CORPS / BODIES) stream rows then END, and
+    // since BL-397 a refused BLACKBOARD is `ERR ... END` — so END alone is
+    // their terminator. Resolving on the ERR line (the old rule) would leave
+    // the trailing END to be read as the NEXT request's response. Every other
+    // op answers exactly one line.
+    if (pending.multi ? line === 'END' : true) {
+      const p = pending;
       pending = null;
-    } else {
-      pending.lines.push(line);
+      p.resolve(p.lines);
     }
   });
 }
+
+const MULTI_LINE_OPS = /^(BLACKBOARD|CORPS|BODIES)\b/;
 
 /// Send one request line to the --serve process; resolve with its response
 /// lines (the terminator line included).
@@ -128,7 +133,7 @@ function sendRequest(line) {
   ensureChild();
   return new Promise((resolve, reject) => {
     if (pending) { reject(new Error('a request is already in flight')); return; }
-    pending = { resolve, reject, lines: [] };
+    pending = { resolve, reject, lines: [], multi: MULTI_LINE_OPS.test(line) };
     child.stdin.write(line + '\n');
   });
 }
@@ -234,6 +239,10 @@ const TOOLS = [
 async function callTool(name, args) {
   if (name === 'get_blackboard') {
     const lines = await sendRequest(`BLACKBOARD ${kv({ corp: args.corp, ticks: args.ticks })}`);
+    // BL-397: the child refuses a non-actor read (`ERR ... END`) rather than
+    // serving rival state — surface that as an error, not an empty fact list.
+    const err = lines.find((l) => l.startsWith('ERR '));
+    if (err) throw new Error(`blackboard read refused: ${err.slice(4)}`);
     const facts = lines.filter((l) => l !== 'END').map((l) => JSON.parse(l));
     return { facts };
   }

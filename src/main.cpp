@@ -180,7 +180,11 @@ const char* corp_command_result_name(corp_command_result r)
 // `--as any` to lift the gate entirely (the explicit research opt-in for
 // bot-vs-bot corpus runs, never the default). A COMMAND naming any other corp
 // answers `RESULT result=rejected_not_owner building=-1` without reaching
-// apply_corp_command. The refusal lives HERE, at the protocol layer, because
+// apply_corp_command, and a BLACKBOARD naming any other corp answers a single
+// line `ERR result=rejected_not_owner` followed by `END` (BL-397 — the
+// lines-then-END shape holds even on refusal; CORPS and BODIES stay public,
+// matching the BL-068 competitor-visibility rule). The refusal lives HERE, at
+// the protocol layer, because
 // apply_corp_command must stay permissive: it is also how the in-process
 // scorer legitimately commands every rival, and a corp check inside it would
 // break the AI it exists to serve.
@@ -294,6 +298,17 @@ int run_serve(int ticks, long long as_corp, bool as_any)
         {
             const auto kv = parse_kv_tokens(iss);
             const entity_id corp = static_cast<entity_id>(kv_get(kv, "corp", 0));
+            // BL-397: reads are gated by the same session actor as writes.
+            // The blackboard is a corp's PRIVATE view — cash, pools, recipes —
+            // and this opcode used to export whichever corp the line named.
+            // The refusal keeps the lines-then-END shape a streaming client
+            // frames by, so ERR here is a line before END, not a terminator.
+            if (!as_any && corp != session_actor)
+            {
+                std::cout << "ERR result=rejected_not_owner" << std::endl;
+                std::cout << "END" << std::endl;
+                continue;
+            }
             const int bb_ticks = static_cast<int>(kv_get(kv, "ticks", tick));
             const corp_blackboard bb = export_corp_blackboard(w, corp, bb_ticks);
             std::ostringstream out;
