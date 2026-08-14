@@ -70,13 +70,42 @@ const VERBS = [
 // The ProjectIo --serve child process
 // ---------------------------------------------------------------------------
 
+// BL-387: the session actor. `--serve` itself refuses to act as a corp the
+// session is not, but this server closes the hole one layer earlier: a write
+// NEVER forwards a caller-supplied corp — whatever `corp` a tool call names,
+// the COMMAND line carries the pinned actor. `node server.js --as <id|any>`
+// forwards to the child; `--as any` (the research opt-in, for bot-vs-bot
+// corpus generation) restores caller-corp pass-through. With no `--as`, the
+// child defaults to the player corp and the actor is resolved from CORPS.
+const asIdx = process.argv.indexOf('--as');
+const AS_ARG = asIdx !== -1 && process.argv[asIdx + 1] ? process.argv[asIdx + 1] : null;
+
+let actorId = null; // lazily resolved when AS_ARG names no explicit actor
+
+/// The corp id every write is issued as, or null under `--as any` (caller
+/// corp passes through untouched).
+async function sessionActor() {
+  if (AS_ARG === 'any') return null;
+  if (AS_ARG !== null) return Number(AS_ARG);
+  if (actorId === null) {
+    const lines = await sendRequest('CORPS');
+    const corps = lines.filter((l) => l.startsWith('{')).map((l) => JSON.parse(l));
+    const p = corps.find((c) => c.is_player);
+    if (!p) throw new Error('no player corp on the seam to pin as the session actor');
+    actorId = p.id;
+  }
+  return actorId;
+}
+
 let child = null;
 let childRl = null;
 let pending = null; // {resolve, reject, lines: string[]} for the in-flight request
 
 function ensureChild() {
   if (child) return;
-  child = spawn(resolveExe(), ['--serve', '--ticks', '12'], { cwd: ROOT });
+  child = spawn(resolveExe(),
+                ['--serve', '--ticks', '12', ...(AS_ARG ? ['--as', AS_ARG] : [])],
+                { cwd: ROOT });
   childRl = readline.createInterface({ input: child.stdout });
   child.on('exit', () => { child = null; childRl = null; });
   childRl.on('line', (line) => {
@@ -137,7 +166,7 @@ const TOOLS = [
     inputSchema: {
       type: 'object',
       properties: {
-        corp: { type: 'integer', description: 'Acting corporation entity id.' },
+        corp: { type: 'integer', description: 'Acting corporation entity id. Pinned to the session actor (BL-387): unless the server was started with --as any, this is overridden by the actor and cannot name another corp.' },
         verb: { type: 'string', enum: VERBS },
         subject: { type: 'integer', description: 'Building (demolish/set_recipe/set_workforce/idle/resume/set_workforce_auto), or body (survey / place_sell_order / request_quote) entity id.' },
         tile: { type: 'integer', description: 'Target tile entity id (build / place_road / hire_unit muster tile).' },
@@ -211,7 +240,11 @@ async function callTool(name, args) {
   if (name === 'issue_command') {
     const verbIdx = VERBS.indexOf(args.verb);
     if (verbIdx === -1) throw new Error(`unknown verb '${args.verb}' — expected one of ${VERBS.join(', ')}`);
-    const lines = await sendRequest(`COMMAND ${kv({ ...args, verb: verbIdx })}`);
+    // BL-387: writes carry the pinned session actor, not the caller's corp.
+    const actor = await sessionActor();
+    const wire = { ...args, verb: verbIdx };
+    if (actor !== null) wire.corp = actor;
+    const lines = await sendRequest(`COMMAND ${kv(wire)}`);
     const resultLine = lines.find((l) => l.startsWith('RESULT '));
     const m = /result=(\S+) building=(-?\d+)/.exec(resultLine || '');
     return { result: m ? m[1] : 'unknown', building: m ? Number(m[2]) : -1 };

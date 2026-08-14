@@ -98,8 +98,8 @@ function check(ok, label, detail) {
 // Line protocol client
 // ---------------------------------------------------------------------------
 
-function makeClient(exe, ticks) {
-  const child = spawn(exe, ['--serve', '--ticks', String(ticks)], { cwd: ROOT });
+function makeClient(exe, ticks, extraArgs = []) {
+  const child = spawn(exe, ['--serve', '--ticks', String(ticks), ...extraArgs], { cwd: ROOT });
   const rl = readline.createInterface({ input: child.stdout });
   let pending = null;
 
@@ -177,7 +177,12 @@ async function main() {
     check(corps.every((c) => typeof c.id === 'number' && typeof c.name === 'string'),
           'every corp row carries an id and a name');
 
-    const subject = ai[0];
+    // BL-387: this server was spawned with no --as, so its session actor is
+    // the player corp — every command below must be issued as it, or the
+    // authority gate (correctly) answers rejected_not_owner before the seam
+    // is ever reached. Acting as a rival now needs `--as`, tested below.
+    check(!!player, 'a player corp exists (the default session actor)');
+    const subject = player;
     if (VERBOSE) console.log(`         acting as corp ${subject.id} (${subject.name})`);
 
     const tickLines = await io.send('TICK');
@@ -323,18 +328,28 @@ async function main() {
                   + `outcomes seen: ${[...seenCodes].join(', ')})`);
     }
 
-    // --- a command naming the player corp is still well-formed ------------
-    // NOT a safety assertion, and the header used to overclaim that it was.
-    // apply_corp_command has NO player guard — the standing "never auto-act on
-    // the player's corp" rule is enforced in the SCORER (run_corp_strategic_step
-    // skips the player), not at the seam, because the seam is also how the
-    // player's own presses are applied. What this checks is only that the seam
-    // does not fall over on a corp id it does not expect to see here.
-    if (player) {
-      const asPlayer = resultOf(await io.send(
-        `COMMAND corp=${player.id} verb=7 subject=0`));
-      check(asPlayer !== null && RESULT_CODES.has(asPlayer),
-            'a command naming the player corp still returns a typed result', asPlayer);
+    // --- BL-387: the session actor gate -----------------------------------
+    // The predecessor of this block only asserted that a command naming the
+    // player corp got a well-formed reply — an overclaim it had to disclaim in
+    // its own header, because the seam had NO actor authority at all: any
+    // caller could command any rival by name. Now the protocol layer refuses
+    // it, and refusal must PERFORM NOTHING — that is the invariant the whole
+    // hardening batch defends, so it is asserted with a state snapshot, not
+    // just a result string.
+    console.log('\n  -- BL-387: the seam acts only as the session actor --');
+    const snapshot = async () =>
+      (await io.send('CORPS')).join('\n') + '\n'
+      + (await io.send(`BLACKBOARD corp=${subject.id}`)).join('\n');
+    const rival = ai[0];
+    {
+      const beforeAuth = await snapshot();
+      const crossCorp = resultOf(await io.send(
+        `COMMAND corp=${rival.id} verb=7 subject=${bodyId ?? 0}`));
+      check(crossCorp === 'rejected_not_owner',
+            'a COMMAND naming a corp that is not the session actor is refused as rejected_not_owner',
+            crossCorp);
+      check(await snapshot() === beforeAuth,
+            'the refused cross-corp command performed nothing (state snapshot identical)');
     }
 
     // --- survey actually progresses ---------------------------------------
@@ -371,6 +386,23 @@ async function main() {
             'the dispatched survey ACTUALLY progresses when the world ticks',
             `${before && before.survey}/${before && before.regions_done} -> `
             + `${now && now.survey}/${now && now.regions_done}`);
+    }
+
+    // --- BL-387: `--as any` lifts the gate, and only on request ------------
+    // A second server, spawned permissive. The SAME cross-corp command the
+    // default server refused above must reach the seam here — bot-vs-bot
+    // corpus generation is the one caller that legitimately plays every corp,
+    // and it has to ask for that mode explicitly.
+    console.log('\n  -- BL-387: --as any restores cross-corp reach (explicit opt-in) --');
+    const io2 = makeClient(exe, 8, ['--as', 'any']);
+    try {
+      const anyCross = resultOf(await io2.send(
+        `COMMAND corp=${rival.id} verb=7 subject=${bodyId ?? 0}`));
+      check(anyCross !== null && RESULT_CODES.has(anyCross) && anyCross !== 'rejected_not_owner',
+            'under --as any the same cross-corp command is not refused for actor reasons',
+            anyCross);
+    } finally {
+      io2.close();
     }
 
     const bye = await io.send('SHUTDOWN');

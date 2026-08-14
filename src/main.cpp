@@ -133,7 +133,7 @@ const char* corp_command_result_name(corp_command_result r)
     return "rejected_invalid";
 }
 
-// --serve [--ticks N]  (BL-278)
+// --serve [--ticks N] [--as <corp-id|any>]  (BL-278)
 //
 // Headless, persistent: builds the canonical world once (identical warm-up to
 // --export-blackboard), then reads one request per line from stdin until EOF
@@ -141,6 +141,17 @@ const char* corp_command_result_name(corp_command_result r)
 // corp_command seam (apply_corp_command — no bypass). This is the process an
 // out-of-process MCP server (tools/mcp/) spawns and talks to; it ships no
 // network code itself; the line protocol below is the whole surface.
+//
+// The line protocol is an EXTERNAL INPUT SURFACE, not a trusted in-process
+// call. So the session carries an ACTOR (BL-387): the one corp this process
+// will act as — the player corp by default, `--as <corp-id>` to pin another,
+// `--as any` to lift the gate entirely (the explicit research opt-in for
+// bot-vs-bot corpus runs, never the default). A COMMAND naming any other corp
+// answers `RESULT result=rejected_not_owner building=-1` without reaching
+// apply_corp_command. The refusal lives HERE, at the protocol layer, because
+// apply_corp_command must stay permissive: it is also how the in-process
+// scorer legitimately commands every rival, and a corp check inside it would
+// break the AI it exists to serve.
 //
 // Requests (space-separated `key=value` tokens after the opcode):
 //   TICK                                            -> advance one tick
@@ -166,7 +177,7 @@ const char* corp_command_result_name(corp_command_result r)
 // without their arguments ever reaching this parser, which made them applicable
 // in the dictionary and inapplicable on the wire.
 // Responses are one line each except BLACKBOARD, which is N JSONL lines + END.
-int run_serve(int ticks)
+int run_serve(int ticks, long long as_corp, bool as_any)
 {
     lua_state lua;
     lua.load("scripts/recipes.lua");
@@ -183,6 +194,14 @@ int run_serve(int ticks)
 
     // BL-365: real background corporations, generated now that reg is loaded.
     generate_background_firms(w, reg, /*seed=*/0x8A21F00Du);
+
+    // BL-387: the session actor, resolved after world construction so the
+    // default can be the player corp. Only meaningful when !as_any; a pinned
+    // id that names no corp simply has every command answer rejected_no_corp,
+    // the same as it would in-process.
+    const entity_id session_actor = (as_corp >= 0)
+        ? static_cast<entity_id>(as_corp)
+        : w.player_entity;
 
     // One econ tick, in one place. The warm-up loop and the TICK opcode used to
     // carry byte-identical copies of this sequence, which is how the survey step
@@ -283,6 +302,17 @@ int run_serve(int ticks)
             if (!floats_ok)
             {
                 std::cout << "RESULT result=rejected_invalid building=-1" << std::endl;
+                continue;
+            }
+
+            // BL-387: refuse to act as a corp the session is not. Before this
+            // gate the only validation of `corp` was that the corp EXISTS, so
+            // any caller could command any rival by name — verified in play,
+            // rival balances moved by tens of millions. The gate sits here and
+            // not in apply_corp_command (see the protocol block above).
+            if (!as_any && cmd.corp != session_actor)
+            {
+                std::cout << "RESULT result=rejected_not_owner building=-1" << std::endl;
                 continue;
             }
 
@@ -542,10 +572,25 @@ int main(int argc, char* argv[])
             if (std::string(argv[i]) == "--serve")
             {
                 int ticks = 12; // matches the app's warm-start (three in-game years)
+                // BL-387: the session actor. Absent -> the player corp (resolved
+                // once the world exists, so -1 is the "default" sentinel here).
+                // `--as any` is the explicit research opt-in (bot-vs-bot corpus
+                // generation) — the permissive mode must be asked for.
+                long long as_corp = -1;
+                bool      as_any  = false;
                 for (int j = i + 1; j < argc; ++j)
+                {
                     if (std::string(argv[j]) == "--ticks" && j + 1 < argc)
                         ticks = std::max(1, std::atoi(argv[j + 1]));
-                return run_serve(ticks);
+                    if (std::string(argv[j]) == "--as" && j + 1 < argc)
+                    {
+                        if (std::string(argv[j + 1]) == "any")
+                            as_any = true;
+                        else
+                            as_corp = std::atoll(argv[j + 1]);
+                    }
+                }
+                return run_serve(ticks, as_corp, as_any);
             }
         }
 
