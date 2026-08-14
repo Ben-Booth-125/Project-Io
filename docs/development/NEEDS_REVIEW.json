@@ -3922,6 +3922,85 @@
     "docs/development/DEVELOPMENT_PRACTICES.md"
    ],
    "resolution": ""
+  },
+  {
+   "id": "NR-226",
+   "title": "The scorer can record a runner_up ABOVE the winning score, and it is not a bug - candidates sort by priority bucket before score",
+   "raised": "2026-08-14",
+   "kind": "observation",
+   "status": "open",
+   "source": "BL-407 implementation, 2026-08-14",
+   "what": "corp_ai.cpp:1182 records `runner_up = cands[i+1].score` - the next entry in sorted order - and `candidate_before` (corp_ai.cpp:219) sorts by priority BUCKET first and score second. So when the winner is the last candidate of its bucket, the next entry belongs to a worse bucket and can legitimately carry a HIGHER score. Verified by reading both sites. The decision feed renders this case as a 'priority call' rather than as a negative margin, because a negative margin reads as 'the scorer picked the weaker option', which is not what happened - it picked the more urgent one.",
+   "why_it_matters": "Anything that consumes the decision log and treats (winning_score - runner_up) as a confidence margin will silently produce negatives on these rows. That includes BL-411 (the emergent-strategy readout) and BL-279 (the trace corpus), both of which are about to aggregate exactly this field. Worth knowing BEFORE either is built. It is also a genuinely interesting property of the AI: the rows where it overrode a better-scoring option for a more urgent one are the rows where its priority model is actually doing work, and they are findable.",
+   "options": [
+    "Leave as is - the bucket-first sort is the design (AI_OPPONENT.md 2B: a lower bucket may NEVER starve a higher one), and consumers handle the case.",
+    "Record the runner-up WITHIN the winner's bucket instead, so the margin is always a like-for-like comparison, and record the cross-bucket override separately."
+   ],
+   "recommendation": "Option 2 is the more useful log, but it is a corp_ai.cpp change and BL-407 does not own it. Worth deciding before BL-411 aggregates the field.",
+   "files": [
+    "src/world/corp_ai.cpp",
+    "src/ui/decision_feed.cpp"
+   ],
+   "resolution": ""
+  },
+  {
+   "id": "NR-227",
+   "title": "BL-407 decisions taken: the agency topic is not merged into the feed, and the reason filter hides prose-only rows",
+   "raised": "2026-08-14",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-407 implementation, 2026-08-14",
+   "what": "Two calls taken during implementation. (1) The feed reads the `decision` history topic but NOT `agency`: the strategic agency entries are a second narration of the same decisions, pushed one-for-one in the same block in corp_ai.cpp, so merging them would double every row, and the reflex-tier agency entries (BL-079, economy_system.cpp) are not scorer decisions and carry neither reason nor margin. The ui_state comment names both topics, so this narrows that stated intent. (2) A reason filter excludes rows recovered from the history log, which carry no reason code - answering 'show me every sustained-loss idle' with rows nobody checked against that question would be a false positive. The feed prints the count of what the filter hid rather than dropping them silently.",
+   "why_it_matters": "Both are defensible and both are invisible in the UI, which is exactly the kind of call that becomes indistinguishable from an accident later. (1) in particular means the feed is NOT a complete record of what the AI did - the BL-079 reflex tier is absent by design, and someone reading the feed as 'everything the AI did this tick' would be wrong.",
+   "options": [],
+   "recommendation": "Both stand. If the reflex tier should be visible, that is a widening of the surface worth its own item rather than a change to this one.",
+   "files": [
+    "src/ui/decision_feed.cpp",
+    "src/ui/ui_state.hpp"
+   ],
+   "resolution": ""
+  },
+  {
+   "id": "NR-228",
+   "title": "The verb/reason label tables are now duplicated between corp_ai.cpp and decision_feed.cpp, and nothing enforces that they move together",
+   "raised": "2026-08-14",
+   "kind": "observation",
+   "status": "open",
+   "source": "BL-407 implementation, 2026-08-14",
+   "what": "corp_ai.cpp carries `corp_verb_label` and `corp_decision_reason_label` in its ANONYMOUS namespace, so nothing exports them. BL-407 needed the same phrasing and did not own corp_ai.cpp, so decision_feed.cpp duplicates both tables word-for-word with a comment saying both must move together. decision_feed.cpp also hand-mirrors the reason enum's COUNT (k_reason_count = 8) for its filter combo, since the enum has no sentinel - an out-of-date value silently hides the newest reason from the filter rather than failing.",
+   "why_it_matters": "Adding a corp_verb or a corp_decision_reason now requires edits in two files plus a hand-maintained count, and the failure mode of missing one is silent: the feed narrates a decision differently from the history log that records the same decision, or the filter quietly cannot reach the new reason. The enum is already append-only and has grown twice (BL-293 order-book verbs, BL-350 procurement verbs), so it will grow again.",
+   "options": [
+    "Hoist both label functions into corp_ai.hpp and add a count sentinel to corp_decision_reason. Small, and it deletes the duplication outright.",
+    "Leave duplicated; rely on the comment."
+   ],
+   "recommendation": "Option 1, folded into whatever next opens corp_ai.cpp - BL-409 is in flight there right now, but widening its scope mid-flight is worse than doing this as a two-minute follow-on.",
+   "files": [
+    "src/world/corp_ai.cpp",
+    "src/world/corp_ai.hpp",
+    "src/ui/decision_feed.cpp"
+   ],
+   "resolution": ""
+  },
+  {
+   "id": "NR-229",
+   "title": "BL-407 asks for a verb filter that the requirement does not, and ui_state has no field for it",
+   "raised": "2026-08-14",
+   "kind": "observation",
+   "status": "open",
+   "source": "BL-407 implementation, 2026-08-14",
+   "what": "BL-407's design names three filters - corp, reason and verb. The requirement group's R2 names only corp and reason, and the seam added only `decision_feed_corp` and `decision_feed_reason` to ui_state. The feed ships with two filters. Not a miss against the requirement, but the design and the requirement disagree and the design is the broader claim.",
+   "why_it_matters": "Small in itself - one int in ui_state plus a combo - but it is the design/requirement drift that makes 'is this item done?' ambiguous later. Better to close it one way or the other explicitly than to leave the item's own design describing a control that does not exist.",
+   "options": [
+    "Add the verb filter (one ui_state int, one combo, one predicate) and mark the design satisfied.",
+    "Amend BL-407's design to two filters and record why the verb filter was dropped - the reason code already partitions verbs fairly well (best_build implies build, dial_* imply the dials)."
+   ],
+   "recommendation": "Option 2. The reason filter already separates the verb families in practice, so a third filter mostly adds a control that duplicates the second one.",
+   "files": [
+    "docs/development/backlog.json",
+    "src/ui/ui_state.hpp",
+    "src/ui/decision_feed.cpp"
+   ],
+   "resolution": ""
   }
  ]
 }
