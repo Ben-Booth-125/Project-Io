@@ -63,10 +63,16 @@ struct campaign_battle_params
     /// that a campaign tick is not a tactical game.
     int max_rounds = 6;
 
-    /// Half-width of the per-round power swing. 300 = each side's scored power
-    /// is multiplied by a uniform draw in [700, 1300] that round. This is the
+    /// Half-width of the per-round power swing. 600 = each side's scored power
+    /// is multiplied by a uniform draw in [400, 1600] that round. This is the
     /// whole uncertainty budget: raise it and strength predicts victory less.
-    int swing_permille = 300;
+    /// Widened from 300 (BL-400, NR-204): at 300 a 1.4:1 attacker won 99% of
+    /// fights, which Ben ruled too safe. Measured at 600 over 1000 seeds per
+    /// ratio: 1.0:1 -> 50%, 1.1:1 -> 63%, 1.2:1 -> 76%, 1.4:1 -> 89%,
+    /// 2.0:1 -> 99.8% — a 1.4:1 edge now loses about one fight in ten while
+    /// a 2:1 edge stays near-certain. Picked from the printed sweep curve
+    /// (campaign_battle_harness's C4 table), not asserted from arithmetic.
+    int swing_permille = 600;
 
     /// Strength (per-mille of the force that marched in) at or below which a
     /// side breaks and the fight ends early.

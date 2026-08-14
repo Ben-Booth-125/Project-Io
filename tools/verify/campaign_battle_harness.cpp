@@ -11,8 +11,10 @@
 //       byte-identical outcome, per-round records included, across two runs.
 //   C2  THE RANDOMNESS IS REAL. Different battle identities produce different
 //       fights — the swing reaches the outcome, it is not decoration.
-//   C3  WITHDRAWAL IS PRICED BY TIME. Breaking off early costs strictly less
-//       than breaking off late, on the same battle and the same stream.
+//   C3  WITHDRAWAL IS PRICED BY TIME AND POSITION. Breaking off late usually
+//       costs more than breaking off early on the same stream, and where it
+//       ever costs less, the withdrawing side's deficit narrowed in between —
+//       the pursuit discount, never free time.
 //   C4  STRENGTH USUALLY WINS. A decisively stronger force wins MOST battles
 //       over a spread of seeds — not all of them. Both halves are asserted:
 //       an unbeatable favourite would mean the uncertainty is fake.
@@ -29,6 +31,7 @@
 #include "world/combat.hpp"
 #include "world/components.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <vector>
 
@@ -181,13 +184,29 @@ int main()
     {
         // A slightly-ahead attacker, so it survives long enough for a late
         // window to exist at all and the comparison is like-for-like.
+        //
+        // WHAT IS ASSERTED CHANGED WITH THE SWING (BL-400). At swing 300 the
+        // cost was strictly increasing in the round on every seed tried, and
+        // this check said "always". At swing 600 that is measurably false —
+        // and correctly so: the pursuit term prices the CURRENT field
+        // position, so a side that was behind and then wins a big round is
+        // pursued less, and its exit gets cheaper. The honest property is the
+        // mechanism, asserted sharper rather than looser: the cost rises with
+        // time on most seeds, and where it ever falls, the withdrawing side's
+        // deficit narrowed in between — the discount is pursuit falling off,
+        // never time being free.
         const std::vector<army_stack_entry> atk = stack_of(unit_class::infantry, 520);
         const std::vector<army_stack_entry> def = stack_of(unit_class::infantry, 480);
 
-        int compared = 0, monotone = 0;
+        int compared = 0, monotone = 0, inversions = 0, explained = 0;
         for (uint64_t t = 100; t < 120; ++t)
         {
-            int prev_cost = -1;
+            // The fought-out fight's trace doubles as the withdrawal-instant
+            // position table: withdrawing consumes no draws, so its first r
+            // rounds are byte-identical to the withdraw-at-r battle's.
+            const campaign_battle_outcome full = fight(id_at(t), atk, def);
+
+            int prev_cost = -1, prev_behind = -1;
             bool ok = true, usable = true;
             for (int r = 1; r <= 5; ++r)
             {
@@ -195,18 +214,31 @@ int main()
                 // Only comparable while the attacker actually got to withdraw —
                 // a battle that ended first has no window at that round.
                 if (o.end != campaign_battle_end::attacker_withdrew) { usable = false; break; }
-                if (prev_cost >= 0 && o.attacker_losses_permille <= prev_cost) ok = false;
-                prev_cost = o.attacker_losses_permille;
+
+                const campaign_battle_round& at = full.rounds[static_cast<size_t>(r) - 1];
+                const int behind = std::max(0, at.defender_strength_permille -
+                                                at.attacker_strength_permille);
+                if (prev_cost >= 0 && o.attacker_losses_permille <= prev_cost)
+                {
+                    ok = false;
+                    ++inversions;
+                    if (behind < prev_behind) ++explained;
+                }
+                prev_cost   = o.attacker_losses_permille;
+                prev_behind = behind;
             }
             if (!usable) continue;
             ++compared;
             if (ok) ++monotone;
         }
-        std::printf("      withdrawal cost across rounds 1..5: %d/%d seeds strictly increasing\n",
-                    monotone, compared);
+        std::printf("      withdrawal cost across rounds 1..5: %d/%d seeds strictly increasing;"
+                    " %d/%d inversions from a narrowed deficit\n",
+                    monotone, compared, explained, inversions);
         check(compared > 0, "C3 setup: at least one seed leaves a withdrawal window open through round 5");
-        check(compared > 0 && monotone == compared,
-              "C3 withdrawing later always costs more than withdrawing earlier, on the same stream");
+        check(compared > 0 && monotone * 2 > compared,
+              "C3 withdrawing later usually costs more than withdrawing earlier, on the same stream");
+        check(explained == inversions,
+              "C3 a later exit only ever gets cheaper because the deficit narrowed - time is never free");
 
         // And the headline comparison, stated plainly.
         const campaign_battle_outcome early = fight(id_at(100), atk, def, withdrawing_side::attacker, 1);
@@ -228,7 +260,7 @@ int main()
         //
         // The first cut of this check asserted that a 1.4:1 attacker wins "most
         // but not all" of 200 seeds. It won ALL 200. That is not a bug in the
-        // resolver and it was not tuned away: six rounds of +/-30% swing average
+        // resolver and it was not tuned away: rounds of symmetric swing average
         // out, so the longer a fight runs the LESS the swing can overturn a
         // standing edge. Uncertainty therefore lives near parity and disappears
         // faster than the single-ratio test assumed.
@@ -238,6 +270,13 @@ int main()
         // edge. The printed table is the instrument - if the band of real
         // uncertainty is too narrow to play with, `swing_permille` (or the round
         // count) is the dial, and this table is what says so.
+        //
+        // And it did say so: at swing 300 the table read 1.2:1 -> 94%,
+        // 1.4:1 -> 99%, and Ben ruled that band too narrow (NR-204 / BL-400).
+        // swing_permille is now 600, picked from a measured sweep of this same
+        // curve; at 600 the expectation is roughly 1.0:1 -> ~50%,
+        // 1.2:1 -> ~75%, 1.4:1 -> ~85-94%, 2:1 -> ~100% — a 1.4:1 attacker
+        // loses a visible share of fights while a 2:1 edge stays near-certain.
         struct ratio_probe { const char* label; int def_count; };
         const ratio_probe probes[] = {
             { "1.00:1", 500 }, { "1.10:1", 455 }, { "1.20:1", 417 },
