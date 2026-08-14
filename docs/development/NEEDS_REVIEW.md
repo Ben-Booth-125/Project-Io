@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*227 entries — 81 open, 146 resolved.*
+*228 entries — 82 open, 146 resolved.*
 
 ---
 
@@ -920,6 +920,21 @@ BL-407's design names three filters - corp, reason and verb. The requirement gro
 > **Recommendation:** Option 2. The reason filter already separates the verb families in practice, so a third filter mostly adds a control that duplicates the second one.
 
 *Files: `docs/development/backlog.json`, `src/ui/ui_state.hpp`, `src/ui/decision_feed.cpp`*
+
+### NR-230 — The build score is quadratic in net margin - `net / payback` collapses to net squared over capex, and real runs score in the billions
+*observation · raised 2026-08-14 · from BL-407 decision feed, first capture run against real data, 2026-08-14*
+
+corp_ai.cpp:558 computes `payback = capex / net`, and :579 scores a build candidate `(net / payback) * focus_weight * jitter * glut`. Substituting the first into the second, `net / (capex / net)` IS `net^2 / capex`. The expression READS as 'return per unit of payback time' - a normal capital-efficiency metric - but is algebraically quadratic in net and only linear (inverse) in capex. Observed consequence, from the first run of the new decision feed against a real 144-tick world: winning scores of 1,241,146,624 and 1,554,420,224 on ordinary petroleum extraction sites. Nothing was wrong with the feed - it renders `corp_decision.winning_score` faithfully; these are the numbers the scorer actually records.
+
+**Why it matters.** Two distinct consequences, and the second is the one that matters. (1) COSMETIC: a raw score in the billions is unreadable, which is why the feed leads with a proportional bar and treats the number as a footnote. (2) BEHAVIOURAL: doubling a site's net margin QUADRUPLES its score, while doubling its capital cost only halves it. So the build scorer weights margin roughly twice as hard as capital efficiency, and a high-margin expensive site beats a cheap efficient one far more often than a linear reading of the formula would suggest. Whoever tuned focus_weight, jitter and glut tuned them against this curve, so the multipliers are calibrated to a quadratic they may not have known was there - which also means simply 'fixing' it to net/capex would silently retune every rival's build behaviour and reshuffle every blessed golden. This is exactly the class of thing AI_OPPONENT.md 10h predicts: found by looking at what the AI actually did, not by a harness asserting what its author already suspected.
+
+- Intended - the quadratic is a deliberate margin bias. Add a comment at corp_ai.cpp:579 saying so, since the expression actively disguises it, and close.
+- Unintended - rewrite as an explicit metric (net/capex, or net with an explicit payback penalty) and re-tune focus_weight/jitter/glut against the new curve. A behavioural change: it reshuffles rival builds, hence world evolution, hence the goldens.
+- Leave the behaviour, fix only the expression: write `c.score = (net * net / capex) * ...` so the code says what it does. Zero behavioural change, and the next reader is not misled.
+
+> **Recommendation:** Option 3 now regardless of the answer to 1 vs 2 - it is a no-op refactor that stops the formula lying, and it makes the real question visible. Then decide 1 vs 2 deliberately, NOT as a drive-by, because option 2 moves every rival's build behaviour and every golden with it.
+
+*Files: `src/world/corp_ai.cpp`, `docs/ai/AI_OPPONENT.md`*
 
 ---
 
