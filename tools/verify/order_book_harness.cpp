@@ -43,6 +43,13 @@
 //       pool without surplus past the hold threshold, never a duplicate order on
 //       a triple that already has one.
 //
+//   R6  RESERVATION FLOOR (BL-386). The buyer-of-last-resort pass pays the
+//       RESOLVED price, never the floor: an order whose floor exceeds the
+//       resolved price clears nothing and keeps its stock, one at or below it
+//       clears at the resolved price exactly, and no corp's clearing income
+//       exceeds its cleared quantity × that price. The floor is a reservation
+//       price, not a self-declared payout.
+//
 // The process exits non-zero if any assertion FAILs.
 
 #include "world/budget_system.hpp"
@@ -55,6 +62,7 @@
 #include "world/recipe_registry.hpp"
 #include "world/world.hpp"
 
+#include <cmath>
 #include <cstdio>
 #include <sstream>
 #include <string>
@@ -524,6 +532,61 @@ int main()
         run_corp_strategic_step(pl.w, reg, rep4, 0, p);
         check(pl.w.sell_orders.empty(),
               "R5.7 the PLAYER's corp is never traded on its behalf (io-standing-rules.md)");
+    }
+
+    // -----------------------------------------------------------------------
+    // R6 — the floor is a reservation price, not a self-declared payout (BL-386)
+    // -----------------------------------------------------------------------
+    // The defect this section pins down: the buyer-of-last-resort pass paid
+    // max(ref_price, floor) with no counterparty debited, so clearing income was
+    // linear in whatever floor the seller named — a money printer reachable by
+    // any corp with one standing order.
+    {
+        // A floor above the resolved price clears NOTHING and keeps its stock.
+        // With supply 40 against demand 0 the resolved price eases from 8 toward
+        // the band floor (2.0), landing at 5.0 — so a floor of 6.0 sits above it.
+        {
+            scenario s = make_scenario(100.0f);
+            apply_corp_command(s.w, reg, place_cmd(s, 40.0f, 6.0f));
+            economy_report empty;
+            const auto flows = clear_markets(s.w, reg, empty);
+            const float rp = s.w.markets.at(s.market).price[ri(resource_type::steel)];
+            check(rp < 6.0f, "R6.1 fixture: the resolved price sits below the order's floor");
+            check(!flows.count(s.corp) || flows.at(s.corp).income == 0.0f,
+                  "R6.2 HOLD: an order with floor above the resolved price earns nothing");
+            check(pool_steel(s) == 100.0f,
+                  "R6.3 HOLD: ...and its pool quantity is retained in full");
+        }
+
+        // The exploit shape itself: an absurd floor earns nothing at all, rather
+        // than income linear in the named floor.
+        {
+            scenario s = make_scenario(100.0f);
+            apply_corp_command(s.w, reg, place_cmd(s, 40.0f, 1.0e12f));
+            economy_report empty;
+            const auto flows = clear_markets(s.w, reg, empty);
+            check((!flows.count(s.corp) || flows.at(s.corp).income == 0.0f) &&
+                  pool_steel(s) == 100.0f,
+                  "R6.4 a floor of 1e12 prints no money and sells no stock");
+        }
+
+        // A floor at or below the resolved price clears AT the resolved price —
+        // not at the floor, not above it.
+        {
+            scenario s = make_scenario(100.0f);
+            apply_corp_command(s.w, reg, place_cmd(s, 40.0f, 3.0f));
+            economy_report empty;
+            const auto flows = clear_markets(s.w, reg, empty);
+            const float rp      = s.w.markets.at(s.market).price[ri(resource_type::steel)];
+            const float cleared = 100.0f - pool_steel(s);
+            check(cleared > 39.99f && cleared < 40.01f,
+                  "R6.5 an order at/below the resolved price clears its full quantity");
+            check(flows.count(s.corp) &&
+                  std::fabs(flows.at(s.corp).income - cleared * rp) < 0.01f,
+                  "R6.6 ...and is paid the RESOLVED price exactly (not the floor, not above)");
+            check(flows.count(s.corp) && flows.at(s.corp).income <= cleared * rp + 0.01f,
+                  "R6.7 INVARIANT: clearing income never exceeds cleared quantity x resolved price");
+        }
     }
 
     std::printf("\n%s  (%d passed, %d failed)\n",

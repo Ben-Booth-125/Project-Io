@@ -66,11 +66,17 @@ struct corp_ai_params
     /// quarter's clearing.
     float trade_release_fraction = 0.5f;
 
-    /// Floor price as a multiple of the market's BASE price — the rarity-derived
-    /// value floor, which is the closest thing to a cost reference the world
-    /// currently exposes per resource. At 1.0 the corp simply refuses to sell
-    /// below the rarity floor; above 1.0 it holds out for a margin over it.
-    float trade_floor_multiple = 1.0f;
+    /// Floor price as a multiple of the market's BASE price. The floor is a
+    /// reservation price — an order whose floor exceeds the resolved price holds
+    /// its stock rather than selling (market_clearing.cpp § auto-clear) — and the
+    /// resolved price pegs at 0.25× base on a glutted market (the price-band
+    /// floor). So 0.25 IS the band floor: the lowest price the market can ever
+    /// resolve, which means surplus always clears at whatever it does resolve.
+    /// Anything above 0.25 makes the corp hold on a deep glut — a strategy call,
+    /// not a default. Note the sell-candidate score (corp_ai.cpp) is valued at
+    /// the floor, so this multiple scales trade-candidate scores with it; the
+    /// conservative estimate stays honest.
+    float trade_floor_multiple = 0.25f;
 
     /// Solvency reserve floor = max(floor_constant, floor_wage_mult × the corp's
     /// per-tick wage bill). A tick is one quarter, so the default is two
