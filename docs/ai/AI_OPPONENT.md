@@ -944,6 +944,53 @@ harnesses' business. Run it with `node tools/mcp/smoke.js`. The lesson is the ge
 nobody exercises is a seam nobody can trust, and all five defects above were found by reading
 rather than by failing.
 
+### 10i. Spectator mode — the seat, not the exception (BL-409, landed 2026-08-14)
+
+Ben, 2026-08-14, asked for a way to **watch the AI play in real time** and discover what
+strategies emerge — explicitly as a way to describe and explain the project's aims, not as
+a feature. Most of what that needs already existed: the clock runs to 16× (a quarter every
+~11 real seconds), rivals already act through `corp_command`, and every decision already
+records `winning_score` / `runner_up` / `reason`. What was missing was a **window**, and one
+rule.
+
+**The rule is not excepted; its subject is removed.** The draft of this item asked whether the
+scorer could be granted the player's corp under a spectate flag — a fourth narrow exception
+alongside BL-079's reflexes, BL-181's workforce dial and BL-202/BL-203's rival tier. Ben
+rejected the framing: *"In spectator mode, there is no need to mark a corp as played by a
+human. 'Who plays your corp' collapses as a question."*
+
+That is the better model and a smaller change. The standing prohibition protects a corp
+**because a human owns it**. A spectated session has no human owner, so the precondition is
+absent rather than waived. `world::player_entity` survives only as a camera and ledger
+anchor — a **viewpoint**, carrying no ownership meaning. Concretely, `corp_ai_params
+::spectating` makes the two guards in `corp_ai.cpp` conditional, and nothing else in the
+evaluation loop distinguishes the player's corp, so past those guards it is simply another
+corp on the same staggered cadence.
+
+**Two properties keep it honest**, both asserted by `tools/verify/spectator_determinism.cpp`:
+
+- The flag **defaults false**, and an unspectated run is byte-identical to the pre-BL-409
+  build — verified by stashing the guard changes and re-running against the genuine prior
+  code, not assumed: `state_hash 3CBAD1D44EE71EDE` both sides. The spectated run hashes
+  `E4933538DDB2A28C`, so "spectating moves the world" has teeth too.
+- Admitting one more corp **shifts no rival's cadence slot**, because the cadence index is
+  over the sorted corp set, which does not change.
+
+**What the first run found.** The decision feed (BL-407) was pointed at a real 144-tick world
+and immediately surfaced two things no harness had. First, `runner_up` can legitimately
+**exceed** `winning_score`: it is `cands[i+1].score` and `candidate_before` sorts by priority
+bucket before score, so the next candidate may out-score the winner from a worse bucket
+(NR-226 — it matters because BL-411 and BL-279 are both about to aggregate that field).
+Second, the build score `(net / payback)` with `payback = capex / net` collapses to
+**`net² / capex`** — quadratic in margin, only inversely linear in capital — which is why real
+runs score in the billions (NR-230). Neither is a defect in the feed. Both are § 10h's thesis
+paying out on its first day: *a harness asserts what its author already suspected; a player
+discovers what nobody thought to assert.*
+
+Still owed: player-press affordances are not yet disabled under spectate (the item's R4), and
+the spectated viewpoint still inherits whichever corp the player would have been — which on
+seed 0 is insolvent and asset-less (NR-231).
+
 ### 10f. Sources added 2026-08-03
 
 - Vox Deorum — hybrid LLM architecture for 4X, 2,327 games, open-weight parity, per-game token cost. https://arxiv.org/abs/2512.18564 · https://github.com/CIVITAS-John/vox-deorum

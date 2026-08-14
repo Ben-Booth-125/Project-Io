@@ -161,15 +161,29 @@ float corp_personality_jitter(entity_id corp, uint64_t personality_seed);
 /// `run_corp_strategic_step` uses internally. Exposed so callers outside the
 /// scorer (e.g. the persona counsel layer, BL-207) can key their own bounded,
 /// per-eval work to the identical deterministic boundary without duplicating
-/// the corp-sort. Always false for the player corp.
+/// the corp-sort.
+///
+/// Always false for the player corp — UNLESS `p.spectating` (BL-409), where
+/// the session has no human seat and the player corp is due on its own cadence
+/// slot like any other. Do not read the unconditional form into this: for a
+/// played session the answer is still always false.
 bool corp_strategic_eval_due(const world& w, entity_id corp, int tick,
                              const corp_ai_params& p = {});
 
-/// Run the strategic evaluation for every due NON-player corp at `tick`,
-/// emit corp_commands, apply them through apply_corp_command, and record both
-/// the world's decision ring and the report's agency_events. The player's corp
-/// is never evaluated and never commanded. Called from run_economy_step after
-/// the BL-079 reflex tier; deterministic.
+/// Run the strategic evaluation for every due corp at `tick`, emit
+/// corp_commands, apply them through apply_corp_command, and record both the
+/// world's decision ring and the report's agency_events. Called from
+/// run_economy_step after the BL-079 reflex tier; deterministic.
+///
+/// The player's corp is skipped entirely — never evaluated, never commanded,
+/// not even its dial cooldowns ticked (io-standing-rules.md). The sole
+/// exception is `p.spectating` (BL-409): with no human seat the prohibition
+/// has no subject, and every corp including `world::player_entity` evaluates
+/// on the same staggered cadence.
+///
+/// Admitting the player corp does not perturb the others. The cadence keys on
+/// a corp's index in the SORTED FULL corp set, which already contains the
+/// player — so a spectated run changes who acts, never when the rest do.
 void run_corp_strategic_step(world& w, const recipe_registry& reg,
                              economy_report& report, int tick,
                              const corp_ai_params& p = {});

@@ -61,6 +61,19 @@ rule has a fuller authority, it is cited — this file does not redefine it.
   other spend**: the scorer carries it in the candidate's `spend`, so a rival cannot hire
   itself below its own reserve floor, and a hire reserves its cash against later candidates
   in the same evaluation. Availability is cash-free; spending is not.
+  **Spectator mode has NO SUBJECT for this rule (BL-409, landed 2026-08-14).** Every
+  exception above widens *what may be done to a corp a human owns*. Spectator mode is
+  not another such widening — it removes the owner. Ben, 2026-08-14: *"In spectator
+  mode, there is no need to mark a corp as played by a human. 'Who plays your corp'
+  collapses as a question."* The prohibition protects a corp **because** a human owns
+  it, so under `corp_ai_params::spectating` its precondition is absent and every corp
+  evaluates on the same staggered cadence, `world::player_entity` included — that field
+  degrading to a camera/ledger anchor with no ownership meaning. Two properties keep
+  this honest, both asserted by `tools/verify/spectator_determinism.cpp`: the flag
+  **defaults false**, so an ordinary played session is byte-identical (verified against
+  the genuine pre-BL-409 build, `state_hash 3CBAD1D44EE71EDE`), and admitting one more
+  corp **shifts no rival's cadence slot**, since the index is over the sorted corp set.
+  Outside spectate the prohibition is unchanged and absolute.
 - Do **not** introduce a retained-mode UI framework in place of ImGui for the prototype.
 
 ## Terms & docs

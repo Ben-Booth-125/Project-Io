@@ -4022,6 +4022,28 @@
     "docs/ai/AI_OPPONENT.md"
    ],
    "resolution": ""
+  },
+  {
+   "id": "NR-231",
+   "title": "The generated player corp is insolvent and asset-less on seed 0, so a spectated campaign opens on a corp with nothing to do",
+   "raised": "2026-08-14",
+   "kind": "observation",
+   "status": "open",
+   "source": "BL-409 harness (spectator_determinism), 2026-08-14",
+   "what": "Building BL-409's R1 assertion turned up something about the WORLD rather than about the guard. On seed 0 the generated player corporation ends 300 ticks at roughly -80,500 credits with zero extractors and zero processors. Once the guard lifts it is scored identically to every rival - the harness proves that - but the scorer has almost nothing to offer it, so it issues very few decisions. It is not being treated differently; it simply has no assets to act on. Two RIVAL corps on the same seed (60478, 60480) are in the same state, so this is not a player-corp-specific generation bug. R1 was therefore rewritten as a controlled A/B - seat the best-endowed corp as the viewpoint, picked by a stable property rather than by outcome - which reaches 4/4 verb families spectated and drops to 0 decisions when seated and played. Same corp, same world, same seed, only the seat varies, so the guard is isolated with no poverty confound.",
+   "why_it_matters": "The whole point of spectator mode is to watch strategies emerge (BL-407/BL-411). If the default seed opens the camera on a corp that is bankrupt and asset-less, the first thing a spectator sees is nothing happening - and worse, they may read the guard as broken when it is working. This is a GENERATION question, not a BL-409 one: CORPORATION_GENERATION.md's specialist premise says the player and major AI start lean, but three of the generated corps on seed 0 appear to start non-viable rather than lean. Worth knowing before BL-410's attention director is built, since the director's whole job is to point the camera at activity.",
+   "options": [
+    "Generation issue - some corps are seeded non-viable. Investigate whether the starting-asset placement can fail to place anything, and file against CORPORATION_GENERATION.",
+    "Working as intended - lean starts are the premise, and a corp with no assets recovering (or not) is the game. Then spectator mode should default its viewpoint to a corp with assets rather than to player_entity.",
+    "Both: fix generation if it is broken, AND have spectate pick an interesting viewpoint rather than inheriting the player seat."
+   ],
+   "recommendation": "Option 3's second half regardless of the first: spectator mode should choose its opening viewpoint deliberately rather than inheriting whichever corp the player would have been. That is a small addition to BL-409 or BL-410, and it is worth deciding before the attention director is built on top of it.",
+   "files": [
+    "src/world/corporation_generation.cpp",
+    "docs/generation/CORPORATION_GENERATION.md",
+    "tools/verify/spectator_determinism.cpp"
+   ],
+   "resolution": ""
   }
  ]
 }

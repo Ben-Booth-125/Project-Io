@@ -407,3 +407,27 @@ numbers are printed rather than asserted.
 Each exits non-zero on a failed assertion. The economy *panel* (the visual class)
 is verified separately via `ProjectIo --verify scripts/verify/economy_panel.lua`
 (the `verifier-visual` skill).
+
+## spectator_determinism (BL-409)
+
+Spectator mode's no-human-seat rule. Asserts that the strategic tier evaluates the
+player corp under `corp_ai_params::spectating` and never without it (R1), that an
+unspectated run is byte-identical to the pre-BL-409 build (R2, golden state_hash
+`3CBAD1D44EE71EDE`), and that a spectated run is itself deterministic and diverges
+from a played one (R3). Also asserts that admitting the player corp shifts no
+rival's cadence slot, since the index is over the sorted corp set.
+
+R1 is a controlled A/B rather than a literal assertion, deliberately: the generated
+player corp on seed 0 is insolvent with no extractors (NR-231), so asserting a
+four-verb-family bar on it would assert that corp is rich rather than that the guard
+lifted. The harness seats the best-endowed corp instead — picked by a stable
+property, not by outcome — so only the seat varies between the two halves.
+
+Links the world superset. CMake target `spectator_determinism` via the generic glob;
+no CMakeLists entry needed.
+
+```
+cmake --build build --target spectator_determinism    # from a vcvars shell
+build_app.bat spectator_determinism                   # or via the pinned script
+ctest --test-dir build -R spectator_determinism
+```

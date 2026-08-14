@@ -459,11 +459,30 @@ std::vector<extraction_site> rank_extraction_sites(const world& w, int top_m)
 
 bool corp_strategic_eval_due(const world& w, entity_id corp, int tick, const corp_ai_params& p)
 {
-    if (corp == w.player_entity)
-        return false;
+    // The player-corp skip, and the ONE condition that removes it (BL-409).
+    //
+    // In a played session the prohibition is absolute: the player's corp is
+    // never strategically evaluated, so this returns false for it on every
+    // tick regardless of cadence (io-standing-rules.md § Determinism & data
+    // model). Do not soften that — the standing exceptions are narrow and
+    // local (BL-079 reflexes, BL-181's single workforce dial), and none of
+    // them reaches this tier.
+    //
+    // Under `p.spectating` the rule is not excepted, it is *unsubscribed*:
+    // the prohibition protects a corp because a human owns it, and a
+    // spectated session has no human seat, so there is no owner to protect
+    // (Ben, 2026-08-14 — "'who plays your corp' collapses as a question").
+    // `world::player_entity` survives only as a camera/ledger anchor.
+    // Not a corporation at all: an existence check, not an ownership one, so
+    // it binds in both modes.
     const auto cit = w.corporations.find(corp);
-    if (cit == w.corporations.end() || cit->second.is_player)
+    if (cit == w.corporations.end())
         return false;
+    // The prohibition itself — same shape as the guard in
+    // run_corp_strategic_step below, so the two read as one rule.
+    if (!p.spectating && (cit->second.is_player || corp == w.player_entity))
+        return false;
+
     const std::vector<entity_id> corp_ids = sorted_corp_ids(w);
     const auto it = std::lower_bound(corp_ids.begin(), corp_ids.end(), corp);
     if (it == corp_ids.end() || *it != corp)
@@ -495,8 +514,19 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         const corporation_component& cc   = w.corporations.at(corp);
 
         // NEVER act on the player corp — no strategic command, no cooldown
-        // bookkeeping, nothing (io-standing-rules.md).
-        if (cc.is_player || corp == w.player_entity)
+        // bookkeeping, nothing (io-standing-rules.md). This is the guard that
+        // makes the prohibition real; the one in corp_strategic_eval_due only
+        // reports the schedule.
+        //
+        // `p.spectating` (BL-409) lifts it, and ONLY it: nothing else in this
+        // loop distinguishes the player's corp, so once past here it is scored,
+        // built, dialled, surveyed and traded exactly as a rival is. That is
+        // the point — a spectated race with one runner standing still is not a
+        // demonstration of the AI, and it leaves one specialist corp's worth of
+        // demand out of the economy. The prohibition still holds in full for a
+        // PLAYED session: `spectating` defaults false and no gameplay path
+        // sets it (app.cpp passes the session's own spectator flag).
+        if (!p.spectating && (cc.is_player || corp == w.player_entity))
             continue;
 
         // Staggered cadence (Victoria-3 tick-task idea): due this tick?

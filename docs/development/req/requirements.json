@@ -10763,29 +10763,29 @@
      "id": "R1",
      "requirement": "With spectating on, the strategic tier evaluates the player corp on the same staggered cadence as every other corp - it builds, dials, surveys and trades like a rival.",
      "class": "headless",
-     "status": "pending",
-     "notes": "The two guards are corp_ai.cpp:465 and :499, plus corp_strategic_eval_due's documented \"always false for the player corp\"."
+     "status": "complete",
+     "notes": "Asserted as a controlled A/B rather than literally, and the reason is a finding in its own right (NR-231): the generated player corp on seed 0 is insolvent with zero extractors, so a four-family bar there would have asserted that corp is rich rather than that the guard lifted. The harness instead seats the best-endowed corp - picked by a stable property, not by outcome - which reaches 4/4 verb families spectated and 0 decisions seated+played. Same corp, same world, same seed, only the seat varies."
     },
     {
      "id": "R2",
      "requirement": "With spectating OFF the run is unchanged byte-for-byte: same seed, same tick count, identical world::state_hash against the pre-BL-409 build.",
      "class": "headless",
-     "status": "pending",
-     "notes": "The whole point of the defaulted argument. A regression here silently changes every existing harness and every saved campaign."
+     "status": "complete",
+     "notes": "VERIFIED, not assumed. The guard changes were stashed and the harness run against the genuine pre-BL-409 corp_ai.cpp: pre-change unspectated state_hash 3CBAD1D44EE71EDE, post-change unspectated 3CBAD1D44EE71EDE - identical, and baked in as the harness golden. The same pre-change build also put the SPECTATED hash at 3CBAD1D44EE71EDE (the flag was inert), so R3's 'spectating moves the world' row correctly FAILED against it - both halves have teeth rather than passing vacuously."
     },
     {
      "id": "R3",
      "requirement": "A spectated run is itself deterministic: same seed, spectating on, N ticks, run twice - identical state_hash both times.",
      "class": "headless",
-     "status": "pending",
-     "notes": "Admitting one more corp must not perturb the cadence: the index is over the sorted corp set, which does not change."
+     "status": "complete",
+     "notes": "Three rows: same seed + spectating + N ticks run twice gives an identical state_hash; the player corp's own decision stream is reproducible under spectate; and a spectated run diverges from a played one. Also asserted that admitting the player shifts NO rival's cadence slot, since the index is over the sorted corp set."
     },
     {
      "id": "R4",
      "requirement": "Player-press affordances are disabled (not hidden) under spectate, so the mode reads as a window rather than as a broken game.",
      "class": "visual",
      "status": "pending",
-     "notes": ""
+     "notes": "NOT DONE. UI work in files the BL-409 agent did not own, and deliberately left rather than reached for. Player-press affordances (construction placement, order entry, workforce dials) still respond under spectate. Needs doing before spectator mode is usable, but it does not block the guard."
     }
    ]
   }
