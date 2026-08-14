@@ -12,7 +12,7 @@ The three artefacts:
 | [`BACKLOG.md`](BACKLOG.md) | **Drained 2026-07-31 — no bodies remain.** Keeps a tombstone plus seven pointer stubs that surviving `@BACKLOG.md` design pointers resolve to (`backlog_lint.js` Invariant 4 checks them). **Kept, not deleted** — deleting it would break those pointers. |
 | [`archive/backlog-design-<quarter>.json`](archive/) | **Cold store.** A landed item's design/resolution prose moves here via `archive_designs.js`; the hot item keeps an `archived` pointer. `--full` and `backlog_view.js` resolve it transparently. **Amend a landed item's prose here, not in `backlog.json`.** |
 | [`REFINED.md`](REFINED.md) | **Active worklist (transient).** A `designed` item is *promoted* here into file-scoped, dependency-marked tasks when we act on it. Cleared as tasks complete. |
-| [`NEEDS_REVIEW.json`](NEEDS_REVIEW.json) | **Review log (non-blocking).** Open questions, decisions taken on Ben's behalf, observations — written **at the moment they arise** (Rule 0c), never saved for a closing summary. Mirror: `NEEDS_REVIEW.md`. |
+| [`NEEDS_REVIEW.json`](NEEDS_REVIEW.json) | **Review log (non-blocking), transient.** Open questions, decisions taken on Ben's behalf, observations — written **at the moment they arise** (Rule 0c), never saved for a closing summary. Resolved entries are **pruned promptly** (Ben, 2026-08-14), not kept as an audit trail — the durable record is wherever the answer landed. Mirror: `NEEDS_REVIEW.md`. |
 
 *(History: `backlog.json` + `BACKLOG.md` replace the former `OPENS.md`; `REFINED.md` replaces
 `TASKS.md`. The lifecycle verb "Publish" was renamed "Deliver" — "Cut" stays reserved for cutting a
@@ -219,9 +219,11 @@ large); for a `design-owed` item, **Design** is the implied first step.
    against the change that moved it.
 
    Finally, **drain `NEEDS_REVIEW.json`**: entries are written as decisions are taken (Rule 0c),
-   so close-out is where you resolve the ones this delivery answered and re-render the mirror. An
-   entry that survives its own resolution is noise; a decision that never got written is
-   indistinguishable from one Ben made.
+   so close-out is where you resolve the ones this delivery answered and re-render the mirror. The
+   file is **transient** (Ben's ruling, 2026-08-14) — once an entry's answer has landed in code, an
+   authority doc, or a backlog item, prune the entry rather than leaving it resolved-but-present. A
+   resolved entry surviving in the file is noise the same way an unwritten decision is silence; a
+   decision that never got written at all is indistinguishable from one Ben made.
 
    **Commit-format scope (recorded 2026-07-31).** The `Tasks:`/`Requirements:` trailer applies to
    **Full-mode item deliveries**; Light, measurement, and filing commits carry a plain descriptive

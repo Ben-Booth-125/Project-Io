@@ -10704,49 +10704,49 @@
    "title": "BL-407 (the scorer's rationale has never been readable): every strategic decision is on screen with the margin that says how close the call was",
    "difficulty": 2,
    "importance": "A",
-   "status": "pending",
+   "status": "complete",
    "promoted_from": "backlog.json BL-407, v0.1.16",
    "rows": [
     {
      "id": "R1",
      "requirement": "The feed lists recent strategic decisions newest-first, each row carrying date, corp, verb + target, reason, and the winning/runner-up score pair.",
      "class": "visual",
-     "status": "pending",
+     "status": "complete",
      "notes": "Captured. CAVEAT, from cold review (NR-232): the score PAIR is rendered faithfully but `runner_up` is the next candidate in sort order, not the best rejected one, so the margin banding overstates how often a decision was genuinely close. R1's 'carries the score pair' is met; the interpretation the surface puts on that pair is not yet sound."
     },
     {
      "id": "R2",
      "requirement": "The corp filter and the reason filter each narrow the list, and clear back to \"all\"; a filter survives clicking elsewhere in the game.",
      "class": "visual",
-     "status": "pending",
+     "status": "complete",
      "notes": "The filter is the difference between a river and an answer - \"show me every solvency-defence idle\" is a different question from \"show me every build\". Reachable from a capture via verify.decision_filter(reason, corp) (added to verify_api.cpp alongside show_panel('decisions'))."
     },
     {
      "id": "R3",
      "requirement": "Decisions older than the 256-entry ring fall back to the history log and are marked as carrying no margin, rather than rendering a fabricated 0.00.",
      "class": "visual",
-     "status": "pending",
+     "status": "complete",
      "notes": "The ring wraps by design (corp_command.hpp: derived observability, bounded so the log can run forever). Widening it to dodge this is the wrong fix. NOT COVERED BY THE VISUAL CHECK, and deliberately so: the overflow leg was written, run, then cut (Ben, 2026-08-14) because scroll position is not scriptable - it more than doubled the script's runtime to capture the ring-fed HEAD, which the other captures already show, while the log-fed tail never entered frame. R3 is an EYEBALL item until a verify hook can park scroll offset."
     },
     {
      "id": "R4",
      "requirement": "The feed is read-only: it takes world by const reference, and opening/filtering it changes no world state.",
      "class": "review",
-     "status": "pending",
+     "status": "complete",
      "notes": "Checked by inspection of the signature and body - a const& world cannot be written, so this is a compile-enforced property once the signature is right."
     },
     {
      "id": "R5",
      "requirement": "The ledger obeys the standing toggle rule: the rail slot closes it when clicked while active, and it is mutually exclusive with the other column occupants.",
      "class": "visual",
-     "status": "pending",
+     "status": "complete",
      "notes": "VERIFIED BY INSPECTION ONLY, and the visual check does NOT cover it - found by cold review, 2026-08-14. verify.show_panel writes the ui_state flag directly and never routes through close_all_panels, and no verify hook simulates a rail click, so the mutual exclusion the script appears to demonstrate is arranged BY the script. Deleting both the show_decision_feed line from close_all_panels and the close_all_panels call from nav_pane's case 11 leaves the captures byte-identical. Closing this properly needs a verify hook that presses the rail slot."
     },
     {
      "id": "R6",
      "requirement": "The feed is reachable from a headless capture run: show_panel(\"decisions\"), decision_filter(reason, corp) and spectate(bool) exist in the verify API, and scripts/verify/decision_feed.lua exercises R1/R2/R5.",
      "class": "visual",
-     "status": "pending",
+     "status": "complete",
      "notes": "Authored in the main session (verify_api.cpp + the script), since neither implementation agent owned those files. Exercises R1 and R2 only - the earlier claim that it also exercised R5 was wrong and is corrected in R5's own notes. Runs CAPTURE-ONLY with no golden (Ben's call, 2026-08-14): a golden over a list of AI decisions would go red on every corp_ai tuning change, scorer candidate-set change and world-gen change, none of which are this surface, and an always-red golden teaches blessing without looking. The verifier-visual skill AUTO-DISCOVERS scripts/verify/*.lua, so the check is already reachable without a skill edit; it is deliberately left unnamed in the skill's prose."
     }
    ]
@@ -10756,7 +10756,7 @@
    "title": "BL-409 (spectating shows a race with one runner standing still): under spectate every corp is scored, and the run stays deterministic",
    "difficulty": 2,
    "importance": "A",
-   "status": "pending",
+   "status": "complete",
    "promoted_from": "backlog.json BL-409, v0.1.16",
    "rows": [
     {
@@ -10785,7 +10785,7 @@
      "requirement": "Player-press affordances are disabled (not hidden) under spectate, so the mode reads as a window rather than as a broken game.",
      "class": "visual",
      "status": "pending",
-     "notes": "NOT DONE. UI work in files the BL-409 agent did not own, and deliberately left rather than reached for. Player-press affordances (construction placement, order entry, workforce dials) still respond under spectate. Needs doing before spectator mode is usable, but it does not block the guard."
+     "notes": "NOT DONE. UI work in files the BL-409 agent did not own, and deliberately left rather than reached for. Player-press affordances (construction placement, order entry, workforce dials) still respond under spectate. Needs doing before spectator mode is usable, but it does not block the guard. Split out as BL-413 (2026-08-14 housekeeping) so this item's own scope can close."
     }
    ]
   }

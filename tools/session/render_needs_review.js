@@ -78,8 +78,9 @@ md.push('[`backlog.json`](backlog.json) is *work*. Entries here are neither: the
 md.push('reversible calls. If an answer creates work, file a backlog item and resolve the entry with');
 md.push('that item\'s id.');
 md.push('');
-md.push('Entries are **never silently deleted** — set `status: resolved` and write the resolution, so');
-md.push('the reasoning survives the answer.');
+md.push('This queue is **transient**: resolved entries are pruned promptly rather than kept for');
+md.push('posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment');
+md.push('the work happens, and that is the durable record. What stays here is what is still open.');
 md.push('');
 md.push(`*${items.length} entries — ${open.length} open, ${done.length} resolved.*`);
 md.push('');
