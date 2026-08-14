@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*222 entries — 76 open, 146 resolved.*
+*223 entries — 77 open, 146 resolved.*
 
 ---
 
@@ -853,6 +853,20 @@ The standing rules (.claude/rules/io-standing-rules.md § Determinism & data mod
 > **Recommendation:** No action now. When BL-409 lands, add the no-seat clause to the standing rules alongside the BL-181 and BL-202/BL-203 exceptions, and resolve this entry with the commit.
 
 *Files: `.claude/rules/io-standing-rules.md`, `docs/ai/AI_OPPONENT.md`, `docs/development/backlog.json`*
+
+### NR-225 — The --verify capture path still builds a 1960 space-arc world, not the 0 CE ancient one
+*observation · raised 2026-08-14 · from BL-407 capture run (scripts/verify/decision_feed.lua), 2026-08-14*
+
+The first run of the new decision-feed check captured a world dated "1960 Jan 1st [Q1]", with a player corporation named Genom Systems and 58 nations on the public channel - space-arc content. ROADMAP.md records the 0 CE epoch default as landed under the ancient refocus (2026-08-12, ahead of the roadmap rewrite). Not investigated: it may be deliberate (a pinned world for capture reproducibility), or the epoch default may not reach the --verify path. Recorded rather than chased because it is outside BL-407's scope.
+
+**Why it matters.** If unintended, every visual check in the suite - 224 goldens - is verifying surfaces against a world the live product no longer generates. That would not make the checks wrong (they still catch rendering regressions) but it would make them progressively less representative of what a player sees, and any check whose content depends on the era (settlement labels, unit rosters, nation voice) would be asserting against the wrong content. If deliberate, it is worth a line in DEVELOPMENT_PRACTICES so the next person to notice does not re-raise it.
+
+- Deliberate - pinned world for reproducibility. Document it and close.
+- Unintended - the 0 CE epoch default does not reach --verify. File a backlog item and re-bless the affected goldens.
+
+> **Recommendation:** Worth ten minutes of someone's time before the next golden re-bless, not before. It changes nothing about BL-407.
+
+*Files: `src/core/verify_api.cpp`, `src/world/hard_coded_world.cpp`, `docs/development/DEVELOPMENT_PRACTICES.md`*
 
 ---
 

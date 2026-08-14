@@ -3901,6 +3901,27 @@
     "docs/development/backlog.json"
    ],
    "resolution": ""
+  },
+  {
+   "id": "NR-225",
+   "title": "The --verify capture path still builds a 1960 space-arc world, not the 0 CE ancient one",
+   "raised": "2026-08-14",
+   "kind": "observation",
+   "status": "open",
+   "source": "BL-407 capture run (scripts/verify/decision_feed.lua), 2026-08-14",
+   "what": "The first run of the new decision-feed check captured a world dated \"1960 Jan 1st [Q1]\", with a player corporation named Genom Systems and 58 nations on the public channel - space-arc content. ROADMAP.md records the 0 CE epoch default as landed under the ancient refocus (2026-08-12, ahead of the roadmap rewrite). Not investigated: it may be deliberate (a pinned world for capture reproducibility), or the epoch default may not reach the --verify path. Recorded rather than chased because it is outside BL-407's scope.",
+   "why_it_matters": "If unintended, every visual check in the suite - 224 goldens - is verifying surfaces against a world the live product no longer generates. That would not make the checks wrong (they still catch rendering regressions) but it would make them progressively less representative of what a player sees, and any check whose content depends on the era (settlement labels, unit rosters, nation voice) would be asserting against the wrong content. If deliberate, it is worth a line in DEVELOPMENT_PRACTICES so the next person to notice does not re-raise it.",
+   "options": [
+    "Deliberate - pinned world for reproducibility. Document it and close.",
+    "Unintended - the 0 CE epoch default does not reach --verify. File a backlog item and re-bless the affected goldens."
+   ],
+   "recommendation": "Worth ten minutes of someone's time before the next golden re-bless, not before. It changes nothing about BL-407.",
+   "files": [
+    "src/core/verify_api.cpp",
+    "src/world/hard_coded_world.cpp",
+    "docs/development/DEVELOPMENT_PRACTICES.md"
+   ],
+   "resolution": ""
   }
  ]
 }
