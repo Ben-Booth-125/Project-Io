@@ -10719,14 +10719,14 @@
      "requirement": "The corp filter and the reason filter each narrow the list, and clear back to \"all\"; a filter survives clicking elsewhere in the game.",
      "class": "visual",
      "status": "pending",
-     "notes": "The filter is the difference between a river and an answer - \"show me every solvency-defence idle\" is a different question from \"show me every build\"."
+     "notes": "The filter is the difference between a river and an answer - \"show me every solvency-defence idle\" is a different question from \"show me every build\". Reachable from a capture via verify.decision_filter(reason, corp) (added to verify_api.cpp alongside show_panel('decisions'))."
     },
     {
      "id": "R3",
      "requirement": "Decisions older than the 256-entry ring fall back to the history log and are marked as carrying no margin, rather than rendering a fabricated 0.00.",
      "class": "visual",
      "status": "pending",
-     "notes": "The ring wraps by design (corp_command.hpp: derived observability, bounded so the log can run forever). Widening it to dodge this is the wrong fix."
+     "notes": "The ring wraps by design (corp_command.hpp: derived observability, bounded so the log can run forever). Widening it to dodge this is the wrong fix. METHOD LIMIT, stated rather than hidden: scripts/verify/decision_feed.lua runs long enough to overflow the ring, but scroll position is not scriptable, so the capture shows the ring-fed HEAD of the list. The log-fed tail and its no-margin marking need an eyeball, or a follow-on verify_api hook that parks scroll offset."
     },
     {
      "id": "R4",
@@ -10741,6 +10741,13 @@
      "class": "visual",
      "status": "pending",
      "notes": "io-standing-rules.md § Toggle rule. close_all_panels/any_panel_open updated in the seam commit."
+    },
+    {
+     "id": "R6",
+     "requirement": "The feed is reachable from a headless capture run: show_panel(\"decisions\"), decision_filter(reason, corp) and spectate(bool) exist in the verify API, and scripts/verify/decision_feed.lua exercises R1/R2/R5.",
+     "class": "visual",
+     "status": "pending",
+     "notes": "Authored in the main session (verify_api.cpp + the script), since neither implementation agent owned those files. Naming the script in the verifier-visual skill needs Ben's authorisation - CLAUDE.md's tool-creation rule - so until then it is run by path rather than by skill."
     }
    ]
   },

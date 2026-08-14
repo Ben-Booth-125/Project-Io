@@ -433,6 +433,27 @@ int app::run_verify(const std::string& script_path, bool bless)
         else if (name == "build")        m_ui.show_build_ledger = open; // tile construction ledger (BL-162)
         else if (name == "frame_hud")    m_ui.show_frame_hud = open;    // frame-budget HUD (BL-249)
         else if (name == "tech_tree")    m_ui.show_tech_tree = open;    // F9 mock viewer (BL-087)
+        else if (name == "decisions")    m_ui.show_decision_feed = open; // AI decision feed (BL-407)
+    });
+
+    // Spectator mode (BL-409). Set BEFORE econ_step: step_economy reads
+    // m_ui.spectating on each call and forwards it to the strategic tier, so
+    // flipping it after the ticks have run would capture a feed populated by an
+    // ordinary played session while claiming to show a spectated one.
+    v.set_function("spectate", [this](bool on) { m_ui.spectating = on; });
+
+    // Park the AI decision feed's filters (BL-407 R2) so a capture can show a
+    // FILTERED list — the resting state is "all", and a filter that only ever
+    // appears under a live cursor is a filter no check can see.
+    //
+    // `reason` takes a corp_decision_reason value, or -1 for "every reason";
+    // `corp` takes an entity id, or 0 for "every corporation". Both are passed
+    // through unvalidated on purpose: the feed clamps its own filters, and a
+    // script that parks an out-of-range value should see the feed's real
+    // fallback rather than a silently corrected one.
+    v.set_function("decision_filter", [this](int reason, sol::optional<int> corp) {
+        m_ui.decision_feed_reason = reason;
+        m_ui.decision_feed_corp   = static_cast<entity_id>(corp.value_or(0));
     });
 
     // Park a fold-out ledger on one of its button-strip views (BL-117 sweep), so a
