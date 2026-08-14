@@ -9548,8 +9548,8 @@
    "resolution": "Landed 2026-08-14 (gate-hygiene block). Each sweep test's CTest COMMAND is now tools/verify/run_sweep.cmake, which reports itself Skipped (SKIP_REGULAR_EXPRESSION) unless IO_RUN_SWEEPS is set — exclusion is machinery, not the -LE flag. CONFIGURATIONS was tried first and measured NOT to gate on the single-config NMake generator (a -C Release run still executed history_sweep), hence the wrapper. Verified both ways: bare ctest skips all sweeps in 0.13s; IO_RUN_SWEEPS=1 runs them. DEVELOPMENT_PRACTICES gate/sweep prose updated."
   },
   {
-   "status": "designed",
-   "glyph": "✓",
+   "status": "complete",
+   "glyph": "*",
    "parked": false,
    "blocked_on": [],
    "written": "2026-08-14",
@@ -9567,7 +9567,9 @@
    ],
    "authority_doc": "docs/ai/AI_OPPONENT.md",
    "summary": "Merges NR-169 and NR-220 (2026-08-14 housekeeping) - the same harness, the same unowned stewardship gap, raised twice a day apart. NR-169: BL-366 and BL-130 both moved the bands they touch (5→8, 8→9) without a re-run. NR-220: the harness was independently confirmed 13-red both before and after an unrelated batch, so the red is stale, not a regression - but nothing currently distinguishes \"stale red\" from \"new failure\" at a glance.",
-   "design": "NR-169's recommendation: a derived ceiling (computed from the harness's own inputs) rather than a hand-set magic number, so the band is something anyone can sanity-check rather than trust. Pair with folding a re-bless of these bands into BL-402's pass (that item currently scopes scripts/verify/ only; this harness's bands live in tools/verify/ and are a distinct mechanism, hence a separate item rather than an addition to BL-402).\n\nPost-BL-386 note (2026-08-14): the floor fix landed and moved the bands as predicted — 13 failures, net-worth final/min on every seed plus one dial-thrash on seed 3; rivals still list 6-7 sell orders per seed, solvency/survival/build-thrash all hold. Bless against THESE numbers (the first honest post-reservation-rule run), not the pre-fix ones. Measured run in the 2026-08-14 DEVLOG entry."
+   "design": "NR-169's recommendation: a derived ceiling (computed from the harness's own inputs) rather than a hand-set magic number, so the band is something anyone can sanity-check rather than trust. Pair with folding a re-bless of these bands into BL-402's pass (that item currently scopes scripts/verify/ only; this harness's bands live in tools/verify/ and are a distinct mechanism, hence a separate item rather than an addition to BL-402).\n\nPost-BL-386 note (2026-08-14): the floor fix landed and moved the bands as predicted — 13 failures, net-worth final/min on every seed plus one dial-thrash on seed 3; rivals still list 6-7 sell orders per seed, solvency/survival/build-thrash all hold. Bless against THESE numbers (the first honest post-reservation-rule run), not the pre-fix ones. Measured run in the 2026-08-14 DEVLOG entry.",
+   "resolved": "2026-08-14",
+   "resolution": "Landed 2026-08-14 (gate-hygiene block). The MSVC band set is re-blessed from a double-checked post-BL-386 run (identical across two invocations) and the block is restructured to NR-169's derived form: the table records the OBSERVED run verbatim and every band is computed by named slack constants (k_nw_lo/hi_mult, k_solvency/survival/build/dial_slack) — a re-bless is now \"replace seven observed numbers per seed\". Stale-red vs new-failure is distinguishable at a glance: the run header and the failure summary print the bless line. The GCC set is deliberately NOT touched (different toolchain floats; WSL numbers must not bless the Linux set) — its block carries a dated STALE-since-BL-386 declaration in advance, per its own convention. MSVC run: ALL PASS (0 failures)."
   },
   {
    "status": "designed",
