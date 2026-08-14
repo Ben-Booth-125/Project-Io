@@ -51,6 +51,15 @@ enum class corp_verb : uint8_t
     cancel_contract,  ///< Terminate contract `order` in flight; forfeits the deposit, moves reputation.
 };
 
+/// One past the highest verb — the wire parser's range gate (BL-396: run_serve
+/// refuses any `verb=` outside [0, corp_verb_count) rather than letting a
+/// narrowing cast truncate it into a verb the caller never named). Bound to
+/// the append-only rule above: this is always `<last enumerator> + 1`, so
+/// appending a verb means moving this with it — and only this, since existing
+/// values never renumber.
+inline constexpr uint8_t corp_verb_count =
+    static_cast<uint8_t>(corp_verb::cancel_contract) + 1;
+
 /// Ceiling on one corporation's outstanding sell orders. The book is now
 /// reachable by command, so it is reachable by a scorer with a bug in it — this
 /// is the bound that keeps a runaway from growing the save format without limit.

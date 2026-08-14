@@ -352,6 +352,38 @@ async function main() {
             'the refused cross-corp command performed nothing (state snapshot identical)');
     }
 
+    // --- BL-396: out-of-domain fields are refused whole, world unchanged ----
+    // Each of these used to pass the parser by narrowing: verb=256 truncated
+    // to 0 and BUILT A BUILDING answering `applied`; type=200 indexed the
+    // economics array out of bounds and SEGFAULTED the process;
+    // workforce=4294967396 wrapped to a legal 100 and applied; quantity=1e300
+    // is a finite double that overflows to +inf when narrowed to float. All
+    // must now answer rejected_invalid, and — the batch's invariant — a
+    // refusal performs NOTHING, asserted by snapshot after every case.
+    console.log('\n  -- BL-396: out-of-domain fields are refused, world unchanged --');
+    {
+      const beforeRange = await snapshot();
+      const rangeCases = [
+        ['verb=256 (truncates to build)',        'verb=256 tile=0'],
+        ['verb=265 (truncates to hire_unit)',    'verb=265 tile=0'],
+        ['verb=-1',                              'verb=-1'],
+        ['type=200 (economics array OOB)',       'verb=0 tile=0 type=200'],
+        ['road_tier=255',                        'verb=6 tile=0 road_tier=255'],
+        ['workforce=4294967396 (wraps to 100)',  'verb=3 subject=0 workforce=4294967396'],
+        ['unit_type=70000 (beyond uint16)',      'verb=8 tile=0 unit_type=70000'],
+        ['quantity=1e300 (overflows to +inf as float)',
+         `verb=9 subject=${bodyId ?? 0} target=0 quantity=1e300`],
+        ['floor_price=-1',
+         `verb=9 subject=${bodyId ?? 0} target=0 quantity=5 floor_price=-1`],
+      ];
+      for (const [label, args] of rangeCases) {
+        const r = resultOf(await io.send(`COMMAND corp=${subject.id} ${args}`));
+        check(r === 'rejected_invalid', `${label} -> rejected_invalid`, r);
+        check(await snapshot() === beforeRange,
+              `${label} performed nothing (state snapshot identical)`);
+      }
+    }
+
     // --- survey actually progresses ---------------------------------------
     // `survey` was an applicable verb whose effect never arrived, because
     // --serve never called advance_surveys. Dispatch one, tick, and assert the
