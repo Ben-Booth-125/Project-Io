@@ -10726,7 +10726,7 @@
      "requirement": "Decisions older than the 256-entry ring fall back to the history log and are marked as carrying no margin, rather than rendering a fabricated 0.00.",
      "class": "visual",
      "status": "pending",
-     "notes": "The ring wraps by design (corp_command.hpp: derived observability, bounded so the log can run forever). Widening it to dodge this is the wrong fix. METHOD LIMIT, stated rather than hidden: scripts/verify/decision_feed.lua runs long enough to overflow the ring, but scroll position is not scriptable, so the capture shows the ring-fed HEAD of the list. The log-fed tail and its no-margin marking need an eyeball, or a follow-on verify_api hook that parks scroll offset."
+     "notes": "The ring wraps by design (corp_command.hpp: derived observability, bounded so the log can run forever). Widening it to dodge this is the wrong fix. NOT COVERED BY THE VISUAL CHECK, and deliberately so: the overflow leg was written, run, then cut (Ben, 2026-08-14) because scroll position is not scriptable - it more than doubled the script's runtime to capture the ring-fed HEAD, which the other captures already show, while the log-fed tail never entered frame. R3 is an EYEBALL item until a verify hook can park scroll offset."
     },
     {
      "id": "R4",
@@ -10747,7 +10747,7 @@
      "requirement": "The feed is reachable from a headless capture run: show_panel(\"decisions\"), decision_filter(reason, corp) and spectate(bool) exist in the verify API, and scripts/verify/decision_feed.lua exercises R1/R2/R5.",
      "class": "visual",
      "status": "pending",
-     "notes": "Authored in the main session (verify_api.cpp + the script), since neither implementation agent owned those files. Naming the script in the verifier-visual skill needs Ben's authorisation - CLAUDE.md's tool-creation rule - so until then it is run by path rather than by skill."
+     "notes": "Authored in the main session (verify_api.cpp + the script), since neither implementation agent owned those files. Runs CAPTURE-ONLY with no golden, on demand (Ben's call, 2026-08-14): a golden over a list of AI decisions would go red on every corp_ai tuning change, scorer candidate-set change and world-gen change - none of which are this surface - and an always-red golden teaches blessing without looking. The verifier-visual skill AUTO-DISCOVERS scripts/verify/*.lua, so the check is already reachable by the skill without a skill edit; only naming it in the skill's prose was ever the open question, and it is deliberately left unnamed."
     }
    ]
   },

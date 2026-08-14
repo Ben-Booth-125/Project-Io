@@ -44,11 +44,18 @@ verify.capture("decision_feed_filtered_idle")
 verify.decision_filter(-1)
 verify.capture("decision_feed_cleared")
 
--- R3: the ring holds 256 entries and wraps. This run is deliberately long
--- enough to overflow it, so the tail of the list must come from the history log
--- and must be MARKED as carrying no margin rather than showing a fabricated
--- 0.00. Scroll state is not scriptable, so this capture is the honest limit of
--- what the visual check reaches: it shows the ring-fed head. R3's fallback
--- marking needs an eyeball on the scrolled tail, noted in the requirement.
-verify.econ_step(120)
-verify.capture("decision_feed_after_ring_wrap")
+-- R3 IS DELIBERATELY NOT CHECKED HERE (Ben, 2026-08-14). The obvious way to
+-- reach it is to run past the 256-entry ring so the tail falls back to the
+-- history log — and that leg was written, run, and then cut. It more than
+-- doubled the script's runtime to produce a capture showing the ring-fed HEAD,
+-- which the captures above already show: scroll position is not scriptable, so
+-- the log-fed tail and its no-margin marking never entered frame. The most
+-- expensive part of the check verified the least, which is the wrong trade at
+-- any price. R3 stays an eyeball item until a verify hook can park scroll
+-- offset; the requirement's notes say so rather than implying coverage.
+--
+-- NO GOLDEN. This check runs capture-only, on demand, when someone touches the
+-- feed. A golden over a list of AI decisions would go red on every corp_ai
+-- tuning change, every scorer candidate-set change and every world-gen change —
+-- none of which are this surface — and a golden that is always red teaches
+-- blessing without looking, which is how a real regression gets waved through.
