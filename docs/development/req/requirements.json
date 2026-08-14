@@ -10571,6 +10571,133 @@
      "notes": "world_determinism R1 PASS; BL-096 R4, BL-257 R2, BL-182 R2 all PASS after all three slices landed together."
     }
    ]
+  },
+  {
+   "brief": "widen-battle-swing",
+   "title": "BL-400 (widen battle swing): a 1.4:1 fight can still be lost, and a 2:1 fight still cannot",
+   "difficulty": 1,
+   "importance": "B",
+   "status": "complete",
+   "promoted_from": "backlog.json BL-400, v0.1.15 (Ben ruling, NR-204)",
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "campaign_battle_harness's printed ratio curve shows a 1.4:1 attacker losing a visible share of fights (target band 5-15%) while a 2:1 attacker stays near-certain, with the value picked from a measured sweep rather than asserted.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "swing_permille 300 -> 600, chosen from a WSL sweep (candidates 300..800, 1000 seeds/ratio). Verified independently in the integrating session: 200-seed harness curve reads 1.0:1 52%, 1.1:1 66%, 1.2:1 72%, 1.4:1 85%, 2:1 100%, 4.2:1 100%. 1.4:1 therefore loses 15%; the stabler 1000-seed measure puts it at 89.3% won / 10.7% lost. Both inside the ordered band."
+    },
+    {
+     "id": "R2",
+     "requirement": "The resolver stays deterministic: same battle identity replays byte-identically, per-round trace included.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "campaign_battle_harness C1 (3 assertions) PASS at the new swing. No new entropy source; the seeded stream is unchanged in kind, only its amplitude."
+    },
+    {
+     "id": "R3",
+     "requirement": "The withdrawal-pricing property is re-derived honestly at the new swing rather than relaxed to pass: any late exit that costs LESS than an early one must be explained by the withdrawing side's deficit narrowing.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "C3 restructured from a blanket \"every seed strictly increasing\" (a property of the NARROW swing, not of the design) into two checks: a majority remain monotone, AND explained == inversions is a strict equality, so an unexplained inversion fails the harness. Net sharper, not looser. Measured: 8/9 seeds monotone, 2/2 inversions explained by a narrowed deficit. Reviewed in the integrating session and confirmed mathematically sound (withdrawal is checked before each round, so the trace index is the withdrawal-instant state)."
+    }
+   ]
+  },
+  {
+   "brief": "dead-market-writes",
+   "title": "BL-382 (two dead market writes): the convoy supply write that pricing never read is gone",
+   "difficulty": 2,
+   "importance": "C",
+   "status": "complete",
+   "promoted_from": "backlog.json BL-382, v0.1.13",
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "credit_arrived_convoys no longer writes market_component.supply on arrival; the pool credit and trade-route recording are unchanged, and the cargo still reaches supply through the ordinary auto-surplus path at the next clear.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "supply_system.cpp. Verified: the write landed AFTER clear_markets zeroed supply and BEFORE the next clear rewrote it, so pricing never read it - while the pre-clearing AI scorer did, a private signal nothing priced agreed with. supply_advance harness PASS (0 failures) on the merged tree."
+    },
+    {
+     "id": "R2",
+     "requirement": "The second finding (a demand pull claimed to be dormant) is documented truthfully rather than as dead code.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "FAILED first review, then corrected. The slice proposed a comment + MARKETS.md block saying the inter-body pull \"never opens\" because home supply exceeds home demand. Verified false in the integrating session: clear_markets zeroes supply at market_clearing.cpp:452 BEFORE inject_interbody_demand at :468, so home supply is identically 0 at the read and the gate opens for every resource with any demand. Comment and doc rewritten to state the real behaviour; the underlying defect filed as BL-404 (inter-body pull is un-netted)."
+    }
+   ]
+  },
+  {
+   "brief": "corp-ai-enumeration-parity",
+   "title": "BL-379 (corp AI enumeration budget parity): the scorer enumerates against the same budget the seam applies",
+   "difficulty": 2,
+   "importance": "C",
+   "status": "complete",
+   "promoted_from": "backlog.json BL-379, v0.2.0",
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "Corp AI candidate enumeration uses construction_params::max_logistics_reach - the same placement budget construct_building applies - so a candidate the scorer offers is one the seam will accept.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "corp_ai.cpp reads the same registry field and the same corp as construction.cpp. Reviewed for exact parity in the integrating session. corp_ai_harness PASS (0 failures), including the byte-identical decision log across two same-seed runs, so the determinism invariant holds."
+    }
+   ]
+  },
+  {
+   "brief": "build-forwards-recipe",
+   "title": "BL-388 (build discards the recipe): a seam-built processor carries the recipe that was asked for",
+   "difficulty": 2,
+   "importance": "A",
+   "status": "complete",
+   "promoted_from": "backlog.json BL-388, v0.1.13",
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "apply_corp_command's build case forwards cmd.recipe to construct_building, so a processing facility built through the seam runs the requested recipe instead of the coerced default.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "corp_command.cpp. Previously every processor built through the seam was a steel smelter regardless of the argument - the AI player could name a recipe and be silently given another. Debug assert added: a placed build satisfies cmd.recipe == no_recipe || the built building carries cmd.recipe."
+    },
+    {
+     "id": "R2",
+     "requirement": "Reject, do not coerce: a stated recipe on a non-processing building type, or an id the registry cannot resolve, returns rejected_invalid BEFORE placement and mutates nothing.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "Pre-placement check. All current issuers audited (corp_ai, the --serve parser, the harnesses) - none state a recipe on a non-processing type, so nothing regresses today. ACTIONS.json updated and the generated mirror regenerated, so the dictionary no longer advertises the old DISCARDED defect to the AI player."
+    }
+   ]
+  },
+  {
+   "brief": "hire-costs-credits",
+   "title": "BL-394 (hire is free and unbounded on the seam): no roster row is free, and the scorer knows the price",
+   "difficulty": 2,
+   "importance": "B",
+   "status": "complete",
+   "promoted_from": "backlog.json BL-394, v0.1.15",
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "hire_unit debits a real credit cost (hire_base_cost + hire_cost_per_power x the roster row power_mod) authored in economy.lua, so tuning it is a data change.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "Levy Spear 40, Rifle Regiment 230. Fields on military_capability_params with defaults matching the Lua, so a hand-built harness registry charges the same. corp_ai_harness BL-352 R4 rows PASS."
+    },
+    {
+     "id": "R2",
+     "requirement": "A refusal on either leg (credits or gated-axis resources) leaves the corp wholly uncharged - no partial debit.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "Both checks run before either debit; both refuse through rejected_funds. corp_ai_harness asserts \"an unaffordable hire is refused whole - no partial debit\" PASS."
+    },
+    {
+     "id": "R3",
+     "requirement": "The rival scorer's solvency gate and its within-tick committed total both see the hire's credit cost, so a rival cannot hire itself below its own reserve floor.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "FAILED first review, then fixed. The slice left candidate.spend at 0.0f, which short-circuits the gate (it tests spend > 0) and contributes nothing to committed - a rival just above its floor could hire for up to 230 and end below it, and a later build in the same evaluation was scored against a balance the hire had already spent. corp_ai.cpp now mirrors the seam formula into c.spend. Availability stays cash-free (which rows are offered still comes from stockpile/market access alone), so the standing-rules grant is respected; it is the SPEND that is gated, like every other spend."
+    }
+   ]
   }
  ]
 }

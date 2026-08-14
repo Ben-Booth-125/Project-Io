@@ -7605,11 +7605,11 @@
    "short_name": "COLD_CONFIGURE_WINDOWS_CHECK",
    "category": "Tooling",
    "title": "Run the from-cold configure check on the Windows box, where the SDL3 TLS revocation failure actually happens",
-   "status": "designed",
+   "status": "complete",
    "glyph": "✓",
    "priority": "F",
    "difficulty": 1,
-   "parked": true,
+   "parked": false,
    "blocked_on": [
     "access to the Windows development machine"
    ],
@@ -7624,7 +7624,7 @@
    ],
    "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
    "summary": "Split out of BL-302 at the v0.1.8 cut. BL-302 settled and implemented the dependency-acquisition posture (seeded FETCHCONTENT_SOURCE_DIR_<dep> cache + a documented from-cold check), but the fault that opened it -- a schannel TLS revocation failure downloading SDL3 -- is Windows-specific and does NOT reproduce on Linux, where a from-cold configure succeeds in ~74s. So the fix is untested against the actual symptom. PARKED 2026-08-09 (Ben): blocked on being at the Windows machine, so it was travelling with every cut and appearing in each done-definition as open work. parked:true / priority F is the project existing flag for not-scheduled; unpark the moment that box is to hand.",
-   "design": "One command, on the Windows machine, from `DEVELOPMENT_PRACTICES.md` § Dependency acquisition:\n\n```\nIO_DEPS_CACHE=/nonexistent cmake -S . -B <tmp>/build -DFETCHCONTENT_BASE_DIR=<tmp>/deps -DCMAKE_BUILD_TYPE=Release\n```\n\n`IO_DEPS_CACHE=/nonexistent` is load-bearing: without it the seeded cache satisfies the configure and the check proves nothing.\n\n**Two outcomes, and they lead different ways.**\n\n- **It fails with the schannel revocation error** -- the posture is vindicated: seed `_deps_cache` from a working tree once, and that machine never needs the network at configure time again. Confirm the seeded path then works there.\n- **It succeeds** -- the original failure was transient or environmental (AV TLS interception, a cert-chain change since), and BL-302's machinery is insurance rather than a fix. Record that, because it changes how much the cache is worth carrying.\n\nEither way the answer is cheap and the item is a verification, not a build. Blocked only on being at that machine."
+   "design": "One command, on the Windows machine, from `DEVELOPMENT_PRACTICES.md` § Dependency acquisition:\n\n```\nIO_DEPS_CACHE=/nonexistent cmake -S . -B <tmp>/build -DFETCHCONTENT_BASE_DIR=<tmp>/deps -DCMAKE_BUILD_TYPE=Release\n```\n\n`IO_DEPS_CACHE=/nonexistent` is load-bearing: without it the seeded cache satisfies the configure and the check proves nothing.\n\n**Two outcomes, and they lead different ways.**\n\n- **It fails with the schannel revocation error** -- the posture is vindicated: seed `_deps_cache` from a working tree once, and that machine never needs the network at configure time again. Confirm the seeded path then works there.\n- **It succeeds** -- the original failure was transient or environmental (AV TLS interception, a cert-chain change since), and BL-302's machinery is insurance rather than a fix. Record that, because it changes how much the cache is worth carrying.\n\nEither way the answer is cheap and the item is a verification, not a build. Blocked only on being at that machine.\n\n## RUN 2026-08-13 on Windows 11 - it SUCCEEDS\n\nThe check was run from the repo root with IO_DEPS_CACHE=/nonexistent and a scratch\nFETCHCONTENT_BASE_DIR: configure completed, exit 0, ~120 MB fetched cold. That is the second\nof the two outcomes this item named.\n\nSo the schannel revocation failure that opened BL-302 was transient or environmental, not a\nstanding property of this machine, and the seeded _deps_cache is INSURANCE rather than a fix -\nworth keeping for a fresh clone on a machine having a bad TLS day, but nothing depends on it.\nRecorded in DEVELOPMENT_PRACTICES.md § The from-cold check alongside the 2026-08-09 Linux run.\n\nThe parked blocker (\"access to the Windows development machine\") had dissolved - sessions now\nrun on Windows 11 directly."
   },
   {
    "id": "BL-342",
@@ -8335,7 +8335,7 @@
    "short_name": "WARM_START_CALENDAR_SEMANTICS",
    "category": "Economy",
    "title": "The warm start runs 80 ticks but consumes no in-game time - decide whether that is right",
-   "status": "designed",
+   "status": "complete",
    "glyph": "✓",
    "priority": "C",
    "difficulty": 1,
@@ -8352,7 +8352,7 @@
    "authority_doc": "docs/economy/ERAS.md",
    "version_goal": "v0.1.13",
    "summary": "Filed from the 2026-08-10 warm-start change (pre_game_ticks 12 -> 80). Ben framed it as \"start the game running from perhaps 1956 or so\", which reads as the campaign beginning earlier. It does not: app::start_new_game runs the ticks and then rebases the clock, so the warm start costs no calendar time and play still opens at epoch_year (1960).",
-   "design": "### The question\n\n`app::start_new_game` runs `pre_game_ticks` and then **rebases the clock**, so the warm start\nconsumes no in-game time and play still opens at `epoch_year` (1960). The world is generated *at*\n1960 state and then ticked forward 20 years, with the result relabelled as the 1960 opening\nposition.\n\nIs the warm start:\n\n**(a)** a settling pass on a 1960 world, with the calendar correctly untouched, or\n**(b)** genuinely the years 1940-1960, in which case generation should produce a **1940** world and\nthe clock should advance to 1960 during it?\n\n(b) is the more coherent story and much the larger change - it would interact with BL-271's Era -1\nhistory sim, which already runs 0->1960 and would need to stop at 1940 and hand over. (a) is what is\nbuilt and is defensible: the pre-game history is a fiction that produces a plausible opening\nposition, not a simulated two decades.\n\n### Recommendation\n\n**(a), documented.** Say plainly in ERAS.md that the warm start is a settling pass with no calendar\nmeaning. Revisit only if the opening year becomes player-visible or configurable - which the New\nWorld wizard (STARTUP.md) could plausibly make it.\n\n### 2026-08-11 - settled\n\nBen: (a) - the warm start is a settling pass with no calendar meaning; play still opens at epoch_year (1960). Action: add a short note to docs/economy/ERAS.md stating the warm start consumes no in-game time and is not a simulated 1940->1960 history. Light-mode doc change, no code change needed."
+   "design": "### The question\n\n`app::start_new_game` runs `pre_game_ticks` and then **rebases the clock**, so the warm start\nconsumes no in-game time and play still opens at `epoch_year` (1960). The world is generated *at*\n1960 state and then ticked forward 20 years, with the result relabelled as the 1960 opening\nposition.\n\nIs the warm start:\n\n**(a)** a settling pass on a 1960 world, with the calendar correctly untouched, or\n**(b)** genuinely the years 1940-1960, in which case generation should produce a **1940** world and\nthe clock should advance to 1960 during it?\n\n(b) is the more coherent story and much the larger change - it would interact with BL-271's Era -1\nhistory sim, which already runs 0->1960 and would need to stop at 1940 and hand over. (a) is what is\nbuilt and is defensible: the pre-game history is a fiction that produces a plausible opening\nposition, not a simulated two decades.\n\n### Recommendation\n\n**(a), documented.** Say plainly in ERAS.md that the warm start is a settling pass with no calendar\nmeaning. Revisit only if the opening year becomes player-visible or configurable - which the New\nWorld wizard (STARTUP.md) could plausibly make it.\n\n### 2026-08-11 - settled\n\nBen: (a) - the warm start is a settling pass with no calendar meaning; play still opens at epoch_year (1960). Action: add a short note to docs/economy/ERAS.md stating the warm start consumes no in-game time and is not a simulated 1940->1960 history. Light-mode doc change, no code change needed.\n\n## CLOSED 2026-08-13 - already satisfied, no code change\n\nVerified in a worktree agent: the settled action (a note in docs/economy/ERAS.md saying the\nwarm start is a settling pass with no calendar meaning) is ALREADY PRESENT at ERAS.md lines\n35-41, landed by commit 835ff70 (the Sprint 10 design pass), and src/core/app.cpp carries the\nmatching NOTE comment above pre_game_ticks. Nothing was owed - the item outlived its own\ncompletion, which is the class of drift the retire sweep exists to catch."
   },
   {
    "id": "BL-370",
@@ -8593,7 +8593,7 @@
    "short_name": "CORP_AI_ENUMERATION_BUDGET_PARITY",
    "category": "AI",
    "title": "Corp AI candidate enumeration should use the same placement budget as the seam that applies it",
-   "status": "designed",
+   "status": "complete",
    "glyph": "✓",
    "priority": "C",
    "difficulty": 2,
@@ -8665,7 +8665,7 @@
    "short_name": "TWO_DEAD_MARKET_WRITES",
    "category": "Economy",
    "title": "One market write only the AI can see, and one demand pull that can never fire",
-   "status": "designed",
+   "status": "complete",
    "glyph": "✓",
    "priority": "C",
    "difficulty": 2,
@@ -8816,7 +8816,7 @@
    "design": "DESIGNED 2026-08-13, found by AI play.\n\n## The defect\n\n`apply_corp_command` begins with `if (w.corporations.find(cmd.corp) == w.corporations.end()) return rejected_no_corp;` and that is the whole of its actor validation. Per-verb checks use `owns(w, cmd.corp, cmd.subject)` to confirm the corp owns the BUILDING it names — but nothing confirms the CALLER may act as that corp.\n\nIn play: a player issued `COMMAND corp=<rival> verb=9 ...` and it returned `applied`. Rival balances moved by +57.9M, +50.1M, +25.7M over six ticks. The inverse is an attack rather than a gift — a 0.001-unit order placed in a rival's name permanently suppresses that rival's auto-surplus path for the triple (BL-380), throttling a competitor's entire income on that good.\n\n## Why this was never a defect before, and is now\n\nIn-process, `cmd.corp` is set by the scorer itself, so the field was never attacker-controlled and the missing check cost nothing. `--serve` turned the seam into an EXTERNAL input surface and the same field became caller-supplied. Nothing about apply_corp_command changed; its threat model did.\n\n**This is the second instance in one session of exactly that pattern** — the NaN float guard (NR-184) was the first. The AI-facing seam is an untrusted input boundary in a way the internal caller never was, and validation written for a trusted caller does not transfer. Two instances is enough to call it a rule rather than an incident, and it should go in the standing rules.\n\n## PROPOSED FIX\n\nAuthority belongs at the PROTOCOL layer, not in apply_corp_command — the in-process scorer legitimately commands every rival corp and must keep doing so. So:\n\n* `run_serve` gains a session actor: `--serve --as <corp>` (default: the player corp), and the `COMMAND` opcode refuses any `corp=` that is not the session actor, with a new `rejected_not_owner` at the opcode level.\n* For the research use where an agent legitimately drives several corps (bot-vs-bot, the BL-279 corpus), an explicit `--as any` opt-in, so the permissive mode exists but must be ASKED for and is visible in the invocation.\n* `tools/mcp/server.js` pins its actor at startup and never forwards a caller-supplied `corp` for writes.\n* `smoke.js` asserts that a command naming a corp other than the session actor is refused — replacing the assertion that currently only checks the reply is well-formed, which this session already flagged as overclaiming.\n\nNote the interaction with BL-386: with the floor-price fix in, driving a rival is no longer a route to printing money, but it is still a route to sabotaging one.\n\n## The read side is worse, and is filed as BL-397\n\nAdversarial play found the same hole on the READ path: the BLACKBOARD opcode takes a corp id from the request line and returns that corp's OWN-ASSET facts — cash, pools, recipes, workforce. So BL-068's competitor-visibility model is enforced within a blackboard and not between them. Fix both together under one session-actor model; stopping the writes while the reads still hand over the private view would be half a fix."
   },
   {
-   "status": "designed",
+   "status": "complete",
    "glyph": "✓",
    "parked": false,
    "blocked_on": [],
@@ -8961,7 +8961,7 @@
    "design": "DESIGNED 2026-08-13, from a play session whose entire second half was unreachable.\n\n## Three separate gaps that together make the verb pointless\n\n**1. Write-only.** `export_corp_blackboard` has four sections and none concerns units. A corp can raise a unit and then has no way to confirm it exists, where it is, or how many it has. The player verified their own force by reading source.\n\n**2. No verb takes a unit.** `hire_unit` names a TILE; every other verb names a building, a body or an order. So a unit cannot be moved, merged, disbanded, garrisoned or ordered. It is created at a tile and stays there for the rest of the campaign.\n\n**3. Demolish orphans them.** `demolish_building` erases the muster base and its stockpile without touching `w.units`, so the units standing on it survive with a `position` pointing at a tile that no longer carries their base. Nothing cleans them up and nothing reports it.\n\n## What this item is NOT\n\nIt is not 'build the conflict layer' — that is BL-315, and the fact that `resolve_battle`'s only caller is the Era -1 sim (BL-384) is a bigger and separate problem. This item is narrower: the units that CAN be raised today are unobservable and unmanageable, and two of the three gaps are cheap.\n\n## PROPOSED FIX, and it is deliberately partial\n\nDo (1) and (3) now, leave (2) to the conflict spine.\n\n* **Export units** as `own_asset` facts — unit id, tile, type, count, strength — in BL-390's self-state section. A corp reading its own force engages no visibility rule.\n* **Decide what demolish does to garrisoned units** and do it explicitly: refuse the demolish while units stand there (`rejected_state`, cheapest and most legible), or disband them with an agency event. Either is fine; silently orphaning them is not.\n* **Leave unit movement alone.** A `move_unit` verb without a conflict layer to move toward is scope creep, and BL-315 should own the shape of unit command when it lands."
   },
   {
-   "status": "designed",
+   "status": "complete",
    "glyph": "✓",
    "parked": false,
    "blocked_on": [],
@@ -9109,7 +9109,7 @@
    "design": "## Why it is its own item\n\nIt was BL-315's third strand, and it was blocking a buildable item behind an unbuilt one:\nat 0 CE there is no live law system to be subject to. Splitting it lets the conflict spine\nbe built now, and lets answerability arrive when there is law for it to read.\n\n## What it owns\n\nThe terms an armed trading house operates under, and the consequence of breaking them.\nThe direction of agency is the whole point - an embargo is something procurement must be\nrouted around, basing rights are granted rather than granted BY, a levy applies TO the\ncompany's recruitment pool.\n\nIt is also where BL-315's identity ruling cashes out. Ben, 2026-08-13: the same company\nreads as army, mercenary or pirate depending on policy - so the reading is a function of\nwhose terms it operates under, and which it has broken. That derivation belongs here, not\nin the conflict spine.\n\n## Design owed\n\nWhich law classes bind a company rather than a nation; what a breach costs (standing?\ncontract access? interdiction?); and whether the army/mercenary/pirate reading is\nper-polity (one nation's privateer is another's pirate) or global. The per-polity reading\nis the richer one and is probably right, but it is not settled."
   },
   {
-   "status": "designed",
+   "status": "complete",
    "glyph": "✓",
    "parked": false,
    "blocked_on": [],
@@ -9197,6 +9197,51 @@
    ],
    "summary": "Ben ruled (NR-162, 2026-08-13): the partial numbers (33.1 ms/econ tick on the 3x world, 0.45 s generation) are not enough - build a proper profiling harness so hardware requirements and expected lag are measured, not inferred from other instruments.",
    "design": "RULED 2026-08-13 (NR-162). What exists is incidental: data_creep_harness times ticks as a side effect, step_economy_phase_ms breaks down one phase family. What is owed is a dedicated tools/verify harness that reports, on the real generated 3x world: generation wall time by stage, econ tick cost by phase over a long run (warm-up vs settled), and the derived per-day/per-quarter latency a player feels at each game speed. Output a table diffable across commits so perf regressions are visible the way data creep is. Frame-side (render) cost stays out of scope for a headless harness - note the boundary; the live-app frame cost is a separate measurement. Push to the verifier-headless skill on landing."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-13",
+   "created": "2026-08-13",
+   "id": "BL-404",
+   "short_name": "INTERBODY_PULL_IS_UNNETTED",
+   "category": "Economy",
+   "title": "The inter-body demand pull nets against a supply that is always zero, so outposts are pulled by gross home demand",
+   "priority": "A",
+   "difficulty": 2,
+   "version_goal": "v0.1.13",
+   "requires": [],
+   "authority_doc": "docs/economy/MARKETS.md",
+   "files": [
+    "src/world/market_clearing.cpp",
+    "docs/economy/MARKETS.md"
+   ],
+   "summary": "inject_interbody_demand subtracts home supply from home demand, intending the home body's UNMET demand. But clear_markets zeroes every market's supply immediately before the injection and the supply writes land after it, so home supply is identically zero at the read. The subtraction is a no-op: every outpost market receives pull_fraction of the home body's GROSS demand every tick, distance-discounted.",
+   "design": "FOUND 2026-08-13 by the verifier-review pass over the BL-382 slice, which had proposed to\ndocument this gate as dormant. It is not dormant - it is live, and it measures the wrong thing.\n\n## The sequence\n\nIn clear_markets (market_clearing.cpp):\n\n1. mc.supply.fill(0.0f) / mc.demand.fill(0.0f) for every market\n2. inject_population_demand\n3. inject_background_demand\n4. inject_interbody_demand   <- reads home supply HERE, and it is 0\n5. ... the auto-surplus and order-book paths write supply\n\nSo the shortfall expression (home demand minus home supply) equals home demand exactly. The\ngate that skips a resource when the shortfall is non-positive therefore opens for every\nresource carrying any demand at all.\n\n## Why it matters\n\nmaybe_spawn_market spawns an outpost market on any off-home building completion. From that\ntick the outpost receives pull_fraction of the home body's GROSS demand for every resource,\ndivided by the distance falloff - injected as demand, which price resolution reads. Outpost\nprices are set by a number that was meant to be a shortfall and is actually a gross total.\nThis is a live input to every outpost price, not a dormant branch.\n\n## The fix is a sequencing question, not an arithmetic one\n\nNetting honestly means reading a home supply this pass has not computed yet. Options, to\nsettle at promotion:\n\na) Move the injection after the supply writes. Truest to the intent, but those writes are\n   themselves demand-sensitive (auto-surplus yields to standing orders), so this risks a\n   two-pass dependency in a pass whose ordering is already load-bearing.\nb) Net against the PREVIOUS tick's supply, captured before the fill. One tick of lag,\n   trivially deterministic, honest about what it is.\nc) Drop the subtraction and state plainly that the pull is on gross demand, re-tuning\n   pull_fraction to compensate. Simplest, and arguably what the mechanism has always done.\n\nRECOMMENDATION: (b). It preserves the design's stated intent, costs one stored array, and\nreorders nothing. Whatever is chosen, the code comment and MARKETS.md must stop describing a\nnetting that does not happen - both were corrected on 2026-08-13 to describe the real\nbehaviour and point here."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-13",
+   "created": "2026-08-13",
+   "id": "BL-405",
+   "short_name": "HIRE_HAS_NO_PRICE_ON_SCREEN",
+   "category": "UI",
+   "title": "Hiring costs credits since BL-394, and no UI surface shows the price",
+   "priority": "B",
+   "difficulty": 1,
+   "version_goal": "v0.1.13",
+   "requires": [],
+   "authority_doc": "docs/ui/SELECTION.md",
+   "files": [
+    "src/ui/selection_panel.cpp"
+   ],
+   "summary": "BL-394 gave hire_unit a real credit cost. The hire control in the Selection panel shows a unit name and a Hire button - no cost, no affordability greying - while its sibling road-tier controls each show cost and validity, and the Build door shows a credit total and disables when unaffordable. The AI player now reads the price from ACTIONS.json; the human is told only after the fact, by a generic refusal string.",
+   "design": "FILED 2026-08-13 from the verifier-review pass on the BL-394 slice.\n\nThe asymmetry is the point: the word interface (ACTIONS.json) documents the cost formula for\nthe AI player, and the human-facing surface does not show it at all. A player who cannot\nafford a unit clicks Hire and gets a generic refusal that says neither which leg failed nor\nhow much was needed.\n\nWhat to add, matching the sibling controls already in the same panel:\n\n- the credit cost on the row, read from the registry (hire_base_cost plus hire_cost_per_power\n  times the roster row's power_mod) - never re-derived in the UI\n- greyed/disabled when the corp cannot afford it, in the Build door's idiom\n- the resource half of the cost too, where the row is gated on stockpile\n\nRule 0b applies if any sizing is ambiguous: report the current row measurements before\nchanging layout. Update the QUESTION_LOG entry for the hire control. ACTIONS.json should not\nneed changing - this is display only, the press semantics are unchanged."
   }
  ]
 }

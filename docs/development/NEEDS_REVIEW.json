@@ -3755,6 +3755,73 @@
     "docs/development/backlog.json"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-217",
+   "title": "The battle harness stopped asserting strict withdrawal-cost monotonicity, and asserts the mechanism instead",
+   "raised": "2026-08-13",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-400 (widen battle swing), landed 2026-08-13",
+   "what": "campaign_battle_harness's C3 check said withdrawing later ALWAYS costs more than withdrawing earlier, on every seed. That held at swing_permille 300 and stops holding at 600: at any swing in your ruled band a side that was behind and then wins a big round is pursued less, so its exit gets cheaper. The check was restructured rather than relaxed - it now asserts (a) most seeds stay monotone, and (b) explained == inversions as a STRICT equality, so every cheaper-late-exit must be accounted for by the withdrawing side's deficit narrowing between the two rounds. An unexplained inversion still fails the harness.",
+   "why_it_matters": "This is a test assertion changing in the same commit as the behaviour it tests, which is exactly the shape of quietly weakening a test to make it pass - so it should be looked at rather than taken on trust. The argument that it is a SHARPENING: the old check asserted a numerical coincidence of the narrow swing; the new one asserts the pursuit mechanism itself, and can fail in a way the old one could not (an inversion with no narrowing deficit would pass the old majority-free check only by accident of seed choice). Measured on the merged tree: 8/9 seeds monotone, 2/2 inversions explained, 16/16 harness assertions PASS. If you would rather keep strict monotonicity at the wider swing, the dial is withdraw_per_round_permille, which is outside BL-400's scope and would be its own item.",
+   "options": [],
+   "recommendation": "Accept. The mechanism is the honest property; strict monotonicity was an artifact of the narrow band you asked to widen.",
+   "files": [
+    "tools/verify/campaign_battle_harness.cpp",
+    "src/world/campaign_battle.hpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-218",
+   "title": "A rival could hire itself below its own reserve floor - the standing rule says hiring is never gated on cash, and the fix gates the spend, not the availability",
+   "raised": "2026-08-13",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-394 (hire costs credits) + the verifier-review pass, 2026-08-13",
+   "what": "BL-394 gave hire_unit a real credit cost but left the scorer's candidate spend at 0.0f, with a comment defending that as respecting the standing-rules grant ('gated on stockpile/market access, never on cash'). The solvency gate tests spend > 0, so it was skipped entirely for hires, and the within-tick committed total did not reserve the cash either. Concrete failure: a rival sitting just above its reserve floor hires a Rifle Regiment for 230 and ends BELOW the floor, and a later build in the same evaluation is scored against a balance the hire had already spent. Fixed by mirroring the seam's cost formula into the candidate's spend.",
+   "why_it_matters": "It touches the wording of a rule you set on 2026-08-07. The reading taken: 'never on cash' governs AVAILABILITY - which roster rows are offered, still decided by stockpile and market access alone - while the solvency gate governs SPEND, which every other verb is already subject to. Under that reading nothing about the grant changed, and the alternative (a rival that can spend past its own floor) is a bug in any reading. But the rule's text now over-claims, and .claude/rules/io-standing-rules.md wants a one-clause amendment saying the credit cost is gated like any other spend. I have NOT amended the rule file - that is your text.",
+   "options": [],
+   "recommendation": "Confirm the availability/spend reading, and I will add the one clause to the standing rules. If you meant 'never on cash' to cover the spend too, then the hire cost itself is the thing to revisit, not the gate.",
+   "files": [
+    "src/world/corp_ai.cpp",
+    ".claude/rules/io-standing-rules.md"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-219",
+   "title": "A slice proposed documenting a live market mechanism as dormant, and the review caught it",
+   "raised": "2026-08-13",
+   "kind": "observation",
+   "status": "open",
+   "source": "BL-382 slice review, 2026-08-13",
+   "what": "The BL-382 slice shipped a code comment and a MARKETS.md block stating that the inter-body demand pull is dormant in the generated world because home supply exceeds home demand, so the shortfall gate never opens. Both were false. clear_markets zeroes every market's supply at market_clearing.cpp:452, and inject_interbody_demand runs at :468 - before any supply write - so home supply is identically zero at the read, the subtraction is a no-op, and the gate opens for every resource carrying any demand. The pull is live and it pulls against GROSS demand. Comment and doc corrected; the defect filed as BL-404 (inter-body pull is un-netted, priority A).",
+   "why_it_matters": "The wrong half is not the code - the slice's actual code change was sound - it is the doc. A comment saying 'this never fires' is an instruction to the next reader not to look, and it would have sat in an authority doc pointing away from a live input to every outpost price. Worth noting as a pattern: the claim was plausible, cited a real measurement (BL-381's supply-vs-demand magnitudes), and was wrong only because of a sequencing fact three functions away. That is precisely what the no-compile review pass is for, and it is the second time in two days a confidently-worded claim has needed checking against the code rather than against its own reasoning.",
+   "options": [],
+   "recommendation": "No action needed beyond BL-404. Recorded because the near-miss is the useful part.",
+   "files": [
+    "src/world/market_clearing.cpp",
+    "docs/economy/MARKETS.md"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-220",
+   "title": "ai_skill_harness is 13 assertions red, and was already 13 red before this batch",
+   "raised": "2026-08-13",
+   "kind": "observation",
+   "status": "open",
+   "source": "Low-risk wave integration, 2026-08-13",
+   "what": "The AI skill harness reports 13 failures on the merged tree (net-worth final and min bands on all five seeds, plus three thrash-ceiling rows). The same harness built and run at the pre-batch commit 9735ee8 reports THE SAME 13 failures, assertion for assertion. So this batch - which changed rival hiring costs, enumeration parity and market writes - moved the harness's verdict not at all.",
+   "why_it_matters": "It settles what would otherwise be an open question hanging over the batch ('did the hire cost break the AI?' - no), and it re-states the standing gap NR-169 already recorded: the golden bands drift with every landing and nobody re-blesses them, so the harness has stopped being able to report anything. A permanently-red instrument trains you to ignore it, which is worse than not having it. The bands want a re-bless pass alongside the visual goldens in BL-402.",
+   "options": [],
+   "recommendation": "Fold the ai_skill_harness band re-bless into BL-402 (golden re-bless pass) rather than leaving it to drift further - the visual goldens and these bands have the same stewardship problem and the same fix.",
+   "files": [
+    "tools/verify/ai_skill_harness.cpp"
+   ],
+   "resolution": null
   }
  ]
 }
