@@ -415,12 +415,17 @@ void inject_interbody_demand(world& w, const recipe_registry& reg)
 
         for (std::size_t r = 0; r < resource_count; ++r)
         {
-            // Dormant in the generated world (BL-382): home supply exceeds home
-            // demand by orders of magnitude for essentially every resource (the
-            // BL-381 measurement), so this gate never opens and outposts get no
-            // pull. The mechanism is sound — the world just never satisfies the
-            // precondition. Re-check when BL-381 gives demand real weight.
-            // See docs/economy/MARKETS.md § What clears there.
+            // THE SUBTRACTION IS A NO-OP HERE, AND THE PULL IS LIVE (BL-404).
+            // `clear_markets` zeroes every market's supply immediately above
+            // (mc.supply.fill) and the supply writes come later in the same
+            // pass, so home.supply is identically 0.0f at this read: the
+            // shortfall is home *gross* demand, not unmet demand, and the gate
+            // opens for every resource carrying any demand at all. Outposts
+            // therefore receive pull_fraction of Kepler's gross demand every
+            // tick. Written as `demand - supply` because that is the intent;
+            // making the intent true means reading a supply this pass has not
+            // computed yet. BL-404 owns the fix — do not "simplify" the
+            // subtraction away, it is the record of what this should net.
             const float home_shortfall = home.demand[r] - home.supply[r];
             if (home_shortfall <= 0.0f)
                 continue;

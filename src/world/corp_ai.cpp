@@ -969,7 +969,22 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     c.cmd.tile      = muster_tile;
                     c.cmd.unit_type = static_cast<uint16_t>(idx);
                     c.score  = static_cast<float>(row->weight) * 0.01f * jitter;
-                    c.spend  = 0.0f; // resource-debited inside apply_corp_command
+                    // The credit half of the cost BL-394 gave the seam, mirrored
+                    // from apply_corp_command's formula so the solvency gate and
+                    // the within-tick `committed` running total both see it. It
+                    // was 0.0f when hiring was free; leaving it at 0.0f once the
+                    // seam charged for it let a rival hire itself BELOW its own
+                    // reserve floor (the gate short-circuits on `spend > 0`) and
+                    // let a later build in the same evaluation be scored against
+                    // a balance the hire had already spent.
+                    //
+                    // This does not gate AVAILABILITY on cash — which rows are
+                    // offered still comes from stockpile/market access alone
+                    // (available_rows above), exactly as the standing-rules
+                    // grant requires. It gates the SPEND, like every other spend.
+                    const military_capability_params& mil = reg.military();
+                    c.spend  = mil.hire_base_cost
+                             + mil.hire_cost_per_power * static_cast<float>(row->power_mod);
                     c.reason = corp_decision_reason::hire_available;
                     c.bucket = bucket_for_reason(c.reason);
                     cands.push_back(c);

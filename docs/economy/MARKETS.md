@@ -60,12 +60,14 @@ home body is the one market every outpost is presumed to ultimately feed, direct
 surplus between bodies — this mechanism only shapes the outpost's local *price*, it moves no
 goods itself).
 
-> **Dormant in the generated world (BL-382, the dead market writes, 2026-08-13).** The pull gates
-> on the home body's *unmet* demand (`demand − supply > 0`), and in the generated world home
-> supply exceeds home demand by two to three orders of magnitude for essentially every resource
-> (the BL-381 measurement of what supply and demand actually mean) — the shortfall is never
-> positive, so outpost markets currently receive zero pull. The mechanism is sound; the world
-> never satisfies its precondition. Re-check when BL-381 lands and demand carries real weight.
+> **The pull is live, and it pulls against *gross* demand (BL-404, found 2026-08-13).** The
+> code reads `demand − supply`, which states the intent — an outpost should be pulled by what
+> the home body *cannot* meet itself. But `clear_markets` zeroes every market's supply before
+> this injection runs, and the supply writes land after it, so `home.supply` is identically zero
+> at the read. The subtraction is a no-op: the shortfall is home gross demand, the gate opens for
+> every resource carrying any demand, and each outpost market receives `pull_fraction` of
+> Kepler's gross demand every tick, distance-discounted. BL-404 owns the fix; the wrong number
+> here is a live input to every outpost price, not a dormant branch.
 
 ## What trades
 
