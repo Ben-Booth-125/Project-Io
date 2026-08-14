@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*231 entries — 85 open, 146 resolved.*
+*231 entries — 84 open, 147 resolved.*
 
 ---
 
@@ -952,21 +952,6 @@ Building BL-409's R1 assertion turned up something about the WORLD rather than a
 > **Recommendation:** Option 3's second half regardless of the first: spectator mode should choose its opening viewpoint deliberately rather than inheriting whichever corp the player would have been. That is a small addition to BL-409 or BL-410, and it is worth deciding before the attention director is built on top of it.
 
 *Files: `src/world/corporation_generation.cpp`, `docs/generation/CORPORATION_GENERATION.md`, `tools/verify/spectator_determinism.cpp`*
-
-### NR-232 — `runner_up` is the next candidate in SORT order, not the best rejected one - so the feed's margin often compares two commands that BOTH ran
-*observation · raised 2026-08-14 · from Cold code review of the BL-407 diff, 2026-08-14*
-
-corp_ai.cpp:1182 records `runner_up = cands[i+1].score` - the next candidate in the sorted list. But the greedy loop applies UP TO SEVEN commands per evaluation (max_builds 1 + max_dials 3 + survey 1 + hire 1 + max_trades 1), pushing a decision for each. So `cands[i+1]` is frequently a command that was ALSO applied on the same tick. Worked example: a corp applies `idle` (must_have, 5.00) at i=0 and `set_recipe` (4.90) at i=1; both pass the gates, both run, both are logged. The feed renders row 0 as '5.00 v 4.90' and bands it a COIN-FLIP - 'the tuning could have flipped this' - when nothing was foregone at all. Confirmed by reading the loop; supersedes and subsumes NR-226, which described only the narrower priority-bucket case.
-
-**Why it matters.** This undercuts BL-407's headline rationale. decision_feed.hpp and question_log.json both argue the surface earns its space because 'the margin is the point - a decision at 0.81 against a runner-up of 0.79 is a coin-flip'. On the common path that sentence is false: the pair is not a contest, it is two things that both happened. The feed is a faithful renderer of a field whose NAME lies. It also means BL-411 (strategy readout) and BL-279 (trace corpus) would aggregate a field that does not mean what it is called - and both are about to.
-
-- Record the best REJECTED candidate instead - the first candidate after i that failed a budget or solvency gate. That makes the field mean what its name says, and is the version BL-411 wants. A corp_ai.cpp change; changes no behaviour, only what is logged.
-- Relabel the column and the field to "next candidate" and drop the coin-flip/conviction framing. Honest, cheap, and much less useful - the surface loses most of its argument for existing.
-- Record BOTH: the next candidate (what it does today) and the best rejected one.
-
-> **Recommendation:** Option 1. It is the field BL-407 was designed around, the change is confined to what corp_ai.cpp writes into the decision record, and it costs no behaviour. Until it lands the feed's margin banding should not be trusted, and the question_log `because` field overstates what the surface delivers.
-
-*Files: `src/world/corp_ai.cpp`, `src/ui/decision_feed.cpp`, `src/ui/decision_feed.hpp`, `docs/ui/question_log.json`*
 
 ### NR-233 — BL-407 review: seven non-blocking findings (per-frame row rebuild, duplicate corp names, hand-mirrored tables, filter caveats)
 *observation · raised 2026-08-14 · from Cold code review of the BL-407 diff, 2026-08-14*
@@ -3094,4 +3079,21 @@ BL-394 gave hire_unit a real credit cost but left the scorer's candidate spend a
 > **RESOLVED.** ACCEPTED 2026-08-13 (Ben), and the standing rules are amended. The availability/spend reading is confirmed: "never on cash" governs which roster rows are OFFERED (stockpile and market access alone), while the credit cost BL-394 introduced is subject to the solvency gate like every other spend. The corp_ai fix stands - a rival carries the hire cost in its candidate spend, so it cannot hire itself below its reserve floor and a hire reserves cash against later candidates in the same evaluation. The BL-324 paragraph in .claude/rules/ io-standing-rules.md now states this explicitly rather than over-claiming.
 
 *Files: `src/world/corp_ai.cpp`, `.claude/rules/io-standing-rules.md`*
+
+### NR-232 — `runner_up` is the next candidate in SORT order, not the best rejected one - so the feed's margin often compares two commands that BOTH ran
+*observation · raised 2026-08-14 · from Cold code review of the BL-407 diff, 2026-08-14*
+
+corp_ai.cpp:1182 records `runner_up = cands[i+1].score` - the next candidate in the sorted list. But the greedy loop applies UP TO SEVEN commands per evaluation (max_builds 1 + max_dials 3 + survey 1 + hire 1 + max_trades 1), pushing a decision for each. So `cands[i+1]` is frequently a command that was ALSO applied on the same tick. Worked example: a corp applies `idle` (must_have, 5.00) at i=0 and `set_recipe` (4.90) at i=1; both pass the gates, both run, both are logged. The feed renders row 0 as '5.00 v 4.90' and bands it a COIN-FLIP - 'the tuning could have flipped this' - when nothing was foregone at all. Confirmed by reading the loop; supersedes and subsumes NR-226, which described only the narrower priority-bucket case.
+
+**Why it matters.** This undercuts BL-407's headline rationale. decision_feed.hpp and question_log.json both argue the surface earns its space because 'the margin is the point - a decision at 0.81 against a runner-up of 0.79 is a coin-flip'. On the common path that sentence is false: the pair is not a contest, it is two things that both happened. The feed is a faithful renderer of a field whose NAME lies. It also means BL-411 (strategy readout) and BL-279 (trace corpus) would aggregate a field that does not mean what it is called - and both are about to.
+
+- Record the best REJECTED candidate instead - the first candidate after i that failed a budget or solvency gate. That makes the field mean what its name says, and is the version BL-411 wants. A corp_ai.cpp change; changes no behaviour, only what is logged.
+- Relabel the column and the field to "next candidate" and drop the coin-flip/conviction framing. Honest, cheap, and much less useful - the surface loses most of its argument for existing.
+- Record BOTH: the next candidate (what it does today) and the best rejected one.
+
+> **Recommendation:** Option 1. It is the field BL-407 was designed around, the change is confined to what corp_ai.cpp writes into the decision record, and it costs no behaviour. Until it lands the feed's margin banding should not be trusted, and the question_log `because` field overstates what the surface delivers.
+
+> **RESOLVED.** FIXED 2026-08-14, option 1. corp_ai.cpp now records the best candidate the corp did NOT take in the evaluation - the highest-scoring one rejected by an action budget, the one-touch rule, the solvency gate or the seam. Every rejection site calls a forgo() lambda; decisions are collected in a pending vector and flushed after the greedy loop, since best_rejected is only complete once the whole candidate list has been walked. Ring push and decision-topic log append stay one-for-one in application order, so BL-407s positional pre-ring recovery is unchanged. VERIFIED LOG-ONLY: world::state_hash does not include ai_decisions, and spectator_determinism reports the same hashes as before the change - played 3CBAD1D44EE71EDE, spectated E4933538DDB2A28C, 18/18 PASS. Every decision from one evaluation now carries the same runner-up, which is honest: the foregone option belongs to the evaluation, not the command. The feeds run>=win branch is relabelled overridden and is now the most interesting row type - the corp passed up a higher-scoring option because priority, budget or solvency decided instead of score.
+
+*Files: `src/world/corp_ai.cpp`, `src/ui/decision_feed.cpp`, `src/ui/decision_feed.hpp`, `docs/ui/question_log.json`*
 

@@ -249,10 +249,15 @@ margin_read read_margin(float win, float run)
 {
     margin_read m;
 
-    // `runner_up` is documented as 0 when there was NO next candidate
-    // (corp_command.hpp). That is a walkover, not a rival that scored zero, so
-    // it gets its own phrase — rendering a full bar against a "0.00" opponent
-    // would state that a rival option existed and lost badly.
+    // Since NR-232 `runner_up` is THE BEST OPTION THIS CORP DID NOT TAKE in the
+    // evaluation — not, as before, whatever candidate happened to sort next,
+    // which was often a command that also ran. So the pair is now a genuine
+    // counterfactual and the phrasing below can be taken at face value.
+    //
+    // 0 means nothing was passed up: every enumerated candidate was acted on.
+    // A walkover, not a rival that scored zero, so it gets its own phrase —
+    // a full bar against a "0.00" opponent would state that an option existed
+    // and lost badly.
     if (run <= 0.0f)
     {
         m.conviction  = 1.0f;
@@ -262,16 +267,18 @@ margin_read read_margin(float win, float run)
         return m;
     }
 
-    // The candidate list sorts by PRIORITY BUCKET first and score second
-    // (corp_ai.cpp, candidate_before), so the next candidate can out-score the
-    // winner — it is simply in a worse bucket. When that happens the score did
-    // not decide anything and the bucket did, which is a materially different
-    // fact from a narrow win. Reporting a negative margin here would read as
-    // "the scorer picked the weaker option", which is not what happened.
+    // The foregone option can still OUT-SCORE what was taken, and this is now
+    // the most interesting row in the feed rather than an artefact. It means
+    // the corp passed up a higher-scoring option because something other than
+    // score decided: a priority bucket (a lower bucket may never starve a
+    // higher one), an action budget, or the solvency floor. Reporting a
+    // negative margin would read as "the scorer picked the weaker option",
+    // which understates it — the scorer picked the more URGENT or the only
+    // AFFORDABLE one, deliberately.
     if (run >= win)
     {
         m.conviction = 0.0f;
-        m.phrase     = "priority call";
+        m.phrase     = "overridden";
         m.colour     = palette::pinned;
         return m;
     }

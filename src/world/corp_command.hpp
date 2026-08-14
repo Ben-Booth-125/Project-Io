@@ -145,7 +145,17 @@ struct corp_decision
     entity_id            corp          = null_entity;
     corp_command         command;
     float                winning_score = 0.0f;
-    float                runner_up     = 0.0f; ///< Next-best candidate's score (0 if none).
+    /// Score of the best candidate the corp did NOT take in this evaluation —
+    /// the highest-scoring one rejected by an action budget, the one-touch rule,
+    /// the solvency gate or the seam. 0 when nothing was passed up.
+    ///
+    /// Was "the next candidate in sort order" until NR-232 (2026-08-14), which
+    /// was misleading: one evaluation applies up to seven commands, so the next
+    /// candidate was frequently a command that ALSO ran, and a reader comparing
+    /// the two scores saw a contest that never happened. Every decision from one
+    /// evaluation now carries the same value — the foregone option belongs to
+    /// the evaluation, not to the individual command.
+    float                runner_up     = 0.0f;
     corp_decision_reason reason        = corp_decision_reason::best_build;
 };
 

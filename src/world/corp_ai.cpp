@@ -1119,6 +1119,40 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         int   builds = 0, dials = 0, surveys = 0, hires = 0, trades = 0;
         float committed = 0.0f;
         std::vector<entity_id> touched_this_eval;
+
+        // The decision log's runner-up (NR-232, 2026-08-14). It used to be
+        // `cands[i + 1].score` — the next candidate in SORT order — which was
+        // wrong in a way that mattered: this loop applies up to seven commands
+        // per evaluation (max_builds + max_dials + survey + hire + max_trades),
+        // so cands[i + 1] was frequently a command that ALSO RAN. The feed built
+        // on that field then reported a near-tie as a coin-flip the tuning could
+        // have flipped, when in truth nothing had been foregone at all.
+        //
+        // It now records **the best option this corp did NOT take** — the
+        // highest-scoring candidate rejected anywhere in the walk, by an action
+        // budget, the one-touch rule, the solvency gate, or the seam itself.
+        // That is what the field's name always claimed, and it is the
+        // counterfactual a reader actually wants: "what did it pass up?"
+        //
+        // Consequences, both deliberate:
+        //  - It is knowable only once the WHOLE list has been walked (a
+        //    candidate rejected at i+5 is as foregone as one rejected at i+1),
+        //    so decisions are collected here and pushed after the loop, in
+        //    application order. The ring and the history log are still written
+        //    one-for-one in that same order, so the feed's positional pairing
+        //    between them is unchanged.
+        //  - Every decision from one evaluation therefore carries the SAME
+        //    runner-up. That is honest: the foregone option belongs to the
+        //    evaluation, not to the individual command.
+        //
+        // Zero still means "nothing was passed up" — every enumerated candidate
+        // was acted on — which the feed renders as "uncontested".
+        struct pending_decision { corp_decision d; entity_id log_body; };
+        std::vector<pending_decision> pending;
+        float best_rejected = 0.0f;
+        const auto forgo = [&best_rejected](const candidate& cand) {
+            best_rejected = std::max(best_rejected, cand.score);
+        };
         for (std::size_t i = 0; i < cands.size(); ++i)
         {
             const candidate& c = cands[i];
@@ -1134,18 +1168,31 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             const bool is_trade  = (c.cmd.verb == corp_verb::place_sell_order ||
                                     c.cmd.verb == corp_verb::remove_sell_order);
             const bool is_dial   = !is_build && !is_survey && !is_hire && !is_trade;
-            if (is_build  && builds  >= p.max_builds) continue;
-            if (is_dial   && dials   >= p.max_dials)  continue;
-            if (is_survey && surveys >= 1)            continue;
+            // Every `continue` below is a FOREGONE candidate, and each one calls
+            // forgo() so it can compete to be the decision log's runner-up.
+            // A budget-capped candidate is the purest case of the thing the
+            // field is for: the corp wanted it and had no slot left.
+            if (is_build  && builds  >= p.max_builds) { forgo(c); continue; }
+            if (is_dial   && dials   >= p.max_dials)  { forgo(c); continue; }
+            if (is_survey && surveys >= 1)            { forgo(c); continue; }
             // One hire per evaluation, same cadence as survey — a rival corp
             // hiring every tick would out-hire the player by pure frequency.
-            if (is_hire   && hires   >= 1)             continue;
-            if (is_trade  && trades  >= p.max_trades) continue;
+            if (is_hire   && hires   >= 1)            { forgo(c); continue; }
+            if (is_trade  && trades  >= p.max_trades) { forgo(c); continue; }
             // One touch per building per evaluation: a second dial on a
             // building already commanded this eval is contradictory.
             if (is_dial && std::find(touched_this_eval.begin(), touched_this_eval.end(),
                                      c.cmd.subject) != touched_this_eval.end())
+            {
+                // Counted as foregone too, though it is the weakest case — the
+                // corp did not pass this up so much as already act on that
+                // building. Included because excluding it would need the reader
+                // to know this rule to interpret the number, and a runner-up
+                // that silently omits some rejections is the same class of
+                // half-truth this whole change is undoing.
+                forgo(c);
                 continue;
+            }
 
             // Solvency gate (BL-203 bucket-aware): Must-Have/Should-Have carry
             // no capex so they are never floor-gated (they cannot starve
@@ -1156,7 +1203,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 (c.bucket == corp_priority_bucket::nice_to_have) ? nice_to_have_floor : floor_;
             if (c.spend > 0.0f &&
                 w.corporations.at(corp).balance - committed - c.spend <= required_floor)
+            {
+                forgo(c); // could not afford it — foregone in the strongest sense
                 continue;
+            }
 
             // Resolve the log's body tag BEFORE the command mutates the world —
             // a demolish erases its subject from w.buildings, so resolving
@@ -1165,7 +1215,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
 
             entity_id built = null_entity;
             if (apply_corp_command(w, reg, c.cmd, &built) != corp_command_result::applied)
+            {
+                forgo(c);
                 continue; // a seam rejection mutates nothing; just skip it
+            }
 
             // APPLY THEN COUNT, and the order is load-bearing rather than
             // incidental. Every budget counter below is incremented only after
@@ -1203,28 +1256,18 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 touched_this_eval.push_back(touched);
             }
 
-            // Decision log: command + winning score vs the next-best candidate.
-            corp_decision d;
-            d.tick          = tick;
-            d.corp          = corp;
-            d.command       = c.cmd;
-            d.winning_score = c.score;
-            d.runner_up     = (i + 1 < cands.size()) ? cands[i + 1].score : 0.0f;
-            d.reason        = c.reason;
-            w.ai_decisions.push(d);
-
-            // World history log (BL-208): an additional, non-evicting copy of
-            // the same decision — the ring above is unchanged and keeps its
-            // existing readers.
-            {
-                world_history_entry log_entry;
-                log_entry.timestamp = tick;
-                log_entry.topic     = history_topic::decision;
-                log_entry.body      = log_body;
-                log_entry.corp      = corp;
-                log_entry.event     = narrate_corp_decision(d);
-                w.history_log.push_back(std::move(log_entry));
-            }
+            // Decision log: command + winning score. The runner-up is filled in
+            // after the loop, once every foregone candidate has been seen
+            // (NR-232 — see the `pending` declaration above). Held here in
+            // application order; the flush below preserves it.
+            pending_decision pd;
+            pd.d.tick          = tick;
+            pd.d.corp          = corp;
+            pd.d.command       = c.cmd;
+            pd.d.winning_score = c.score;
+            pd.d.reason        = c.reason;
+            pd.log_body        = log_body;
+            pending.push_back(std::move(pd));
 
             // Agency event so the chat feed can render the command (BL-205).
             agency_event ev{};
@@ -1301,6 +1344,33 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 log_entry.event     = narrate_agency_event(ev);
                 w.history_log.push_back(std::move(log_entry));
             }
+        }
+
+        // ---- Flush this evaluation's decisions (NR-232) ---------------------
+        // Deferred to here because `best_rejected` is only complete once the
+        // whole candidate list has been walked. Order is application order, and
+        // the ring push and the `decision`-topic log append stay one-for-one in
+        // that order — the positional pairing the decision feed relies on to
+        // recover pre-ring rows (BL-407) is unchanged.
+        //
+        // What DID change: `decision` and `agency` entries no longer alternate
+        // within one evaluation — the agency entries are appended above, per
+        // command, and the decision entries all land here. Nothing reads the
+        // two topics as an interleaved sequence (the feed filters by topic and
+        // ignores `agency` entirely), but a future reader that wants to pair a
+        // decision with its agency event must match on fields, not on adjacency.
+        for (pending_decision& pd : pending)
+        {
+            pd.d.runner_up = best_rejected;
+            w.ai_decisions.push(pd.d);
+
+            world_history_entry log_entry;
+            log_entry.timestamp = tick;
+            log_entry.topic     = history_topic::decision;
+            log_entry.body      = pd.log_body;
+            log_entry.corp      = corp;
+            log_entry.event     = narrate_corp_decision(pd.d);
+            w.history_log.push_back(std::move(log_entry));
         }
     }
 }

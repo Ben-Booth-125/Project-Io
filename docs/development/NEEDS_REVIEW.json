@@ -4050,7 +4050,7 @@
    "title": "`runner_up` is the next candidate in SORT order, not the best rejected one - so the feed's margin often compares two commands that BOTH ran",
    "raised": "2026-08-14",
    "kind": "observation",
-   "status": "open",
+   "status": "resolved",
    "source": "Cold code review of the BL-407 diff, 2026-08-14",
    "what": "corp_ai.cpp:1182 records `runner_up = cands[i+1].score` - the next candidate in the sorted list. But the greedy loop applies UP TO SEVEN commands per evaluation (max_builds 1 + max_dials 3 + survey 1 + hire 1 + max_trades 1), pushing a decision for each. So `cands[i+1]` is frequently a command that was ALSO applied on the same tick. Worked example: a corp applies `idle` (must_have, 5.00) at i=0 and `set_recipe` (4.90) at i=1; both pass the gates, both run, both are logged. The feed renders row 0 as '5.00 v 4.90' and bands it a COIN-FLIP - 'the tuning could have flipped this' - when nothing was foregone at all. Confirmed by reading the loop; supersedes and subsumes NR-226, which described only the narrower priority-bucket case.",
    "why_it_matters": "This undercuts BL-407's headline rationale. decision_feed.hpp and question_log.json both argue the surface earns its space because 'the margin is the point - a decision at 0.81 against a runner-up of 0.79 is a coin-flip'. On the common path that sentence is false: the pair is not a contest, it is two things that both happened. The feed is a faithful renderer of a field whose NAME lies. It also means BL-411 (strategy readout) and BL-279 (trace corpus) would aggregate a field that does not mean what it is called - and both are about to.",
@@ -4066,7 +4066,7 @@
     "src/ui/decision_feed.hpp",
     "docs/ui/question_log.json"
    ],
-   "resolution": ""
+   "resolution": "FIXED 2026-08-14, option 1. corp_ai.cpp now records the best candidate the corp did NOT take in the evaluation - the highest-scoring one rejected by an action budget, the one-touch rule, the solvency gate or the seam. Every rejection site calls a forgo() lambda; decisions are collected in a pending vector and flushed after the greedy loop, since best_rejected is only complete once the whole candidate list has been walked. Ring push and decision-topic log append stay one-for-one in application order, so BL-407s positional pre-ring recovery is unchanged. VERIFIED LOG-ONLY: world::state_hash does not include ai_decisions, and spectator_determinism reports the same hashes as before the change - played 3CBAD1D44EE71EDE, spectated E4933538DDB2A28C, 18/18 PASS. Every decision from one evaluation now carries the same runner-up, which is honest: the foregone option belongs to the evaluation, not the command. The feeds run>=win branch is relabelled overridden and is now the most interesting row type - the corp passed up a higher-scoring option because priority, budget or solvency decided instead of score."
   },
   {
    "id": "NR-233",
