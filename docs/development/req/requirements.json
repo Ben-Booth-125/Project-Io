@@ -10712,7 +10712,7 @@
      "requirement": "The feed lists recent strategic decisions newest-first, each row carrying date, corp, verb + target, reason, and the winning/runner-up score pair.",
      "class": "visual",
      "status": "pending",
-     "notes": ""
+     "notes": "Captured. CAVEAT, from cold review (NR-232): the score PAIR is rendered faithfully but `runner_up` is the next candidate in sort order, not the best rejected one, so the margin banding overstates how often a decision was genuinely close. R1's 'carries the score pair' is met; the interpretation the surface puts on that pair is not yet sound."
     },
     {
      "id": "R2",
@@ -10740,14 +10740,14 @@
      "requirement": "The ledger obeys the standing toggle rule: the rail slot closes it when clicked while active, and it is mutually exclusive with the other column occupants.",
      "class": "visual",
      "status": "pending",
-     "notes": "io-standing-rules.md § Toggle rule. close_all_panels/any_panel_open updated in the seam commit."
+     "notes": "VERIFIED BY INSPECTION ONLY, and the visual check does NOT cover it - found by cold review, 2026-08-14. verify.show_panel writes the ui_state flag directly and never routes through close_all_panels, and no verify hook simulates a rail click, so the mutual exclusion the script appears to demonstrate is arranged BY the script. Deleting both the show_decision_feed line from close_all_panels and the close_all_panels call from nav_pane's case 11 leaves the captures byte-identical. Closing this properly needs a verify hook that presses the rail slot."
     },
     {
      "id": "R6",
      "requirement": "The feed is reachable from a headless capture run: show_panel(\"decisions\"), decision_filter(reason, corp) and spectate(bool) exist in the verify API, and scripts/verify/decision_feed.lua exercises R1/R2/R5.",
      "class": "visual",
      "status": "pending",
-     "notes": "Authored in the main session (verify_api.cpp + the script), since neither implementation agent owned those files. Runs CAPTURE-ONLY with no golden, on demand (Ben's call, 2026-08-14): a golden over a list of AI decisions would go red on every corp_ai tuning change, scorer candidate-set change and world-gen change - none of which are this surface - and an always-red golden teaches blessing without looking. The verifier-visual skill AUTO-DISCOVERS scripts/verify/*.lua, so the check is already reachable by the skill without a skill edit; only naming it in the skill's prose was ever the open question, and it is deliberately left unnamed."
+     "notes": "Authored in the main session (verify_api.cpp + the script), since neither implementation agent owned those files. Exercises R1 and R2 only - the earlier claim that it also exercised R5 was wrong and is corrected in R5's own notes. Runs CAPTURE-ONLY with no golden (Ben's call, 2026-08-14): a golden over a list of AI decisions would go red on every corp_ai tuning change, scorer candidate-set change and world-gen change, none of which are this surface, and an always-red golden teaches blessing without looking. The verifier-visual skill AUTO-DISCOVERS scripts/verify/*.lua, so the check is already reachable without a skill edit; it is deliberately left unnamed in the skill's prose."
     }
    ]
   },

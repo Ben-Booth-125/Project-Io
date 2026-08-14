@@ -1507,8 +1507,12 @@ void app::render()
     // the report's tile-pass inputs; nothing it reads is held on the world.
     ui::draw_generation_ledger(m_world, m_ui, m_generation_report, &m_ui.show_generation_ledger);
     // AI decision feed (BL-407) — a reader over world::ai_decisions and the
-    // history log's decision/agency topics. Read-only: const world in, and it
-    // writes nothing but its own filters in ui_state.
+    // history log's `decision` topic. NOT `agency`: the strategic agency entries
+    // are a second narration of the same decisions (pushed one-for-one in the
+    // same block in corp_ai.cpp), so merging them would double every row, and
+    // the BL-079 reflex-tier entries are not scorer decisions at all — they
+    // carry neither reason nor score. See NR-227.
+    // Read-only: const world in, and it writes nothing but its own ui_state filters.
     ui::draw_decision_feed(m_world, m_ui, &m_ui.show_decision_feed);
     {
         const ui::player_plot_history phist{m_balance_history, m_income_history, m_expenditure_history};

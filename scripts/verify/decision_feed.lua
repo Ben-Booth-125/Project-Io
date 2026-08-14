@@ -18,13 +18,22 @@ verify.spectate(true)
 verify.econ_step(24)
 
 -- econ_step opens the economy panel; the column holds ONE occupant, so close it
--- explicitly rather than relying on the feed's own toggle to evict it.
+-- explicitly.
+--
+-- R5 IS NOT CHECKED HERE, and saying so is the point. `show_panel` writes the
+-- ui_state flag DIRECTLY — it never routes through `close_all_panels`, and there
+-- is no verify hook that simulates a rail click. So the mutual exclusion below
+-- is arranged by this script rather than demonstrated by the app: delete both
+-- the `show_decision_feed` line from `close_all_panels` AND the
+-- `close_all_panels(state)` call from nav_pane's case 11, and these captures
+-- come out byte-identical. R5 is verified by INSPECTION only. Claiming
+-- otherwise is the vacuous-green failure this project already paid for once
+-- (BL-404, and interbody_pull_harness's own first run).
 verify.show_panel("economy", false)
 verify.show_panel("decisions", true)
 
--- R1: rows newest-first with date, corp, verb + target, reason, and the
--- winning/runner-up pair. R5's mutual exclusion is visible here too — the
--- economy panel must be gone from the column.
+-- R1: rows newest-first with date, corp, verb + target, reason, and the score
+-- pair.
 verify.capture("decision_feed_all")
 
 -- R2: the reason filter narrows the list. 0 = best_build, the reason with the

@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*229 entries — 83 open, 146 resolved.*
+*231 entries — 85 open, 146 resolved.*
 
 ---
 
@@ -880,6 +880,8 @@ corp_ai.cpp:1182 records `runner_up = cands[i+1].score` - the next entry in sort
 
 > **Recommendation:** Option 2 is the more useful log, but it is a corp_ai.cpp change and BL-407 does not own it. Worth deciding before BL-411 aggregates the field.
 
+> **RESOLVED.** SUPERSEDED by NR-232 (2026-08-14). The bucket-ordering case described here is real but is the narrow half of a wider problem: `runner_up` is the next candidate in sort order, which is frequently a command that was ALSO APPLIED, not a rejected rival at all. Read NR-232 instead.
+
 *Files: `src/world/corp_ai.cpp`, `src/ui/decision_feed.cpp`*
 
 ### NR-227 — BL-407 decisions taken: the agency topic is not merged into the feed, and the reason filter hides prose-only rows
@@ -950,6 +952,32 @@ Building BL-409's R1 assertion turned up something about the WORLD rather than a
 > **Recommendation:** Option 3's second half regardless of the first: spectator mode should choose its opening viewpoint deliberately rather than inheriting whichever corp the player would have been. That is a small addition to BL-409 or BL-410, and it is worth deciding before the attention director is built on top of it.
 
 *Files: `src/world/corporation_generation.cpp`, `docs/generation/CORPORATION_GENERATION.md`, `tools/verify/spectator_determinism.cpp`*
+
+### NR-232 — `runner_up` is the next candidate in SORT order, not the best rejected one - so the feed's margin often compares two commands that BOTH ran
+*observation · raised 2026-08-14 · from Cold code review of the BL-407 diff, 2026-08-14*
+
+corp_ai.cpp:1182 records `runner_up = cands[i+1].score` - the next candidate in the sorted list. But the greedy loop applies UP TO SEVEN commands per evaluation (max_builds 1 + max_dials 3 + survey 1 + hire 1 + max_trades 1), pushing a decision for each. So `cands[i+1]` is frequently a command that was ALSO applied on the same tick. Worked example: a corp applies `idle` (must_have, 5.00) at i=0 and `set_recipe` (4.90) at i=1; both pass the gates, both run, both are logged. The feed renders row 0 as '5.00 v 4.90' and bands it a COIN-FLIP - 'the tuning could have flipped this' - when nothing was foregone at all. Confirmed by reading the loop; supersedes and subsumes NR-226, which described only the narrower priority-bucket case.
+
+**Why it matters.** This undercuts BL-407's headline rationale. decision_feed.hpp and question_log.json both argue the surface earns its space because 'the margin is the point - a decision at 0.81 against a runner-up of 0.79 is a coin-flip'. On the common path that sentence is false: the pair is not a contest, it is two things that both happened. The feed is a faithful renderer of a field whose NAME lies. It also means BL-411 (strategy readout) and BL-279 (trace corpus) would aggregate a field that does not mean what it is called - and both are about to.
+
+- Record the best REJECTED candidate instead - the first candidate after i that failed a budget or solvency gate. That makes the field mean what its name says, and is the version BL-411 wants. A corp_ai.cpp change; changes no behaviour, only what is logged.
+- Relabel the column and the field to "next candidate" and drop the coin-flip/conviction framing. Honest, cheap, and much less useful - the surface loses most of its argument for existing.
+- Record BOTH: the next candidate (what it does today) and the best rejected one.
+
+> **Recommendation:** Option 1. It is the field BL-407 was designed around, the change is confined to what corp_ai.cpp writes into the decision record, and it costs no behaviour. Until it lands the feed's margin banding should not be trusted, and the question_log `because` field overstates what the surface delivers.
+
+*Files: `src/world/corp_ai.cpp`, `src/ui/decision_feed.cpp`, `src/ui/decision_feed.hpp`, `docs/ui/question_log.json`*
+
+### NR-233 — BL-407 review: seven non-blocking findings (per-frame row rebuild, duplicate corp names, hand-mirrored tables, filter caveats)
+*observation · raised 2026-08-14 · from Cold code review of the BL-407 diff, 2026-08-14*
+
+S1 - decision_feed.cpp rebuilds all rows EVERY FRAME while open: a reverse walk of the history log, up to 512 feed_rows each with 2-3 std::strings and 1-3 map lookups, then ~6 ImGui items per row (~3000/frame) with TextWrapped doing word-wrap layout. No ImGuiListClipper. This project has a frame-budget HUD (BL-249) and already paid down one O(corps x tiles) loop (BL-253). S2 - make_corp_name has no uniqueness pass, so two corps from one nation collide at roughly 1/108 per pair, and the corp filter's ImGui::Selectable then emits two items with identical IDs. S3 - k_reason_count = 8 and both label tables are hand-mirrored from corp_ai.cpp's anonymous namespace; a 9th reason silently vanishes from the filter and narrates as 'unspecified' (see also NR-228). S4 - the provenance line says 'N older recovered from the history log' where N is capped at 256, so with 5000 evicted decisions it implies that is all there were. S5 - the corp filter silently resets to 'all' when the filtered corp has no rows left, which ACTIONS.json's ledger.decision_feed_filter_corp does not mention. S7 - the Clear button has no ACTIONS.json entry.
+
+**Why it matters.** None blocks. S1 is the one with teeth: the feed is meant to be watched at 16x speed while the sim runs, which is precisely when a per-frame rebuild of 512 rows competes with the frame budget - and spectator mode is the mode that keeps it open. S2 and S3 are silent-failure shapes rather than present bugs.
+
+> **Recommendation:** S1 before spectator mode is used in anger (cache the row vector, rebuild on tick change rather than per frame; add a clipper). S4/S5/S7 are small truthfulness fixes. S2 belongs to corporation generation, not here.
+
+*Files: `src/ui/decision_feed.cpp`, `src/world/corporation_generation.cpp`, `docs/ai/ACTIONS.json`*
 
 ---
 

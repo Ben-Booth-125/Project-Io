@@ -186,9 +186,11 @@ struct ui_state
 
     // --- AI decision feed (BL-407) ---
     // A reader over stores that have always been populated and never surfaced:
-    // world::ai_decisions (the 256-entry strategic ring, with score margins) and
-    // world::history_log's `decision` / `agency` topics (permanent, prose, no
-    // margins). Like every ledger it starts closed. See ui/decision_feed.hpp.
+    // world::ai_decisions (the 256-entry strategic ring, with scores) and
+    // world::history_log's `decision` topic (permanent, prose, no scores).
+    // The `agency` topic is deliberately NOT read — it re-narrates the same
+    // decisions one-for-one and would double every row (NR-227).
+    // Like every ledger it starts closed. See ui/decision_feed.hpp.
 
     bool show_decision_feed = false; ///< Whether the AI decision feed is open.
 
