@@ -428,6 +428,14 @@ would seed the check and prove nothing. Expect `-- Deps: COLD -> ...` then exit 
 2026-08-09 on Linux: **74 s, ~120 MB, succeeds** — the schannel fault is Windows-specific and
 does not reproduce here, so this check passing on Linux does *not* clear BL-302 on Windows.
 
+**Measured 2026-08-13 on Windows 11 (BL-341): ~120 MB, exit 0 — it succeeds.** This is the
+outcome BL-341 named as the second of two, and it settles the posture: the schannel revocation
+failure that opened BL-302 was **transient or environmental** (AV TLS interception, or a
+cert-chain that has since changed), not a standing property of this machine. So the seeded
+`_deps_cache` is **insurance, not a fix** — worth keeping, because a fresh clone on a machine
+having a bad TLS day still wants it, but nothing here depends on it. Re-run this check before
+trusting a fresh-clone build on a machine you have not built on.
+
 The complement — proves the cache alone is sufficient, with the network fully off:
 
 ```sh
