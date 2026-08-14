@@ -522,8 +522,12 @@ repository public to enable this feature"*). And GitHub Actions was **deleted on
 from the tree. Do not cite `build.yml` or a "red CI run"; neither can occur.
 
 What actually guards `main` is therefore **entirely local and human**: a green local build plus
-`ctest --test-dir build_linux -LE sweep --output-on-failure` (or `check.bat`) before a release commit lands — step
+`ctest --test-dir build_linux --output-on-failure` (or `check.bat`) before a release commit lands — step
 1 of the Cut above. That is the whole gate. Run it deliberately; nothing will run it for you.
+*(The `-LE sweep` this line used to carry is no longer needed — since BL-415 each sweep test's
+COMMAND is a gate script that reports itself Skipped unless `IO_RUN_SWEEPS` is set in the
+environment, so a bare `ctest` skips them by machinery rather than by a flag the caller has to
+remember.)*
 
 **Test tiers, and why the gate excludes one (BL-288, 2026-08-09).** The suite holds three kinds
 of program, and treating them alike is what made the gate untrustworthy:
@@ -546,7 +550,10 @@ how the one real defect, `ai_skill_harness`'s stale GCC goldens, sat unnoticed a
 positives for days.
 
 So: a `bench` failure means *re-run it on an idle machine* before treating it as a regression,
-and the `sweep` tests are run deliberately (`ctest -L sweep`, or by name), never as a gate.
+and the `sweep` tests are run deliberately (`$env:IO_RUN_SWEEPS=1; ctest -L sweep`, or by
+running the harness exe directly), never as a gate — since BL-415 each sweep test's COMMAND is
+a gate script (`tools/verify/run_sweep.cmake`) that reports itself Skipped without that
+environment variable, so a bare `ctest` cannot run one by accident.
 
 One consequence worth stating, because it has already bitten: a build tree's **configuration is
 not obvious from its name**. `build_linux/` is Ninja + **Release** and is the canonical Linux tree;

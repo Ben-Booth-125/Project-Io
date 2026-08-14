@@ -9523,8 +9523,8 @@
    "design": "Consolidate to one canonical name table (RESOURCES.md already owns the canonical list) with the other two call sites reading through it, plus a loud failure (not a silent fallback) on lookup miss so a future gap fails at the point it is introduced rather than three tables later, unpredictably, at runtime."
   },
   {
-   "status": "designed",
-   "glyph": "✓",
+   "status": "complete",
+   "glyph": "*",
    "parked": false,
    "blocked_on": [],
    "written": "2026-08-14",
@@ -9543,7 +9543,9 @@
    ],
    "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
    "summary": "Filed from NR-194 (2026-08-14 housekeeping). history_sim_harness, history_sweep and data_creep_harness carry a `sweep` CTest label and are documented as excluded from the routine gate, but the gate invocation that actually excludes them (`ctest -LE sweep`) is nowhere enforced - a bare `ctest` runs them anyway. This session two orphaned history_sim_harness processes were found burning ~5,200 CPU-seconds each from a killed run, starving the machine.",
-   "design": "Either make the documented gate command the one every script and doc actually calls (grep for bare `ctest` invocations and fix them), or set these three harnesses' CTest properties so they are skipped by default and opted into explicitly - a label that only protects the caller who remembers a flag is documentation wearing machinery's clothes."
+   "design": "Either make the documented gate command the one every script and doc actually calls (grep for bare `ctest` invocations and fix them), or set these three harnesses' CTest properties so they are skipped by default and opted into explicitly - a label that only protects the caller who remembers a flag is documentation wearing machinery's clothes.",
+   "resolved": "2026-08-14",
+   "resolution": "Landed 2026-08-14 (gate-hygiene block). Each sweep test's CTest COMMAND is now tools/verify/run_sweep.cmake, which reports itself Skipped (SKIP_REGULAR_EXPRESSION) unless IO_RUN_SWEEPS is set — exclusion is machinery, not the -LE flag. CONFIGURATIONS was tried first and measured NOT to gate on the single-config NMake generator (a -C Release run still executed history_sweep), hence the wrapper. Verified both ways: bare ctest skips all sweeps in 0.13s; IO_RUN_SWEEPS=1 runs them. DEVELOPMENT_PRACTICES gate/sweep prose updated."
   },
   {
    "status": "designed",
