@@ -191,6 +191,15 @@ struct military_capability_params
 {
     float military_points_per_base_tick       = 1.0f;
     float science_per_research_institute_tick = 1.0f;
+
+    /// BL-394: hire_unit's credit cost, debited from the corp's balance at
+    /// apply time — cost = hire_base_cost + hire_cost_per_power × the roster
+    /// row's power_mod. The base is a FLOOR: row 0's gate is all-zero, so the
+    /// resource debit alone made the cheapest rows free and hiring unbounded
+    /// for any seam caller. Defaults match economy.lua so a hand-built harness
+    /// registry charges hires sensibly without Lua.
+    float hire_base_cost      = 40.0f;
+    float hire_cost_per_power = 0.5f;
 };
 
 /// BL-350 procurement/contract tunables, authored in scripts/economy.lua under the top-level

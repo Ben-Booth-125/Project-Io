@@ -918,8 +918,11 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
 
         // ---- Hire candidates: campaign roster, gated on the corp's OWN ------
         // stockpile/market access (unit_roster.hpp), never on cash — the
-        // solvency gate below still applies (spend stays 0.0f: the cost is a
-        // resource debit inside apply_corp_command, not capex). Widening the
+        // solvency gate below still applies. spend stays 0.0f deliberately:
+        // BL-394 gave the seam a real credit cost (economy.lua § military) on
+        // top of the resource debit, but AVAILABILITY here stays cash-free per
+        // the standing-rules grant — a cash-poor corp's hire simply bounces as
+        // rejected_funds at apply, charging nothing. Widening the
         // AI-agency exception list to include hiring is a deliberate call
         // (2026-08-08, recorded in io-standing-rules.md) — rival corps raise
         // units through the exact seam the player uses, no special case.
