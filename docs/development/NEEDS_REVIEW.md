@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*220 entries — 74 open, 146 resolved.*
+*222 entries — 76 open, 146 resolved.*
 
 ---
 
@@ -827,6 +827,32 @@ interbody_pull_harness loads scripts/economy.lua + recipes.lua by relative path.
 > **Recommendation:** Add the same cannot-open-the-script hard exit to pregame_balance_harness and persona_counsel_harness, and re-read their last reported numbers with that in mind.
 
 *Files: `tools/verify/interbody_pull_harness.cpp`, `CMakeLists.txt`, `tools/verify/pregame_balance_harness.cpp`*
+
+### NR-223 — Spectator mode filed to v0.1.16 - "the live band" was named without a minor, and no live minor carries its theme
+*decision taken on your behalf · raised 2026-08-14 · from Spectator-mode design session, 2026-08-14*
+
+Ben chose "all five into the live band" and priority A for the spectator set (BL-407 to BL-412), without naming a minor. Neither live minor's theme fits: v0.1.15 is the mercenary vertical slice (cut by Sprint 16 - adding six A-priority items would blow that cut), and v0.1.16 is "ancient conflict & seams", the Era -1 cluster. I filed all six to v0.1.16 on the grounds that ROADMAP.md describes it as "a holding assignment - sprints will promote and likely split it; the theme is the claim, not the item count", and that spectator mode is arc-agnostic observability over the campaign engine both arcs share.
+
+**Why it matters.** Six A-priority items is a large foreign body inside a minor whose stated theme is ancient conflict. If Ben would rather these carried their own minor - and "watch the machine play" is a legible theme in its own right - that is a roadmap edit, which is his call, not one to take on his behalf. The alternative reading of "live band" was v0.1.15, which I ruled out on cut risk rather than on theme.
+
+- Leave all six in v0.1.16 and let the sprint split it, as filed.
+- Give the set its own live minor (a ROADMAP.md edit naming the theme).
+- Split: BL-407 + BL-411 (the diagnostics pair) into v0.1.15 since they pay immediately and would inform BL-315 conflict-spine work; the rest to v0.1.16.
+
+> **Recommendation:** Its own minor, if any of this is built as a block. The set is coherent and none of it is ancient-conflict work.
+
+*Files: `docs/development/backlog.json`, `docs/development/ROADMAP.md`*
+
+### NR-224 — Standing rule grant: spectator mode has no human seat, so the player-corp prohibition has no subject - recorded, not yet written into the rules file
+*decision taken on your behalf · raised 2026-08-14 · from Spectator-mode design session, 2026-08-14 (BL-409)*
+
+The standing rules (.claude/rules/io-standing-rules.md § Determinism & data model) prohibit auto-acting on the player's own corp strategically, with one narrow exception (BL-181's workforce dial). Spectator mode needs every corp scored. Ben's ruling, 2026-08-14: "In spectator mode, there is no need to mark a corp as played by a human. 'Who plays your corp' collapses as a question." So this is NOT an exception carved into the rule - the rule protects a corp because a human owns it, and under spectate no corp has a human owner. world::player_entity survives as a viewpoint anchor for the camera and ledgers, with no ownership meaning. The rules file is deliberately UNCHANGED: the authority time-slices, and the clause goes in when BL-409 lands (DELIVERY.md § Design state).
+
+**Why it matters.** The grant is load-bearing and would otherwise exist only in this conversation. Between now and BL-409 landing, .claude/rules/io-standing-rules.md still reads as a flat prohibition, and a future session reading only that file would correctly refuse the work. This entry is what tells it the grant exists and is dated.
+
+> **Recommendation:** No action now. When BL-409 lands, add the no-seat clause to the standing rules alongside the BL-181 and BL-202/BL-203 exceptions, and resolve this entry with the commit.
+
+*Files: `.claude/rules/io-standing-rules.md`, `docs/ai/AI_OPPONENT.md`, `docs/development/backlog.json`*
 
 ---
 

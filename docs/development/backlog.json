@@ -9270,6 +9270,180 @@
    ],
    "summary": "inject_interbody_demand takes market_for_body(home_body) - the lowest-id market of the 17 the home body carries - and treats its demand and supply as the whole body's. Measured: that market holds 12% of the body's demand and a variable share of its supply. Because w.markets is unordered, the pick differs across standard libraries, so the pull's magnitude (and BL-404's answer) depends on an implementation accident rather than on the economy.",
    "design": "FOUND 2026-08-13 by interbody_pull_harness, written to settle BL-404 and which turned up\nthe larger defect underneath it.\n\n## What the pull thinks 'home' means\n\n`inject_interbody_demand` opens with:\n\n    const entity_id home_market_id = market_for_body(w, w.home_body);\n    const market_component& home = w.markets.at(home_market_id);\n\nand then treats `home.demand` / `home.supply` as THE HOME BODY'S demand and supply. But\n`market_for_body` returns the LOWEST-ID market on the body, and BL-096 carves many markets\nonto the home body. Measured on the canonical MSVC build, seed 0, 60 ticks:\n\n  * home body markets            : 17\n  * body totals                  : supply 7497.9, demand 33.9\n  * the market the pull READS    : supply 1491.4, demand 4.0  (12% of body demand)\n\nSo every outpost market in the game is price-supported in proportion to roughly an eighth of\nthe home body's appetite, chosen by an arbitrary id ordering.\n\n## The instability is the sharpest part\n\nThe same harness on a g++/WSL build of the same seed reports 8 markets, body supply 2863.3,\nand a read market carrying 0.0 supply. Same seed, same source, different standard library:\n`w.markets` is an unordered container, so the lowest id is not a stable choice of market\nacross toolchains. Same-seed reproducibility WITHIN a binary (the determinism invariant) is\nuntouched and still holds - this is not a determinism violation. But it does mean the\nidentity of 'the home market' is an implementation accident, and a price input should not be.\n\nIt also decides BL-404's answer: on one build a corrected netting silences 33% of the pull,\non the other 0%. That is why BL-404 cannot be settled until this is.\n\n## Options\n\na) **Aggregate over the body.** Sum demand (and supply) across every market on the home body.\n   Truest to what the code says it means. Multiplies the pull roughly 8x on today's numbers,\n   so pull_fraction wants re-tuning in the same change, and outpost prices will move.\nb) **Name the home market explicitly.** Give the world a `primary_market` per body, chosen at\n   generation and stored, so the pick is authored rather than incidental. Cheaper, stable,\n   and keeps the current magnitude - but leaves 'the home body's demand' meaning one\n   market's demand, which is what the code claims it is not.\nc) **Pull per-market rather than per-body.** Each outpost market reads the home market that\n   is its actual counterpart. Most faithful to a trade model; the largest change, and it\n   needs a notion of counterpart markets that does not exist yet.\n\nRECOMMENDATION: (a), together with re-tuning pull_fraction against the measured curve, and\nwith BL-404's netting decided in the same pass since the two interact. (b) is the cheap\nstopgap if outpost prices must not move yet.\n\n## Guard\n\n`interbody_pull_harness` (tools/verify) asserts the structural half - several markets exist,\nthe pull reads one, its demand is a fraction of the body's - and PRINTS the varying half\nrather than asserting it, so it stays green on either toolchain while keeping the numbers in\nfront of whoever fixes this."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-14",
+   "created": "2026-08-14",
+   "version_goal": "v0.1.16",
+   "id": "BL-407",
+   "short_name": "AI_DECISION_FEED",
+   "category": "AI",
+   "difficulty": 2,
+   "title": "AI decision feed - a ledger window over the decision ring and the history log's decision/agency topics",
+   "requires": [],
+   "files": [
+    "src/ui/decision_feed.cpp (new)",
+    "src/ui/decision_feed.hpp (new)",
+    "src/ui/nav_pane.cpp",
+    "src/ui/ui_state.hpp",
+    "docs/ui/question_log.json",
+    "docs/ai/ACTIONS.json"
+   ],
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "summary": "Filed 2026-08-14 from the spectator-mode design session. Every strategic decision the scorer takes ALREADY records its own rationale - corp_decision carries the winning score, the runner-up score and a reason code (corp_command.hpp), pushed to world::ai_decisions (256-entry ring) AND permanently to world::history_log under the `decision` and `agency` topics. Nothing in src/ui/ reads either store: a grep for corp_decision / decision_ring / agency_event across src/ui + src/core hits only session_history.cpp. The reasoning is in memory, forever, unread. This is the cheapest and highest-value piece of spectator mode - the data exists, only the window is missing.",
+   "design": "## Why this one first\n\nOf the six spectator items this is the only one that adds no simulation state and\nchanges no rule. It is a reader over two stores that are already populated on every\ntick of every existing session. It also pays outside spectator mode: it is the\ninstrument AI_OPPONENT.md § 10h asks for - *\"a harness asserts what its author\nalready suspected; a player discovers what nobody thought to assert\"* - and the\nidle/resume oscillation that § 10h records as the AI's dominant behaviour for an\nunknown number of sprints was invisible for exactly this reason.\n\n## The surface\n\nA ledger window on the nav rail, following the standing toggle rule (clicking the\nrail icon while active closes it; re-clicking the active sub-view tab closes it).\nRows newest-first, one per decision:\n\n| column | source |\n|---|---|\n| tick / date | `corp_decision.tick`, rendered through the campaign calendar |\n| corp | `corp_decision.corp` -> name, in the corp identity colour (`palette::corp_identity_colour`) |\n| verb + target | `corp_decision.command` rendered through the ACTIONS.json gloss for that verb |\n| reason | `corp_decision.reason` -> the reason code's human phrase |\n| margin | `winning_score` vs `runner_up` - the number that says whether it was a close call or a walkover |\n\n**The margin column is the point.** A decision taken at 0.81 against a runner-up of\n0.79 is a coin-flip the tuning could have gone either way on; one taken at 0.9\nagainst 0.1 is a conviction. Nothing currently distinguishes them, and the\ndifference is most of what \"what strategy is it running\" means.\n\n## Two stores, one view\n\n`world::ai_decisions` is a 256-entry ring - live, cheap, and it wraps. The history\nlog is permanent but stores prose (`event` / `consequence` strings), not scores.\nThe feed reads the RING for the live tail (with margins) and falls back to the LOG\nfor anything older than the ring's window (without margins, and say so in the row\nrather than faking a number). Do not widen the ring to avoid this: its 256-cap is\ndeliberate (\"derived observability, not save-format state - bounded so the log can\nrun forever\", corp_command.hpp).\n\n## Filters\n\nBy corp, by reason code, and a verb filter. The reason-code filter is what turns the\nfeed from a river into an answer: \"show me every `best_build` this run\" is a\ndifferent question from \"show me every solvency-defence idle\".\n\n## Out of scope here\n\nClicking a row to select the subject and move the canvas is BL-410 (attention\ndirector) - it needs the camera work, not the feed. The per-run aggregate is BL-411.\nThis item is the raw log, legibly rendered.\n\n## Obligations\n\nNew surface, so it owes a `question_log.json` entry (BL-260 - the question it answers,\nwhy it earns its space, the item that demanded it). New controls, so the ledger family\nin `ACTIONS.json` gains its entries; a stale dictionary misleads the AI player."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-14",
+   "created": "2026-08-14",
+   "version_goal": "v0.1.16",
+   "id": "BL-408",
+   "short_name": "SPECTATOR_GOD_VIEW",
+   "category": "Discovery",
+   "difficulty": 3,
+   "title": "Spectator god view - lift the survey mask, the activity fog and the rival-internals redaction, in the UI layer only",
+   "requires": [
+    "BL-409"
+   ],
+   "files": [
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/entity_summary.cpp",
+    "src/ui/hover_content.cpp",
+    "src/ui/chat_panel.cpp",
+    "src/core/session_history.cpp",
+    "src/ui/ui_state.hpp",
+    "docs/ui/DISCOVERY.md",
+    "docs/ui/question_log.json"
+   ],
+   "authority_doc": "docs/ui/DISCOVERY.md",
+   "summary": "Filed 2026-08-14. A spectator currently sees LESS than the AI it is watching. The planetary canvas is survey-masked (survey_tile_visible, body_surface_canvas.cpp), the comms feed is deliberately redacted to one nation-level aggregate event per tick (session_history.cpp, honouring the BL-068 competitor-visibility rule), and selecting a rival corp yields name / nation / starting capital / asset count and nothing else (entity_summary.cpp draw_corporation_summary). Spectator mode needs a god view that lifts all three - and needs to lift them WITHOUT touching world/* or the blackboard export, because those are what keep the AI honest.",
+   "design": "## The rule this breaks, and why that is legitimate\n\nDISCOVERY.md's competitor-visibility rule (BL-068) and the two fogs exist to make the\nplayer earn information. **In spectator mode there is no player** (BL-409), so there is\nnobody being cheated. The rule protects a competitive relationship that spectating does\nnot instantiate.\n\nThat argument only holds if the lift is **strictly presentational**. The hard line:\n\n- **May change:** what `src/ui/*` draws and what the comms feed prints.\n- **May NOT change:** `world/*` state, `survey_tile_visible`, the activity-fog store, or\n  `export_corp_blackboard`. The blackboard's whole value is that it is visibility-honest\n  (corp_ai.hpp: rival buildings existence/type/tile ONLY, never cash, pools, recipes or\n  workforce). A god view that reached into the export would silently give a future agent\n  player telepathy, and STRATEGIES.md § Resolutions already settled that question - Ben,\n  2026-08-06: *\"No additional information for the AI.\"*\n\nSo the flag is read at the draw call, never at the source. Enforce it by construction:\nthe spectator flag lives in `ui_state`, and `world/*` never sees it.\n\n## The three lifts\n\n1. **Survey mask.** `body_surface_canvas.cpp` gates per-tile detail on\n   `survey_tile_visible(body.survey, ...)`. Under spectate, treat every region as\n   revealed. The `UNSURVEYED` / `Surveying n/m` header suffix stays - it is now\n   *information about the AI's own blindness*, which is exactly what a spectator wants to\n   read, and it becomes far more interesting once you can see what it is missing.\n2. **Comms redaction.** `post_nation_agency_comms` posts one nation-voiced line per nation\n   per tick, the heaviest event only, by design. Under spectate, post per-corp and\n   unthrottled. Keep the nation voice as an option rather than deleting it - the redacted\n   feed is the one a player will ship with, so it must stay exercised.\n3. **Rival internals.** `draw_corporation_summary` gains the full readout under spectate:\n   cash, per-body pools, running recipes, workforce targets, reserve floor, and the\n   should-have buffer. All of it is already computable from public functions\n   (`corp_reserve_floor`, `corp_should_have_buffer`, `estimate_building_profit`).\n\n## The tell to design for\n\nWhen the mask is lifted, a spectator should still be able to see **where the AI's own\nfog is**. A build the scorer never considered because the tile was unsurveyed is one of\nthe most legible strategy signals in the game, and it is invisible if god view simply\nerases the distinction. Render revealed-but-unsurveyed tiles with a marker rather than\nas ordinary revealed ground.\n\n## Obligations\n\nDISCOVERY.md gains a section on the spectator exemption when this lands (not before -\nthe authority doc time-slices). `question_log.json` entries for the changed surfaces."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-14",
+   "created": "2026-08-14",
+   "version_goal": "v0.1.16",
+   "id": "BL-409",
+   "short_name": "SPECTATOR_NO_PLAYER_SEAT",
+   "category": "AI",
+   "difficulty": 2,
+   "title": "Spectator mode has no human seat - every corp is scored, and player_entity becomes a viewpoint rather than an ownership claim",
+   "requires": [],
+   "files": [
+    "src/world/corp_ai.cpp",
+    "src/world/corp_ai.hpp",
+    "src/core/app.cpp",
+    "src/main.cpp",
+    "src/ui/ui_state.hpp",
+    ".claude/rules/io-standing-rules.md",
+    "docs/ai/AI_OPPONENT.md"
+   ],
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "summary": "Filed 2026-08-14. The scorer explicitly skips the player's corp - corp_ai.cpp:465 and :499, and corp_strategic_eval_due is documented \"Always false for the player corp\". Spectating therefore shows a race with one runner standing still, and one specialist corp's worth of demand missing from the economy. Ben's ruling, 2026-08-14, reframed the fix: in spectator mode there is no need to mark a corp as played by a human at all - \"'who plays your corp' collapses as a question\". The mode does not hand the player's corp to the AI; it asserts that no corp is a player's.",
+   "design": "## Ben's reframe, and why it is the better item\n\nThe question was drafted as *may the scorer drive the player's corp under a spectate\nflag* - an exception carved into the standing rule that the player's own corp is never\nauto-acted on strategically. Ben, 2026-08-14: *\"In spectator mode, there is no need to\nmark a corp as played by a human. 'Who plays your corp' collapses as a question.\"*\n\nThat is a cleaner formulation and a smaller change. The standing rule protects a corp\n**because a human owns it**. Spectator mode has no human owner, so the rule is not\nbeing excepted - its precondition is absent. `player_entity` stops meaning *the corp the\nrules protect* and means only *the corp the camera and the ledgers are currently pointed\nat*: a **viewpoint**.\n\n## What changes\n\n- A spectator flag on the session (set from `--spectate`, and from the main menu).\n- Under it, `corp_strategic_eval_due` and `run_corp_strategic_step` stop special-casing\n  `world::player_entity` / `corporation_component::is_player`. Every corp evaluates on\n  the same staggered cadence. The two guards are corp_ai.cpp:465 and :499.\n- `player_entity` remains set - the UI needs an anchor - but nothing reads it as an\n  ownership claim. The `(Player)` tag in `draw_corporation_summary` becomes a viewpoint\n  marker or is dropped under spectate.\n- Player-press affordances (construction placement, order entry, workforce dials) are\n  disabled under spectate. Not hidden - **disabled and legible**, so it stays obvious\n  that the mode is a window, not a broken game.\n\n## Determinism\n\nThis must not perturb the seeded run. The cadence is `sorted-corp-id index % cadence_k\n== tick % cadence_k`, so admitting one more corp shifts nothing for the others - the\nindex is over the sorted corp set, which does not change. The player's corp simply\nstops being skipped at its own slot. A spectated run and a played-but-idle run will\ndiverge (correctly - one has an extra actor), but each stays replayable from its seed.\nVerify with a headless harness: same seed, spectate on, run N ticks twice, assert an\nidentical `world::state_hash`.\n\n## The standing rule\n\n`.claude/rules/io-standing-rules.md` § Determinism & data model carries the\nplayer-corp prohibition and its BL-181 workforce-dial exception. It gains the\nno-seat clause **when this work lands**, not before - the authority time-slices\n(DELIVERY.md § Design state). Ben's grant is dated 2026-08-14 and recorded in\nNEEDS_REVIEW.\n\n## Deliberately NOT in scope\n\nReassigning the viewpoint to an arbitrary rival mid-session. That is 42 `player_entity`\nreferences across 14 UI files and it is a separate item if it is ever wanted; the\nno-seat framing makes it much less necessary, since under spectate every corp is\nalready symmetric and the Selection element already inspects any of them."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-14",
+   "created": "2026-08-14",
+   "version_goal": "v0.1.16",
+   "id": "BL-410",
+   "short_name": "SPECTATOR_ATTENTION_DIRECTOR",
+   "category": "Canvas",
+   "difficulty": 2,
+   "title": "Attention director - follow the tick's heaviest decision, and jump to any decision from the feed",
+   "requires": [
+    "BL-407",
+    "BL-409"
+   ],
+   "files": [
+    "src/ui/ui_state.hpp",
+    "src/ui/decision_feed.cpp (new, BL-407)",
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/solar_system_canvas.cpp",
+    "src/ui/interp.cpp",
+    "docs/ui/CANVASES.md",
+    "docs/ui/question_log.json"
+   ],
+   "authority_doc": "docs/ui/CANVASES.md",
+   "summary": "Filed 2026-08-14. Nothing moves the camera on its own, so a spectator stares at one body while the interesting build happens two bodies away. Two affordances: click a decision-feed row to select its subject and navigate the zoom ladder to it, and an opt-in auto-follow that each econ tick moves to that tick's heaviest decision. The severity ordering already exists - session_history.cpp's severity_of ranks idled/demolished (4) above built/hired (3) above recipe_switch/resumed (2) above road/workforce/survey/order traffic (1).",
+   "design": "## Two modes, one mechanism\n\n**Jump-to (manual).** A decision-feed row knows its `corp_decision.command`, which\ncarries the target entity. Clicking it sets `selected_entity` and drives the zoom\nladder to the owning body - the same descend-by-click path CANVASES.md already\ndefines, invoked programmatically rather than by a press.\n\n**Auto-follow (opt-in, off by default).** Each econ tick, pick the heaviest decision\nby the existing `severity_of` ordering, break ties by lowest corp id (determinism),\nand navigate there. Reuse `severity_of` rather than authoring a second ranking - a\nsecond ordering that disagrees with the comms feed's would be a bug generator.\n\n## The pacing problem, which is the real design work\n\nAt speed 5 an econ tick resolves every ~11 real seconds (16x multiplier, 2 s/day at\n1x, 90-day quarter). Auto-follow that snaps the camera every 11 seconds is unwatchable,\nand at lower speeds it is dead air. Three things make it read:\n\n1. **Ease, never snap.** Route through `interp.cpp`, over roughly a second. The\n   transition is what tells the eye *where it went*, which is most of the value.\n2. **Hold a minimum dwell.** Never retarget within ~4 real seconds of the last move,\n   even if a heavier decision lands. A camera that twitches shows nothing.\n3. **Ignore the noise floor.** Do not follow severity-1 traffic (roads, workforce\n   nudges, order-book churn) at all. Follow builds, demolitions, idles and hires -\n   the decisions that change the industrial landscape.\n\n## Determinism\n\nThe director is presentation and must not touch the sim. Camera state lives in\n`ui_state`; nothing in `world/*` learns that it exists.\n\n## Obligations\n\nCANVASES.md gains the programmatic-navigation note when this lands. `question_log.json`\nfor the follow toggle; `ACTIONS.json` for the new controls."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-14",
+   "created": "2026-08-14",
+   "version_goal": "v0.1.16",
+   "id": "BL-411",
+   "short_name": "EMERGENT_STRATEGY_READOUT",
+   "category": "AI",
+   "difficulty": 3,
+   "title": "Emergent-strategy readout - per-corp run summary of verb mix, spend by priority bucket, and reason-code tally",
+   "requires": [
+    "BL-407"
+   ],
+   "files": [
+    "src/ui/strategy_readout.cpp (new)",
+    "src/ui/strategy_readout.hpp (new)",
+    "src/ui/charts.cpp",
+    "src/ui/nav_pane.cpp",
+    "docs/ai/STRATEGIES.md",
+    "docs/ui/question_log.json"
+   ],
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "summary": "Filed 2026-08-14. The literal answer to the question that prompted the spectator session - Ben, 2026-08-14: watch AI play \"and discover what strategies emerge from the current game\", to have \"a better way to describe and explain our main aims\". The decision feed (BL-407) shows the moves; this shows the SHAPE across a run. Aggregates the same two stores into a per-corp profile: verb mix, spend split across the must-have / should-have / nice-to-have buckets (corp_ai.hpp bucket_for_reason), reason-code tally, and how those shift over the run.",
+   "design": "## What a strategy looks like in this engine\n\nThe scorer has no strategy object - `corp_strategy` is a direct read of\n`industrial_focus`, kept as its own name precisely so it can diverge later\n(corp_ai.hpp). So an emergent strategy is not a thing to read out of a field; it is a\n**distribution over decisions**. Three distributions carry almost all of it:\n\n1. **Verb mix.** What fraction of this corp's decisions were builds, dials, surveys,\n   roads, hires, orders. An expander and a consolidator have visibly different mixes.\n2. **Spend by priority bucket.** `bucket_for_reason` already classifies every reason\n   into must-have (solvency defence) / should-have (feed the running assets) /\n   nice-to-have (expansion). A corp spending most of its run in must-have is drowning;\n   one that stays in nice-to-have is running unopposed. This is the single most\n   legible health signal available, and it is free - the mapping is a pure function\n   that already exists.\n3. **Reason-code tally.** Which reasons actually fired. § 10h's idle/resume\n   oscillation would have shown here as two reciprocal codes dominating the tally.\n\n## Over the run, not just at the end\n\nEach quarter, plot the bucket split as a stacked band per corp. The interesting\nartifact is the *transition* - the quarter a corp falls out of nice-to-have and never\nrecovers is the quarter it lost, and being able to point at that quarter is exactly\nthe \"describe and explain our main aims\" the session asked for. Use `charts.cpp` and\nthe existing per-tick history recorder pattern in `session_history.cpp` rather than a\nnew store.\n\n## Feeds two things beyond spectating\n\n- **STRATEGIES.md's invention loop.** The deck is AI-invented and the schema authored\n  (Ben, 2026-08-06), and a card earns its slot by same-seed comparison. This readout is\n  the measuring instrument that comparison needs; without it \"the card worked\" is an\n  assertion.\n- **BL-279 (trace corpus).** The same aggregation labels a run, which is what a\n  fine-tuning corpus needs alongside the traces.\n\n## Honesty constraint\n\nReport the distribution; do not name the strategy. A label like \"aggressive expander\"\nrendered from three thresholds is a fiction the reader will trust more than it earns,\nand naming it would also pre-empt STRATEGIES.md's settled position that the deck is\ndiscovered rather than authored. Show the mix and let the shape speak."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-14",
+   "created": "2026-08-14",
+   "version_goal": "v0.1.16",
+   "id": "BL-412",
+   "short_name": "LIVE_AGENT_CONTROL_SEAM",
+   "category": "AI",
+   "difficulty": 4,
+   "title": "Live agent control seam - let an external agent play a rendered session, not just a headless one",
+   "requires": [
+    "BL-278"
+   ],
+   "files": [
+    "src/main.cpp",
+    "src/core/app.cpp",
+    "src/core/app.hpp",
+    "tools/mcp/server.js",
+    "docs/ai/AI_OPPONENT.md"
+   ],
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "summary": "Filed 2026-08-14. --serve (BL-278) is headless-only: main.cpp branches to the line-protocol server INSTEAD of app::run, so an agent playing through the MCP seam is invisible while it plays. Spectating the deterministic scorer (BL-407 to BL-411) and spectating a language model are therefore different jobs, and this is the second one. Deliberately filed as its own item so the first five do not silently acquire its cost.",
+   "design": "## The structural gap\n\n`main.cpp` dispatches on argv: `--serve` runs the line-protocol loop, `--verify` runs\nthe headless capture harness, `--autostart` runs the GUI. They are exclusive branches.\nThe seam an agent drives and the loop that draws pixels never coexist, so the only way\nto observe an agent's play today is to read a transcript after the fact.\n\n## Shape\n\nThe honest version is: `app::run`'s frame loop gains a non-blocking drain of pending\nprotocol requests, serviced at a tick boundary rather than mid-frame. Requests apply\nthrough `apply_corp_command` - the same seam the presses and the scorer already use, so\nno third code path appears. `ADVANCE_TICK` under a live session means *release the clock\nfor one econ tick*, which is a different contract from the headless one and is the part\nthat needs designing rather than coding.\n\n## The three real problems\n\n1. **Clock ownership.** Headless, the agent drives the clock. Live, the wall clock does.\n   Either the agent gates the clock (and the session stalls whenever the model is\n   thinking - honest, and probably right for watching) or the clock free-runs (and the\n   agent plays a moving target). Pick deliberately; do not let it fall out of the\n   implementation.\n2. **Determinism.** A wall-clock-paced session where commands land on whichever tick\n   they happen to arrive is **not replayable**, which forfeits the property AI_OPPONENT.md\n   § 10h leans on hardest (*\"a play transcript is a replay artifact\"*). Applying commands\n   only at tick boundaries, in arrival order, recorded, preserves it. This is the reason\n   to gate the clock.\n3. **Transport.** stdio is taken by the app's own console. Needs a socket, and the\n   engine still ships no HTTP client, no API key, no cloud dependency - the hard\n   invariant of AI_OPPONENT.md § 10. A local socket the agent connects TO is inside\n   that line; anything the engine dials out to is not.\n\n## Relation to the rest\n\nComposes with BL-407 (the feed shows the agent's moves alongside the scorer's) and\nBL-408 (god view). It does NOT need BL-409 - an agent playing a corp is the opposite\nof the no-seat mode; the seat is occupied, just not by a human. Both configurations\nshould be reachable.\n\n## Research use, not the shipped rival\n\nThe § 10g ruling stands: the deterministic scorer remains the action generator for the\nshipped rival. This is the research and diagnostics seam § 10h argues already pays."
   }
  ]
 }
