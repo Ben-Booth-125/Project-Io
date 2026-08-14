@@ -9,6 +9,7 @@
 #include "world.hpp"
 
 #include <algorithm>
+#include <cassert> // BL-388: build-seam recipe-forwarding assertion
 #include <cmath>
 
 namespace {
@@ -241,11 +242,31 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
     {
         case corp_verb::build:
         {
+            // BL-388: a stated recipe must reach the built processor — reject
+            // rather than silently coerce. construct_building substitutes steel
+            // for no_recipe (right for a caller with no opinion, wrong for one
+            // that named a recipe), so before this forward every seam-built
+            // processor answered `applied` and ran steel whatever was asked.
+            if (cmd.recipe != no_recipe)
+            {
+                if (cmd.type != building_type::processing_facility)
+                    return corp_command_result::rejected_invalid;
+                if (reg.get_recipe(cmd.recipe) == nullptr)
+                    return corp_command_result::rejected_invalid;
+            }
             entity_id built = null_entity;
             const construction_result r =
-                construct_building(w, reg, cmd.corp, cmd.tile, cmd.type, cmd.target, built);
-            if (r == construction_result::placed && out_building)
-                *out_building = built;
+                construct_building(w, reg, cmd.corp, cmd.tile, cmd.type, cmd.target, built,
+                                   cmd.recipe);
+            if (r == construction_result::placed)
+            {
+                // The command's argument must survive into the world it created;
+                // nothing else checks that the seam kept its word (BL-388).
+                assert(cmd.recipe == no_recipe ||
+                       w.buildings.at(built).recipe == cmd.recipe);
+                if (out_building)
+                    *out_building = built;
+            }
             return map_construction(r);
         }
 

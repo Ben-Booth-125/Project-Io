@@ -67,12 +67,13 @@
     {
      "name": "recipe",
      "type": "uint16 recipe id",
-     "meaning": "Processing rows only: the recipe the facility is seeded with (the row it was priced on). no_recipe elsewhere; a recipe-less processor seeds the default steel recipe.\n\n**KNOWN DEFECT, BL-388 — this argument is DISCARDED.** `apply_corp_command` calls `construct_building` without forwarding it, so every processing facility built through the seam gets recipe 0 (steel) whatever you ask for, and the command still answers `applied`. A player ordered a Food Processor with recipe=2 and got a steel smelter. Until BL-388 lands, build the facility and then issue `set_recipe` as a separate command, which does work."
+     "meaning": "Processing rows only: the recipe the facility is seeded with (the row it was priced on). no_recipe elsewhere; a recipe-less processor seeds the default steel recipe. Forwarded through the seam since BL-388 (2026-08-13): the built facility carries exactly the recipe named. A recipe on any non-processing type, or an id the registry does not resolve, is rejected_invalid — stated-but-wrong is refused, never silently coerced."
     }
    ],
    "preconditions": [
     "The acting corporation exists (rejected_no_corp otherwise).",
     "The tile entity exists (rejected_invalid otherwise).",
+    "A stated recipe (anything but no_recipe) requires type = processing_facility AND an id the recipe registry resolves (rejected_invalid otherwise, checked before placement — BL-388).",
     "placement_rules::can_place_in_world accepts (type, target) on this tile — ocean, missing deposit, a port off the coast, or a full per-body slot cap (Launchpad: max 1 per body) all refuse (rejected_placement).",
     "The building type is UNLOCKED for the acting corporation (BL-344). Today exactly one type is gated: military_base requires the tech E0-ML-01 \"Standing Garrison Doctrine\", earned automatically once the corp owns at least 2 extraction sites AND holds a balance of at least Cr 2,000. A locked row shows \"Locked - the technology that permits this has not been researched\" in place of the Build button, and construct_building refuses with tech_locked, which the corp-command seam reports as rejected_tech_locked.",
     "The corporation's balance covers the full capex: registry build_cost plus the material costs priced at the tile's local market (rejected_funds). The UI shows this one credit total and disables Build with 'Can't afford' when short."
