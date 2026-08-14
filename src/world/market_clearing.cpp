@@ -415,6 +415,12 @@ void inject_interbody_demand(world& w, const recipe_registry& reg)
 
         for (std::size_t r = 0; r < resource_count; ++r)
         {
+            // Dormant in the generated world (BL-382): home supply exceeds home
+            // demand by orders of magnitude for essentially every resource (the
+            // BL-381 measurement), so this gate never opens and outposts get no
+            // pull. The mechanism is sound — the world just never satisfies the
+            // precondition. Re-check when BL-381 gives demand real weight.
+            // See docs/economy/MARKETS.md § What clears there.
             const float home_shortfall = home.demand[r] - home.supply[r];
             if (home_shortfall <= 0.0f)
                 continue;

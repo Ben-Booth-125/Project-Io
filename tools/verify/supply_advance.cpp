@@ -225,7 +225,10 @@ static void test_dispatch_and_gate()
 }
 
 // ---------------------------------------------------------------------------
-// R7 + R8: credit_arrived_convoys credits pool and market supply on arrival
+// R7 + R8: credit_arrived_convoys credits the pool and leaves market supply
+// alone (BL-382 — a direct supply write was zeroed by the next clear_markets
+// before pricing read it, while the pre-clear AI scorer did read it; the cargo
+// reaches supply via the auto-surplus path off the pool instead)
 // ---------------------------------------------------------------------------
 static void test_credit_arrived()
 {
@@ -269,8 +272,8 @@ static void test_credit_arrived()
           pool_qty, 5.0f + 30.0f);
 
     const float mkt_supply = w.markets.at(dest_mkt).supply[ri(resource_type::iron_ore)];
-    check(near(mkt_supply, 10.0f + 30.0f), "R8: market supply injected",
-          mkt_supply, 10.0f + 30.0f);
+    check(near(mkt_supply, 10.0f), "R8: market supply untouched (BL-382)",
+          mkt_supply, 10.0f);
 }
 
 // ---------------------------------------------------------------------------
