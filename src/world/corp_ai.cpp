@@ -916,16 +916,20 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             }
         }
 
-        // ---- Hire candidates: campaign roster, gated on the corp's OWN ------
-        // stockpile/market access (unit_roster.hpp), never on cash — the
-        // solvency gate below still applies. spend stays 0.0f deliberately:
-        // BL-394 gave the seam a real credit cost (economy.lua § military) on
-        // top of the resource debit, but AVAILABILITY here stays cash-free per
-        // the standing-rules grant — a cash-poor corp's hire simply bounces as
-        // rejected_funds at apply, charging nothing. Widening the
-        // AI-agency exception list to include hiring is a deliberate call
-        // (2026-08-08, recorded in io-standing-rules.md) — rival corps raise
-        // units through the exact seam the player uses, no special case.
+        // ---- Hire candidates: campaign roster, AVAILABILITY gated on the ----
+        // corp's OWN stockpile/market access (unit_roster.hpp), never on cash.
+        //
+        // The credit cost BL-394 gave the seam (economy.lua § military, on top
+        // of the resource debit) is carried in each candidate's `spend`, so the
+        // solvency gate and the within-tick `committed` total both see it —
+        // Ben's ruling on NR-218, 2026-08-13: "never on cash" governs which
+        // rows are OFFERED, not whether a corp may spend past its own reserve
+        // floor. Availability is cash-free; spending is gated like every other
+        // spend. See io-standing-rules.md § the BL-324 paragraph.
+        //
+        // Widening the AI-agency exception list to include hiring is a
+        // deliberate call (2026-08-08, recorded in io-standing-rules.md) —
+        // rival corps raise units through the exact seam the player uses.
         {
             // BL-325 S2: hire moves onto the base. A corp with no COMPLETED
             // military_base of its own has no muster tile at all — it must

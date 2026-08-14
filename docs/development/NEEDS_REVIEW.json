@@ -3761,7 +3761,7 @@
    "title": "The battle harness stopped asserting strict withdrawal-cost monotonicity, and asserts the mechanism instead",
    "raised": "2026-08-13",
    "kind": "decision-taken",
-   "status": "open",
+   "status": "resolved",
    "source": "BL-400 (widen battle swing), landed 2026-08-13",
    "what": "campaign_battle_harness's C3 check said withdrawing later ALWAYS costs more than withdrawing earlier, on every seed. That held at swing_permille 300 and stops holding at 600: at any swing in your ruled band a side that was behind and then wins a big round is pursued less, so its exit gets cheaper. The check was restructured rather than relaxed - it now asserts (a) most seeds stay monotone, and (b) explained == inversions as a STRICT equality, so every cheaper-late-exit must be accounted for by the withdrawing side's deficit narrowing between the two rounds. An unexplained inversion still fails the harness.",
    "why_it_matters": "This is a test assertion changing in the same commit as the behaviour it tests, which is exactly the shape of quietly weakening a test to make it pass - so it should be looked at rather than taken on trust. The argument that it is a SHARPENING: the old check asserted a numerical coincidence of the narrow swing; the new one asserts the pursuit mechanism itself, and can fail in a way the old one could not (an inversion with no narrowing deficit would pass the old majority-free check only by accident of seed choice). Measured on the merged tree: 8/9 seeds monotone, 2/2 inversions explained, 16/16 harness assertions PASS. If you would rather keep strict monotonicity at the wider swing, the dial is withdraw_per_round_permille, which is outside BL-400's scope and would be its own item.",
@@ -3771,14 +3771,14 @@
     "tools/verify/campaign_battle_harness.cpp",
     "src/world/campaign_battle.hpp"
    ],
-   "resolution": null
+   "resolution": "ACCEPTED 2026-08-13 (Ben). The C3 restructure stands: the harness asserts the pursuit mechanism (every cheaper-late-exit explained by a narrowed deficit, as a strict equality) rather than the strict per-seed monotonicity that was an artifact of the narrow swing he asked to widen. No change to withdraw_per_round_permille; strict monotonicity is not being preserved at the wider swing."
   },
   {
    "id": "NR-218",
    "title": "A rival could hire itself below its own reserve floor - the standing rule says hiring is never gated on cash, and the fix gates the spend, not the availability",
    "raised": "2026-08-13",
    "kind": "decision-taken",
-   "status": "open",
+   "status": "resolved",
    "source": "BL-394 (hire costs credits) + the verifier-review pass, 2026-08-13",
    "what": "BL-394 gave hire_unit a real credit cost but left the scorer's candidate spend at 0.0f, with a comment defending that as respecting the standing-rules grant ('gated on stockpile/market access, never on cash'). The solvency gate tests spend > 0, so it was skipped entirely for hires, and the within-tick committed total did not reserve the cash either. Concrete failure: a rival sitting just above its reserve floor hires a Rifle Regiment for 230 and ends BELOW the floor, and a later build in the same evaluation is scored against a balance the hire had already spent. Fixed by mirroring the seam's cost formula into the candidate's spend.",
    "why_it_matters": "It touches the wording of a rule you set on 2026-08-07. The reading taken: 'never on cash' governs AVAILABILITY - which roster rows are offered, still decided by stockpile and market access alone - while the solvency gate governs SPEND, which every other verb is already subject to. Under that reading nothing about the grant changed, and the alternative (a rival that can spend past its own floor) is a bug in any reading. But the rule's text now over-claims, and .claude/rules/io-standing-rules.md wants a one-clause amendment saying the credit cost is gated like any other spend. I have NOT amended the rule file - that is your text.",
@@ -3788,7 +3788,7 @@
     "src/world/corp_ai.cpp",
     ".claude/rules/io-standing-rules.md"
    ],
-   "resolution": null
+   "resolution": "ACCEPTED 2026-08-13 (Ben), and the standing rules are amended. The availability/spend reading is confirmed: \"never on cash\" governs which roster rows are OFFERED (stockpile and market access alone), while the credit cost BL-394 introduced is subject to the solvency gate like every other spend. The corp_ai fix stands - a rival carries the hire cost in its candidate spend, so it cannot hire itself below its reserve floor and a hire reserves cash against later candidates in the same evaluation. The BL-324 paragraph in .claude/rules/ io-standing-rules.md now states this explicitly rather than over-claiming."
   },
   {
    "id": "NR-219",

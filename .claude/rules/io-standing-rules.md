@@ -54,6 +54,13 @@ rule has a fuller authority, it is cited — this file does not redefine it.
   evaluation, gated on the corp's own stockpile/market access (never on cash). A deliberate
   widening of the BL-202/BL-203 exception, not a new category: hiring is one more legal verb
   on the same deterministic scored-utility layer, not a planner of its own.
+  **"Never on cash" governs AVAILABILITY, not spend (Ben, 2026-08-13, ruling on NR-218).**
+  Which roster rows are offered is decided by stockpile and market access alone — a
+  cash-poor corp still sees every row it has the goods for. But since BL-394 gave
+  `hire_unit` a real credit cost, that cost is subject to the **solvency gate like every
+  other spend**: the scorer carries it in the candidate's `spend`, so a rival cannot hire
+  itself below its own reserve floor, and a hire reserves its cash against later candidates
+  in the same evaluation. Availability is cash-free; spending is not.
 - Do **not** introduce a retained-mode UI framework in place of ImGui for the prototype.
 
 ## Terms & docs

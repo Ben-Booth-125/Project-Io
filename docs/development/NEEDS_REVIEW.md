@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*218 entries — 74 open, 144 resolved.*
+*218 entries — 72 open, 146 resolved.*
 
 ---
 
@@ -778,28 +778,6 @@ A sweep to retire obsolete backlog items found ZERO safe retirements - every sus
 > **Recommendation:** Skim the four calls; the code evidence is in each item's 2026-08-13 triage note.
 
 *Files: `docs/development/backlog.json`*
-
-### NR-217 — The battle harness stopped asserting strict withdrawal-cost monotonicity, and asserts the mechanism instead
-*decision taken on your behalf · raised 2026-08-13 · from BL-400 (widen battle swing), landed 2026-08-13*
-
-campaign_battle_harness's C3 check said withdrawing later ALWAYS costs more than withdrawing earlier, on every seed. That held at swing_permille 300 and stops holding at 600: at any swing in your ruled band a side that was behind and then wins a big round is pursued less, so its exit gets cheaper. The check was restructured rather than relaxed - it now asserts (a) most seeds stay monotone, and (b) explained == inversions as a STRICT equality, so every cheaper-late-exit must be accounted for by the withdrawing side's deficit narrowing between the two rounds. An unexplained inversion still fails the harness.
-
-**Why it matters.** This is a test assertion changing in the same commit as the behaviour it tests, which is exactly the shape of quietly weakening a test to make it pass - so it should be looked at rather than taken on trust. The argument that it is a SHARPENING: the old check asserted a numerical coincidence of the narrow swing; the new one asserts the pursuit mechanism itself, and can fail in a way the old one could not (an inversion with no narrowing deficit would pass the old majority-free check only by accident of seed choice). Measured on the merged tree: 8/9 seeds monotone, 2/2 inversions explained, 16/16 harness assertions PASS. If you would rather keep strict monotonicity at the wider swing, the dial is withdraw_per_round_permille, which is outside BL-400's scope and would be its own item.
-
-> **Recommendation:** Accept. The mechanism is the honest property; strict monotonicity was an artifact of the narrow band you asked to widen.
-
-*Files: `tools/verify/campaign_battle_harness.cpp`, `src/world/campaign_battle.hpp`*
-
-### NR-218 — A rival could hire itself below its own reserve floor - the standing rule says hiring is never gated on cash, and the fix gates the spend, not the availability
-*decision taken on your behalf · raised 2026-08-13 · from BL-394 (hire costs credits) + the verifier-review pass, 2026-08-13*
-
-BL-394 gave hire_unit a real credit cost but left the scorer's candidate spend at 0.0f, with a comment defending that as respecting the standing-rules grant ('gated on stockpile/market access, never on cash'). The solvency gate tests spend > 0, so it was skipped entirely for hires, and the within-tick committed total did not reserve the cash either. Concrete failure: a rival sitting just above its reserve floor hires a Rifle Regiment for 230 and ends BELOW the floor, and a later build in the same evaluation is scored against a balance the hire had already spent. Fixed by mirroring the seam's cost formula into the candidate's spend.
-
-**Why it matters.** It touches the wording of a rule you set on 2026-08-07. The reading taken: 'never on cash' governs AVAILABILITY - which roster rows are offered, still decided by stockpile and market access alone - while the solvency gate governs SPEND, which every other verb is already subject to. Under that reading nothing about the grant changed, and the alternative (a rival that can spend past its own floor) is a bug in any reading. But the rule's text now over-claims, and .claude/rules/io-standing-rules.md wants a one-clause amendment saying the credit cost is gated like any other spend. I have NOT amended the rule file - that is your text.
-
-> **Recommendation:** Confirm the availability/spend reading, and I will add the one clause to the standing rules. If you meant 'never on cash' to cover the spend too, then the hire cost itself is the thing to revisit, not the gate.
-
-*Files: `src/world/corp_ai.cpp`, `.claude/rules/io-standing-rules.md`*
 
 ### NR-219 — A slice proposed documenting a live market mechanism as dormant, and the review caught it
 *observation · raised 2026-08-13 · from BL-382 slice review, 2026-08-13*
@@ -2912,4 +2890,30 @@ Measured over 200 seeds per ratio, attacker 500 infantry on open ground: 1.00:1 
 > **RESOLVED.** RULED 2026-08-13 (Ben, elicitation form): widen the per-round swing so a 1.4:1 fight can still be lost, accepting that force matters somewhat less. Filed as BL-400 (widen battle swing) - re-measure the printed curve at the new swing_permille rather than asserting a target. The player-influenced swing (terrain/doctrine/surprise) remains a later deepening, not foreclosed.
 
 *Files: `src/world/campaign_battle.cpp`, `src/world/campaign_battle.hpp`, `tools/verify/campaign_battle_harness.cpp`*
+
+### NR-217 — The battle harness stopped asserting strict withdrawal-cost monotonicity, and asserts the mechanism instead
+*decision taken on your behalf · raised 2026-08-13 · from BL-400 (widen battle swing), landed 2026-08-13*
+
+campaign_battle_harness's C3 check said withdrawing later ALWAYS costs more than withdrawing earlier, on every seed. That held at swing_permille 300 and stops holding at 600: at any swing in your ruled band a side that was behind and then wins a big round is pursued less, so its exit gets cheaper. The check was restructured rather than relaxed - it now asserts (a) most seeds stay monotone, and (b) explained == inversions as a STRICT equality, so every cheaper-late-exit must be accounted for by the withdrawing side's deficit narrowing between the two rounds. An unexplained inversion still fails the harness.
+
+**Why it matters.** This is a test assertion changing in the same commit as the behaviour it tests, which is exactly the shape of quietly weakening a test to make it pass - so it should be looked at rather than taken on trust. The argument that it is a SHARPENING: the old check asserted a numerical coincidence of the narrow swing; the new one asserts the pursuit mechanism itself, and can fail in a way the old one could not (an inversion with no narrowing deficit would pass the old majority-free check only by accident of seed choice). Measured on the merged tree: 8/9 seeds monotone, 2/2 inversions explained, 16/16 harness assertions PASS. If you would rather keep strict monotonicity at the wider swing, the dial is withdraw_per_round_permille, which is outside BL-400's scope and would be its own item.
+
+> **Recommendation:** Accept. The mechanism is the honest property; strict monotonicity was an artifact of the narrow band you asked to widen.
+
+> **RESOLVED.** ACCEPTED 2026-08-13 (Ben). The C3 restructure stands: the harness asserts the pursuit mechanism (every cheaper-late-exit explained by a narrowed deficit, as a strict equality) rather than the strict per-seed monotonicity that was an artifact of the narrow swing he asked to widen. No change to withdraw_per_round_permille; strict monotonicity is not being preserved at the wider swing.
+
+*Files: `tools/verify/campaign_battle_harness.cpp`, `src/world/campaign_battle.hpp`*
+
+### NR-218 — A rival could hire itself below its own reserve floor - the standing rule says hiring is never gated on cash, and the fix gates the spend, not the availability
+*decision taken on your behalf · raised 2026-08-13 · from BL-394 (hire costs credits) + the verifier-review pass, 2026-08-13*
+
+BL-394 gave hire_unit a real credit cost but left the scorer's candidate spend at 0.0f, with a comment defending that as respecting the standing-rules grant ('gated on stockpile/market access, never on cash'). The solvency gate tests spend > 0, so it was skipped entirely for hires, and the within-tick committed total did not reserve the cash either. Concrete failure: a rival sitting just above its reserve floor hires a Rifle Regiment for 230 and ends BELOW the floor, and a later build in the same evaluation is scored against a balance the hire had already spent. Fixed by mirroring the seam's cost formula into the candidate's spend.
+
+**Why it matters.** It touches the wording of a rule you set on 2026-08-07. The reading taken: 'never on cash' governs AVAILABILITY - which roster rows are offered, still decided by stockpile and market access alone - while the solvency gate governs SPEND, which every other verb is already subject to. Under that reading nothing about the grant changed, and the alternative (a rival that can spend past its own floor) is a bug in any reading. But the rule's text now over-claims, and .claude/rules/io-standing-rules.md wants a one-clause amendment saying the credit cost is gated like any other spend. I have NOT amended the rule file - that is your text.
+
+> **Recommendation:** Confirm the availability/spend reading, and I will add the one clause to the standing rules. If you meant 'never on cash' to cover the spend too, then the hire cost itself is the thing to revisit, not the gate.
+
+> **RESOLVED.** ACCEPTED 2026-08-13 (Ben), and the standing rules are amended. The availability/spend reading is confirmed: "never on cash" governs which roster rows are OFFERED (stockpile and market access alone), while the credit cost BL-394 introduced is subject to the solvency gate like every other spend. The corp_ai fix stands - a rival carries the hire cost in its candidate spend, so it cannot hire itself below its reserve floor and a hire reserves cash against later candidates in the same evaluation. The BL-324 paragraph in .claude/rules/ io-standing-rules.md now states this explicitly rather than over-claiming.
+
+*Files: `src/world/corp_ai.cpp`, `.claude/rules/io-standing-rules.md`*
 
