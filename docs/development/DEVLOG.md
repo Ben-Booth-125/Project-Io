@@ -10,7 +10,59 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — Doc-system weight: requirements hot/cold split + DEVLOG rollover (2026-08-14, latest)
+## Session — Seam batch: the money printer closed and the word interface given a door (2026-08-14, latest)
+
+Full mode, Batch Delivery over four items — BL-386 (sell-order floor prints money, S),
+BL-387 (seam actor authority, S), BL-396 (wire parser validates nothing, S), BL-397 (seam read
+privacy, A). The three S-tier items were the entire S tier; all four share one root cause:
+`--serve` turned a trusted in-process seam into an external input surface.
+
+**What landed.** The floor is a reservation price: the auto-clear pass holds any order whose
+floor exceeds the resolved price and pays the resolved price otherwise — the `max(rp, floor)`
+crediting that let a seller name the price a perfect counterparty pays is gone, and
+`trade_floor_multiple` re-tuned 1.0 → 0.25 so rivals keep trading under the honest rule. The
+serve seam gained a session actor (`--as <corp|any>`, default the player corp): COMMAND refuses
+to act as any other corp, BLACKBOARD refuses to read one, and `--as any` is the explicit
+bot-vs-bot research opt-in. Every COMMAND field now parses wide, range-checks against its real
+domain, and rejects the whole command on violation — `verb=256` no longer builds a building,
+`type=200` no longer segfaults the server, `quantity=1e300` fails as the float it lands as. The
+`remove_sell_order` oracle is closed (foreign and nonexistent ids indistinguishable).
+
+**Method notes, both directions.** Two worktree agents did the code (economy slice; seam slice
+across three items with per-item commits); both worktrees were cut from a base TWO COMMITS
+STALE — the new `agent_base_check.js`, written this morning for exactly this, caught both
+pre-merge and a rebase cured each cleanly. It also found its own first bug (named-branch
+filtering) and three leftover stale agent branches from earlier sessions (NR-235). The review
+barrier earned its place: verdict FIX FIRST with three real Criticals (a harness assertion
+certifying the pre-BL-397 oracle, the spectator golden, a missing smoke case the requirement
+named) plus two suggestions taken (the float path still accepted garbage via `atof`; trailing
+junk tolerated on integer tokens) and one filed (BL-422, held orders still credit market
+inventory at listing time — a listing==selling equivalence BL-386 broke).
+
+**Verification.** order_book_harness 52/52 with the new R6 family (hold/clear/income-invariant,
+bite-proven against a reverted fix); econ_harness ALL PASS after updating four fixtures that
+certified the old spec (floors moved to legal values so the BL-351 clamp semantics stay
+exercised); econ_stability ALL PASS; integrating MSVC build green; smoke.js ALL CHECKS PASSED
+(actor refusals with byte-identical state snapshots, the range family, the closed oracle,
+`--as any`); spectator_determinism re-blessed 3CBAD1D44EE71EDE → DD166049DA180508 (deliberate,
+reproducibility confirmed first; the golden is toolchain-specific — noted in the harness).
+ai_skill_harness moved exactly as BL-386's design predicted — net-worth bands fail on every
+seed while solvency/survival/thrash hold and rivals still list 6–7 orders/seed. **Deliberately
+not blessed here**: BL-416 (golden stewardship) owns the re-bless and now carries the post-fix
+numbers in its design note, so the bands get blessed once, against the honest economy.
+
+**Docs.** MARKETS.md step 11 restated (with the correction's history); the cold-store
+`player-sell-orders` R2 rewritten (the requirement certified the defect); ACTIONS.json's
+`place_sell_order`/`remove_sell_order` entries corrected and mirrors regenerated; AI_OPPONENT.md
+§ 6 records the session-actor model; the standing rules gained the untrusted-boundary invariant
+(delegated call — NR-234).
+
+**Status:** Complete — 4 items landed, 4 requirement groups complete (16/16 rows), BL-422 filed.
+**Runtime:** ~2.5 h, Full, Batch Delivery (2 worktree agents + review barrier).
+
+---
+
+## Session — Doc-system weight: requirements hot/cold split + DEVLOG rollover (2026-08-14)
 
 Light mode (tooling + docs, no `src/`). Ben asked what to improve now the project is large; the
 measured answer was context weight, so this session built the missing half of the hot/cold

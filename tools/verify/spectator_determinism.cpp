@@ -108,7 +108,14 @@ constexpr int      k_ticks = 300;
 // identical across the change. (That same pre-change build put the SPECTATED
 // hash at 3CBAD1D44EE71EDE too — the flag was inert — so R3's "spectating moves
 // the world" row correctly failed there. Both halves have teeth.)
-constexpr uint64_t k_unspectated_golden = 0x3CBAD1D44EE71EDEull;
+// Re-blessed 2026-08-14 (later the same day): BL-386 made the sell-order floor
+// a reservation price and re-tuned trade_floor_multiple 1.0 -> 0.25, which
+// changes every rival's order floors and clearing income — a deliberate,
+// item-designed economy move (its design predicted "expect this to move every
+// economy golden"). New value confirmed reproducible across two independent
+// same-seed runs before blessing. MSVC-derived; this golden is
+// toolchain-specific (float clearing arithmetic differs under g++).
+constexpr uint64_t k_unspectated_golden = 0xDD166049DA180508ull;
 
 /// Hand-built registry mirroring scripts/economy.lua + scripts/recipes.lua for
 /// the building types the generator places. Copied from ai_skill_harness so the

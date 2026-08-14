@@ -3,13 +3,14 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 159 entries across 2 volume(s).
+One line per session, newest first — 160 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
+| 2026-08-14 | [Seam batch: the money printer closed and the word interface given a door](DEVLOG.md) | BL-351 BL-386 BL-387 BL-396 BL-397 BL-416 BL-422 | DEVLOG.md |
 | 2026-08-14 | [Doc-system weight: requirements hot/cold split + DEVLOG rollover](DEVLOG.md) | BL-421 | DEVLOG.md |
 | 2026-08-13 | [AI gameplay: the word interface made runnable, and the rival's idle/resume oscillation measured](DEVLOG.md) | BL-049 BL-079 BL-094 BL-193 BL-202 BL-203 BL-278 BL-293 BL-315 BL-324 BL-350 BL-366 BL-377 BL-381 BL-384 BL-386 BL-387 BL-388 BL-389 BL-390 BL-393 BL-394 | DEVLOG.md |
 | 2026-08-11 | [BL-130 lands: BL-365's blocker chain closed, and a live crash caught in passing](DEVLOG.md) | BL-078 BL-095 BL-130 BL-253 BL-263 BL-365 BL-366 BL-368 | DEVLOG.md |

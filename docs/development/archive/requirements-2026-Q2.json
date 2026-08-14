@@ -1776,13 +1776,13 @@
         },
         {
           "id": "R2",
-          "requirement": "A standing player sell order sells up to its quantity from the (corp, body) pool, valued at max(resolved_price, floor_price).",
+          "requirement": "A standing player sell order sells up to its quantity from the (corp, body) pool; unmatched quantity auto-clears at the resolved price only when floor_price <= resolved price, else holds. (Rewritten 2026-08-14, BL-386: the original text — \"valued at max(resolved_price, floor_price)\" — certified the money-printing defect; the requirement, not the code, was wrong.)",
           "verification": [
             "headless"
           ],
           "status": "complete",
           "result_metric": "",
-          "notes": "SO.2"
+          "notes": "SO.2; rewritten under BL-386 (sell-order floor fix) — see requirements.json § sell-order-floor for the correcting group."
         },
         {
           "id": "R3",

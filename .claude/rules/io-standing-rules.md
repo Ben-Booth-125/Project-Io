@@ -75,6 +75,16 @@ rule has a fuller authority, it is cited — this file does not redefine it.
   corp **shifts no rival's cadence slot**, since the index is over the sorted corp set.
   Outside spectate the prohibition is unchanged and absolute.
 - Do **not** introduce a retained-mode UI framework in place of ImGui for the prototype.
+- **An AI-facing seam is an untrusted input boundary (recorded 2026-08-14 with BL-387/BL-396/
+  BL-397, after four instances of the pattern in one session; promotion to a standing rule is a
+  delegated call — NR-234).** Validation written for a trusted
+  in-process caller does not transfer to an external surface: the moment a seam takes wire input
+  (`--serve`, the MCP server, any future agent transport), every field must be validated **as the
+  value that lands in the destination** — range-checked against the real domain before any narrowing
+  cast (a finite double can be an infinite float), with the whole command rejected on violation,
+  never truncated, wrapped, or clamped silently. A rejection must mutate **nothing**. Actor
+  authority is part of the same boundary: the protocol layer decides which corp a session may act
+  as and read as; `apply_corp_command` stays permissive for the in-process scorer.
 
 ## Terms & docs
 

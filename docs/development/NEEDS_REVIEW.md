@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*3 entries — 3 open, 0 resolved.*
+*5 entries — 5 open, 0 resolved.*
 
 ---
 
@@ -63,6 +63,26 @@ You asked for BL-404 next. It is NOT implemented, deliberately. Building the mea
 > **Recommendation:** Accept; overturn via --restore plus git if any of the three reads wrong.
 
 *Files: `docs/development/req/requirements.json`, `docs/development/archive/requirements-2026-Q2.json`, `docs/development/archive/requirements-2026-Q3.json`, `docs/development/archive/requirements-undated.json`*
+
+### NR-234 — Untrusted-boundary invariant promoted into the standing rules — delegated call
+*decision taken on your behalf · raised 2026-08-14 · from BL-387 (seam actor authority) design: "Two instances is enough to call it a rule rather than an incident, and it should go in the standing rules." Acted on while landing the seam batch.*
+
+Added a bullet to .claude/rules/io-standing-rules.md: an AI-facing seam is an untrusted input boundary — validate the value that lands in the field (range-check before narrowing casts), reject the whole command on violation, rejections mutate nothing, actor authority lives at the protocol layer. AI_OPPONENT.md § 6 records the session-actor model.
+
+**Why it matters.** The standing rules are the always-on invariants — adding one binds every future session. The pattern occurred four times in one session (NaN guard, actor authority, parser truncation, float narrowing), so the design itself asked for the promotion, but the wording and its placement are mine.
+
+> **Recommendation:** Keep; reword or demote to AI_OPPONENT.md-only if you want the standing rules leaner.
+
+*Files: `.claude/rules/io-standing-rules.md`, `docs/ai/AI_OPPONENT.md`*
+
+### NR-235 — Three stale worktree-agent branches carry one unmerged commit each
+*observation · raised 2026-08-14 · from First run of the new tools/session/agent_base_check.js (seam batch, 2026-08-14).*
+
+worktree-agent-a06bd53e3dbdb3302 and worktree-agent-a6aea9bd1514a3604 (10 commits behind main) and worktree-agent-a06e732cbc6ad6282 (90 behind) each hold exactly one commit main does not contain.
+
+**Why it matters.** Either abandoned duplicates of work that landed another way (delete the branches) or genuinely lost agent output (recover it). The stale-base retro found agents whose commits were painful to integrate; these may be the ones that never were.
+
+> **Recommendation:** A ten-minute triage: `git log -1 --stat` each branch; delete if duplicated, cherry-pick if lost.
 
 ---
 

@@ -366,9 +366,11 @@ async function main() {
       const beforeRange = await snapshot();
       const rangeCases = [
         ['verb=256 (truncates to build)',        'verb=256 tile=0'],
-        ['verb=265 (truncates to hire_unit)',    'verb=265 tile=0'],
+        ['verb=265 (truncates to place_sell_order)', 'verb=265 tile=0'],
         ['verb=-1',                              'verb=-1'],
+        ['verb=7xyz (trailing junk is malformed, not a 7)', 'verb=7xyz subject=0'],
         ['type=200 (economics array OOB)',       'verb=0 tile=0 type=200'],
+        ['target=64 (beyond resource_count)',    'verb=0 tile=0 type=0 target=64'],
         ['road_tier=255',                        'verb=6 tile=0 road_tier=255'],
         ['workforce=4294967396 (wraps to 100)',  'verb=3 subject=0 workforce=4294967396'],
         ['unit_type=70000 (beyond uint16)',      'verb=8 tile=0 unit_type=70000'],
@@ -376,6 +378,8 @@ async function main() {
          `verb=9 subject=${bodyId ?? 0} target=0 quantity=1e300`],
         ['floor_price=-1',
          `verb=9 subject=${bodyId ?? 0} target=0 quantity=5 floor_price=-1`],
+        ['floor_price=abc (garbage parses as no order, not floor 0)',
+         `verb=9 subject=${bodyId ?? 0} target=0 quantity=5 floor_price=abc`],
       ];
       for (const [label, args] of rangeCases) {
         const r = resultOf(await io.send(`COMMAND corp=${subject.id} ${args}`));

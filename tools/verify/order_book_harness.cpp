@@ -358,8 +358,11 @@ int main()
             s.w.corporations[other] = corporation_component{};
             corp_command c;
             c.corp = other; c.verb = corp_verb::remove_sell_order; c.order = id;
-            check(apply_corp_command(s.w, reg, c) == corp_command_result::rejected_not_owner,
-                  "R3.7 removing another corp's order is rejected_not_owner");
+            // BL-397: deliberately the SAME code as a nonexistent id (R3.8) — a
+            // distinguishable rejection was an oracle that let an id sweep map
+            // the whole global book without placing an order.
+            check(apply_corp_command(s.w, reg, c) == corp_command_result::rejected_invalid,
+                  "R3.7 removing another corp's order is rejected_invalid (indistinguishable from R3.8)");
         }
         {
             corp_command c;

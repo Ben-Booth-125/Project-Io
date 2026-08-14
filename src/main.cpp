@@ -82,7 +82,10 @@ long long kv_get_checked(const std::unordered_map<std::string, std::string>& kv,
         return dflt;
     char* end = nullptr;
     const long long v = std::strtoll(it->second.c_str(), &end, 10);
-    if (end == it->second.c_str() || v < lo || v > hi)
+    // *end must be the terminator: "7xyz" is a malformed token, not a 7 with
+    // decoration — tolerating the tail is the same silent substitution the
+    // range check refuses, one lexeme later.
+    if (end == it->second.c_str() || *end != '\0' || v < lo || v > hi)
     {
         *ok = false;
         return dflt;
@@ -124,8 +127,12 @@ double kv_getf(const std::unordered_map<std::string, std::string>& kv, const cha
     const auto it = kv.find(key);
     if (it == kv.end())
         return dflt; // absent is not malformed — the default stands
-    const double v = std::atof(it->second.c_str());
-    if (!std::isfinite(v))
+    // strtod with the same full-token rule as the integer path: atof parses
+    // "abc" to 0.0, and 0.0 here means "accept the market price" — the exact
+    // silent order-substitution the note above argues against.
+    char* end = nullptr;
+    const double v = std::strtod(it->second.c_str(), &end);
+    if (end == it->second.c_str() || *end != '\0' || !std::isfinite(v))
     {
         if (ok) *ok = false;
         return dflt;

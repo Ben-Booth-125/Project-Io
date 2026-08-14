@@ -2827,6 +2827,89 @@
       ],
       "resolution": "All 5 rows met. river_generation_harness + determinism_harness pass; CTest 37/37."
     },
+    "seam-actor-authority": {
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Item-spanning: smoke.js asserts a COMMAND naming a corp other than the session actor is refused (rejected_not_owner) with the world unchanged, and that --as any permits it.",
+          "verification": [
+            "headless: tools/mcp/smoke.js"
+          ],
+          "status": "complete",
+          "result_metric": "smoke.js: rejected_not_owner + snapshot identical + --as any permits — ALL PASS",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "requirement": "--serve gains --as <corp|any> (default player corp); the COMMAND opcode refuses a non-actor corp at the opcode level, before apply_corp_command.",
+          "verification": [
+            "code: main.cpp run_serve",
+            "review"
+          ],
+          "status": "complete",
+          "result_metric": "main.cpp run_serve(int,long long,bool) + opcode gate before apply_corp_command",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "requirement": "tools/mcp/server.js pins its actor at startup and never forwards a caller-supplied corp on writes.",
+          "verification": [
+            "code: tools/mcp/server.js"
+          ],
+          "status": "complete",
+          "result_metric": "server.js actor pinned at startup; caller corp overridden on writes",
+          "notes": ""
+        },
+        {
+          "id": "R4",
+          "requirement": "The standing rules gain the untrusted-boundary invariant (trusted-caller validation does not transfer to an external surface); AI_OPPONENT.md records the session-actor model.",
+          "verification": [
+            "doc: .claude/rules/io-standing-rules.md",
+            "doc: docs/ai/AI_OPPONENT.md"
+          ],
+          "status": "complete",
+          "result_metric": "io-standing-rules.md bullet + AI_OPPONENT.md § 6 session actor",
+          "notes": ""
+        }
+      ],
+      "resolution": "Complete, all rows met. --serve --as <corp|any> (default w.player_entity); COMMAND refuses non-actor corps at the opcode level; server.js pins its actor and never forwards caller corp on writes; smoke.js asserts refusal + identical state snapshot + the --as any opt-in. Untrusted-boundary invariant added to the standing rules (delegated call, NR-234); AI_OPPONENT.md § 6 records the session-actor model. smoke: ALL CHECKS PASSED on the integrated MSVC build."
+    },
+    "seam-read-privacy": {
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Item-spanning: smoke.js asserts BLACKBOARD for a non-actor corp is refused (permitted under --as any), and that a foreign order id and a nonexistent order id are indistinguishable to remove_sell_order.",
+          "verification": [
+            "headless: tools/mcp/smoke.js"
+          ],
+          "status": "complete",
+          "result_metric": "smoke.js: ERR refusal, --as any serves, foreign==nonexistent result string — ALL PASS",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "requirement": "The BLACKBOARD opcode serves the session actor and refuses any other corp id except under --as any.",
+          "verification": [
+            "code: main.cpp BLACKBOARD gate"
+          ],
+          "status": "complete",
+          "result_metric": "main.cpp BLACKBOARD gate before export_corp_blackboard",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "requirement": "remove_sell_order answers rejected_invalid for any order id not in the caller's own book, existing or not.",
+          "verification": [
+            "code: corp_command.cpp remove_sell_order",
+            "review"
+          ],
+          "status": "complete",
+          "result_metric": "corp_command.cpp remove_sell_order collapsed; order_book_harness R3.7/R3.8/R3.9 PASS",
+          "notes": ""
+        }
+      ],
+      "resolution": "Complete, all rows met. BLACKBOARD serves the session actor only (ERR result=rejected_not_owner + END for others, lifted under --as any); remove_sell_order answers rejected_invalid for any order outside the caller's book, existing or not — order_book_harness R3.7 updated to the collapsed semantics (52/52), smoke.js sweeps the id space and never surfaces rejected_not_owner. Line-framing fix in both JS clients rode with this item (multi-line ops terminate on END alone)."
+    },
     "selectable-markers": {
       "rows": [
         {
@@ -2901,6 +2984,54 @@
     },
     "selection-always-open": {
       "resolution": "Group closed 2026-08-10 by the hygiene-batch lint pass: the item completed 2026-08-09 but the group was left active. R4 (golden re-bless) stays pending per NR-104 - noted, not met."
+    },
+    "sell-order-floor": {
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Item-spanning: order_book_harness proves the clearing invariant — no corporation's clearing income exceeds its cleared quantity times the market's resolved price; an order with floor above the resolved price clears nothing and retains its pool; at/below clears at the resolved price.",
+          "verification": [
+            "headless: tools/verify/order_book_harness.cpp"
+          ],
+          "status": "complete",
+          "result_metric": "order_book_harness 52/52 incl. R6.1-R6.7; revert-test fails R6.2/R6.3/R6.4",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "requirement": "The auto-clear pass holds any order whose floor_price exceeds ref_price (clears nothing) and pays rem * ref_price otherwise — the max(rp, floor) crediting is gone.",
+          "verification": [
+            "code: market_clearing.cpp auto-clear",
+            "review"
+          ],
+          "status": "complete",
+          "result_metric": "market_clearing.cpp auto-clear: floor>rp continue; income += rem*rp",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "requirement": "trade_floor_multiple default re-tuned (1.0 -> 0.25) so a rival's standing orders still clear on a glutted market under the fixed rule; the reservation dial is real.",
+          "verification": [
+            "code: corp_ai.hpp trade_floor_multiple",
+            "headless"
+          ],
+          "status": "complete",
+          "result_metric": "trade_floor_multiple=0.25f; rivals place 6-7 sell orders/seed post-fix (ai_skill_harness), order_book R5 green",
+          "notes": ""
+        },
+        {
+          "id": "R4",
+          "requirement": "The spec that certified the defect is corrected: MARKETS.md step 11 restates the reservation rule; the player-sell-orders R2 row is rewritten in its cold store.",
+          "verification": [
+            "doc: docs/economy/MARKETS.md",
+            "doc: archive/requirements-*.json § player-sell-orders"
+          ],
+          "status": "complete",
+          "result_metric": "MARKETS.md step 11 + archive/requirements-2026-Q2.json player-sell-orders R2 rewritten",
+          "notes": ""
+        }
+      ],
+      "resolution": "Complete, all rows met. The auto-clear pass holds any order whose floor exceeds the resolved price and pays rem*rp otherwise; trade_floor_multiple 1.0->0.25. order_book_harness gained the R6 family (7 assertions incl. the 1e12 money-printer shape and the income<=qty*rp invariant): 52/52 PASS, bite-proven against a reverted fix. econ_harness fixtures that certified the old spec updated (SO/BL351): ALL PASS. MARKETS.md step 11 restated; the certifying player-sell-orders R2 rewritten in its cold store; ACTIONS.json floor_price/expected_output corrected. spectator_determinism golden re-blessed (3CBAD1D44EE71EDE -> DD166049DA180508, deliberate move). ai_skill_harness net-worth bands moved as the item predicted (rivals still list orders, 6-7/seed) — re-bless owned by BL-416, next block. Review-barrier follow-on filed as BL-422 (held orders still credit market inventory at listing)."
     },
     "sell-order-pool-overcommit": {
       "resolution": "Fixed in market_clearing.cpp: running per-(corp,body,resource) remainder at listing, per-order matched bookkeeping (ob_sell_entry.rem replaces the aggregate matched_sell map), zero-clamped debits. econ_harness 33/33 incl. BL351.1-6."
@@ -3424,6 +3555,53 @@
         }
       ],
       "resolution": "Code-complete and headless-verified 2026-08-08. R1/R6's manual-visual leg (a human clicking the Hire button in a live app session) was not run in this headless environment — filed as NR-086, same shape as NR-026's frame-budget gap for BL-249: shipped complete with the human-verification step open as a named follow-up, not silently skipped."
+    },
+    "wire-parser-validation": {
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Item-spanning: smoke.js asserts out-of-range verb, type, target, road_tier, workforce, unit_type and quantity are each refused AND the world is unchanged after each refusal; type=200 (the segfault) is a refusal.",
+          "verification": [
+            "headless: tools/mcp/smoke.js"
+          ],
+          "status": "complete",
+          "result_metric": "smoke.js 11 range cases x (refusal + unchanged snapshot) — ALL PASS; type=200 refused, no segfault",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "requirement": "Every COMMAND field parses wide, range-checks against its destination's real domain, and any violation rejects the whole command rejected_invalid — no truncation, wrapping, or silent clamping remains.",
+          "verification": [
+            "code: main.cpp checked parse",
+            "review"
+          ],
+          "status": "complete",
+          "result_metric": "kv_get_checked in main.cpp; review barrier confirmed no raw static_cast survives in COMMAND",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "requirement": "corp_verb_count is declared beside the corp_verb enum so the range check cannot drift.",
+          "verification": [
+            "code: corp_command.hpp corp_verb_count"
+          ],
+          "status": "complete",
+          "result_metric": "corp_verb_count = cancel_contract + 1 (corp_command.hpp)",
+          "notes": ""
+        },
+        {
+          "id": "R4",
+          "requirement": "Float fields are validated as the float that lands in the field: 1e300 (finite double, infinite float) is refused.",
+          "verification": [
+            "code",
+            "headless: tools/mcp/smoke.js"
+          ],
+          "status": "complete",
+          "result_metric": "quantity=1e300 and floor_price=abc refused (float-narrowed isfinite + strtod full-token)",
+          "notes": ""
+        }
+      ],
+      "resolution": "Complete, all rows met. One checked-parse helper (kv_get_checked, full-token + wide parse + domain range check) routes all 12 integer COMMAND fields; kv_getf moved to strtod with the same full-token rule and float-level finiteness; corp_verb_count and building_type_count declared beside their enums. smoke.js range family (11 cases incl. the type=200 segfault, verb=7xyz trailing junk, floor_price=abc garbage, target=64 from the review barrier): each rejected_invalid with a byte-identical state snapshot. ALL CHECKS PASSED."
     },
     "world-descriptor": {
       "rows": [

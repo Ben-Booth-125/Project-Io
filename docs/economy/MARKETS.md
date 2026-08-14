@@ -126,8 +126,16 @@ minable-but-unsellable asymmetry of the BL-040 raws are catalogued in
     explicit buys by price-time priority: cheapest ask first, highest bid first, corp id as the
     deterministic tiebreak. A buyer's `preferred_seller` is served first, tolerated up to
     **1.10×** the cheapest compatible ask. Trades clear at the **seller's ask**.
-11. **Buyer of last resort** — unmatched player sell quantity auto-clears at
-    `max(reference_price, floor_price)`, so listed supply always clears (prototype invariant).
+11. **Buyer of last resort** — unmatched standing-order quantity auto-clears at the
+    **reference price**, and only if the order's floor allows it: an order whose
+    `floor_price` exceeds the reference price clears **nothing** and its stock stays in the
+    pool. The floor is a reservation price — "hold rather than sell below this" — never a
+    price the market is made to pay. *(Corrected 2026-08-14, BL-386: the previous rule,
+    `max(reference_price, floor_price)` with no counterparty debited, let a seller name the
+    price a perfect counterparty pays — unbounded income, found by AI play. The auto-surplus
+    path (step 9) is unchanged: clearing at the market's own resolved price is the defensible
+    prototype simplification; paying a seller-named price was not a simplification of a
+    market but the absence of one.)*
 12. **Price update** — where explicit trades occurred, the price eases toward their VWAP;
     otherwise it takes the reference price.
 

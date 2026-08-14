@@ -26,7 +26,7 @@ const { execSync } = require('child_process');
 const argv = process.argv.slice(2);
 const bIdx = argv.indexOf('--base');
 const BASE = bIdx >= 0 ? argv[bIdx + 1] : 'main';
-const named = argv.filter((a, i) => !a.startsWith('--') && i !== bIdx + 1);
+const named = argv.filter((a, i) => !a.startsWith('--') && (bIdx < 0 || i !== bIdx + 1));
 
 const git = (cmd) => execSync(`git ${cmd}`, { encoding: 'utf8' }).trim();
 
