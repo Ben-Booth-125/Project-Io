@@ -528,6 +528,23 @@ target_link_libraries(era_roster PRIVATE io_world_obj lua54)
 target_compile_features(era_roster PRIVATE cxx_std_20)
 target_compile_options(era_roster PRIVATE ${IO_WARNING_FLAGS})
 
+# recipe_switch_harness (BL-430) is a live-Lua harness for the same reason as
+# era_roster above: its no-dominance guard (R1) asks what the AUTHORED recipe
+# roster's cost/depth shape actually is, which a hand-built fixture cannot
+# answer without becoming the thing under test.
+add_executable(recipe_switch_harness
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/recipe_switch_harness.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(recipe_switch_harness PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(recipe_switch_harness PRIVATE io_world_obj lua54)
+target_compile_features(recipe_switch_harness PRIVATE cxx_std_20)
+target_compile_options(recipe_switch_harness PRIVATE ${IO_WARNING_FLAGS})
+
 # chain_depth (BL-428) — the growth-spine metric. Live-Lua for its D6 rows, which
 # ask what the SHIPPED recipe graph's depth actually is; D1-D5 are hand-built
 # fixtures, because those ask whether the metric computes what it claims and must
@@ -706,6 +723,7 @@ set(IO_TEST_SCRIPT_ROOTED_HARNESSES
     interbody_pull_harness
     pregame_balance_harness
     persona_counsel_harness
+    recipe_switch_harness
 )
 
 foreach(harness_src ${IO_VERIFY_HARNESSES})

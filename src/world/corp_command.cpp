@@ -2,6 +2,7 @@
 
 #include "condition_set.hpp" // BL-350: request_quote's embargo decline condition
 #include "construction.hpp"
+#include "economy_system.hpp" // BL-430: try_switch_recipe, the shared recipe-switch gate
 #include "logistics.hpp" // invalidate_logistics_caches (idle/resume flips the anchor set)
 #include "recipe_registry.hpp"
 #include "survey_system.hpp"
@@ -304,10 +305,18 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                 return corp_command_result::rejected_invalid;
             if (b.recipe == cmd.recipe)
                 return corp_command_result::rejected_state; // no-op
-            b.recipe              = cmd.recipe;
-            b.active_recipe_index = static_cast<int>(cmd.recipe); // registry index == id (recipe_at)
-            b.loss_streak         = 0; // give the new recipe a chance (BL-079 idiom)
-            return corp_command_result::applied;
+            // BL-430: gated by economy.recipe_switch's cost/cooldown, through the
+            // one implementation this seam shares with construction_panel's method
+            // dropdown — the AI's dial_recipe margin-chase (corp_ai.cpp) reaches
+            // here too, and pays the same cost, since it is the same seam.
+            switch (try_switch_recipe(w, reg, cmd.corp, b, cmd.recipe))
+            {
+                case recipe_switch_result::applied:            return corp_command_result::applied;
+                case recipe_switch_result::on_cooldown:         return corp_command_result::rejected_cooldown;
+                case recipe_switch_result::insufficient_funds:  return corp_command_result::rejected_funds;
+                case recipe_switch_result::invalid:             return corp_command_result::rejected_invalid;
+            }
+            return corp_command_result::rejected_invalid;
         }
 
         case corp_verb::set_workforce:

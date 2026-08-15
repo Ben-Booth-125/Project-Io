@@ -317,6 +317,16 @@ void recipe_registry::load_from_lua(lua_state& lua)
         m_procurement = pp;
     }
 
+    // BL-430 player-facing recipe-switch cost/cooldown (economy.recipe_switch).
+    sol::optional<sol::table> recipe_switch = (*econ)["recipe_switch"];
+    if (recipe_switch)
+    {
+        recipe_switch_params rs;
+        rs.switch_cost    = recipe_switch->get_or("switch_cost",    rs.switch_cost);
+        rs.cooldown_ticks = recipe_switch->get_or("cooldown_ticks", rs.cooldown_ticks);
+        m_recipe_switch = rs;
+    }
+
     // Road-placement cost per tier (economy.roads.{track,road,highway}, BL-172; BL-147 shipped a
     // single `local` tier). Same shape as a building's cost (flat credits + market-bought
     // materials) but paid up front at placement. Tier index 0..2 = Track/Road/Highway.

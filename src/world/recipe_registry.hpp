@@ -240,6 +240,26 @@ struct construction_params
     float site_time_stack_min = 0.5f;
 };
 
+/// BL-430 player-facing recipe-switch tunables, authored in scripts/economy.lua under
+/// `economy.recipe_switch`. Read by the seam that changes a processing_facility's
+/// active recipe on the PLAYER path (corp_command's set_recipe verb, and the
+/// construction_panel management UI, which shares its gate). Deliberately NOT read
+/// by the BL-079 reflex switch (economy_system.cpp's floored-recipe auto-agency) —
+/// that stays free/instant, since it is sanctioned auto-agency reacting to a loss,
+/// not a player (or the AI's dial_recipe margin-chase, which goes through the same
+/// seam and so pays the same cost) committing to a new method. See PRODUCTION.md.
+struct recipe_switch_params
+{
+    /// One-off credit cost debited from the corp on a successful switch. 0 = free
+    /// (pre-BL-430 behaviour), the default so a hand-built harness registry that
+    /// never authors this table switches recipes for free, same as before.
+    float switch_cost = 0.0f;
+
+    /// Economy ticks after a switch before the SAME building may switch again
+    /// through this seam. 0 = no cooldown (pre-BL-430 behaviour).
+    int cooldown_ticks = 0;
+};
+
 /// BL-148/149 logistics-node discount tunables, authored in scripts/economy.lua under
 /// the top-level `logistics.node_discount`. A convoy's intra-body haul cost is discounted
 /// for each population-centre (BL-148) and inland_logistics_hub (BL-149) tile its A* path
@@ -392,6 +412,9 @@ public:
     /// BL-350 procurement/contract tunables (economy.procurement in Lua).
     const procurement_params& procurement() const { return m_procurement; }
 
+    /// BL-430 player-facing recipe-switch cost/cooldown (economy.recipe_switch in Lua).
+    const recipe_switch_params& recipe_switch() const { return m_recipe_switch; }
+
     /// Base logistics cost per unit distance per unit cargo for the given convoy mode.
     float logistics_cost(convoy_mode m) const
     {
@@ -541,6 +564,7 @@ public:
     void set_construction(const construction_params& c) { m_construction = c; }
     void set_military(const military_capability_params& m) { m_military = m; }
     void set_procurement(const procurement_params& p) { m_procurement = p; }
+    void set_recipe_switch(const recipe_switch_params& p) { m_recipe_switch = p; }
     void set_economics(building_type type, const building_economics& e)
     {
         m_building_econ[static_cast<std::size_t>(type)] = e;
@@ -685,6 +709,10 @@ private:
 
     /// BL-350 procurement tunables. Defaults match economy.lua.
     procurement_params m_procurement = {};
+
+    /// BL-430 recipe-switch cost/cooldown. Defaults to free/instant so a
+    /// hand-built harness registry that never sets this behaves as it always did.
+    recipe_switch_params m_recipe_switch = {};
 
     /// Logistics base cost per unit distance per unit cargo, indexed by convoy_mode
     /// (land=0, sea=1, air=2, space=3). Defaults match economy.lua values.

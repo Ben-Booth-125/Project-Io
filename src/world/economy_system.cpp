@@ -535,6 +535,36 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
 
 } // namespace
 
+// BL-430: see the declaration in economy_system.hpp for the full rationale —
+// the single implementation shared by corp_command's set_recipe verb (also the
+// AI's dial_recipe margin-chase path) and construction_panel's method dropdown.
+recipe_switch_result try_switch_recipe(world& w, const recipe_registry& reg,
+                                       entity_id corp, building_component& b,
+                                       uint16_t new_recipe_id)
+{
+    if (reg.get_recipe(new_recipe_id) == nullptr)
+        return recipe_switch_result::invalid;
+    if (b.recipe == new_recipe_id)
+        return recipe_switch_result::invalid; // no-op
+    if (b.recipe_switch_cooldown > 0)
+        return recipe_switch_result::on_cooldown;
+
+    const auto cit = w.corporations.find(corp);
+    if (cit == w.corporations.end())
+        return recipe_switch_result::invalid;
+
+    const recipe_switch_params& sw = reg.recipe_switch();
+    if (cit->second.balance < sw.switch_cost)
+        return recipe_switch_result::insufficient_funds;
+
+    cit->second.balance -= sw.switch_cost;
+    b.recipe                 = new_recipe_id;
+    b.active_recipe_index    = static_cast<int>(new_recipe_id); // registry index == id (recipe_at)
+    b.loss_streak            = 0;                                // give the new recipe a chance
+    b.recipe_switch_cooldown = sw.cooldown_ticks;
+    return recipe_switch_result::applied;
+}
+
 economy_report run_economy_step(world& w, const recipe_registry& reg, bool spectating)
 {
     economy_report report;
@@ -546,6 +576,13 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // pays for its materials as real market demand and progresses only as fast as
     // the local market can supply them (full / stretched / paused).
     run_construction(w, reg, report);
+
+    // BL-430: tick down every building's player-recipe-switch cooldown. Order-
+    // independent (each building's counter is decremented against itself only),
+    // so iterating w.buildings directly is deterministic without a sort.
+    for (auto& [bid, b] : w.buildings)
+        if (b.recipe_switch_cooldown > 0)
+            --b.recipe_switch_cooldown;
 
     // BL-332 capability points: a flat per-tick credit to the owning corp's
     // military_points / science for every COMPLETED military_base /

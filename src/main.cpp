@@ -169,6 +169,7 @@ const char* corp_command_result_name(corp_command_result r)
         case corp_command_result::rejected_no_input_access: return "rejected_no_input_access";
         case corp_command_result::rejected_embargo:         return "rejected_embargo";
         case corp_command_result::rejected_reputation:      return "rejected_reputation";
+        case corp_command_result::rejected_cooldown:        return "rejected_cooldown"; // BL-430
     }
     return "rejected_invalid";
 }

@@ -122,6 +122,7 @@ enum class corp_command_result : uint8_t
     rejected_no_input_access, ///< The supplier's local market cannot supply the recipe's inputs.
     rejected_embargo,         ///< The supplier's condition_set evaluates false against the buyer.
     rejected_reputation,      ///< The (buyer, supplier) reputation pair sits below the standing floor.
+    rejected_cooldown,        ///< BL-430: economy.recipe_switch's cooldown has not elapsed on this building.
 };
 
 /// Apply one command through the player-grade seams. Deterministic; a rejected

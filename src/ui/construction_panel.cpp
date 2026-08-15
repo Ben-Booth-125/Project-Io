@@ -476,8 +476,13 @@ void draw_selected_section(world& w, const recipe_registry& reg,
                 const std::string lbl = std::string("     ") + (ri.display_name.empty() ? "-" : ri.display_name);
                 if (ImGui::Selectable(lbl.c_str(), sel))
                 {
-                    b.active_recipe_index = i;
-                    b.recipe = reg.recipe_id(ri.name);
+                    // BL-430: gated by economy.recipe_switch (cost + cooldown) —
+                    // the same seam corp_command's set_recipe verb uses, so a
+                    // player press and an AI margin-chase pay the same price. A
+                    // refusal (cooldown / funds) leaves active_recipe_index and
+                    // b.recipe untouched, which is why this does not also assign
+                    // them the way the old direct-mutate code used to.
+                    try_switch_recipe(w, reg, w.player_entity, b, reg.recipe_id(ri.name));
                 }
                 icons::resource(pdl, {ip.x + pipr + 2.0f, ip.y + ImGui::GetTextLineHeight() * 0.5f},
                                 pipr, method_res(i));
@@ -486,6 +491,14 @@ void draw_selected_section(world& w, const recipe_registry& reg,
             }
             ImGui::EndCombo();
         }
+
+        // BL-430: legibility for the gate above — a silently-ignored click reads
+        // as broken, so name the cost/cooldown while one is in force.
+        if (b.recipe_switch_cooldown > 0)
+            ImGui::TextDisabled("Method locked %d more tick%s (retooling)",
+                                b.recipe_switch_cooldown, b.recipe_switch_cooldown == 1 ? "" : "s");
+        else if (reg.recipe_switch().switch_cost > 0.0f)
+            ImGui::TextDisabled("Switching method costs %.0f cr", reg.recipe_switch().switch_cost);
     }
 
     // --- Where this site sits in its tile's stack (BL-193) ---------------------

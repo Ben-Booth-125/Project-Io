@@ -516,6 +516,55 @@ building roster), the next item in Sprint 17.
 
 ---
 
+## Alternate production methods (BL-430, 2026-08-15)
+
+**Ruling (Ben, 2026-08-15): alternates with real trade-offs, not tier upgrades.** The core data
+model already existed before this item — `recipes.lua` already lets several recipes share a
+primary output (the Charcoal Burner and the Peat Kiln both → `charcoal`), and
+`recipe_registry::recipe_at`/`recipe_count` already browse every era-allowed recipe for a
+`processing_facility`, so a building's Production dropdown (`construction_panel.cpp`) has always
+offered every era-allowed method interchangeably. What BL-430 added was the *cost of choosing*.
+
+**Switching costs something.** Changing a `processing_facility`'s active recipe through the
+*player-grade* seam — the management UI's method dropdown, or `corp_command`'s `set_recipe` verb
+(which the AI's `dial_recipe` margin-chase also goes through, so it pays the same price) — now
+debits a one-off credit cost and starts a cooldown, both authored in `economy.recipe_switch`
+(`scripts/economy.lua`; defaults `switch_cost = 12.0`, `cooldown_ticks = 6`). The single
+implementation is `try_switch_recipe` (`economy_system.{hpp,cpp}`); a refusal (on cooldown,
+insufficient funds, unknown/no-op recipe) mutates nothing. `building_component.recipe_switch_
+cooldown` carries the countdown, decremented once per economy tick.
+
+**The BL-079 reflex switch is deliberately exempt.** A building whose output has floored
+(`economy_system.cpp`'s loss-streak rescue) may still auto-switch to a healthier recipe for free
+and instantly — that is sanctioned, narrow, local auto-agency reacting to a sustained loss, not a
+strategic commitment, and it never calls `try_switch_recipe`. See
+`.claude/rules/io-standing-rules.md`'s BL-079 exception for the standing invariant this preserves.
+
+**The no-dominance guard.** `tools/verify/recipe_switch_harness.cpp`'s `R1` groups recipes by
+(primary output resource, era band) — the set genuinely interchangeable as methods on one building
+— and asserts no pair beats its sibling on *both* input-basket cost (a fixed reference-price
+snapshot, `world_gen.lua`'s `base_price`) *and* the chain depth of its deepest input at once. A
+pair identical or split across the two axes is a real trade-off; a pair dominated on both is dead
+content the moment its sibling is reachable. Wage and build-duration were considered and rejected
+as guard axes: those live on `building_economics` (the *building type*), not the recipe, and every
+`processing_facility` offers the same era-allowed recipe set — so those axes are identical across
+every sibling by construction and carry no discriminating information.
+
+**As of 2026-08-15 the guard fails against the shipped roster** — four sibling pairs (all
+pre-dating this item, from BL-340/BL-429/BL-433) are strictly dominated on both axes:
+`steel_from_iron_nickel` over `steel`, `propellant_atmospheric` over `propellant_electrolysis`,
+`peat_charcoal` over `charcoal`, and `glass` over `trade_goods`. Left failing rather than tuned
+silently — see `NEEDS_REVIEW.json` (NR-243) for the open call on whether these are genuine
+alternates needing a retune, or intended tier upgrades the guard should not compare at all.
+
+**AI scoring.** `corp_ai.cpp`'s `dial_recipe` candidate does not price `switch_cost` into its
+projected gain and does not pre-filter on `recipe_switch_cooldown`; the seam still enforces both
+at apply time, so a losing candidate is refused rather than mutating anything. Stated as a decision
+in `corp_ai.cpp` and recorded in `NEEDS_REVIEW.json` (NR-242) rather than silently deferred — a
+cost/cooldown-aware scorer is real new planner scope, not a small follow-on.
+
+---
+
 ## Layer 3 prototype scope
 
 Layer 3 implements:

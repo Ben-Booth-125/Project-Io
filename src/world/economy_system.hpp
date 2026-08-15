@@ -163,6 +163,38 @@ struct economy_report
 economy_report run_economy_step(world& w, const recipe_registry& reg,
                                 bool spectating = false);
 
+/// BL-430: outcome of a PLAYER-grade recipe-switch attempt (try_switch_recipe).
+enum class recipe_switch_result : uint8_t
+{
+    applied,              ///< b.recipe changed; cost debited, cooldown started.
+    invalid,              ///< Unknown recipe id, or already the active recipe.
+    on_cooldown,          ///< b.recipe_switch_cooldown has not reached 0 yet.
+    insufficient_funds,   ///< The owning corp cannot cover recipe_switch().switch_cost.
+};
+
+/// Attempt a PLAYER-grade recipe switch on `b`, gated by `economy.recipe_switch`
+/// (recipe_registry::recipe_switch()) — a one-off credit cost debited from `corp`
+/// and a cooldown before the SAME building may switch again through this seam.
+/// The single implementation shared by corp_command's set_recipe verb (which the
+/// AI's dial_recipe margin-chase also goes through — same seam, same cost) and the
+/// construction_panel management UI's method dropdown.
+///
+/// Deliberately NOT called by the BL-079 reflex switch (economy_system.cpp's
+/// floored-recipe auto-agency): that is sanctioned auto-agency reacting to a
+/// sustained loss, not a commitment, and stays free/instant. See
+/// recipe_switch_params for the full reasoning.
+///
+/// A rejection mutates nothing.
+///
+/// @param w             World; `corp`'s balance is debited on success.
+/// @param reg           Loaded recipe/economy registry (recipe_switch() reads the gate).
+/// @param corp          The owning corporation, debited on success.
+/// @param b             The building whose recipe changes.
+/// @param new_recipe_id The candidate recipe's absolute id (recipe_registry storage id).
+recipe_switch_result try_switch_recipe(world& w, const recipe_registry& reg,
+                                       entity_id corp, building_component& b,
+                                       uint16_t new_recipe_id);
+
 /// The rate one extraction site would yield at full reserve, BEFORE its stack
 /// decay: base_rate × richness × effective workforce × workforce target ×
 /// (1 − hazard). The single definition of "one site's nominal draw" — the stack
