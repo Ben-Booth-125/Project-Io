@@ -695,6 +695,22 @@ int main(int argc, char* argv[])
             }
         }
 
+        // --verify-all [dir]: the whole committed suite against ONE world
+        // generation (BL-423 — regenerating the identical deterministic world
+        // per script cost ~40 s x 79 launches). Checked before --verify so the
+        // longer flag is not shadowed by a prefix scan; both are exact matches,
+        // but the order documents the intent.
+        for (int i = 1; i < argc; ++i)
+        {
+            if (std::string(argv[i]) == "--verify-all")
+            {
+                std::string dir = "scripts/verify";
+                if (i + 1 < argc && std::string(argv[i + 1]) != "--bless")
+                    dir = argv[i + 1];
+                return app{}.run_verify_all(dir, bless);
+            }
+        }
+
         for (int i = 1; i < argc; ++i)
         {
             if (std::string(argv[i]) == "--verify")

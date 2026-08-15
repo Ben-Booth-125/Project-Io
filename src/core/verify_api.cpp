@@ -9,10 +9,19 @@
 #include "app.hpp"
 
 #include <imgui.h>
+#include <imgui_impl_sdl3.h>
+#include <imgui_impl_sdlrenderer3.h>
 #include <SDL3/SDL.h>
+
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#endif
 
 #include "ui/canvas_command.hpp"
 #include "ui/detail_level.hpp"
+#include "ui/fonts.hpp"
 #include "ui/frame_stats.hpp"
 #include "ui/market_ledger.hpp"
 #include "ui/presentation.hpp"
@@ -206,9 +215,66 @@ int app::run_autostart()
 
 int app::run_verify(const std::string& script_path, bool bless)
 {
+    return run_verify_scripts({script_path}, bless);
+}
+
+int app::run_verify_all(const std::string& dir, bool bless)
+{
+    // Every committed check in one launch (BL-423). Sorted for a deterministic
+    // run order; lib.lua is the helper library, not a check.
+    namespace fs = std::filesystem;
+    std::vector<std::string> scripts;
+    for (const auto& e : fs::directory_iterator(dir))
+    {
+        if (!e.is_regular_file() || e.path().extension() != ".lua") continue;
+        if (e.path().filename() == "lib.lua") continue;
+        scripts.push_back(e.path().string());
+    }
+    std::sort(scripts.begin(), scripts.end());
+    if (scripts.empty())
+    {
+        SDL_Log("verify-all: no scripts under %s", dir.c_str());
+        return 1;
+    }
+    SDL_Log("verify-all: %zu script(s) under %s", scripts.size(), dir.c_str());
+    return run_verify_scripts(scripts, bless);
+}
+
+void app::reset_verify_transients()
+{
+    m_last_econ_report = {};
+    m_last_corp_standings.clear();
+    m_last_econ_tick = 0;
+    m_balance_history.clear();
+    m_income_history.clear();
+    m_expenditure_history.clear();
+    m_market_history = {};
+    m_building_rank_hist.clear();
+    m_body_resource_hist = {};
+    m_tile_resource_hist = {};
+    m_tracked_tiles.clear();
+    m_resource_hist_days.clear();
+    m_resource_sample_index = 0;
+    m_prev_selection = null_entity;
+    m_last_orbit_days = 0.0;
+    m_last_survey_day = 0;
+}
+
+int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
+{
     // Deterministic, non-interactive setup: fixed window (resized to verify_w/
     // verify_h below), seeded world, sim left paused so orbits and ticks never
     // advance between captures. The script drives view/overlay state directly.
+    //
+    // Hide BEFORE the ~40 s synchronous generation, not after — hidden-after
+    // meant the window sat on the desktop for exactly the generation, which is
+    // both the annoyance and the hang-ghost exposure window.
+    SDL_HideWindow(m_window);
+
+    // Setup runs ONCE for the whole batch (BL-423) — make_hard_coded_world costs
+    // ~38 s on the Debug build, which is the entire reason batch mode exists. The
+    // pristine snapshot taken after setup is what makes once safe: it is restored
+    // before every script, so script order cannot leak state.
     setup_world();
     load_economy();
 
@@ -248,13 +314,35 @@ int app::run_verify(const std::string& script_path, bool bless)
     // interactive default. SyncWindow blocks until the resize is applied so the very
     // first capture already renders at the fixed size.
     SDL_SetWindowSize(m_window, verify_w, verify_h);
+
+    // A verify run is headless work that happens to hold a window. It pumps no
+    // events during the ~40 s synchronous generation and multi-second Debug
+    // econ steps, so Windows declares it hung (five Application Hang 1002
+    // events across 2026-08-14/15, one per silently truncated pass), ghosts
+    // it, and the ghost's close path kills the whole batch. Three measures:
+    // hide the window (nothing to click, nothing on the desktop while a pass
+    // runs; captures read the render target, not the screen), stop the ghost
+    // takeover outright on Windows, and pump events at every loop boundary we
+    // control (per script, per econ tick — generation itself stays synchronous
+    // and is covered by the first two).
+    SDL_HideWindow(m_window);
+#ifdef _WIN32
+    DisableProcessWindowsGhosting();
+#endif
     SDL_SyncWindow(m_window);
 
-    // Golden-image diffing: goldens live in a "golden" directory beside the verify
-    // script, so running against the source script path (the skill's iteration
-    // mode) reads/writes the committed source tree, not a stale build copy.
     m_verify_bless = bless;
-    m_golden_dir   = (std::filesystem::path{script_path}.parent_path() / "golden").string();
+
+    // The pristine state every script starts from (BL-423). Both are plain
+    // value types (flat containers, entity ids, no pointers into each other),
+    // so assignment is a complete, safe reset — the property the whole batch
+    // rests on. Taken AFTER setup so the reach-budget mirror and window sizing
+    // are part of what gets restored.
+    const world    pristine_world = m_world;
+    const ui_state pristine_ui    = m_ui;
+    // The comms log is snapshotted rather than value-reset: its channel list is
+    // seeded at setup and must survive; only the accumulated messages must not.
+    const ui::chat_state pristine_chat = m_chat;
 
     // Expose the `verify` API. Each function writes ui_state directly — the
     // "direct state manipulation" driver — so captures are reproducible without
@@ -295,6 +383,31 @@ int app::run_verify(const std::string& script_path, bool bless)
     v.set_function("add_pan",  [this](float dx, float dy) {
         m_ui.planetary_pan_x += dx;
         m_ui.planetary_pan_y += dy;
+    });
+    // The BL-204 tick-boundary checksum, exposed so a script (or a batch-mode
+    // equivalence hunt — how BL-423's restore was proven) can print whether two
+    // runs hold the same world without comparing pixels.
+    v.set_function("state_hash", [this]() {
+        char buf[24];
+        std::snprintf(buf, sizeof buf, "%016llX",
+                      static_cast<unsigned long long>(
+                          m_world.state_hash(m_world.current_day_tick)));
+        return std::string(buf);
+    });
+    // Dump the comms log as strings (channel:day:from:text), so an equivalence
+    // hunt can diff feed CONTENT rather than pixels.
+    v.set_function("chat_lines", [this]() {
+        sol::state& s = m_lua.state();
+        sol::table out = s.create_table();
+        int idx = 0;
+        for (const auto& msg : m_chat.messages)
+        {
+            char head[48];
+            std::snprintf(head, sizeof head, "%d:d%d:%llu: ", msg.channel, msg.day,
+                          static_cast<unsigned long long>(msg.from));
+            out[++idx] = std::string(head) + msg.text;
+        }
+        return out;
     });
     v.set_function("capture", [this](const std::string& name) { capture_frame(name); });
     // Render N frames WITHOUT capturing (BL-228). capture() composits exactly one
@@ -371,6 +484,9 @@ int app::run_verify(const std::string& script_path, bool bless)
             // invalidates, freezing derived values across every capture.
             ++m_world.current_day_tick;
             step_economy();
+            // Heartbeat: a Debug econ tick runs seconds; without this the
+            // window is hang-declared mid-script (see the run header above).
+            SDL_PumpEvents();
         }
         m_ui.show_economy_panel = true;
     });
@@ -1306,34 +1422,104 @@ int app::run_verify(const std::string& script_path, bool bless)
         return out;
     });
 
-    try
+    int script_errors = 0;
+    for (const std::string& script_path : scripts)
     {
-        // Auto-load the helper library (scripts/verify/lib.lua) from the script's
-        // own directory before running it, so scripts get the high-level helpers
-        // (sweep_overlays, tour_buildings, frame_tile) without a `require` (the
-        // package lib is not opened). Loading it from the script's directory means
-        // iterating against the source path picks up the source lib, not a stale
-        // build copy. Skipped when the target *is* the library.
-        namespace fs = std::filesystem;
-        const fs::path script{script_path};
-        const fs::path lib = script.parent_path() / "lib.lua";
-        if (fs::exists(lib) &&
-            fs::weakly_canonical(lib) != fs::weakly_canonical(script))
-            m_lua.load(lib.string());
+        SDL_PumpEvents(); // heartbeat between scripts (see the run header above)
 
-        m_lua.load(script_path);
-    }
-    catch (const std::exception& e)
-    {
-        SDL_Log("verify script failed: %s", e.what());
-        return 1;
+        // Re-assert the fixed capture size: a menu/wizard script re-enters the
+        // interactive sizing path (measured: one resize mid-batch left 69
+        // goldens blessed at 1720x1080), and the batch must hand every script
+        // the 1280x720 the goldens standardise on. Hidden stays hidden.
+        SDL_SetWindowSize(m_window, verify_w, verify_h);
+        SDL_SyncWindow(m_window);
+        // Every script sees the state a solo run gives it: pristine world and
+        // ui, the in-game screen (a menu script re-enters via verify.show_menu
+        // and must not strand its successor there), and a clean overflow
+        // ledger. What this deliberately does NOT reset is the shared Lua
+        // state: a script's leaked GLOBAL survives into the next script.
+        // Accepted — the committed scripts use locals — and lib.lua is
+        // reloaded each iteration so the helper globals a script might clobber
+        // come back.
+        // A cold ImGui context per script. ImGui derives per-window layout
+        // (scrollbar visibility, sizes) from the PREVIOUS frame, and solo runs
+        // bless every golden on cold frame-1 windows — a warm window carries
+        // the prior script's content shape into this script's first capture.
+        // Measured: with everything else proven identical (per-tick state_hash,
+        // the full comms message list), the comms child still rendered with the
+        // previous script's scrollbar/wrap, diffing 1.2% against its solo
+        // golden. Rebuilding the context reproduces frame-1 conditions exactly;
+        // the font-atlas rebuild it costs is milliseconds against the ~38 s
+        // generation this mode exists to amortise.
+        ImGui_ImplSDLRenderer3_Shutdown();
+        ImGui_ImplSDL3_Shutdown();
+        ImGui::DestroyContext();
+        ImGui::CreateContext();
+        ImGui::StyleColorsDark();
+        ImGui_ImplSDL3_InitForSDLRenderer(m_window, m_renderer);
+        ImGui_ImplSDLRenderer3_Init(m_renderer);
+        ui::load_ui_font();
+        ui::set_overflow_recording(true);
+
+        // Restore via copy-construct + move-assign, NOT plain copy-assign.
+        // operator= into a container that a previous script's ticks have grown
+        // keeps the grown bucket count, and unordered_map iteration order can
+        // depend on bucket count — belt-and-braces beside the context reset
+        // above; a fresh copy's storage derives from the pristine contents
+        // alone, and the move replaces the old storage wholesale.
+        {
+            world fresh_world = pristine_world;
+            m_world = std::move(fresh_world);
+            ui_state fresh_ui = pristine_ui;
+            m_ui = std::move(fresh_ui);
+            ui::chat_state fresh_chat = pristine_chat;
+            m_chat = std::move(fresh_chat);
+        }
+        m_screen = app_screen::in_game;
+        reset_verify_transients();
+        ui::clear_overflows();
+
+        // Goldens live in a "golden" directory beside each verify script, so
+        // running against the source script path (the skill's iteration mode)
+        // reads/writes the committed source tree, not a stale build copy.
+        m_golden_dir = (std::filesystem::path{script_path}.parent_path() / "golden").string();
+
+        const int failures_before = m_verify_failures;
+        try
+        {
+            // Auto-load the helper library (scripts/verify/lib.lua) from the
+            // script's own directory before running it, so scripts get the
+            // high-level helpers (sweep_overlays, tour_buildings, frame_tile)
+            // without a `require` (the package lib is not opened).
+            namespace fs = std::filesystem;
+            const fs::path script{script_path};
+            const fs::path lib = script.parent_path() / "lib.lua";
+            if (fs::exists(lib) &&
+                fs::weakly_canonical(lib) != fs::weakly_canonical(script))
+                m_lua.load(lib.string());
+
+            m_lua.load(script_path);
+        }
+        catch (const std::exception& e)
+        {
+            // A batch does not abort on one broken script (BL-423 R3): count
+            // it, say so, and keep going — the remaining 78 checks are exactly
+            // as informative as they were before this one broke.
+            SDL_Log("verify script FAILED: %s: %s", script_path.c_str(), e.what());
+            ++script_errors;
+            continue;
+        }
+        SDL_Log("verify: %s — %d golden failure(s)",
+                script_path.c_str(), m_verify_failures - failures_before);
     }
 
-    // Non-zero exit if any capture failed its golden diff, so the harness/skill
-    // reads an advisory PASS/FAIL off the process result as well as the logs.
-    if (m_verify_failures > 0)
+    // Non-zero exit if any capture failed its golden diff or any script threw,
+    // so the harness/skill reads an advisory PASS/FAIL off the process result
+    // as well as the logs.
+    if (m_verify_failures > 0 || script_errors > 0)
     {
-        SDL_Log("verify: %d capture(s) failed golden diff", m_verify_failures);
+        SDL_Log("verify: %d capture(s) failed golden diff, %d script error(s)",
+                m_verify_failures, script_errors);
         return 1;
     }
     return 0;

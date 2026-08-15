@@ -63,6 +63,14 @@ public:
     ///         script failed to load/execute or any capture failed its golden diff.
     int run_verify(const std::string& script_path, bool bless = false);
 
+    /// Batch form of run_verify (BL-423): every *.lua under @p dir (sorted,
+    /// lib.lua excluded), against ONE world generation — the ~38 s
+    /// make_hard_coded_world cost is paid once, and a pristine world/ui_state
+    /// snapshot is restored before each script so every script sees exactly the
+    /// state a solo run gives it. A script that throws is counted as a failure
+    /// and the batch continues. Same return contract as run_verify.
+    int run_verify_all(const std::string& dir, bool bless = false);
+
     /// Headless: generate a world and run start_new_game's WHOLE tail, then
     /// exit. Covers what run_verify never reaches — it calls setup_world +
     /// load_economy and stops, so generate_background_firms and the pre-game
@@ -70,6 +78,18 @@ public:
     int run_autostart();
 
 private:
+    /// The shared core of run_verify / run_verify_all: one setup + API
+    /// registration, then each script against a pristine-state restore.
+    int run_verify_scripts(const std::vector<std::string>& scripts, bool bless);
+
+    /// Reset every app-owned per-tick accumulator that lives OUTSIDE world and
+    /// ui_state (balance/income/market/resource histories, the last econ
+    /// report, orbit/survey clocks). The batch restore (BL-423) reassigns
+    /// world + ui, and these are the third bucket it would otherwise miss —
+    /// found the honest way: a header sparkline showed six points where a solo
+    /// run shows four. Any new per-tick app member belongs in here.
+    void reset_verify_transients();
+
     void process_events(bool& running);
 
     /// Map a key-down event onto the unified action table and dispatch it, or
