@@ -88,14 +88,268 @@ void shield(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
     dl->AddPolyline(v, 5, outline, ImDrawFlags_Closed, 1.0f);
 }
 
+// --- BL-429: named-building glyphs -------------------------------------------
+// One shape per (extraction target / processing primary-output) resource that
+// the ancient roster gave a building name to (BL-429 slice 2). Two or more
+// named buildings that reach the same resource share one glyph by design —
+// the glyph identifies WHAT a site makes or works, not which specific recipe
+// — so e.g. the Charcoal Burner and the Peat Kiln (both -> charcoal) read the
+// same, exactly as two Iron Mines already share one glyph regardless of tile.
+// Anything without a bespoke shape here falls through to the generic
+// ore_chunk / square in `building()` below.
+
+void quarry_stone(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // An irregular five-sided boulder — taller and more asymmetric than the
+    // flat eight-sided ore_chunk crystal, so raw stone reads apart from a
+    // mineral deposit at a glance.
+    const ImVec2 v[5] = {
+        { c.x - r * 0.55f, c.y - r },         // top-left peak
+        { c.x + r * 0.30f, c.y - r * 0.80f }, // top-right shoulder
+        { c.x + r,         c.y + r * 0.20f }, // right bulge
+        { c.x + r * 0.15f, c.y + r },         // bottom point
+        { c.x - r,         c.y + r * 0.35f }, // left bulge
+    };
+    dl->AddConvexPolyFilled(v, 5, fill);
+    dl->AddPolyline(v, 5, outline, ImDrawFlags_Closed, 1.0f);
+}
+
+void woodcutter_timber(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // Two crossed logs with round end-caps — a stronger "raw wood" read at
+    // icon size than a tree silhouette, and the only X silhouette in the
+    // building family.
+    const float k = r * 0.75f;
+    dl->AddLine({c.x - k, c.y - k}, {c.x + k, c.y + k}, fill, 3.0f);
+    dl->AddLine({c.x - k, c.y + k}, {c.x + k, c.y - k}, fill, 3.0f);
+    const float capr = r * 0.20f;
+    dl->AddCircleFilled({c.x - k, c.y - k}, capr, fill);
+    dl->AddCircleFilled({c.x + k, c.y + k}, capr, fill);
+    dl->AddCircleFilled({c.x - k, c.y + k}, capr, fill);
+    dl->AddCircleFilled({c.x + k, c.y - k}, capr, fill);
+}
+
+void sand_pit(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A low, wide dune — much flatter than the port/production triangles, so
+    // it reads as a heap rather than a peak — with wind-blown grain dots
+    // above the crest.
+    const ImVec2 v[3] = {
+        { c.x - r, c.y + r * 0.60f },
+        { c.x + r, c.y + r * 0.60f },
+        { c.x,     c.y - r * 0.10f },
+    };
+    dl->AddConvexPolyFilled(v, 3, fill);
+    dl->AddPolyline(v, 3, outline, ImDrawFlags_Closed, 1.0f);
+    dl->AddCircleFilled({c.x - r * 0.35f, c.y - r * 0.55f}, r * 0.08f, fill);
+    dl->AddCircleFilled({c.x,             c.y - r * 0.75f}, r * 0.08f, fill);
+    dl->AddCircleFilled({c.x + r * 0.35f, c.y - r * 0.55f}, r * 0.08f, fill);
+}
+
+void clay_pit(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A narrow-necked raw-clay vessel — the unfired counterpart of the
+    // Potter & Weaver's tied goods bundle, with a plain rim rather than a
+    // cinched neck.
+    const ImVec2 v[6] = {
+        { c.x - r * 0.28f, c.y - r },         // neck top-left
+        { c.x + r * 0.28f, c.y - r },         // neck top-right
+        { c.x + r * 0.55f, c.y - r * 0.15f }, // shoulder right
+        { c.x + r * 0.40f, c.y + r },         // base right
+        { c.x - r * 0.40f, c.y + r },         // base left
+        { c.x - r * 0.55f, c.y - r * 0.15f }, // shoulder left
+    };
+    dl->AddConvexPolyFilled(v, 6, fill);
+    dl->AddPolyline(v, 6, outline, ImDrawFlags_Closed, 1.0f);
+}
+
+void peat_cutting(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // Three stacked, alternately-offset turf bricks — cut peat, distinct from
+    // both the stone boulder and the ore/mineral chunk.
+    const float bw   = r * 0.85f;
+    const float bh   = r * 0.40f;
+    const float gap  = r * 0.14f;
+    const float offs = r * 0.20f;
+    const float step = bh + gap;
+    const float y0   = c.y - step * 1.5f + bh * 0.5f;
+    for (int i = 0; i < 3; ++i)
+    {
+        const float  yy   = y0 + static_cast<float>(i) * step;
+        const float  xoff = (i % 2 == 0) ? -offs : offs;
+        const ImVec2 lo   = {c.x - bw * 0.5f + xoff, yy};
+        const ImVec2 hi   = {c.x + bw * 0.5f + xoff, yy + bh};
+        dl->AddRectFilled(lo, hi, fill);
+        dl->AddRect(lo, hi, outline, 0.0f, 0, 1.0f);
+    }
+}
+
+void iron_mine(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // Crossed pick handles with small wedge heads — the universal "mine"
+    // mark, distinct from the raw ore_chunk crystal it sits beside in the
+    // Build door.
+    const float  k  = r * 0.80f;
+    const ImVec2 a1 = {c.x - k, c.y - k}, a2 = {c.x + k, c.y + k};
+    const ImVec2 b1 = {c.x - k, c.y + k}, b2 = {c.x + k, c.y - k};
+    dl->AddLine(a1, a2, fill, 2.5f);
+    dl->AddLine(b1, b2, fill, 2.5f);
+    const float  hw = r * 0.22f;
+    const ImVec2 h1[3] = { {a1.x - hw, a1.y}, {a1.x + hw, a1.y}, {a1.x, a1.y - hw} };
+    const ImVec2 h2[3] = { {b2.x - hw, b2.y}, {b2.x + hw, b2.y}, {b2.x, b2.y - hw} };
+    dl->AddConvexPolyFilled(h1, 3, fill);
+    dl->AddConvexPolyFilled(h2, 3, fill);
+}
+
+void copper_mine(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A pointy-top hexagon nugget — hub_node's hexagon rotated 30 degrees and
+    // stripped of its centre dot, so a copper claim never reads as a
+    // logistics hub.
+    ImVec2 v[6];
+    for (int i = 0; i < 6; ++i)
+    {
+        const float a = 3.14159265f / 3.0f * static_cast<float>(i) + 3.14159265f / 6.0f;
+        v[i] = { c.x + r * 0.85f * std::cos(a), c.y + r * 0.85f * std::sin(a) };
+    }
+    dl->AddConvexPolyFilled(v, 6, fill);
+    dl->AddPolyline(v, 6, outline, ImDrawFlags_Closed, 1.0f);
+}
+
+void water_extractor(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A teardrop — a pointed cap over a rounded base — the only rounded,
+    // pointed silhouette in the set, reading as "water" against every
+    // angular glyph beside it.
+    const float  br = r * 0.62f;
+    const ImVec2 bc = {c.x, c.y + r * 0.25f};
+    dl->AddCircleFilled(bc, br, fill);
+    const ImVec2 v[3] = {
+        { c.x,               c.y - r },
+        { bc.x + br * 0.85f, bc.y - br * 0.15f },
+        { bc.x - br * 0.85f, bc.y - br * 0.15f },
+    };
+    dl->AddConvexPolyFilled(v, 3, fill);
+    dl->AddCircle(bc, br, outline, 0, 1.0f);
+}
+
+void farm(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // Three stalks fanning from a base point, each capped with a grain head —
+    // "cultivated ground", distinct from the tied goods bundle the harvest
+    // eventually becomes. Shared by the Farm and the Fishing Wharf (BL-168):
+    // both work the same target resource, distinguished by placement rather
+    // than by what they visibly produce.
+    const ImVec2 base  = {c.x, c.y + r};
+    const float  headr = r * 0.16f;
+    for (int i = -1; i <= 1; ++i)
+    {
+        const ImVec2 tip = {c.x + static_cast<float>(i) * r * 0.55f, c.y - r * 0.85f};
+        dl->AddLine(base, tip, fill, 2.0f);
+        dl->AddCircleFilled(tip, headr, fill);
+    }
+}
+
+void charcoal_kiln(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A squat earthen mound with a smoke vent — the only dome silhouette in
+    // the set. Shared by the Charcoal Burner and the Peat Kiln (both -> charcoal).
+    const ImVec2 v[5] = {
+        { c.x - r,         c.y + r },
+        { c.x - r * 0.75f, c.y - r * 0.30f },
+        { c.x,             c.y - r * 0.90f },
+        { c.x + r * 0.75f, c.y - r * 0.30f },
+        { c.x + r,         c.y + r },
+    };
+    dl->AddConvexPolyFilled(v, 5, fill);
+    dl->AddPolyline(v, 5, outline, ImDrawFlags_Closed, 1.0f);
+    dl->AddLine({c.x, c.y - r * 0.90f}, {c.x, c.y - r * 1.15f}, outline, 1.5f);
+}
+
+void bloomery(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A cluster of rough lumps — the raw bloom, distinct from the smooth
+    // teardrop and the angular ore_chunk crystal.
+    dl->AddCircleFilled({c.x,             c.y - r * 0.15f}, r * 0.55f, fill);
+    dl->AddCircleFilled({c.x - r * 0.55f, c.y + r * 0.30f}, r * 0.38f, fill);
+    dl->AddCircleFilled({c.x + r * 0.55f, c.y + r * 0.25f}, r * 0.38f, fill);
+    dl->AddCircle({c.x, c.y - r * 0.15f}, r * 0.55f, outline, 0, 1.0f);
+}
+
+void smithy_ingot(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A flat trapezoid ingot bar — the worked-metal silhouette, distinct from
+    // the copper hexagon nugget and the iron ore-chunk crystal it is smelted
+    // from. Shared with the industrial Smelter's steel — it IS the same good.
+    const ImVec2 v[4] = {
+        { c.x - r,         c.y + r * 0.35f },
+        { c.x - r * 0.62f, c.y - r * 0.35f },
+        { c.x + r * 0.62f, c.y - r * 0.35f },
+        { c.x + r,         c.y + r * 0.35f },
+    };
+    dl->AddConvexPolyFilled(v, 4, fill);
+    dl->AddPolyline(v, 4, outline, ImDrawFlags_Closed, 1.0f);
+}
+
+void goods_bundle(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A cinched sack — round body, tied neck — the finished-goods bundle.
+    // Distinct from the water teardrop (no point at the top; a flat tie-line
+    // instead) and the plain processing square. Shared by the Potter & Weaver
+    // and the Glassworks (both -> trade_goods_misc).
+    const ImVec2 bc = {c.x, c.y + r * 0.15f};
+    dl->AddCircleFilled(bc, r * 0.80f, fill);
+    dl->AddCircle(bc, r * 0.80f, outline, 0, 1.0f);
+    dl->AddLine({c.x - r * 0.45f, c.y - r * 0.55f}, {c.x + r * 0.45f, c.y - r * 0.55f}, outline, 2.0f);
+}
+
+void ration_pack(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A rounded, strapped ration pack — two binding lines across a loaf
+    // shape. Distinct from the goods sack (no cinched neck; a flat
+    // rectangular block instead). Shared with the industrial Food
+    // Processor's rations — it IS the same good.
+    const ImVec2 lo = {c.x - r * 0.80f, c.y - r * 0.55f};
+    const ImVec2 hi = {c.x + r * 0.80f, c.y + r * 0.55f};
+    dl->AddRectFilled(lo, hi, fill, r * 0.25f);
+    dl->AddRect(lo, hi, outline, r * 0.25f, 0, 1.0f);
+    dl->AddLine({c.x - r * 0.30f, lo.y}, {c.x - r * 0.30f, hi.y}, outline, 1.5f);
+    dl->AddLine({c.x + r * 0.30f, lo.y}, {c.x + r * 0.30f, hi.y}, outline, 1.5f);
+}
+
 } // namespace
 
-void building(ImDrawList* dl, ImVec2 centre, float r, building_type type, ImU32 fill)
+void building(ImDrawList* dl, ImVec2 centre, float r, building_type type,
+             resource_type identity, ImU32 fill)
 {
     switch (type)
     {
-        case building_type::extraction_site:      ore_chunk(dl, centre, r, fill); break;
-        case building_type::processing_facility:  square(dl, centre, r, fill);    break;
+        case building_type::extraction_site:
+            switch (identity)
+            {
+                case resource_type::stone:                quarry_stone(dl, centre, r, fill);      break;
+                case resource_type::timber:                woodcutter_timber(dl, centre, r, fill); break;
+                case resource_type::sand:                  sand_pit(dl, centre, r, fill);           break;
+                case resource_type::clay:                  clay_pit(dl, centre, r, fill);           break;
+                case resource_type::peat:                  peat_cutting(dl, centre, r, fill);       break;
+                case resource_type::iron_ore:               iron_mine(dl, centre, r, fill);          break;
+                case resource_type::copper_ore:             copper_mine(dl, centre, r, fill);        break;
+                case resource_type::water:                  water_extractor(dl, centre, r, fill);    break;
+                case resource_type::agricultural_produce:   farm(dl, centre, r, fill);               break;
+                default:                                     ore_chunk(dl, centre, r, fill);          break;
+            }
+            break;
+        case building_type::processing_facility:
+            switch (identity)
+            {
+                case resource_type::charcoal:         charcoal_kiln(dl, centre, r, fill); break;
+                case resource_type::iron_blooms:      bloomery(dl, centre, r, fill);      break;
+                case resource_type::steel:            smithy_ingot(dl, centre, r, fill);  break;
+                case resource_type::trade_goods_misc: goods_bundle(dl, centre, r, fill);  break;
+                case resource_type::food_rations:     ration_pack(dl, centre, r, fill);   break;
+                default:                                square(dl, centre, r, fill);        break;
+            }
+            break;
         case building_type::port:                 triangle(dl, centre, r, fill);  break;
         case building_type::inland_logistics_hub: hub_node(dl, centre, r, fill);  break; // BL-149
         case building_type::military_base:        shield(dl, centre, r, fill);    break; // BL-325

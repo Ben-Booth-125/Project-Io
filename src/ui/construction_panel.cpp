@@ -212,17 +212,6 @@ void draw_queue_section(const world& w, const recipe_registry& reg)
 // recipe at construction, so this was blocking the very first thing a player
 // would want to change).
 //
-// The primary output resource of a recipe — the argmax of its outputs. Used to tag a
-// production method with a resource pip glyph (proper per-method glyphs are owed).
-resource_type primary_output_resource(const recipe& r)
-{
-    std::size_t best = 0;
-    float best_v = -1.0f;
-    for (std::size_t i = 0; i < resource_count; ++i)
-        if (r.outputs[i] > best_v) { best_v = r.outputs[i]; best = i; }
-    return static_cast<resource_type>(best);
-}
-
 // BL-367: one row of the tile's grouped-by-stack list — mirrors
 // placement_rules::stack_members' own (type, target) grouping rather than
 // inventing a second one (BL-229's construction ledger already reads
@@ -381,8 +370,19 @@ void draw_selected_section(world& w, const recipe_registry& reg,
         // The Buildings tab lists the player's own holdings, so the identity colour is
         // theirs — no owner lookup needed here (ownership lives in corp.assets, not on
         // the building).
+        //
+        // BL-429: identity is the extraction target, or a processing facility's
+        // primary output (falling back to its stored target_resource — the
+        // pre-BL-429 placeholder — when no recipe is assigned).
+        const resource_type plate_identity =
+            (b.type == building_type::processing_facility)
+                ? (reg.get_recipe(b.recipe) != nullptr
+                       ? primary_output_resource(*reg.get_recipe(b.recipe))
+                       : b.target_resource)
+                : b.target_resource;
         icons::building(dl, {(p.x + mx.x) * 0.5f, (p.y + mx.y) * 0.5f}, plate * 0.30f,
-                        b.type, palette::corp_identity_colour(w.player_entity, w.player_entity));
+                        b.type, plate_identity,
+                        palette::corp_identity_colour(w.player_entity, w.player_entity));
         ImGui::Dummy({plate, plate});
 
         ImGui::SameLine();
@@ -447,7 +447,7 @@ void draw_selected_section(world& w, const recipe_registry& reg,
     }
 
     const char* method_verdict =
-        (n_recipes >= 1) ? reg.recipe_at(b.type, std::clamp(b.active_recipe_index, 0, n_recipes - 1)).name.c_str()
+        (n_recipes >= 1) ? reg.recipe_at(b.type, std::clamp(b.active_recipe_index, 0, n_recipes - 1)).display_name.c_str()
                          : "Single method";
     const bool open_production =
         section_row(sec_production, "Production", IM_COL32(150, 158, 172, 255), method_verdict);
@@ -456,7 +456,7 @@ void draw_selected_section(world& w, const recipe_registry& reg,
     {
         b.active_recipe_index = std::clamp(b.active_recipe_index, 0, n_recipes - 1);
         const recipe& cur     = reg.recipe_at(b.type, b.active_recipe_index);
-        const char*   preview = cur.name.empty() ? "-" : cur.name.c_str();
+        const char*   preview = cur.display_name.empty() ? "-" : cur.display_name.c_str();
 
         // Current-method pip, then the combo.
         const ImVec2 gp = ImGui::GetCursorScreenPos();
@@ -473,7 +473,7 @@ void draw_selected_section(world& w, const recipe_registry& reg,
                 const recipe& ri  = reg.recipe_at(b.type, i);
                 const bool    sel = (i == b.active_recipe_index);
                 const ImVec2  ip  = ImGui::GetCursorScreenPos();
-                const std::string lbl = std::string("     ") + (ri.name.empty() ? "-" : ri.name);
+                const std::string lbl = std::string("     ") + (ri.display_name.empty() ? "-" : ri.display_name);
                 if (ImGui::Selectable(lbl.c_str(), sel))
                 {
                     b.active_recipe_index = i;

@@ -1057,26 +1057,28 @@ void draw_selection_content(world& w, const recipe_registry& reg,
 
 namespace {
 
-// A recipe's display name for a construction-ledger row: "food_rations" ->
-// "Food Rations". Row names must be UNIQUE — the candidate card's ImGui id is its
-// name — so each processing recipe gets its own readable label (BL-162).
-std::string pretty_recipe(const std::string& raw)
+/// BL-429: the named building an extraction_site targeting @p r reads as in the
+/// Build door — "Quarry" rather than "Extraction: Stone". Falls back to the
+/// resource's own display name for anything not given a bespoke identity
+/// (space/background raws outside this item's ancient-arc scope).
+const char* extraction_building_name(resource_type r)
 {
-    std::string out = raw;
-    bool at_start = true;
-    for (char& ch : out)
+    switch (r)
     {
-        if (ch == '_')
-        {
-            ch = ' ';
-            at_start = true;
-            continue;
-        }
-        if (at_start && ch >= 'a' && ch <= 'z')
-            ch = static_cast<char>(ch - 'a' + 'A');
-        at_start = false;
+        case resource_type::iron_ore:       return "Iron Mine";
+        case resource_type::coal:           return "Coal Mine";
+        case resource_type::petroleum:      return "Oil Field";
+        case resource_type::silica:         return "Silica Quarry";
+        case resource_type::copper_ore:     return "Copper Mine";
+        case resource_type::rare_earth_ore: return "Rare-Earth Mine";
+        case resource_type::water:          return "Water Extractor";
+        case resource_type::stone:          return "Quarry";
+        case resource_type::timber:         return "Woodcutter's Camp";
+        case resource_type::sand:           return "Sand Pit";
+        case resource_type::clay:           return "Clay Pit";
+        case resource_type::peat:           return "Peat Cutting";
+        default:                            return resource_name(r);
     }
-    return out;
 }
 
 } // namespace
@@ -1189,19 +1191,20 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
     for (const resource_type er : placement_rules::k_extractable)
         if (tile.resource_deposit[static_cast<std::size_t>(er)] > 0.0f)
             cands.push_back({building_type::extraction_site, er,
-                             std::string("Extraction: ") + resource_name(er)});
+                             (er == resource_type::agricultural_produce) ? "Farm"
+                                                                          : extraction_building_name(er)});
     // Fishing Wharf (BL-168): agricultural_produce has no terrestrial deposit here,
     // so the loop above skips it — but a coastal tile can still work it. Without this,
     // the ledger never offers the one candidate whose whole point is a zero-deposit tile.
     if (tile.resource_deposit[static_cast<std::size_t>(resource_type::agricultural_produce)] <= 0.0f
         && placement_rules::is_coastal(w, tile_id))
         cands.push_back({building_type::extraction_site, resource_type::agricultural_produce,
-                         std::string("Extraction: ") + resource_name(resource_type::agricultural_produce)});
-    // One processing row per recipe, each priced on its own economics.
+                         "Fishing Wharf"});
+    // One processing row per recipe (BL-429: its authored display_name, "Bloomery"
+    // rather than "Processing: Iron Blooms"), each priced on its own economics.
     for (int ri = 0; ri < reg.recipe_count(building_type::processing_facility); ++ri)
         cands.push_back({building_type::processing_facility, resource_type::iron_ore,
-                         "Processing: " + pretty_recipe(
-                             reg.recipe_at(building_type::processing_facility, ri).name),
+                         reg.recipe_at(building_type::processing_facility, ri).display_name,
                          static_cast<std::uint16_t>(ri)});
     cands.push_back({building_type::port,                 resource_type::iron_ore, "Port"});
     cands.push_back({building_type::launchpad,            resource_type::iron_ore, "Launchpad"});
@@ -1344,8 +1347,17 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
         {
             constexpr float gr = 9.0f;
             const ImVec2    gp = ImGui::GetCursorScreenPos();
+            // BL-429: extraction rows already carry their target in c.target; a
+            // processing row's c.target is always the placeholder iron_ore set
+            // when the candidate was built above, so the glyph is computed here
+            // from the row's own recipe instead, matching its name (Bloomery,
+            // Smithy, ...) rather than the placeholder.
+            const resource_type icon_identity =
+                (c.type == building_type::processing_facility && c.recipe != no_recipe)
+                    ? primary_output_resource(reg.recipe_at(building_type::processing_facility, c.recipe))
+                    : c.target;
             icons::building(cdl, {gp.x + gr, gp.y + ImGui::GetTextLineHeight() * 0.5f}, gr,
-                            c.type, IM_COL32(150, 235, 160, 255));
+                            c.type, icon_identity, IM_COL32(150, 235, 160, 255));
             ImGui::Dummy({gr * 2.0f, ImGui::GetTextLineHeight()});
             ImGui::SameLine();
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s",

@@ -3423,7 +3423,7 @@
    "brief": "ancient-chain-roster",
    "batch": "2026-08-15-sprint-17",
    "title": "BL-429 — The ancient building roster and its production chains",
-   "status": "pending",
+   "status": "complete",
    "promoted_from": "backlog.json BL-429 ANCIENT_BUILDING_ROSTER",
    "rows": [
     {
@@ -3468,23 +3468,23 @@
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "requirement": "The roster reaches 20+ NAMED buildings on ~3 building_type values, following the BL-166/BL-168 pattern (recipe + placement rule, not a new enum value), each with its placement rule and glyph, browsable in a Build door that can present that many.",
      "verification": [
       "visual"
      ],
-     "result_metric": "",
-     "notes": "NOT BUILT — this slice delivered the CHAINS (the data layer the named buildings would sit on). The named identities, placement rules, glyphs and the Build door's ability to present 20+ entries are the remainder of BL-429."
+     "result_metric": "named + placed + door-scaled + glyphed",
+     "notes": "SLICE 2 (2026-08-15): names, placement rules and Build-door scaling MET — recipe::display_name (Charcoal Burner, Bloomery, Smithy, Potter & Weaver, Miller, Glassworks, Peat Kiln) plus extraction_building_name() (Quarry, Woodcutter's Camp, Sand Pit, Clay Pit, Peat Cutting, Iron/Copper Mine, Farm vs Fishing Wharf) read in selection_panel.cpp's Build door and construction_panel.cpp's method selector; an ancient-band tile can show ~20+ named rows (9 extraction + 9 processing + 4 infrastructure). STILL PENDING: per-building GLYPHS — every named building still renders its building_type's shared icon (ore_chunk / square), not a distinct one. Deliberate deferral, recorded in backlog.json BL-429 SLICE 2 and NEEDS_REVIEW.json — real asset-authoring work (ICONS.md's per-glyph process), not attempted this pass. SLICE 3 (2026-08-15): glyphs closed. icons::building() gained a resource_type `identity` parameter (extraction target / processing primary output, via the new shared primary_output_resource() in recipe_registry.hpp); 14 new hand-drawn glyphs cover the 9 extraction + 5 processing resource keys the ancient roster reaches (two named buildings sharing an output — Charcoal Burner/Peat Kiln both -> charcoal, Potter & Weaver/Glassworks both -> trade_goods_misc — share one glyph by design, the same way two Iron Mines already share one regardless of tile). All 4 call sites updated: the Build door, the Buildings-tab identity plate, the on-canvas marker (hoisted the target/recipe lookup out of the wrap-copy k-loop so every wrap-copy reads the same identity, not just k==0), and the placement ghost preview (extraction-only — armed placement mode carries no recipe field). ICONS.md § 1c catalogues the new shapes. UNVERIFIED VISUALLY — see NR-240, extended to cover this slice too; no GUI build was possible this session."
     },
     {
      "id": "R6",
-     "status": "pending",
+     "status": "complete",
      "requirement": "No orphan raws remain in the ancient tier: every priced raw has at least one consumer.",
      "verification": [
       "headless"
      ],
-     "result_metric": "",
-     "notes": "NOT MET and deliberately recorded: sand and peat are priced by this slice but still consumed by nothing. BL-432's roster harness is where this becomes a mechanical assertion rather than a note."
+     "result_metric": "sand, peat both consumed",
+     "notes": "SLICE 2 (2026-08-15): sand -> Glassworks (trade_goods_misc), peat -> Peat Kiln (charcoal). Also fixed a real pre-existing gap found on the way: placement_rules::k_extractable never listed resource_type::peat despite tile_generation.cpp authoring peat deposits on wetland tiles, so no extraction_site could ever have targeted it — added, so Peat Cutting is now placeable. buildings_rework_harness R1 (n >= 15) still holds at 16."
     }
    ]
   }
