@@ -9753,7 +9753,7 @@
    "title": "The Ages view's lazy Era -1 run costs >8 min on the Debug build",
    "summary": "Measured 2026-08-14: history_ages.lua exceeds an 8-minute bound solo, on both the 3x map and the 70%-area resize (BL-424) — the cost is the per-year time-lapse recording the lazy 0->1960 re-run does (generation's own pass, which keeps only the outcome, finishes inside the ~40s launch). It silently hung two full visual passes. The check is PARKED in scripts/verify/parked/ (a parked check is a debt with a note, per the data_creep precedent), so the History Ages view currently has NO golden coverage.",
    "category": "Performance",
-   "priority": "B",
+   "priority": "A",
    "difficulty": 3,
    "status": "design-owed",
    "version_goal": "v0.1.16",
@@ -9763,7 +9763,7 @@
     "scripts/verify/parked/history_ages.lua"
    ],
    "created": "2026-08-14",
-   "design": "Open questions: (a) record the time-lapse at coarser-than-yearly steps (the view scrubs decades in practice)? (b) snapshot only what the Ages canvas draws (province ownership per tile) rather than full state? (c) memoise at generation time behind a flag so --verify pays nothing? Measure which half is the cost (sim vs recording) before choosing — BL-403's harness is the natural instrument. Un-park the script as part of landing."
+   "design": "Open questions: (a) record the time-lapse at coarser-than-yearly steps (the view scrubs decades in practice)? (b) snapshot only what the Ages canvas draws (province ownership per tile) rather than full state? (c) memoise at generation time behind a flag so --verify pays nothing? Measure which half is the cost (sim vs recording) before choosing — BL-403's harness is the natural instrument. Un-park the script as part of landing.\n\nScheduled 2026-08-15 (Ben): take BL-425 + BL-426 + BL-427 together as the next session's block — the verify-cost triad (ages sim affordability, stale-exe gate guard, world snapshot cache). Shared instrument note: BL-425 wants the sim-vs-recording split measured and BL-427 wants generation phase timings; both are BL-403's (profiling harness) natural territory, so the session should probably open by building that instrument or a lightweight cut of it. BL-425 is design-owed — Design is its first verb."
   },
   {
    "id": "BL-426",
@@ -9771,7 +9771,7 @@
    "title": "The gate detects stale harness exes instead of trusting the runner",
    "summary": "Third recorded bite of the same trap (2026-08-12 triple-bless: \"the whole harness tier was a build behind\"; the v0.1.10 ninja stale object; 2026-08-14: a 72/74-green ctest run on pre-resize binaries whose goldens should have failed). ctest runs binaries but does not build them, and a green run on stale exes reads exactly like a green run.",
    "category": "Tooling",
-   "priority": "B",
+   "priority": "A",
    "difficulty": 2,
    "status": "designed",
    "version_goal": "v0.1.16",
@@ -9780,7 +9780,7 @@
     "tools/verify/"
    ],
    "created": "2026-08-14",
-   "design": "A CTest FIXTURES_REQUIRED setup test that fails the whole run when any registered harness exe is older than the newest source under src/ + tools/verify/ (a small cmake -P script comparing mtimes, same shape as run_sweep.cmake). Belt: check.bat already builds first — the guard is for the bare-ctest path everyone reaches for anyway. The guard must name the stale exes in its failure output; \"rebuild and rerun\" should be the whole fix."
+   "design": "A CTest FIXTURES_REQUIRED setup test that fails the whole run when any registered harness exe is older than the newest source under src/ + tools/verify/ (a small cmake -P script comparing mtimes, same shape as run_sweep.cmake). Belt: check.bat already builds first — the guard is for the bare-ctest path everyone reaches for anyway. The guard must name the stale exes in its failure output; \"rebuild and rerun\" should be the whole fix.\n\nScheduled 2026-08-15 (Ben): take BL-425 + BL-426 + BL-427 together as the next session's block — the verify-cost triad (ages sim affordability, stale-exe gate guard, world snapshot cache). Shared instrument note: BL-425 wants the sim-vs-recording split measured and BL-427 wants generation phase timings; both are BL-403's (profiling harness) natural territory, so the session should probably open by building that instrument or a lightweight cut of it. BL-425 is design-owed — Design is its first verb."
   },
   {
    "id": "BL-427",
@@ -9788,7 +9788,7 @@
    "title": "Verify runs load a cached post-generation world instead of regenerating",
    "summary": "Ben's proposal, 2026-08-15, after the verify-cost measurements: make_hard_coded_world costs ~40s per launch on the Debug build (tile-count-insensitive — the Era -1 sim, planetology, background-firm calibration and settlement passes dominate), and every SOLO --verify launch pays it in full. Serialize the generated world once, load it per launch; --verify-all already amortises the cost for batch passes but solo iteration on one check still pays ~40s per run.",
    "category": "Tooling",
-   "priority": "B",
+   "priority": "A",
    "difficulty": 3,
    "status": "designed",
    "version_goal": "v0.1.16",
@@ -9797,7 +9797,7 @@
     "src/world/world_io.cpp"
    ],
    "created": "2026-08-15",
-   "design": "Write the post-setup world through the existing flat-binary seam to a gitignored cache (build_gen/verify_world.bin) keyed by world::state_hash(0) + a generator stamp; on --verify launch, load if the stamp matches, else regenerate and rewrite. The guard is the point (BL-426's lesson, third bite this week: a silently stale cache would verify an old world while reading as green). Two known gaps to close or scope out: (a) the generation_report is not world state — history_ledger_and_comms.lua and the wizard-chart checks capture it, so it must be cached alongside or those scripts regenerate; (b) prove load==generate once with the state hash and a full-suite compare before trusting it. Does NOT address per-script econ stepping (~4.5s/tick Debug), which now dominates batch passes — the Release verify tree is that lever and pairs naturally with this item."
+   "design": "Write the post-setup world through the existing flat-binary seam to a gitignored cache (build_gen/verify_world.bin) keyed by world::state_hash(0) + a generator stamp; on --verify launch, load if the stamp matches, else regenerate and rewrite. The guard is the point (BL-426's lesson, third bite this week: a silently stale cache would verify an old world while reading as green). Two known gaps to close or scope out: (a) the generation_report is not world state — history_ledger_and_comms.lua and the wizard-chart checks capture it, so it must be cached alongside or those scripts regenerate; (b) prove load==generate once with the state hash and a full-suite compare before trusting it. Does NOT address per-script econ stepping (~4.5s/tick Debug), which now dominates batch passes — the Release verify tree is that lever and pairs naturally with this item.\n\nScheduled 2026-08-15 (Ben): take BL-425 + BL-426 + BL-427 together as the next session's block — the verify-cost triad (ages sim affordability, stale-exe gate guard, world snapshot cache). Shared instrument note: BL-425 wants the sim-vs-recording split measured and BL-427 wants generation phase timings; both are BL-403's (profiling harness) natural territory, so the session should probably open by building that instrument or a lightweight cut of it. BL-425 is design-owed — Design is its first verb."
   }
  ]
 }
