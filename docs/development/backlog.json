@@ -9199,7 +9199,7 @@
     "scripts/verify/"
    ],
    "summary": "Ben ruled (NR-104, 2026-08-13): re-bless now, on the Windows box - not held for the unexplained Linux 20-35% diff. Covers the BL-266 Selection-band set (sticky_card_*, selection_*, walk_04, v009_emblem, continents_lens_kepler_key), deletes the orphaned sticky_card_01_dismissed.png, and clears the ~119-commit drift NR-130 recorded.",
-   "design": "RULED 2026-08-13 (NR-104). Run every visual check on the Windows box, bless the diffs routinely (goldens are disposable - flag only unexplained diffs), delete sticky_card_01_dismissed.png. NR-130's drift list and NR-131's empty-tile pop_markers frame are in scope: fix the pop_markers framing rather than blessing an empty capture. Sequence after BL-401 (key move) if both run in the same block, so the continents goldens are blessed once, not twice. The Linux-box 20-35% universal diff stays open as its own question - a Windows bless is valid regardless."
+   "design": "RULED 2026-08-13 (NR-104). Run every visual check on the Windows box, bless the diffs routinely (goldens are disposable - flag only unexplained diffs), delete sticky_card_01_dismissed.png. NR-130's drift list and NR-131's empty-tile pop_markers frame are in scope: fix the pop_markers framing rather than blessing an empty capture. Sequence after BL-401 (key move) if both run in the same block, so the continents goldens are blessed once, not twice. The Linux-box 20-35% universal diff stays open as its own question - a Windows bless is valid regardless.\n\nProgress note 2026-08-15: pop_markers framing fixed (dynamic largest-settlement idiom), sticky_card_01_dismissed.png deleted, history_ages parked (BL-425). The wholesale bless itself is ON HOLD: Ben has twice questioned whether golden-diffing earns its cost at all (NR-237 carries the assessment and options). Resolve the policy before blessing 200+ files that a demotion would delete."
   },
   {
    "status": "designed",
@@ -9543,9 +9543,9 @@
    ],
    "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
    "summary": "Filed from NR-194 (2026-08-14 housekeeping). history_sim_harness, history_sweep and data_creep_harness carry a `sweep` CTest label and are documented as excluded from the routine gate, but the gate invocation that actually excludes them (`ctest -LE sweep`) is nowhere enforced - a bare `ctest` runs them anyway. This session two orphaned history_sim_harness processes were found burning ~5,200 CPU-seconds each from a killed run, starving the machine.",
-   "design": "Either make the documented gate command the one every script and doc actually calls (grep for bare `ctest` invocations and fix them), or set these three harnesses' CTest properties so they are skipped by default and opted into explicitly - a label that only protects the caller who remembers a flag is documentation wearing machinery's clothes.",
    "resolved": "2026-08-14",
-   "resolution": "Landed 2026-08-14 (gate-hygiene block). Each sweep test's CTest COMMAND is now tools/verify/run_sweep.cmake, which reports itself Skipped (SKIP_REGULAR_EXPRESSION) unless IO_RUN_SWEEPS is set — exclusion is machinery, not the -LE flag. CONFIGURATIONS was tried first and measured NOT to gate on the single-config NMake generator (a -C Release run still executed history_sweep), hence the wrapper. Verified both ways: bare ctest skips all sweeps in 0.13s; IO_RUN_SWEEPS=1 runs them. DEVELOPMENT_PRACTICES gate/sweep prose updated."
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
    "status": "complete",
@@ -9567,9 +9567,9 @@
    ],
    "authority_doc": "docs/ai/AI_OPPONENT.md",
    "summary": "Merges NR-169 and NR-220 (2026-08-14 housekeeping) - the same harness, the same unowned stewardship gap, raised twice a day apart. NR-169: BL-366 and BL-130 both moved the bands they touch (5→8, 8→9) without a re-run. NR-220: the harness was independently confirmed 13-red both before and after an unrelated batch, so the red is stale, not a regression - but nothing currently distinguishes \"stale red\" from \"new failure\" at a glance.",
-   "design": "NR-169's recommendation: a derived ceiling (computed from the harness's own inputs) rather than a hand-set magic number, so the band is something anyone can sanity-check rather than trust. Pair with folding a re-bless of these bands into BL-402's pass (that item currently scopes scripts/verify/ only; this harness's bands live in tools/verify/ and are a distinct mechanism, hence a separate item rather than an addition to BL-402).\n\nPost-BL-386 note (2026-08-14): the floor fix landed and moved the bands as predicted — 13 failures, net-worth final/min on every seed plus one dial-thrash on seed 3; rivals still list 6-7 sell orders per seed, solvency/survival/build-thrash all hold. Bless against THESE numbers (the first honest post-reservation-rule run), not the pre-fix ones. Measured run in the 2026-08-14 DEVLOG entry.",
    "resolved": "2026-08-14",
-   "resolution": "Landed 2026-08-14 (gate-hygiene block). The MSVC band set is re-blessed from a double-checked post-BL-386 run (identical across two invocations) and the block is restructured to NR-169's derived form: the table records the OBSERVED run verbatim and every band is computed by named slack constants (k_nw_lo/hi_mult, k_solvency/survival/build/dial_slack) — a re-bless is now \"replace seven observed numbers per seed\". Stale-red vs new-failure is distinguishable at a glance: the run header and the failure summary print the bless line. The GCC set is deliberately NOT touched (different toolchain floats; WSL numbers must not bless the Linux set) — its block carries a dated STALE-since-BL-386 declaration in advance, per its own convention. MSVC run: ALL PASS (0 failures)."
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
    "status": "designed",
@@ -9706,6 +9706,96 @@
    ],
    "created": "2026-08-14",
    "design": "Credit inventory only for quantity that actually clears (matched + auto-cleared), or defer the inventory credit until after the auto-clear pass resolves which orders held. Guard with an order_book_harness assertion: a held order leaves mc.inventory unchanged for that resource. Decide whether the supply-side price signal should still see held stock (an argument exists both ways — held stock is real and near the market, but it is explicitly not for sale below its floor); default to NOT visible, matching the reservation semantics BL-386 established."
+  },
+  {
+   "id": "BL-423",
+   "short_name": "VERIFY_ALL_BATCH_MODE",
+   "title": "--verify-all: one world generation for the whole visual suite",
+   "summary": "Measured 2026-08-14 (Ben flagged the slowness): each --verify launch spends ~38s in make_hard_coded_world on the Debug build + 3x map, and the capture takes 0.25s — so a 79-script pass costs ~50 minutes regenerating the identical deterministic world 79 times. Batch mode generates once, snapshots the pristine world + ui_state, and restores before each script.",
+   "category": "Tooling",
+   "priority": "A",
+   "difficulty": 3,
+   "status": "complete",
+   "version_goal": "v0.1.16",
+   "created": "2026-08-14",
+   "resolved": "2026-08-14",
+   "files": [
+    "src/core/verify_api.cpp",
+    "src/core/app.hpp",
+    "src/main.cpp"
+   ],
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
+  },
+  {
+   "id": "BL-424",
+   "short_name": "HOMEWORLD_70PC_AREA_RESIZE",
+   "title": "Homeworld grid resized to 70% area: 312x145 -> 261x121",
+   "summary": "Ben, 2026-08-14, after the verify-cost measurement session: \"I think the map is just too big to render. Let's make it 70% the size\" — clarified to 70% AREA. Measurement located the actual cost in Debug-build world generation (~38s) and the lazy Era -1 ages run (>10 min), both scaling with the 45,240-tile 3x map; rendering itself was fast. 261x121 = 31,581 tiles keeps ~2.09x the original playfield.",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 2,
+   "status": "complete",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/hard_coded_world.hpp"
+   ],
+   "created": "2026-08-14",
+   "resolved": "2026-08-14",
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
+  },
+  {
+   "id": "BL-425",
+   "short_name": "AGES_LAZY_SIM_UNAFFORDABLE",
+   "title": "The Ages view's lazy Era -1 run costs >8 min on the Debug build",
+   "summary": "Measured 2026-08-14: history_ages.lua exceeds an 8-minute bound solo, on both the 3x map and the 70%-area resize (BL-424) — the cost is the per-year time-lapse recording the lazy 0->1960 re-run does (generation's own pass, which keeps only the outcome, finishes inside the ~40s launch). It silently hung two full visual passes. The check is PARKED in scripts/verify/parked/ (a parked check is a debt with a note, per the data_creep precedent), so the History Ages view currently has NO golden coverage.",
+   "category": "Performance",
+   "priority": "B",
+   "difficulty": 3,
+   "status": "design-owed",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/ui/history_panel.cpp",
+    "src/world/history_sim.cpp",
+    "scripts/verify/parked/history_ages.lua"
+   ],
+   "created": "2026-08-14",
+   "design": "Open questions: (a) record the time-lapse at coarser-than-yearly steps (the view scrubs decades in practice)? (b) snapshot only what the Ages canvas draws (province ownership per tile) rather than full state? (c) memoise at generation time behind a flag so --verify pays nothing? Measure which half is the cost (sim vs recording) before choosing — BL-403's harness is the natural instrument. Un-park the script as part of landing."
+  },
+  {
+   "id": "BL-426",
+   "short_name": "GATE_STALE_EXE_GUARD",
+   "title": "The gate detects stale harness exes instead of trusting the runner",
+   "summary": "Third recorded bite of the same trap (2026-08-12 triple-bless: \"the whole harness tier was a build behind\"; the v0.1.10 ninja stale object; 2026-08-14: a 72/74-green ctest run on pre-resize binaries whose goldens should have failed). ctest runs binaries but does not build them, and a green run on stale exes reads exactly like a green run.",
+   "category": "Tooling",
+   "priority": "B",
+   "difficulty": 2,
+   "status": "designed",
+   "version_goal": "v0.1.16",
+   "files": [
+    "CMakeLists.txt",
+    "tools/verify/"
+   ],
+   "created": "2026-08-14",
+   "design": "A CTest FIXTURES_REQUIRED setup test that fails the whole run when any registered harness exe is older than the newest source under src/ + tools/verify/ (a small cmake -P script comparing mtimes, same shape as run_sweep.cmake). Belt: check.bat already builds first — the guard is for the bare-ctest path everyone reaches for anyway. The guard must name the stale exes in its failure output; \"rebuild and rerun\" should be the whole fix."
+  },
+  {
+   "id": "BL-427",
+   "short_name": "VERIFY_WORLD_SNAPSHOT_CACHE",
+   "title": "Verify runs load a cached post-generation world instead of regenerating",
+   "summary": "Ben's proposal, 2026-08-15, after the verify-cost measurements: make_hard_coded_world costs ~40s per launch on the Debug build (tile-count-insensitive — the Era -1 sim, planetology, background-firm calibration and settlement passes dominate), and every SOLO --verify launch pays it in full. Serialize the generated world once, load it per launch; --verify-all already amortises the cost for batch passes but solo iteration on one check still pays ~40s per run.",
+   "category": "Tooling",
+   "priority": "B",
+   "difficulty": 3,
+   "status": "designed",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/core/verify_api.cpp",
+    "src/world/world_io.cpp"
+   ],
+   "created": "2026-08-15",
+   "design": "Write the post-setup world through the existing flat-binary seam to a gitignored cache (build_gen/verify_world.bin) keyed by world::state_hash(0) + a generator stamp; on --verify launch, load if the stamp matches, else regenerate and rewrite. The guard is the point (BL-426's lesson, third bite this week: a silently stale cache would verify an old world while reading as green). Two known gaps to close or scope out: (a) the generation_report is not world state — history_ledger_and_comms.lua and the wizard-chart checks capture it, so it must be cached alongside or those scripts regenerate; (b) prove load==generate once with the state hash and a full-suite compare before trusting it. Does NOT address per-script econ stepping (~4.5s/tick Debug), which now dominates batch passes — the Release verify tree is that lever and pairs naturally with this item."
   }
  ]
 }

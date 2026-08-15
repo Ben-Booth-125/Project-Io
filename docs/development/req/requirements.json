@@ -3297,6 +3297,18 @@
    "promoted_from": "backlog.json BL-397",
    "batch": "seam-batch-2026-08-14",
    "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "verify-batch-mode",
+   "title": "BL-423 — --verify-all: one generation for the whole visual suite",
+   "difficulty": 3,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-08-15",
+   "promoted_from": "backlog.json BL-423",
+   "batch": "gate-hygiene-2026-08-14",
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
   }
  ]
 }

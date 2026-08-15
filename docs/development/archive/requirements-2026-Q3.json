@@ -3556,6 +3556,42 @@
       ],
       "resolution": "Code-complete and headless-verified 2026-08-08. R1/R6's manual-visual leg (a human clicking the Hire button in a live app session) was not run in this headless environment — filed as NR-086, same shape as NR-026's frame-budget gap for BL-249: shipped complete with the human-verification step open as a named follow-up, not silently skipped."
     },
+    "verify-batch-mode": {
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Item-spanning: a --verify-all run produces captures byte-equivalent to per-script --verify runs — a representative sample blessed by SOLO runs passes at 0.0000% under the BATCH run, including a script that runs AFTER a world-mutating (econ_step) script in batch order.",
+          "verification": [
+            "visual: solo-blessed goldens vs batch compare"
+          ],
+          "status": "complete",
+          "result_metric": "2-script probe (world-mutating pop_markers first, header copy second): batch vs solo-blessed goldens = 0 golden failures both scripts",
+          "notes": "Three restore layers were needed and each was found by measurement, not review: (1) app-owned per-tick accumulators (balance/market/resource histories, last econ report) — found via a 6-point vs 4-point header sparkline; (2) the comms log snapshot; (3) a cold ImGui context per script — per-window layout (scrollbar visibility) derives from the previous frame, and solo goldens are all blessed on cold frame-1 windows. Proven with verify.state_hash() per tick (identical) + verify.chat_lines() dump (identical) before the pixels agreed — both bindings kept as permanent instruments."
+        },
+        {
+          "id": "R2",
+          "requirement": "The batch generates the world exactly once: total wall-clock for the full suite falls from ~launch-cost x N to launch-cost + N x per-script cost (measured).",
+          "verification": [
+            "manual: timed run"
+          ],
+          "status": "complete",
+          "result_metric": "one ~40s generation per pass (measured); 72 scripts in 28m45 where per-script launches would pay ~78x40s = 52min in generation alone; remaining cost is per-script Debug econ stepping (~4.5s/tick)",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "requirement": "A script that throws mid-batch is counted as a failure and the batch continues to the remaining scripts.",
+          "verification": [
+            "code",
+            "manual"
+          ],
+          "status": "complete",
+          "result_metric": "per-script try/catch counts the failure, logs \"verify script FAILED: <path>\", continues; batch exit non-zero on any script error",
+          "notes": ""
+        }
+      ],
+      "resolution": "Complete, all rows met. Batch equivalence needed FIVE per-script isolation layers, each found by measurement: world/ui snapshot (move-assigned), app-side per-tick accumulators, the comms log, a cold ImGui context (frame-1 layout conditions), and the fixed capture size (a wizard script resized mid-batch and poisoned 69 goldens at 1720x1080 — caught by the size-mismatch diff). Hang-ghost hardening rode along: hidden window from before generation, DisableProcessWindowsGhosting, SDL_PumpEvents heartbeats — five Application Hang 1002 events across two days each matched a silently truncated pass."
+    },
     "wire-parser-validation": {
       "rows": [
         {

@@ -10,7 +10,45 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — Seam batch: the money printer closed and the word interface given a door (2026-08-14, latest)
+## Session — Gate hygiene becomes a measurement saga: batch verify, the 70% map, and the golden question (2026-08-14/15, latest)
+
+Mixed mode, and the block that kept reframing itself. Started as three gate-hygiene items;
+ended with the visual harness rebuilt, the map resized, five stale-state classes measured out
+of existence, and the golden policy itself on Ben's desk.
+
+**Landed.** BL-415 (sweep gate): exclusion by machinery — `run_sweep.cmake` reports Skipped
+without `IO_RUN_SWEEPS`; `CONFIGURATIONS` was tried first and measured not to gate a
+single-config generator. BL-416 (AI bands): re-blessed and restructured to the derived form
+(observed table + named slack; the failure output prints its bless line), then re-blessed
+AGAIN same-session for the resize — seven numbers per seed, as designed. BL-423
+(`--verify-all`): one ~40 s generation per pass instead of one per script; equivalence needed
+FIVE isolation layers, each found by instrument (state_hash, a chat dump, pixel diffs), and
+the run survives Windows now (hidden window, ghosting disabled, event heartbeats — five
+Application Hang 1002 events over two days each matched a silently truncated pass). BL-424:
+the homeworld at 70% area (312×145 → 261×121), single-source constants; `population_mvp` and
+`stack_capacity_harness`, red for sessions, PASS on the smaller world.
+
+**Measured, and worth remembering.** The verify cost was never rendering: a capture is 0.25 s;
+`make_hard_coded_world` is ~40 s on the Debug build and is TILE-COUNT-INSENSITIVE (the resize
+moved it not at all — the Era −1 sim, planetology and firm calibration dominate).
+`history_ages` runs its lazy Era −1 time-lapse past 8 minutes and is parked (BL-425). The
+stale-exe trap bit twice more in one day — a 72/74-green ctest on pre-resize binaries read
+exactly like a green gate (BL-426 filed: the gate should detect it). BL-427 (Ben's proposal):
+cache the post-generation world behind a state-hash guard, the right lever for solo runs.
+
+**Open on Ben's desk.** NR-237: whether golden-diffing earns its place at all — his question,
+and the measured evidence half-supports him (every diff this week was intended change or world
+drift; the genuine catches were harness bugs; there is no CI to run them). Recommendation in
+the entry: demote to a world-independent curated set + assertion-based checks, re-freeze per
+surface approaching v0.1.0. The suite-wide bless (BL-402's remainder) is HELD on that ruling —
+~200 binary files should not be committed the day before a demotion deletes them.
+
+**Status:** BL-415/416/423/424 complete; BL-402 paused on NR-237; BL-425/426/427 filed.
+**Runtime:** ~5 h across the two days' boundary, Full, measurement-heavy.
+
+---
+
+## Session — Seam batch: the money printer closed and the word interface given a door (2026-08-14)
 
 Full mode, Batch Delivery over four items — BL-386 (sell-order floor prints money, S),
 BL-387 (seam actor authority, S), BL-396 (wire parser validates nothing, S), BL-397 (seam read
