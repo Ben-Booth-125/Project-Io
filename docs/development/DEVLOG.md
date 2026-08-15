@@ -52,7 +52,8 @@ the verifier-visual skill (skill edit = executing the ruling). Reintroduction cr
 freezing — a surface joins the set when its pixels stop being expected to change.
 
 **Status:** BL-402/415/416/423/424 complete; BL-425/426/427 filed; NR-237 resolved-and-pruned.
-**Runtime:** ~5 h across the two days' boundary, Full, measurement-heavy.
+**Runtime:** ~8 h across the two days' boundary (through the golden demotion and the
+next-session scheduling), Full, measurement-heavy.
 
 ---
 
