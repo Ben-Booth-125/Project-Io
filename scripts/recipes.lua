@@ -234,19 +234,21 @@ recipes = {
     -- burn drives off most of the mass, which is what makes charcoal dearer
     -- per unit than the timber it came from.
     {
-        name    = "charcoal",
-        era     = "ancient",
-        inputs  = { timber = 3.0 },
-        outputs = { charcoal = 1.0 },
+        name         = "charcoal",
+        display_name = "Charcoal Burner", -- BL-429 slice 2
+        era          = "ancient",
+        inputs       = { timber = 3.0 },
+        outputs      = { charcoal = 1.0 },
     },
 
     -- id 18 — Bloomery: iron ore + charcoal -> iron blooms. The ancient world's
     -- only route to worked iron; no coal, no blast furnace.
     {
-        name    = "iron_blooms",
-        era     = "ancient",
-        inputs  = { iron_ore = 2.0, charcoal = 1.0 },
-        outputs = { iron_blooms = 1.0 },
+        name         = "iron_blooms",
+        display_name = "Bloomery", -- BL-429 slice 2
+        era          = "ancient",
+        inputs       = { iron_ore = 2.0, charcoal = 1.0 },
+        outputs      = { iron_blooms = 1.0 },
     },
 
     -- id 19 — Smithy: blooms + charcoal -> steel. The ancient counterpart of
@@ -254,20 +256,22 @@ recipes = {
     -- depth 3 here against depth 1 there, which is precisely the difference
     -- between the two arcs' industry.
     {
-        name    = "steel_from_blooms",
-        era     = "ancient",
-        inputs  = { iron_blooms = 2.0, charcoal = 1.0 },
-        outputs = { steel = 1.0 },
+        name         = "steel_from_blooms",
+        display_name = "Smithy", -- BL-429 slice 2
+        era          = "ancient",
+        inputs       = { iron_blooms = 2.0, charcoal = 1.0 },
+        outputs      = { steel = 1.0 },
     },
 
     -- id 20 — Potter/Weaver: clay + timber -> trade goods. Gives BL-286's
     -- placeholder luxury a producer, and clay its first consumer. Timber is
     -- the kiln's fuel, not a component.
     {
-        name    = "trade_goods",
-        era     = "ancient",
-        inputs  = { clay = 2.0, timber = 1.0 },
-        outputs = { trade_goods_misc = 1.0 },
+        name         = "trade_goods",
+        display_name = "Potter & Weaver", -- BL-429 slice 2
+        era          = "ancient",
+        inputs       = { clay = 2.0, timber = 1.0 },
+        outputs      = { trade_goods_misc = 1.0 },
     },
 
     -- id 21 — Miller: agricultural produce + stone -> food rations. The ancient
@@ -275,10 +279,44 @@ recipes = {
     -- wear out). Shallower than the chain above on purpose: food should not be
     -- gated behind an industry, or an ancient start cannot feed itself.
     {
-        name    = "food_rations_milled",
-        era     = "ancient",
-        inputs  = { agricultural_produce = 2.0, stone = 1.0 },
-        outputs = { food_rations = 1.0 },
+        name         = "food_rations_milled",
+        display_name = "Miller", -- BL-429 slice 2
+        era          = "ancient",
+        inputs       = { agricultural_produce = 2.0, stone = 1.0 },
+        outputs      = { food_rations = 1.0 },
+    },
+
+    -- BL-429 slice 2 (2026-08-15) — closing R6, the two raws slice 1 recorded as
+    -- "still orphaned": sand and peat were priced but consumed by nothing. Both
+    -- were extractable in the tile-generation sense (sand already in
+    -- placement_rules::k_extractable, peat's deposits authored in
+    -- tile_generation.cpp but never added to k_extractable — a real gap, closed
+    -- alongside this recipe) but had no building to place on them.
+
+    -- id 22 — Glassworks: sand -> trade goods. A second, independent producer of
+    -- trade_goods_misc alongside the Potter/Weaver — precedented by industrial
+    -- `steel` already having three (coal-smelter, iron-nickel, bloomery route):
+    -- distinct raws feeding a shared terminal good is an ordinary multi-producer
+    -- economy fact, not BL-430's alternate-METHOD feature (one building offering
+    -- interchangeable recipes for the same output).
+    {
+        name         = "glass",
+        display_name = "Glassworks", -- BL-429 slice 2
+        era          = "ancient",
+        inputs       = { sand = 2.0 },
+        outputs      = { trade_goods_misc = 1.0 },
+    },
+
+    -- id 23 — Peat Kiln: peat -> charcoal. Peat as the poorer, cheaper
+    -- pre-industrial fuel (world_gen.lua prices it below timber) beside the
+    -- Charcoal Burner's wood route — the same "more than one raw reaches this
+    -- good" shape as id 22 above, not a tuned alternate method.
+    {
+        name         = "peat_charcoal",
+        display_name = "Peat Kiln", -- BL-429 slice 2
+        era          = "ancient",
+        inputs       = { peat = 2.0 },
+        outputs      = { charcoal = 1.0 },
     },
 }
 

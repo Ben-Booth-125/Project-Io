@@ -102,6 +102,29 @@ era_band read_era(const sol::table& entry, const std::string& context)
                              + " (expected any, ancient or industrial)");
 }
 
+/// BL-429: "food_rations_milled" -> "Food Rations Milled" — the pre-existing
+/// Build-door title-casing (formerly `pretty_recipe` in selection_panel.cpp),
+/// now the DEFAULT a recipe's `display_name` falls back to when none is
+/// authored, so every recipe has a legible label without requiring one.
+std::string title_case(const std::string& raw)
+{
+    std::string out = raw;
+    bool at_start = true;
+    for (char& ch : out)
+    {
+        if (ch == '_')
+        {
+            ch = ' ';
+            at_start = true;
+            continue;
+        }
+        if (at_start && ch >= 'a' && ch <= 'z')
+            ch = static_cast<char>(ch - 'a' + 'A');
+        at_start = false;
+    }
+    return out;
+}
+
 } // namespace
 
 // --- load_from_lua -----------------------------------------------------------
@@ -135,6 +158,12 @@ void recipe_registry::load_from_lua(lua_state& lua)
         if (outputs) read_resource_map(*outputs, r.outputs, "recipe '" + r.name + "' outputs");
 
         r.era = read_era(*entry, "recipe '" + r.name + "'"); // BL-433
+
+        // BL-429: named-building identity. Falls back to a title-cased `name`
+        // when the author didn't give the recipe a building name of its own.
+        r.display_name = entry->get_or<std::string>("display_name", "");
+        if (r.display_name.empty())
+            r.display_name = title_case(r.name);
 
         m_recipes.push_back(std::move(r));
     }

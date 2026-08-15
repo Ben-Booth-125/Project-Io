@@ -447,7 +447,7 @@ void draw_selected_section(world& w, const recipe_registry& reg,
     }
 
     const char* method_verdict =
-        (n_recipes >= 1) ? reg.recipe_at(b.type, std::clamp(b.active_recipe_index, 0, n_recipes - 1)).name.c_str()
+        (n_recipes >= 1) ? reg.recipe_at(b.type, std::clamp(b.active_recipe_index, 0, n_recipes - 1)).display_name.c_str()
                          : "Single method";
     const bool open_production =
         section_row(sec_production, "Production", IM_COL32(150, 158, 172, 255), method_verdict);
@@ -456,7 +456,7 @@ void draw_selected_section(world& w, const recipe_registry& reg,
     {
         b.active_recipe_index = std::clamp(b.active_recipe_index, 0, n_recipes - 1);
         const recipe& cur     = reg.recipe_at(b.type, b.active_recipe_index);
-        const char*   preview = cur.name.empty() ? "-" : cur.name.c_str();
+        const char*   preview = cur.display_name.empty() ? "-" : cur.display_name.c_str();
 
         // Current-method pip, then the combo.
         const ImVec2 gp = ImGui::GetCursorScreenPos();
@@ -473,7 +473,7 @@ void draw_selected_section(world& w, const recipe_registry& reg,
                 const recipe& ri  = reg.recipe_at(b.type, i);
                 const bool    sel = (i == b.active_recipe_index);
                 const ImVec2  ip  = ImGui::GetCursorScreenPos();
-                const std::string lbl = std::string("     ") + (ri.name.empty() ? "-" : ri.name);
+                const std::string lbl = std::string("     ") + (ri.display_name.empty() ? "-" : ri.display_name);
                 if (ImGui::Selectable(lbl.c_str(), sel))
                 {
                     b.active_recipe_index = i;

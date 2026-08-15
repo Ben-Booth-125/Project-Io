@@ -10,7 +10,70 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — Gate hygiene becomes a measurement saga: batch verify, the 70% map, and the golden demotion (2026-08-14/15, latest)
+## Session — BL-429 slice 2: the ancient roster gets names (2026-08-15, latest)
+
+Full mode, continuing Sprint 17 (economy breadth). Slice 1 landed the ancient production chains
+(BL-428 depth metric, BL-429's five recipes); this session picked up R5/R6, the roster's remaining
+requirements — named identities and closing the last two orphan raws.
+
+**Built.** A `recipe::display_name` field (recipe_registry.hpp/.cpp), authored for the five slice-1
+ancient recipes — Charcoal Burner, Bloomery, Smithy, Potter & Weaver, Miller — and read by both the
+Build door (selection_panel.cpp) and a live building's method selector (construction_panel.cpp) in
+place of the raw recipe key / the old "Processing: X" prefix; it defaults to a title-cased recipe
+name when unauthored, so every recipe keeps a legible label with nothing new required. A parallel
+`extraction_building_name()` lookup does the same for extraction rows (Quarry, Woodcutter's Camp,
+Sand Pit, Clay Pit, Peat Cutting, Iron/Copper Mine, Water Extractor, Coal Mine, Oil Field, Silica
+Quarry, Rare-Earth Mine), and Farm/Fishing Wharf now read as distinct names instead of sharing one
+"Extraction: Agricultural Produce" label.
+
+**R6 closed.** Sand and peat — "still orphaned" per slice 1's own note — each got a consumer:
+Glassworks (sand -> trade_goods_misc, recipe 22) and Peat Kiln (peat -> charcoal, recipe 23). Both
+are a second producer of an existing output from a different raw, the same multi-producer shape
+`steel` already has (coal-smelter / iron-nickel / bloomery) — not BL-430's alternate-method feature,
+which is a different item.
+
+**A real pre-existing gap found and fixed on the way.** `placement_rules::k_extractable` never
+listed `resource_type::peat`, despite `tile_generation.cpp` authoring peat deposits on wetland tiles
+— no extraction_site could ever have targeted it. Fixed by adding it; `buildings_rework_harness`'s
+R1 (`n >= 15`) still holds at 16.
+
+**R5's glyph clause deliberately NOT done, and recorded rather than glossed (NR-239).** Every named
+extraction building still renders `icons::building`'s shared ore_chunk glyph; every processing
+building the shared square — exactly how Farm/Smelter/Hydroponics Bay already render, not a
+regression, but the roster's "each with its own glyph" clause stays open. Hand-authoring 16
+silhouette-distinct vector icons (ICONS.md's own per-glyph process) is real asset work this slice
+did not attempt; it needs its own follow-on rather than let R5 read as met without it.
+
+**Environment note (NR-240): this session ran remote, without a compiler.** `cmake -B build`'s
+SDL3/sol2/ImGui FetchContent steps pull from `codeload.github.com`, which this session's network
+policy denies (confirmed a 403 organization policy denial, not a transient fault — the proxy's own
+README says not to route around it). Lua changes were syntax-checked with `luac5.4 -p` and pass; the
+C++ changes were manually re-read against every call site of the touched fields but never compiled.
+Owed at the next session with real toolchain access: `cmake --build`, then
+`buildings_rework_harness` / `chain_depth` / `resource_chain_harness`, then a live look at the Build
+door on an ancient-band tile.
+
+### Verification
+
+Lua: `luac5.4 -p scripts/economy.lua scripts/recipes.lua` both pass. `backlog_lint`: 0 fail, 6
+warnings, all pre-existing and unrelated. C++: **not compiled** this session — see NR-240. Ancient
+Build-door row count reasoned by hand from the era-masked recipe/extraction lists: ~9 named
+extraction rows + 9 named processing rows (2 any-era + 7 ancient) + 4 infrastructure rows, past the
+R5 threshold of 20+ named buildings.
+
+### Open for Ben
+
+- NR-239: per-building glyphs for the ancient roster are unbuilt — worth a standalone follow-on
+  item, or folded into BL-431's chain/method UI?
+- NR-240: this diff needs its first compile at the next session with real network access before
+  anything else builds on top of it.
+
+**Runtime:** not tracked this session (Runtime line remains uncollected — same standing gap NR-177's
+retro already named).
+
+---
+
+## Session — Gate hygiene becomes a measurement saga: batch verify, the 70% map, and the golden demotion (2026-08-14/15)
 
 Mixed mode, and the block that kept reframing itself. Started as three gate-hygiene items;
 ended with the visual harness rebuilt, the map resized, five stale-state classes measured out

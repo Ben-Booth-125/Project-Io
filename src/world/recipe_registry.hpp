@@ -57,6 +57,14 @@ struct recipe
     /// BL-433: the product this recipe belongs to. Authored as `era = "..."` in
     /// recipes.lua; absent means `any`.
     era_band era = era_band::any;
+
+    /// BL-429: the building's player-facing NAME — "Bloomery", "Smithy" — as
+    /// opposed to `name`, which stays the raw lookup key `recipe_id` indexes by
+    /// and never changes once a save references it. Authored as
+    /// `display_name = "..."` in recipes.lua; if absent, `load_from_lua` fills it
+    /// with a title-cased `name` (the old Build-door behaviour), so every recipe
+    /// always carries a legible label without requiring one to be authored.
+    std::string display_name;
 };
 
 /// Per-building-type economic constants, authored in scripts/economy.lua.

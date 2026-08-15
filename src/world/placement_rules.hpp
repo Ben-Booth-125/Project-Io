@@ -100,6 +100,11 @@ inline constexpr resource_type k_extractable[] = {
     resource_type::iron_nickel_ore,
     resource_type::platinum_group_metals,
     resource_type::regolith,
+    // BL-429 slice 2: peat's deposits were authored in tile_generation.cpp
+    // (wetland tiles) but never added here, so no extraction_site could ever
+    // target it — a real, pre-existing gap, not new scope. Peat Cutting is now
+    // placeable, and the Peat Kiln recipe (recipes.lua) gives it a consumer.
+    resource_type::peat,
 };
 
 /// True if the given composition is ocean — buildings are never placed on water.
