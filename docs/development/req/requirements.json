@@ -3418,6 +3418,75 @@
      "notes": "NOT BUILT — slice 2. Adds per-corp world state, so it lands with the save-format note BL-107 will need: appending is free only until saves exist."
     }
    ]
+  },
+  {
+   "brief": "ancient-chain-roster",
+   "batch": "2026-08-15-sprint-17",
+   "title": "BL-429 — The ancient building roster and its production chains",
+   "status": "pending",
+   "promoted_from": "backlog.json BL-429 ANCIENT_BUILDING_ROSTER",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "ITEM-SPANNING (headless): the ancient arc has a LAYERED production chain rather than a flat one — measurably, its max chain depth (BL-428) is greater than 1, meaning goods exist that require goods that require raws.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "ancient max depth 1 -> 3",
+     "notes": "Verified 2026-08-15 by chain_depth D6. The load-bearing edit was RETAGGING the coal-fired steel recipe `industrial`, not the five additions: while the shallow coal route remained available (coal is a raw), min-across-recipes correctly collapsed steel back to depth 1 and the new chain would have existed but meant nothing."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "No new resource_type values. Every input in the ancient chain is an existing enum value that already had deposits and extraction rules, and the chain gives previously orphaned raws a consumer (BL-340's admission rule applied to the ancient tier).",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "",
+     "notes": "Held. timber, clay, stone and iron_ore all had authored deposits (tile_generation generate_deposits) and appear in placement_rules k_extractable; none had a base price before this slice. charcoal, iron_blooms and trade_goods_misc are BL-286 enum values given their first producer."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "Every ancient recipe is browsable in the ancient band and ABSENT from the industrial one, and vice versa — the era gate cuts both ways, so \"ancient\" does not degrade to \"everything plus extras\".",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "ancient 10/22, industrial 17/22",
+     "notes": "Verified by era_roster, extended this slice with the ancient-chain list and a no-stranded-entry row (every authored recipe reachable from one band or the other)."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "An unconfigured processing facility defaults to a recipe the CURRENT ERA allows, not to a hard-named one. Naming a recipe still resolves after a retag (the storage path is band-independent), so a hard-named default would silently seed an ancient campaign's processors with an industrial recipe — and nothing would refuse it, since the era gates browsing and placement rather than execution.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "",
+     "notes": "recipe_registry::default_recipe_id() added; the three recipe_id(\"steel\") call sites in app.cpp, main.cpp (x2) and construction.cpp now use it. This was a trap CREATED by this slice's retag and closed in the same pass."
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "requirement": "The roster reaches 20+ NAMED buildings on ~3 building_type values, following the BL-166/BL-168 pattern (recipe + placement rule, not a new enum value), each with its placement rule and glyph, browsable in a Build door that can present that many.",
+     "verification": [
+      "visual"
+     ],
+     "result_metric": "",
+     "notes": "NOT BUILT — this slice delivered the CHAINS (the data layer the named buildings would sit on). The named identities, placement rules, glyphs and the Build door's ability to present 20+ entries are the remainder of BL-429."
+    },
+    {
+     "id": "R6",
+     "status": "pending",
+     "requirement": "No orphan raws remain in the ancient tier: every priced raw has at least one consumer.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "",
+     "notes": "NOT MET and deliberately recorded: sand and peat are priced by this slice but still consumed by nothing. BL-432's roster harness is where this becomes a mechanical assertion rather than a note."
+    }
+   ]
   }
  ]
 }

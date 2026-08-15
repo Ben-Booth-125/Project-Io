@@ -35,6 +35,19 @@ resource_type resource_from_name(const std::string& name, bool& ok)
         { "spices",                resource_type::spices },
         { "coffee",                resource_type::coffee },
         { "furs",                  resource_type::furs },
+        // BL-286 logistics/endemic goods. These enum values have existed since
+        // 2026-08-04 and were NEVER added here — the map's "covers the full enum"
+        // claim above was false for eleven of them, so any recipe naming one threw
+        // "Unknown resource" at load. Found 2026-08-15 by BL-429's ancient chain,
+        // which is the first authored recipe to reference them.
+        { "grain",                 resource_type::grain },
+        { "fodder",                resource_type::fodder },
+        { "salt",                  resource_type::salt },
+        { "transport_capacity",    resource_type::transport_capacity },
+        { "charcoal",              resource_type::charcoal },
+        { "iron_blooms",           resource_type::iron_blooms },
+        { "bullion",               resource_type::bullion },
+        { "trade_goods_misc",      resource_type::trade_goods_misc },
         { "steel",                 resource_type::steel },
         { "refined_fuel",          resource_type::refined_fuel },
         { "food_rations",          resource_type::food_rations },

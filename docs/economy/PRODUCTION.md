@@ -401,6 +401,45 @@ spread across the build. The front door shows the analog rate/ETA/paused status 
 binary reject. Tunables live in `scripts/economy.lua` § `construction`. A depletable real
 market inventory (vs. the derived figure) is revisited in `backlog.json` § BL-130.
 
+## The ancient chain (BL-429, first slice, 2026-08-15)
+
+The ancient arc's production chains, authored in `scripts/recipes.lua` with `era = "ancient"`.
+**No new `resource_type` values were added.** Every input here was already in the enum with
+authored deposits and extraction rules, and — until this slice — no price and no consumer. That is
+BL-340's minable-but-unsellable asymmetry, which BL-340 closed for the space tier and left wide open
+for this one: `stone`, `timber`, `sand`, `clay` and `peat` could all be mined and none could be
+sold.
+
+| Recipe | Inputs → output | Depth |
+|---|---|---|
+| Charcoal Burner | 3 timber → 1 charcoal | 1 |
+| Bloomery | 2 iron ore + 1 charcoal → 1 iron blooms | 2 |
+| Smithy | 2 iron blooms + 1 charcoal → 1 steel | 3 |
+| Potter/Weaver | 2 clay + 1 timber → 1 trade goods | 1 |
+| Miller | 2 agricultural produce + 1 stone → 1 food rations | 1 |
+
+**The load-bearing edit is the retag, not the additions.** The coal-fired `steel` recipe became
+`industrial`, so the ancient arc reaches steel only through timber → charcoal → blooms → steel.
+Without that, the shallow route stayed available (coal is a raw) and min-across-recipes correctly
+collapsed steel back to depth 1 — the chain would have existed and meant nothing. Ancient max depth
+went 1 → 3 on exactly that change.
+
+Food is deliberately **not** gated behind an industry: the Miller is depth 1, because an ancient
+start that cannot feed itself until it has built a smelting chain is not a start.
+
+**A trap this created, and how it is closed.** Three call sites defaulted an unconfigured processing
+facility to `recipe_id("steel")`. That still *resolves* after the retag — the storage path is
+band-independent by design — so an ancient campaign would have silently seeded its processors with
+an industrial recipe, and nothing would have refused it, since the era gates browsing and placement
+rather than execution. They now call `recipe_registry::default_recipe_id()`, which returns the first
+recipe the current band allows. **Ask for a sensible default; do not name a recipe and hope.**
+
+Still owed on BL-429: the extraction/processing buildings that would give these chains named
+identities (quarry, woodcutter, kiln, smithy) with their placement rules and glyphs, and the
+remaining orphan raws — `sand` and `peat` are priced now but still have no consumer.
+
+---
+
 ## Chain depth — the growth track (BL-428, 2026-08-15)
 
 **The growth spine is chain depth** (Ben's ruling, chosen over building tiers, the ancient tech
@@ -432,8 +471,8 @@ cannot get there. Implemented as a bounded fixed point rather than a graph walk,
 construction, needs no recursion, and does not depend on traversal or container order (the BL-406
 lesson, where an unordered container decided a number the economy read).
 
-Measured on the shipped recipes, 2026-08-15: **industrial max depth 4, ancient max depth 1** — the
-ancient arc has no chain yet, which is what BL-429's roster exists to fix.
+Measured on the shipped recipes, 2026-08-15: **industrial max depth 4, ancient max depth 3** — the
+ancient figure was **1** before BL-429's chain landed (one layer above raws and nothing beyond).
 
 Guard: `tools/verify/chain_depth.cpp`. **Still owed** (BL-428 slice 2): depth gating placement, and
 the per-corp record of what a corp has *reached*.

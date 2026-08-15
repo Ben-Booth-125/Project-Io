@@ -862,7 +862,7 @@ void app::load_economy()
     // Author processing recipes onto generated assets. The recipe id is a registry
     // index, unknown at generation time, so it is assigned here once the registry
     // exists. Every unconfigured processor defaults to the steel recipe.
-    const uint16_t default_recipe = m_registry.recipe_id("steel");
+    const uint16_t default_recipe = m_registry.default_recipe_id(); // BL-429: era-aware, not hard-named
     for (auto& [id, b] : m_world.buildings)
         if (b.type == building_type::processing_facility && b.recipe == no_recipe)
             b.recipe = default_recipe;

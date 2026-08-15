@@ -74,15 +74,23 @@ bool contains(const std::vector<std::string>& v, const std::string& s)
 /// derived from the tags: deriving them from the same field under test would make
 /// the assertion vacuous — it would pass whatever the data said.
 const char* k_industrial_recipes[] = {
+    "steel", // BL-429: coal-fired direct smelting is the INDUSTRIAL route
     "refined_fuel", "hydroponics_bay", "steel_from_iron_nickel",
     "propellant_atmospheric", "propellant_electrolysis",
     "silicon", "ree_alloy", "machinery", "alloys", "electronics",
     "spacecraft_components", "clean_water", "consumer_goods", "medical_supplies",
 };
 
-/// Chains that must survive into the ancient arc. Thin by design at this point —
-/// filling the ancient roster out is BL-429, not this item.
-const char* k_shared_recipes[] = { "steel", "food_rations", "refined_copper" };
+/// BL-429's ancient chain. These must be browsable in the ancient band and ABSENT
+/// from the industrial one — the gate has to cut both ways, or "ancient" would
+/// just mean "everything, plus some extra".
+const char* k_ancient_recipes[] = {
+    "charcoal", "iron_blooms", "steel_from_blooms", "trade_goods",
+    "food_rations_milled",
+};
+
+/// Chains shared by both arcs — no era tag at all.
+const char* k_shared_recipes[] = { "food_rations", "refined_copper" };
 
 } // namespace
 
@@ -110,6 +118,8 @@ int main()
     for (const char* n : k_shared_recipes)
         ids_any.push_back(reg.recipe_id(n));
     for (const char* n : k_industrial_recipes)
+        ids_any.push_back(reg.recipe_id(n));
+    for (const char* n : k_ancient_recipes)
         ids_any.push_back(reg.recipe_id(n));
 
     // --- R1: the ancient band drops the industrial roster ----------------------
@@ -143,6 +153,15 @@ int main()
         }
     check(all_shared_offered, "every shared recipe survives into the ancient band");
 
+    bool all_ancient_offered = true;
+    for (const char* n : k_ancient_recipes)
+        if (!contains(anc, n))
+        {
+            std::printf("      missing from ancient: %s\n", n);
+            all_ancient_offered = false;
+        }
+    check(all_ancient_offered, "BL-429's ancient chain is browsable in the ancient band");
+
     // ANTI-VACUITY: if the tags were all `any`, or all `industrial`, the two checks
     // above could both pass on a degenerate roster. Pin the shape.
     check(anc.size() > 0 && anc.size() < authored,
@@ -152,11 +171,31 @@ int main()
     std::printf("\nR1 — industrial band\n");
     reg.set_era(era_band::industrial);
     const std::vector<std::string> ind = browsable(reg);
-    check(ind.size() == authored,
-          "the industrial band browses every authored recipe (" + std::to_string(ind.size()) +
-              " of " + std::to_string(authored) + ")");
+    std::printf("  browsable in industrial: %zu of %zu authored\n", ind.size(), authored);
     check(reg.building_available(building_type::launchpad),
           "the Launchpad is available in the industrial band");
+
+    bool all_industrial_offered = true;
+    for (const char* n : k_industrial_recipes)
+        if (!contains(ind, n))
+        {
+            std::printf("      missing from industrial: %s\n", n);
+            all_industrial_offered = false;
+        }
+    check(all_industrial_offered, "every industrial recipe is browsable in the industrial band");
+
+    // The gate cuts BOTH ways (BL-429): an ancient-only chain must not appear in
+    // the industrial arc, or "ancient" would degrade to "everything plus extras".
+    bool any_ancient_leaked = false;
+    for (const char* n : k_ancient_recipes)
+        if (contains(ind, n))
+        {
+            std::printf("      leaked into industrial: %s\n", n);
+            any_ancient_leaked = true;
+        }
+    check(!any_ancient_leaked, "no ancient-only recipe is browsable in the industrial band");
+    check(ind.size() + anc.size() >= authored,
+          "every authored recipe is reachable from one band or the other (no stranded entry)");
 
     // --- R2: ids are absolute, and stable across every band --------------------
     // The load-bearing row. recipe_at() indexes the era's list; recipe_id()/
@@ -173,6 +212,9 @@ int main()
             if (reg.recipe_id(n) != ids_any[k++])
                 stable = false;
         for (const char* n : k_industrial_recipes)
+            if (reg.recipe_id(n) != ids_any[k++])
+                stable = false;
+        for (const char* n : k_ancient_recipes)
             if (reg.recipe_id(n) != ids_any[k++])
                 stable = false;
         check(stable, "every authored recipe keeps its absolute id under band " +

@@ -238,7 +238,7 @@ int run_serve(int ticks, long long as_corp, bool as_any)
 
     world w = make_hard_coded_world();
 
-    const uint16_t default_recipe = reg.recipe_id("steel");
+    const uint16_t default_recipe = reg.default_recipe_id(); // BL-429
     for (auto& [id, b] : w.buildings)
         if (b.type == building_type::processing_facility && b.recipe == no_recipe)
             b.recipe = default_recipe;
@@ -528,7 +528,7 @@ int run_blackboard_export(const std::string& which, const std::string& out_dir, 
     world w = make_hard_coded_world();
 
     // Author default recipes onto generated processors (mirrors app::load_economy).
-    const uint16_t default_recipe = reg.recipe_id("steel");
+    const uint16_t default_recipe = reg.default_recipe_id(); // BL-429
     for (auto& [id, b] : w.buildings)
         if (b.type == building_type::processing_facility && b.recipe == no_recipe)
             b.recipe = default_recipe;

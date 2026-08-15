@@ -318,6 +318,25 @@ public:
         return no_recipe;
     }
 
+    /// BL-429: the recipe an unconfigured processing facility should default to —
+    /// the first recipe the CURRENT ERA allows, as an absolute id.
+    ///
+    /// This exists because the obvious spelling, `recipe_id("steel")`, became a
+    /// trap the moment BL-429 tagged the coal-fired steel route `industrial`: it
+    /// still resolves (the storage path is band-independent, by design), so an
+    /// ancient campaign would silently seed its processors with a recipe that is
+    /// not part of its economy — and nothing would refuse it, since the era gates
+    /// browsing and placement, not execution. Callers that want "a sensible
+    /// default" must ask for one, not name a recipe and hope.
+    ///
+    /// Returns `no_recipe` for an empty or fully-masked roster.
+    uint16_t default_recipe_id() const
+    {
+        if (m_allowed.empty())
+            return no_recipe;
+        return static_cast<uint16_t>(m_allowed.front());
+    }
+
     /// Economy constants for a building type.
     const building_economics& economics(building_type type) const
     {

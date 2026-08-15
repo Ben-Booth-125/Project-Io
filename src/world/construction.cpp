@@ -158,7 +158,7 @@ construction_result construct_building(world& w, const recipe_registry& reg,
         // the player's bar described). Otherwise the historic default, so a freshly
         // built processor is still productive; the player reconfigures it via building
         // management. Mirrors app::load_economy.
-        bc.recipe = (recipe != no_recipe) ? recipe : reg.recipe_id("steel");
+        bc.recipe = (recipe != no_recipe) ? recipe : reg.default_recipe_id(); // BL-429
     }
 
     w.buildings[bld_id]  = bc;
