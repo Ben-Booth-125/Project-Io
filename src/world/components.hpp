@@ -386,6 +386,14 @@ struct building_component
     /// AI_OPPONENT.md § 5 Hysteresis). Decremented each evaluation of the
     /// owning corp. Never set on player buildings.
     int  ai_cooldown = 0;
+
+    /// BL-430: economy ticks remaining before this building's recipe may be
+    /// switched again through the PLAYER-grade seam (corp_command's set_recipe
+    /// verb, and the construction_panel UI, which shares its gate). Set from
+    /// recipe_switch_params::cooldown_ticks on a successful switch through that
+    /// seam; decremented once per economy tick (run_economy_step). NOT touched by
+    /// the BL-079 reflex switch, which stays free/instant — see recipe_switch_params.
+    int  recipe_switch_cooldown = 0;
 };
 
 /// Pooled resource quantities held by an entity.

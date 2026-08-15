@@ -139,6 +139,47 @@
     "src/ui/icons.hpp"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-242",
+   "title": "BL-430: AI recipe-switching pays no attention to the new switch cost/cooldown at scoring time",
+   "raised": "2026-08-15",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-430 (alternate production methods) implementation session.",
+   "what": "corp_ai.cpp's dial_recipe margin-chase (run_corp_strategic_step) scores a recipe switch purely on projected margin gain; it does not subtract economy.recipe_switch's switch_cost, and does not check the target building's recipe_switch_cooldown before proposing a candidate. The decision taken: do NOT build cost/cooldown-aware AI scoring in this pass. The seam itself (corp_command's set_recipe verb, through try_switch_recipe in economy_system.cpp) still enforces both at apply time -- a candidate that would be rejected on cooldown or insufficient funds is simply refused, mutating nothing, exactly as the seam already handles every other reason a corp_ai candidate can fail. So the AI is not exploitable and nothing is unsafe; it just occasionally proposes (and loses a decision slot to) a switch that will bounce.",
+   "why_it_matters": "Scoped explicitly per BL-430 design ruling ­-- widening corp_ai.cpp scoring to price in the switch cost/cooldown is real new planner scope (a projected-gain-minus-cost comparison, plus a cooldown pre-filter), not a small follow-on to this item. Left as a stated call rather than a silent gap.",
+   "options": [
+    "A) Leave as-is: the seam-level gate is the safety property that matters; a slightly wasteful candidate is cheap.",
+    "B) File a small follow-on backlog item scoped to pricing dial_recipe candidates against switch_cost and pre-filtering on recipe_switch_cooldown > 0."
+   ],
+   "recommendation": "B, next time corp_ai.cpp is touched for another dial -- cheap once someone is already in that function, not worth its own session.",
+   "files": [
+    "src/world/corp_ai.cpp",
+    "src/world/economy_system.cpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-243",
+   "title": "BL-430 no-dominance guard finds four REAL dominated recipe pairs in the shipped roster",
+   "raised": "2026-08-15",
+   "kind": "observation",
+   "status": "open",
+   "source": "tools/verify/recipe_switch_harness.cpp R1, run against the real scripts/recipes.lua while landing BL-430.",
+   "what": "The guard groups recipes by (primary output, era band) -- the set genuinely interchangeable as 'methods' on the same processing_facility per recipe_registry.hpp's browse path -- and checks that no pair beats another on BOTH input-basket cost (reference world_gen.lua prices) AND chain-depth of its deepest input. Four pairs fail cleanly: steel_from_iron_nickel dominates steel (cost 2.0 vs 3.0, same depth 0); propellant_atmospheric dominates propellant_electrolysis (cost 2.0 vs 4.0, same depth 1); peat_charcoal dominates charcoal/Charcoal Burner (cost 2.4 vs 4.5, same depth 0); glass/Glassworks dominates trade_goods/Potter&Weaver (cost 2.0 vs 3.9, same depth 0). All four pairs predate BL-430 -- they came from BL-340/BL-429/BL-433 as 'more than one raw reaches this good', and BL-429's own recipes.lua comments on the charcoal and trade_goods pairs explicitly say 'not a tuned alternate method'. BL-430 did not author or retune any of them.",
+   "why_it_matters": "Authorial intent aside, a rational player on the SAME processing_facility building always prefers the cheaper, equal-depth route -- so today Charcoal Burner, Potter&Weaver, steel's coal-fired route (once iron-nickel is available) and propellant_electrolysis are dead content once their dominant sibling is reachable. That is exactly the shape BL-430's ruling asked the guard to catch, even though the guard was written for BL-430's OWN future alternates, not as a retroactive audit of the existing roster. Left failing rather than tuned silently -- these are real balance numbers, not a defect in the check.",
+   "options": [
+    "A) Leave as-is: log the finding, do not touch recipes.lua magnitudes on this pass -- BL-430 scope is the mechanism, not a balance retune.",
+    "B) Retune one input quantity per pair (e.g. raise peat_charcoal input from 2.0 to something depth-neutral but costlier) in a small follow-on, or add a second differentiating axis (e.g. workforce/throughput) that the current recipe-level model does not carry.",
+    "C) Reclassify: some of these ARE meant as strict tier upgrades (steel_from_iron_nickel over steel, once nickel deposits are scarcer/rarer than iron) rather than side-grade alternates, in which case the guard should exclude cross-tier pairs -- needs Ben's call on which axis (terrain/resource rarity) distinguishes a tier upgrade from a real alternate."
+   ],
+   "recommendation": "C first (a five-minute design call unblocks whether this is even the right guard shape), then B if genuine alternates remain dominated.",
+   "files": [
+    "tools/verify/recipe_switch_harness.cpp",
+    "scripts/recipes.lua"
+   ],
+   "resolution": null
   }
  ]
 }

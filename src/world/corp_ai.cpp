@@ -769,6 +769,13 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             }
 
             // Recipe margin-chase (generalises the tier-0 floored-output rescue).
+            // BL-430 DECISION: `gain` below is not offset by economy.recipe_switch's
+            // one-off cost, and this candidate is not gated on the cooldown before it
+            // is scored — the seam (corp_command's set_recipe verb, via
+            // try_switch_recipe) still enforces both at APPLY time, so a bad chase
+            // just gets rejected rather than mutating anything; it is not a new
+            // planner, just an unpriced one. Stated explicitly (not a silent gap) —
+            // see NEEDS_REVIEW.json.
             if (b.type == building_type::processing_facility && b.recipe != no_recipe)
             {
                 const float cur_margin = recipe_margin(w, reg, b.tile, b.recipe);

@@ -166,6 +166,20 @@ economy = {
         reputation_on_cancel   = -2.0,
     },
 
+    -- BL-430: switching a processing_facility's recipe through the player-grade
+    -- seam (the management UI's method dropdown, or an AI's dial_recipe margin
+    -- chase — both go through corp_command's set_recipe verb) is a COMMITMENT,
+    -- not a free per-tick optimisation. The BL-079 reflex switch (an idled/
+    -- floored building's automatic recipe change) does NOT read this table and
+    -- stays free/instant — it is sanctioned auto-agency reacting to a loss, not
+    -- a strategic choice. Cost is a round, legible number (half a Track road);
+    -- cooldown is short enough that a genuine trade-off is still worth chasing,
+    -- long enough that a corp cannot flip-flop every tick for a marginal margin.
+    recipe_switch = {
+        switch_cost    = 12.0,
+        cooldown_ticks = 6,
+    },
+
     -- Player-placeable roads, now a three-tier ladder (BL-172; BL-147 shipped a single tier). A
     -- road is a per-tile mutation (raises tile.road_level, lowering its A* traversal cost), not a
     -- building — no maintenance/recipe, just an up-front placement cost. The tiers, by road_level:
