@@ -9798,6 +9798,170 @@
    ],
    "created": "2026-08-15",
    "design": "Write the post-setup world through the existing flat-binary seam to a gitignored cache (build_gen/verify_world.bin) keyed by world::state_hash(0) + a generator stamp; on --verify launch, load if the stamp matches, else regenerate and rewrite. The guard is the point (BL-426's lesson, third bite this week: a silently stale cache would verify an old world while reading as green). Two known gaps to close or scope out: (a) the generation_report is not world state — history_ledger_and_comms.lua and the wizard-chart checks capture it, so it must be cached alongside or those scripts regenerate; (b) prove load==generate once with the state hash and a full-suite compare before trusting it. Does NOT address per-script econ stepping (~4.5s/tick Debug), which now dominates batch passes — the Release verify tree is that lever and pairs naturally with this item.\n\nScheduled 2026-08-15 (Ben): take BL-425 + BL-426 + BL-427 together as the next session's block — the verify-cost triad (ages sim affordability, stale-exe gate guard, world snapshot cache). Shared instrument note: BL-425 wants the sim-vs-recording split measured and BL-427 wants generation phase timings; both are BL-403's (profiling harness) natural territory, so the session should probably open by building that instrument or a lightweight cut of it. BL-425 is design-owed — Design is its first verb."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-15",
+   "created": "2026-08-15",
+   "category": "Economy",
+   "version_goal": "v0.1.17",
+   "requires": [],
+   "id": "BL-428",
+   "short_name": "CHAIN_DEPTH_IS_THE_GROWTH_SPINE",
+   "title": "Chain depth is the growth track — how far down the production graph a corp can reach is what gates its next building",
+   "priority": "A",
+   "difficulty": 4,
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "scripts/recipes.lua",
+    "scripts/economy.lua",
+    "src/world/recipe_registry.hpp",
+    "src/world/recipe_registry.cpp",
+    "src/world/placement_rules.cpp",
+    "docs/economy/PRODUCTION.md"
+   ],
+   "summary": "RULING 2026-08-15 (Ben, elicitation form): the growth track's spine is CHAIN DEPTH, not building tiers, not the tech ladder, not settlement scale. A corp advances by reaching further down the production graph - the goods it can actually make gate the buildings it may place next - so growth is a consequence of the economy it has built rather than a parallel unlock system laid over it. This is the item the roster expansion (BL-429) and the alternate methods (BL-430) both hang from, and the structure tech (BL-296) and politics (BL-158) are meant to REFINE rather than replace.",
+   "design": "FILED 2026-08-15 from Ben's sprint-planning ruling. Four spines were offered - building\ntiers, chain depth, the ancient tech ladder, settlement scale - and chain depth was taken.\n\n## What the ruling means\n\nGrowth is not a separate track. A corp's reach down the production graph IS its progress:\nthe deeper the chain it can close, the more the world opens to it. Concretely, a building's\nplacement precondition becomes a statement about goods the corp can already produce, rather\nthan a flag some other system sets. Build a bloomery, and the smithy becomes placeable\nbecause blooms exist; not because a tech completed.\n\nWhy this over the alternatives, in Ben's choice and worth recording: a tier ladder or a tech\nladder is a SECOND system that must be kept in agreement with the economy, and the project\nhas already paid that reconciliation cost once (BL-155/BL-156 both settling on the same\n`condition_set` and neither building it). Chain depth has no second system to desync from -\nit is read off the recipe graph that has to exist anyway.\n\n## Why this is the right substrate right now\n\nThe ancient arc's resource enum is ALREADY stocked for it and mostly idle. `components.hpp`\ncarries stone, timber, sand, clay, peat, charcoal, iron_blooms, grain, fodder, salt and\nbullion - the BL-286 logistics tranche plus the ambient raws - and BL-286's own comment\nadmits the behaviours were never filed (\"behaviour unfiled\" appears five times). Several\ncarry no base price in `world_gen.lua`, which is exactly the minable-but-unsellable asymmetry\nBL-340 closed for the space tier and never closed for the ancient one.\n\nSo the depth ladder does not need new resources. It needs the chains that consume the ones\nalready sitting in the enum. That is the cheapest possible version of this feature and the\nmost honest: it retires orphans instead of minting them.\n\n## What has to be defined\n\n1. **A depth metric.** Depth of a good = longest input path back to a raw. Computed once at\n   registry load from `recipes.lua`, not authored per good, so it cannot drift from the graph.\n   Determinism: the graph is authored data, the walk is pure - it must produce the same\n   number on every toolchain (the BL-406 lesson: never let an unordered container decide a\n   number the economy reads).\n2. **What depth gates.** First cut: building placement. A building type declares the minimum\n   depth its corp must have REACHED (i.e. actually produced at least once, recorded per corp),\n   and `placement_rules.cpp` enforces it alongside terrain.\n3. **Cycles.** The graph must be acyclic for depth to be defined. The registry load should\n   reject a cyclic recipe set loudly rather than looping - a headless harness assertion.\n4. **What \"reached\" means for a corp** - produced once ever, or currently producing? Produced\n   once ever is the legible choice (progress does not evaporate when a building idles) and\n   costs one per-corp bitset over resource_type.\n\n## Guard\n\nA headless harness (`tools/verify/chain_depth.cpp`) asserting: the graph is acyclic; every\ngood's depth is stable across two loads; every building's declared minimum depth is\nREACHABLE from the starting position (no unplaceable building, the roster equivalent of an\norphan resource); and that a fresh corp can reach the deepest tier by some path.\n\n## The refinement seam this leaves open\n\nTech (BL-296) and politics (BL-158/v0.1.6) refine this rather than gate it: a tech can make a\nchain cheaper, shorter, or unlock an ALTERNATE method (BL-430) for a chain you already run -\nit does not hand you a depth you did not earn. Stated here so the later systems have a shape\nto attach to instead of re-litigating the spine."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-15",
+   "created": "2026-08-15",
+   "category": "Economy",
+   "version_goal": "v0.1.17",
+   "requires": [
+    "BL-428"
+   ],
+   "id": "BL-429",
+   "short_name": "ANCIENT_BUILDING_ROSTER",
+   "title": "The building roster is 7 types and half of them are space-era — the ancient arc needs 20+ buildings that consume the resources it already has",
+   "priority": "A",
+   "difficulty": 4,
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "scripts/economy.lua",
+    "scripts/recipes.lua",
+    "src/world/components.hpp",
+    "src/world/placement_rules.cpp",
+    "src/ui/icons.cpp",
+    "docs/economy/PRODUCTION.md",
+    "docs/ui/ICONS.md"
+   ],
+   "summary": "RULING 2026-08-15 (Ben): take the roster past 20 building types, as a content sprint of its own. Measured today: scripts/economy.lua carries SEVEN building_type entries (extraction_site, processing_facility, port, launchpad, inland_logistics_hub, military_base, research_institute) and scripts/recipes.lua carries 17 recipes, one per output. Named buildings like the Hydroponics Bay and Fishing Wharf are not types at all - they are the generic processing_facility distinguished by recipe and placement rule, which is the pattern the expansion should follow rather than minting enum values.",
+   "design": "FILED 2026-08-15 from Ben's sprint-planning ruling (\"20+ types, content sprint of its own\").\n\n## What is actually there today\n\n  * building_type entries in `economy.lua` : 7\n  * recipes in `recipes.lua`               : 17, one per output, no alternates\n  * of the 7 types, LAUNCHPAD is space-era and the refinery chain runs on PETROLEUM\n\nThe arc is the ancient product at 0 CE (NR-177). A roster expansion that adds to the current\nset without confronting that would double the space-era debt inside the live product - see\nBL-433, filed alongside this, which owns the misplacement question.\n\n## The pattern to follow, and the one to avoid\n\nBL-166/BL-168 established it and `economy.lua` records it: the Hydroponics Bay and the Fishing\nWharf are the SAME `processing_facility` / `extraction_site` types as everything else,\ndistinguished by recipe and by placement rule, not by a new enum value. That is how a roster\nreaches 20+ named buildings without a 20-value enum, without touching the serialised width,\nand without a glyph explosion.\n\n**Mint a new `building_type` only where BL-325's test is met** - it earns the enum value with a\ndistinct placement rule AND a distinct glyph AND behaviour no recipe can express. The\nmilitary_base passed that test. A tannery does not.\n\n## What the roster should cover, against the resources that already exist\n\nThe enum already holds the ancient substrate: stone, timber, sand, clay, peat, charcoal,\niron_blooms, grain, fodder, salt, bullion, plus the endemic four (tobacco, spices, coffee,\nfurs). Most are BL-286 orphans - in the enum, unconsumed by any recipe, several unpriced in\n`world_gen.lua`. The roster's job is to give every one of them a consumer, which is BL-340's\nadmission rule applied to the ancient tier:\n\n  * **Extraction** - quarry (stone), clay pit, sand pit, woodcutter (timber), peat cutting,\n    salt pan, grain farm, pasture (fodder), mine (iron ore, copper ore)\n  * **Primary processing** - charcoal burner (timber -> charcoal), bloomery (iron ore +\n    charcoal -> iron_blooms), kiln (clay -> ceramics), glassworks (sand -> glass),\n    sawmill (timber -> timber goods), mill (grain -> flour/rations)\n  * **Secondary** - smithy (blooms -> tools/arms), tannery, weaver, potter, shipwright,\n    stonemason\n  * **Terminal / mercantile** - mint (bullion), warehouse, market stall\n\nThat is comfortably past 20 named buildings on ~3 building_type values. Exact list, recipes\nand magnitudes are the sprint's content work; the ADMISSION RULE is the invariant - no\nbuilding whose output nothing consumes, no resource no building consumes.\n\n## Depth, and how this item relates to BL-428\n\nEvery entry above declares its minimum chain depth (BL-428). The roster IS the depth ladder\nmade concrete: quarry at depth 0, bloomery at 1, smithy at 2, and so on. Build the ladder and\nthe roster in the same pass or the numbers will not agree.\n\n## UI consequence, which is half the work\n\n20+ buildings will not fit the Build door's current shape, and ICONS.md gains a glyph per\nnamed building. Both are in scope: a roster the player cannot browse is not content, it is a\ndata file. Its question_log entry must be written with it (BL-260)."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-15",
+   "created": "2026-08-15",
+   "category": "Economy",
+   "version_goal": "v0.1.17",
+   "requires": [
+    "BL-428"
+   ],
+   "id": "BL-430",
+   "short_name": "ALTERNATE_PRODUCTION_METHODS",
+   "title": "A building has a recipe, not a choice of one — alternate production methods with real trade-offs",
+   "priority": "A",
+   "difficulty": 3,
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "scripts/recipes.lua",
+    "src/world/recipe_registry.hpp",
+    "src/world/recipe_registry.cpp",
+    "src/world/economy_system.cpp",
+    "docs/economy/PRODUCTION.md"
+   ],
+   "summary": "RULING 2026-08-15 (Ben): yes, alternates with real trade-offs - not tier upgrades. Today recipes.lua is one recipe per output and a building stores a single recipe id, so choosing a building IS choosing its method. An alternate is a different input basket for the same output, each honestly better under different conditions (local abundance, chain depth, wage cost, throughput), so the player is choosing rather than upgrading.",
+   "design": "FILED 2026-08-15 from Ben's sprint-planning ruling (\"yes, alternates with real trade-offs\" -\nchosen over \"only as tier upgrades\" and over keeping one recipe per output).\n\n## The distinction the ruling turns on\n\nA **tier upgrade** is strictly better and therefore not a decision - it is a delay. An\n**alternate** must be genuinely better under some conditions and worse under others, or the\nplayer will find the dominant one once and never look again. That is the design bar, and it\nis testable: if any alternate dominates its sibling on every axis, it is a tier, not a method,\nand the pair should be re-authored or merged.\n\n## The trade-off axes available today\n\nReal ones the engine already has, so no new machinery is needed to make the choice bite:\n\n  * **Input basket** - charcoal vs peat vs coal as smelting fuel: what is locally abundant\n    differs by body and region, so the same method is not best everywhere.\n  * **Labour intensity** - `base_wage` and workforce against `base_rate`: a hand method is\n    cheap to build and dear to run; a water-powered one inverts that.\n  * **Chain depth** - a deeper method needs a good you may not reach yet (BL-428), so the\n    shallow method stays correct early and stays available late.\n  * **Throughput vs yield** - batches per tick against output per batch.\n\n## Shape\n\n`recipes.lua` entries gain a `produces` / method grouping so several recipes can declare the\nsame output and be presented as siblings. The recipe id stays the 0-based index and ORDER\nMUST STAY STABLE - authored ids are stored in `building_component.recipe` and a reorder would\nsilently repoint every existing building. Append new methods; never insert.\n\nSwitching method on a running building is the existing recipe-switch path (BL-079's reflex\nalready switches a floored recipe), so the mechanism exists - what is new is that the choice\nbecomes the player's, with a cost or a cooldown to switch so it is a commitment rather than a\nper-tick optimisation. That cost is a first-cut constant in `economy.lua`, tuned by playtest.\n\n## Guard\n\nA headless harness assertion that no method DOMINATES a sibling on every axis\n(inputs cost, wage, rate, depth) - the mechanical form of the design bar above. It will need\na price snapshot to compare input baskets, so it belongs next to the existing economy harness.\n\n## Interaction with the AI\n\n`corp_ai.cpp` scores build/demolish/survey/road/hire. Method choice is a NEW decision surface\nand the scorer will pick badly by default (it has no notion of local abundance). Either the\nalternates are scored - a small, deterministic addition in the same scored-utility layer - or\nbackground corps are pinned to the shallow method explicitly. Pinning silently is the failure\nmode: it would make every rival look strategically identical. Decide at promotion; either way\nit is a stated call, not a default."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-15",
+   "created": "2026-08-15",
+   "category": "UI",
+   "version_goal": "v0.1.17",
+   "requires": [
+    "BL-429",
+    "BL-430"
+   ],
+   "id": "BL-431",
+   "short_name": "PRODUCTION_METHOD_AND_CHAIN_UI",
+   "title": "The production choice and the chain that leads to it have no surface — method selector, chain trace, and the depth readout",
+   "priority": "B",
+   "difficulty": 3,
+   "authority_doc": "docs/ui/SELECTION.md",
+   "files": [
+    "src/ui/selection_panel.cpp",
+    "src/ui/icons.cpp",
+    "docs/ui/SELECTION.md",
+    "docs/ui/question_log.json",
+    "docs/ai/ACTIONS.json"
+   ],
+   "summary": "The UI half of the economy-breadth sprint. Three surfaces the player needs the moment BL-429 and BL-430 land: a production-method selector on the building panel (with the trade-off legible at the point of choice, not after), a chain trace answering \"what do I need to make this\", and a depth readout answering \"how far down the graph have I actually got\". Without these the content is invisible: 20+ buildings and a choice of method are a data file the player cannot see.",
+   "design": "FILED 2026-08-15 with the economy-breadth sprint. This is the \"pad out the UI\" half of\nBen's ask, applied to the economy side; BL-393's unit surfaces are its military twin.\n\n## Three questions, three surfaces (BL-260 discipline - each declares the question it answers)\n\n1. **\"Which way should this building make its output?\"** - a method selector on the Selection\n   panel's building view. Shows each alternate's input basket, wage and rate SIDE BY SIDE, so\n   the trade-off (BL-430) is legible at the point of choice. A selector that shows only names\n   pushes the player to a wiki. Switching cost shown before committing, like the Build door\n   shows a credit total.\n2. **\"What do I need in order to make this?\"** - a chain trace from any good back to its raws,\n   reachable from the good itself (resource pip, market row, recipe line). Read off the same\n   registry graph BL-428 computes depth from, so it cannot disagree with the simulation.\n3. **\"How far down the graph have I actually got?\"** - the depth readout: the corp's reached\n   depth, what the next depth would open, and what is missing to get there. This is the growth\n   track made visible, and without it chain depth is an invisible gate that reads as a bug.\n\n## Constraints\n\nThe Selection panel is already dense; the method selector must not push the workforce dial or\nprofitability off screen. Rule 0b applies at build time - state the current measurements\nbefore reshaping the panel, and open the live app before asking Ben to judge the layout.\n\nToggle rule applies to any ledger slot this earns.\n\n## Owed alongside the code\n\n  * `docs/ui/question_log.json` entries for all three surfaces, written WITH them, not after.\n  * `docs/ai/ACTIONS.json` - method switching is a new control and therefore a new dictionary\n    entry. Transcribed from the seam verb once it exists (BL-270 discipline), never authored\n    ahead of it.\n  * A user story per surface in `user_stories.json`: the intent axis has nothing on \"choose how\n    I produce\" today."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-15",
+   "created": "2026-08-15",
+   "category": "Economy",
+   "version_goal": "v0.1.17",
+   "requires": [],
+   "id": "BL-433",
+   "short_name": "SPACE_ERA_BUILDINGS_IN_THE_ANCIENT_ARC",
+   "title": "The live ancient product still ships a Launchpad and a petroleum refinery — the roster contradicts the arc",
+   "priority": "B",
+   "difficulty": 2,
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "scripts/economy.lua",
+    "scripts/recipes.lua",
+    "docs/economy/PRODUCTION.md",
+    "docs/economy/ERAS.md"
+   ],
+   "summary": "Found 2026-08-15 while sizing the economy-breadth sprint. The live arc is the ancient product at 0 CE (NR-177), but scripts/economy.lua still carries a launchpad building_type and scripts/recipes.lua still refines petroleum into refined_fuel and propellant. Not a bug - it is the space arc's roster, correctly parked at the version level but never parked in the DATA the ancient product loads. A player at 0 CE can be offered a launchpad.",
+   "design": "FOUND 2026-08-15 while measuring the roster for BL-429.\n\n## What is there\n\n`economy.lua` § buildings carries `launchpad` as one of seven building_type entries.\n`recipes.lua` id 1 is petroleum -> refined_fuel, and the BL-308 propellant recipes sit on top\nof it. The space arc is parked at the ROADMAP/backlog level (~41 items carry `parked: true`),\nbut parking was a backlog operation and the Lua data was not part of it.\n\n## Why it matters more than it looks\n\nThree ways it bites, in order of how much:\n\n1. **The player at 0 CE can be offered a launchpad.** Whatever the placement rules do in\n   practice, the roster is what the Build door reads, and an anachronism there reads as a bug\n   in the product rather than a parked feature.\n2. **BL-429's roster count is measured against a polluted baseline.** \"Seven building types\"\n   includes one that should not be in this arc at all - so the real ancient roster is six.\n3. **The AI scorer sees them.** `corp_ai.cpp` scores build candidates over the roster it is\n   given; a rival that builds toward a space chain in an ancient world is not a strategy, it\n   is a data leak.\n\n## The call this needs\n\nNot mine to take, because it decides how the two arcs share one data set:\n\na) **Era-gate the data** - each building and recipe declares the era it belongs to; the\n   loader filters on the campaign's era. Truest, and ERAS.md already designs an era system\n   (status: designed, NOT implemented), so this would be its first real consumer.\nb) **Split the data files** - `economy_ancient.lua` / `economy_space.lua`, chosen at startup.\n   Cheapest, and honest about the two arcs being two products; costs duplication where they\n   genuinely overlap (extraction_site, port, warehouse).\nc) **Leave it and rely on placement rules** - the status quo. Cheapest of all and the reason\n   this was invisible until now.\n\nRECOMMENDATION: (a). It is the same amount of work as (b) once, it gives ERAS.md its first\nimplementation instead of leaving it a designed-but-unbuilt doc, and the ancient arc's own\ntech ladder (BL-296) will want an era-ish gate anyway. But it is a shared-substrate decision\nand BL-429 should not start before it is answered - the roster expansion writes into exactly\nthese files."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-15",
+   "created": "2026-08-15",
+   "category": "Testing",
+   "version_goal": "v0.1.17",
+   "requires": [
+    "BL-428"
+   ],
+   "id": "BL-432",
+   "short_name": "ECONOMY_BREADTH_GUARD_HARNESS",
+   "title": "One harness for the roster invariants — no orphan resources, no unplaceable buildings, no dominant method, no cyclic graph",
+   "priority": "B",
+   "difficulty": 2,
+   "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+   "files": [
+    "tools/verify/chain_depth.cpp",
+    ".claude/skills/verifier-headless/SKILL.md"
+   ],
+   "summary": "The saved check for the economy-breadth sprint, filed as its own item so it is built rather than promised. Four invariants over the loaded registry: the recipe graph is acyclic (or depth is undefined), every resource_type in the enum has a producer or a consumer (BL-340's admission rule, mechanised), every building's declared minimum depth is reachable from a fresh start, and no production method dominates a sibling on every axis (BL-430's design bar).",
+   "design": "FILED 2026-08-15 with the economy-breadth sprint, under CLAUDE.md § \"Tool creation is skill\ncreation\" - a roster this size will not stay coherent by authorship alone, and the check\nwritten now catches next quarter's orphan.\n\n## Why a harness and not a review pass\n\nBL-286 is the cautionary precedent and it is in the code comments: eleven resource values were\nadded with \"behaviour unfiled\", and five of them still have no consumer today, months later.\nNo human reading a diff catches that; a load-time graph walk catches it in a second. The same\ngoes for a building nobody can place and a method nobody would ever pick.\n\n## The four assertions\n\n1. **Acyclic.** Depth (BL-428) is undefined on a cycle. Fail loudly at load rather than loop.\n2. **No orphans, both directions.** Every `resource_type` is produced by some recipe or\n   extractable from some deposit, AND consumed by some recipe or bought by some named actor.\n   Terminal goods declare themselves terminal so they are exempt from the second half - an\n   explicit exemption list, so an orphan cannot hide as an assumed terminal.\n3. **Every building reachable.** For each building's minimum depth, a path exists from a fresh\n   corp's starting position to that depth. An unplaceable building is the roster's orphan.\n4. **No dominant method.** For each output with alternates, no sibling is better on every axis\n   (input cost at reference prices, wage, rate, depth). This is BL-430's design bar mechanised.\n\n## Determinism note\n\nThe walk must not depend on container iteration order - the BL-406 lesson, where an unordered\ncontainer decided a number the economy read. Sort by authored recipe id before walking, and\nassert the depth vector is byte-identical across two loads in the same process.\n\nRuns as `tools/verify/chain_depth.cpp` under the `verifier-headless` skill, named in the skill\nso it is discoverable, and added to the ctest tier."
   }
  ]
 }

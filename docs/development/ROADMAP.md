@@ -53,6 +53,18 @@ async loading screen, and the startup-hang fix. SPRINTS.md § Sprint 15 is the r
   shared-currency scorer (**BL-318**), sim perf (**BL-320**), the works roster (**BL-321**), and
   voice/unit calibration (**BL-337**). A holding assignment — sprints will promote and likely
   split it; the theme is the claim, not the item count.
+- **v0.1.17 — Economy breadth.** *Theme: the chain is the growth track.* Named 2026-08-15 on Ben's
+  steer that the economy needs "robust and expansive building options, production methods, and an
+  implied growth track that we can refine tech and politics around". Four rulings settle its shape:
+  the growth spine is **chain depth** (how far down the production graph a corp can reach gates its
+  next building — not a tier ladder, not a tech gate); the roster goes past **20 building types**;
+  buildings offer **alternate production methods with real trade-offs**, not upgrades; and it comes
+  **before** the military sprint. Carries **BL-428** (the depth spine), **BL-429** (ancient
+  roster), **BL-430** (alternate methods), **BL-431** (method/chain UI), **BL-432** (guard harness)
+  and **BL-433** (the Launchpad and petroleum chain still shipping inside a 0 CE product). The
+  ancient tech ladder (**BL-296**) and the politics stub then *refine* this spine rather than
+  replace it — which is the whole reason a second unlock system was rejected. Cut by **Sprint 17**;
+  done-definition owed at the cut, per NR-103.
 - **Still live from the old band, arc-agnostic:** v0.1.5's remainder (BL-325 unit supply decay),
   v0.1.6 (politics stub), v0.1.7 (generation visibility — generation is shared by both arcs),
   v0.1.13's infra tail (BL-107 save format and friends), and the v0.1.2 UI leftovers.
