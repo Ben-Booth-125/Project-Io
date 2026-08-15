@@ -240,9 +240,9 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** The idled asset now reads profitable again — prices recovered or inputs cheapened — so resuming captures margin with zero capex. The AI's own dial_resume fires on exactly this signal.
 
-### `gameplay.set_recipe` — The 'Production method' combo on the Selection band's building layout; the same combo also appears as 'Production Methods' in the Building panel's Buildings-tab inline detail.
+### `gameplay.set_recipe` — The Method comparison section on the Selection panel's building Facts column (BL-431, `draw_production_method_section` — Compare toggle, each alternate's basket/wage/rate plus a Switch button); the same seam also drives the 'Production Methods' combo in the Building panel's Buildings-tab inline detail.
 
-**Press.** Select the owned building, open the production-method combo, click a recipe row (each row carries a resource pip for its primary output).
+**Press.** Select the owned building, press Compare, then Switch on the desired alternate row (Selection panel); or open the production-method combo and click a recipe row (Buildings-tab detail — each row carries a resource pip for its primary output).
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -256,7 +256,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 - Construction is complete — the UI hides all controls while ticks_remaining > 0.
 - The building produces output (infrastructure has no recipe section at all).
 
-**Expected output.** An immediate component write — no queue, no cost. From the next economy tick the building consumes the new recipe's inputs and produces its outputs; its profit readout, its input demand on the local market, and what it contributes to the pool all change with it. Re-selecting the recipe already active is a no-op (rejected_state at the command seam).
+**Expected output.** On success, an immediate component write gated by economy.recipe_switch (BL-430): a one-off credit cost debited from the corp and a cooldown before the SAME building may switch again through this seam (both configurable, default free/instant). From the next economy tick the building consumes the new recipe's inputs and produces its outputs; its profit readout, its input demand on the local market, and what it contributes to the pool all change with it. Re-selecting the recipe already active, switching on cooldown, or switching without enough credit all reject (rejected_state / on_cooldown / insufficient_funds at the command seam) and change nothing.
 
 **Reason to select.** The first lever on a processor's profitability, free of capex: per-recipe margins genuinely diverge with local prices (steel can lose money on a tile where food rations clear well), so switching chases the better-clearing output with the plant already paid for. Every new processor defaults to the steel recipe, so this is typically the first press after building one.
 

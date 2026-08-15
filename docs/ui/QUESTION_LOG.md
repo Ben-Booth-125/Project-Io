@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**19 surfaces** — 3 settled, 16 awaiting Ben's wording.
+**22 surfaces** — 3 settled, 19 awaiting Ben's wording.
 
 ---
 
@@ -123,6 +123,30 @@ alphabetical order.
 **Because:** Identity is carried by emblem and colour across every canvas and ledger (BL-090). One place has to establish that vocabulary, or the marker colours are arbitrary everywhere else.
 
 *Demanded by BL-090, BL-091 · `src/ui/profile_panel.cpp` · id `profile_panel`*
+
+### Selection panel - Chain trace
+
+**Answers:** What do I need in order to make this?
+
+**Because:** BL-429 widened the roster past 20 buildings and BL-428 gave every good a real chain depth, but nothing on screen shows the chain itself - a player sees a locked building and has to reconstruct its input tree by trial and error. The trace walks recipe_registry's own recipe list recursively down to raws, the same data depth_of reads, so it can never disagree with the simulation the way a hand-rolled parallel graph could.
+
+*Demanded by BL-431, BL-428 · `src/ui/selection_panel.cpp` · id `selection_chain_trace`*
+
+### Selection panel - Depth readout
+
+**Answers:** How far down the graph have I actually got?
+
+**Because:** BL-428's chain depth gates a corp's next building on how deep its own economy reaches, but an invisible gate reads as a bug rather than a target. The readout names the corp's own reached depth against the graph's ceiling, and lists what the next depth would unlock and which inputs are still missing, turning the growth spine into something the player can aim at.
+
+*Demanded by BL-431, BL-428 · `src/ui/selection_panel.cpp` · id `selection_depth_readout`*
+
+### Selection panel - Production method selector
+
+**Answers:** Which way should this building make its output?
+
+**Because:** BL-430 gave processing facilities alternate recipes with different input baskets and switch cost/cooldown, but the only place that trade-off was legible was a plain-name dropdown on the management panel - a player choosing blind reaches for a wiki. Showing every alternate's basket, wage and rate side by side, with the switch cost named up front, puts the trade-off at the point of choice rather than after it, the way the Build door shows a credit total before placing.
+
+*Demanded by BL-431, BL-430 · `src/ui/selection_panel.cpp` · id `selection_method_selector`*
 
 ### Selection element
 

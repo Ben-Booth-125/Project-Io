@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*6 entries — 5 open, 1 resolved.*
+*9 entries — 8 open, 1 resolved.*
 
 ---
 
@@ -80,6 +80,49 @@ cmake -B build's SDL3/sol2/ImGui FetchContent steps all pull from codeload.githu
 > **Recommendation:** At the next session with a real GUI build: open the Build door on an ancient-band tile (all 14 shapes appear across extraction/processing rows), the Buildings tab identity plate, and the Planetary canvas marker for a built ancient building. Check each shape reads at its actual on-screen size, not just at a zoomed mental model of the coordinates. Fix proportions on sight — nothing here is expected to be exactly right first try.
 
 *Files: `src/ui/icons.cpp`, `src/ui/icons.hpp`*
+
+### NR-242 — BL-430: AI recipe-switching pays no attention to the new switch cost/cooldown at scoring time
+*decision taken on your behalf · raised 2026-08-15 · from BL-430 (alternate production methods) implementation session.*
+
+corp_ai.cpp's dial_recipe margin-chase (run_corp_strategic_step) scores a recipe switch purely on projected margin gain; it does not subtract economy.recipe_switch's switch_cost, and does not check the target building's recipe_switch_cooldown before proposing a candidate. The decision taken: do NOT build cost/cooldown-aware AI scoring in this pass. The seam itself (corp_command's set_recipe verb, through try_switch_recipe in economy_system.cpp) still enforces both at apply time -- a candidate that would be rejected on cooldown or insufficient funds is simply refused, mutating nothing, exactly as the seam already handles every other reason a corp_ai candidate can fail. So the AI is not exploitable and nothing is unsafe; it just occasionally proposes (and loses a decision slot to) a switch that will bounce.
+
+**Why it matters.** Scoped explicitly per BL-430 design ruling �-- widening corp_ai.cpp scoring to price in the switch cost/cooldown is real new planner scope (a projected-gain-minus-cost comparison, plus a cooldown pre-filter), not a small follow-on to this item. Left as a stated call rather than a silent gap.
+
+- A) Leave as-is: the seam-level gate is the safety property that matters; a slightly wasteful candidate is cheap.
+- B) File a small follow-on backlog item scoped to pricing dial_recipe candidates against switch_cost and pre-filtering on recipe_switch_cooldown > 0.
+
+> **Recommendation:** B, next time corp_ai.cpp is touched for another dial -- cheap once someone is already in that function, not worth its own session.
+
+*Files: `src/world/corp_ai.cpp`, `src/world/economy_system.cpp`*
+
+### NR-243 — BL-430 no-dominance guard finds four REAL dominated recipe pairs in the shipped roster
+*observation · raised 2026-08-15 · from tools/verify/recipe_switch_harness.cpp R1, run against the real scripts/recipes.lua while landing BL-430.*
+
+The guard groups recipes by (primary output, era band) -- the set genuinely interchangeable as 'methods' on the same processing_facility per recipe_registry.hpp's browse path -- and checks that no pair beats another on BOTH input-basket cost (reference world_gen.lua prices) AND chain-depth of its deepest input. Four pairs fail cleanly: steel_from_iron_nickel dominates steel (cost 2.0 vs 3.0, same depth 0); propellant_atmospheric dominates propellant_electrolysis (cost 2.0 vs 4.0, same depth 1); peat_charcoal dominates charcoal/Charcoal Burner (cost 2.4 vs 4.5, same depth 0); glass/Glassworks dominates trade_goods/Potter&Weaver (cost 2.0 vs 3.9, same depth 0). All four pairs predate BL-430 -- they came from BL-340/BL-429/BL-433 as 'more than one raw reaches this good', and BL-429's own recipes.lua comments on the charcoal and trade_goods pairs explicitly say 'not a tuned alternate method'. BL-430 did not author or retune any of them.
+
+**Why it matters.** Authorial intent aside, a rational player on the SAME processing_facility building always prefers the cheaper, equal-depth route -- so today Charcoal Burner, Potter&Weaver, steel's coal-fired route (once iron-nickel is available) and propellant_electrolysis are dead content once their dominant sibling is reachable. That is exactly the shape BL-430's ruling asked the guard to catch, even though the guard was written for BL-430's OWN future alternates, not as a retroactive audit of the existing roster. Left failing rather than tuned silently -- these are real balance numbers, not a defect in the check.
+
+- A) Leave as-is: log the finding, do not touch recipes.lua magnitudes on this pass -- BL-430 scope is the mechanism, not a balance retune.
+- B) Retune one input quantity per pair (e.g. raise peat_charcoal input from 2.0 to something depth-neutral but costlier) in a small follow-on, or add a second differentiating axis (e.g. workforce/throughput) that the current recipe-level model does not carry.
+- C) Reclassify: some of these ARE meant as strict tier upgrades (steel_from_iron_nickel over steel, once nickel deposits are scarcer/rarer than iron) rather than side-grade alternates, in which case the guard should exclude cross-tier pairs -- needs Ben's call on which axis (terrain/resource rarity) distinguishes a tier upgrade from a real alternate.
+
+> **Recommendation:** C first (a five-minute design call unblocks whether this is even the right guard shape), then B if genuine alternates remain dominated.
+
+*Files: `tools/verify/recipe_switch_harness.cpp`, `scripts/recipes.lua`*
+
+### NR-244 — BL-431 production method/chain/depth UI has no executable check yet — visual read owed live
+*decision taken on your behalf · raised 2026-08-15 · from BL-431 delivery session — sub-agent had no display access, so the C++ was built and verified by compile only.*
+
+Three new Selection-panel surfaces landed (src/ui/selection_panel.cpp: draw_production_method_section, draw_chain_trace_section/draw_chain_trace, draw_depth_readout, plus the ui_state toggles selection_method_open/selection_chain_open/selection_chain_target/selection_depth_open). The GUI target (ProjectIo.exe) built clean with no new warnings from selection_panel.cpp. A requirement group was filed (req/requirements.json, brief production-method-chain-ui, 3 rows, status active) but no scripts/verify/*.lua or tools/verify/*.cpp was authored to back it — the sub-agent had no way to run either kind of check in its context.
+
+**Why it matters.** The three rows are exactly the kind of thing Rule 0b and the standing verifier skills exist for: R1 (method selector layout doesn't push the profitability/workforce controls off screen) needs verifier-visual against a live capture; R2 (chain trace never disagrees with depth_of) and R3 (corp_reached_depth <= max_depth()) are both cheap headless assertions over recipe_registry, straightforward for verifier-headless. Landing the UI without landing its own check leaves BL-431 the one item in the recent BL-428/429/430/431 cluster without an automated guard.
+
+- A) Open the live app (per the standing 'open the app after visual questions' practice), eyeball the Method/Chain/Depth sections on a stacked ancient-band tile, then author scripts/verify/selection_method_chain.lua + a small tools/verify/chain_trace_agreement.cpp and flip both requirement rows to complete.
+- B) Accept the compile-only verification for this session and file the two harnesses as their own small backlog items instead of blocking on them now.
+
+> **Recommendation:** A — the surfaces are dense (three toggles stacked in an already-tight Facts column) and are exactly the case Rule 0b calls out as needing real numbers, not a guess.
+
+*Files: `src/ui/selection_panel.cpp`, `docs/development/req/requirements.json`, `docs/ui/SELECTION.md`*
 
 ---
 

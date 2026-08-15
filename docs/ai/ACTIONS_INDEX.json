@@ -47,7 +47,7 @@
   ],
   [
    "gameplay.set_recipe",
-   "The 'Production method' combo on the Selection band's building layout; the same combo also appears as 'Production Methods' in the Building panel's Buildings-tab inline detail."
+   "The Method comparison section on the Selection panel's building Facts column (BL-431, `draw_production_method_section` — Compare toggle, each alternate's basket/wage/rate plus a Switch button); the same seam also drives the 'Production Methods' combo in the Building panel's Buildings-tab inline detail."
   ],
   [
    "gameplay.set_workforce",

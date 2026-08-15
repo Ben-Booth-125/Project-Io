@@ -294,6 +294,45 @@
     "src/ui/decision_feed.cpp"
    ],
    "status": "drafted"
+  },
+  "selection_method_selector": {
+   "surface": "Selection panel - Production method selector",
+   "answers": "Which way should this building make its output?",
+   "because": "BL-430 gave processing facilities alternate recipes with different input baskets and switch cost/cooldown, but the only place that trade-off was legible was a plain-name dropdown on the management panel - a player choosing blind reaches for a wiki. Showing every alternate's basket, wage and rate side by side, with the switch cost named up front, puts the trade-off at the point of choice rather than after it, the way the Build door shows a credit total before placing.",
+   "backlog_item": [
+    "BL-431",
+    "BL-430"
+   ],
+   "files": [
+    "src/ui/selection_panel.cpp"
+   ],
+   "status": "drafted"
+  },
+  "selection_chain_trace": {
+   "surface": "Selection panel - Chain trace",
+   "answers": "What do I need in order to make this?",
+   "because": "BL-429 widened the roster past 20 buildings and BL-428 gave every good a real chain depth, but nothing on screen shows the chain itself - a player sees a locked building and has to reconstruct its input tree by trial and error. The trace walks recipe_registry's own recipe list recursively down to raws, the same data depth_of reads, so it can never disagree with the simulation the way a hand-rolled parallel graph could.",
+   "backlog_item": [
+    "BL-431",
+    "BL-428"
+   ],
+   "files": [
+    "src/ui/selection_panel.cpp"
+   ],
+   "status": "drafted"
+  },
+  "selection_depth_readout": {
+   "surface": "Selection panel - Depth readout",
+   "answers": "How far down the graph have I actually got?",
+   "because": "BL-428's chain depth gates a corp's next building on how deep its own economy reaches, but an invisible gate reads as a bug rather than a target. The readout names the corp's own reached depth against the graph's ceiling, and lists what the next depth would unlock and which inputs are still missing, turning the growth spine into something the player can aim at.",
+   "backlog_item": [
+    "BL-431",
+    "BL-428"
+   ],
+   "files": [
+    "src/ui/selection_panel.cpp"
+   ],
+   "status": "drafted"
   }
  }
 }

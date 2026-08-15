@@ -585,10 +585,294 @@ void draw_selection_action(const world& w, const recipe_registry& reg,
     }
 }
 
+// --- BL-431: production method selector, chain trace, depth readout --------
+//
+// Three toggles appended below the BL-074 profitability readout, each guarded
+// so it renders nothing outside its own condition — a stale ui_state flag from
+// a previously-inspected building is therefore inert on any other selection,
+// matching the ledger-persistence pattern the rest of this file already uses.
+//
+// MEASURED BEFORE ADDING (Rule 0b): draw_building_profit prints one title line
+// ("Profitability (est. / qtr)") + two paired value rows + one Net row = 4
+// text lines at ImGui::GetTextLineHeightWithSpacing() (~19px at the default
+// font), so ~76px before this section starts. Each toggle below adds exactly
+// one header line (~19px) when collapsed; only the currently-open one grows
+// past that, and only one of the three is expected open at a time in practice.
+
+// The chain-trace walk reads recipe_registry's OWN graph — the same data
+// BL-428's depth_of/rebuild_depth reads — rather than a parallel structure, so
+// it cannot disagree with the simulation. For a non-raw resource it picks the
+// era-allowed recipe that WOULD have set depth_of(r) under the MIN-across-
+// recipes rule the registry itself uses (rebuild_depth's comment), ties broken
+// by authored order — the same tie-break the registry's fixed point uses.
+void draw_chain_trace(ImDrawList* dl, const recipe_registry& reg, resource_type r, int indent)
+{
+    const float pipr = ImGui::GetFontSize() * 0.38f;
+    const auto  pad  = [&] {
+        if (indent > 0)
+            ImGui::Indent(pipr * 2.2f * indent);
+    };
+    const auto  unpad = [&] {
+        if (indent > 0)
+            ImGui::Unindent(pipr * 2.2f * indent);
+    };
+
+    pad();
+    const ImVec2 gp = ImGui::GetCursorScreenPos();
+    const float  rh = ImGui::GetTextLineHeight();
+    icons::resource(dl, {gp.x + pipr, gp.y + rh * 0.5f}, pipr, r);
+    ImGui::Dummy({pipr * 2.0f + 4.0f, rh});
+    ImGui::SameLine();
+
+    const int depth = reg.depth_of(r);
+    if (depth <= 0)
+    {
+        ImGui::TextDisabled("%s (raw)", resource_name(r));
+        unpad();
+        return;
+    }
+
+    // Find the era-allowed recipe producing r whose deepest input is minimal —
+    // the recipe rebuild_depth would have credited for this good's depth.
+    const recipe* best      = nullptr;
+    int           best_cost = -1;
+    for (int i = 0; i < reg.recipe_count(building_type::processing_facility); ++i)
+    {
+        const recipe& ri = reg.recipe_at(building_type::processing_facility, i);
+        if (ri.outputs[static_cast<std::size_t>(r)] <= 0.0f)
+            continue;
+        int deepest = 0;
+        for (std::size_t in = 0; in < resource_count; ++in)
+            if (ri.inputs[in] > 0.0f)
+                deepest = std::max(deepest, reg.depth_of(static_cast<resource_type>(in)));
+        if (best == nullptr || deepest < best_cost)
+        {
+            best      = &ri;
+            best_cost = deepest;
+        }
+    }
+
+    if (best == nullptr)
+    {
+        ImGui::TextDisabled("%s — unreachable", resource_name(r));
+        unpad();
+        return;
+    }
+
+    ImGui::Text("%s <- %s", resource_name(r), best->display_name.c_str());
+    for (std::size_t in = 0; in < resource_count; ++in)
+        if (best->inputs[in] > 0.0f)
+            draw_chain_trace(dl, reg, static_cast<resource_type>(in), indent + 1);
+    unpad();
+}
+
+// "How far down the graph have I actually got?" — the corp's REACHED depth,
+// read off what it has actually built (completed extraction sites are raws at
+// depth 0; completed processing facilities credit their active recipe's
+// primary output depth), against max_depth() — the graph's ceiling under the
+// current era. Distinguishes "the corp's progress" from "the graph's shape",
+// the same axis corp_ai.cpp's dial_recipe margin-chase never needed to name
+// because it always acts building-by-building rather than asking "how deep am
+// I" in aggregate — this readout is the first caller of that question.
+int corp_reached_depth(const world& w, const recipe_registry& reg, entity_id corp)
+{
+    int reached = -1;
+    for (const auto& [id, b] : w.buildings)
+    {
+        if (b.ticks_remaining > 0 || owner_corp_of(w, id) != corp)
+            continue;
+        int cand = -1;
+        if (b.type == building_type::extraction_site)
+            cand = 0;
+        else if (b.type == building_type::processing_facility)
+            if (const recipe* r = reg.get_recipe(b.recipe))
+                cand = reg.depth_of(primary_output_resource(*r));
+        reached = std::max(reached, cand);
+    }
+    return reached;
+}
+
+void draw_depth_readout(const world& w, const recipe_registry& reg, ui_state& ui, entity_id corp)
+{
+    const int reached = corp_reached_depth(w, reg, corp);
+    const int ceiling = reg.max_depth();
+    char      verdict[32];
+    if (reached < 0)
+        std::snprintf(verdict, sizeof(verdict), "- / %d", ceiling);
+    else
+        std::snprintf(verdict, sizeof(verdict), "%d / %d", reached, ceiling);
+
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Depth reached");
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s", verdict);
+    if (ImGui::SmallButton(ui.selection_depth_open ? "Hide##depth" : "What's next?##depth"))
+        ui.selection_depth_open = !ui.selection_depth_open; // Toggle rule
+
+    if (!ui.selection_depth_open)
+        return;
+
+    if (reached >= ceiling)
+    {
+        ImGui::TextDisabled("At the graph's current ceiling.");
+        return;
+    }
+
+    // What the next depth would unlock: every good sitting exactly one level
+    // deeper than the corp has reached, and (per-good) which of its recipe's
+    // inputs the corp has NOT yet reached — the missing piece, not just the name.
+    const int target = (reached < 0) ? 0 : reached + 1;
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        if (reg.depth_of(static_cast<resource_type>(r)) != target)
+            continue;
+        ImGui::BulletText("%s", resource_name(static_cast<resource_type>(r)));
+        for (int i = 0; i < reg.recipe_count(building_type::processing_facility); ++i)
+        {
+            const recipe& ri = reg.recipe_at(building_type::processing_facility, i);
+            if (ri.outputs[r] <= 0.0f)
+                continue;
+            for (std::size_t in = 0; in < resource_count; ++in)
+            {
+                if (ri.inputs[in] <= 0.0f)
+                    continue;
+                const int in_depth = reg.depth_of(static_cast<resource_type>(in));
+                if (in_depth < 0 || in_depth >= target)
+                {
+                    ImGui::Indent();
+                    ImGui::TextDisabled("needs %s", resource_name(static_cast<resource_type>(in)));
+                    ImGui::Unindent();
+                }
+            }
+            break; // one recipe's worth of "what's missing" is enough to act on
+        }
+    }
+}
+
+// "Which way should this building make its output?" — every era-allowed
+// recipe for this building side by side with its input basket, so the BL-430
+// switch trade-off is legible BEFORE committing, the way the Build door shows
+// a credit total before placing. Calls try_switch_recipe (economy_system.hpp)
+// exactly as construction_panel.cpp's management dropdown already does —
+// never assigns b.recipe / b.active_recipe_index directly, so a refused switch
+// (cooldown / funds) leaves the building's state untouched.
+void draw_production_method_section(world& w, const recipe_registry& reg, ui_state& ui, entity_id id)
+{
+    const auto bit = w.buildings.find(id);
+    if (bit == w.buildings.end())
+        return;
+    building_component& b = bit->second;
+    if (b.type != building_type::processing_facility)
+        return;
+    const int n = reg.recipe_count(b.type);
+    if (n <= 1)
+        return; // nothing to choose between
+
+    const recipe* cur = reg.get_recipe(b.recipe);
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Method");
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s", cur ? cur->display_name.c_str() : "-");
+    if (ImGui::SmallButton(ui.selection_method_open ? "Hide##method" : "Compare##method"))
+        ui.selection_method_open = !ui.selection_method_open; // Toggle rule
+
+    if (!ui.selection_method_open)
+        return;
+
+    const building_economics& econ = reg.economics(b.type);
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    for (int i = 0; i < n; ++i)
+    {
+        const recipe& ri  = reg.recipe_at(b.type, i);
+        const bool    active = (cur != nullptr && ri.name == cur->name);
+        ImGui::PushID(i);
+
+        const ImVec2 gp = ImGui::GetCursorScreenPos();
+        const float  rh = ImGui::GetFrameHeight();
+        const float  pipr = ImGui::GetFontSize() * 0.4f;
+        icons::resource(dl, {gp.x + pipr, gp.y + rh * 0.5f}, pipr, primary_output_resource(ri));
+        ImGui::Dummy({pipr * 2.0f + 4.0f, rh});
+        ImGui::SameLine();
+        ImGui::TextColored(active ? ImGui::ColorConvertU32ToFloat4(palette::selection)
+                                   : ImGui::GetStyle().Colors[ImGuiCol_Text],
+                           "%s%s", ri.display_name.c_str(), active ? " (active)" : "");
+
+        // Input basket — the trade-off itself.
+        std::string basket;
+        for (std::size_t in = 0; in < resource_count; ++in)
+            if (ri.inputs[in] > 0.0f)
+            {
+                if (!basket.empty()) basket += ", ";
+                char item[64];
+                std::snprintf(item, sizeof(item), "%.1f %s", ri.inputs[in], resource_name(static_cast<resource_type>(in)));
+                basket += item;
+            }
+        ImGui::TextDisabled("  in: %s", basket.empty() ? "-" : basket.c_str());
+        ImGui::TextDisabled("  wage %.1f/tick  rate %.1f/tick", econ.base_wage, econ.base_rate);
+
+        if (!active)
+        {
+            ImGui::SameLine();
+            const bool on_cooldown = b.recipe_switch_cooldown > 0;
+            ImGui::BeginDisabled(on_cooldown);
+            if (ImGui::SmallButton("Switch"))
+                try_switch_recipe(w, reg, w.player_entity, b, reg.recipe_id(ri.name));
+            ImGui::EndDisabled();
+            if (on_cooldown)
+                ImGui::TextDisabled("  locked %d more tick%s", b.recipe_switch_cooldown,
+                                    b.recipe_switch_cooldown == 1 ? "" : "s");
+            else if (reg.recipe_switch().switch_cost > 0.0f)
+                ImGui::TextDisabled("  switch cost %.0f cr", reg.recipe_switch().switch_cost);
+        }
+        ImGui::PopID();
+        ImGui::Separator();
+    }
+}
+
+// "What do I need to make this?" — a header line naming the building's own
+// output plus a toggle that opens draw_chain_trace rooted there. Kept separate
+// from the method section (the two answer different questions, BL-260) even
+// though both live on the same building card.
+void draw_chain_trace_section(const world& w, const recipe_registry& reg, ui_state& ui, entity_id id)
+{
+    const auto bit = w.buildings.find(id);
+    if (bit == w.buildings.end())
+        return;
+    const building_component& b = bit->second;
+    resource_type root;
+    if (b.type == building_type::extraction_site)
+        root = b.target_resource;
+    else if (b.type == building_type::processing_facility)
+    {
+        const recipe* r = reg.get_recipe(b.recipe);
+        if (r == nullptr)
+            return;
+        root = primary_output_resource(*r);
+    }
+    else
+        return;
+
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Chain");
+    ImGui::SameLine();
+    if (ImGui::SmallButton(ui.selection_chain_open && ui.selection_chain_target == root
+                                ? "Hide##chain" : "What's it need?##chain"))
+    {
+        // Toggle rule: re-pressing while THIS root is already open closes it;
+        // pressing on a different root (a different building selected) opens fresh.
+        if (ui.selection_chain_open && ui.selection_chain_target == root)
+            ui.selection_chain_open = false;
+        else
+        {
+            ui.selection_chain_open   = true;
+            ui.selection_chain_target = root;
+        }
+    }
+    if (ui.selection_chain_open && ui.selection_chain_target == root)
+        draw_chain_trace(ImGui::GetWindowDrawList(), reg, root, 0);
+}
+
 // The facts: only what informs the action (BL-093) — slim and muted. Everything
 // encyclopedic (orbit, composition, deposits, prices) lives in the ledgers, one
 // 'go to' away.
-void draw_selection_facts(const world& w, const recipe_registry& reg,
+void draw_selection_facts(world& w, const recipe_registry& reg,
                           const economy_report& report, ui_state& ui, selection_kind kind)
 {
     const entity_id sel = ui.selected_entity;
@@ -600,7 +884,17 @@ void draw_selection_facts(const world& w, const recipe_registry& reg,
             break;
         case selection_kind::building:
             if (is_player_owned(w, sel))
+            {
                 draw_building_profit(w, reg, report, sel);   // BL-074: is it profitable?
+                ImGui::Separator();
+                draw_production_method_section(w, reg, ui, sel);  // BL-431: which way?
+                draw_chain_trace_section(w, reg, ui, sel);        // BL-431: what does it need?
+                if (const auto bit = w.buildings.find(sel); bit != w.buildings.end())
+                {
+                    ImGui::Separator();
+                    draw_depth_readout(w, reg, ui, owner_corp_of(w, sel)); // BL-431: how far have I got?
+                }
+            }
             else
                 draw_rival_building_summary(w, sel);         // owner + private rows
             break;

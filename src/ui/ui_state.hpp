@@ -203,6 +203,19 @@ struct ui_state
     /// value. Held as int so "all" has a home the enum does not have to invent.
     int decision_feed_reason = -1;
 
+    // --- BL-431 Selection-panel production surfaces ---
+    // Three toggles, each closed by default (ledger policy above) and each
+    // following the Toggle rule: re-pressing the currently-open one closes it
+    // rather than leaving it stuck open. Keyed to selected_entity implicitly —
+    // selecting a new entity does not clear these, matching the existing ledger
+    // pattern (a player who wants Method open on every building they inspect
+    // keeps it open), but the sections render nothing for a non-processing_facility
+    // selection so a stale "open" flag is inert there.
+    bool selection_method_open = false; ///< "Which way should this building make its output?" (method selector).
+    bool selection_chain_open  = false; ///< "What do I need to make this?" (chain trace), rooted at selection_chain_target.
+    resource_type selection_chain_target = resource_type::iron_ore; ///< The good the chain trace is rooted at; set when the trace is opened from a pip.
+    bool selection_depth_open  = false; ///< "How far down the graph have I actually got?" (depth readout).
+
     /// Spectator mode (BL-409): no human seat. Presentation-side flag only —
     /// `world/*` never reads it; the sim's copy travels as corp_ai_params
     /// .spectating through run_economy_step's defaulted argument.

@@ -243,6 +243,38 @@ then **Net** (coloured positive/negative/neutral by sign). Figures come from
 where attributable, estimated where the pooled market resists exact per-building attribution.
 Before an economy tick has run, the section shows "Run an economy tick to estimate." instead.
 
+### The building element's method, chain and depth (BL-431)
+
+Below the profitability readout, a player-owned **processing_facility** building's Facts column
+carries three more toggles (all closed by default, all following the Toggle rule — re-pressing the
+open one closes it):
+
+- **Method** (`draw_production_method_section`) — "Which way should this building make its
+  output?" Shown only when the building has more than one era-allowed recipe. Pressing **Compare**
+  lists every alternate side by side: its primary-output pip, its input basket, the building type's
+  wage/rate, and — for every recipe but the active one — a **Switch** button. Switch cost/cooldown
+  (`recipe_switch_params`, BL-430) is named inline rather than silently blocking the press. Calls
+  `try_switch_recipe` (`economy_system.hpp`) exactly as `construction_panel.cpp`'s management
+  dropdown already does; it never assigns `building_component::recipe` directly, so a refused
+  switch leaves the building untouched.
+- **Chain** (`draw_chain_trace_section` / `draw_chain_trace`) — "What do I need to make this?"
+  Rooted at the building's own primary output (extraction target, or the active recipe's output),
+  walking `recipe_registry`'s own recipe list recursively down to raws — the SAME data BL-428's
+  `depth_of` reads, so the trace cannot disagree with the simulation. At each non-raw good it
+  follows the era-allowed recipe that minimises the deepest input, mirroring the registry's own
+  min-across-recipes rule.
+- **Depth readout** (`draw_depth_readout`) — "How far down the graph have I actually got?" Shows
+  the owning corp's **reached** depth (the deepest primary output among its own *completed*
+  extraction sites and processing facilities, `corp_reached_depth`) against `recipe_registry::
+  max_depth()`, the graph's ceiling under the current era. "What's next?" lists every good sitting
+  exactly one depth past the corp's reached depth, and — per good — which of its recipe's inputs
+  the corp has not yet reached.
+
+Measured before adding (Rule 0b): the profitability section above prints 4 text lines (title + two
+paired rows + Net), ~76px at the default font's `GetTextLineHeightWithSpacing()` (~19px/line).
+Each of the three new toggles adds one header line collapsed; only the currently-open one grows
+past that.
+
 ### The body element's action is the survey front door (then go-to-surface)
 
 An unsurveyed **Body**'s hero action is its **Survey section** (survey system, BL-067),
