@@ -300,6 +300,54 @@ struct seed_golden
     int       dial_max;             ///< Thrash ceiling: total non-build, non-survey commands (dials).
 };
 
+// --- Band derivation (BL-416, from NR-169's recommendation) -----------------
+// A bless records the OBSERVED run; every band is COMPUTED from it by the named
+// slack constants below, so a band is something anyone can recompute from the
+// numbers beside it rather than a hand-set magic value. Changing a slack is a
+// policy change; changing an observed value is a re-bless — the two no longer
+// blur into one edit.
+struct seed_observed
+{
+    uint32_t seed;
+    float final_;   ///< net-worth curve, last sample
+    float min_;     ///< net-worth curve, lowest sample
+    int   solvency; ///< ticks any AI corp sampled below zero
+    float survival; ///< fraction of AI corps still active at the end
+    int   build;    ///< total `build` commands
+    int   dial;     ///< total dial commands (non-build/survey/hire_unit)
+};
+
+// The multiplicative net-worth width this block has always used (~[0.58, 1.39]);
+// additive slack for the count metrics. Tight enough to catch a real skill
+// regression, wide enough to absorb honest jitter.
+constexpr float k_nw_lo_mult      = 0.58f;
+constexpr float k_nw_hi_mult      = 1.39f;
+constexpr int   k_solvency_slack  = 6;
+constexpr float k_survival_slack  = 0.16f;  ///< one corp of seven, rounded up
+constexpr int   k_build_slack     = 6;
+constexpr int   k_dial_slack      = 50;
+
+inline seed_golden derive(const seed_observed& o)
+{
+    return {
+        o.seed,
+        { o.final_ * k_nw_lo_mult, o.final_ * k_nw_hi_mult },
+        { o.min_   * k_nw_lo_mult, o.min_   * k_nw_hi_mult },
+        o.solvency + k_solvency_slack,
+        { o.survival - k_survival_slack > 0.0f ? o.survival - k_survival_slack : 0.0f, 1.00f },
+        o.build + k_build_slack,
+        o.dial  + k_dial_slack,
+    };
+}
+
+inline std::vector<seed_golden> derive_all(const std::vector<seed_observed>& obs)
+{
+    std::vector<seed_golden> out;
+    out.reserve(obs.size());
+    for (const seed_observed& o : obs) out.push_back(derive(o));
+    return out;
+}
+
 // ---------------------------------------------------------------------------
 // FROZEN BENCHMARK SEED-SET (BL-204) — five seeds spanning the generator's
 // body/terrain/market diversity via world_params.seed (0 reproduces the legacy
@@ -434,13 +482,37 @@ float output. Bless a set from a fresh Clang run and add its own block."
 // observed value. Build ceilings are raised 5 -> 10 because a 3x map offers
 // proportionally more legal sites and the old ceiling now sits exactly on the
 // observed value for seed 0, which is a false-positive waiting to happen.
-const std::vector<seed_golden> goldens = {
-    { 0, { 648000.0f, 1554000.0f}, { 35000.0f,  85000.0f}, 12, {0.70f, 1.00f}, 12, 260 },
-    { 1, { 494000.0f, 1183000.0f}, { 45000.0f, 108000.0f}, 10, {0.70f, 1.00f}, 12, 290 },
-    { 2, { 358000.0f,  858000.0f}, { 31000.0f,  74000.0f}, 10, {0.60f, 1.00f}, 12, 260 },
-    { 3, { 683000.0f, 1636000.0f}, { 58000.0f, 139000.0f}, 12, {0.70f, 1.00f}, 12, 260 },
-    { 4, { 425000.0f, 1017000.0f}, { 38000.0f,  92000.0f}, 12, {0.60f, 1.00f}, 12, 310 },
+//
+// --- RE-BLESSED 2026-08-14 (BL-416), from a fresh MSVC run, identical across
+// two consecutive invocations. THE ECONOMY CHANGED UNDER THE BANDS, exactly as
+// BL-386's design predicted: the sell-order floor became a reservation price
+// and trade_floor_multiple fell 1.0 -> 0.25, so a rival's standing orders now
+// earn the resolved market price instead of 4x it on every glutted good. Every
+// net-worth figure fell (seed 0: 1.12M -> 801k; seed 2: 617k -> 158k) and the
+// dial totals fell with them (the scorer stops re-dialling workforce it can no
+// longer fund) — the drop IS the fix working. Solvency and survival stayed in
+// their old bands on every seed; rivals still place 5-7 sell orders per seed,
+// so the reservation dial trades rather than hoarding.
+//
+// This bless also switches the block to the DERIVED form (BL-416/NR-169): the
+// table below is the observed run, verbatim; the bands are computed by the
+// slack constants beside `derive()` above. To re-bless: run twice, confirm
+// identical, replace these seven numbers per seed, done.
+// --- RE-BLESSED 2026-08-15 (BL-424): the homeworld grid fell to 70% area
+// (312x145 -> 261x121, Ben's call), so every benchmark seed generates a smaller
+// world — fewer deposits, fewer siting choices, tighter margins. Identical
+// across two consecutive runs before blessing. First use of the derived form's
+// intended workflow: seven numbers per seed replaced, nothing else touched.
+const std::vector<seed_observed> observed = {
+    { 0, 181559.0f, 27753.7f, 10, 0.86f, 3, 33 },
+    { 1, 110288.8f, 26750.3f,  0, 0.86f, 5, 50 },
+    { 2, 173754.4f, 18886.7f,  5, 1.00f, 5, 43 },
+    { 3, 621949.7f, 60971.8f,  0, 0.86f, 6, 62 },
+    { 4, 205193.4f, 30406.2f,  7, 0.57f, 2, 42 },
 };
+const std::vector<seed_golden> goldens = derive_all(observed);
+const char* const k_bands_blessed =
+    "2026-08-15 (MSVC, post-BL-424 70%-area map)";
 #elif defined(__GNUC__)
 // --- Linux / GCC -O2 — RE-BLESSED 2026-08-09 (BL-285 task 1, at the v0.1.8 cut).
 // Observed on that run:
@@ -572,6 +644,16 @@ const std::vector<seed_golden> goldens = {
 // bind on observation. The net-worth-final bands below are left as re-centred
 // above rather than re-tightened again — every seed sits comfortably inside
 // them, and narrowing a band twice in one session is fitting to noise.
+// STALE AS OF 2026-08-14 (BL-386), DECLARED IN ADVANCE per this block's own
+// convention: the sell-order floor became a reservation price and
+// trade_floor_multiple fell 1.0 -> 0.25, which cut rival trading income ~4x on
+// glutted goods. Every net-worth band below WILL fail on the next GCC run, and
+// that red is stale bands, not a regression — the failure summary prints this
+// bless line so the two are distinguishable at a glance. Re-bless from the
+// canonical Linux build's own run (never from WSL numbers on the Windows box —
+// same compiler family, different libstdc++/version, different floats), and
+// prefer switching this block to the derived `seed_observed` form the MSVC
+// block now uses.
 const std::vector<seed_golden> goldens = {
     { 0, {638000.0f, 1327000.0f}, { 45000.0f, 105000.0f}, 20, {0.45f, 0.95f},  5,  52 },
     { 1, {512000.0f, 1063000.0f}, { 42000.0f, 100000.0f}, 10, {0.45f, 1.00f},  5,  55 },
@@ -579,6 +661,8 @@ const std::vector<seed_golden> goldens = {
     { 3, {481000.0f,  998000.0f}, { 34000.0f,  81000.0f}, 15, {0.45f, 0.95f},  5,  40 },
     { 4, {924000.0f, 1919000.0f}, { 73000.0f, 172000.0f},  8, {0.20f, 1.00f},  6,  69 },
 };
+const char* const k_bands_blessed =
+    "2026-08-09 (GCC — STALE since 2026-08-14/BL-386; re-bless from the Linux build)";
 #else
 #error "ai_skill_harness: no blessed golden band set for this toolchain (BL-252). \
 Bless one from a fresh run on this toolchain and add its own block — do not \
@@ -619,6 +703,10 @@ int main()
     // =========================================================================
     // R1-R4 — per-seed golden bands over the frozen benchmark set.
     // =========================================================================
+    // The bless line makes stale-red distinguishable from new-failure at a
+    // glance (BL-416): a red run whose bands predate the last deliberate
+    // economy/AI change is a re-bless owed, not a regression found.
+    std::printf("\ngolden bands blessed: %s\n", k_bands_blessed);
     for (const seed_golden& g : goldens)
     {
         char hdr[64];
@@ -672,7 +760,8 @@ int main()
         check(dial_total <= g.dial_max, label);
     }
 
-    std::printf("\n%s (%d failure%s)\n", g_failures == 0 ? "ALL PASS" : "FAILURES",
-                g_failures, g_failures == 1 ? "" : "s");
+    std::printf("\n%s (%d failure%s)  [bands blessed: %s]\n",
+                g_failures == 0 ? "ALL PASS" : "FAILURES",
+                g_failures, g_failures == 1 ? "" : "s", k_bands_blessed);
     return g_failures == 0 ? 0 : 1;
 }

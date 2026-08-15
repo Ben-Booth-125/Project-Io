@@ -440,6 +440,18 @@ prices/aggregates; rival *buildings* but not their internals; its own routes and
 The AI reads through the same information asymmetry the player does; anything else is the fog
 cheat the calibration research warns against. Version the schema from day one.
 
+**The session actor (BL-387/BL-397, 2026-08-14).** `--serve` turned this seam into an external
+input surface, and validation written for the trusted in-process caller did not transfer:
+`cmd.corp` and BLACKBOARD's `corp=` were caller-supplied, so an agent could command any rival and
+read any rival's private view. Authority now lives at the **protocol layer**, not in
+`apply_corp_command` (the in-process scorer legitimately commands every rival and must keep
+doing so): a serve session has one **actor** (`--as <corp>`, default the player corp), COMMAND
+refuses any other corp with `rejected_not_owner`, and BLACKBOARD serves only the actor's
+visibility-honest view. `--as any` is the explicit research opt-in (bot-vs-bot, the BL-279
+corpus) — permissive mode exists but must be asked for and is visible in the invocation. The
+general rule this instance produced lives in the standing rules: **an AI-facing seam is an
+untrusted input boundary; validate the value that lands in the field, at the boundary.**
+
 ---
 
 ## 6a. The action dictionary (BL-270, 2026-08-02) — the word interface's third leg

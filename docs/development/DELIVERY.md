@@ -203,6 +203,13 @@ large); for a `design-owed` item, **Design** is the implied first step.
    `backlog_lint.js` fails on a pointer with no record behind it. The first run took `backlog.json`
    from 1.22 MB to 710 KB.
 
+   The requirements ledger sheds weight the same way (added 2026-08-14, BL-421): run
+   **`node tools/session/archive_requirements.js`** to move resolved groups' `rows` + `resolution`
+   into `docs/development/archive/requirements-<quarter>.json`, leaving the index fields plus an
+   `archived` pointer. `requirements_query.js` resolves archived groups transparently; amend a
+   landed group's rows/resolution **in the cold file**. The first run took `requirements.json`
+   from 556 KB to 124 KB.
+
    Three more close-out checks, all cheap, each catching a class of drift that used to pass:
    **`node tools/session/mirror_check.js`** re-renders every generated Markdown mirror and reports
    any that had drifted from its canonical JSON; **`node tools/session/devlog_index.js`**

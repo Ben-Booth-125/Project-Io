@@ -70,28 +70,62 @@ const VERBS = [
 // The ProjectIo --serve child process
 // ---------------------------------------------------------------------------
 
+// BL-387: the session actor. `--serve` itself refuses to act as a corp the
+// session is not, but this server closes the hole one layer earlier: a write
+// NEVER forwards a caller-supplied corp — whatever `corp` a tool call names,
+// the COMMAND line carries the pinned actor. `node server.js --as <id|any>`
+// forwards to the child; `--as any` (the research opt-in, for bot-vs-bot
+// corpus generation) restores caller-corp pass-through. With no `--as`, the
+// child defaults to the player corp and the actor is resolved from CORPS.
+const asIdx = process.argv.indexOf('--as');
+const AS_ARG = asIdx !== -1 && process.argv[asIdx + 1] ? process.argv[asIdx + 1] : null;
+
+let actorId = null; // lazily resolved when AS_ARG names no explicit actor
+
+/// The corp id every write is issued as, or null under `--as any` (caller
+/// corp passes through untouched).
+async function sessionActor() {
+  if (AS_ARG === 'any') return null;
+  if (AS_ARG !== null) return Number(AS_ARG);
+  if (actorId === null) {
+    const lines = await sendRequest('CORPS');
+    const corps = lines.filter((l) => l.startsWith('{')).map((l) => JSON.parse(l));
+    const p = corps.find((c) => c.is_player);
+    if (!p) throw new Error('no player corp on the seam to pin as the session actor');
+    actorId = p.id;
+  }
+  return actorId;
+}
+
 let child = null;
 let childRl = null;
 let pending = null; // {resolve, reject, lines: string[]} for the in-flight request
 
 function ensureChild() {
   if (child) return;
-  child = spawn(resolveExe(), ['--serve', '--ticks', '12'], { cwd: ROOT });
+  child = spawn(resolveExe(),
+                ['--serve', '--ticks', '12', ...(AS_ARG ? ['--as', AS_ARG] : [])],
+                { cwd: ROOT });
   childRl = readline.createInterface({ input: child.stdout });
   child.on('exit', () => { child = null; childRl = null; });
   childRl.on('line', (line) => {
     if (line.startsWith('[Lua]')) return; // world-build startup banner, not a response
     if (!pending) return;
-    if (line === 'END' || line.startsWith('OK ') || line.startsWith('RESULT ')
-        || line.startsWith('ERR ') || line === 'BYE') {
-      pending.lines.push(line);
-      pending.resolve(pending.lines);
+    pending.lines.push(line);
+    // Multi-line ops (BLACKBOARD / CORPS / BODIES) stream rows then END, and
+    // since BL-397 a refused BLACKBOARD is `ERR ... END` — so END alone is
+    // their terminator. Resolving on the ERR line (the old rule) would leave
+    // the trailing END to be read as the NEXT request's response. Every other
+    // op answers exactly one line.
+    if (pending.multi ? line === 'END' : true) {
+      const p = pending;
       pending = null;
-    } else {
-      pending.lines.push(line);
+      p.resolve(p.lines);
     }
   });
 }
+
+const MULTI_LINE_OPS = /^(BLACKBOARD|CORPS|BODIES)\b/;
 
 /// Send one request line to the --serve process; resolve with its response
 /// lines (the terminator line included).
@@ -99,7 +133,7 @@ function sendRequest(line) {
   ensureChild();
   return new Promise((resolve, reject) => {
     if (pending) { reject(new Error('a request is already in flight')); return; }
-    pending = { resolve, reject, lines: [] };
+    pending = { resolve, reject, lines: [], multi: MULTI_LINE_OPS.test(line) };
     child.stdin.write(line + '\n');
   });
 }
@@ -137,7 +171,7 @@ const TOOLS = [
     inputSchema: {
       type: 'object',
       properties: {
-        corp: { type: 'integer', description: 'Acting corporation entity id.' },
+        corp: { type: 'integer', description: 'Acting corporation entity id. Pinned to the session actor (BL-387): unless the server was started with --as any, this is overridden by the actor and cannot name another corp.' },
         verb: { type: 'string', enum: VERBS },
         subject: { type: 'integer', description: 'Building (demolish/set_recipe/set_workforce/idle/resume/set_workforce_auto), or body (survey / place_sell_order / request_quote) entity id.' },
         tile: { type: 'integer', description: 'Target tile entity id (build / place_road / hire_unit muster tile).' },
@@ -205,13 +239,21 @@ const TOOLS = [
 async function callTool(name, args) {
   if (name === 'get_blackboard') {
     const lines = await sendRequest(`BLACKBOARD ${kv({ corp: args.corp, ticks: args.ticks })}`);
+    // BL-397: the child refuses a non-actor read (`ERR ... END`) rather than
+    // serving rival state — surface that as an error, not an empty fact list.
+    const err = lines.find((l) => l.startsWith('ERR '));
+    if (err) throw new Error(`blackboard read refused: ${err.slice(4)}`);
     const facts = lines.filter((l) => l !== 'END').map((l) => JSON.parse(l));
     return { facts };
   }
   if (name === 'issue_command') {
     const verbIdx = VERBS.indexOf(args.verb);
     if (verbIdx === -1) throw new Error(`unknown verb '${args.verb}' — expected one of ${VERBS.join(', ')}`);
-    const lines = await sendRequest(`COMMAND ${kv({ ...args, verb: verbIdx })}`);
+    // BL-387: writes carry the pinned session actor, not the caller's corp.
+    const actor = await sessionActor();
+    const wire = { ...args, verb: verbIdx };
+    if (actor !== null) wire.corp = actor;
+    const lines = await sendRequest(`COMMAND ${kv(wire)}`);
     const resultLine = lines.find((l) => l.startsWith('RESULT '));
     const m = /result=(\S+) building=(-?\d+)/.exec(resultLine || '');
     return { result: m ? m[1] : 'unknown', building: m ? Number(m[2]) : -1 };

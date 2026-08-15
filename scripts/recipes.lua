@@ -9,6 +9,17 @@
 --
 -- The recipe's **id** is its 0-based index in this list. A building stores that
 -- id in building_component.recipe; keep the order stable so authored ids hold.
+--
+-- BL-433: an optional `era` field ("any" | "ancient" | "industrial") says which
+-- product a recipe belongs to. Absent means "any" — shared by both arcs. The
+-- registry MASKS on it rather than removing, precisely so the ids above stay
+-- stable across bands; see recipe_registry.hpp § BL-433 era band. An unknown
+-- string is a load-time error, not a silent fallback.
+--
+-- The ancient roster is deliberately thin right now — steel, food_rations and
+-- refined_copper are the only untagged processing chains — because tagging is
+-- all this item does. Filling it out is BL-429 (ancient building roster), which
+-- is the next item in Sprint 17.
 -- Magnitudes are legible round defaults, iterated by playtest (PRODUCTION.md).
 
 recipes = {
@@ -17,8 +28,15 @@ recipes = {
     -- between this recipe and PRODUCTION.md's Smelter table, which always
     -- named coal as a reagent — and giving coal a consumer, per the
     -- admission rule (BL-340) rather than leaving it an orphan raw.
+    --
+    -- BL-429: tagged `industrial`. Coal-fired direct smelting is the industrial
+    -- route; the ancient arc reaches steel through the bloomery chain at the end
+    -- of this file (timber -> charcoal -> blooms -> steel). This retag is what
+    -- gives the ancient economy any DEPTH at all — measured before it, ancient max
+    -- chain depth was 1, meaning one layer above raws and nothing beyond.
     {
         name    = "steel",
+        era     = "industrial", -- BL-429
         inputs  = { iron_ore = 2.0, coal = 1.0 },
         outputs = { steel = 1.0 },
     },
@@ -26,6 +44,7 @@ recipes = {
     -- id 1 — Refinery: petroleum -> refined fuel.
     {
         name    = "refined_fuel",
+        era     = "industrial", -- BL-433
         inputs  = { petroleum = 2.0 },
         outputs = { refined_fuel = 1.0 },
     },
@@ -45,6 +64,7 @@ recipes = {
     -- bay itself is built from) as its two inputs.
     {
         name    = "hydroponics_bay",
+        era     = "industrial", -- BL-433
         inputs  = { water = 1.5, steel = 0.5 },
         outputs = { agricultural_produce = 1.0 },
     },
@@ -54,6 +74,7 @@ recipes = {
     -- like id 0's steel recipe but with no coal reagent.
     {
         name    = "steel_from_iron_nickel",
+        era     = "industrial", -- BL-433
         inputs  = { iron_nickel_ore = 2.0 },
         outputs = { steel = 1.0 },
     },
@@ -66,6 +87,7 @@ recipes = {
     -- recipe rather than given a resource_type — nothing else would ever hold it.
     {
         name    = "propellant_atmospheric",
+        era     = "industrial", -- BL-433
         inputs  = { refined_fuel = 2.0 },
         outputs = { propellant = 1.0 },
     },
@@ -84,6 +106,7 @@ recipes = {
     -- selection.
     {
         name    = "propellant_electrolysis",
+        era     = "industrial", -- BL-433
         inputs  = { water = 3.0, refined_fuel = 1.0 },
         outputs = { propellant = 1.0 },
     },
@@ -98,6 +121,7 @@ recipes = {
     -- id 7 — Refinery: silica -> silicon.
     {
         name    = "silicon",
+        era     = "industrial", -- BL-433
         inputs  = { silica = 2.0 },
         outputs = { silicon = 1.0 },
     },
@@ -112,6 +136,7 @@ recipes = {
     -- id 9 — Refinery: rare earth ore -> REE alloy.
     {
         name    = "ree_alloy",
+        era     = "industrial", -- BL-433
         inputs  = { rare_earth_ore = 2.0 },
         outputs = { ree_alloy = 1.0 },
     },
@@ -121,6 +146,7 @@ recipes = {
     -- between the two rather than a forced chain.
     {
         name    = "machinery",
+        era     = "industrial", -- BL-433
         inputs  = { steel = 1.0, refined_copper = 1.0 },
         outputs = { machinery = 1.0 },
     },
@@ -128,6 +154,7 @@ recipes = {
     -- id 11 — Fabricator: steel + REE alloy -> alloys.
     {
         name    = "alloys",
+        era     = "industrial", -- BL-433
         inputs  = { steel = 1.0, ree_alloy = 1.0 },
         outputs = { alloys = 1.0 },
     },
@@ -135,6 +162,7 @@ recipes = {
     -- id 12 — Electronics Lab: silicon + refined copper + REE alloy -> electronics.
     {
         name    = "electronics",
+        era     = "industrial", -- BL-433
         inputs  = { silicon = 1.0, refined_copper = 1.0, ree_alloy = 0.5 },
         outputs = { electronics = 1.0 },
     },
@@ -144,6 +172,7 @@ recipes = {
     -- the militia's BL-350 contracts are its only buyer.
     {
         name    = "spacecraft_components",
+        era     = "industrial", -- BL-433
         inputs  = { alloys = 2.0, electronics = 1.0 },
         outputs = { spacecraft_components = 1.0 },
     },
@@ -158,6 +187,7 @@ recipes = {
     -- id 14 — Water Treatment Plant: water -> clean water.
     {
         name    = "clean_water",
+        era     = "industrial", -- BL-433
         inputs  = { water = 2.0 },
         outputs = { clean_water = 1.0 },
     },
@@ -167,6 +197,7 @@ recipes = {
     -- already-shipped refined industrial input.
     {
         name    = "consumer_goods",
+        era     = "industrial", -- BL-433
         inputs  = { food_rations = 1.0, steel = 1.0 },
         outputs = { consumer_goods = 1.0 },
     },
@@ -178,8 +209,76 @@ recipes = {
     -- water-as-process-input precedent (id 3 above).
     {
         name    = "medical_supplies",
+        era     = "industrial", -- BL-433
         inputs  = { water = 1.0, agricultural_produce = 1.0 },
         outputs = { medical_supplies = 1.0 },
+    },
+
+    -- =====================================================================
+    -- BL-429 — the ANCIENT chain. Appended (never inserted): a recipe's id is
+    -- its index here and building_component.recipe stores it, so inserting
+    -- would repoint every existing building.
+    --
+    -- The admission rule (BL-340) applied to the ancient tier: every one of
+    -- these consumes a raw that already had deposits, extraction rules and —
+    -- until this item — no price and no consumer. Nothing new was added to
+    -- resource_type; these are the orphans BL-286 left, given consumers.
+    --
+    -- The chain is deliberately LAYERED, because chain depth is the growth
+    -- track (BL-428): timber -> charcoal -> blooms -> steel is four rungs, so
+    -- an ancient corp's reach grows as it builds rather than as a counter ticks.
+    -- =====================================================================
+
+    -- id 17 — Charcoal Burner: timber -> charcoal. The ancient fuel step, and
+    -- the reason a forest tile is worth holding. Lossy on purpose (3 -> 1): a
+    -- burn drives off most of the mass, which is what makes charcoal dearer
+    -- per unit than the timber it came from.
+    {
+        name    = "charcoal",
+        era     = "ancient",
+        inputs  = { timber = 3.0 },
+        outputs = { charcoal = 1.0 },
+    },
+
+    -- id 18 — Bloomery: iron ore + charcoal -> iron blooms. The ancient world's
+    -- only route to worked iron; no coal, no blast furnace.
+    {
+        name    = "iron_blooms",
+        era     = "ancient",
+        inputs  = { iron_ore = 2.0, charcoal = 1.0 },
+        outputs = { iron_blooms = 1.0 },
+    },
+
+    -- id 19 — Smithy: blooms + charcoal -> steel. The ancient counterpart of
+    -- id 0, which is now `industrial`. Same terminal good by a longer road:
+    -- depth 3 here against depth 1 there, which is precisely the difference
+    -- between the two arcs' industry.
+    {
+        name    = "steel_from_blooms",
+        era     = "ancient",
+        inputs  = { iron_blooms = 2.0, charcoal = 1.0 },
+        outputs = { steel = 1.0 },
+    },
+
+    -- id 20 — Potter/Weaver: clay + timber -> trade goods. Gives BL-286's
+    -- placeholder luxury a producer, and clay its first consumer. Timber is
+    -- the kiln's fuel, not a component.
+    {
+        name    = "trade_goods",
+        era     = "ancient",
+        inputs  = { clay = 2.0, timber = 1.0 },
+        outputs = { trade_goods_misc = 1.0 },
+    },
+
+    -- id 21 — Miller: agricultural produce + stone -> food rations. The ancient
+    -- route to the same good id 2 makes, and stone's first consumer (millstones
+    -- wear out). Shallower than the chain above on purpose: food should not be
+    -- gated behind an industry, or an ancient start cannot feed itself.
+    {
+        name    = "food_rations_milled",
+        era     = "ancient",
+        inputs  = { agricultural_produce = 2.0, stone = 1.0 },
+        outputs = { food_rations = 1.0 },
     },
 }
 

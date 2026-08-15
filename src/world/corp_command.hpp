@@ -51,6 +51,15 @@ enum class corp_verb : uint8_t
     cancel_contract,  ///< Terminate contract `order` in flight; forfeits the deposit, moves reputation.
 };
 
+/// One past the highest verb — the wire parser's range gate (BL-396: run_serve
+/// refuses any `verb=` outside [0, corp_verb_count) rather than letting a
+/// narrowing cast truncate it into a verb the caller never named). Bound to
+/// the append-only rule above: this is always `<last enumerator> + 1`, so
+/// appending a verb means moving this with it — and only this, since existing
+/// values never renumber.
+inline constexpr uint8_t corp_verb_count =
+    static_cast<uint8_t>(corp_verb::cancel_contract) + 1;
+
 /// Ceiling on one corporation's outstanding sell orders. The book is now
 /// reachable by command, so it is reachable by a scorer with a bug in it — this
 /// is the bound that keeps a runaway from growing the save format without limit.
@@ -107,6 +116,7 @@ enum class corp_command_result : uint8_t
     rejected_funds,         ///< Solvency check inside the seam refused the spend.
     rejected_state,         ///< No-op in current state (already idle, survey in progress, ...).
     rejected_tech_locked,   ///< BL-344: the corp has not earned the tech that unlocks this type.
+    rejected_era_locked,    ///< BL-433: the type is not in the campaign's era band (a Launchpad at 0 CE). Distinct from tech_locked: no research reaches it.
     // --- BL-350: request_quote's four distinguishable decline conditions ---
     rejected_no_capacity,     ///< The named supplier holds no completed building that can produce the good.
     rejected_no_input_access, ///< The supplier's local market cannot supply the recipe's inputs.

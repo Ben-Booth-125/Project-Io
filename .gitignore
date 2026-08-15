@@ -24,6 +24,9 @@ cmake_install.cmake
 Makefile
 *.cmake
 !CMakeLists.txt
+# Hand-written cmake scripts are source, not generated output (the blanket
+# *.cmake above targets CMake's own droppings like cmake_install.cmake).
+!tools/verify/run_sweep.cmake
 
 # IDE
 .vs/

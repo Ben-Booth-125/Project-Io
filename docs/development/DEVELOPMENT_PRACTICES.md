@@ -121,12 +121,20 @@ ProjectIo --verify scripts/verify/<name>.lua
   helper" rather than a from-scratch script. Prefer them over raw `set_pan` math.
 - **Capture:** `capture("name")` renders one frame and writes `screenshots/name.png`
   (in-app `SDL_RenderReadPixels` → `write_png_rgba`; nothing leaves the window).
-- **Output:** PNGs for inspection **and automatic pass/fail** — golden-image diffing is **built and
-  shipped** (BL `golden-image-diff`), no longer deferred. Each capture is diffed against its committed
-  reference at `scripts/verify/golden/<name>.png` (note: singular `golden/`); the harness logs
-  `Golden PASS/FAIL <name>: <pct>% differing` and exits non-zero on any fail. Re-bless a golden
-  deliberately with `ProjectIo --verify <script> --bless` (overwrites it — a reviewable diff in
-  version control).
+- **Output:** PNGs for inspection; golden-image diffing exists but is **demoted to a curated,
+  world-independent set** (Ben's ruling, 2026-08-15 — NR-237). The measured record was decisive:
+  in a project whose UI and generated world both churn deliberately, every full-suite diff was
+  either an intended change or world drift, the answer was always "bless", and the genuine
+  catches were harness bugs. So: **captures are the product, assertions are the verdict**
+  (`verify.expect`, `expect_no_clipping` — the `text_overflow_floor` model), and a golden exists
+  only where any pixel diff is guaranteed meaningful — surfaces that do not draw generated world
+  content (the icon vocabulary; candidates join as areas freeze approaching the prototype cut,
+  because **freezing is what makes a golden pay**). A capture with a committed
+  `scripts/verify/golden/<name>.png` still diffs exactly as before (PASS/FAIL logs, non-zero
+  exit, `screenshots/diff/`); a capture without one is capture-only. `--bless` **refreshes the
+  curated set and never grows it** — a capture with no existing golden is skipped under bless
+  (app_capture.cpp), so admitting a surface is a deliberate act: copy its capture into
+  `golden/` once, bless thereafter.
 - **Shipped tolerance** (`app::compare_to_golden`, `src/core/app.cpp`): a two-threshold budget — a
   pixel differs when any R/G/B channel delta exceeds 8; the capture fails when differing pixels
   exceed 0.5% of the frame. A diff image lands in `screenshots/diff/<name>.png`. **Still owed**
@@ -155,24 +163,16 @@ game state through the *same code path the interactive control uses*, then asser
   the `capture()` at the end is incidental. Stage preconditions with existing primitives
   (e.g. `verify.set_balance` to afford an action) rather than entangling a separate concern.
 
-#### Golden staleness — shared chrome regresses every capture (observed 2026-07-05)
+#### Golden staleness — the coupling that motivated the demotion (history)
 
-A golden captures the **whole 1280×720 window**, so it regresses when *shared chrome* changes — the
-profile card, header, or minimap toolbar — **even if the feature under test is untouched**. So a
-change that edits shell chrome staleens **every** golden that shows it, at once. This is not a
-cross-platform or capture-timing artefact — a fresh golden passes at ≤0.5% on the same box.
-Two disciplines follow:
-
-- **Re-bless dependent goldens as part of the chrome change** (DELIVERY step 5), not later — a stale
-  golden hides real regressions behind chrome noise.
-- **Bless policy (settled by practice, 2026-07-31).** The old instruction — hold blanket `--bless`
-  until the baseline-platform (Linux vs Windows) decision — is retired: three bulk re-blesses have
-  since run on this Windows box (95004cf, 85c847d, 6b8e109, all 2026-07-30). The de-facto policy:
-  **Windows is the working baseline; re-bless freely; flag only unexplained diffs.** Goldens are
-  disposable — a bless is routine bookkeeping, not a review event.
-
-*(The 2026-07-05 sweep numbers that used to sit here — 9 pass / 66 fail / 55 no-golden — are dead:
-the bulk re-blesses above reset the whole baseline, 68 scripts blessed per sweep.)*
+A golden captures the **whole 1280×720 window**, so it regressed whenever *shared chrome* changed
+(observed 2026-07-05), and whenever a `src/world/` change moved generated content (BL-259,
+2026-08-03) — which in a churning prototype was **most changes**. The disciplines that grew here
+(re-bless with the change; "Windows is the baseline; re-bless freely; flag only unexplained
+diffs"; goldens are disposable) were honest management of that coupling, and they are the record
+of why the 2026-08-15 demotion happened: when the routine answer to every diff is "bless", the
+diff carries no information. The curated world-independent set above is exempt from the coupling
+by construction — that is the admission criterion.
 
 #### World-content staleness — a `src/world/` change owes a re-bless too (BL-259, 2026-08-03)
 
@@ -183,10 +183,11 @@ went unnoticed for two days (BL-233's terrain re-price, landed 2026-07-31, wasn'
 BL-259 caught it 2026-08-03) because nothing owned the coupling — the headless side has the
 equivalent discipline (a band change ships with its commit), the visual side didn't.
 
-**A `src/world/` change that reshapes generated output re-blesses the visual suite in the same
-commit** (`scripts/verify/bless_all.sh`), the way a shared-chrome change already does. Eyeball the
-largest diffs first to confirm they're content, not a layout regression hiding in the noise, then
-bless freely per the policy above.
+**Since the 2026-08-15 demotion this obligation shrinks to the curated set**: a `src/world/`
+change cannot stale a world-independent golden, so in practice a content change owes nothing
+here (`--verify-all --bless` refreshes the curated files in seconds and is safe to run — it
+cannot grow the set). What a content change owes instead is a **capture pass eyeballed on the
+surfaces it touches** — the captures are the product; the eyeball is the check.
 
 #### Cross-platform goldens — settled 2026-08-01 (BL-252)
 
@@ -522,8 +523,12 @@ repository public to enable this feature"*). And GitHub Actions was **deleted on
 from the tree. Do not cite `build.yml` or a "red CI run"; neither can occur.
 
 What actually guards `main` is therefore **entirely local and human**: a green local build plus
-`ctest --test-dir build_linux -LE sweep --output-on-failure` (or `check.bat`) before a release commit lands — step
+`ctest --test-dir build_linux --output-on-failure` (or `check.bat`) before a release commit lands — step
 1 of the Cut above. That is the whole gate. Run it deliberately; nothing will run it for you.
+*(The `-LE sweep` this line used to carry is no longer needed — since BL-415 each sweep test's
+COMMAND is a gate script that reports itself Skipped unless `IO_RUN_SWEEPS` is set in the
+environment, so a bare `ctest` skips them by machinery rather than by a flag the caller has to
+remember.)*
 
 **Test tiers, and why the gate excludes one (BL-288, 2026-08-09).** The suite holds three kinds
 of program, and treating them alike is what made the gate untrustworthy:
@@ -546,7 +551,10 @@ how the one real defect, `ai_skill_harness`'s stale GCC goldens, sat unnoticed a
 positives for days.
 
 So: a `bench` failure means *re-run it on an idle machine* before treating it as a regression,
-and the `sweep` tests are run deliberately (`ctest -L sweep`, or by name), never as a gate.
+and the `sweep` tests are run deliberately (`$env:IO_RUN_SWEEPS=1; ctest -L sweep`, or by
+running the harness exe directly), never as a gate — since BL-415 each sweep test's COMMAND is
+a gate script (`tools/verify/run_sweep.cmake`) that reports itself Skipped without that
+environment variable, so a bare `ctest` cannot run one by accident.
 
 One consequence worth stating, because it has already bitten: a build tree's **configuration is
 not obvious from its name**. `build_linux/` is Ninja + **Release** and is the canonical Linux tree;

@@ -98,23 +98,23 @@ function check(ok, label, detail) {
 // Line protocol client
 // ---------------------------------------------------------------------------
 
-function makeClient(exe, ticks) {
-  const child = spawn(exe, ['--serve', '--ticks', String(ticks)], { cwd: ROOT });
+function makeClient(exe, ticks, extraArgs = []) {
+  const child = spawn(exe, ['--serve', '--ticks', String(ticks), ...extraArgs], { cwd: ROOT });
   const rl = readline.createInterface({ input: child.stdout });
   let pending = null;
 
   rl.on('line', (line) => {
     if (line.startsWith('[Lua]')) return; // world-build banner, not a response
     if (!pending) return;
-    // BLACKBOARD and CORPS stream N lines then END; everything else is one line.
-    if (line === 'END' || line.startsWith('OK ') || line.startsWith('RESULT ')
-        || line.startsWith('ERR ') || line === 'BYE') {
-      pending.lines.push(line);
+    pending.lines.push(line);
+    // BLACKBOARD / CORPS / BODIES stream rows then END, and since BL-397 a
+    // refused BLACKBOARD is `ERR ... END` — so END alone terminates them.
+    // Resolving on the ERR line would leave the trailing END to be read as
+    // the NEXT request's response. Every other op answers exactly one line.
+    if (pending.multi ? line === 'END' : true) {
       const p = pending;
       pending = null;
       p.resolve(p.lines);
-    } else {
-      pending.lines.push(line);
     }
   });
 
@@ -130,7 +130,8 @@ function makeClient(exe, ticks) {
   function send(line) {
     return new Promise((resolve, reject) => {
       if (pending) return reject(new Error('a request is already in flight'));
-      pending = { resolve, reject, lines: [] };
+      pending = { resolve, reject, lines: [],
+                  multi: /^(BLACKBOARD|CORPS|BODIES)\b/.test(line) };
       const timer = setTimeout(() => {
         if (pending) { const p = pending; pending = null; p.reject(new Error(`timeout waiting for: ${line}`)); }
       }, 120000);
@@ -177,7 +178,12 @@ async function main() {
     check(corps.every((c) => typeof c.id === 'number' && typeof c.name === 'string'),
           'every corp row carries an id and a name');
 
-    const subject = ai[0];
+    // BL-387: this server was spawned with no --as, so its session actor is
+    // the player corp — every command below must be issued as it, or the
+    // authority gate (correctly) answers rejected_not_owner before the seam
+    // is ever reached. Acting as a rival now needs `--as`, tested below.
+    check(!!player, 'a player corp exists (the default session actor)');
+    const subject = player;
     if (VERBOSE) console.log(`         acting as corp ${subject.id} (${subject.name})`);
 
     const tickLines = await io.send('TICK');
@@ -323,18 +329,64 @@ async function main() {
                   + `outcomes seen: ${[...seenCodes].join(', ')})`);
     }
 
-    // --- a command naming the player corp is still well-formed ------------
-    // NOT a safety assertion, and the header used to overclaim that it was.
-    // apply_corp_command has NO player guard — the standing "never auto-act on
-    // the player's corp" rule is enforced in the SCORER (run_corp_strategic_step
-    // skips the player), not at the seam, because the seam is also how the
-    // player's own presses are applied. What this checks is only that the seam
-    // does not fall over on a corp id it does not expect to see here.
-    if (player) {
-      const asPlayer = resultOf(await io.send(
-        `COMMAND corp=${player.id} verb=7 subject=0`));
-      check(asPlayer !== null && RESULT_CODES.has(asPlayer),
-            'a command naming the player corp still returns a typed result', asPlayer);
+    // --- BL-387: the session actor gate -----------------------------------
+    // The predecessor of this block only asserted that a command naming the
+    // player corp got a well-formed reply — an overclaim it had to disclaim in
+    // its own header, because the seam had NO actor authority at all: any
+    // caller could command any rival by name. Now the protocol layer refuses
+    // it, and refusal must PERFORM NOTHING — that is the invariant the whole
+    // hardening batch defends, so it is asserted with a state snapshot, not
+    // just a result string.
+    console.log('\n  -- BL-387: the seam acts only as the session actor --');
+    const snapshot = async () =>
+      (await io.send('CORPS')).join('\n') + '\n'
+      + (await io.send(`BLACKBOARD corp=${subject.id}`)).join('\n');
+    const rival = ai[0];
+    {
+      const beforeAuth = await snapshot();
+      const crossCorp = resultOf(await io.send(
+        `COMMAND corp=${rival.id} verb=7 subject=${bodyId ?? 0}`));
+      check(crossCorp === 'rejected_not_owner',
+            'a COMMAND naming a corp that is not the session actor is refused as rejected_not_owner',
+            crossCorp);
+      check(await snapshot() === beforeAuth,
+            'the refused cross-corp command performed nothing (state snapshot identical)');
+    }
+
+    // --- BL-396: out-of-domain fields are refused whole, world unchanged ----
+    // Each of these used to pass the parser by narrowing: verb=256 truncated
+    // to 0 and BUILT A BUILDING answering `applied`; type=200 indexed the
+    // economics array out of bounds and SEGFAULTED the process;
+    // workforce=4294967396 wrapped to a legal 100 and applied; quantity=1e300
+    // is a finite double that overflows to +inf when narrowed to float. All
+    // must now answer rejected_invalid, and — the batch's invariant — a
+    // refusal performs NOTHING, asserted by snapshot after every case.
+    console.log('\n  -- BL-396: out-of-domain fields are refused, world unchanged --');
+    {
+      const beforeRange = await snapshot();
+      const rangeCases = [
+        ['verb=256 (truncates to build)',        'verb=256 tile=0'],
+        ['verb=265 (truncates to place_sell_order)', 'verb=265 tile=0'],
+        ['verb=-1',                              'verb=-1'],
+        ['verb=7xyz (trailing junk is malformed, not a 7)', 'verb=7xyz subject=0'],
+        ['type=200 (economics array OOB)',       'verb=0 tile=0 type=200'],
+        ['target=64 (beyond resource_count)',    'verb=0 tile=0 type=0 target=64'],
+        ['road_tier=255',                        'verb=6 tile=0 road_tier=255'],
+        ['workforce=4294967396 (wraps to 100)',  'verb=3 subject=0 workforce=4294967396'],
+        ['unit_type=70000 (beyond uint16)',      'verb=8 tile=0 unit_type=70000'],
+        ['quantity=1e300 (overflows to +inf as float)',
+         `verb=9 subject=${bodyId ?? 0} target=0 quantity=1e300`],
+        ['floor_price=-1',
+         `verb=9 subject=${bodyId ?? 0} target=0 quantity=5 floor_price=-1`],
+        ['floor_price=abc (garbage parses as no order, not floor 0)',
+         `verb=9 subject=${bodyId ?? 0} target=0 quantity=5 floor_price=abc`],
+      ];
+      for (const [label, args] of rangeCases) {
+        const r = resultOf(await io.send(`COMMAND corp=${subject.id} ${args}`));
+        check(r === 'rejected_invalid', `${label} -> rejected_invalid`, r);
+        check(await snapshot() === beforeRange,
+              `${label} performed nothing (state snapshot identical)`);
+      }
     }
 
     // --- survey actually progresses ---------------------------------------
@@ -371,6 +423,93 @@ async function main() {
             'the dispatched survey ACTUALLY progresses when the world ticks',
             `${before && before.survey}/${before && before.regions_done} -> `
             + `${now && now.survey}/${now && now.regions_done}`);
+    }
+
+    // --- BL-387: `--as any` lifts the gate, and only on request ------------
+    // A second server, spawned permissive. The SAME cross-corp command the
+    // default server refused above must reach the seam here — bot-vs-bot
+    // corpus generation is the one caller that legitimately plays every corp,
+    // and it has to ask for that mode explicitly.
+    // --- BL-397: reads serve only the session actor's private view ----------
+    // The blackboard is a corp's PRIVATE view (cash, pools, recipes); the
+    // opcode used to export whichever corp the request line named. The refusal
+    // must keep the lines-then-END shape or a streaming client's framing
+    // breaks — asserted literally.
+    console.log("\n  -- BL-397: reads serve only the session actor's private view --");
+    {
+      const bbRival = await io.send(`BLACKBOARD corp=${rival.id}`);
+      check(bbRival.length === 2 && bbRival[0] === 'ERR result=rejected_not_owner'
+            && bbRival[1] === 'END',
+            'BLACKBOARD for a non-actor corp answers ERR result=rejected_not_owner then END',
+            bbRival.join(' | '));
+    }
+
+    console.log('\n  -- BL-387: --as any restores cross-corp reach (explicit opt-in) --');
+    const io2 = makeClient(exe, 8, ['--as', 'any']);
+    try {
+      const anyCross = resultOf(await io2.send(
+        `COMMAND corp=${rival.id} verb=7 subject=${bodyId ?? 0}`));
+      check(anyCross !== null && RESULT_CODES.has(anyCross) && anyCross !== 'rejected_not_owner',
+            'under --as any the same cross-corp command is not refused for actor reasons',
+            anyCross);
+
+      // Under --as any the same rival read serves.
+      const bbAny = await io2.send(`BLACKBOARD corp=${rival.id}`);
+      check(bbAny.filter((l) => l.startsWith('{')).length > 0
+            && !bbAny.some((l) => l.startsWith('ERR ')),
+            'under --as any a non-actor BLACKBOARD serves facts rather than refusing');
+
+      // --- BL-397: remove_sell_order no longer distinguishes foreign from
+      // nonexistent. It answered `rejected_not_owner` for someone else's order
+      // and `rejected_invalid` for no order — a perfect oracle: order ids are
+      // one global monotonic sequence, so sweeping the id space mapped the
+      // whole book. Build the two cases with KNOWN ids: place as the player
+      // (its id found by sweeping to the `applied` removal — the sweep itself
+      // must never surface rejected_not_owner), then place as a rival, whose
+      // order takes exactly the next id. Runs on the --as any server because
+      // constructing a foreign order requires acting as two corps.
+      if (listBody !== undefined) {
+        const placed = resultOf(await io2.send(
+          `COMMAND corp=${subject.id} verb=9 subject=${listBody} target=${listRes} `
+          + `quantity=5 floor_price=0.5`));
+        check(placed === 'applied', 'the player can place the probe order on the --as any server',
+              placed);
+
+        let foundId = null;
+        let sweepLeaked = false;
+        for (let id = 1; id <= 4096 && foundId === null; ++id) {
+          const r = resultOf(await io2.send(
+            `COMMAND corp=${subject.id} verb=10 order=${id}`));
+          if (r === 'applied') foundId = id;
+          else if (r === 'rejected_not_owner') sweepLeaked = true;
+        }
+        check(!sweepLeaked,
+              'sweeping the order-id space never surfaces rejected_not_owner (the oracle is gone)');
+        check(foundId !== null, 'the sweep finds and removes the player\'s own order',
+              String(foundId));
+
+        if (foundId !== null) {
+          const rivalPlaced = resultOf(await io2.send(
+            `COMMAND corp=${rival.id} verb=9 subject=${listBody} target=${listRes} `
+            + `quantity=5 floor_price=0.5`));
+          check(rivalPlaced === 'applied', 'a rival order exists to probe against', rivalPlaced);
+          const foreignId = foundId + 1; // next allocation of the monotonic counter
+
+          const foreign = resultOf(await io2.send(
+            `COMMAND corp=${subject.id} verb=10 order=${foreignId}`));
+          const nonexistent = resultOf(await io2.send(
+            `COMMAND corp=${subject.id} verb=10 order=4000000000`));
+          check(foreign === 'rejected_invalid' && nonexistent === 'rejected_invalid'
+                && foreign === nonexistent,
+                'a foreign order id and a nonexistent order id answer the SAME result string',
+                `foreign=${foreign} nonexistent=${nonexistent}`);
+        }
+      } else {
+        console.log('         (no priced (body, resource) pair found earlier; '
+                    + 'order-oracle check skipped and says so)');
+      }
+    } finally {
+      io2.close();
     }
 
     const bye = await io.send('SHUTDOWN');

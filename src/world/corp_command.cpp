@@ -224,6 +224,7 @@ corp_command_result map_construction(construction_result r)
         case construction_result::no_corp:                return corp_command_result::rejected_no_corp;
         case construction_result::no_tile:                return corp_command_result::rejected_invalid;
         case construction_result::tech_locked:            return corp_command_result::rejected_tech_locked;
+        case construction_result::era_locked:             return corp_command_result::rejected_era_locked;
         case construction_result::invalid_tile:
         case construction_result::out_of_range:
         case construction_result::slot_occupied:
@@ -508,10 +509,16 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
 
             const auto it = std::find_if(w.sell_orders.begin(), w.sell_orders.end(),
                                          [&](const sell_order& o) { return o.id == cmd.order; });
-            if (it == w.sell_orders.end())
-                return corp_command_result::rejected_invalid; // no such order
-            if (it->corp != cmd.corp)
-                return corp_command_result::rejected_not_owner; // someone else's order
+            // A nonexistent order and someone ELSE'S order answer identically
+            // (BL-397). Distinguishing them (`rejected_invalid` vs
+            // `rejected_not_owner`) made the result an existence oracle: order
+            // ids are one global monotonic sequence, so sweeping the id space
+            // mapped the whole book — whose orders exist, corp by corp. Any id
+            // not in the caller's own book is simply invalid. In-process
+            // callers only ever remove their own orders, so they never see the
+            // collapsed case.
+            if (it == w.sell_orders.end() || it->corp != cmd.corp)
+                return corp_command_result::rejected_invalid;
 
             // Erase by id, never by index: every surviving order keeps its handle,
             // so a removal cannot invalidate a command already composed against

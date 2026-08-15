@@ -96,6 +96,19 @@ void app::compare_to_golden(const std::string& name, SDL_Surface* rgba)
 
     if (m_verify_bless)
     {
+        // --bless REFRESHES the curated golden set; it does not GROW it
+        // (NR-237, Ben's ruling 2026-08-15: golden-diffing is demoted to a
+        // small world-independent set; everywhere else captures are the
+        // product and assertions are the verdict). A capture with no existing
+        // golden stays capture-only even under --bless — otherwise one routine
+        // bless pass silently resurrects the 200-file set the ruling retired.
+        // Admitting a NEW surface to the set is a deliberate act: create the
+        // file first (copy its capture into golden/) and bless it thereafter.
+        if (!std::filesystem::exists(golden))
+        {
+            SDL_Log("Golden skipped (not in the curated set): %s", golden.string().c_str());
+            return;
+        }
         std::error_code ec;
         std::filesystem::create_directories(m_golden_dir, ec);
         if (write_png_rgba(golden.string(), w, h, packed.data(), w * 4))

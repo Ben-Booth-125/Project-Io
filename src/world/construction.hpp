@@ -17,6 +17,7 @@ enum class construction_result : uint8_t
     slot_occupied,       ///< The body's per-type cap is full (Launchpad: max 1 per body).
     insufficient_materials, ///< Unreachable since BL-095-lite folded material cost into credits (kept for switch compat).
     tech_locked,         ///< BL-344: the corporation has not earned the tech that unlocks this type.
+    era_locked,          ///< BL-433: this building type is not part of the campaign's era band (e.g. a Launchpad at 0 CE).
 };
 
 /// Attempt to construct a building of `type` (targeting `target` for an extraction

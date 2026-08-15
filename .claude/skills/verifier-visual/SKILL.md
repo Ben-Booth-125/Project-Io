@@ -116,12 +116,19 @@ machines, so CI and any dev box agree.
    report what each frame shows against the requirement being checked. Cite the
    capture file names.
 
-## Golden-image diffing (automatic PASS/FAIL)
+## Golden-image diffing (automatic PASS/FAIL — demoted to a curated set, 2026-08-15)
 
-A capture can be checked automatically against a committed **golden** reference
-image instead of eyeballed (BACKLOG § Canvas [F3]). Goldens live in a `golden/`
-directory **beside the verify scripts** — `scripts/verify/golden/<capture>.png`,
-one per named `capture()`.
+**Golden-diffing is demoted to a small, world-independent curated set** (Ben's ruling,
+NR-237; policy authority: `DEVELOPMENT_PRACTICES.md` § Visual verification). Captures are
+the product and assertions (`verify.expect`, `expect_no_clipping`) are the verdict; a
+golden exists only where any pixel diff is guaranteed meaningful — surfaces that draw no
+generated world content (currently the `icon_silhouettes` pair). `--bless` refreshes
+existing goldens and **never creates one**: admitting a new surface to the set means
+copying its capture into `golden/` once, deliberately.
+
+Goldens live in a `golden/` directory **beside the verify scripts** —
+`scripts/verify/golden/<capture>.png`, one per named `capture()`; a capture without one
+runs capture-only.
 
 - **Compare (default).** When a golden exists for a capture, `--verify` diffs the
   captured frame against it, logs `Golden PASS <name>: …%` or `Golden FAIL <name>: …%`,

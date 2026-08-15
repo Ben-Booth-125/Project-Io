@@ -488,9 +488,11 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     //
     // Auto-surplus and auto-demand (processor shortfalls) always clear at the
     // reference price derived from supply/demand ratios — the market is a perfect
-    // counterparty for these. Explicit player orders go through the order book and
-    // also auto-clear at max(ref_price, floor) when no matching buyer exists, so
-    // supply is always guaranteed to clear (prototype invariant).
+    // counterparty for these. Explicit orders go through the order book and, when
+    // no matching buyer exists, auto-clear at the resolved price — never above it.
+    // The floor is a reservation price: an order whose floor sits above the
+    // resolved price holds its stock instead of selling, so listed supply is NOT
+    // guaranteed to clear.
     struct auto_sell_entry { entity_id corp; entity_id market; std::size_t r; float qty; };
     struct auto_buy_entry  { entity_id corp; entity_id market; std::size_t r; float qty; };
     std::vector<auto_sell_entry> auto_sells;
@@ -644,7 +646,7 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // --- Explicit order-book matching (player sell vs player buy) ---
     // Provides preferred-seller routing and a VWAP price signal when priced orders
     // dominate. Unmatched player sell supply auto-clears below (market as buyer of
-    // last resort at max(ref_price, floor)), so supply always clears.
+    // last resort at the resolved price); a floor above it means hold, not sell.
     std::vector<matched_trade> trades;
 
     // The books are unordered maps and trade order feeds float accumulation into
@@ -769,10 +771,14 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     }
 
     // --- Auto-clear unmatched player sell supply ---
-    // The market is a buyer of last resort at max(ref_price, floor). Each order's
-    // own `rem` (left by the matching pass) clears — not a per-seller aggregate,
-    // which would subtract the seller's whole matched total from every one of that
-    // seller's orders (BL-351). Sorted key order again: income accumulation.
+    // The market is a buyer of last resort at the RESOLVED price, never above it —
+    // the market pays no counterparty's money, so it cannot honour a price the
+    // supply/demand state does not support. The floor is a reservation price: an
+    // order whose floor exceeds the resolved price clears nothing and its stock
+    // stays in the pool. Each cleared order's own `rem` (left by the matching
+    // pass) clears — not a per-seller aggregate, which would subtract the seller's
+    // whole matched total from every one of that seller's orders (BL-351). Sorted
+    // key order again: income accumulation.
     for (const entity_id mid : book_mids)
     {
         const auto& sell_by_r = sell_books[mid];
@@ -784,7 +790,8 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
             {
                 if (se.rem <= 0.0f)
                     continue;
-                const float clearing = std::max(rp, se.floor_price);
+                if (se.floor_price > rp)
+                    continue; // reservation price above the market: hold, don't sell
                 auto pkit = w.corp_body_pools.find(std::make_pair(se.corp, body));
                 if (pkit != w.corp_body_pools.end())
                 {
@@ -797,7 +804,7 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
                     float& q = pkit->second.quantities[r];
                     q = std::max(0.0f, q - se.rem); // defensive: a pool never goes negative
                 }
-                flows[se.corp].income += se.rem * clearing;
+                flows[se.corp].income += se.rem * rp;
             }
         }
     }

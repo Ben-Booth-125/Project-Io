@@ -511,6 +511,40 @@ target_link_libraries(interbody_pull_harness PRIVATE io_world_obj lua54)
 target_compile_features(interbody_pull_harness PRIVATE cxx_std_20)
 target_compile_options(interbody_pull_harness PRIVATE ${IO_WARNING_FLAGS})
 
+# era_roster (BL-433) is a live-Lua harness for the same reason as the two above:
+# the question it asks is what the AUTHORED era tags do. A hand-built registry
+# would assert only that the mask works on data the harness itself wrote, which
+# is precisely how a mis-tagged entry would slip through.
+add_executable(era_roster
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/era_roster.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(era_roster PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(era_roster PRIVATE io_world_obj lua54)
+target_compile_features(era_roster PRIVATE cxx_std_20)
+target_compile_options(era_roster PRIVATE ${IO_WARNING_FLAGS})
+
+# chain_depth (BL-428) — the growth-spine metric. Live-Lua for its D6 rows, which
+# ask what the SHIPPED recipe graph's depth actually is; D1-D5 are hand-built
+# fixtures, because those ask whether the metric computes what it claims and must
+# not drift with the economy.
+add_executable(chain_depth
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/chain_depth.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(chain_depth PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(chain_depth PRIVATE io_world_obj lua54)
+target_compile_features(chain_depth PRIVATE cxx_std_20)
+target_compile_options(chain_depth PRIVATE ${IO_WARNING_FLAGS})
+
 # font_glyph_harness (BL-234) is the one harness that links ImGui rather than
 # ${IO_WORLD_SOURCES}: the defect it guards is the ImFontConfig handed to
 # AddFontFromFileTTF, which lives in src/ui/fonts.cpp, not in world/*. It still
@@ -667,6 +701,8 @@ set(IO_TEST_BENCH_HARNESSES
 # Harnesses that load the real scripts/*.lua by relative path, and so must run
 # with the repo root as their working directory (see the foreach below).
 set(IO_TEST_SCRIPT_ROOTED_HARNESSES
+    chain_depth
+    era_roster
     interbody_pull_harness
     pregame_balance_harness
     persona_counsel_harness
@@ -682,14 +718,27 @@ foreach(harness_src ${IO_VERIFY_HARNESSES})
         target_compile_features(${harness_name} PRIVATE cxx_std_20)
         target_compile_options(${harness_name} PRIVATE ${IO_WARNING_FLAGS})
     endif()
-    add_test(NAME ${harness_name} COMMAND ${harness_name})
     if(harness_name IN_LIST IO_TEST_SWEEP_HARNESSES)
-        # No TIMEOUT is set deliberately: a sweep runs until it has its answer,
-        # and the `sweep` label is what keeps it out of the routine gate.
-        set_tests_properties(${harness_name} PROPERTIES LABELS "sweep")
+        # No TIMEOUT is set deliberately: a sweep runs until it has its answer.
+        # The COMMAND is a gate script, not the exe (BL-415): without
+        # IO_RUN_SWEEPS in the environment it prints the skip line and CTest
+        # marks the test Skipped via SKIP_REGULAR_EXPRESSION — exclusion from
+        # the routine gate is machinery, not a `-LE sweep` flag the caller has
+        # to remember. (CONFIGURATIONS was tried first and does not gate on a
+        # single-config generator — measured, not assumed.) Deliberate run:
+        # `$env:IO_RUN_SWEEPS=1; ctest --test-dir build -L sweep`, or run the
+        # exe directly. The label remains for selection.
+        add_test(NAME ${harness_name} COMMAND ${CMAKE_COMMAND}
+            -DIO_SWEEP_EXE=$<TARGET_FILE:${harness_name}>
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/run_sweep.cmake")
+        set_tests_properties(${harness_name} PROPERTIES
+            LABELS "sweep"
+            SKIP_REGULAR_EXPRESSION "sweep harness skipped")
     elseif(harness_name IN_LIST IO_TEST_LONG_HARNESSES)
+        add_test(NAME ${harness_name} COMMAND ${harness_name})
         set_tests_properties(${harness_name} PROPERTIES TIMEOUT ${IO_TEST_TIMEOUT_LONG})
     else()
+        add_test(NAME ${harness_name} COMMAND ${harness_name})
         set_tests_properties(${harness_name} PROPERTIES TIMEOUT ${IO_TEST_TIMEOUT_DEFAULT})
     endif()
     if(harness_name IN_LIST IO_TEST_BENCH_HARNESSES)

@@ -15,11 +15,25 @@ verify.goto_surface("home")
 verify.set_overlay("none")
 verify.capture("pop_markers_default")
 
--- Zoom onto a populated region so tiers + City+ labels read at scale.
-frame_tile(66, 6, 9)
+-- Frame the largest population centre rather than a fixed tile (the
+-- settlement_labels.lua idiom): the old hard-coded (66, 6) survived until the
+-- BL-257 / BL-348 generation changes left it pointing at empty terrain, and an
+-- empty capture verifies nothing.
+local best = nil
+for _, c in ipairs(verify.population_centres()) do
+    if best == nil or c.scale > best.scale then best = c end
+end
+if best == nil then
+    error("pop_markers: no population centres in the generated world")
+end
+print(string.format("pop_markers: framing centre scale=%d at (%d, %d)",
+                    best.scale, best.x, best.y))
+
+-- Zoom onto the populated region so tiers + City+ labels read at scale.
+frame_tile(best.x, best.y, 9)
 verify.capture("pop_markers_zoom")
 
 -- Country lens: the same markers pick up the host-nation tint (R4).
-frame_tile(66, 6, 9)
+frame_tile(best.x, best.y, 9)
 verify.set_overlay("country")
 verify.capture("pop_markers_country_tint")

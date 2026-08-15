@@ -1,16 +1,37 @@
 building_id,corp_id,corp_name,body_name,type,output,active,exhausted
-30294,30312,"Faros-YelenKalen International","Kepler",Extraction Site,3714.33,1,0
-30295,30312,"Faros-YelenKalen International","Kepler",Extraction Site,3011.88,1,0
-30296,30312,"Faros-YelenKalen International","Kepler",Extraction Site,356.971,1,0
-30297,30313,"Exoar-Exoex Enterprises","Kepler",Extraction Site,780.55,1,0
-30298,30313,"Exoar-Exoex Enterprises","Kepler",Extraction Site,614.344,1,0
-30299,30313,"Exoar-Exoex Enterprises","Kepler",Extraction Site,327.974,1,0
-30300,30314,"Corix Industries","Kepler",Extraction Site,815.173,1,0
-30301,30314,"Corix Industries","Kepler",Extraction Site,317.648,1,0
-30302,30314,"Corix Industries","Kepler",Extraction Site,469.46,1,0
-30304,30316,"FararAthar Holdings","Kepler",Processing Facility,8,1,0
-30305,30316,"FararAthar Holdings","Kepler",Processing Facility,8,1,0
-30306,30316,"FararAthar Holdings","Kepler",Extraction Site,1581.82,1,0
-30307,30317,"CalonIntus-PaxisAthen Ventures","Kepler",Extraction Site,588.899,1,0
-30308,30317,"CalonIntus-PaxisAthen Ventures","Kepler",Extraction Site,1644.55,1,0
-30309,30317,"CalonIntus-PaxisAthen Ventures","Kepler",Extraction Site,454.756,1,0
+46778,46799,"Exoar-Exoex Enterprises","Huhaidar",Extraction Site,1746.89,1,0
+46779,46799,"Exoar-Exoex Enterprises","Huhaidar",Extraction Site,2151.42,1,0
+46780,46799,"Exoar-Exoex Enterprises","Huhaidar",Extraction Site,3078.05,1,0
+46781,46800,"Corix Industries","Huhaidar",Extraction Site,2931.29,1,0
+46782,46800,"Corix Industries","Huhaidar",Extraction Site,2201.24,1,0
+46783,46800,"Corix Industries","Huhaidar",Extraction Site,3265.94,1,0
+46784,46801,"Calyx Industries","Huhaidar",Extraction Site,792.055,1,0
+46786,46801,"Calyx Industries","Huhaidar",Extraction Site,1342.98,1,0
+51097,46801,"Calyx Industries","Huhaidar",Extraction Site,16936.1,1,0
+46787,46802,"FararAthar Holdings","Huhaidar",Extraction Site,1358.66,1,0
+46788,46802,"FararAthar Holdings","Huhaidar",Extraction Site,751.022,1,0
+46789,46802,"FararAthar Holdings","Huhaidar",Extraction Site,3382.82,1,0
+46791,46803,"CalonIntus-PaxisAthen Ventures","Huhaidar",Extraction Site,1920.08,1,0
+46792,46803,"CalonIntus-PaxisAthen Ventures","Huhaidar",Extraction Site,1065.3,1,0
+46793,46803,"CalonIntus-PaxisAthen Ventures","Huhaidar",Extraction Site,3121.8,1,0
+46794,46804,"Genom Systems","Huhaidar",Processing Facility,0,0,0
+46795,46804,"Genom Systems","Huhaidar",Processing Facility,0,0,0
+51098,46805,"Terel-Coron Holdings","Huhaidar",Extraction Site,13548.8,1,0
+51092,51028,"YelorCalur Operations","Huhaidar",Extraction Site,51684.7,1,0
+51032,51035,"HexyxCorix-CalosFaran Enterprises","Huhaidar",Extraction Site,4353.96,1,0
+51033,51035,"HexyxCorix-CalosFaran Enterprises","Huhaidar",Extraction Site,637.903,1,0
+51034,51035,"HexyxCorix-CalosFaran Enterprises","Huhaidar",Extraction Site,41.013,1,0
+51041,51042,"Ruzumz Enterprises","Huhaidar",Extraction Site,1184.48,1,0
+51093,51042,"Ruzumz Enterprises","Huhaidar",Extraction Site,41347.8,1,0
+51045,51046,"BorosGenan-Zenom Industries","Huhaidar",Extraction Site,56582.6,1,0
+51052,51053,"CoraxCoros Operations","Huhaidar",Extraction Site,1143.64,1,0
+51056,51057,"Maikka Processing Group","Huhaidar",Extraction Site,3384.38,1,0
+51094,51057,"Maikka Processing Group","Huhaidar",Extraction Site,33078.2,1,0
+51060,51061,"Tei Extraction Co.","Huhaidar",Extraction Site,2065.86,1,0
+51064,51065,"Dynan Resources","Huhaidar",Extraction Site,2017.98,1,0
+51095,51071,"JorenRexax Enterprises","Huhaidar",Extraction Site,26462.6,1,0
+51074,51075,"Rexar Dynamics","Huhaidar",Extraction Site,2980.47,1,0
+51081,51082,"Zenus-Orbon Operations","Huhaidar",Extraction Site,1019.46,1,0
+51085,51086,"Roteit Logistics","Huhaidar",Extraction Site,2960.75,1,0
+51096,51086,"Roteit Logistics","Huhaidar",Extraction Site,21170.1,1,0
+51089,51090,"He Holdings","Huhaidar",Extraction Site,1424.65,1,0

@@ -7,7 +7,7 @@ ones your request touches — **not all of them**: the set is now ~650K tokens (
 `node tools/doc_weight.js`), so "read everything first" stopped being an instruction anyone could
 follow. Read for **traversal**: find the doc that owns the question and read that. Where a doc has
 an index or a query tool — `DEVLOG_INDEX.md`, `backlog_query.js`, `actions_query.js`,
-`ACTIONS_INDEX.json` — use it instead of loading the file.
+`ACTIONS_INDEX.json`, `requirements_query.js` — use it instead of loading the file.
 
 ## Response style
 
@@ -51,7 +51,7 @@ a specific implementation choice was made.
 **Start at the index, not the log.** `DEVLOG_INDEX.md` is one generated line per session
 (date, title, the `BL-` ids it touched, which volume holds it) across every volume — find the
 session you want there, then open only that entry. `DEVLOG.md` holds the live sessions;
-sessions before 2026-07 live in `docs/development/archive/DEVLOG-2026.md`. Regenerate the
+sessions before 2026-08 live in `docs/development/archive/DEVLOG-2026.md`. Regenerate the
 index with `node tools/session/devlog_index.js` after adding an entry; roll older entries out
 with `--rollover <YYYY-MM>`.
 
@@ -256,7 +256,7 @@ backlog**, or **B) implement now** (smoke-test, then ask before committing).
 | **Ben's review queue** (open questions + decisions taken on his behalf) | `docs/development/NEEDS_REVIEW.json` (view: `NEEDS_REVIEW.md`) | Not work and not blocking. **Append here rather than dropping a judgement call** — especially a `decision-taken`, since an unrecorded delegated decision is indistinguishable from one Ben made. |
 | **Player-intent coverage** (user stories) | `docs/development/user_stories.json` (view: `USER_STORIES.md`) | The second route — intent axis; companion to the backlog, consumed by BL-098's review. |
 | **Method** (lifecycle, depth verbs, batch, worktrees) | `docs/development/DELIVERY.md` | The long-form of this section. |
-| **Requirements** (data + history) | `docs/development/req/requirements.json` (policy `docs/development/req/REQUIREMENTS.md`) | |
+| **Requirements** (data + history) | `docs/development/req/requirements.json` (policy `docs/development/req/REQUIREMENTS.md`) | Queryable — `tools/session/requirements_query.js`; resolved groups' rows/resolution live cold in `archive/requirements-<quarter>.json` via `archive_requirements.js`. Amend landed groups **in the cold file**. |
 | **Standing invariants** | `.claude/rules/io-standing-rules.md` | Always-on; the "do not" rules. |
 | Backlog **design prose** for a **landed** item | `docs/development/archive/backlog-design-<quarter>.json` | The cold store. Moved there on landing by `archive_designs.js`; amend it **here**, not in `backlog.json`. |
 | What was built / why | `docs/development/DEVLOG_INDEX.md` → `DEVLOG.md` (live) / `archive/DEVLOG-<year>.md` | Find the session in the index; open only that entry. |

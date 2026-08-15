@@ -401,6 +401,121 @@ spread across the build. The front door shows the analog rate/ETA/paused status 
 binary reject. Tunables live in `scripts/economy.lua` § `construction`. A depletable real
 market inventory (vs. the derived figure) is revisited in `backlog.json` § BL-130.
 
+## The ancient chain (BL-429, first slice, 2026-08-15)
+
+The ancient arc's production chains, authored in `scripts/recipes.lua` with `era = "ancient"`.
+**No new `resource_type` values were added.** Every input here was already in the enum with
+authored deposits and extraction rules, and — until this slice — no price and no consumer. That is
+BL-340's minable-but-unsellable asymmetry, which BL-340 closed for the space tier and left wide open
+for this one: `stone`, `timber`, `sand`, `clay` and `peat` could all be mined and none could be
+sold.
+
+| Recipe | Inputs → output | Depth |
+|---|---|---|
+| Charcoal Burner | 3 timber → 1 charcoal | 1 |
+| Bloomery | 2 iron ore + 1 charcoal → 1 iron blooms | 2 |
+| Smithy | 2 iron blooms + 1 charcoal → 1 steel | 3 |
+| Potter/Weaver | 2 clay + 1 timber → 1 trade goods | 1 |
+| Miller | 2 agricultural produce + 1 stone → 1 food rations | 1 |
+
+**The load-bearing edit is the retag, not the additions.** The coal-fired `steel` recipe became
+`industrial`, so the ancient arc reaches steel only through timber → charcoal → blooms → steel.
+Without that, the shallow route stayed available (coal is a raw) and min-across-recipes correctly
+collapsed steel back to depth 1 — the chain would have existed and meant nothing. Ancient max depth
+went 1 → 3 on exactly that change.
+
+Food is deliberately **not** gated behind an industry: the Miller is depth 1, because an ancient
+start that cannot feed itself until it has built a smelting chain is not a start.
+
+**A trap this created, and how it is closed.** Three call sites defaulted an unconfigured processing
+facility to `recipe_id("steel")`. That still *resolves* after the retag — the storage path is
+band-independent by design — so an ancient campaign would have silently seeded its processors with
+an industrial recipe, and nothing would have refused it, since the era gates browsing and placement
+rather than execution. They now call `recipe_registry::default_recipe_id()`, which returns the first
+recipe the current band allows. **Ask for a sensible default; do not name a recipe and hope.**
+
+Still owed on BL-429: the extraction/processing buildings that would give these chains named
+identities (quarry, woodcutter, kiln, smithy) with their placement rules and glyphs, and the
+remaining orphan raws — `sand` and `peat` are priced now but still have no consumer.
+
+---
+
+## Chain depth — the growth track (BL-428, 2026-08-15)
+
+**The growth spine is chain depth** (Ben's ruling, chosen over building tiers, the ancient tech
+ladder and settlement scale). How far down the production graph a corp can reach is what gates its
+next building, so progress is a *consequence of the economy it has built* rather than a parallel
+unlock system laid over it. The decisive argument: every alternative is a second system that must be
+kept in agreement with the economy, and depth is read off the recipe graph that has to exist anyway.
+
+Depth is **computed, never authored** (`recipe_registry::depth_of`):
+
+```
+depth(raw)  = 0                       -- a good no allowed recipe produces
+depth(good) = min over producing recipes of ( 1 + max over that recipe's inputs of depth(input) )
+```
+
+The two composition rules differ deliberately. **Max within a recipe**: you cannot run it until your
+deepest input exists, so its difficulty is its hardest input. **Min across recipes**: if two routes
+make the same good, you have reached it as soon as the *easier* route is open. That asymmetry only
+starts to matter when BL-430 lands alternate production methods — it is settled here rather than
+discovered there.
+
+Depth is computed over the **era-allowed** recipes only (BL-433): a route the campaign's band masks
+out does not exist for that campaign, so it must not shorten anything. Masking can only ever *raise*
+depth or make a good unreachable, never lower it.
+
+**`-1` means unreachable** — no sequence of allowed recipes bottoms out in raws. That covers a cycle
+and an orphaned input with one code, because from the player's side they are the same fact: you
+cannot get there. Implemented as a bounded fixed point rather than a graph walk, so it terminates by
+construction, needs no recursion, and does not depend on traversal or container order (the BL-406
+lesson, where an unordered container decided a number the economy read).
+
+Measured on the shipped recipes, 2026-08-15: **industrial max depth 4, ancient max depth 3** — the
+ancient figure was **1** before BL-429's chain landed (one layer above raws and nothing beyond).
+
+Guard: `tools/verify/chain_depth.cpp`. **Still owed** (BL-428 slice 2): depth gating placement, and
+the per-corp record of what a corp has *reached*.
+
+---
+
+## The era band — which roster a campaign sees (BL-433, 2026-08-15)
+
+Every authored building type and recipe carries an optional **era band**: `any` (the default,
+shared by both arcs), `ancient`, or `industrial`. Authored as `era = "..."` in `scripts/economy.lua`
+and `scripts/recipes.lua`; an unknown string is a **load-time error**, not a silent fallback,
+because a typo would quietly re-admit a space-era entry to the ancient roster.
+
+The campaign's band is derived from `world_params::epoch_year` against the same 1700 threshold the
+antiquity branch already uses — below 1700 is ancient — and applied in `app::load_economy` right
+after the registry loads. This is why a 0 CE campaign is never offered a Launchpad, the petroleum
+and propellant chains, or the spacecraft chain.
+
+**The band masks; it never removes.** A recipe's id is its index in the authored list and that id
+is *stored* in `building_component.recipe`, so a filter that compacted the list would silently
+repoint every building whose recipe sat after a filtered one. The registry therefore keeps two
+paths, and the distinction matters to anyone adding a caller:
+
+| Path | Functions | Behaviour |
+|---|---|---|
+| **Storage** | `get_recipe(id)`, `recipe_id(name)` | Absolute and band-independent. A stored id means the same recipe in every band. |
+| **Browse** | `recipe_count(bt)`, `recipe_at(bt, i)` | Era-masked. Walking `[0, recipe_count)` walks *this campaign's* recipes. |
+
+Every pre-existing caller of the browse path already meant "the recipes available to me", which is
+why none needed rewriting. `construct_building` is the authoritative gate (refusing with
+`construction_result::era_locked`, distinct from `tech_locked` because no research reaches it), and
+the Selection panel's build door filters on `building_available` so the door does not offer what the
+gate would refuse. Guard: `tools/verify/era_roster.cpp`.
+
+The band is **not** ERAS.md's Era 0 / Era 1 — that axis is per-corp progression *within* the
+industrial arc, gated on space access. See the note at the head of `ERAS.md`.
+
+The ancient roster is deliberately thin at this point — `steel`, `food_rations` and
+`refined_copper` are the only untagged processing chains. Filling it out is **BL-429** (ancient
+building roster), the next item in Sprint 17.
+
+---
+
 ## Layer 3 prototype scope
 
 Layer 3 implements:

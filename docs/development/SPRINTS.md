@@ -115,6 +115,101 @@ leans on. If it sprawls, the fallback is BL-377 against the *existing* battle re
 thinnest possible command surface — a contract you accept whose battle resolves itself is still a
 loop; a designed-but-unbuilt spine is not.
 
+**Amendment 2026-08-15.** Three of the four planned items are `complete` — **BL-377** (mercenary
+contract seam), **BL-378** (minimap base render) and **BL-398** (persona counsel tick cost). The
+sprint then drifted: the sessions that followed went to v0.1.16 work (spectator mode, the decision
+feed, gate hygiene) rather than to the two items that make the slice *play*. **BL-315** (conflict
+spine) is now `designed` rather than design-owed, so the sprint's stated risk did not materialise —
+it simply was not built. The remainder is re-planned as **Sprint 18** below, and v0.1.15 stays
+uncut until it lands.
+
+---
+
+# Sprint 17 — Economy breadth: the chain is the growth track (opened 2026-08-15)
+
+**Goal.** Give the ancient economy enough building options, production methods and *depth* that
+progress is something the player builds rather than something a system grants. Cuts a new minor,
+**v0.1.17**. Ben, this date: *"make sure the economy has robust and expansive building options,
+production methods, and an implied growth track that we can refine tech and politics around."*
+
+**The four rulings that shape it** (2026-08-15, elicitation form):
+
+1. The growth spine is **chain depth** — not building tiers, not the tech ladder, not settlement
+   scale. How far down the production graph a corp can reach is what gates its next building.
+2. The roster goes **past 20 building types**, as a content sprint of its own.
+3. Buildings offer **alternate production methods with real trade-offs** — not tier upgrades.
+4. **Economy first**, military follows.
+
+**What the measurement found before any work.** `scripts/economy.lua` carries **7** `building_type`
+entries and `scripts/recipes.lua` carries **17** recipes, one per output, no alternates — so
+choosing a building *is* choosing its method today. One of the seven is the space-era Launchpad and
+the refinery chain runs on petroleum, inside a product set at 0 CE. And the ancient substrate is
+already in the enum and mostly idle: `stone`, `timber`, `sand`, `clay`, `peat`, `charcoal`,
+`iron_blooms`, `grain`, `fodder`, `salt`, `bullion` are BL-286 values whose behaviours were never
+filed. The sprint's cheapest and most honest version is to give those orphans consumers rather than
+mint new resources.
+
+**Planned.**
+- **BL-428 — chain depth is the growth spine** (`designed`, A): the depth metric off the recipe
+  graph, what it gates, and the acyclicity it requires. Foundation — everything else reads it.
+- **BL-433 — space-era buildings in the ancient arc** (`designed`, B): *answer this first.* It
+  carries an open a/b/c on how the two arcs share one data set, and BL-429 writes into exactly
+  those files.
+- **BL-429 — ancient building roster** (`designed`, A): 7 → 20+ named buildings on ~3
+  `building_type` values, following the BL-166/BL-168 pattern (recipe + placement rule, not a new
+  enum value). Every ancient orphan resource gets a consumer.
+- **BL-430 — alternate production methods** (`designed`, A): several recipes per output, with the
+  design bar that no method may dominate a sibling on every axis.
+- **BL-431 — production-method and chain UI** (`designed`, B): the method selector, the chain
+  trace, the depth readout. Without these the content is a data file the player cannot see.
+- **BL-432 — economy-breadth guard harness** (`designed`, B): the four invariants mechanised —
+  acyclic graph, no orphan resources either direction, every building reachable, no dominant
+  method.
+
+**Risk.** Content sprints sprawl, and this one has a real dependency chain (BL-428 → BL-429/430 →
+BL-431). The order above is the mitigation: depth and the era question settle first, and the roster
+is built against a metric that already exists rather than alongside one. If the roster runs long,
+**BL-431's UI is the part that must not be cut** — 20 invisible buildings are worth less than 12
+legible ones.
+
+**Watch for.** `corp_ai.cpp` scores build candidates over whatever roster it is handed. A 20+
+roster and a method choice are both new decision surfaces for the scorer; BL-430 names the call
+explicitly rather than letting a default pin every rival to the same method.
+
+---
+
+# Sprint 18 — The military engagement surface (planned 2026-08-15, opens after Sprint 17)
+
+**Goal.** Finish what Sprint 16 started: make the fight *playable and visible*. Closes and cuts
+**v0.1.15**, the mercenary vertical slice.
+
+**Planned.**
+- **BL-393 — units are write-only and inert** (`designed`, A): the sharpest live defect. A player
+  raised 25 units and found nothing to do with any of them — no verb takes a unit as a subject, no
+  blackboard predicate reads one back, and demolishing the muster base silently orphans every unit
+  standing on it. Foundation for everything below.
+- **BL-315 — conflict spine** (`designed`, A): units as tokens on the tile map, a campaign battle
+  resolver with seeded randomness and withdrawal. Nothing in the campaign layer commands
+  `resolve_battle` today.
+- **BL-384 — the Era −1 sim conquers nothing** (`designed`, A): 267 battles, zero provinces taken
+  across a full run. The generator that feeds the ancient product cannot fight to a conclusion.
+- **BL-405 — hire has no price on screen** (`designed`, B): hiring costs credits since BL-394 and
+  no surface shows it; the AI reads the price from `ACTIONS.json`, the human is told by a refusal
+  string.
+- **BL-325 tail — unit supply decay** (`designed`, B): the last leg of military bases and supply.
+- **BL-314 — unit verb family** (`design-owed`, B): unblocks the moment BL-393 gives it a
+  `unit_command` seam to transcribe from. Dictionary entries are transcribed, never authored ahead
+  of the seam (BL-270).
+
+**UI padding, in scope and not a rider.** This is the half Ben named: unit markers and their glyphs
+(ICONS.md), a unit view in the Selection panel, a force ledger, battle outcomes in the comms dock,
+and a `question_log.json` entry per surface. A unit you cannot see is the same defect BL-393
+describes, one layer up.
+
+**Risk.** BL-315 is still the item the sprint leans on, and it is now the *only* unknown — its
+design landed but nothing is built against it. Fallback is unchanged from Sprint 16: the thinnest
+command surface over the existing battle resolution beats a designed-but-unbuilt spine.
+
 ---
 
 # Sprints 8–14 — the plan (written 2026-08-10, re-sequenced the same day; Sprints 12–14 superseded 2026-08-12 by NR-177 — their minors parked with the space arc, never opened)

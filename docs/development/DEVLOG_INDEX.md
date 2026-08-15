@@ -3,13 +3,16 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 158 entries across 2 volume(s).
+One line per session, newest first — 161 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
+| 2026-08-14 | [Gate hygiene becomes a measurement saga: batch verify, the 70% map, and the golden demotion](DEVLOG.md) | BL-402 BL-415 BL-416 BL-423 BL-424 BL-425 BL-426 BL-427 | DEVLOG.md |
+| 2026-08-14 | [Seam batch: the money printer closed and the word interface given a door](DEVLOG.md) | BL-351 BL-386 BL-387 BL-396 BL-397 BL-416 BL-422 | DEVLOG.md |
+| 2026-08-14 | [Doc-system weight: requirements hot/cold split + DEVLOG rollover](DEVLOG.md) | BL-421 | DEVLOG.md |
 | 2026-08-13 | [AI gameplay: the word interface made runnable, and the rival's idle/resume oscillation measured](DEVLOG.md) | BL-049 BL-079 BL-094 BL-193 BL-202 BL-203 BL-278 BL-293 BL-315 BL-324 BL-350 BL-366 BL-377 BL-381 BL-384 BL-386 BL-387 BL-388 BL-389 BL-390 BL-393 BL-394 | DEVLOG.md |
 | 2026-08-11 | [BL-130 lands: BL-365's blocker chain closed, and a live crash caught in passing](DEVLOG.md) | BL-078 BL-095 BL-130 BL-253 BL-263 BL-365 BL-366 BL-368 | DEVLOG.md |
 | 2026-08-11 | [BL-263 lands: BL-365's blocker chain, first link](DEVLOG.md) | BL-089 BL-096 BL-130 BL-263 BL-365 BL-366 BL-368 | DEVLOG.md |
@@ -65,53 +68,53 @@ the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 | 2026-08-02 | [the design-owed sweep: thirty items settled, and three recovered from a merge](DEVLOG.md) | BL-054 BL-087 BL-094 BL-098 BL-131 BL-155 BL-157 BL-158 BL-171 BL-189 BL-210 BL-217 BL-218 BL-223 BL-225 BL-229 BL-262 BL-263 | DEVLOG.md |
 | 2026-08-01 | [the disclosure spine: one fold idiom, and the surfaces stop inventing their own](DEVLOG.md) | BL-214 BL-215 BL-233 BL-247 BL-248 BL-252 BL-254 BL-259 | DEVLOG.md |
 | 2026-08-01 | [the last four v0.1.0 items, and the goldens finally have one truth value](DEVLOG.md) | BL-162 BL-203 BL-221 BL-233 BL-252 BL-254 BL-255 BL-256 BL-257 BL-258 | DEVLOG.md |
-| 2026-07-31 | [closing the v0.1.0 cut set: terrain combat, font glyphs, and the three audit instruments](DEVLOG.md) | BL-162 BL-210 BL-226 BL-230 BL-233 BL-234 BL-249 BL-252 BL-253 BL-254 BL-255 | DEVLOG.md |
-| 2026-07-31 | [BL-214/BL-247/BL-248 (drill-through UI): narrow-by-default disclosure design, and a mid-session tree wipe](DEVLOG.md) | BL-196 BL-214 BL-247 BL-248 | DEVLOG.md |
-| 2026-07-31 | [BL-190 (food demand): population demand was erased before pricing — ordering fix](DEVLOG.md) | BL-078 BL-096 BL-166 BL-168 BL-190 | DEVLOG.md |
-| 2026-07-31 | [Doc-truth sweep: every authority doc reconciled with the shipped code](DEVLOG.md) | BL-036 BL-037 BL-051 BL-054 BL-069 BL-094 BL-114 BL-130 BL-155 BL-200 BL-214 BL-223 BL-226 | DEVLOG.md |
-| 2026-07-31 | [BL-231 (landform render): drawing the axis the build cost already charged for](DEVLOG.md) | BL-051 BL-172 BL-226 BL-231 | DEVLOG.md |
-| 2026-07-30 | [BL-221 (pre-national ladder): the first stage that shapes the political map](DEVLOG.md) | BL-170 BL-217 BL-218 BL-219 BL-220 BL-221 BL-222 BL-224 | DEVLOG.md |
-| 2026-07-30 | [BL-220 (dated history timestamps): the foundation under the HISTORY.md ladder](DEVLOG.md) | BL-208 BL-209 BL-210 BL-217 BL-220 BL-221 BL-222 | DEVLOG.md |
-| 2026-07-30 | [v0.1.0 legibility batch: the five cut-blockers, and four items designed](DEVLOG.md) | BL-123 BL-162 BL-174 BL-176 BL-177 BL-178 BL-179 BL-211 BL-213 BL-214 BL-215 BL-216 | DEVLOG.md |
-| 2026-07-29 | [History ledger: the generation charts get a second home (BL-211)](DEVLOG.md) | BL-210 BL-211 | DEVLOG.md |
-| 2026-07-28 | [Generation oral-history pivot; Selection band reshape (BL-210/211/212/213)](DEVLOG.md) | BL-167 BL-194 BL-210 BL-211 BL-212 BL-213 | DEVLOG.md |
-| 2026-07-28 | [Chemical life: the seven-gate abiogenesis chain designed, vocabulary built (BL-209)](DEVLOG.md) | BL-167 BL-208 BL-209 | DEVLOG.md |
-| 2026-07-26 | [AI architecture accepted, comms chat log lands (BL-199 closed, BL-205 slice 1)](DEVLOG.md) | BL-079 BL-153 BL-160 BL-181 BL-193 BL-194 BL-195 BL-196 BL-197 BL-198 BL-199 BL-202 BL-203 BL-204 BL-205 | DEVLOG.md |
-| 2026-07-22 | [Wizard back-out, built-tile routing, the building Selection element (BL-193)](DEVLOG.md) | BL-135 BL-181 BL-192 BL-193 | DEVLOG.md |
-| 2026-07-21 | [Planetology: the A→B→C→D chain, the New World wizard, endemic trade (BL-167, BL-191)](DEVLOG.md) | BL-051 BL-114 BL-167 BL-181 BL-191 BL-192 | DEVLOG.md |
-| 2026-07-21 | [Sprint 1 procgen review: BL-040 correction, BL-051/132 settle, Planetology (BL-167) reframed](DEVLOG.md) | BL-040 BL-051 BL-096 BL-132 BL-166 BL-167 BL-170 | DEVLOG.md |
-| 2026-07-21 | [Design settle (redo): rivers as edges + coastal cluster (BL-166/168/170; BL-188/189 filed)](DEVLOG.md) | BL-166 BL-168 BL-170 BL-188 BL-189 | DEVLOG.md |
-| 2026-07-18 | [Corporate borders: BL-182 recorded + visual reach slice (BL-183)](DEVLOG.md) | BL-057 BL-085 BL-182 BL-183 | DEVLOG.md |
-| 2026-07-11 | [Road tiers + spanning render fix (BL-172; BL-173 filed)](DEVLOG.md) | BL-172 BL-173 | DEVLOG.md |
-| 2026-07-11 | [Budget ledger redesign (BL-171)](DEVLOG.md) | BL-072 BL-074 BL-112 BL-147 BL-155 BL-171 | DEVLOG.md |
-| 2026-07-10 | [v0.1.1 Batch: Roads & planetary logistics (BL-147/148/149)](DEVLOG.md) | BL-077 BL-146 BL-147 BL-148 BL-149 BL-150 BL-152 BL-153 | DEVLOG.md |
-| 2026-07-10 | [Generated road network (BL-146)](DEVLOG.md) | BL-077 BL-146 BL-147 BL-148 BL-149 | DEVLOG.md |
-| 2026-07-10 | [On-canvas legends: bounded scrollable body (BL-164, folds BL-163); BL-165 reconciled](DEVLOG.md) | BL-163 BL-164 BL-165 | DEVLOG.md |
-| 2026-07-10 | [Tile construction ledger, first pass (BL-162)](DEVLOG.md) | BL-162 | DEVLOG.md |
-| 2026-07-10 | [Tile Selection element redesign (BL-123)](DEVLOG.md) | BL-071 BL-123 BL-139 BL-162 | DEVLOG.md |
-| 2026-07-09 | [v0.1.0 legibility polish + UX-review Batch Delivery (BL-133–145, BL-159)](DEVLOG.md) | BL-068 BL-097 BL-133 BL-134 BL-135 BL-136 BL-137 BL-138 BL-139 BL-140 BL-141 BL-142 BL-143 BL-144 BL-145 BL-159 | DEVLOG.md |
-| 2026-07-09 | [Fog of war: activity-fog shadow + Planetary reach fog + convoy beam](DEVLOG.md) | BL-087 BL-089 BL-150 BL-151 BL-152 BL-153 BL-154 | DEVLOG.md |
-| 2026-07-09 | [Roadmap refocus: expanded-prototype arc + Era→Filter](DEVLOG.md) | BL-087 BL-094 BL-146 BL-155 BL-156 BL-157 BL-158 | DEVLOG.md |
-| 2026-07-08 | [BL-129: prose pass on the central documentation](DEVLOG.md) | BL-129 | DEVLOG.md |
-| 2026-07-08 | [BL-087 tech/quest design resolutions](DEVLOG.md) | BL-087 | DEVLOG.md |
-| 2026-07-07 | [Economy dynamism batch delivered: BL-078/095/096/079/112](DEVLOG.md) | BL-078 BL-079 BL-095 BL-096 BL-112 BL-130 BL-131 BL-132 | DEVLOG.md |
-| 2026-07-07 | [Economy-cluster design: demand model, market stock, market gen](DEVLOG.md) | BL-078 BL-079 BL-095 BL-096 BL-112 BL-130 BL-131 BL-132 | DEVLOG.md |
-| 2026-07-07 | [Tooling + batch: ID-reservation ledger, BL-126, BL-113](DEVLOG.md) | BL-077 BL-094 BL-099 BL-107 BL-112 BL-113 BL-126 | DEVLOG.md |
-| 2026-07-07 | [Ledger-mockup design + shell proportion/selection pass](DEVLOG.md) | BL-065 BL-123 BL-124 BL-125 BL-126 | DEVLOG.md |
-| 2026-07-06 | [Market ledger redesign + city naming](DEVLOG.md) | BL-120 BL-124 BL-125 BL-126 BL-127 BL-128 | DEVLOG.md |
-| 2026-07-06 | [One-question-per-view sweep + corp-dashboard legibility](DEVLOG.md) | BL-111 BL-117 BL-118 BL-119 BL-120 BL-121 BL-122 | DEVLOG.md |
-| 2026-07-06 | [BL-122 Paradox-style fold-out shell (skeleton)](DEVLOG.md) | BL-082 BL-117 BL-118 BL-122 | DEVLOG.md |
-| 2026-07-06 | [Corp starting resource stockpile: fixed give → generated](DEVLOG.md) | BL-095 BL-111 BL-114 BL-115 BL-116 | DEVLOG.md |
-| 2026-07-06 | [Playability: construction deadlock fix + fresh-start build assertion](DEVLOG.md) | BL-044 BL-081 BL-095 | DEVLOG.md |
-| 2026-07-05 | [User-story testing pillar + local tooling + golden-staleness sweep](DEVLOG.md) | BL-011 BL-070 BL-098 BL-100 | DEVLOG.md |
-| 2026-07-05 | [Engineering health sweep + audit quick-win batch](DEVLOG.md) | BL-098 BL-101 BL-102 BL-103 BL-104 BL-105 BL-106 BL-107 BL-108 BL-109 BL-110 | DEVLOG.md |
-| 2026-07-05 | [v0.0.9 polish batch delivered](DEVLOG.md) | BL-008 BL-070 BL-071 BL-074 BL-081 BL-082 BL-089 BL-090 BL-093 BL-099 BL-100 | DEVLOG.md |
-| 2026-07-04 | [v0.0.8 legibility + fog batch delivered; version record reconciled](DEVLOG.md) | BL-017 BL-067 BL-077 BL-083 BL-084 BL-085 BL-086 BL-088 BL-089 BL-090 BL-092 | DEVLOG.md |
-| 2026-07-01 | [Discovery: trade-route fog design (BL-088 + BL-089) + roadmap re-sync](DEVLOG.md) | BL-064 BL-065 BL-067 BL-068 BL-071 BL-072 BL-073 BL-083 BL-088 BL-089 | DEVLOG.md |
-| 2026-07-01 | [QOL: main menu + campaign-start framing/legibility](DEVLOG.md) | BL-083 | DEVLOG.md |
-| 2026-07-01 | [Visibility pass: design Q&A → backlog cluster](DEVLOG.md) | BL-050 BL-071 BL-083 BL-084 BL-085 BL-086 | DEVLOG.md |
-| 2026-07-01 | [Era 1 tech / quest system: research → first structural sketch](DEVLOG.md) | BL-087 | DEVLOG.md |
-| 2026-07-01 | [BL-076 Display options window](DEVLOG.md) | BL-070 BL-076 | DEVLOG.md |
+| 2026-07-31 | [closing the v0.1.0 cut set: terrain combat, font glyphs, and the three audit instruments](archive/DEVLOG-2026.md) | BL-162 BL-210 BL-226 BL-230 BL-233 BL-234 BL-249 BL-252 BL-253 BL-254 BL-255 | DEVLOG-2026.md |
+| 2026-07-31 | [BL-214/BL-247/BL-248 (drill-through UI): narrow-by-default disclosure design, and a mid-session tree wipe](archive/DEVLOG-2026.md) | BL-196 BL-214 BL-247 BL-248 | DEVLOG-2026.md |
+| 2026-07-31 | [BL-190 (food demand): population demand was erased before pricing — ordering fix](archive/DEVLOG-2026.md) | BL-078 BL-096 BL-166 BL-168 BL-190 | DEVLOG-2026.md |
+| 2026-07-31 | [Doc-truth sweep: every authority doc reconciled with the shipped code](archive/DEVLOG-2026.md) | BL-036 BL-037 BL-051 BL-054 BL-069 BL-094 BL-114 BL-130 BL-155 BL-200 BL-214 BL-223 BL-226 | DEVLOG-2026.md |
+| 2026-07-31 | [BL-231 (landform render): drawing the axis the build cost already charged for](archive/DEVLOG-2026.md) | BL-051 BL-172 BL-226 BL-231 | DEVLOG-2026.md |
+| 2026-07-30 | [BL-221 (pre-national ladder): the first stage that shapes the political map](archive/DEVLOG-2026.md) | BL-170 BL-217 BL-218 BL-219 BL-220 BL-221 BL-222 BL-224 | DEVLOG-2026.md |
+| 2026-07-30 | [BL-220 (dated history timestamps): the foundation under the HISTORY.md ladder](archive/DEVLOG-2026.md) | BL-208 BL-209 BL-210 BL-217 BL-220 BL-221 BL-222 | DEVLOG-2026.md |
+| 2026-07-30 | [v0.1.0 legibility batch: the five cut-blockers, and four items designed](archive/DEVLOG-2026.md) | BL-123 BL-162 BL-174 BL-176 BL-177 BL-178 BL-179 BL-211 BL-213 BL-214 BL-215 BL-216 | DEVLOG-2026.md |
+| 2026-07-29 | [History ledger: the generation charts get a second home (BL-211)](archive/DEVLOG-2026.md) | BL-210 BL-211 | DEVLOG-2026.md |
+| 2026-07-28 | [Generation oral-history pivot; Selection band reshape (BL-210/211/212/213)](archive/DEVLOG-2026.md) | BL-167 BL-194 BL-210 BL-211 BL-212 BL-213 | DEVLOG-2026.md |
+| 2026-07-28 | [Chemical life: the seven-gate abiogenesis chain designed, vocabulary built (BL-209)](archive/DEVLOG-2026.md) | BL-167 BL-208 BL-209 | DEVLOG-2026.md |
+| 2026-07-26 | [AI architecture accepted, comms chat log lands (BL-199 closed, BL-205 slice 1)](archive/DEVLOG-2026.md) | BL-079 BL-153 BL-160 BL-181 BL-193 BL-194 BL-195 BL-196 BL-197 BL-198 BL-199 BL-202 BL-203 BL-204 BL-205 | DEVLOG-2026.md |
+| 2026-07-22 | [Wizard back-out, built-tile routing, the building Selection element (BL-193)](archive/DEVLOG-2026.md) | BL-135 BL-181 BL-192 BL-193 | DEVLOG-2026.md |
+| 2026-07-21 | [Planetology: the A→B→C→D chain, the New World wizard, endemic trade (BL-167, BL-191)](archive/DEVLOG-2026.md) | BL-051 BL-114 BL-167 BL-181 BL-191 BL-192 | DEVLOG-2026.md |
+| 2026-07-21 | [Sprint 1 procgen review: BL-040 correction, BL-051/132 settle, Planetology (BL-167) reframed](archive/DEVLOG-2026.md) | BL-040 BL-051 BL-096 BL-132 BL-166 BL-167 BL-170 | DEVLOG-2026.md |
+| 2026-07-21 | [Design settle (redo): rivers as edges + coastal cluster (BL-166/168/170; BL-188/189 filed)](archive/DEVLOG-2026.md) | BL-166 BL-168 BL-170 BL-188 BL-189 | DEVLOG-2026.md |
+| 2026-07-18 | [Corporate borders: BL-182 recorded + visual reach slice (BL-183)](archive/DEVLOG-2026.md) | BL-057 BL-085 BL-182 BL-183 | DEVLOG-2026.md |
+| 2026-07-11 | [Road tiers + spanning render fix (BL-172; BL-173 filed)](archive/DEVLOG-2026.md) | BL-172 BL-173 | DEVLOG-2026.md |
+| 2026-07-11 | [Budget ledger redesign (BL-171)](archive/DEVLOG-2026.md) | BL-072 BL-074 BL-112 BL-147 BL-155 BL-171 | DEVLOG-2026.md |
+| 2026-07-10 | [v0.1.1 Batch: Roads & planetary logistics (BL-147/148/149)](archive/DEVLOG-2026.md) | BL-077 BL-146 BL-147 BL-148 BL-149 BL-150 BL-152 BL-153 | DEVLOG-2026.md |
+| 2026-07-10 | [Generated road network (BL-146)](archive/DEVLOG-2026.md) | BL-077 BL-146 BL-147 BL-148 BL-149 | DEVLOG-2026.md |
+| 2026-07-10 | [On-canvas legends: bounded scrollable body (BL-164, folds BL-163); BL-165 reconciled](archive/DEVLOG-2026.md) | BL-163 BL-164 BL-165 | DEVLOG-2026.md |
+| 2026-07-10 | [Tile construction ledger, first pass (BL-162)](archive/DEVLOG-2026.md) | BL-162 | DEVLOG-2026.md |
+| 2026-07-10 | [Tile Selection element redesign (BL-123)](archive/DEVLOG-2026.md) | BL-071 BL-123 BL-139 BL-162 | DEVLOG-2026.md |
+| 2026-07-09 | [v0.1.0 legibility polish + UX-review Batch Delivery (BL-133–145, BL-159)](archive/DEVLOG-2026.md) | BL-068 BL-097 BL-133 BL-134 BL-135 BL-136 BL-137 BL-138 BL-139 BL-140 BL-141 BL-142 BL-143 BL-144 BL-145 BL-159 | DEVLOG-2026.md |
+| 2026-07-09 | [Fog of war: activity-fog shadow + Planetary reach fog + convoy beam](archive/DEVLOG-2026.md) | BL-087 BL-089 BL-150 BL-151 BL-152 BL-153 BL-154 | DEVLOG-2026.md |
+| 2026-07-09 | [Roadmap refocus: expanded-prototype arc + Era→Filter](archive/DEVLOG-2026.md) | BL-087 BL-094 BL-146 BL-155 BL-156 BL-157 BL-158 | DEVLOG-2026.md |
+| 2026-07-08 | [BL-129: prose pass on the central documentation](archive/DEVLOG-2026.md) | BL-129 | DEVLOG-2026.md |
+| 2026-07-08 | [BL-087 tech/quest design resolutions](archive/DEVLOG-2026.md) | BL-087 | DEVLOG-2026.md |
+| 2026-07-07 | [Economy dynamism batch delivered: BL-078/095/096/079/112](archive/DEVLOG-2026.md) | BL-078 BL-079 BL-095 BL-096 BL-112 BL-130 BL-131 BL-132 | DEVLOG-2026.md |
+| 2026-07-07 | [Economy-cluster design: demand model, market stock, market gen](archive/DEVLOG-2026.md) | BL-078 BL-079 BL-095 BL-096 BL-112 BL-130 BL-131 BL-132 | DEVLOG-2026.md |
+| 2026-07-07 | [Tooling + batch: ID-reservation ledger, BL-126, BL-113](archive/DEVLOG-2026.md) | BL-077 BL-094 BL-099 BL-107 BL-112 BL-113 BL-126 | DEVLOG-2026.md |
+| 2026-07-07 | [Ledger-mockup design + shell proportion/selection pass](archive/DEVLOG-2026.md) | BL-065 BL-123 BL-124 BL-125 BL-126 | DEVLOG-2026.md |
+| 2026-07-06 | [Market ledger redesign + city naming](archive/DEVLOG-2026.md) | BL-120 BL-124 BL-125 BL-126 BL-127 BL-128 | DEVLOG-2026.md |
+| 2026-07-06 | [One-question-per-view sweep + corp-dashboard legibility](archive/DEVLOG-2026.md) | BL-111 BL-117 BL-118 BL-119 BL-120 BL-121 BL-122 | DEVLOG-2026.md |
+| 2026-07-06 | [BL-122 Paradox-style fold-out shell (skeleton)](archive/DEVLOG-2026.md) | BL-082 BL-117 BL-118 BL-122 | DEVLOG-2026.md |
+| 2026-07-06 | [Corp starting resource stockpile: fixed give → generated](archive/DEVLOG-2026.md) | BL-095 BL-111 BL-114 BL-115 BL-116 | DEVLOG-2026.md |
+| 2026-07-06 | [Playability: construction deadlock fix + fresh-start build assertion](archive/DEVLOG-2026.md) | BL-044 BL-081 BL-095 | DEVLOG-2026.md |
+| 2026-07-05 | [User-story testing pillar + local tooling + golden-staleness sweep](archive/DEVLOG-2026.md) | BL-011 BL-070 BL-098 BL-100 | DEVLOG-2026.md |
+| 2026-07-05 | [Engineering health sweep + audit quick-win batch](archive/DEVLOG-2026.md) | BL-098 BL-101 BL-102 BL-103 BL-104 BL-105 BL-106 BL-107 BL-108 BL-109 BL-110 | DEVLOG-2026.md |
+| 2026-07-05 | [v0.0.9 polish batch delivered](archive/DEVLOG-2026.md) | BL-008 BL-070 BL-071 BL-074 BL-081 BL-082 BL-089 BL-090 BL-093 BL-099 BL-100 | DEVLOG-2026.md |
+| 2026-07-04 | [v0.0.8 legibility + fog batch delivered; version record reconciled](archive/DEVLOG-2026.md) | BL-017 BL-067 BL-077 BL-083 BL-084 BL-085 BL-086 BL-088 BL-089 BL-090 BL-092 | DEVLOG-2026.md |
+| 2026-07-01 | [Discovery: trade-route fog design (BL-088 + BL-089) + roadmap re-sync](archive/DEVLOG-2026.md) | BL-064 BL-065 BL-067 BL-068 BL-071 BL-072 BL-073 BL-083 BL-088 BL-089 | DEVLOG-2026.md |
+| 2026-07-01 | [QOL: main menu + campaign-start framing/legibility](archive/DEVLOG-2026.md) | BL-083 | DEVLOG-2026.md |
+| 2026-07-01 | [Visibility pass: design Q&A → backlog cluster](archive/DEVLOG-2026.md) | BL-050 BL-071 BL-083 BL-084 BL-085 BL-086 | DEVLOG-2026.md |
+| 2026-07-01 | [Era 1 tech / quest system: research → first structural sketch](archive/DEVLOG-2026.md) | BL-087 | DEVLOG-2026.md |
+| 2026-07-01 | [BL-076 Display options window](archive/DEVLOG-2026.md) | BL-070 BL-076 | DEVLOG-2026.md |
 | 2026-06-30 | [Gameplay-clarity / profit strand: budget cluster delivered](archive/DEVLOG-2026.md) | BL-071 BL-072 BL-073 BL-074 BL-075 BL-076 | DEVLOG-2026.md |
 | 2026-06-30 | [v0.0.8 Batch Delivery: BL-068 Visibility + BL-069 Population legibility](archive/DEVLOG-2026.md) | BL-067 BL-068 BL-069 | DEVLOG-2026.md |
 | 2026-06-30 | [v0.0.8 Batch Delivery: BL-067 Survey system](archive/DEVLOG-2026.md) | BL-067 BL-068 BL-069 | DEVLOG-2026.md |

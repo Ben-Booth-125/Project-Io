@@ -303,10 +303,13 @@ int main()
               before - ww.corporations[wc].balance, 44.0f);
     }
 
-    // --- Player sell orders: floor price honoured, auto-path yields control ---
+    // --- Player sell orders: the floor is a reservation price (BL-386) ---
     // A corp pool holds 10 steel on a body whose market trades steel at base 8 with
     // no demand. Resolved price floors: target base*sqrt(0/10)=0 -> 0.25*8=2, EMA
-    // from prior 8 -> 5.0. A player order (qty 10, floor 6) sells all 10 at max(5,6)=6.
+    // from prior 8 -> 5.0. An order at floor 4 (below the market) clears all 10 at
+    // the RESOLVED price 5 — never at the floor, never above the market. An order
+    // whose floor exceeds the resolved price holds instead (order_book_harness R6
+    // covers the hold side in depth).
     {
         world ws;
         const entity_id b = ws.create_entity(); ws.bodies[b] = body_component{};
@@ -323,24 +326,24 @@ int main()
         // to clear_markets — clearing reads the book itself now.
         sell_order o; o.id = ws.allocate_order_id();
         o.corp = corp; o.body = b; o.resource = resource_type::steel;
-        o.quantity = 10.0f; o.floor_price = 6.0f;
+        o.quantity = 10.0f; o.floor_price = 4.0f;
         ws.sell_orders.push_back(o);
 
         economy_report empty; // no production this scenario
         auto f = clear_markets(ws, reg, empty);
         check(near(ws.markets[m].price[ri(resource_type::steel)], 5.0f),
               "SO.1 steel price floored+eased to 5.0", ws.markets[m].price[ri(resource_type::steel)], 5.0f);
-        check(near(f[corp].income, 60.0f),
-              "SO.2 standing order sells 10 at floor 6 (income 60)", f[corp].income, 60.0f);
+        check(near(f[corp].income, 50.0f),
+              "SO.2 standing order sells 10 at the resolved price 5, not the floor (income 50)", f[corp].income, 50.0f);
         check(near(ws.pool_for(corp, b).quantities[ri(resource_type::steel)], 0.0f),
               "SO.3 pool debited by the order", ws.pool_for(corp, b).quantities[ri(resource_type::steel)], 0.0f);
     }
 
     // --- BL-351: duplicate sell orders cannot over-commit the pool ---
-    // Two identical orders (qty 10, floor 6) against a pool of 10 steel: the
+    // Two identical orders (qty 10, floor 4) against a pool of 10 steel: the
     // second lists only the running remainder (0), so at most the pool clears,
     // the pool floors at 0, and income prices only the cleared quantity.
-    // Price as SO.1: no demand -> ref 5.0, clearing = max(5, 6) = 6.
+    // Price as SO.1: no demand -> ref 5.0; floor 4 permits, clearing pays 5.
     {
         world ws;
         const entity_id b = ws.create_entity(); ws.bodies[b] = body_component{};
@@ -356,7 +359,7 @@ int main()
         // BL-293: the book is world state, so the duplicate orders are placed on
         // the world rather than handed to clear_markets.
         sell_order o; o.corp = corp; o.body = b; o.resource = resource_type::steel;
-        o.quantity = 10.0f; o.floor_price = 6.0f;
+        o.quantity = 10.0f; o.floor_price = 4.0f;
         o.id = ws.allocate_order_id(); ws.sell_orders.push_back(o);
         o.id = ws.allocate_order_id(); ws.sell_orders.push_back(o);
 
@@ -368,14 +371,15 @@ int main()
               "BL351.1 duplicate orders clear at most the pool (10 total)", cleared, 10.0f);
         check(pool_after >= 0.0f && near(pool_after, 0.0f),
               "BL351.2 pool floors at zero (never negative)", pool_after, 0.0f);
-        check(near(f[corp].income, cleared * 6.0f),
-              "BL351.3 income == cleared quantity x clearing price (10*6)", f[corp].income, cleared * 6.0f);
+        check(near(f[corp].income, cleared * 5.0f),
+              "BL351.3 income == cleared quantity x resolved price (10*5)", f[corp].income, cleared * 5.0f);
     }
 
     // --- BL-351: a multi-order seller's unmatched remainder clears per order ---
     // One seller lists two orders of 5 (floor 2); one buyer takes 5. The matched 5
-    // drains one order; the OTHER order's own remainder (5) auto-clears at
-    // max(ref, floor) — the old per-seller aggregate zeroed both orders' remainder.
+    // drains one order; the OTHER order's own remainder (5) auto-clears at the
+    // resolved price (floor 2 permits) — the old per-seller aggregate zeroed both
+    // orders' remainder.
     // Ref price: S=10 D=5 base 8 -> target 8*sqrt(0.5)=5.657, EMA -> 6.828.
     // Income = 5*2 (matched at ask) + 5*6.828 (auto-clear) = 44.142.
     {

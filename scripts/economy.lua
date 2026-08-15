@@ -75,7 +75,13 @@ economy = {
             build_duration_ticks = 2.0,
             resource_costs = { steel = 20.0 },
         },
+        -- BL-433: the one building type that is unambiguously not ancient. Tagged
+        -- `industrial` so a campaign opened at 0 CE never offers it — the roster is
+        -- what the Build door reads, and an anachronism there reads as a bug in the
+        -- product rather than as a parked feature. Every other type below is shared
+        -- by both arcs and stays untagged (= "any").
         launchpad = {
+            era         = "industrial",
             base_rate   = 0.0,
             maintenance = 20.0,
             base_wage   = 15.0,

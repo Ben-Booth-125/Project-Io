@@ -27,6 +27,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <sstream>
 #include <string>
 #include <unordered_map>
@@ -56,6 +57,40 @@ long kv_get(const std::unordered_map<std::string, std::string>& kv, const char* 
     if (it == kv.end())
         return dflt;
     return std::atol(it->second.c_str());
+}
+
+/// BL-396: the checked sibling of kv_get, for the COMMAND parse — the one
+/// opcode whose fields feed narrow types and array indices. Parses WIDE
+/// (long long), then refuses (clears `ok`) anything that fails to parse as an
+/// integer at all or falls outside [lo, hi], the destination's REAL domain.
+/// Never truncates, never wraps, never clamps: `verb=256` used to truncate to
+/// 0 and BUILD A BUILDING answering `applied`, `type=200` indexed the
+/// per-type economics array out of bounds and segfaulted the process, and
+/// `workforce=4294967396` wrapped to a legal 100 and applied. An absent key
+/// keeps its default, which is in-domain by construction — absent is not
+/// malformed, exactly kv_getf's reading.
+///
+/// strtoll saturates to LLONG_MAX/MIN on overflow, and every domain this
+/// parser passes tops out at uint32's max, so the saturated value is itself
+/// out of [lo, hi] and no errno check is needed.
+long long kv_get_checked(const std::unordered_map<std::string, std::string>& kv,
+                         const char* key, long long dflt,
+                         long long lo, long long hi, bool* ok)
+{
+    const auto it = kv.find(key);
+    if (it == kv.end())
+        return dflt;
+    char* end = nullptr;
+    const long long v = std::strtoll(it->second.c_str(), &end, 10);
+    // *end must be the terminator: "7xyz" is a malformed token, not a 7 with
+    // decoration — tolerating the tail is the same silent substitution the
+    // range check refuses, one lexeme later.
+    if (end == it->second.c_str() || *end != '\0' || v < lo || v > hi)
+    {
+        *ok = false;
+        return dflt;
+    }
+    return v;
 }
 
 /// Fractional sibling of kv_get. `quantity` and `floor_price` (BL-293) are real
@@ -92,8 +127,12 @@ double kv_getf(const std::unordered_map<std::string, std::string>& kv, const cha
     const auto it = kv.find(key);
     if (it == kv.end())
         return dflt; // absent is not malformed — the default stands
-    const double v = std::atof(it->second.c_str());
-    if (!std::isfinite(v))
+    // strtod with the same full-token rule as the integer path: atof parses
+    // "abc" to 0.0, and 0.0 here means "accept the market price" — the exact
+    // silent order-substitution the note above argues against.
+    char* end = nullptr;
+    const double v = std::strtod(it->second.c_str(), &end);
+    if (end == it->second.c_str() || *end != '\0' || !std::isfinite(v))
     {
         if (ok) *ok = false;
         return dflt;
@@ -113,6 +152,7 @@ const char* corp_command_result_name(corp_command_result r)
         case corp_command_result::rejected_funds:    return "rejected_funds";
         case corp_command_result::rejected_state:    return "rejected_state";
         case corp_command_result::rejected_tech_locked: return "rejected_tech_locked";
+        case corp_command_result::rejected_era_locked: return "rejected_era_locked";
         // BL-350's four distinguishable declines. Without these the switch fell
         // through and reported every one of them as "rejected_invalid", which
         // tells an agent its arguments were malformed when in fact they were
@@ -133,7 +173,7 @@ const char* corp_command_result_name(corp_command_result r)
     return "rejected_invalid";
 }
 
-// --serve [--ticks N]  (BL-278)
+// --serve [--ticks N] [--as <corp-id|any>]  (BL-278)
 //
 // Headless, persistent: builds the canonical world once (identical warm-up to
 // --export-blackboard), then reads one request per line from stdin until EOF
@@ -141,6 +181,28 @@ const char* corp_command_result_name(corp_command_result r)
 // corp_command seam (apply_corp_command — no bypass). This is the process an
 // out-of-process MCP server (tools/mcp/) spawns and talks to; it ships no
 // network code itself; the line protocol below is the whole surface.
+//
+// The line protocol is an EXTERNAL INPUT SURFACE, not a trusted in-process
+// call. So the session carries an ACTOR (BL-387): the one corp this process
+// will act as — the player corp by default, `--as <corp-id>` to pin another,
+// `--as any` to lift the gate entirely (the explicit research opt-in for
+// bot-vs-bot corpus runs, never the default). A COMMAND naming any other corp
+// answers `RESULT result=rejected_not_owner building=-1` without reaching
+// apply_corp_command, and a BLACKBOARD naming any other corp answers a single
+// line `ERR result=rejected_not_owner` followed by `END` (BL-397 — the
+// lines-then-END shape holds even on refusal; CORPS and BODIES stay public,
+// matching the BL-068 competitor-visibility rule). The refusal lives HERE, at
+// the protocol layer, because
+// apply_corp_command must stay permissive: it is also how the in-process
+// scorer legitimately commands every rival, and a corp check inside it would
+// break the AI it exists to serve.
+//
+// For the same reason, every COMMAND integer field is parsed wide and checked
+// against its destination's real domain (BL-396); any violation answers
+// `RESULT result=rejected_invalid building=-1` without reaching the seam.
+// Nothing is truncated, wrapped or clamped — see kv_get_checked. Floats are
+// checked as FLOATS (1e300 is a finite double and an infinite float), and
+// negative quantity / floor_price is refused at the wire.
 //
 // Requests (space-separated `key=value` tokens after the opcode):
 //   TICK                                            -> advance one tick
@@ -166,7 +228,7 @@ const char* corp_command_result_name(corp_command_result r)
 // without their arguments ever reaching this parser, which made them applicable
 // in the dictionary and inapplicable on the wire.
 // Responses are one line each except BLACKBOARD, which is N JSONL lines + END.
-int run_serve(int ticks)
+int run_serve(int ticks, long long as_corp, bool as_any)
 {
     lua_state lua;
     lua.load("scripts/recipes.lua");
@@ -176,13 +238,21 @@ int run_serve(int ticks)
 
     world w = make_hard_coded_world();
 
-    const uint16_t default_recipe = reg.recipe_id("steel");
+    const uint16_t default_recipe = reg.default_recipe_id(); // BL-429
     for (auto& [id, b] : w.buildings)
         if (b.type == building_type::processing_facility && b.recipe == no_recipe)
             b.recipe = default_recipe;
 
     // BL-365: real background corporations, generated now that reg is loaded.
     generate_background_firms(w, reg, /*seed=*/0x8A21F00Du);
+
+    // BL-387: the session actor, resolved after world construction so the
+    // default can be the player corp. Only meaningful when !as_any; a pinned
+    // id that names no corp simply has every command answer rejected_no_corp,
+    // the same as it would in-process.
+    const entity_id session_actor = (as_corp >= 0)
+        ? static_cast<entity_id>(as_corp)
+        : w.player_entity;
 
     // One econ tick, in one place. The warm-up loop and the TICK opcode used to
     // carry byte-identical copies of this sequence, which is how the survey step
@@ -236,6 +306,17 @@ int run_serve(int ticks)
         {
             const auto kv = parse_kv_tokens(iss);
             const entity_id corp = static_cast<entity_id>(kv_get(kv, "corp", 0));
+            // BL-397: reads are gated by the same session actor as writes.
+            // The blackboard is a corp's PRIVATE view — cash, pools, recipes —
+            // and this opcode used to export whichever corp the line named.
+            // The refusal keeps the lines-then-END shape a streaming client
+            // frames by, so ERR here is a line before END, not a terminator.
+            if (!as_any && corp != session_actor)
+            {
+                std::cout << "ERR result=rejected_not_owner" << std::endl;
+                std::cout << "END" << std::endl;
+                continue;
+            }
             const int bb_ticks = static_cast<int>(kv_get(kv, "ticks", tick));
             const corp_blackboard bb = export_corp_blackboard(w, corp, bb_ticks);
             std::ostringstream out;
@@ -246,43 +327,94 @@ int run_serve(int ticks)
         else if (op == "COMMAND")
         {
             const auto kv = parse_kv_tokens(iss);
-            corp_command cmd;
-            cmd.tick      = tick;
-            cmd.corp      = static_cast<entity_id>(kv_get(kv, "corp", 0));
-            cmd.verb      = static_cast<corp_verb>(kv_get(kv, "verb", 0));
-            cmd.subject   = static_cast<entity_id>(kv_get(kv, "subject", 0));
-            cmd.tile      = static_cast<entity_id>(kv_get(kv, "tile", 0));
-            cmd.type      = static_cast<building_type>(kv_get(kv, "type", 0));
-            cmd.target    = static_cast<resource_type>(kv_get(kv, "target", 0));
-            cmd.recipe    = static_cast<uint16_t>(kv_get(kv, "recipe", no_recipe));
-            cmd.workforce = static_cast<int>(kv_get(kv, "workforce", 100));
-            cmd.road_tier = static_cast<uint8_t>(kv_get(kv, "road_tier", 1));
+
+            // BL-396: every integer field parses WIDE and is range-checked
+            // against its destination's REAL domain before any narrowing cast
+            // (kv_get_checked). The narrow static_casts this replaces were the
+            // wire's whole validation story, and each failure mode was a
+            // different lie: truncation applied a command the caller never
+            // sent, a wrap applied a legal-looking value, and an out-of-enum
+            // `type` indexed past the economics table. A violation rejects the
+            // COMMAND whole, before apply_corp_command.
+            bool ok = true;
+            constexpr long long id_max =
+                static_cast<long long>(std::numeric_limits<entity_id>::max());
+            const long long verb_v = kv_get_checked(kv, "verb", 0, 0, corp_verb_count - 1, &ok);
+            const long long corp_v = kv_get_checked(kv, "corp", 0, 0, id_max, &ok);
+            const long long subj_v = kv_get_checked(kv, "subject", 0, 0, id_max, &ok);
+            const long long tile_v = kv_get_checked(kv, "tile", 0, 0, id_max, &ok);
+            const long long type_v = kv_get_checked(kv, "type", 0, 0, building_type_count - 1, &ok);
+            const long long tgt_v  = kv_get_checked(kv, "target", 0, 0,
+                                                    static_cast<long long>(resource_count) - 1, &ok);
+            const long long rcp_v  = kv_get_checked(kv, "recipe", no_recipe, 0, 0xFFFF, &ok);
+            const long long wf_v   = kv_get_checked(kv, "workforce", 100, 0, 200, &ok);
+            const long long road_v = kv_get_checked(kv, "road_tier", 1, 1, 3, &ok);
+            // unit_type only needs to FIT its uint16 destination:
+            // apply_corp_command range-checks it against the live
+            // unit_roster_table() itself, so the wire's only job is stopping a
+            // wrap from re-aiming it at a different roster row.
+            const long long unit_v  = kv_get_checked(kv, "unit_type", 0, 0, 0xFFFF, &ok);
+            const long long order_v = kv_get_checked(
+                kv, "order", 0, 0,
+                static_cast<long long>(std::numeric_limits<uint32_t>::max()), &ok);
+            const long long cp_v    = kv_get_checked(kv, "counterparty", 0, 0, id_max, &ok);
+
+            // Floats narrow FIRST, then test finiteness: 1e300 is a finite
+            // double and an infinite float, and the seam stores floats.
+            // kv_getf's own double-level guard still catches nan/inf/1e400 —
+            // and see its comment for why the default must never stand in for
+            // a malformed value. Negative quantity / floor_price is refused
+            // here too: the seam guards them for place_sell_order, but a
+            // malformed line should not reach the seam whatever the verb.
+            bool floats_ok = true;
+            const float qty_v   = static_cast<float>(kv_getf(kv, "quantity", 0.0, &floats_ok));
+            const float floor_v = static_cast<float>(kv_getf(kv, "floor_price", 0.0, &floats_ok));
+            if (!std::isfinite(qty_v) || !std::isfinite(floor_v)
+                || qty_v < 0.0f || floor_v < 0.0f)
+                floats_ok = false;
+
+            if (!ok || !floats_ok)
+            {
+                std::cout << "RESULT result=rejected_invalid building=-1" << std::endl;
+                continue;
+            }
+
             // The seam grew three verb families past this parser — BL-324's
             // hire_unit, BL-293's order book, BL-350's procurement — and each
             // one's arguments went unread, so those verbs could only ever be
-            // applied with defaults.
-            //
-            // FIVE were unreachable outright: place_sell_order defaulted to
-            // quantity 0, which apply_corp_command rejects before anything else;
-            // remove_sell_order/accept_quote/cancel_contract defaulted to order
-            // 0, naming no real order; request_quote defaulted to a null
-            // counterparty. `hire_unit` is the SIXTH and is the genuinely
-            // partly-supported case — unit_type 0 is a valid roster index, so it
-            // worked, but only ever raised roster row 0 and no caller could
-            // choose otherwise.
-            cmd.unit_type    = static_cast<uint16_t>(kv_get(kv, "unit_type", 0));
-            bool floats_ok   = true;
-            cmd.quantity     = static_cast<float>(kv_getf(kv, "quantity", 0.0, &floats_ok));
-            cmd.floor_price  = static_cast<float>(kv_getf(kv, "floor_price", 0.0, &floats_ok));
-            cmd.order        = static_cast<uint32_t>(kv_get(kv, "order", 0));
-            cmd.counterparty = static_cast<entity_id>(kv_get(kv, "counterparty", 0));
+            // applied with defaults. FIVE were unreachable outright:
+            // place_sell_order defaulted to quantity 0, which
+            // apply_corp_command rejects before anything else;
+            // remove_sell_order/accept_quote/cancel_contract defaulted to
+            // order 0, naming no real order; request_quote defaulted to a null
+            // counterparty. `hire_unit` was the SIXTH and the genuinely
+            // partly-supported case — unit_type 0 is a valid roster index, so
+            // it worked, but only ever raised roster row 0.
+            corp_command cmd;
+            cmd.tick         = tick;
+            cmd.corp         = static_cast<entity_id>(corp_v);
+            cmd.verb         = static_cast<corp_verb>(verb_v);
+            cmd.subject      = static_cast<entity_id>(subj_v);
+            cmd.tile         = static_cast<entity_id>(tile_v);
+            cmd.type         = static_cast<building_type>(type_v);
+            cmd.target       = static_cast<resource_type>(tgt_v);
+            cmd.recipe       = static_cast<uint16_t>(rcp_v);
+            cmd.workforce    = static_cast<int>(wf_v);
+            cmd.road_tier    = static_cast<uint8_t>(road_v);
+            cmd.unit_type    = static_cast<uint16_t>(unit_v);
+            cmd.quantity     = qty_v;
+            cmd.floor_price  = floor_v;
+            cmd.order        = static_cast<uint32_t>(order_v);
+            cmd.counterparty = static_cast<entity_id>(cp_v);
 
-            // A malformed float is a malformed COMMAND, answered as one. Falling
-            // through with the default would answer `applied` to an order the
-            // caller did not place.
-            if (!floats_ok)
+            // BL-387: refuse to act as a corp the session is not. Before this
+            // gate the only validation of `corp` was that the corp EXISTS, so
+            // any caller could command any rival by name — verified in play,
+            // rival balances moved by tens of millions. The gate sits here and
+            // not in apply_corp_command (see the protocol block above).
+            if (!as_any && cmd.corp != session_actor)
             {
-                std::cout << "RESULT result=rejected_invalid building=-1" << std::endl;
+                std::cout << "RESULT result=rejected_not_owner building=-1" << std::endl;
                 continue;
             }
 
@@ -396,7 +528,7 @@ int run_blackboard_export(const std::string& which, const std::string& out_dir, 
     world w = make_hard_coded_world();
 
     // Author default recipes onto generated processors (mirrors app::load_economy).
-    const uint16_t default_recipe = reg.recipe_id("steel");
+    const uint16_t default_recipe = reg.default_recipe_id(); // BL-429
     for (auto& [id, b] : w.buildings)
         if (b.type == building_type::processing_facility && b.recipe == no_recipe)
             b.recipe = default_recipe;
@@ -542,10 +674,41 @@ int main(int argc, char* argv[])
             if (std::string(argv[i]) == "--serve")
             {
                 int ticks = 12; // matches the app's warm-start (three in-game years)
+                // BL-387: the session actor. Absent -> the player corp (resolved
+                // once the world exists, so -1 is the "default" sentinel here).
+                // `--as any` is the explicit research opt-in (bot-vs-bot corpus
+                // generation) — the permissive mode must be asked for.
+                long long as_corp = -1;
+                bool      as_any  = false;
                 for (int j = i + 1; j < argc; ++j)
+                {
                     if (std::string(argv[j]) == "--ticks" && j + 1 < argc)
                         ticks = std::max(1, std::atoi(argv[j + 1]));
-                return run_serve(ticks);
+                    if (std::string(argv[j]) == "--as" && j + 1 < argc)
+                    {
+                        if (std::string(argv[j + 1]) == "any")
+                            as_any = true;
+                        else
+                            as_corp = std::atoll(argv[j + 1]);
+                    }
+                }
+                return run_serve(ticks, as_corp, as_any);
+            }
+        }
+
+        // --verify-all [dir]: the whole committed suite against ONE world
+        // generation (BL-423 — regenerating the identical deterministic world
+        // per script cost ~40 s x 79 launches). Checked before --verify so the
+        // longer flag is not shadowed by a prefix scan; both are exact matches,
+        // but the order documents the intent.
+        for (int i = 1; i < argc; ++i)
+        {
+            if (std::string(argv[i]) == "--verify-all")
+            {
+                std::string dir = "scripts/verify";
+                if (i + 1 < argc && std::string(argv[i + 1]) != "--bless")
+                    dir = argv[i + 1];
+                return app{}.run_verify_all(dir, bless);
             }
         }
 

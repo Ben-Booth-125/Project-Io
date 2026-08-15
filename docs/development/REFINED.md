@@ -118,6 +118,72 @@
 > § ui-frame-recompute-caches / § misc-hygiene-sweep. The review barrier caught three real
 > faults before close (NR-130/133/134 carry the residuals).
 
+> Drained 2026-08-14: seam batch (BL-386 floor reservation fix, BL-387 seam actor authority,
+> BL-396 wire parser validation, BL-397 seam read privacy) — all 13 tasks COMPLETE across two
+> worktree agents + main-session doc/integration slices, review barrier ran (verdict FIX FIRST,
+> three Criticals fixed pre-compile), integrating MSVC build green, smoke.js ALL CHECKS PASSED,
+> order_book_harness 52/52, econ_harness/econ_stability ALL PASS, spectator_determinism golden
+> re-blessed (deliberate BL-386 move). Removed per the retain-one policy. Record lives in DEVLOG.md
+> (2026-08-14 seam-batch entry), the four backlog.json resolution fields, and requirements.json
+> § sell-order-floor / § seam-actor-authority / § wire-parser-validation / § seam-read-privacy.
+> ai_skill_harness band re-bless deliberately deferred to BL-416 (golden stewardship) with the
+> post-fix numbers recorded in its design note. Follow-on filed: BL-422 (held-order phantom
+> inventory).
+
+## Era-gated economy roster (promoted from BL-433) — **COMPLETE** (5/5, 2026-08-15)
+
+Requirements: requirements.json § era-gated-roster
+
+The mask-not-removal constraint is the whole shape of this group: a recipe's id is its index in
+`m_recipes` and that id is **stored** in `building_component.recipe`, so filtering by deletion
+would silently repoint every building whose recipe sat after a filtered one. Storage stays
+absolute (`get_recipe`/`recipe_id`); browsing goes through the era mask (`recipe_count`/
+`recipe_at`). Task A establishes that split and everything else depends on it.
+
+- **[2] A — Add the era band to the registry: `era_band` enum, `era` field on `recipe` and
+  `building_economics`, the `m_allowed` position mask, `set_era()`, `building_available()`, and
+  `era_band_for_epoch()`. `recipe_count`/`recipe_at` map through the mask; `get_recipe`/
+  `recipe_id` stay absolute.** Files: `src/world/recipe_registry.hpp`. Deps: foundation.
+  Satisfies: R2, R3.
+- **[2] B — Parse `era = "any"|"ancient"|"industrial"` for both recipes and buildings, throwing
+  on an unknown string with the offending entry named.** Files: `src/world/recipe_registry.cpp`.
+  Deps: A. Satisfies: R4.
+- **[1] C — Tag the space-era data: `launchpad` and the petroleum/propellant/spacecraft-chain
+  recipes as `industrial`; leave everything shared untagged (defaults to `any`).** Files:
+  `scripts/economy.lua`, `scripts/recipes.lua`. Deps: B. Satisfies: R1.
+- **[1] D — Set the band from the live campaign: derive it from `world_params::epoch_year` in
+  `load_economy()`, against the same 1700 threshold the antiquity branch already documents.**
+  Files: `src/core/app.cpp`. Deps: A. Satisfies: R1.
+- **[2] E — Guard harness `tools/verify/era_roster.cpp`: the four requirement rows, including the
+  byte-identity check for the default band.** Files: `tools/verify/era_roster.cpp`,
+  `.claude/skills/verifier-headless/SKILL.md`. Deps: C, D. Satisfies: R1, R2, R3, R4.
+
+**Parallelisation.** A is the foundation and is not splittable — every other task reads the types
+it introduces. B/D are disjoint after A (`recipe_registry.cpp` vs `app.cpp`) and could fan out,
+but the group is small enough that the merge cost exceeds the saving; running it in the main
+session. C is data-only and trivially serial after B. E last, because it verifies the others.
+
+**Closed 2026-08-15. All five tasks complete; `era_roster` reports 15 assertions ALL PASS.**
+Two things were found mid-build and folded in rather than deferred, both because leaving them
+would have made the gate a half-gate:
+
+- **The seam needed its own refusal code.** `map_construction`'s switch over `construction_result`
+  is exhaustive, so `era_locked` could not simply be added — and folding it into
+  `rejected_placement` would have been exactly the overloading BL-395 (untyped result line) exists
+  to complain about. Added `corp_command_result::rejected_era_locked`, distinct from
+  `rejected_tech_locked` because no amount of research reaches an era-locked type.
+- **The build door had to filter too.** The gate refusing a Launchpad is not the same as the
+  player never being offered one. The processing rows needed nothing — they are built from
+  `recipe_count`/`recipe_at`, which *are* the masked browse path, which is the design paying for
+  itself.
+
+One limitation stated rather than hidden: `draw_tile_selection`'s "is anything placeable here"
+hint takes no registry and so is not era-aware. It only fires when nothing else is placeable, and
+processing/port/hub accept any land tile, so a launchpad-only true cannot occur in practice —
+but it is a signature change away from being exactly right if that ever stops holding.
+
+---
+
 ## Nation/corp generation visibility (promoted from BL-305) — **PAUSED, no tasks started**
 
 **Resume here.** Paused 2026-08-08 before any code (see NR-085): task A's file scope

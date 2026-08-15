@@ -188,6 +188,15 @@ enum class building_type : uint8_t
                              ///< not a resource_type. See economy_system.cpp's capability-points pass.
 };
 
+/// One past the last building type — the wire parser's range gate (BL-396:
+/// run_serve refuses any `type=` outside [0, building_type_count) rather than
+/// letting a narrowing cast truncate it into a type the caller never named,
+/// or index the per-type economics table out of bounds). Derived from the
+/// enum's tail, the same way resource_count derives from resource_type::count:
+/// appending a type means moving this with it.
+static constexpr uint8_t building_type_count =
+    static_cast<uint8_t>(building_type::research_institute) + 1;
+
 /// Sentinel `building_component.recipe` value meaning "no processing recipe is
 /// assigned" — used by extraction sites and unconfigured processors. The recipe
 /// id is otherwise an index into the recipe registry (see recipe_registry.hpp).

@@ -24,6 +24,14 @@ construction_result construct_building(world& w, const recipe_registry& reg,
     if (tile_it == w.tiles.end())
         return construction_result::no_tile;
 
+    // BL-433 era gate. First, and ahead of every tile check, for the same reason
+    // BL-344's tech gate sits ahead of the terrain ones: a type outside the
+    // campaign's era is unavailable EVERYWHERE, so "this does not exist in this
+    // era" is a truer refusal than "that tile is not coastal". The registry's
+    // band is `any` unless a campaign set one, so no harness is affected.
+    if (!reg.building_available(type))
+        return construction_result::era_locked;
+
     // Tile-level validity check (ocean / deposit / terrain).
     if (!placement_rules::can_place(tile_it->second, type, target))
         return construction_result::invalid_tile;
@@ -150,7 +158,7 @@ construction_result construct_building(world& w, const recipe_registry& reg,
         // the player's bar described). Otherwise the historic default, so a freshly
         // built processor is still productive; the player reconfigures it via building
         // management. Mirrors app::load_economy.
-        bc.recipe = (recipe != no_recipe) ? recipe : reg.recipe_id("steel");
+        bc.recipe = (recipe != no_recipe) ? recipe : reg.default_recipe_id(); // BL-429
     }
 
     w.buildings[bld_id]  = bc;

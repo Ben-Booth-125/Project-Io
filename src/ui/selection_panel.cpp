@@ -1209,6 +1209,16 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
     cands.push_back({building_type::military_base,        resource_type::iron_ore, "Military Base"});        // BL-325 S1
     cands.push_back({building_type::research_institute,   resource_type::iron_ore, "Research Institute"});   // BL-332
 
+    // BL-433: drop types outside the campaign's era band, so a 0 CE player is never
+    // offered a Launchpad. The processing rows above need no filtering — they are
+    // built from recipe_count/recipe_at, which are the era-masked browse path.
+    // construct_building refuses these anyway (construction_result::era_locked);
+    // this is the door not showing what the gate would refuse.
+    cands.erase(std::remove_if(cands.begin(), cands.end(),
+                               [&reg](const candidate& c)
+                               { return !reg.building_available(c.type); }),
+                cands.end());
+
     // BL-326: fold group by building family — Ben rejected the profit-ranked flat list
     // for named, expandable groups. Assigned by type rather than parsed from the display
     // name, so a future rename of "Extraction: X" can't silently drop a row into the

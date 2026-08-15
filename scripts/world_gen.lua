@@ -57,6 +57,31 @@ world_gen = {
             clean_water            = 3.0,
             consumer_goods         = 12.0,
             medical_supplies       = 14.0,
+
+            -- BL-429: the ANCIENT tier. BL-340 closed the minable-but-unsellable
+            -- asymmetry for the space chain and left it wide open here — every one
+            -- of these had authored deposits and extraction rules (tile_generation
+            -- generate_deposits, placement_rules k_extractable) and no price at all,
+            -- so an ancient corp could mine them and never sell a unit.
+            --
+            -- Priced as bulk commons: cheap, heavy, worth something only in volume
+            -- or after work. Stone and timber sit below iron ore (2.5) because they
+            -- are everywhere; peat below both, being the poor fuel.
+            stone                  = 1.0,
+            timber                 = 1.5,
+            sand                   = 1.0,
+            clay                   = 1.2,
+            peat                   = 1.2,
+
+            -- The ancient intermediates. Charcoal is dearer than the timber it
+            -- comes from (a burn takes days and loses mass); blooms carry the
+            -- charcoal plus the ore.
+            charcoal               = 4.0,
+            iron_blooms            = 9.0,
+
+            -- BL-286's placeholder luxury, given a producer at last (the potter's
+            -- and weaver's output). Priced as a modest trade good, not a treasure.
+            trade_goods_misc       = 8.0,
         },
 
         -- Nation tradeable-resource concentration gates (BL-096): a nation

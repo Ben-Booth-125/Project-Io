@@ -8779,8 +8779,8 @@
    "design": "DESIGNED 2026-08-13, found checking whether BL-381's proposed fix was computable by the audience it is meant to serve.\n\n## The gap\n\n`export_corp_blackboard`'s market section emits three facts per priced resource: `price`, `supply`, `demand`. It skips any resource whose `base_price` is zero (correctly — an untraded good has no public quote) and then never emits the base price it just tested.\n\nSo an agent reads `price:steel = 3.2` and has no way to know whether steel is cheap, dear or ordinary. Every price-based judgement an external policy might make — is this glutted, is this worth producing, is this a good moment to sell — needs a reference, and the reference is present in the market component and withheld from the export.\n\nIt is worse than a missing convenience: the two aggregates that ARE exported, supply and demand, are exactly the pair BL-381 establishes cannot be divided meaningfully. So the blackboard currently gives an agent two numbers it should not use and withholds the one it should.\n\n## Not a visibility question\n\nWorth stating so it is not re-litigated: `base_price` is a rarity-derived property of the market and the resource, not of any corporation. Exporting it reveals nothing about a rival, so BL-068 is not engaged. This is an omission, not a policy.\n\n## The fix\n\nEmit `base_price:<r>` alongside the existing three, with `public_market` provenance, in the same loop that already reads it. Two lines. Bump the blackboard `_v` and re-bless `blackboard_harness`'s fact counts, which is the only real cost.\n\n## Do it with BL-381, not before\n\nLanding this alone adds facts to every export for no consumer. Landing it WITH BL-381 means the scorer's new price-based gate and an external policy's view of the same decision are computed from the same public numbers — which is the property that makes the AI's reasoning reproducible from outside, and the one AI_OPPONENT.md section 6 claims for the export in the first place."
   },
   {
-   "status": "designed",
-   "glyph": "✓",
+   "status": "complete",
+   "glyph": "*",
    "parked": false,
    "blocked_on": [],
    "written": "2026-08-13",
@@ -8801,11 +8801,13 @@
     "docs/economy/MARKETS.md"
    ],
    "summary": "clear_markets' unmatched-sell auto-clear computes `clearing = max(ref_price, floor_price)` and credits `income += rem * clearing` with NO counterparty debited and NO ceiling. A player listing at floor_price 1e12 reached cash 1.587e17 in eighteen ticks. Found by an agent playing the seam, confirmed independently by a second.",
-   "design": "DESIGNED 2026-08-13, found by AI play (two independent players, same conclusion).\n\n## The defect\n\nIn the auto-clear pass for unmatched standing sell supply: `const float clearing = std::max(rp, se.floor_price);` followed by `flows[se.corp].income += se.rem * clearing;`. Nothing debits a buyer, nothing caps the floor, and nothing checks the floor against the market's own price band. Income is exactly linear in the floor the seller names.\n\nMeasured by a player: baseline 5,535/tick; floor 2.0 gave 17,829/tick; floor 5 gave 44,654/tick; floor 1e6 gave 8.94 BILLION per tick; floor 1e12 reached cash 1.587e17 by tick 26. The market price of the good never moved off 0.625 in any run and no other corporation's balance was debited.\n\n## AND IT IS ALREADY FIRING, WHICH IS THE PART THAT MATTERS\n\nThis is not only an exploit a player could reach for. **The rival AI is doing it every time it trades**, and it resolves NR-144's open question about why rival trading tripled AI net worth.\n\nThe chain: a glutted good's price is pegged at `0.25 x base_price` (the band floor). `corp_ai` lists at `floor = base_price * trade_floor_multiple`, default 1.0, i.e. AT base_price. So `clearing = max(0.25*base, base) = base` — **every unit the AI lists earns four times the market rate, funded from nothing**. NR-144 recorded the tripling and reasoned it was 'corps converting idle stock to cash rather than a broken scorer'. It was a broken market, and the scorer was innocent.\n\n## THE CODEBASE ALREADY KNOWS HOW TO DO THIS, ONE LOOP AWAY\n\nIndependent triage found the detail that makes the fix unarguable: the MATCHED-trade loop immediately above this one DOES debit the buyer — `flows[t.buyer].expenditure` — because a matched trade has a real counterparty. The auto-clear pass beneath it credits `flows[se.corp].income` and debits nobody. So the correct shape is present in the same function, twelve lines earlier, and the defect is that one path was written as a market and the other as a wish.\n\n## Why the auto-surplus path is fine and this one is not\n\nThe auto-surplus path clears at `ref_price` — the price the market actually resolved — so 'the market is a perfect counterparty' costs the world goods at a fair price. That is a deliberate prototype simplification (MARKETS.md) and it is defensible. The order book path lets the SELLER name the price the perfect counterparty pays, which is a different thing entirely: it is not a simplification of a market, it is the absence of one.\n\n## PROPOSED FIX\n\nA floor price should DECLINE a sale, not raise its price. That is what a floor means and what the dictionary entry for `place_sell_order` already tells an agent it means ('minimum acceptable unit price'). Concretely, in the auto-clear pass:\n\n```\nif (se.floor_price > rp) continue;   // held back: the market will not meet the floor\nflows[se.corp].income += se.rem * rp;\n```\n\nso an order above the market clears NOTHING and the stock stays in the pool, and an order at or below the market clears at the market price. That makes a floor a genuine reservation price, makes `trade_floor_multiple` a real strategic dial rather than a money multiplier, and removes the free income without removing the buyer of last resort.\n\n**Expect this to move every economy golden and to CUT AI net worth by roughly the tripling NR-144 recorded.** That drop is the fix working, not a regression — re-bless with a note pointing here.\n\n## THE SPEC SAYS TO DO IT, WHICH IS WHY NOBODY CAUGHT IT\n\nFound in triage and it changes what this item has to touch. The behaviour is not code drifting from a\nspecification — it IS the specification:\n\n* `docs/development/req/requirements.json`, group `player-sell-orders`, row **R2**, status **complete**:\n  \"A standing player sell order sells up to its quantity from the (corp, body) pool, **valued at\n  max(resolved_price, floor_price)**.\"\n* `docs/economy/MARKETS.md` step 11 states the same thing and calls it a **prototype invariant**.\n* `ACTIONS.json`'s own entry contradicted ITSELF — asserting `max(price, floor)` in one clause and\n  \"a floor above what the resolution supports means less or nothing sells\" in the next.\n\nSo the requirement certifies the defect, the authority doc blesses it, the dictionary states both the\nbehaviour and its opposite, and every downstream check confirmed the code against the wrong spec. The\nrequirement must be REWRITTEN, not re-verified; MARKETS.md's step 11 restated; the dictionary entry\ncorrected (done 2026-08-13).\n\n## AND THE AI's DEFAULT STOPS WORKING WHEN THIS LANDS\n\n`corp_ai` lists at `floor = base_price * trade_floor_multiple`, default **1.0**, while a glutted good's\nresolved price sits at the band floor **0.25 x base**. Under the fixed rule — a floor above the market\nclears nothing — a rival at the default would sell **nothing at all**, having previously sold everything\nat 4x. So `trade_floor_multiple` must be re-tuned in the same change, or the fix silently converts an\noverpowered trader into one that never trades. It becomes a genuine reservation dial for the first time,\nwhich is what BL-380 wants it to be.\n\n## Guard it with a test that could have caught it\n\n`order_book_harness` must gain an assertion that no corporation's income from a clearing exceeds its cleared quantity times the market's resolved price. That is the invariant, it is one line to check, and it is the thing no existing assertion states.\n\nNote the fix direction the triage explicitly rules OUT: do not cap `floor_price` in `corp_command`'s validation. An arbitrarily high floor is a legitimate thing for a seller to name — it means 'hold' — and the defect is in the payer, not the validator. Capping the input would hide the bug and remove a real strategic option at once.\n\n## Independently verified 2026-08-13\n\nTriaged as a real defect at high confidence by an agent with no authoring context, which reproduced it end-to-end against the live seam and concurred with the proposed fix."
+   "resolved": "2026-08-14",
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
-   "status": "designed",
-   "glyph": "✓",
+   "status": "complete",
+   "glyph": "*",
    "parked": false,
    "blocked_on": [],
    "written": "2026-08-13",
@@ -8826,7 +8828,9 @@
     "tools/mcp/smoke.js"
    ],
    "summary": "The only validation of cmd.corp is that the corporation EXISTS. A player driving the seam issued commands in rivals' names and moved their balances by tens of millions, and can suppress a rival's auto-surplus path permanently by placing a 0.001-unit order in their name. The owns() helper gates BUILDING ownership and nothing gates ACTOR identity.",
-   "design": "DESIGNED 2026-08-13, found by AI play.\n\n## The defect\n\n`apply_corp_command` begins with `if (w.corporations.find(cmd.corp) == w.corporations.end()) return rejected_no_corp;` and that is the whole of its actor validation. Per-verb checks use `owns(w, cmd.corp, cmd.subject)` to confirm the corp owns the BUILDING it names — but nothing confirms the CALLER may act as that corp.\n\nIn play: a player issued `COMMAND corp=<rival> verb=9 ...` and it returned `applied`. Rival balances moved by +57.9M, +50.1M, +25.7M over six ticks. The inverse is an attack rather than a gift — a 0.001-unit order placed in a rival's name permanently suppresses that rival's auto-surplus path for the triple (BL-380), throttling a competitor's entire income on that good.\n\n## Why this was never a defect before, and is now\n\nIn-process, `cmd.corp` is set by the scorer itself, so the field was never attacker-controlled and the missing check cost nothing. `--serve` turned the seam into an EXTERNAL input surface and the same field became caller-supplied. Nothing about apply_corp_command changed; its threat model did.\n\n**This is the second instance in one session of exactly that pattern** — the NaN float guard (NR-184) was the first. The AI-facing seam is an untrusted input boundary in a way the internal caller never was, and validation written for a trusted caller does not transfer. Two instances is enough to call it a rule rather than an incident, and it should go in the standing rules.\n\n## PROPOSED FIX\n\nAuthority belongs at the PROTOCOL layer, not in apply_corp_command — the in-process scorer legitimately commands every rival corp and must keep doing so. So:\n\n* `run_serve` gains a session actor: `--serve --as <corp>` (default: the player corp), and the `COMMAND` opcode refuses any `corp=` that is not the session actor, with a new `rejected_not_owner` at the opcode level.\n* For the research use where an agent legitimately drives several corps (bot-vs-bot, the BL-279 corpus), an explicit `--as any` opt-in, so the permissive mode exists but must be ASKED for and is visible in the invocation.\n* `tools/mcp/server.js` pins its actor at startup and never forwards a caller-supplied `corp` for writes.\n* `smoke.js` asserts that a command naming a corp other than the session actor is refused — replacing the assertion that currently only checks the reply is well-formed, which this session already flagged as overclaiming.\n\nNote the interaction with BL-386: with the floor-price fix in, driving a rival is no longer a route to printing money, but it is still a route to sabotaging one.\n\n## The read side is worse, and is filed as BL-397\n\nAdversarial play found the same hole on the READ path: the BLACKBOARD opcode takes a corp id from the request line and returns that corp's OWN-ASSET facts — cash, pools, recipes, workforce. So BL-068's competitor-visibility model is enforced within a blackboard and not between them. Fix both together under one session-actor model; stopping the writes while the reads still hand over the private view would be half a fix."
+   "resolved": "2026-08-14",
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
    "status": "complete",
@@ -9024,8 +9028,8 @@
    "design": "DESIGNED 2026-08-13, from four play sessions that each hit it.\n\n## Two faults in the same channel\n\n**The out-param is untyped.** `RESULT ... building=<n>` is the whole return surface. A `hire_unit` puts a UNIT entity id in that field; `place_sell_order` and `request_quote` put nothing and it reads 0, which is a syntactically valid entity id rather than a recognisable absence. An agent parsing this cannot tell what kind of thing it just made, or whether it made one.\n\n**The rejection is under-resolved.** `rejected_invalid` covers, on `place_sell_order` alone: no such body, that body has no market, that market does not price the resource, and malformed quantity/floor. On `hire_unit`: bad roster index, row not currently available, and non-existent tile — three different fixes, one code. On `accept_quote`/`cancel_contract`: the id never existed, the id names the other kind of record, and the contract completed and was erased.\n\nThat last one is the worst in practice. A player's id bookkeeping drifted by one, and the seam could not tell them the difference between 'wrong id' and 'already finished' — which are opposite situations calling for opposite responses.\n\n## Why it matters more here than in a UI\n\nAI_OPPONENT.md section 10a names typed, enumerated failure as the property that lets an out-of-process policy correct itself. A UI can render four different messages from one code because a human reads the surrounding screen; an agent has only the code. This session already fixed one instance of exactly this (the four BL-350 declines collapsed into rejected_invalid) and these are the remainder.\n\n## PROPOSED FIX\n\n* Replace `building=` with a typed pair — `result=applied kind=unit id=34912` / `kind=order id=42` / `kind=none` — so the response says what it made. This changes the wire format, so bump whatever the protocol's version marker becomes and update smoke.js and the dictionary together.\n* Split `rejected_invalid` where the causes call for different responses. `rejected_no_market`, `rejected_unpriced`, `rejected_not_found` and `rejected_unavailable` would cover every case reported above, and `corp_command_result` is append-only so adding them is safe.\n* Fold in the three smaller legibility findings while in here: `survey` accepts and CHARGES FOR the star (three players hit it; `dispatch_survey` never checks `body_type::star`), `set_workforce` is accepted on a military base that staffs at zero by design, and `request_quote`'s `subject` is accepted and never read."
   },
   {
-   "status": "designed",
-   "glyph": "✓",
+   "status": "complete",
+   "glyph": "*",
    "parked": false,
    "blocked_on": [],
    "written": "2026-08-13",
@@ -9045,11 +9049,13 @@
     "tools/mcp/smoke.js"
    ],
    "summary": "run_serve reads every integer with atol and static_casts straight into a narrow enum or field with no range check. verb=256 truncates to 0 and BUILDS A BUILDING, answering applied. verb=265 places a sell order. type=200 SEGFAULTS the process, taking the whole session's state with it. workforce=4294967396 wraps to 100 and applies. And quantity=1e300 passes the isfinite guard added earlier the same day, then overflows to +infinity when narrowed to float.",
-   "design": "DESIGNED 2026-08-13, found by an agent whose whole agenda was to break the seam. It is the most severe finding of the session and it is one root cause with many faces.\n\n## The root cause\n\nEvery field in the COMMAND opcode is parsed with `atol` and then `static_cast` directly into its destination — `corp_verb` (uint8_t), `building_type`, `resource_type`, `road_tier` (uint8_t), `workforce` (int). Nothing checks that the parsed value is in range for the type it is about to become.\n\n## What that produces, measured\n\n**A rejection that mutates, which is the invariant this seam must never break.** `verb=256` truncates to 0 and BUILDS A BUILDING, answering `applied building=34630`. `verb=512`, `verb=1024` and `verb=-256` all build. `verb=265` places a sell order. So a caller naming a verb that does not exist gets a completely different action performed in its name, reported as success.\n\n**A segfault.** `type=200` casts to `building_type` and indexes the economics array out of bounds: exit 139, no RESULT line, no BYE, the process gone and the session's whole world with it. One line from any caller.\n\n**Phantom buildings.** `type` 8..20 pass placement and construct a building of a type not in the enum, which then persists in the corp's asset list, ticks through `run_economy_step` forever, and is priced off whatever memory follows the economics array.\n\n**Silent wrapping.** `workforce=-5` and `workforce=201` are correctly refused, but `workforce=4294967396` wraps to 100 and applies — the guard is real and the parser lets values around it. Same shape on `recipe` and `unit_type`.\n\n**`road_tier=255`** is priced as a Highway (the economics lookup clamps) and then written RAW into `tile.road_level`, which feeds `road_traversal_multiplier` — so one command creates a road tier the game has no concept of, with a movement bonus nothing intended.\n\n## AND IT DEFEATS THE GUARD ADDED EARLIER TODAY — recorded honestly\n\n`kv_getf` was given an `isfinite` check this session, after review found NaN reaching the order book. That guard tests the DOUBLE. `quantity=1e300` is a finite double, passes, and then overflows to +infinity when narrowed to `float` on assignment. So the NaN hole is closed and the infinity hole beside it was not, in the same function, by the same author, in the same session. The lesson is the one BL-387 and BL-394 also carry: validate at the boundary means validate the value that actually lands in the field, not the one you parsed.\n\n## PROPOSED FIX\n\nOne helper, used everywhere: parse into a wide type, RANGE-CHECK against the destination's real domain, and fail the whole command with `rejected_invalid` on any violation — never truncate, never wrap, never clamp silently.\n\n* `verb` must be `< corp_verb_count`; add that constant beside the enum so it cannot drift.\n* `type` must be a declared `building_type`; same for `resource_type` and `road_tier`.\n* Narrow floats through a checked conversion that rejects anything not finite AS A FLOAT, not merely as a double.\n* Reject a malformed COMMAND wholesale rather than applying it with defaults — the same call this session already made for non-finite floats, generalised to every field.\n\n`smoke.js` must then assert the whole class: an out-of-range verb, type, resource, road tier, workforce and quantity each refused, and — the load-bearing one — that the world is UNCHANGED after each refusal.\n\n## Note on severity\n\nNone of this is reachable from the GUI, which cannot emit an out-of-range enum. It is reachable from the first day the seam took external input, which is the fourth instance this session of that same pattern."
+   "resolved": "2026-08-14",
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
-   "status": "designed",
-   "glyph": "✓",
+   "status": "complete",
+   "glyph": "*",
    "parked": false,
    "blocked_on": [],
    "written": "2026-08-13",
@@ -9071,7 +9077,9 @@
     "src/world/corp_command.cpp"
    ],
    "summary": "The BLACKBOARD opcode takes a corp id from the request line and exports that corp's OWN-ASSET facts — cash, pools, per-building recipes and workforce — to whoever asked. The visibility model is honest about what a corp may see about OTHERS; nothing enforces which corp the caller IS. Separately, remove_sell_order's two rejection codes distinguish 'no such order' from 'someone else's order', so sweeping the id space maps the entire global book.",
-   "design": "DESIGNED 2026-08-13, found by adversarial play. The sibling of BL-387 on the READ side, and it is the more serious half.\n\n## The leak\n\n`export_corp_blackboard` is carefully visibility-honest about what corp X may learn about corp Y — rival buildings yes, rival cash and pools and recipes no (BL-068). That model is correct and it is undermined completely by the transport: the BLACKBOARD opcode takes `corp=` from the request line and exports THAT corp's own-asset section. A player read every rival's cash, pools, and per-building recipe and workforce simply by asking for them.\n\nSo the fog is enforced within a blackboard and not between blackboards. BL-068's whole competitor-visibility rule, and the commercial-sphere activity fog with it, are decoration on a seam that will hand over the private view for the asking.\n\n## The oracle\n\nSmaller but the same family: `remove_sell_order` returns `rejected_invalid` for an id that does not exist and `rejected_not_owner` for one that belongs to someone else. The two are perfectly distinguishable, so sweeping the id space reveals exactly how many orders stand globally and which are whose — without placing a single order. This is the cost of the typed-rejection discipline, and it is worth paying, but it should be a deliberate choice rather than an accident.\n\n## PROPOSED FIX\n\nBoth fall out of BL-387's session-actor model, which is why this requires it: once `--serve` knows which corp the session IS, BLACKBOARD serves that corp and refuses any other (except under the explicit `--as any` research opt-in), and the order-book oracle narrows to the caller's own book — an id outside it answers one code, not two.\n\nDo them together. Fixing the write path alone would leave the read path handing out exactly the intelligence the write path was just stopped from acting on."
+   "resolved": "2026-08-14",
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
    "id": "BL-398",
@@ -9172,7 +9180,7 @@
    "design": "RULED 2026-08-13 (NR-104). BL-266 made the Selection band always open, and the Continent lens key (BL-226/BL-376 lineage) now shares that corner. Ben chose moving the key over keeping the shared corner.\n\nBefore building: report the current measurements (key size, corner offsets, band extents) and confirm the destination corner with Ben against the live app (Rule 0b + the open-the-game memory). Update the QUESTION_LOG entry for the lens key if its placement rationale changes, and expect the continents_lens goldens to need re-blessing - fold that into BL-402's pass if it has not yet run."
   },
   {
-   "status": "designed",
+   "status": "complete",
    "glyph": "✓",
    "parked": false,
    "blocked_on": [],
@@ -9191,7 +9199,9 @@
     "scripts/verify/"
    ],
    "summary": "Ben ruled (NR-104, 2026-08-13): re-bless now, on the Windows box - not held for the unexplained Linux 20-35% diff. Covers the BL-266 Selection-band set (sticky_card_*, selection_*, walk_04, v009_emblem, continents_lens_kepler_key), deletes the orphaned sticky_card_01_dismissed.png, and clears the ~119-commit drift NR-130 recorded.",
-   "design": "RULED 2026-08-13 (NR-104). Run every visual check on the Windows box, bless the diffs routinely (goldens are disposable - flag only unexplained diffs), delete sticky_card_01_dismissed.png. NR-130's drift list and NR-131's empty-tile pop_markers frame are in scope: fix the pop_markers framing rather than blessing an empty capture. Sequence after BL-401 (key move) if both run in the same block, so the continents goldens are blessed once, not twice. The Linux-box 20-35% universal diff stays open as its own question - a Windows bless is valid regardless."
+   "resolved": "2026-08-15",
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
    "status": "designed",
@@ -9240,7 +9250,7 @@
     "docs/economy/MARKETS.md"
    ],
    "summary": "inject_interbody_demand subtracts home supply from home demand, intending the home body's UNMET demand. But clear_markets zeroes every market's supply immediately before the injection and the supply writes land after it, so home supply is identically zero at the read. The subtraction is a no-op: every outpost market receives pull_fraction of the home body's GROSS demand every tick, distance-discounted.",
-   "design": "FOUND 2026-08-13 by the verifier-review pass over the BL-382 slice, which had proposed to\ndocument this gate as dormant. It is not dormant - it is live, and it measures the wrong thing.\n\n## The sequence\n\nIn clear_markets (market_clearing.cpp):\n\n1. mc.supply.fill(0.0f) / mc.demand.fill(0.0f) for every market\n2. inject_population_demand\n3. inject_background_demand\n4. inject_interbody_demand   <- reads home supply HERE, and it is 0\n5. ... the auto-surplus and order-book paths write supply\n\nSo the shortfall expression (home demand minus home supply) equals home demand exactly. The\ngate that skips a resource when the shortfall is non-positive therefore opens for every\nresource carrying any demand at all.\n\n## Why it matters\n\nmaybe_spawn_market spawns an outpost market on any off-home building completion. From that\ntick the outpost receives pull_fraction of the home body's GROSS demand for every resource,\ndivided by the distance falloff - injected as demand, which price resolution reads. Outpost\nprices are set by a number that was meant to be a shortfall and is actually a gross total.\nThis is a live input to every outpost price, not a dormant branch.\n\n## The fix is a sequencing question, not an arithmetic one\n\nNetting honestly means reading a home supply this pass has not computed yet. Options, to\nsettle at promotion:\n\na) Move the injection after the supply writes. Truest to the intent, but those writes are\n   themselves demand-sensitive (auto-surplus yields to standing orders), so this risks a\n   two-pass dependency in a pass whose ordering is already load-bearing.\nb) Net against the PREVIOUS tick's supply, captured before the fill. One tick of lag,\n   trivially deterministic, honest about what it is.\nc) Drop the subtraction and state plainly that the pull is on gross demand, re-tuning\n   pull_fraction to compensate. Simplest, and arguably what the mechanism has always done.\n\nRECOMMENDATION: (b). It preserves the design's stated intent, costs one stored array, and\nreorders nothing. Whatever is chosen, the code comment and MARKETS.md must stop describing a\nnetting that does not happen - both were corrected on 2026-08-13 to describe the real\nbehaviour and point here.\n\n## MEASURED 2026-08-13 — and the recommendation above is REFUTED\n\n`tools/verify/interbody_pull_harness.cpp` was written to settle this item against the real\nLua-authored economy rather than a hand-built fixture. Two things came out of it, and the\nsecond one blocks this item.\n\n**1. R1 confirmed, structurally.** At the injector's read point the subtraction is a no-op:\nthe gate opens for every resource carrying any demand, on every build tested. The item's\ncore claim stands.\n\n**2. Option (b) is not implementable as written, because 'home supply' is not the home\nbody's supply.** The pull reads ONE of the home body's many markets (the lowest-id pick from\nan unordered container). On the canonical MSVC build that market holds 1491.4 supply of the\nbody's 7497.9 and 4.0 demand of its 33.9; on a g++ build of the same seed it holds 0.0\nsupply of 2863.3. So 'net against the previous tick's supply' silences 33% of the pull on\none toolchain and 0% on the other. The netting cannot be corrected before the thing being\nnetted against is well-defined.\n\nThat defect is filed as **BL-406 (the home market is an arbitrary pick)**, and this item now\nrequires it. Settle BL-406 first; this item's a/b/c choice should then be made in the same\npass, because aggregating over the body changes what a corrected netting would do.\n\n**A note on the earlier reasoning.** This item's own text cited BL-381's finding that home\nsupply exceeds home demand by two to three orders of magnitude. That is right at BODY level\n(7497.9 vs 33.9) and does not describe the market the gate reads. A claim can be true of the\neconomy and false of the code path that matters - which is the whole reason this was measured\nrather than argued."
+   "design": "FOUND 2026-08-13 by the verifier-review pass over the BL-382 slice, which had proposed to\ndocument this gate as dormant. It is not dormant - it is live, and it measures the wrong thing.\n\n## The sequence\n\nIn clear_markets (market_clearing.cpp):\n\n1. mc.supply.fill(0.0f) / mc.demand.fill(0.0f) for every market\n2. inject_population_demand\n3. inject_background_demand\n4. inject_interbody_demand   <- reads home supply HERE, and it is 0\n5. ... the auto-surplus and order-book paths write supply\n\nSo the shortfall expression (home demand minus home supply) equals home demand exactly. The\ngate that skips a resource when the shortfall is non-positive therefore opens for every\nresource carrying any demand at all.\n\n## Why it matters\n\nmaybe_spawn_market spawns an outpost market on any off-home building completion. From that\ntick the outpost receives pull_fraction of the home body's GROSS demand for every resource,\ndivided by the distance falloff - injected as demand, which price resolution reads. Outpost\nprices are set by a number that was meant to be a shortfall and is actually a gross total.\nThis is a live input to every outpost price, not a dormant branch.\n\n## The fix is a sequencing question, not an arithmetic one\n\nNetting honestly means reading a home supply this pass has not computed yet. Options, to\nsettle at promotion:\n\na) Move the injection after the supply writes. Truest to the intent, but those writes are\n   themselves demand-sensitive (auto-surplus yields to standing orders), so this risks a\n   two-pass dependency in a pass whose ordering is already load-bearing.\nb) Net against the PREVIOUS tick's supply, captured before the fill. One tick of lag,\n   trivially deterministic, honest about what it is.\nc) Drop the subtraction and state plainly that the pull is on gross demand, re-tuning\n   pull_fraction to compensate. Simplest, and arguably what the mechanism has always done.\n\nRECOMMENDATION: (b). It preserves the design's stated intent, costs one stored array, and\nreorders nothing. Whatever is chosen, the code comment and MARKETS.md must stop describing a\nnetting that does not happen - both were corrected on 2026-08-13 to describe the real\nbehaviour and point here.\n\n## MEASURED 2026-08-13 — and the recommendation above is REFUTED\n\n`tools/verify/interbody_pull_harness.cpp` was written to settle this item against the real\nLua-authored economy rather than a hand-built fixture. Two things came out of it, and the\nsecond one blocks this item.\n\n**1. R1 confirmed, structurally.** At the injector's read point the subtraction is a no-op:\nthe gate opens for every resource carrying any demand, on every build tested. The item's\ncore claim stands.\n\n**2. Option (b) is not implementable as written, because 'home supply' is not the home\nbody's supply.** The pull reads ONE of the home body's many markets (the lowest-id pick from\nan unordered container). On the canonical MSVC build that market holds 1491.4 supply of the\nbody's 7497.9 and 4.0 demand of its 33.9; on a g++ build of the same seed it holds 0.0\nsupply of 2863.3. So 'net against the previous tick's supply' silences 33% of the pull on\none toolchain and 0% on the other. The netting cannot be corrected before the thing being\nnetted against is well-defined.\n\nThat defect is filed as **BL-406 (the home market is an arbitrary pick)**, and this item now\nrequires it. Settle BL-406 first; this item's a/b/c choice should then be made in the same\npass, because aggregating over the body changes what a corrected netting would do.\n\n**A note on the earlier reasoning.** This item's own text cited BL-381's finding that home\nsupply exceeds home demand by two to three orders of magnitude. That is right at BODY level\n(7497.9 vs 33.9) and does not describe the market the gate reads. A claim can be true of the\neconomy and false of the code path that matters - which is the whole reason this was measured\nrather than argued.\n\n## RULING 2026-08-15 (Ben, elicitation form): defer, decide after BL-406 lands\n\nBen took BL-406 option (c) — a per-counterpart-market pull — and explicitly deferred this\nitem's own a/b/c to after that lands. Correct sequencing: (c) changes WHAT is being netted\nagainst (a specific counterpart market's supply, not a body aggregate or an arbitrary pick),\nso choosing a netting rule now would be choosing it against a model that is about to be\nreplaced. Outpost prices are cleared to move, so option (c) here — drop the subtraction and\nre-tune — is no longer ruled out on magnitude grounds.\n\nStays blocked on BL-406. Re-open the a/b/c choice in the same pass that lands it."
   },
   {
    "status": "designed",
@@ -9276,7 +9286,7 @@
    "category": "Economy",
    "title": "The inter-body pull reads one arbitrary market as 'the home body', and which one is not stable across toolchains",
    "priority": "A",
-   "difficulty": 3,
+   "difficulty": 4,
    "version_goal": "v0.1.13",
    "requires": [],
    "authority_doc": "docs/economy/MARKETS.md",
@@ -9286,7 +9296,7 @@
     "docs/economy/MARKETS.md"
    ],
    "summary": "inject_interbody_demand takes market_for_body(home_body) - the lowest-id market of the 17 the home body carries - and treats its demand and supply as the whole body's. Measured: that market holds 12% of the body's demand and a variable share of its supply. Because w.markets is unordered, the pick differs across standard libraries, so the pull's magnitude (and BL-404's answer) depends on an implementation accident rather than on the economy.",
-   "design": "FOUND 2026-08-13 by interbody_pull_harness, written to settle BL-404 and which turned up\nthe larger defect underneath it.\n\n## What the pull thinks 'home' means\n\n`inject_interbody_demand` opens with:\n\n    const entity_id home_market_id = market_for_body(w, w.home_body);\n    const market_component& home = w.markets.at(home_market_id);\n\nand then treats `home.demand` / `home.supply` as THE HOME BODY'S demand and supply. But\n`market_for_body` returns the LOWEST-ID market on the body, and BL-096 carves many markets\nonto the home body. Measured on the canonical MSVC build, seed 0, 60 ticks:\n\n  * home body markets            : 17\n  * body totals                  : supply 7497.9, demand 33.9\n  * the market the pull READS    : supply 1491.4, demand 4.0  (12% of body demand)\n\nSo every outpost market in the game is price-supported in proportion to roughly an eighth of\nthe home body's appetite, chosen by an arbitrary id ordering.\n\n## The instability is the sharpest part\n\nThe same harness on a g++/WSL build of the same seed reports 8 markets, body supply 2863.3,\nand a read market carrying 0.0 supply. Same seed, same source, different standard library:\n`w.markets` is an unordered container, so the lowest id is not a stable choice of market\nacross toolchains. Same-seed reproducibility WITHIN a binary (the determinism invariant) is\nuntouched and still holds - this is not a determinism violation. But it does mean the\nidentity of 'the home market' is an implementation accident, and a price input should not be.\n\nIt also decides BL-404's answer: on one build a corrected netting silences 33% of the pull,\non the other 0%. That is why BL-404 cannot be settled until this is.\n\n## Options\n\na) **Aggregate over the body.** Sum demand (and supply) across every market on the home body.\n   Truest to what the code says it means. Multiplies the pull roughly 8x on today's numbers,\n   so pull_fraction wants re-tuning in the same change, and outpost prices will move.\nb) **Name the home market explicitly.** Give the world a `primary_market` per body, chosen at\n   generation and stored, so the pick is authored rather than incidental. Cheaper, stable,\n   and keeps the current magnitude - but leaves 'the home body's demand' meaning one\n   market's demand, which is what the code claims it is not.\nc) **Pull per-market rather than per-body.** Each outpost market reads the home market that\n   is its actual counterpart. Most faithful to a trade model; the largest change, and it\n   needs a notion of counterpart markets that does not exist yet.\n\nRECOMMENDATION: (a), together with re-tuning pull_fraction against the measured curve, and\nwith BL-404's netting decided in the same pass since the two interact. (b) is the cheap\nstopgap if outpost prices must not move yet.\n\n## Guard\n\n`interbody_pull_harness` (tools/verify) asserts the structural half - several markets exist,\nthe pull reads one, its demand is a fraction of the body's - and PRINTS the varying half\nrather than asserting it, so it stays green on either toolchain while keeping the numbers in\nfront of whoever fixes this."
+   "design": "FOUND 2026-08-13 by interbody_pull_harness, written to settle BL-404 and which turned up\nthe larger defect underneath it.\n\n## What the pull thinks 'home' means\n\n`inject_interbody_demand` opens with:\n\n    const entity_id home_market_id = market_for_body(w, w.home_body);\n    const market_component& home = w.markets.at(home_market_id);\n\nand then treats `home.demand` / `home.supply` as THE HOME BODY'S demand and supply. But\n`market_for_body` returns the LOWEST-ID market on the body, and BL-096 carves many markets\nonto the home body. Measured on the canonical MSVC build, seed 0, 60 ticks:\n\n  * home body markets            : 17\n  * body totals                  : supply 7497.9, demand 33.9\n  * the market the pull READS    : supply 1491.4, demand 4.0  (12% of body demand)\n\nSo every outpost market in the game is price-supported in proportion to roughly an eighth of\nthe home body's appetite, chosen by an arbitrary id ordering.\n\n## The instability is the sharpest part\n\nThe same harness on a g++/WSL build of the same seed reports 8 markets, body supply 2863.3,\nand a read market carrying 0.0 supply. Same seed, same source, different standard library:\n`w.markets` is an unordered container, so the lowest id is not a stable choice of market\nacross toolchains. Same-seed reproducibility WITHIN a binary (the determinism invariant) is\nuntouched and still holds - this is not a determinism violation. But it does mean the\nidentity of 'the home market' is an implementation accident, and a price input should not be.\n\nIt also decides BL-404's answer: on one build a corrected netting silences 33% of the pull,\non the other 0%. That is why BL-404 cannot be settled until this is.\n\n## Options\n\na) **Aggregate over the body.** Sum demand (and supply) across every market on the home body.\n   Truest to what the code says it means. Multiplies the pull roughly 8x on today's numbers,\n   so pull_fraction wants re-tuning in the same change, and outpost prices will move.\nb) **Name the home market explicitly.** Give the world a `primary_market` per body, chosen at\n   generation and stored, so the pick is authored rather than incidental. Cheaper, stable,\n   and keeps the current magnitude - but leaves 'the home body's demand' meaning one\n   market's demand, which is what the code claims it is not.\nc) **Pull per-market rather than per-body.** Each outpost market reads the home market that\n   is its actual counterpart. Most faithful to a trade model; the largest change, and it\n   needs a notion of counterpart markets that does not exist yet.\n\nRECOMMENDATION: (a), together with re-tuning pull_fraction against the measured curve, and\nwith BL-404's netting decided in the same pass since the two interact. (b) is the cheap\nstopgap if outpost prices must not move yet.\n\n## Guard\n\n`interbody_pull_harness` (tools/verify) asserts the structural half - several markets exist,\nthe pull reads one, its demand is a fraction of the body's - and PRINTS the varying half\nrather than asserting it, so it stays green on either toolchain while keeping the numbers in\nfront of whoever fixes this.\n\n## RULING 2026-08-15 (Ben, elicitation form): option (c), per-counterpart-market pull\n\nOption (c) is taken over the recommended (a). The pull becomes per-market: each outpost\nmarket reads the home market that is its actual counterpart, rather than any body-level\naggregate. The 'home body's demand' framing is retired entirely - the defect this item\nnames is dissolved rather than repaired, because no single market is asked to stand for a\nbody any more.\n\n**Outpost prices are cleared to move** (same ruling), so magnitude preservation is not a\nconstraint on the design. `pull_fraction` is re-tuned against whatever curve (c) produces.\n\nConsequence: the missing piece is now the load-bearing one - a notion of COUNTERPART\nMARKETS does not exist in the model. That is the first task at promotion, ahead of touching\n`inject_interbody_demand` at all: define what makes a home market the counterpart of an\noutpost market (resource overlap, ownership, proximity, or an explicit link recorded at\n`maybe_spawn_market` time), and settle whether the relation is one-to-one or many-to-many.\nDifficulty raised 3 -> 4 to reflect it.\n\n`interbody_pull_harness` should gain the per-counterpart assertion as the new structural\nguard once the relation is defined; its current 'the pull reads one market of many' assertion\nbecomes obsolete by construction."
   },
   {
    "status": "complete",
@@ -9515,8 +9525,8 @@
    "design": "Consolidate to one canonical name table (RESOURCES.md already owns the canonical list) with the other two call sites reading through it, plus a loud failure (not a silent fallback) on lookup miss so a future gap fails at the point it is introduced rather than three tables later, unpredictably, at runtime."
   },
   {
-   "status": "designed",
-   "glyph": "✓",
+   "status": "complete",
+   "glyph": "*",
    "parked": false,
    "blocked_on": [],
    "written": "2026-08-14",
@@ -9535,11 +9545,13 @@
    ],
    "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
    "summary": "Filed from NR-194 (2026-08-14 housekeeping). history_sim_harness, history_sweep and data_creep_harness carry a `sweep` CTest label and are documented as excluded from the routine gate, but the gate invocation that actually excludes them (`ctest -LE sweep`) is nowhere enforced - a bare `ctest` runs them anyway. This session two orphaned history_sim_harness processes were found burning ~5,200 CPU-seconds each from a killed run, starving the machine.",
-   "design": "Either make the documented gate command the one every script and doc actually calls (grep for bare `ctest` invocations and fix them), or set these three harnesses' CTest properties so they are skipped by default and opted into explicitly - a label that only protects the caller who remembers a flag is documentation wearing machinery's clothes."
+   "resolved": "2026-08-14",
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
-   "status": "designed",
-   "glyph": "✓",
+   "status": "complete",
+   "glyph": "*",
    "parked": false,
    "blocked_on": [],
    "written": "2026-08-14",
@@ -9557,7 +9569,9 @@
    ],
    "authority_doc": "docs/ai/AI_OPPONENT.md",
    "summary": "Merges NR-169 and NR-220 (2026-08-14 housekeeping) - the same harness, the same unowned stewardship gap, raised twice a day apart. NR-169: BL-366 and BL-130 both moved the bands they touch (5→8, 8→9) without a re-run. NR-220: the harness was independently confirmed 13-red both before and after an unrelated batch, so the red is stale, not a regression - but nothing currently distinguishes \"stale red\" from \"new failure\" at a glance.",
-   "design": "NR-169's recommendation: a derived ceiling (computed from the harness's own inputs) rather than a hand-set magic number, so the band is something anyone can sanity-check rather than trust. Pair with folding a re-bless of these bands into BL-402's pass (that item currently scopes scripts/verify/ only; this harness's bands live in tools/verify/ and are a distinct mechanism, hence a separate item rather than an addition to BL-402)."
+   "resolved": "2026-08-14",
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
    "status": "designed",
@@ -9654,6 +9668,302 @@
    "authority_doc": "docs/ai/AI_OPPONENT.md",
    "summary": "Merges NR-228 and NR-233 S3 (2026-08-14 housekeeping). corp_ai.cpp carries corp_verb_label/corp_decision_reason_label in an anonymous namespace, so BL-407 duplicated both word-for-word rather than exporting them, plus a hand-set k_reason_count = 8 for the filter combo since corp_decision_reason has no count sentinel. Both enums are append-only and have already grown twice each (BL-293/BL-350 for the verb; none yet for the reason, but the pattern is established) - the next addition silently narrates two ways or vanishes from the filter unless both files are remembered.",
    "design": "Hoist both label functions into corp_ai.hpp (small, no behaviour change) and add a count sentinel to corp_decision_reason's definition so the filter combo derives its size instead of hand-mirroring it. Whoever next has corp_ai.cpp open for other reasons is the natural owner - it is a two-minute fix once that file is already in hand."
+  },
+  {
+   "id": "BL-421",
+   "short_name": "REQUIREMENTS_QUERY_AND_COLD_STORE",
+   "title": "Requirements ledger hot/cold split: requirements_query.js + archive_requirements.js",
+   "summary": "requirements.json was 556 KB / ~142K tokens with 223 of 232 groups frozen history and no query tool — the one canonical store still only reachable by loading it whole. Applied the backlog's own hot/cold split: resolved groups' rows+resolution move to archive/requirements-<quarter>.json, and a backlog_query-style retrieval tool serves the in-flight view, single groups (cold-resolved), and row-level sweeps (--failed, --class).",
+   "category": "Tooling",
+   "priority": "B",
+   "difficulty": 2,
+   "status": "complete",
+   "version_goal": "v0.1.16",
+   "files": [
+    "tools/session/req_store.js",
+    "tools/session/requirements_query.js",
+    "tools/session/archive_requirements.js",
+    "tools/session/story_check.js",
+    "docs/development/req/requirements.json",
+    "docs/development/req/REQUIREMENTS.md"
+   ],
+   "created": "2026-08-14",
+   "resolved": "2026-08-14",
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
+  },
+  {
+   "id": "BL-422",
+   "short_name": "HELD_ORDER_PHANTOM_INVENTORY",
+   "title": "A held sell order still credits market inventory at listing time",
+   "summary": "Found by the seam-batch review barrier (2026-08-14): market_clearing.cpp credits a standing order's LISTED quantity to mc.inventory (~line 578, the BL-130 real-inventory seam) before clearing runs. Pre-BL-386 everything listed also sold, so listing == selling; under the reservation rule a held order (floor above the resolved price) sells nothing, yet the market's inventory gains stock that never left the seller's pool — phantom availability that buyers and the price resolution can see.",
+   "category": "Economy",
+   "priority": "B",
+   "difficulty": 2,
+   "status": "designed",
+   "version_goal": "v0.1.13",
+   "files": [
+    "src/world/market_clearing.cpp",
+    "tools/verify/order_book_harness.cpp"
+   ],
+   "created": "2026-08-14",
+   "design": "Credit inventory only for quantity that actually clears (matched + auto-cleared), or defer the inventory credit until after the auto-clear pass resolves which orders held. Guard with an order_book_harness assertion: a held order leaves mc.inventory unchanged for that resource. Decide whether the supply-side price signal should still see held stock (an argument exists both ways — held stock is real and near the market, but it is explicitly not for sale below its floor); default to NOT visible, matching the reservation semantics BL-386 established."
+  },
+  {
+   "id": "BL-423",
+   "short_name": "VERIFY_ALL_BATCH_MODE",
+   "title": "--verify-all: one world generation for the whole visual suite",
+   "summary": "Measured 2026-08-14 (Ben flagged the slowness): each --verify launch spends ~38s in make_hard_coded_world on the Debug build + 3x map, and the capture takes 0.25s — so a 79-script pass costs ~50 minutes regenerating the identical deterministic world 79 times. Batch mode generates once, snapshots the pristine world + ui_state, and restores before each script.",
+   "category": "Tooling",
+   "priority": "A",
+   "difficulty": 3,
+   "status": "complete",
+   "version_goal": "v0.1.16",
+   "created": "2026-08-14",
+   "resolved": "2026-08-14",
+   "files": [
+    "src/core/verify_api.cpp",
+    "src/core/app.hpp",
+    "src/main.cpp"
+   ],
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
+  },
+  {
+   "id": "BL-424",
+   "short_name": "HOMEWORLD_70PC_AREA_RESIZE",
+   "title": "Homeworld grid resized to 70% area: 312x145 -> 261x121",
+   "summary": "Ben, 2026-08-14, after the verify-cost measurement session: \"I think the map is just too big to render. Let's make it 70% the size\" — clarified to 70% AREA. Measurement located the actual cost in Debug-build world generation (~38s) and the lazy Era -1 ages run (>10 min), both scaling with the 45,240-tile 3x map; rendering itself was fast. 261x121 = 31,581 tiles keeps ~2.09x the original playfield.",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 2,
+   "status": "complete",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/hard_coded_world.hpp"
+   ],
+   "created": "2026-08-14",
+   "resolved": "2026-08-14",
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
+  },
+  {
+   "id": "BL-425",
+   "short_name": "AGES_LAZY_SIM_UNAFFORDABLE",
+   "title": "The Ages view's lazy Era -1 run costs >8 min on the Debug build",
+   "summary": "Measured 2026-08-14: history_ages.lua exceeds an 8-minute bound solo, on both the 3x map and the 70%-area resize (BL-424) — the cost is the per-year time-lapse recording the lazy 0->1960 re-run does (generation's own pass, which keeps only the outcome, finishes inside the ~40s launch). It silently hung two full visual passes. The check is PARKED in scripts/verify/parked/ (a parked check is a debt with a note, per the data_creep precedent), so the History Ages view currently has NO golden coverage.",
+   "category": "Performance",
+   "priority": "A",
+   "difficulty": 3,
+   "status": "design-owed",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/ui/history_panel.cpp",
+    "src/world/history_sim.cpp",
+    "scripts/verify/parked/history_ages.lua"
+   ],
+   "created": "2026-08-14",
+   "design": "Open questions: (a) record the time-lapse at coarser-than-yearly steps (the view scrubs decades in practice)? (b) snapshot only what the Ages canvas draws (province ownership per tile) rather than full state? (c) memoise at generation time behind a flag so --verify pays nothing? Measure which half is the cost (sim vs recording) before choosing — BL-403's harness is the natural instrument. Un-park the script as part of landing.\n\nScheduled 2026-08-15 (Ben): take BL-425 + BL-426 + BL-427 together as the next session's block — the verify-cost triad (ages sim affordability, stale-exe gate guard, world snapshot cache). Shared instrument note: BL-425 wants the sim-vs-recording split measured and BL-427 wants generation phase timings; both are BL-403's (profiling harness) natural territory, so the session should probably open by building that instrument or a lightweight cut of it. BL-425 is design-owed — Design is its first verb."
+  },
+  {
+   "id": "BL-426",
+   "short_name": "GATE_STALE_EXE_GUARD",
+   "title": "The gate detects stale harness exes instead of trusting the runner",
+   "summary": "Third recorded bite of the same trap (2026-08-12 triple-bless: \"the whole harness tier was a build behind\"; the v0.1.10 ninja stale object; 2026-08-14: a 72/74-green ctest run on pre-resize binaries whose goldens should have failed). ctest runs binaries but does not build them, and a green run on stale exes reads exactly like a green run.",
+   "category": "Tooling",
+   "priority": "A",
+   "difficulty": 2,
+   "status": "designed",
+   "version_goal": "v0.1.16",
+   "files": [
+    "CMakeLists.txt",
+    "tools/verify/"
+   ],
+   "created": "2026-08-14",
+   "design": "A CTest FIXTURES_REQUIRED setup test that fails the whole run when any registered harness exe is older than the newest source under src/ + tools/verify/ (a small cmake -P script comparing mtimes, same shape as run_sweep.cmake). Belt: check.bat already builds first — the guard is for the bare-ctest path everyone reaches for anyway. The guard must name the stale exes in its failure output; \"rebuild and rerun\" should be the whole fix.\n\nScheduled 2026-08-15 (Ben): take BL-425 + BL-426 + BL-427 together as the next session's block — the verify-cost triad (ages sim affordability, stale-exe gate guard, world snapshot cache). Shared instrument note: BL-425 wants the sim-vs-recording split measured and BL-427 wants generation phase timings; both are BL-403's (profiling harness) natural territory, so the session should probably open by building that instrument or a lightweight cut of it. BL-425 is design-owed — Design is its first verb."
+  },
+  {
+   "id": "BL-427",
+   "short_name": "VERIFY_WORLD_SNAPSHOT_CACHE",
+   "title": "Verify runs load a cached post-generation world instead of regenerating",
+   "summary": "Ben's proposal, 2026-08-15, after the verify-cost measurements: make_hard_coded_world costs ~40s per launch on the Debug build (tile-count-insensitive — the Era -1 sim, planetology, background-firm calibration and settlement passes dominate), and every SOLO --verify launch pays it in full. Serialize the generated world once, load it per launch; --verify-all already amortises the cost for batch passes but solo iteration on one check still pays ~40s per run.",
+   "category": "Tooling",
+   "priority": "A",
+   "difficulty": 3,
+   "status": "designed",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/core/verify_api.cpp",
+    "src/world/world_io.cpp"
+   ],
+   "created": "2026-08-15",
+   "design": "Write the post-setup world through the existing flat-binary seam to a gitignored cache (build_gen/verify_world.bin) keyed by world::state_hash(0) + a generator stamp; on --verify launch, load if the stamp matches, else regenerate and rewrite. The guard is the point (BL-426's lesson, third bite this week: a silently stale cache would verify an old world while reading as green). Two known gaps to close or scope out: (a) the generation_report is not world state — history_ledger_and_comms.lua and the wizard-chart checks capture it, so it must be cached alongside or those scripts regenerate; (b) prove load==generate once with the state hash and a full-suite compare before trusting it. Does NOT address per-script econ stepping (~4.5s/tick Debug), which now dominates batch passes — the Release verify tree is that lever and pairs naturally with this item.\n\nScheduled 2026-08-15 (Ben): take BL-425 + BL-426 + BL-427 together as the next session's block — the verify-cost triad (ages sim affordability, stale-exe gate guard, world snapshot cache). Shared instrument note: BL-425 wants the sim-vs-recording split measured and BL-427 wants generation phase timings; both are BL-403's (profiling harness) natural territory, so the session should probably open by building that instrument or a lightweight cut of it. BL-425 is design-owed — Design is its first verb."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-15",
+   "created": "2026-08-15",
+   "category": "Economy",
+   "version_goal": "v0.1.17",
+   "requires": [],
+   "id": "BL-428",
+   "short_name": "CHAIN_DEPTH_IS_THE_GROWTH_SPINE",
+   "title": "Chain depth is the growth track — how far down the production graph a corp can reach is what gates its next building",
+   "priority": "A",
+   "difficulty": 4,
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "scripts/recipes.lua",
+    "scripts/economy.lua",
+    "src/world/recipe_registry.hpp",
+    "src/world/recipe_registry.cpp",
+    "src/world/placement_rules.cpp",
+    "docs/economy/PRODUCTION.md"
+   ],
+   "summary": "RULING 2026-08-15 (Ben, elicitation form): the growth track's spine is CHAIN DEPTH, not building tiers, not the tech ladder, not settlement scale. A corp advances by reaching further down the production graph - the goods it can actually make gate the buildings it may place next - so growth is a consequence of the economy it has built rather than a parallel unlock system laid over it. This is the item the roster expansion (BL-429) and the alternate methods (BL-430) both hang from, and the structure tech (BL-296) and politics (BL-158) are meant to REFINE rather than replace.",
+   "design": "FILED 2026-08-15 from Ben's sprint-planning ruling. Four spines were offered - building\ntiers, chain depth, the ancient tech ladder, settlement scale - and chain depth was taken.\n\n## What the ruling means\n\nGrowth is not a separate track. A corp's reach down the production graph IS its progress:\nthe deeper the chain it can close, the more the world opens to it. Concretely, a building's\nplacement precondition becomes a statement about goods the corp can already produce, rather\nthan a flag some other system sets. Build a bloomery, and the smithy becomes placeable\nbecause blooms exist; not because a tech completed.\n\nWhy this over the alternatives, in Ben's choice and worth recording: a tier ladder or a tech\nladder is a SECOND system that must be kept in agreement with the economy, and the project\nhas already paid that reconciliation cost once (BL-155/BL-156 both settling on the same\n`condition_set` and neither building it). Chain depth has no second system to desync from -\nit is read off the recipe graph that has to exist anyway.\n\n## Why this is the right substrate right now\n\nThe ancient arc's resource enum is ALREADY stocked for it and mostly idle. `components.hpp`\ncarries stone, timber, sand, clay, peat, charcoal, iron_blooms, grain, fodder, salt and\nbullion - the BL-286 logistics tranche plus the ambient raws - and BL-286's own comment\nadmits the behaviours were never filed (\"behaviour unfiled\" appears five times). Several\ncarry no base price in `world_gen.lua`, which is exactly the minable-but-unsellable asymmetry\nBL-340 closed for the space tier and never closed for the ancient one.\n\nSo the depth ladder does not need new resources. It needs the chains that consume the ones\nalready sitting in the enum. That is the cheapest possible version of this feature and the\nmost honest: it retires orphans instead of minting them.\n\n## What has to be defined\n\n1. **A depth metric.** Depth of a good = longest input path back to a raw. Computed once at\n   registry load from `recipes.lua`, not authored per good, so it cannot drift from the graph.\n   Determinism: the graph is authored data, the walk is pure - it must produce the same\n   number on every toolchain (the BL-406 lesson: never let an unordered container decide a\n   number the economy reads).\n2. **What depth gates.** First cut: building placement. A building type declares the minimum\n   depth its corp must have REACHED (i.e. actually produced at least once, recorded per corp),\n   and `placement_rules.cpp` enforces it alongside terrain.\n3. **Cycles.** The graph must be acyclic for depth to be defined. The registry load should\n   reject a cyclic recipe set loudly rather than looping - a headless harness assertion.\n4. **What \"reached\" means for a corp** - produced once ever, or currently producing? Produced\n   once ever is the legible choice (progress does not evaporate when a building idles) and\n   costs one per-corp bitset over resource_type.\n\n## Guard\n\nA headless harness (`tools/verify/chain_depth.cpp`) asserting: the graph is acyclic; every\ngood's depth is stable across two loads; every building's declared minimum depth is\nREACHABLE from the starting position (no unplaceable building, the roster equivalent of an\norphan resource); and that a fresh corp can reach the deepest tier by some path.\n\n## The refinement seam this leaves open\n\nTech (BL-296) and politics (BL-158/v0.1.6) refine this rather than gate it: a tech can make a\nchain cheaper, shorter, or unlock an ALTERNATE method (BL-430) for a chain you already run -\nit does not hand you a depth you did not earn. Stated here so the later systems have a shape\nto attach to instead of re-litigating the spine."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-15",
+   "created": "2026-08-15",
+   "category": "Economy",
+   "version_goal": "v0.1.17",
+   "requires": [
+    "BL-428"
+   ],
+   "id": "BL-429",
+   "short_name": "ANCIENT_BUILDING_ROSTER",
+   "title": "The building roster is 7 types and half of them are space-era — the ancient arc needs 20+ buildings that consume the resources it already has",
+   "priority": "A",
+   "difficulty": 4,
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "scripts/economy.lua",
+    "scripts/recipes.lua",
+    "src/world/components.hpp",
+    "src/world/placement_rules.cpp",
+    "src/ui/icons.cpp",
+    "docs/economy/PRODUCTION.md",
+    "docs/ui/ICONS.md"
+   ],
+   "summary": "RULING 2026-08-15 (Ben): take the roster past 20 building types, as a content sprint of its own. Measured today: scripts/economy.lua carries SEVEN building_type entries (extraction_site, processing_facility, port, launchpad, inland_logistics_hub, military_base, research_institute) and scripts/recipes.lua carries 17 recipes, one per output. Named buildings like the Hydroponics Bay and Fishing Wharf are not types at all - they are the generic processing_facility distinguished by recipe and placement rule, which is the pattern the expansion should follow rather than minting enum values.",
+   "design": "FILED 2026-08-15 from Ben's sprint-planning ruling (\"20+ types, content sprint of its own\").\n\n## What is actually there today\n\n  * building_type entries in `economy.lua` : 7\n  * recipes in `recipes.lua`               : 17, one per output, no alternates\n  * of the 7 types, LAUNCHPAD is space-era and the refinery chain runs on PETROLEUM\n\nThe arc is the ancient product at 0 CE (NR-177). A roster expansion that adds to the current\nset without confronting that would double the space-era debt inside the live product - see\nBL-433, filed alongside this, which owns the misplacement question.\n\n## The pattern to follow, and the one to avoid\n\nBL-166/BL-168 established it and `economy.lua` records it: the Hydroponics Bay and the Fishing\nWharf are the SAME `processing_facility` / `extraction_site` types as everything else,\ndistinguished by recipe and by placement rule, not by a new enum value. That is how a roster\nreaches 20+ named buildings without a 20-value enum, without touching the serialised width,\nand without a glyph explosion.\n\n**Mint a new `building_type` only where BL-325's test is met** - it earns the enum value with a\ndistinct placement rule AND a distinct glyph AND behaviour no recipe can express. The\nmilitary_base passed that test. A tannery does not.\n\n## What the roster should cover, against the resources that already exist\n\nThe enum already holds the ancient substrate: stone, timber, sand, clay, peat, charcoal,\niron_blooms, grain, fodder, salt, bullion, plus the endemic four (tobacco, spices, coffee,\nfurs). Most are BL-286 orphans - in the enum, unconsumed by any recipe, several unpriced in\n`world_gen.lua`. The roster's job is to give every one of them a consumer, which is BL-340's\nadmission rule applied to the ancient tier:\n\n  * **Extraction** - quarry (stone), clay pit, sand pit, woodcutter (timber), peat cutting,\n    salt pan, grain farm, pasture (fodder), mine (iron ore, copper ore)\n  * **Primary processing** - charcoal burner (timber -> charcoal), bloomery (iron ore +\n    charcoal -> iron_blooms), kiln (clay -> ceramics), glassworks (sand -> glass),\n    sawmill (timber -> timber goods), mill (grain -> flour/rations)\n  * **Secondary** - smithy (blooms -> tools/arms), tannery, weaver, potter, shipwright,\n    stonemason\n  * **Terminal / mercantile** - mint (bullion), warehouse, market stall\n\nThat is comfortably past 20 named buildings on ~3 building_type values. Exact list, recipes\nand magnitudes are the sprint's content work; the ADMISSION RULE is the invariant - no\nbuilding whose output nothing consumes, no resource no building consumes.\n\n## Depth, and how this item relates to BL-428\n\nEvery entry above declares its minimum chain depth (BL-428). The roster IS the depth ladder\nmade concrete: quarry at depth 0, bloomery at 1, smithy at 2, and so on. Build the ladder and\nthe roster in the same pass or the numbers will not agree.\n\n## UI consequence, which is half the work\n\n20+ buildings will not fit the Build door's current shape, and ICONS.md gains a glyph per\nnamed building. Both are in scope: a roster the player cannot browse is not content, it is a\ndata file. Its question_log entry must be written with it (BL-260).\n\n## SLICE 1 LANDED 2026-08-15 — the chains, not yet the named buildings\n\nWhat landed: the ancient production chains and the prices that make them tradeable. What did NOT:\nthe named building identities (quarry, woodcutter, kiln, smithy...), their placement rules and\nglyphs, and a Build door that can present 20+ entries. Requirements `ancient-chain-roster` R1-R4\ncomplete, R5-R6 pending.\n\n**The measurement that justified doing it this way round.** Before this slice the ancient arc's max\nchain depth was **1** — one layer above raws and nothing beyond. Named buildings on top of a flat\neconomy would have been 20 ways to do the same shallow thing. Depth first, identities second.\n\n**The load-bearing edit was a RETAG, not the five additions.** Tagging the coal-fired `steel` recipe\n`industrial` is what gave the ancient arc depth. With the shallow coal route still available (coal is\na raw), BL-428's min-across-recipes rule correctly collapsed steel back to depth 1 — the new chain\nwould have existed and meant nothing. Ancient max depth went 1 -> 3 on exactly that change. Worth\nremembering as a general shape: adding a deep chain does not deepen an economy while a shallow route\nto the same good remains open.\n\n**A trap this slice created and closed in the same pass.** Three call sites defaulted an\nunconfigured processing facility to `recipe_id(\"steel\")`. That still RESOLVES after the retag — the\nstorage path is band-independent by design (BL-433) — so an ancient campaign would have silently\nseeded its processors with an industrial recipe, and nothing would have refused it, because the era\ngates browsing and placement rather than execution. Now `default_recipe_id()`. The general rule, and\nit is worth stating because the next author will hit it: **ask the registry for a sensible default;\ndo not name a recipe and hope.**\n\n**A latent defect found on the way** (NR-237): `resource_from_name` was missing eight BL-286 enum\nvalues despite its own comment claiming full-enum coverage, so any recipe naming one threw at load.\nInvisible until now because BL-286 shipped those goods with their behaviours \"unfiled\", so nothing\never authored against them.\n\n**Still orphaned**, and recorded rather than glossed: `sand` and `peat` are priced by this slice but\nconsumed by nothing. BL-432 is where that becomes a mechanical assertion."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-15",
+   "created": "2026-08-15",
+   "category": "Economy",
+   "version_goal": "v0.1.17",
+   "requires": [
+    "BL-428"
+   ],
+   "id": "BL-430",
+   "short_name": "ALTERNATE_PRODUCTION_METHODS",
+   "title": "A building has a recipe, not a choice of one — alternate production methods with real trade-offs",
+   "priority": "A",
+   "difficulty": 3,
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "scripts/recipes.lua",
+    "src/world/recipe_registry.hpp",
+    "src/world/recipe_registry.cpp",
+    "src/world/economy_system.cpp",
+    "docs/economy/PRODUCTION.md"
+   ],
+   "summary": "RULING 2026-08-15 (Ben): yes, alternates with real trade-offs - not tier upgrades. Today recipes.lua is one recipe per output and a building stores a single recipe id, so choosing a building IS choosing its method. An alternate is a different input basket for the same output, each honestly better under different conditions (local abundance, chain depth, wage cost, throughput), so the player is choosing rather than upgrading.",
+   "design": "FILED 2026-08-15 from Ben's sprint-planning ruling (\"yes, alternates with real trade-offs\" -\nchosen over \"only as tier upgrades\" and over keeping one recipe per output).\n\n## The distinction the ruling turns on\n\nA **tier upgrade** is strictly better and therefore not a decision - it is a delay. An\n**alternate** must be genuinely better under some conditions and worse under others, or the\nplayer will find the dominant one once and never look again. That is the design bar, and it\nis testable: if any alternate dominates its sibling on every axis, it is a tier, not a method,\nand the pair should be re-authored or merged.\n\n## The trade-off axes available today\n\nReal ones the engine already has, so no new machinery is needed to make the choice bite:\n\n  * **Input basket** - charcoal vs peat vs coal as smelting fuel: what is locally abundant\n    differs by body and region, so the same method is not best everywhere.\n  * **Labour intensity** - `base_wage` and workforce against `base_rate`: a hand method is\n    cheap to build and dear to run; a water-powered one inverts that.\n  * **Chain depth** - a deeper method needs a good you may not reach yet (BL-428), so the\n    shallow method stays correct early and stays available late.\n  * **Throughput vs yield** - batches per tick against output per batch.\n\n## Shape\n\n`recipes.lua` entries gain a `produces` / method grouping so several recipes can declare the\nsame output and be presented as siblings. The recipe id stays the 0-based index and ORDER\nMUST STAY STABLE - authored ids are stored in `building_component.recipe` and a reorder would\nsilently repoint every existing building. Append new methods; never insert.\n\nSwitching method on a running building is the existing recipe-switch path (BL-079's reflex\nalready switches a floored recipe), so the mechanism exists - what is new is that the choice\nbecomes the player's, with a cost or a cooldown to switch so it is a commitment rather than a\nper-tick optimisation. That cost is a first-cut constant in `economy.lua`, tuned by playtest.\n\n## Guard\n\nA headless harness assertion that no method DOMINATES a sibling on every axis\n(inputs cost, wage, rate, depth) - the mechanical form of the design bar above. It will need\na price snapshot to compare input baskets, so it belongs next to the existing economy harness.\n\n## Interaction with the AI\n\n`corp_ai.cpp` scores build/demolish/survey/road/hire. Method choice is a NEW decision surface\nand the scorer will pick badly by default (it has no notion of local abundance). Either the\nalternates are scored - a small, deterministic addition in the same scored-utility layer - or\nbackground corps are pinned to the shallow method explicitly. Pinning silently is the failure\nmode: it would make every rival look strategically identical. Decide at promotion; either way\nit is a stated call, not a default."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-15",
+   "created": "2026-08-15",
+   "category": "UI",
+   "version_goal": "v0.1.17",
+   "requires": [
+    "BL-429",
+    "BL-430"
+   ],
+   "id": "BL-431",
+   "short_name": "PRODUCTION_METHOD_AND_CHAIN_UI",
+   "title": "The production choice and the chain that leads to it have no surface — method selector, chain trace, and the depth readout",
+   "priority": "B",
+   "difficulty": 3,
+   "authority_doc": "docs/ui/SELECTION.md",
+   "files": [
+    "src/ui/selection_panel.cpp",
+    "src/ui/icons.cpp",
+    "docs/ui/SELECTION.md",
+    "docs/ui/question_log.json",
+    "docs/ai/ACTIONS.json"
+   ],
+   "summary": "The UI half of the economy-breadth sprint. Three surfaces the player needs the moment BL-429 and BL-430 land: a production-method selector on the building panel (with the trade-off legible at the point of choice, not after), a chain trace answering \"what do I need to make this\", and a depth readout answering \"how far down the graph have I actually got\". Without these the content is invisible: 20+ buildings and a choice of method are a data file the player cannot see.",
+   "design": "FILED 2026-08-15 with the economy-breadth sprint. This is the \"pad out the UI\" half of\nBen's ask, applied to the economy side; BL-393's unit surfaces are its military twin.\n\n## Three questions, three surfaces (BL-260 discipline - each declares the question it answers)\n\n1. **\"Which way should this building make its output?\"** - a method selector on the Selection\n   panel's building view. Shows each alternate's input basket, wage and rate SIDE BY SIDE, so\n   the trade-off (BL-430) is legible at the point of choice. A selector that shows only names\n   pushes the player to a wiki. Switching cost shown before committing, like the Build door\n   shows a credit total.\n2. **\"What do I need in order to make this?\"** - a chain trace from any good back to its raws,\n   reachable from the good itself (resource pip, market row, recipe line). Read off the same\n   registry graph BL-428 computes depth from, so it cannot disagree with the simulation.\n3. **\"How far down the graph have I actually got?\"** - the depth readout: the corp's reached\n   depth, what the next depth would open, and what is missing to get there. This is the growth\n   track made visible, and without it chain depth is an invisible gate that reads as a bug.\n\n## Constraints\n\nThe Selection panel is already dense; the method selector must not push the workforce dial or\nprofitability off screen. Rule 0b applies at build time - state the current measurements\nbefore reshaping the panel, and open the live app before asking Ben to judge the layout.\n\nToggle rule applies to any ledger slot this earns.\n\n## Owed alongside the code\n\n  * `docs/ui/question_log.json` entries for all three surfaces, written WITH them, not after.\n  * `docs/ai/ACTIONS.json` - method switching is a new control and therefore a new dictionary\n    entry. Transcribed from the seam verb once it exists (BL-270 discipline), never authored\n    ahead of it.\n  * A user story per surface in `user_stories.json`: the intent axis has nothing on \"choose how\n    I produce\" today."
+  },
+  {
+   "status": "complete",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-15",
+   "created": "2026-08-15",
+   "category": "Economy",
+   "version_goal": "v0.1.17",
+   "requires": [],
+   "id": "BL-433",
+   "short_name": "SPACE_ERA_BUILDINGS_IN_THE_ANCIENT_ARC",
+   "title": "The live ancient product still ships a Launchpad and a petroleum refinery — the roster contradicts the arc",
+   "priority": "B",
+   "difficulty": 2,
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "scripts/economy.lua",
+    "scripts/recipes.lua",
+    "docs/economy/PRODUCTION.md",
+    "docs/economy/ERAS.md"
+   ],
+   "summary": "Found 2026-08-15 while sizing the economy-breadth sprint. The live arc is the ancient product at 0 CE (NR-177), but scripts/economy.lua still carries a launchpad building_type and scripts/recipes.lua still refines petroleum into refined_fuel and propellant. Not a bug - it is the space arc's roster, correctly parked at the version level but never parked in the DATA the ancient product loads. A player at 0 CE can be offered a launchpad.",
+   "design": "FOUND 2026-08-15 while measuring the roster for BL-429.\n\n## What is there\n\n`economy.lua` § buildings carries `launchpad` as one of seven building_type entries.\n`recipes.lua` id 1 is petroleum -> refined_fuel, and the BL-308 propellant recipes sit on top\nof it. The space arc is parked at the ROADMAP/backlog level (~41 items carry `parked: true`),\nbut parking was a backlog operation and the Lua data was not part of it.\n\n## Why it matters more than it looks\n\nThree ways it bites, in order of how much:\n\n1. **The player at 0 CE can be offered a launchpad.** Whatever the placement rules do in\n   practice, the roster is what the Build door reads, and an anachronism there reads as a bug\n   in the product rather than a parked feature.\n2. **BL-429's roster count is measured against a polluted baseline.** \"Seven building types\"\n   includes one that should not be in this arc at all - so the real ancient roster is six.\n3. **The AI scorer sees them.** `corp_ai.cpp` scores build candidates over the roster it is\n   given; a rival that builds toward a space chain in an ancient world is not a strategy, it\n   is a data leak.\n\n## The call this needs\n\nNot mine to take, because it decides how the two arcs share one data set:\n\na) **Era-gate the data** - each building and recipe declares the era it belongs to; the\n   loader filters on the campaign's era. Truest, and ERAS.md already designs an era system\n   (status: designed, NOT implemented), so this would be its first real consumer.\nb) **Split the data files** - `economy_ancient.lua` / `economy_space.lua`, chosen at startup.\n   Cheapest, and honest about the two arcs being two products; costs duplication where they\n   genuinely overlap (extraction_site, port, warehouse).\nc) **Leave it and rely on placement rules** - the status quo. Cheapest of all and the reason\n   this was invisible until now.\n\nRECOMMENDATION: (a). It is the same amount of work as (b) once, it gives ERAS.md its first\nimplementation instead of leaving it a designed-but-unbuilt doc, and the ancient arc's own\ntech ladder (BL-296) will want an era-ish gate anyway. But it is a shared-substrate decision\nand BL-429 should not start before it is answered - the roster expansion writes into exactly\nthese files.\n\n## RULING 2026-08-15: option (a), era-gate the data\n\nTaken on Ben's instruction to answer this myself and start Sprint 17. Reasons unchanged from\nthe recommendation: (a) and (b) cost about the same once, (a) gives ERAS.md its first\nimplementation instead of leaving it a designed-but-unbuilt doc, and BL-296's ancient tech\nladder will want an era-shaped gate anyway. (b) additionally duplicates every entry the two\narcs genuinely share — extraction_site, port, warehouse — and duplication is what goes stale.\n\n## The trap that shapes the implementation\n\nA recipe's **id is its index** in `m_recipes`, and that id is STORED in\n`building_component.recipe`. So the era filter must be a MASK, never a removal: dropping a\ndisallowed recipe from the vector would silently repoint every building whose recipe sat\nafter it. `recipes.lua`'s own header already says \"keep the order stable so authored ids\nhold\" — the filter has to honour that.\n\nThe shape that satisfies both, without touching the ten call sites that iterate recipes:\n\n  * `m_recipes` keeps EVERY authored recipe, in file order. `get_recipe(id)` and\n    `recipe_id(name)` stay absolute — they are the storage/lookup path.\n  * A new `m_allowed` vector holds the positions permitted in the current era.\n    `recipe_count(bt)` / `recipe_at(bt, i)` map through it — they are the BROWSE path, and\n    every existing caller already means \"the recipes available to me\" by them.\n\nThat split is why no consumer needs rewriting: the ten sites that walk\n`[0, recipe_count)` start walking the era's recipes instead of all of them, which is what\neach of them was already trying to express.\n\n## Band, not era-number\n\nTwo bands plus a wildcard: `any` / `ancient` / `industrial`. Deliberately NOT reusing\nERAS.md's Era 0 / Era 1 numbering — that axis is about *space access within the industrial\narc* and is gated on launchpad presence, a different question from *which product is this*.\nConflating them would give one field two meanings.\n\nThe campaign's band is derived from `world_params::epoch_year` against the SAME 1700\nthreshold the antiquity branch already documents, so there is one number in the codebase and\nnot two: below 1700 is ancient, 1700 and above is industrial.\n\n## Default is 'any', and that is load-bearing\n\nAn unset registry permits everything, so every existing headless harness — none of which\nknows about eras — loads exactly the roster it loads today. Same property BL-409 relied on\nfor spectator mode: the new behaviour is opt-in, so the un-opted path is byte-identical and\ncan be asserted as such.",
+   "completed": "2026-08-15",
+   "resolution": "Landed 2026-08-15, option (a). `era_band` (any/ancient/industrial) tags every authored building type and recipe; the campaign's band is derived from world_params::epoch_year against the 1700 threshold and set in app::load_economy. The filter MASKS rather than removes, which is the whole shape of the change: storage (get_recipe/recipe_id) stays absolute so stored recipe ids never repoint, while browse (recipe_count/recipe_at) walks the era's list — and because every existing caller of the browse path already meant 'the recipes available to me', none of the ten call sites needed rewriting. construct_building is the authoritative gate (construction_result::era_locked, distinct from tech_locked because no research reaches it, surfaced as corp_command_result::rejected_era_locked rather than overloading rejected_placement — BL-395's complaint); the Selection build door filters on building_available so it does not offer what the gate would refuse. Default band is `any`, so every pre-existing harness and the default world are untouched. Guard: tools/verify/era_roster.cpp, 15 assertions ALL PASS, live-Lua and script-rooted. Docs: PRODUCTION.md gained an era-band section (incl. the storage/browse table); ERAS.md's header block gained the note that this is a SECOND thing in code saying 'era' and is a different axis from Era 0/Era 1. Ancient roster is deliberately thin (steel, food_rations, refined_copper) — filling it out is BL-429."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-15",
+   "created": "2026-08-15",
+   "category": "Testing",
+   "version_goal": "v0.1.17",
+   "requires": [
+    "BL-428"
+   ],
+   "id": "BL-432",
+   "short_name": "ECONOMY_BREADTH_GUARD_HARNESS",
+   "title": "One harness for the roster invariants — no orphan resources, no unplaceable buildings, no dominant method, no cyclic graph",
+   "priority": "B",
+   "difficulty": 2,
+   "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+   "files": [
+    "tools/verify/chain_depth.cpp",
+    ".claude/skills/verifier-headless/SKILL.md"
+   ],
+   "summary": "The saved check for the economy-breadth sprint, filed as its own item so it is built rather than promised. Four invariants over the loaded registry: the recipe graph is acyclic (or depth is undefined), every resource_type in the enum has a producer or a consumer (BL-340's admission rule, mechanised), every building's declared minimum depth is reachable from a fresh start, and no production method dominates a sibling on every axis (BL-430's design bar).",
+   "design": "FILED 2026-08-15 with the economy-breadth sprint, under CLAUDE.md § \"Tool creation is skill\ncreation\" - a roster this size will not stay coherent by authorship alone, and the check\nwritten now catches next quarter's orphan.\n\n## Why a harness and not a review pass\n\nBL-286 is the cautionary precedent and it is in the code comments: eleven resource values were\nadded with \"behaviour unfiled\", and five of them still have no consumer today, months later.\nNo human reading a diff catches that; a load-time graph walk catches it in a second. The same\ngoes for a building nobody can place and a method nobody would ever pick.\n\n## The four assertions\n\n1. **Acyclic.** Depth (BL-428) is undefined on a cycle. Fail loudly at load rather than loop.\n2. **No orphans, both directions.** Every `resource_type` is produced by some recipe or\n   extractable from some deposit, AND consumed by some recipe or bought by some named actor.\n   Terminal goods declare themselves terminal so they are exempt from the second half - an\n   explicit exemption list, so an orphan cannot hide as an assumed terminal.\n3. **Every building reachable.** For each building's minimum depth, a path exists from a fresh\n   corp's starting position to that depth. An unplaceable building is the roster's orphan.\n4. **No dominant method.** For each output with alternates, no sibling is better on every axis\n   (input cost at reference prices, wage, rate, depth). This is BL-430's design bar mechanised.\n\n## Determinism note\n\nThe walk must not depend on container iteration order - the BL-406 lesson, where an unordered\ncontainer decided a number the economy read. Sort by authored recipe id before walking, and\nassert the depth vector is byte-identical across two loads in the same process.\n\nRuns as `tools/verify/chain_depth.cpp` under the `verifier-headless` skill, named in the skill\nso it is discoverable, and added to the ctest tier."
   }
  ]
 }
