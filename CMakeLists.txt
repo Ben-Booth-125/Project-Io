@@ -511,6 +511,23 @@ target_link_libraries(interbody_pull_harness PRIVATE io_world_obj lua54)
 target_compile_features(interbody_pull_harness PRIVATE cxx_std_20)
 target_compile_options(interbody_pull_harness PRIVATE ${IO_WARNING_FLAGS})
 
+# era_roster (BL-433) is a live-Lua harness for the same reason as the two above:
+# the question it asks is what the AUTHORED era tags do. A hand-built registry
+# would assert only that the mask works on data the harness itself wrote, which
+# is precisely how a mis-tagged entry would slip through.
+add_executable(era_roster
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/era_roster.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(era_roster PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(era_roster PRIVATE io_world_obj lua54)
+target_compile_features(era_roster PRIVATE cxx_std_20)
+target_compile_options(era_roster PRIVATE ${IO_WARNING_FLAGS})
+
 # font_glyph_harness (BL-234) is the one harness that links ImGui rather than
 # ${IO_WORLD_SOURCES}: the defect it guards is the ImFontConfig handed to
 # AddFontFromFileTTF, which lives in src/ui/fonts.cpp, not in world/*. It still
@@ -667,6 +684,7 @@ set(IO_TEST_BENCH_HARNESSES
 # Harnesses that load the real scripts/*.lua by relative path, and so must run
 # with the repo root as their working directory (see the foreach below).
 set(IO_TEST_SCRIPT_ROOTED_HARNESSES
+    era_roster
     interbody_pull_harness
     pregame_balance_harness
     persona_counsel_harness

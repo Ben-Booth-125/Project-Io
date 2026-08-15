@@ -19,6 +19,20 @@
 > into space" is fine, and one meant to capture "the campaign has advanced to Era 1" is not, since
 > the era is per-corp under the proxy and world-wide under the design. When the Era system is
 > implemented, replace the measure body and re-run `condition_set_harness` C2h/C2l. (NR-113.)
+>
+> **A SECOND thing in code now says "era", and it is NOT this one (BL-433, 2026-08-15).**
+> `era_band` (`src/world/recipe_registry.hpp`) tags each authored building type and recipe as
+> `any` / `ancient` / `industrial`, and the registry masks its browsable roster on the band the
+> campaign's `epoch_year` derives (below 1700 → ancient). It exists because the live 0 CE product
+> was still shipping a Launchpad and a petroleum refinery.
+>
+> **The two are different axes and must not be merged.** `era_band` asks *which product is this* —
+> the ancient arc or the industrial/space one, a world-wide fact fixed at generation.
+> Era 0 / Era 1 below ask *how far has this corp got within the industrial arc* — a per-corp,
+> in-campaign progression whose gate is space access. A building can be `industrial`-band and
+> still Era-0 (a refinery); nothing is `ancient`-band and Era 1. Conflating them would give one
+> word two meanings in the same file, which is the failure the `condition_subject::era` note
+> above already had to guard against once.
 
 An **Era** is a named phase in the game's industrial arc, defined by the accessible territory, available buildings, and the dominant strategic challenge. Eras are a formal game system: each has a defined entry gate, a distinct resource profile, and a characteristic question for the player to answer. The game begins in Era 0; transitions are triggered by meeting explicit conditions, not by an automatic timer.
 

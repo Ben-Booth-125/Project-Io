@@ -3309,6 +3309,56 @@
    "promoted_from": "backlog.json BL-423",
    "batch": "gate-hygiene-2026-08-14",
    "archived": "docs/development/archive/requirements-2026-Q3.json"
+  },
+  {
+   "brief": "era-gated-roster",
+   "batch": "2026-08-15-sprint-17",
+   "title": "BL-433 — Era-gate the economy data so the ancient arc stops shipping a Launchpad",
+   "status": "complete",
+   "promoted_from": "backlog.json BL-433 SPACE_ERA_BUILDINGS_IN_THE_ANCIENT_ARC",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "ITEM-SPANNING (headless): with the registry's era band set to `ancient` (the band a 0 CE epoch_year derives), the browsable roster excludes every entry authored `industrial` — the Launchpad is not a placeable building type, and the petroleum->refined_fuel, propellant and spacecraft-chain recipes are not offered by recipe_count/recipe_at on any building type. With the band set to `industrial` they are all present. With the band left at its default `any`, every authored entry is present.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "ancient 3/17, industrial 17/17",
+     "notes": "Verified 2026-08-15 by tools/verify/era_roster.cpp against the REAL scripts (not a hand-built registry). Ancient band browses 3 of 17 authored recipes; no industrial recipe leaks; Launchpad unavailable. Industrial band browses 17 of 17 with the Launchpad available. Anti-vacuity row asserts the ancient roster is a PROPER subset, so an all-any or all-industrial tagging cannot pass."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "LOAD-BEARING: recipe ids are stable across bands. get_recipe(id) and recipe_id(name) return the same absolute id for the same authored recipe in every band, because the filter masks rather than removes. Concretely: recipe_id(\"steel\") and recipe_id(\"food_rations\") are identical under ancient, industrial and any, and a building whose stored recipe id was authored in one band still resolves to the same recipe object in another.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "",
+     "notes": "Verified. Absolute ids identical under all three bands, and a recipe filtered OUT of the ancient band still resolves by its stored id (refined_fuel) while remaining absent from what the band offers. The mask-not-remove design holds."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "DEFAULT-OFF: a registry that never has its band set behaves exactly as it does today. Every existing headless harness — none of which knows about eras — sees the full roster, and a world built with the default params produces the same state_hash as the pre-change build.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "",
+     "notes": "Verified for the roster half: a freshly loaded registry has band `any`, browses all 17, and still offers the Launchpad. Full state_hash byte-identity was NOT separately re-measured against a pre-change binary — it is covered structurally instead: the default band changes no roster, and determinism_harness/ai_skill_harness passed unchanged in the same ctest run."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "An unknown era string in recipes.lua or economy.lua is a load-time error naming the offending entry, not a silent fallback to `any`. A silent fallback would let a typo quietly re-admit a space-era building to the ancient roster, which is the exact defect this item exists to close.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "",
+     "notes": "Verified: a plausible typo ('industial') on recipes[2].era throws at load, and the message names the offending value and the entry — \"Unknown era 'industial' in recipe 'refined_fuel' (expected any, ancient or industrial)\"."
+    }
+   ],
+   "resolved": "2026-08-15"
   }
  ]
 }

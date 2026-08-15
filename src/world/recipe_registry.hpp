@@ -12,6 +12,39 @@
 // Only recipe_registry.cpp pulls in the Lua state to populate the tables.
 class lua_state;
 
+/// BL-433: which product's roster an authored entry belongs to.
+///
+/// Two bands plus a wildcard, and deliberately NOT ERAS.md's Era 0 / Era 1
+/// numbering — that axis is about space access *within* the industrial arc and
+/// is gated on launchpad presence, a different question from "which product is
+/// this". One field, one meaning.
+///
+/// `any` is the default and it is load-bearing: a registry whose band is never
+/// set permits everything, so every headless harness — none of which knows about
+/// eras — loads exactly the roster it loaded before this existed.
+enum class era_band : uint8_t
+{
+    any        = 0, ///< Shared by both arcs. The default for an untagged entry.
+    ancient    = 1, ///< The 0 CE product (world_params::epoch_year < 1700).
+    industrial = 2, ///< The 1960 arc, including everything space-facing.
+};
+
+/// The band a campaign's epoch year belongs to. Uses the SAME 1700 threshold the
+/// antiquity branch already documents on world_params::epoch_year, so the split
+/// between the two arcs is one number in the codebase rather than two.
+inline era_band era_band_for_epoch(int64_t epoch_year)
+{
+    return (epoch_year < 1700) ? era_band::ancient : era_band::industrial;
+}
+
+/// Does an entry authored for band @p entry appear in a campaign running @p campaign?
+/// An `any` entry appears in every band; an `any` campaign (the unset default)
+/// admits every entry.
+inline bool era_permits(era_band campaign, era_band entry)
+{
+    return campaign == era_band::any || entry == era_band::any || entry == campaign;
+}
+
 /// A processing recipe: per-batch input and output quantities, indexed by
 /// resource_type. Reagents are simply inputs with no matching output. Authored
 /// in scripts/recipes.lua; the recipe's id is its index in recipe_registry::recipes.
@@ -20,6 +53,10 @@ struct recipe
     std::string                       name;
     std::array<float, resource_count> inputs  = {};
     std::array<float, resource_count> outputs = {};
+
+    /// BL-433: the product this recipe belongs to. Authored as `era = "..."` in
+    /// recipes.lua; absent means `any`.
+    era_band era = era_band::any;
 };
 
 /// Per-building-type economic constants, authored in scripts/economy.lua.
@@ -39,6 +76,13 @@ struct building_economics
     /// producing (playtest patch, 2026-07-06). 0 = instant (pre-existing
     /// behaviour), authored in scripts/economy.lua as `build_duration_ticks`.
     float build_duration_ticks = 0.0f;
+
+    /// BL-433: the product this building type belongs to. Authored as
+    /// `era = "..."` in economy.lua; absent means `any`. Unlike recipes, a
+    /// building type is addressed by its enum value rather than by position, so
+    /// gating it needs no mask — `recipe_registry::building_available` reads
+    /// this directly.
+    era_band era = era_band::any;
 };
 
 /// BL-365 population-growth-gate tunables, authored in scripts/economy.lua under
@@ -322,22 +366,64 @@ public:
         return m_road_econ[i];
     }
 
+    /// Every AUTHORED recipe, era-filtered or not. This is the storage-side count
+    /// (ids index into it); `recipe_count(building_type)` below is the browse-side
+    /// count and respects the era.
     std::size_t recipe_count() const { return m_recipes.size(); }
 
-    /// Returns the number of available recipes for the given building type.
-    /// Only processing_facility has recipes; all other types return 0. Inline (pure
-    /// data, no Lua) so the SDL/Lua-free world superset — and the headless harnesses
-    /// that exclude recipe_registry.cpp — link without it (BL-079 uses this).
+    // --- BL-433 era band ------------------------------------------------------
+    //
+    // THE SPLIT THAT MAKES THIS SAFE. A recipe's id is its index in m_recipes and
+    // that id is STORED in building_component.recipe, so the era filter masks
+    // rather than removes — dropping a disallowed recipe from the vector would
+    // silently repoint every building whose recipe sat after it.
+    //
+    //   * STORAGE path — get_recipe(id) / recipe_id(name). Absolute, band-independent.
+    //     A building's stored id means the same recipe in every band.
+    //   * BROWSE path  — recipe_count(bt) / recipe_at(bt, i). Maps through m_allowed,
+    //     so a caller walking [0, recipe_count) walks THIS era's recipes.
+    //
+    // Every existing caller of the browse path already meant "the recipes available
+    // to me" by it, which is why none of them needed rewriting when this landed.
+
+    /// The campaign's band. `any` (the default) permits every authored entry.
+    era_band era() const { return m_era; }
+
+    /// Set the campaign's band and rebuild the browse mask. Idempotent; safe to
+    /// call again after load_from_lua (which resets the band to `any`).
+    void set_era(era_band e)
+    {
+        m_era = e;
+        rebuild_allowed();
+    }
+
+    /// Is this building type part of the current era's roster? Types are addressed
+    /// by enum value, not by position, so this needs no mask — placement and the
+    /// Build door filter on it.
+    bool building_available(building_type bt) const
+    {
+        return era_permits(m_era, economics(bt).era);
+    }
+
+    /// Returns the number of recipes available IN THE CURRENT ERA for the given
+    /// building type. Only processing_facility has recipes; all other types return
+    /// 0. Inline (pure data, no Lua) so the SDL/Lua-free world superset — and the
+    /// headless harnesses that exclude recipe_registry.cpp — link without it
+    /// (BL-079 uses this).
     int recipe_count(building_type bt) const
     {
         if (bt != building_type::processing_facility)
             return 0;
-        return static_cast<int>(m_recipes.size());
+        return static_cast<int>(m_allowed.size());
     }
 
-    /// Returns the recipe at index @p i for building type @p bt. The index is
-    /// clamped to [0, recipe_count(bt) - 1]; returns a dummy empty recipe if the
-    /// type has no recipes. Inline for the same headless-link reason as above.
+    /// Returns the @p i-th recipe available in the current era for building type
+    /// @p bt. The index is clamped to [0, recipe_count(bt) - 1]; returns a dummy
+    /// empty recipe if the type has no recipes. Inline for the same headless-link
+    /// reason as above.
+    ///
+    /// NOTE the index is a position in the ERA'S list, not a recipe id. To store
+    /// the result, go through `recipe_id(r.name)` — as every existing caller does.
     const recipe& recipe_at(building_type bt, int i) const
     {
         static const recipe empty{};
@@ -345,7 +431,7 @@ public:
         if (n == 0)
             return empty;
         const int clamped = (i < 0) ? 0 : (i >= n ? n - 1 : i);
-        return m_recipes[static_cast<std::size_t>(clamped)];
+        return m_recipes[m_allowed[static_cast<std::size_t>(clamped)]];
     }
 
     // --- direct construction for tests (headless harness builds these by hand) ---
@@ -374,11 +460,32 @@ public:
     uint16_t add_recipe(const recipe& r)
     {
         m_recipes.push_back(r);
+        rebuild_allowed();
         return static_cast<uint16_t>(m_recipes.size() - 1);
     }
 
 private:
+    /// Recompute the browse mask from the authored recipes and the current band.
+    /// Walks m_recipes in authored order, so the mask — and therefore every
+    /// browse-order-dependent decision downstream of it — is a pure function of
+    /// authored data, not of any container's iteration order.
+    void rebuild_allowed()
+    {
+        m_allowed.clear();
+        for (std::size_t i = 0; i < m_recipes.size(); ++i)
+            if (era_permits(m_era, m_recipes[i].era))
+                m_allowed.push_back(i);
+    }
+
     std::vector<recipe> m_recipes;
+
+    /// BL-433 browse mask: positions in m_recipes permitted by m_era, in authored
+    /// order. Rebuilt by set_era / add_recipe / load_from_lua.
+    std::vector<std::size_t> m_allowed;
+
+    /// The campaign's band. `any` = unset = permit everything, which is what keeps
+    /// every pre-BL-433 harness and the default world byte-identical.
+    era_band m_era = era_band::any;
 
     /// Indexed by building_type (none / extraction_site / processing_facility / port /
     /// launchpad / inland_logistics_hub / military_base / research_institute — BL-332

@@ -401,6 +401,43 @@ spread across the build. The front door shows the analog rate/ETA/paused status 
 binary reject. Tunables live in `scripts/economy.lua` § `construction`. A depletable real
 market inventory (vs. the derived figure) is revisited in `backlog.json` § BL-130.
 
+## The era band — which roster a campaign sees (BL-433, 2026-08-15)
+
+Every authored building type and recipe carries an optional **era band**: `any` (the default,
+shared by both arcs), `ancient`, or `industrial`. Authored as `era = "..."` in `scripts/economy.lua`
+and `scripts/recipes.lua`; an unknown string is a **load-time error**, not a silent fallback,
+because a typo would quietly re-admit a space-era entry to the ancient roster.
+
+The campaign's band is derived from `world_params::epoch_year` against the same 1700 threshold the
+antiquity branch already uses — below 1700 is ancient — and applied in `app::load_economy` right
+after the registry loads. This is why a 0 CE campaign is never offered a Launchpad, the petroleum
+and propellant chains, or the spacecraft chain.
+
+**The band masks; it never removes.** A recipe's id is its index in the authored list and that id
+is *stored* in `building_component.recipe`, so a filter that compacted the list would silently
+repoint every building whose recipe sat after a filtered one. The registry therefore keeps two
+paths, and the distinction matters to anyone adding a caller:
+
+| Path | Functions | Behaviour |
+|---|---|---|
+| **Storage** | `get_recipe(id)`, `recipe_id(name)` | Absolute and band-independent. A stored id means the same recipe in every band. |
+| **Browse** | `recipe_count(bt)`, `recipe_at(bt, i)` | Era-masked. Walking `[0, recipe_count)` walks *this campaign's* recipes. |
+
+Every pre-existing caller of the browse path already meant "the recipes available to me", which is
+why none needed rewriting. `construct_building` is the authoritative gate (refusing with
+`construction_result::era_locked`, distinct from `tech_locked` because no research reaches it), and
+the Selection panel's build door filters on `building_available` so the door does not offer what the
+gate would refuse. Guard: `tools/verify/era_roster.cpp`.
+
+The band is **not** ERAS.md's Era 0 / Era 1 — that axis is per-corp progression *within* the
+industrial arc, gated on space access. See the note at the head of `ERAS.md`.
+
+The ancient roster is deliberately thin at this point — `steel`, `food_rations` and
+`refined_copper` are the only untagged processing chains. Filling it out is **BL-429** (ancient
+building roster), the next item in Sprint 17.
+
+---
+
 ## Layer 3 prototype scope
 
 Layer 3 implements:

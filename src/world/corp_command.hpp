@@ -116,6 +116,7 @@ enum class corp_command_result : uint8_t
     rejected_funds,         ///< Solvency check inside the seam refused the spend.
     rejected_state,         ///< No-op in current state (already idle, survey in progress, ...).
     rejected_tech_locked,   ///< BL-344: the corp has not earned the tech that unlocks this type.
+    rejected_era_locked,    ///< BL-433: the type is not in the campaign's era band (a Launchpad at 0 CE). Distinct from tech_locked: no research reaches it.
     // --- BL-350: request_quote's four distinguishable decline conditions ---
     rejected_no_capacity,     ///< The named supplier holds no completed building that can produce the good.
     rejected_no_input_access, ///< The supplier's local market cannot supply the recipe's inputs.

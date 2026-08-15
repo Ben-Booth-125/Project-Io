@@ -687,7 +687,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 r == construction_result::no_tile                ? "no_tile" :
                 r == construction_result::slot_occupied          ? "slot_occupied" :
                 r == construction_result::insufficient_materials ? "insufficient_materials" :
-                r == construction_result::tech_locked            ? "tech_locked" : "failed";
+                r == construction_result::tech_locked            ? "tech_locked" :
+                r == construction_result::era_locked             ? "era_locked" : "failed";
             if (r == construction_result::placed)
                 m_ui.selected_entity = built;
             SDL_Log("verify.build_first_valid: %s at tile (%d,%d)", name, tc.grid_x, tc.grid_y);
@@ -722,7 +723,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 r == construction_result::no_tile                ? "no_tile" :
                 r == construction_result::slot_occupied          ? "slot_occupied" :
                 r == construction_result::insufficient_materials ? "insufficient_materials" :
-                r == construction_result::tech_locked            ? "tech_locked" : "failed";
+                r == construction_result::tech_locked            ? "tech_locked" :
+                r == construction_result::era_locked             ? "era_locked" : "failed";
             if (r == construction_result::placed)
                 m_ui.selected_entity = built;
             SDL_Log("verify.build_at: %s at tile (%d,%d)", name, col, row);

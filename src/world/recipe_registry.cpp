@@ -71,6 +71,24 @@ void read_resource_map(const sol::table& src, std::array<float, resource_count>&
     }
 }
 
+/// BL-433: read an optional `era = "any"|"ancient"|"industrial"` field.
+///
+/// An UNKNOWN string throws rather than falling back to `any`. That is the point:
+/// a silent fallback would let a typo ("industial") quietly re-admit a space-era
+/// entry to the ancient roster, which is the exact defect this gate exists to
+/// close. Absent is fine and means `any` — most entries are shared.
+era_band read_era(const sol::table& entry, const std::string& context)
+{
+    sol::optional<std::string> e = entry["era"];
+    if (!e)
+        return era_band::any;
+    if (*e == "any")        return era_band::any;
+    if (*e == "ancient")    return era_band::ancient;
+    if (*e == "industrial") return era_band::industrial;
+    throw std::runtime_error("Unknown era '" + *e + "' in " + context
+                             + " (expected any, ancient or industrial)");
+}
+
 } // namespace
 
 // --- load_from_lua -----------------------------------------------------------
@@ -103,8 +121,16 @@ void recipe_registry::load_from_lua(lua_state& lua)
         if (inputs)  read_resource_map(*inputs,  r.inputs,  "recipe '" + r.name + "' inputs");
         if (outputs) read_resource_map(*outputs, r.outputs, "recipe '" + r.name + "' outputs");
 
+        r.era = read_era(*entry, "recipe '" + r.name + "'"); // BL-433
+
         m_recipes.push_back(std::move(r));
     }
+
+    // BL-433: a fresh load starts band-agnostic. The caller (app::load_economy)
+    // sets the campaign's band immediately after; a harness that never sets one
+    // keeps the full roster, which is what R3 asserts.
+    m_era = era_band::any;
+    rebuild_allowed();
 
     // --- economy constants (scripts/economy.lua must have run) ---
     sol::optional<sol::table> econ = s["economy"];
@@ -218,6 +244,7 @@ void recipe_registry::load_from_lua(lua_state& lua)
             if (rcosts)
                 read_resource_map(*rcosts, e.resource_build_cost,
                                   std::string("buildings.") + nt.key + ".resource_costs");
+            e.era = read_era(*b, std::string("buildings.") + nt.key); // BL-433
             m_building_econ[static_cast<std::size_t>(nt.type)] = e;
         }
     }

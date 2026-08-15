@@ -833,6 +833,16 @@ void app::load_economy()
     m_lua.load("scripts/economy.lua");
     m_registry.load_from_lua(m_lua);
 
+    // BL-433: gate the roster on the campaign's era band, derived from the epoch
+    // year the live world was actually built from. Must happen HERE, after the
+    // load (which resets the band to `any`) and before anything browses recipes —
+    // the default-recipe authoring below is the first such reader.
+    //
+    // A 0 CE campaign therefore never sees the Launchpad or the petroleum,
+    // propellant and spacecraft chains; a 1960 one sees everything. Ids are
+    // untouched either way: the filter masks, it does not remove.
+    m_registry.set_era(era_band_for_epoch(m_active_world_params.epoch_year));
+
     // BL-323 S2b: mirror the reach budget onto ui_state so every placement surface
     // filters on the same number the authoritative gate uses. Done here, once, right
     // after the registry is loaded — a surface that filtered on a different budget
@@ -1634,6 +1644,11 @@ void app::render()
                 m_ui.construction.last_message =
                     "Not researched yet: " +
                     gating_tech_for(m_ui.construction.pending_type) + "."; break;
+            case construction_result::era_locked:
+                // BL-433: distinct from tech_locked on purpose — no amount of
+                // research reaches this one, so saying "not researched yet" would
+                // send the player looking for a tech that does not exist.
+                m_ui.construction.last_message = "Not in this era."; break;
             default:
                 m_ui.construction.last_message = "Construction failed."; break;
         }
