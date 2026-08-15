@@ -389,6 +389,60 @@ public:
     /// The campaign's band. `any` (the default) permits every authored entry.
     era_band era() const { return m_era; }
 
+    // --- BL-428 chain depth ---------------------------------------------------
+    //
+    // THE GROWTH SPINE (Ben, 2026-08-15, chosen over building tiers / a tech
+    // ladder / settlement scale). How far down the production graph a corp can
+    // reach is what gates its next building — so progress is a consequence of the
+    // economy it has built, not a parallel unlock system laid over it. The
+    // decisive argument was that every alternative is a SECOND system that must be
+    // kept in agreement with the economy; depth is read off the recipe graph that
+    // has to exist anyway.
+    //
+    // DEFINITION, and the two different composition rules it needs:
+    //
+    //   depth(raw)  = 0            — a good no recipe produces (mined, grown, felled)
+    //   depth(good) = min over the recipes that produce it of
+    //                   ( 1 + max over that recipe's inputs of depth(input) )
+    //
+    // MAX within a recipe: you cannot run it until your deepest input exists, so
+    // the recipe's difficulty is its hardest input. MIN across recipes: if two
+    // routes make the same good, you have reached it as soon as the EASIER route
+    // is open. That asymmetry starts mattering the moment BL-430 lands alternate
+    // production methods, so it is settled here rather than discovered there.
+    //
+    // Depth is computed over the ERA-ALLOWED recipes only. A route filtered out by
+    // BL-433 does not exist for that campaign, so it must not shorten anything.
+    //
+    // -1 means UNREACHABLE: no sequence of allowed recipes bottoms out in raws.
+    // That covers a cycle (A needs B needs A never bottoms out) and an input
+    // orphan (needs a good nothing produces or extracts) with one code, because
+    // from the player's side they are the same fact — you cannot get there.
+
+    /// Chain depth of a resource under the current era band, or -1 if unreachable.
+    int depth_of(resource_type r) const
+    {
+        return m_depth[static_cast<std::size_t>(r)];
+    }
+
+    /// A good no allowed recipe produces — the graph's floor. Note this is a
+    /// statement about the RECIPE graph only: whether a raw is actually extractable
+    /// anywhere is a deposit question, and belongs to BL-432's roster audit.
+    bool is_raw(resource_type r) const
+    {
+        return m_depth[static_cast<std::size_t>(r)] == 0;
+    }
+
+    /// The deepest reachable good under the current band — the ceiling a corp can
+    /// climb to. Useful to a UI readout and as an anti-vacuity bound in tests.
+    int max_depth() const
+    {
+        int best = 0;
+        for (const int d : m_depth)
+            best = (d > best) ? d : best;
+        return best;
+    }
+
     /// Set the campaign's band and rebuild the browse mask. Idempotent; safe to
     /// call again after load_from_lua (which resets the band to `any`).
     void set_era(era_band e)
@@ -475,6 +529,75 @@ private:
         for (std::size_t i = 0; i < m_recipes.size(); ++i)
             if (era_permits(m_era, m_recipes[i].era))
                 m_allowed.push_back(i);
+        rebuild_depth();
+    }
+
+    /// BL-428: recompute chain depth over the era-allowed recipes.
+    ///
+    /// A FIXED POINT rather than a graph walk, and deliberately. It terminates
+    /// obviously (a bounded loop), it is independent of any traversal or container
+    /// order — the BL-406 lesson, where an unordered container decided a number the
+    /// economy read — and it makes "cyclic" and "input-orphaned" the same
+    /// observable outcome (a good that never settles), which is what they are from
+    /// the player's side. No recursion, so no stack depth to reason about.
+    ///
+    /// Bound: `resource_count` passes. The longest simple chain cannot exceed the
+    /// number of distinct goods, so anything still unsettled after that many
+    /// relaxations never will be.
+    void rebuild_depth()
+    {
+        constexpr int unreachable = -1;
+
+        // Seed: a good produced by no allowed recipe is a raw at depth 0;
+        // everything else starts unreachable and must earn a depth.
+        for (std::size_t r = 0; r < resource_count; ++r)
+            m_depth[r] = 0;
+        for (const std::size_t i : m_allowed)
+            for (std::size_t r = 0; r < resource_count; ++r)
+                if (m_recipes[i].outputs[r] > 0.0f)
+                    m_depth[r] = unreachable;
+
+        for (std::size_t pass = 0; pass < resource_count; ++pass)
+        {
+            bool changed = false;
+            for (const std::size_t i : m_allowed) // authored order — see above
+            {
+                const recipe& rc = m_recipes[i];
+
+                // The recipe is runnable only once every input has settled; its
+                // cost is then its DEEPEST input (max within a recipe).
+                int deepest_input = 0;
+                bool inputs_ready = true;
+                for (std::size_t r = 0; r < resource_count && inputs_ready; ++r)
+                {
+                    if (rc.inputs[r] <= 0.0f)
+                        continue;
+                    const int d = m_depth[r];
+                    if (d == unreachable)
+                        inputs_ready = false;
+                    else if (d > deepest_input)
+                        deepest_input = d;
+                }
+                if (!inputs_ready)
+                    continue;
+
+                const int cand = deepest_input + 1;
+                for (std::size_t r = 0; r < resource_count; ++r)
+                {
+                    if (rc.outputs[r] <= 0.0f)
+                        continue;
+                    // MIN across recipes: the easiest route is the one that decides
+                    // when you have reached this good.
+                    if (m_depth[r] == unreachable || cand < m_depth[r])
+                    {
+                        m_depth[r] = cand;
+                        changed    = true;
+                    }
+                }
+            }
+            if (!changed)
+                break; // settled
+        }
     }
 
     std::vector<recipe> m_recipes;
@@ -486,6 +609,12 @@ private:
     /// The campaign's band. `any` = unset = permit everything, which is what keeps
     /// every pre-BL-433 harness and the default world byte-identical.
     era_band m_era = era_band::any;
+
+    /// BL-428 chain depth per resource under the current band; -1 = unreachable.
+    /// Rebuilt with the mask, since a route the era filters out must not shorten
+    /// anything. Every entry is 0 until the first rebuild — a registry with no
+    /// recipes is all raws, which is the truthful answer for an empty graph.
+    std::array<int, resource_count> m_depth = {};
 
     /// Indexed by building_type (none / extraction_site / processing_facility / port /
     /// launchpad / inland_logistics_hub / military_base / research_institute — BL-332

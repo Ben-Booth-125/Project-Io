@@ -528,6 +528,23 @@ target_link_libraries(era_roster PRIVATE io_world_obj lua54)
 target_compile_features(era_roster PRIVATE cxx_std_20)
 target_compile_options(era_roster PRIVATE ${IO_WARNING_FLAGS})
 
+# chain_depth (BL-428) — the growth-spine metric. Live-Lua for its D6 rows, which
+# ask what the SHIPPED recipe graph's depth actually is; D1-D5 are hand-built
+# fixtures, because those ask whether the metric computes what it claims and must
+# not drift with the economy.
+add_executable(chain_depth
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/chain_depth.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(chain_depth PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(chain_depth PRIVATE io_world_obj lua54)
+target_compile_features(chain_depth PRIVATE cxx_std_20)
+target_compile_options(chain_depth PRIVATE ${IO_WARNING_FLAGS})
+
 # font_glyph_harness (BL-234) is the one harness that links ImGui rather than
 # ${IO_WORLD_SOURCES}: the defect it guards is the ImFontConfig handed to
 # AddFontFromFileTTF, which lives in src/ui/fonts.cpp, not in world/*. It still
@@ -684,6 +701,7 @@ set(IO_TEST_BENCH_HARNESSES
 # Harnesses that load the real scripts/*.lua by relative path, and so must run
 # with the repo root as their working directory (see the foreach below).
 set(IO_TEST_SCRIPT_ROOTED_HARNESSES
+    chain_depth
     era_roster
     interbody_pull_harness
     pregame_balance_harness

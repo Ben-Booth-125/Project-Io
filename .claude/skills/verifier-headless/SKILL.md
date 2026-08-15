@@ -204,6 +204,40 @@ in `tools/verify/README.md`.
   floor, never under the hold threshold, never a duplicate, never on the player's corp (R5).
   Links the world superset; CMake target `order_book_harness` via the generic glob. 43
   assertions, ~instant.
+- **`chain_depth`** — The growth-spine metric (BL-428): how far down the production graph a corp can
+  reach, computed off the recipe graph rather than authored. **Mixed fixture strategy, on purpose** —
+  D1–D5 are hand-built graphs, because they ask whether the metric computes what it claims and must
+  not drift with the economy; D6 loads the real scripts, because it asks what the *shipped* graph's
+  depth actually is. Asserts raws are depth 0 and **max-within-a-recipe** (a depth-1 input mixed with
+  a raw gives 2, not 3); **min-across-recipes** (adding a shallower alternate route *lowers* a good's
+  depth — the rule BL-430's alternate methods will lean on, pinned before it is needed); that cycles
+  and orphaned inputs read as **unreachable (-1)** rather than looping or fabricating a number, and
+  that a route bottoming out in raws resolves them; order-independence; and against the shipped
+  recipes, that every produced good has a well-defined depth and that BL-433's era masking never
+  *adds* depth. Prints the real ceilings — **industrial 4, ancient 1** as of 2026-08-15, the latter
+  being the measurement that says the ancient roster has no chain yet (BL-429).
+
+  **BL-432 extends this same file** with the three roster invariants that need a fuller roster to
+  mean anything: no orphan resources in either direction, every building's minimum depth reachable,
+  and no production method dominating a sibling on every axis.
+- **`era_roster`** — The era gate over the authored economy data (BL-433). The **fourth live-Lua
+  harness**: it asks what the *authored* `era` tags do, so it loads the real `scripts/economy.lua`
+  + `recipes.lua` rather than hand-building a registry — a hand-built fixture could only confirm
+  the mask works on data the harness itself wrote, which is how a mis-tagged entry would slip
+  through. Asserts **R1** the ancient band drops every `industrial` entry (no Launchpad, none of
+  the petroleum/propellant/spacecraft chains) while the industrial band keeps all of them;
+  **R2** — the load-bearing row — recipe ids are **absolute and stable across bands**, and a
+  recipe filtered *out* of a band still resolves by its stored id, because the filter masks
+  rather than removes (a compacting filter would silently repoint every building whose recipe sat
+  after a filtered one); **R3** the default band is `any`, so every pre-BL-433 harness sees the
+  full roster; **R4** a misspelled era throws at load naming the offending value, rather than
+  falling back to `any` and quietly re-admitting a space-era building.
+
+  Carries an **anti-vacuity row**: the ancient roster must be a *proper* subset — neither empty nor
+  the whole file — so an all-`any` or all-`industrial` tagging cannot pass. Declared explicitly in
+  `CMakeLists.txt` (adds back `recipe_registry.cpp` + `scripting/lua_state.cpp`, the sol2 include
+  dir, links `lua54`) and listed in `IO_TEST_SCRIPT_ROOTED_HARNESSES`, since it resolves script
+  paths relative to the repo root.
 - **`interbody_pull_harness`** — The inter-body demand pull (BL-263) and whether its netting
   means anything (BL-404/BL-406). **One of the three harnesses that needs a live Lua state**
   (with `pregame_balance_harness` and `persona_counsel_harness`): the question it asks is what
@@ -289,9 +323,10 @@ only when building outside the CMake tree.
   `make_hard_coded_world`), so results are reproducible.
 - Keep `recipe_registry.hpp` **pure data** (sol2 only in its `.cpp`) so economy
   logic stays harness-buildable. **Most** harnesses hand-build a `recipe_registry`
-  rather than loading Lua; three do not — `pregame_balance_harness`,
-  `persona_counsel_harness` and `interbody_pull_harness` link `lua54` and load the
-  real scripts, and are declared explicitly in `CMakeLists.txt` above the glob.
+  rather than loading Lua; five do not — `pregame_balance_harness`,
+  `persona_counsel_harness`, `interbody_pull_harness`, `era_roster` and `chain_depth`
+  link `lua54` and load the real scripts, and are declared explicitly in
+  `CMakeLists.txt` above the glob.
   The Lua-loading + **GUI** path is covered by `verifier-visual`.
 - **Hand-built or authored — choose by what the check is asking.** A hand-built
   fixture is right when the question is *does this formula compute what it says*:

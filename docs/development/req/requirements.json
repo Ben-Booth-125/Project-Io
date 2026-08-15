@@ -3359,6 +3359,65 @@
     }
    ],
    "resolved": "2026-08-15"
+  },
+  {
+   "brief": "chain-depth-spine",
+   "batch": "2026-08-15-sprint-17",
+   "title": "BL-428 — Chain depth is the growth track",
+   "status": "pending",
+   "promoted_from": "backlog.json BL-428 CHAIN_DEPTH_IS_THE_GROWTH_SPINE",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "ITEM-SPANNING (headless): chain depth is computed off the recipe graph, not authored. A good no recipe produces is depth 0; otherwise depth = MIN over the recipes producing it of (1 + MAX over that recipe's inputs). The two composition rules differ on purpose: max within a recipe (you cannot run it until your deepest input exists), min across recipes (the easier of two routes is the one that decides when you have reached a good).",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "shipped graph: industrial max depth 4, ancient max depth 1",
+     "notes": "Verified 2026-08-15 by tools/verify/chain_depth.cpp rows D1-D3. The min/max asymmetry is pinned by a test now rather than discovered when BL-430 adds alternate methods: D3 adds a second, shallower route and asserts the good's depth DROPS."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "A cycle or an orphaned input yields UNREACHABLE (-1) — never an infinite loop, never a fabricated number. Adding a route that bottoms out in raws resolves it.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "",
+     "notes": "Verified, D4. Implemented as a bounded fixed point rather than a graph walk: it terminates by construction, and \"cyclic\" and \"input-orphaned\" become the same observable outcome, which is what they are from the player's side. D6 additionally asserts the SHIPPED graph has no unreachable produced good."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "Determinism: the depth vector is identical across two loads and independent of the order recipes are added or of any container iteration order. Depth is computed over the ERA-ALLOWED recipes only, and masking routes out (BL-433) never ADDS depth.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "",
+     "notes": "Verified, D5 + D6. The fixed point walks m_allowed in authored order — the BL-406 lesson, where an unordered container decided a number the economy read."
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "requirement": "Depth GATES placement: a building type declares the minimum chain depth its corp must have reached, and construct_building refuses below it with a distinct reason the player is taught (as era_locked and tech_locked already are).",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "",
+     "notes": "NOT BUILT — slice 2. The metric it reads is in place and verified."
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "requirement": "A corp's REACHED depth is recorded as 'has produced this good at least once, ever' — progress does not evaporate when a building idles — as a per-corp set over resource_type, updated where production is credited (extraction and processing both).",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "",
+     "notes": "NOT BUILT — slice 2. Adds per-corp world state, so it lands with the save-format note BL-107 will need: appending is free only until saves exist."
+    }
+   ]
   }
  ]
 }

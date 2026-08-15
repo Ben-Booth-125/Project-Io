@@ -401,6 +401,45 @@ spread across the build. The front door shows the analog rate/ETA/paused status 
 binary reject. Tunables live in `scripts/economy.lua` § `construction`. A depletable real
 market inventory (vs. the derived figure) is revisited in `backlog.json` § BL-130.
 
+## Chain depth — the growth track (BL-428, 2026-08-15)
+
+**The growth spine is chain depth** (Ben's ruling, chosen over building tiers, the ancient tech
+ladder and settlement scale). How far down the production graph a corp can reach is what gates its
+next building, so progress is a *consequence of the economy it has built* rather than a parallel
+unlock system laid over it. The decisive argument: every alternative is a second system that must be
+kept in agreement with the economy, and depth is read off the recipe graph that has to exist anyway.
+
+Depth is **computed, never authored** (`recipe_registry::depth_of`):
+
+```
+depth(raw)  = 0                       -- a good no allowed recipe produces
+depth(good) = min over producing recipes of ( 1 + max over that recipe's inputs of depth(input) )
+```
+
+The two composition rules differ deliberately. **Max within a recipe**: you cannot run it until your
+deepest input exists, so its difficulty is its hardest input. **Min across recipes**: if two routes
+make the same good, you have reached it as soon as the *easier* route is open. That asymmetry only
+starts to matter when BL-430 lands alternate production methods — it is settled here rather than
+discovered there.
+
+Depth is computed over the **era-allowed** recipes only (BL-433): a route the campaign's band masks
+out does not exist for that campaign, so it must not shorten anything. Masking can only ever *raise*
+depth or make a good unreachable, never lower it.
+
+**`-1` means unreachable** — no sequence of allowed recipes bottoms out in raws. That covers a cycle
+and an orphaned input with one code, because from the player's side they are the same fact: you
+cannot get there. Implemented as a bounded fixed point rather than a graph walk, so it terminates by
+construction, needs no recursion, and does not depend on traversal or container order (the BL-406
+lesson, where an unordered container decided a number the economy read).
+
+Measured on the shipped recipes, 2026-08-15: **industrial max depth 4, ancient max depth 1** — the
+ancient arc has no chain yet, which is what BL-429's roster exists to fix.
+
+Guard: `tools/verify/chain_depth.cpp`. **Still owed** (BL-428 slice 2): depth gating placement, and
+the per-corp record of what a corp has *reached*.
+
+---
+
 ## The era band — which roster a campaign sees (BL-433, 2026-08-15)
 
 Every authored building type and recipe carries an optional **era band**: `any` (the default,
