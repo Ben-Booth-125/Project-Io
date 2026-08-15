@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*9 entries — 8 open, 1 resolved.*
+*18 entries — 15 open, 3 resolved.*
 
 ---
 
@@ -124,6 +124,90 @@ Three new Selection-panel surfaces landed (src/ui/selection_panel.cpp: draw_prod
 
 *Files: `src/ui/selection_panel.cpp`, `docs/development/req/requirements.json`, `docs/ui/SELECTION.md`*
 
+### NR-246 — building_management_shell.lua verify script targets the deleted Buildings tab
+*observation · raised 2026-08-15 · from Same BL-431-follow-on delivery that deleted the construction panel's Buildings tab.*
+
+scripts/verify/building_management_shell.lua calls verify.show_panel('construction', true) then verify.construction_view(1) to land on the (now-deleted) Buildings tab and capture its production-method/profit/workforce UI shell. View 1 no longer exists - the construction panel is queue-only (view 0). The script was left un-rewritten rather than adapted, per this delivery's scope.
+
+**Why it matters.** The script still runs (construction_view(1) just sets an int nobody reads for dispatch anymore) but its capture no longer shows what its own comment says it verifies - the workforce/profit UI shell now lives on the building Selection card's Workforce/Profitability pages instead, reached via selection + verify.fold('building_metric', page) rather than construction_view.
+
+> **Recommendation:** Rewrite building_management_shell.lua to select a player building and use the Selection card's pager (building_pages() order, as of the 2026-08-15 playtest rework: Profitability/Method/Workforce — Chain/Depth/Lifecycle are gone, folded into Profitability or moved to the action grid) instead of construction_view(1), or fold its intent into a new selection-card-focused check and retire this one.
+
+*Files: `scripts/verify/building_management_shell.lua`, `src/ui/selection_panel.cpp`*
+
+### NR-247 — Unit Strength page prints unit_component::strength raw, despite its "fixed-point" doc comment
+*decision taken on your behalf · raised 2026-08-15 · from New Soldier (unit) Selection card, Strength page (src/ui/selection_panel.cpp draw_unit_strength_page).*
+
+components.hpp documents unit_component::strength as a "Fixed-point combat strength scalar (BL-157)", implying a display divisor is needed to show a real-world number. But every current writer (corp_command.cpp hire_unit, corporation_generation.cpp, hard_coded_world.cpp) sets it equal to the raw manpower count (e.g. 50) with no scale applied, and the existing hover-card reader (entity_summary.cpp draw_unit_summary) already prints it raw with ImGui::Text("Strength: %d", u.strength). The new card prints the raw value too, matching that existing reader, rather than inventing a divisor with no basis in the actual writers.
+
+**Why it matters.** If a future combat pass (BL-157/BL-272 follow-on) starts writing a genuinely fixed-point strength, both this new page and the older hover-card reader will silently disagree with the doc comment until someone reconciles them - worth a look whenever combat resolution actually starts consuming strength values.
+
+> **Recommendation:** When BL-157/combat lands real fixed-point strength writes, update both entity_summary.cpp::draw_unit_summary and selection_panel.cpp::draw_unit_strength_page together (and fix or drop the stale doc comment).
+
+*Files: `src/ui/selection_panel.cpp`, `src/ui/entity_summary.cpp`, `src/world/components.hpp`*
+
+### NR-248 — Profitability chart's Revenue/Expenses split is as fine as building_profit.hpp gets — no revenue sub-breakdown exists
+*observation · raised 2026-08-15 · from Playtest-driven building-card rework (2026-08-15): Ben asked for a Revenue-vs-Expenses bar chart on the Profitability page.*
+
+building_profit (src/world/building_profit.hpp) tracks exactly four numbers: revenue (one pooled valuation of this tick's output at market price), input_cost, maintenance, wages. There is no per-resource or per-line revenue breakdown to chart — the pooled market resists exact per-building attribution even for the ONE revenue figure that exists, per the struct's own doc comment. draw_building_profit's new chart therefore plots Revenue against Expenses := input_cost + maintenance + wages, the finest real split the data supports, rather than inventing sub-categories.
+
+**Why it matters.** Flagged per Rule 0b/the standing 'measure before reshaping' practice — this is a real data-availability ceiling, not an implementation shortcut. A finer revenue/expense breakdown (e.g. per-resource revenue, wages vs maintenance as separate bars) would need building_profit itself to track more, not just a UI change.
+
+- A) Leave as-is: Revenue vs Expenses is honest and matches the finest split building_profit tracks.
+- B) Extend building_profit to keep wages/maintenance/input_cost as a genuinely separate 3-bar expense breakdown alongside Revenue, if a future pass wants it (input_cost and maintenance+wages are already separate fields, so this is a small UI change, not a data change — only a true revenue sub-breakdown needs new tracking).
+
+> **Recommendation:** A for now. If the Profitability page's 2-bar chart reads as too coarse once played more, B's expense 3-way split is cheap (the fields already exist); a revenue sub-breakdown is not.
+
+*Files: `src/world/building_profit.hpp`, `src/ui/selection_panel.cpp`*
+
+### NR-249 — No per-building profit history exists — the Profitability page's 6-month net-profit line is a placeholder series, same constraint as the old Workforce trend graph
+*observation · raised 2026-08-15 · from Playtest-driven building-card rework (2026-08-15): Ben asked for a line chart of net profit over the last 6 months.*
+
+No time-series profit history is recorded per building anywhere in the simulation (the same gap draw_building_workforce_page's pre-existing placeholder trend graph already lived with). draw_building_profit's new 'Net, 6 mo.' PlotLines chart reuses that same honest-placeholder idiom: a smooth deterministic series anchored to the live net-profit estimate, 6 points rather than the workforce graph's 9, with no claim to be real history.
+
+**Why it matters.** Two placeholder trend graphs now exist on the same card (Profitability's Net line, Workforce's target trend) for the identical reason: nothing records per-building history over time. If BL-something eventually adds a real per-building time series (the way body/corp-level history is tracked elsewhere), both should switch to it together rather than one getting fixed and the other staying a placeholder.
+
+> **Recommendation:** No action needed now — noted so a future per-building-history item knows to sweep both graphs, not just the one it was written against.
+
+*Files: `src/ui/selection_panel.cpp`*
+
+### NR-250 — Profitability page vertical budget for the Inputs chart is a fixed judgment-call clamp, not a measured fit
+*decision taken on your behalf · raised 2026-08-15 · from Playtest reflow (2026-08-15): Ben asked the Profitability page to fit one screen — bars+line row left 1/3 / right 2/3, Inputs chart below.*
+
+draw_building_profit budgets vertical space as: inputs_h = clamp(total_h*0.24, 46, 70) when a recipe applies, top_h = max(70, total_h - inputs_h - label_h - spacing). These numbers were picked to look right at typical accordion heights, not measured against the worst case (a recipe with many inputs widens draw_input_basket_chart's columns down to a floor, but the STRIP HEIGHT stays fixed regardless of item count).
+
+**Why it matters.** A very short accordion height (small window) or a recipe with an unusually large input basket could still make the Inputs strip cramped even though nothing overflows/scrolls. No real building in the current recipe set stresses this, so it was not visually confirmed against a worst case.
+
+> **Recommendation:** If a future recipe expansion adds a build with many inputs, or the accordion height shrinks further, re-check the Inputs strip legibility live and retune the clamp bounds rather than assuming these numbers still hold.
+
+*Files: `src/ui/selection_panel.cpp`*
+
+### NR-252 — Group-taxonomy judgment calls in the BL-434 recipe grouping
+*decision taken on your behalf · raised 2026-08-15 · from BL-434 sub-facility groups: tagging every recipes.lua entry with a group.*
+
+Two calls were genuinely ambiguous when tagging recipes.lua: (1) hydroponics_bay was grouped under Food Processing alongside food_rations/food_rations_milled, even though it PRODUCES agricultural_produce (an agriculture step) rather than processing it into rations (a food-processing step) - it could instead be a standalone Agriculture group. (2) machinery/alloys/spacecraft_components were grouped together as one Advanced Fabrication group (Fabricator + Assembly Plant), rather than split into a Fabricator group and a separate Assembly group, since the task brief gave no explicit steer either way for these three.
+
+**Why it matters.** Both calls affect which Build-door candidates get bundled together and which recipe switches are cheap (intra-group) vs expensive (cross-group) - a different split changes actual playtest costs, not just labels.
+
+- Leave as authored (Food Processing includes Hydroponics Bay; Advanced Fabrication covers all three).
+- Split Hydroponics Bay into a standalone Agriculture group.
+- Split Advanced Fabrication into Fabricator (machinery, alloys) and Assembly (spacecraft_components) once each has more recipes.
+
+> **Recommendation:** Leave as authored; revisit if either group grows enough recipes that the merge starts feeling wrong at the Build door.
+
+*Files: `scripts/recipes.lua`, `docs/economy/PRODUCTION.md`*
+
+### NR-253 — recipe_switch.cooldown_ticks dropped 6 -> 1, needs playtest
+*decision taken on your behalf · raised 2026-08-16 · from Playtest, 2026-08-16: Ben asked how long a method switch takes, then called the answer (6 ticks = 90 days/tick x 6 = ~1.5 in-game years) too long to even register as a mechanic - the disabled Switch glyph just read as "not possible".*
+
+economy.recipe_switch.cooldown_ticks changed from 6 to 1 (one econ tick, ~90 days) on Ben's direct instruction. switch_cost (12cr) is unchanged. A visible progress bar was also added to the Method page ("Retooling - N ticks left") so a running cooldown is legible without hovering the disabled glyph.
+
+**Why it matters.** 1 tick is a first-cut replacement, not a measured value - it removes the near-invisibility problem but has not been played against real economy pacing. Too short and the cooldown stops meaning anything as a commitment device (BL-430's whole point was that switching should NOT be a per-tick optimisation).
+
+> **Recommendation:** Leave at 1 tick for the next playtest pass; retune (likely upward, 2-3 ticks) if switching starts reading as free.
+
+*Files: `scripts/economy.lua`, `src/ui/selection_panel.cpp`*
+
 ---
 
 ## Resolved
@@ -143,4 +227,34 @@ R5 asks for 20+ named buildings "each with its placement rule and glyph". This s
 > **RESOLVED.** Closed same session (2026-08-15), not deferred: icons::building() gained a resource_type identity parameter and 14 new hand-drawn glyphs cover the 9 extraction + 5 processing resource keys the ancient roster reaches. R5 in requirements.json's ancient-chain-roster group is now complete. Still open: NR-240's compile/visual-verification gap applies to this work too — nobody has actually SEEN these glyphs render yet.
 
 *Files: `src/ui/icons.cpp`, `src/ui/icons.hpp`, `docs/ui/ICONS.md`, `docs/development/req/requirements.json`*
+
+### NR-245 — Manage button now opens the Construction queue, not building detail (Buildings tab deleted)
+*decision taken on your behalf · raised 2026-08-15 · from BL-431-follow-on delivery: Workforce and Lifecycle moved from the construction panel's Buildings tab onto the building Selection card as two more accordion pages; the Buildings tab and its tab switcher were deleted (construction_panel.cpp is Construction-queue-only now, foldout title renamed 'Building' -> 'Construction').*
+
+The building Selection card's Manage action (src/ui/selection_panel.cpp, draw_building_selection_body's action grid) used to set ui.construction.panel_view = 1 to land on the Buildings tab's inline detail. That tab is gone - all of its detail (recipe/Method, Chain, Depth, Workforce, Lifecycle) now lives on the Selection card itself. Manage was changed to just set ui.show_construction_panel = true, opening the one view left (the queue).
+
+**Why it matters.** Manage's meaning shifted from 'show me this building's detail' (now redundant - the card IS the detail) to 'show me what's under construction'. A player pressing Manage on a completed, non-building-anything building now sees an empty queue rather than a jump to controls, which could read as a dead button if the queue is empty and nothing else changes on screen.
+
+- A) Leave as-is - the card already shows every control Manage used to route to, so Manage's new job (open the queue) is a legitimate, smaller one, not a broken one.
+- B) Repurpose or remove the Manage action entirely now that its old destination is redundant with the card it lives on, freeing the action-grid slot for something else.
+
+> **Recommendation:** A for now - removing/repurposing Manage is a UI-vocabulary change that deserves its own look rather than a side effect of this delivery; flag for the next Selection-card pass.
+
+> **RESOLVED.** B, taken 2026-08-15 in the playtest rework: Ben played the card and asked for Manage gone outright (its destination was already redundant with the card, per option B above). The action-grid slot it freed, plus one former reserved slot, now hold Mothball and Dismantle (the former Lifecycle page's two controls, moved onto the action grid — see NR-246 for the pager-order fallout).
+
+### NR-251 — cross_group_multiplier (6.0x) is a first-cut number, needs playtest
+*decision taken on your behalf · raised 2026-08-15 · from BL-434 sub-facility groups: tiered recipe-switch cost.*
+
+recipe_switch_params::cross_group_multiplier defaults to 6.0, putting a cross-group retool (e.g. Bloomery -> Loom) at 72cr against the existing 12cr intra-group switch_cost. That is well short of a fresh processing_facility all-in capex (~400cr: 200 build_cost + ~200cr steel materials at current prices), so at these numbers a cross-group retool is NOT yet the more expensive option versus building fresh - it is a real but not decisive nudge.
+
+**Why it matters.** The design brief asked for a multiplier large enough that build-fresh plausibly beats retool in typical cases (5-8x suggested, deliberately not full parity). 6.0x sits in that suggested band but was not validated against actual playtest economy pacing.
+
+- Leave at 6.0x and revisit once Metal Foundry / Food Processing / etc. groups are actually played against each other.
+- Raise toward the point where cross-group cost approaches or exceeds build_cost, making "just build another" the clearly cheaper move in most cases.
+
+> **Recommendation:** Leave at 6.0x for the first playtest pass; retune once real corp behaviour is observed switching between groups.
+
+> **RESOLVED.** Superseded 2026-08-16: Ben retired cross-group switching entirely rather than tuning its price - the only way to change a building's group is now dismantle + rebuild via the tile selector. cross_group_multiplier no longer exists (removed from recipe_switch_params, scripts/economy.lua, recipe_registry.cpp's loader); try_switch_recipe refuses a cross-group target outright (recipe_switch_result::cross_group). This tuning question is moot, not answered.
+
+*Files: `src/world/recipe_registry.hpp`, `scripts/economy.lua`*
 

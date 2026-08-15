@@ -65,6 +65,17 @@ struct recipe
     /// with a title-cased `name` (the old Build-door behaviour), so every recipe
     /// always carries a legible label without requiring one to be authored.
     std::string display_name;
+
+    /// BL-434: which sub-facility KIND this recipe belongs to — "Metal Foundry",
+    /// "Food Processing", etc. — so the generic processing_facility building type
+    /// can be presented (Build door) and gated (recipe-switch cost) as if it were
+    /// several distinct facility kinds, without adding new building_type enum
+    /// values. Authored as `group = "..."` in recipes.lua, same optional-field
+    /// pattern as `era`/`display_name`; absent means the literal "General" — a
+    /// real, if catch-all, group name (not empty string) so every recipe always
+    /// has SOME group to compare against in the cross-group-switch cost check
+    /// (economy_system.cpp's try_switch_recipe) without a special empty-string case.
+    std::string group = "General";
 };
 
 /// The primary output resource of a recipe — the argmax of its outputs. Used
@@ -258,6 +269,14 @@ struct recipe_switch_params
     /// Economy ticks after a switch before the SAME building may switch again
     /// through this seam. 0 = no cooldown (pre-BL-430 behaviour).
     int cooldown_ticks = 0;
+
+    // BL-434 added a `cross_group_multiplier` here (a steep price tier on a
+    // cross-group retool) and it was removed again minutes later in the same
+    // session: Ben reconsidered and cross-group switching is now REFUSED
+    // outright (recipe_switch_result::cross_group in economy_system.hpp), not
+    // priced — see try_switch_recipe's doc comment for the full call. Noted
+    // here so a future reader isn't left wondering why a tunable was added and
+    // pulled back-to-back rather than assuming it was reverted by accident.
 };
 
 /// BL-148/149 logistics-node discount tunables, authored in scripts/economy.lua under
@@ -380,6 +399,21 @@ public:
         if (m_allowed.empty())
             return no_recipe;
         return static_cast<uint16_t>(m_allowed.front());
+    }
+
+    /// BL-434: same contract as default_recipe_id() above, narrowed to one GROUP —
+    /// the first era-allowed recipe whose `group` matches. Used by the Build door
+    /// to seed a freshly-placed processing_facility with a group's own default
+    /// recipe when the caller wants "the Metal Foundry" rather than "a recipe".
+    /// Returns `no_recipe` if the group has no era-allowed recipe (should not
+    /// happen for an authored group, but a caller passing a stale/typo'd group
+    /// name gets a clean no-op rather than an out-of-range id).
+    uint16_t default_recipe_id(const std::string& group) const
+    {
+        for (const std::size_t i : m_allowed)
+            if (m_recipes[i].group == group)
+                return static_cast<uint16_t>(i);
+        return no_recipe;
     }
 
     /// Economy constants for a building type.

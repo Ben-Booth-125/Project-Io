@@ -16,6 +16,13 @@
 -- stable across bands; see recipe_registry.hpp § BL-433 era band. An unknown
 -- string is a load-time error, not a silent fallback.
 --
+-- BL-434: an optional `group` field ("Metal Foundry", "Food Processing", ...) says
+-- which sub-facility KIND a recipe belongs to, so the generic processing_facility
+-- building type reads (Build door) and switches (recipe-switch cost) as several
+-- distinct facility kinds. Absent means "General" (see recipe_registry.hpp); every
+-- recipe below is tagged since a natural sibling group exists for all of them
+-- (see docs/economy/PRODUCTION.md § Sub-facility groups for the taxonomy table).
+--
 -- The ancient roster is deliberately thin right now — steel, food_rations and
 -- refined_copper are the only untagged processing chains — because tagging is
 -- all this item does. Filling it out is BL-429 (ancient building roster), which
@@ -37,6 +44,7 @@ recipes = {
     {
         name    = "steel",
         era     = "industrial", -- BL-429
+        group   = "Metal Foundry", -- BL-434
         inputs  = { iron_ore = 2.0, coal = 1.0 },
         outputs = { steel = 1.0 },
     },
@@ -45,6 +53,7 @@ recipes = {
     {
         name    = "refined_fuel",
         era     = "industrial", -- BL-433
+        group   = "Refinery", -- BL-434
         inputs  = { petroleum = 2.0 },
         outputs = { refined_fuel = 1.0 },
     },
@@ -52,6 +61,7 @@ recipes = {
     -- id 2 — Food Processor: agricultural produce -> food rations.
     {
         name    = "food_rations",
+        group   = "Food Processing", -- BL-434
         inputs  = { agricultural_produce = 2.0 },
         outputs = { food_rations = 1.0 },
     },
@@ -65,6 +75,7 @@ recipes = {
     {
         name    = "hydroponics_bay",
         era     = "industrial", -- BL-433
+        group   = "Food Processing", -- BL-434: agriculture-adjacent, same feed-the-population kind
         inputs  = { water = 1.5, steel = 0.5 },
         outputs = { agricultural_produce = 1.0 },
     },
@@ -75,6 +86,7 @@ recipes = {
     {
         name    = "steel_from_iron_nickel",
         era     = "industrial", -- BL-433
+        group   = "Metal Foundry", -- BL-434
         inputs  = { iron_nickel_ore = 2.0 },
         outputs = { steel = 1.0 },
     },
@@ -88,6 +100,7 @@ recipes = {
     {
         name    = "propellant_atmospheric",
         era     = "industrial", -- BL-433
+        group   = "Chemical Works", -- BL-434
         inputs  = { refined_fuel = 2.0 },
         outputs = { propellant = 1.0 },
     },
@@ -107,6 +120,7 @@ recipes = {
     {
         name    = "propellant_electrolysis",
         era     = "industrial", -- BL-433
+        group   = "Chemical Works", -- BL-434
         inputs  = { water = 3.0, refined_fuel = 1.0 },
         outputs = { propellant = 1.0 },
     },
@@ -122,6 +136,7 @@ recipes = {
     {
         name    = "silicon",
         era     = "industrial", -- BL-433
+        group   = "Electronics", -- BL-434
         inputs  = { silica = 2.0 },
         outputs = { silicon = 1.0 },
     },
@@ -129,6 +144,7 @@ recipes = {
     -- id 8 — Smelter: copper ore -> refined copper.
     {
         name    = "refined_copper",
+        group   = "Metal Foundry", -- BL-434
         inputs  = { copper_ore = 2.0 },
         outputs = { refined_copper = 1.0 },
     },
@@ -137,6 +153,7 @@ recipes = {
     {
         name    = "ree_alloy",
         era     = "industrial", -- BL-433
+        group   = "Electronics", -- BL-434
         inputs  = { rare_earth_ore = 2.0 },
         outputs = { ree_alloy = 1.0 },
     },
@@ -147,6 +164,7 @@ recipes = {
     {
         name    = "machinery",
         era     = "industrial", -- BL-433
+        group   = "Advanced Fabrication", -- BL-434
         inputs  = { steel = 1.0, refined_copper = 1.0 },
         outputs = { machinery = 1.0 },
     },
@@ -155,6 +173,7 @@ recipes = {
     {
         name    = "alloys",
         era     = "industrial", -- BL-433
+        group   = "Advanced Fabrication", -- BL-434
         inputs  = { steel = 1.0, ree_alloy = 1.0 },
         outputs = { alloys = 1.0 },
     },
@@ -163,6 +182,7 @@ recipes = {
     {
         name    = "electronics",
         era     = "industrial", -- BL-433
+        group   = "Electronics", -- BL-434
         inputs  = { silicon = 1.0, refined_copper = 1.0, ree_alloy = 0.5 },
         outputs = { electronics = 1.0 },
     },
@@ -173,6 +193,7 @@ recipes = {
     {
         name    = "spacecraft_components",
         era     = "industrial", -- BL-433
+        group   = "Advanced Fabrication", -- BL-434
         inputs  = { alloys = 2.0, electronics = 1.0 },
         outputs = { spacecraft_components = 1.0 },
     },
@@ -188,6 +209,7 @@ recipes = {
     {
         name    = "clean_water",
         era     = "industrial", -- BL-433
+        group   = "Welfare Goods", -- BL-434
         inputs  = { water = 2.0 },
         outputs = { clean_water = 1.0 },
     },
@@ -198,6 +220,7 @@ recipes = {
     {
         name    = "consumer_goods",
         era     = "industrial", -- BL-433
+        group   = "Welfare Goods", -- BL-434
         inputs  = { food_rations = 1.0, steel = 1.0 },
         outputs = { consumer_goods = 1.0 },
     },
@@ -210,6 +233,7 @@ recipes = {
     {
         name    = "medical_supplies",
         era     = "industrial", -- BL-433
+        group   = "Welfare Goods", -- BL-434
         inputs  = { water = 1.0, agricultural_produce = 1.0 },
         outputs = { medical_supplies = 1.0 },
     },
@@ -237,6 +261,7 @@ recipes = {
         name         = "charcoal",
         display_name = "Charcoal Burner", -- BL-429 slice 2
         era          = "ancient",
+        group        = "Fuel Production", -- BL-434: fuel/energy, not metal itself; the Bloomery/Smithy's supplier
         inputs       = { timber = 3.0 },
         outputs      = { charcoal = 1.0 },
     },
@@ -247,6 +272,7 @@ recipes = {
         name         = "iron_blooms",
         display_name = "Bloomery", -- BL-429 slice 2
         era          = "ancient",
+        group        = "Metal Foundry", -- BL-434
         inputs       = { iron_ore = 2.0, charcoal = 1.0 },
         outputs      = { iron_blooms = 1.0 },
     },
@@ -259,6 +285,7 @@ recipes = {
         name         = "steel_from_blooms",
         display_name = "Smithy", -- BL-429 slice 2
         era          = "ancient",
+        group        = "Metal Foundry", -- BL-434
         inputs       = { iron_blooms = 2.0, charcoal = 1.0 },
         outputs      = { steel = 1.0 },
     },
@@ -270,6 +297,7 @@ recipes = {
         name         = "trade_goods",
         display_name = "Potter & Weaver", -- BL-429 slice 2
         era          = "ancient",
+        group        = "Artisan Goods", -- BL-434: shares its terminal good with the Glassworks below
         inputs       = { clay = 2.0, timber = 1.0 },
         outputs      = { trade_goods_misc = 1.0 },
     },
@@ -282,6 +310,7 @@ recipes = {
         name         = "food_rations_milled",
         display_name = "Miller", -- BL-429 slice 2
         era          = "ancient",
+        group        = "Food Processing", -- BL-434
         inputs       = { agricultural_produce = 2.0, stone = 1.0 },
         outputs      = { food_rations = 1.0 },
     },
@@ -303,6 +332,7 @@ recipes = {
         name         = "glass",
         display_name = "Glassworks", -- BL-429 slice 2
         era          = "ancient",
+        group        = "Artisan Goods", -- BL-434: second producer of trade_goods_misc, same group as Potter & Weaver
         inputs       = { sand = 2.0 },
         outputs      = { trade_goods_misc = 1.0 },
     },
@@ -315,6 +345,7 @@ recipes = {
         name         = "peat_charcoal",
         display_name = "Peat Kiln", -- BL-429 slice 2
         era          = "ancient",
+        group        = "Fuel Production", -- BL-434: second producer of charcoal, same group as Charcoal Burner
         inputs       = { peat = 2.0 },
         outputs      = { charcoal = 1.0 },
     },

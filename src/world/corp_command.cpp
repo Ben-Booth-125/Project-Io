@@ -315,6 +315,10 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                 case recipe_switch_result::on_cooldown:         return corp_command_result::rejected_cooldown;
                 case recipe_switch_result::insufficient_funds:  return corp_command_result::rejected_funds;
                 case recipe_switch_result::invalid:             return corp_command_result::rejected_invalid;
+                // BL-434 retraction: a cross-group target is not a legal switch at
+                // all (see try_switch_recipe's comment) — same bucket as `invalid`,
+                // the closest existing generic refusal, rather than new plumbing.
+                case recipe_switch_result::cross_group:         return corp_command_result::rejected_invalid;
             }
             return corp_command_result::rejected_invalid;
         }

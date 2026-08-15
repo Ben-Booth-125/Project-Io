@@ -565,6 +565,68 @@ cost/cooldown-aware scorer is real new planner scope, not a small follow-on.
 
 ---
 
+## Sub-facility groups (BL-434, 2026-08-15)
+
+**The generic split.** Every processing recipe still runs on the one `building_type::
+processing_facility` enum value — BL-434 does not add a new building type. What it adds is a
+`group` field on `recipe` (`recipe_registry.hpp`, authored as `group = "..."` in `recipes.lua`,
+alongside `era`/`display_name`): a sub-facility KIND — "Metal Foundry", "Food Processing" — so
+the generic building reads and behaves like several recognizable facility kinds without a second
+`building_type` axis. Absent means the literal `"General"` (a real group name, not empty string,
+so the switch-cost lookup below never needs a special case).
+
+**The taxonomy.** Every authored recipe as of this item has a named group with at least one
+sibling — nothing was left in the `"General"` catch-all:
+
+| Group | Recipes (era) | Notes |
+|---|---|---|
+| Metal Foundry | `steel` (industrial), `steel_from_iron_nickel` (industrial), `refined_copper` (any), `iron_blooms` "Bloomery" (ancient), `steel_from_blooms` "Smithy" (ancient) | Every route that smelts or shapes a structural metal — the industrial Smelter and the ancient Bloomery/Smithy chain both land here, since they reach the same terminal goods (steel, refined copper) by different roads. |
+| Refinery | `refined_fuel` (industrial) | Currently a singleton — a real, specific kind (distinct from Metal Foundry's smelting), not a forced catch-all; more refined-fuel-family recipes would join it rather than needing a rename. |
+| Food Processing | `food_rations` (any), `hydroponics_bay` (industrial), `food_rations_milled` "Miller" (ancient) | Feeding the population, whether growing the produce (Hydroponics Bay) or milling it into rations (Food Processor, Miller). |
+| Chemical Works | `propellant_atmospheric` (industrial), `propellant_electrolysis` (industrial) | The Chemical Plant's two propellant routes (BL-308). |
+| Electronics | `silicon` (industrial), `ree_alloy` (industrial), `electronics` (industrial) | The silicon/REE/electronics chain — named explicitly by this item's own design brief. |
+| Advanced Fabrication | `machinery` (industrial), `alloys` (industrial), `spacecraft_components` (industrial) | Fabricator + Assembly Plant: goods assembled from refined inputs rather than smelted from ore. |
+| Welfare Goods | `clean_water` (industrial), `consumer_goods` (industrial), `medical_supplies` (industrial) | The BL-368 habitability tranche — Water Treatment Plant, Consumer Goods Factory, Pharmaceutical Lab. |
+| Fuel Production | `charcoal` "Charcoal Burner" (ancient), `peat_charcoal` "Peat Kiln" (ancient) | Two independent producers of the same fuel good (`charcoal`) — an ordinary multi-producer economy fact (see the Alternate production methods section above), not itself an alternate-method pair since they're already grouped. |
+| Artisan Goods | `trade_goods` "Potter & Weaver" (ancient), `glass` "Glassworks" (ancient) | Two independent producers of `trade_goods_misc`, same shape as Fuel Production above. |
+
+Judgment calls recorded in `NEEDS_REVIEW.json`: whether Hydroponics Bay (an agriculture
+*producer*, not a food *processor*) belongs in Food Processing or a standalone Agriculture group,
+and whether Advanced Fabrication should instead split into a Fabricator group and an Assembly
+group once more recipes land in either.
+
+**Build door: one row per group, not per recipe.** `draw_construction_ledger`
+(`selection_panel.cpp`) used to expand `processing_facility` into one candidate row per
+era-allowed recipe. It now collapses those rows to one per GROUP: the representative recipe is
+the highest-expected-profit era-allowed recipe in that group (ties keep the first in authored
+order), and the row is labelled with the group name rather than the recipe's own `display_name`.
+Placing it seeds the fresh building with that representative recipe
+(`construct_building`'s trailing `recipe` parameter, via `ui.construction.pending_recipe`, same
+seam as before). `recipe_registry::default_recipe_id(group)` gives any other caller (AI, a future
+seam) the same "this group's default recipe" lookup without duplicating the era-mask walk.
+
+**Switching within a group stays cheap; switching across groups is refused outright.**
+`try_switch_recipe` (`economy_system.cpp`) looks up both the old and new recipe's `group` via the
+registry: same group pays the existing `switch_cost`/`cooldown_ticks` (`economy.recipe_switch`);
+different groups are REFUSED (`recipe_switch_result::cross_group`), not priced. This retracts a
+cross-group cost tier (`cross_group_multiplier`) that shipped in this same item and was pulled
+minutes later — Ben reconsidered: "switching methods can mean changing to a different building
+type — we should retire that completely. So the only way to access a different building type is
+fully dismantling the building, then using the tile selector to reselect and build a new
+building." The Method page's candidate list (`draw_production_method_section`, `selection_panel.cpp`)
+is filtered to the active recipe's own group for the same reason — a cross-group recipe is never
+even offered as a choice, not merely refused if picked. A recipe with no group tag (the
+empty-`b.recipe`/`no_recipe` case, e.g. mid-construction) falls back to permitting the switch at
+the intra-group cost rather than crashing or refusing on a data edge case — this seam must never
+crash on missing data.
+
+`tools/verify/recipe_switch_harness.cpp`'s `S6` asserts the refusal mechanically (three dummy
+recipes in two groups, in the same hand-built registry the `S1`-`S5` mechanism checks already use):
+an intra-group switch applies at the base cost, a cross-group switch is refused and mutates
+nothing.
+
+---
+
 ## Layer 3 prototype scope
 
 Layer 3 implements:

@@ -172,7 +172,10 @@ void draw_time_panel(sim_loop& sim, int& prev_speed, const ImVec2& disp)
             const int   speeds[] = { 0,    1,   2,   3,   4,   5 };
             const int   n        = 6;
             const float spacing  = ImGui::GetStyle().ItemSpacing.x;
-            const float bw       = (ctrl_w - spacing * (n - 1)) / n;
+            // Narrowed off the exact fill-width division (Ben, playtest: the "V"
+            // button was riding the screen edge) — a small margin per button so the
+            // row sits comfortably inside ctrl_w instead of exactly matching it.
+            const float bw       = (ctrl_w - spacing * (n - 1)) / n * 0.92f;
 
             for (int i = 0; i < n; ++i)
             {

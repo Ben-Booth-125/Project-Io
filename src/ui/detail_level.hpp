@@ -73,6 +73,7 @@ enum class detail_surface : std::uint8_t
 {
     none = 0,          ///< Nothing expanded. The resting value.
     selection_metric,  ///< The tile Selection band's metric card (key = page index).
+    building_metric,   ///< The building Selection band's accordion page (key = page index).
     history_story,     ///< History ledger, Story view.
     history_chain,     ///< History ledger, Chain view (key = chain_stage).
     generation_stage,  ///< The New World wizard's chain stages (key = chain_stage).

@@ -2802,7 +2802,66 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     fallback = tb->second;
             }
 
-            state.selected_entity = (marker_hit != null_entity) ? marker_hit : fallback;
+            // Placeholder unit-cycle scaffolding: a REPEAT click on the same tile the
+            // selection already sits on cycles Soldier -> Building -> Tile -> Soldier
+            // (skipping any stage with nothing there), instead of re-resolving the
+            // same marker/fallback every click. Deliberately checked BEFORE consulting
+            // marker_hit at all: on a built tile the building's marker zone covers
+            // nearly the whole hex (BL-367), so gating this on "marker_hit missed"
+            // meant the cycle almost never fired there — every click just re-hit the
+            // marker and reselected the same building, which read as "selection
+            // depends on where I click" rather than as a cycle. Once we already know
+            // this is the anchored tile, what to select next is fully determined by
+            // the stage table below; marker position no longer matters. A click that
+            // lands on a FRESH tile still goes through the marker-hit / fallback
+            // precedence untouched, below. Units mostly don't exist yet in the live
+            // economy (BL-393); this is built ahead of that on purpose (Ben's direction).
+            if (hovered_tile != null_entity && state.selection_cycle_tile == hovered_tile)
+            {
+                entity_id unit_here = null_entity;
+                for (const auto& [uid, uc] : w.units)
+                    if (uc.position == hovered_tile) { unit_here = uid; break; } // first match; no ordering guarantee needed here
+
+                entity_id building_here = null_entity;
+                if (const auto tb2 = tile_to_bld.find(hovered_tile); tb2 != tile_to_bld.end())
+                    building_here = tb2->second;
+
+                const entity_id stages[3] = { unit_here, building_here, hovered_tile };
+                int stage = state.selection_cycle_stage;
+                for (int i = 0; i < 3; ++i)
+                {
+                    stage = (stage + 1) % 3;
+                    if (stages[stage] != null_entity)
+                        break;
+                }
+                state.selection_cycle_stage = stage;
+                state.selected_entity       = stages[stage];
+            }
+            else
+            {
+                state.selected_entity = (marker_hit != null_entity) ? marker_hit : fallback;
+
+                // Seed/reset the cycle anchor so a follow-up repeat click on this
+                // SAME tile knows where to advance from next time.
+                if (hovered_tile != null_entity)
+                {
+                    entity_id unit_here = null_entity;
+                    for (const auto& [uid, uc] : w.units)
+                        if (uc.position == hovered_tile) { unit_here = uid; break; }
+                    entity_id building_here = null_entity;
+                    if (const auto tb2 = tile_to_bld.find(hovered_tile); tb2 != tile_to_bld.end())
+                        building_here = tb2->second;
+
+                    state.selection_cycle_tile  = hovered_tile;
+                    state.selection_cycle_stage = (unit_here != null_entity)     ? 0
+                                                 : (building_here != null_entity) ? 1
+                                                                                  : 2;
+                }
+                else
+                {
+                    state.selection_cycle_tile = null_entity;
+                }
+            }
         }
         else if (hovered_tile != null_entity)
         {

@@ -601,6 +601,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         const std::string& n = *name;
         detail_surface s = detail_surface::none;
         if      (n == "selection_metric") s = detail_surface::selection_metric;
+        else if (n == "building_metric")  s = detail_surface::building_metric;
         else if (n == "history_story")    s = detail_surface::history_story;
         else if (n == "history_chain")    s = detail_surface::history_chain;
         else if (n == "generation_stage") s = detail_surface::generation_stage;

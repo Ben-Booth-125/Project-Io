@@ -554,10 +554,30 @@ recipe_switch_result try_switch_recipe(world& w, const recipe_registry& reg,
         return recipe_switch_result::invalid;
 
     const recipe_switch_params& sw = reg.recipe_switch();
-    if (cit->second.balance < sw.switch_cost)
+
+    // BL-434 retraction (2026-08-16, minutes after BL-434 itself landed in this
+    // same session): cross-GROUP switching used to cost more (a tiered
+    // multiplier); Ben reconsidered and it is now REFUSED outright instead —
+    // "switching methods can mean changing to a different building type — we
+    // should retire that completely. So the only way to access a different
+    // building type is fully dismantling the building, then using the tile
+    // selector to reselect and build a new building." Looked up by group name
+    // rather than id/enum, since `group` is the whole point of the field
+    // (recipe_registry.hpp). A missing old recipe (e.g. a fresh
+    // processing_facility mid-construction, whose b.recipe may be `no_recipe`)
+    // or an unrecognised group falls back to PERMITTING the switch at the
+    // intra-group cost rather than refusing on a data edge case — this seam
+    // must never crash or silently misbehave on missing data.
+    const recipe* old_r = reg.get_recipe(b.recipe);
+    const recipe* new_r = reg.get_recipe(new_recipe_id);
+    if (old_r != nullptr && new_r != nullptr && old_r->group != new_r->group)
+        return recipe_switch_result::cross_group;
+
+    const float cost = sw.switch_cost;
+    if (cit->second.balance < cost)
         return recipe_switch_result::insufficient_funds;
 
-    cit->second.balance -= sw.switch_cost;
+    cit->second.balance -= cost;
     b.recipe                 = new_recipe_id;
     b.active_recipe_index    = static_cast<int>(new_recipe_id); // registry index == id (recipe_at)
     b.loss_streak            = 0;                                // give the new recipe a chance

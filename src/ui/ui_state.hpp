@@ -203,18 +203,30 @@ struct ui_state
     /// value. Held as int so "all" has a home the enum does not have to invent.
     int decision_feed_reason = -1;
 
-    // --- BL-431 Selection-panel production surfaces ---
-    // Three toggles, each closed by default (ledger policy above) and each
-    // following the Toggle rule: re-pressing the currently-open one closes it
-    // rather than leaving it stuck open. Keyed to selected_entity implicitly —
-    // selecting a new entity does not clear these, matching the existing ledger
-    // pattern (a player who wants Method open on every building they inspect
-    // keeps it open), but the sections render nothing for a non-processing_facility
-    // selection so a stale "open" flag is inert there.
-    bool selection_method_open = false; ///< "Which way should this building make its output?" (method selector).
-    bool selection_chain_open  = false; ///< "What do I need to make this?" (chain trace), rooted at selection_chain_target.
-    resource_type selection_chain_target = resource_type::iron_ore; ///< The good the chain trace is rooted at; set when the trace is opened from a pip.
-    bool selection_depth_open  = false; ///< "How far down the graph have I actually got?" (depth readout).
+    // --- Building Selection card accordion (supersedes BL-431's three toggles) ---
+    // The building card now takes the tile card's 3-column band shape: Profitability /
+    // Method / Chain / Depth (whichever apply) each get a PAGE rather than a
+    // stack of independently-toggled sections, so one pager index replaces the
+    // former selection_method_open / selection_chain_open / selection_chain_target /
+    // selection_depth_open quartet — a page is always fully rendered while shown,
+    // there is nothing left to hide-and-reveal within it. Not clamped to the
+    // current building's page count here (that vector is rebuilt per-frame); the
+    // draw site clamps against it, same as the tile card's card_resource_page.
+    int selection_building_page = 0;
+
+    /// Unit Selection card accordion page index (mirrors selection_building_page's
+    /// role for the new Soldier card) — Strength / Roster, whichever apply.
+    int selection_unit_page = 0;
+
+    // --- Tile repeat-click selection cycle (placeholder unit-loop scaffolding) ---
+    // Which tile the loop is currently anchored to, and which of the three fixed
+    // stages (0 = unit, 1 = building, 2 = tile) the selection currently sits on.
+    // A click on hovered_tile == selection_cycle_tile advances the stage
+    // (skipping stages with nothing there); a click elsewhere reseeds both.
+    // Mirrors card_resource_page's per-selection reset idiom rather than adding a
+    // separate "is this a repeat click" flag.
+    entity_id selection_cycle_tile  = null_entity;
+    int       selection_cycle_stage = 0;
 
     /// Spectator mode (BL-409): no human seat. Presentation-side flag only —
     /// `world/*` never reads it; the sim's copy travels as corp_ai_params
