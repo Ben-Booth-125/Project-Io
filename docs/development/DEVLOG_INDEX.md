@@ -3,13 +3,14 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 162 entries across 2 volume(s).
+One line per session, newest first — 163 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
+| 2026-08-15 | [BL-429 slice 3: the ancient roster gets glyphs](DEVLOG.md) | BL-429 BL-430 BL-431 | DEVLOG.md |
 | 2026-08-15 | [BL-429 slice 2: the ancient roster gets names](DEVLOG.md) | BL-428 BL-429 BL-430 BL-431 | DEVLOG.md |
 | 2026-08-14 | [Gate hygiene becomes a measurement saga: batch verify, the 70% map, and the golden demotion](DEVLOG.md) | BL-402 BL-415 BL-416 BL-423 BL-424 BL-425 BL-426 BL-427 | DEVLOG.md |
 | 2026-08-14 | [Seam batch: the money printer closed and the word interface given a door](DEVLOG.md) | BL-351 BL-386 BL-387 BL-396 BL-397 BL-416 BL-422 | DEVLOG.md |

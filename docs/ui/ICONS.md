@@ -40,8 +40,8 @@ void glyph(ImDrawList* dl, ImVec2 centre, float r, /* trailing type/tier/colour 
 - **colour** — either a caller-supplied `ImU32`, or *derived* (the `resource`
   glyph pulls its colour from `presentation_of`). See the catalogue for which.
 - **trailing parameters** — most glyphs take a single colour; the two
-  multi-parameter cases are `building` (a `building_type` + `fill`) and
-  `settlement` (a `tier` + `colour`).
+  multi-parameter cases are `building` (a `building_type` + a `resource_type`
+  identity, BL-429 § 1c + `fill`) and `settlement` (a `tier` + `colour`).
 
 Two settled visual sub-conventions (the resolution of former Open clarifications 3–4):
 
@@ -65,12 +65,12 @@ Glyphs fall into three families by role.
 
 | Glyph | Function | Shape | Colour | Drawn for / where |
 |---|---|---|---|---|
-| **Extraction site** | `building(…, extraction_site, fill)` | Faceted ore/mineral silhouette + outline — an angular eight-sided crystal chunk (wider than tall, corner-cut facets), distinct from the regular gem-diamond pip and the port triangle | Caller `fill` | Building marker, Planetary canvas |
-| **Processing facility** | `building(…, processing_facility, fill)` | Filled square + outline | Caller `fill` | Building marker, Planetary canvas |
-| **Port** | `building(…, port, fill)` | Filled upward triangle + outline | Caller `fill` | Building marker, Planetary canvas |
-| **Inland logistics hub** | `building(…, inland_logistics_hub, fill)` | Filled flat-top hexagon + outline with a small dark hub dot at the centre — a six-sided network-node silhouette (BL-149), distinct from the launchpad/none circle and the port triangle | Caller `fill` | Building marker, Planetary canvas; build-front-door row |
-| **Military base** | `building(…, military_base, fill)` | Filled shield + outline — flat top, shoulders tapering to a bottom point (BL-325 S1); the martial building, **filled** like every building glyph, so it never reads as the port's upward triangle or the hub's hexagon | Caller `fill` | Building marker, Planetary canvas; build-front-door row |
-| **Building (none/other)** | `building(…, none, fill)` | Filled circle (dot) — also the fallback for `launchpad` | Caller `fill` | Fallback building marker |
+| **Extraction site** | `building(…, extraction_site, identity, fill)` | Faceted ore/mineral silhouette + outline — an angular eight-sided crystal chunk (wider than tall, corner-cut facets), distinct from the regular gem-diamond pip and the port triangle. The generic fallback when `identity` names no bespoke shape (see § 1c) | Caller `fill` | Building marker, Planetary canvas |
+| **Processing facility** | `building(…, processing_facility, identity, fill)` | Filled square + outline. The generic fallback when `identity` names no bespoke shape (see § 1c) | Caller `fill` | Building marker, Planetary canvas |
+| **Port** | `building(…, port, identity, fill)` | Filled upward triangle + outline (`identity` ignored) | Caller `fill` | Building marker, Planetary canvas |
+| **Inland logistics hub** | `building(…, inland_logistics_hub, identity, fill)` | Filled flat-top hexagon + outline with a small dark hub dot at the centre — a six-sided network-node silhouette (BL-149), distinct from the launchpad/none circle and the port triangle | Caller `fill` | Building marker, Planetary canvas; build-front-door row |
+| **Military base** | `building(…, military_base, identity, fill)` | Filled shield + outline — flat top, shoulders tapering to a bottom point (BL-325 S1); the martial building, **filled** like every building glyph, so it never reads as the port's upward triangle or the hub's hexagon | Caller `fill` | Building marker, Planetary canvas; build-front-door row |
+| **Building (none/other)** | `building(…, none, identity, fill)` | Filled circle (dot) — also the fallback for `launchpad` | Caller `fill` | Fallback building marker |
 | **Resource pip** | `resource(…, res)` | Filled diamond (no outline) | **Derived** — `presentation_of(res).colour` | Resource strips, deposit markers |
 | **Under construction** | `under_construction(…, colour)` | Crane silhouette — a mast, an angled boom, a back-stay brace, and a short hook line, four strokes with the same shadow-then-colour pass as `convoy`; stroke-only (BL-327), echoing the landform family's "not yet installed" convention — a filled glyph would claim the site already IS its type | Caller `colour` (the owner-tinted marker colour) | Building marker, Planetary canvas — drawn IN PLACE OF the type silhouette while `ticks_remaining > 0`; replaced the BL-323 S4 desaturation treatment same-day (dimming read as "faded", not "being built") |
 | **Convoy** | `convoy(…, colour)` | Rightward chevron (→) — two stroke lines meeting at a right point (goods in transit); points *right*, distinct from the filled port triangle (the old upward *unit* chevron was deleted uncalled, BL-294; a unit marker returns with BL-157) | Caller stroke | Supply-lens on-canvas convoy marker — drawn on tiles a player convoy passes through, Planetary canvas |
@@ -138,6 +138,48 @@ Because the terrain palette spans near-white ice to dark forest, and any lens ma
 composite over it, these glyphs take their stroke from `ui::contrast_ink(fill)` — chosen
 by the finished fill's luminance — rather than a fixed colour that would vanish somewhere
 in that range.
+
+### 1c. Named-building identity glyphs (BL-429 slice 2)
+
+`building(…, extraction_site | processing_facility, identity, fill)` takes a fourth
+parameter — `resource_type identity` — that dispatches to a bespoke shape for the
+**named** ancient buildings the Build door now shows (BL-429): an extraction site's
+`identity` is its target resource, a processing facility's is its recipe's
+**primary output** (`primary_output_resource`, `recipe_registry.hpp`). Anything
+`identity` names with no bespoke shape below falls through to the family's generic
+glyph (the extraction ore-chunk / the processing square) — always safe to pass.
+
+**Two or more named buildings that reach the same resource share one glyph, by
+design.** The glyph identifies WHAT a site makes or works, not which specific
+recipe — the same way two Iron Mines on different tiles already share one glyph
+regardless of tile. So the Charcoal Burner and the Peat Kiln (both `-> charcoal`)
+read the same, as do the Potter & Weaver and the Glassworks (both
+`-> trade_goods_misc`), and Smithy/Miller share their glyph with the industrial
+Smelter/Food Processor — it genuinely is the same steel, the same rations.
+
+| Named building(s) | Resource key | Shape |
+|---|---|---|
+| Quarry | `stone` | An irregular five-sided boulder — taller and more asymmetric than the generic ore-chunk crystal |
+| Woodcutter's Camp | `timber` | Two crossed logs with round end-caps — the only X silhouette in the building family |
+| Sand Pit | `sand` | A low, wide dune with three grain dots above the crest |
+| Clay Pit | `clay` | A narrow-necked raw vessel — a plain rim, unlike the tied goods bundle below |
+| Peat Cutting | `peat` | Three stacked, alternately-offset turf bricks |
+| Iron Mine | `iron_ore` | Crossed pick handles with small wedge heads |
+| Copper Mine | `copper_ore` | A pointy-top hexagon nugget — the hub glyph's hexagon rotated 30° with its centre dot removed |
+| Water Extractor | `water` | A teardrop — a pointed cap over a rounded base, the only rounded-and-pointed silhouette |
+| Farm, Fishing Wharf | `agricultural_produce` | Three stalks fanning from a base point, each capped with a grain-head dot. Farm and Fishing Wharf (BL-168) share the glyph — they work the same resource, distinguished by placement, not by what they visibly produce |
+| Charcoal Burner, Peat Kiln | `charcoal` | A squat earthen mound with a smoke vent — the only dome silhouette |
+| Bloomery | `iron_blooms` | A cluster of three rough lumps |
+| Smithy (+ the industrial Smelter) | `steel` | A flat trapezoid ingot bar |
+| Potter & Weaver, Glassworks | `trade_goods_misc` | A cinched sack — round body, tied neck |
+| Miller (+ the industrial Food Processor) | `food_rations` | A rounded, strapped ration pack — two binding lines across a loaf shape |
+
+**Not yet covered by a bespoke shape** (falls through to the generic ore-chunk):
+the remaining `k_extractable` targets outside the ancient roster's names — coal,
+petroleum, silica, rare-earth ore, iron-nickel ore, platinum-group metals,
+regolith — since `extraction_building_name()` (`selection_panel.cpp`) gives them a
+text name without a matching glyph. Extending the shape table to match is a
+natural follow-on, not attempted this pass (NR-239).
 
 ### 2. UI-affordance glyphs — drawn in chrome
 

@@ -67,6 +67,23 @@ struct recipe
     std::string display_name;
 };
 
+/// The primary output resource of a recipe — the argmax of its outputs. Used
+/// to key a processing method's resource pip (construction_panel.cpp) and,
+/// BL-429 slice 2, its Build-door / on-canvas glyph (`ui::icons::building`):
+/// two recipes that reach the same good (Charcoal Burner and the Peat Kiln,
+/// both -> charcoal) share one glyph by design, since the glyph identifies
+/// WHAT a building makes, not which specific recipe. Shared here (not just in
+/// construction_panel.cpp, its original home) so every UI file that draws a
+/// processing building's icon reads the same identity.
+inline resource_type primary_output_resource(const recipe& r)
+{
+    std::size_t best   = 0;
+    float       best_v = -1.0f;
+    for (std::size_t i = 0; i < resource_count; ++i)
+        if (r.outputs[i] > best_v) { best_v = r.outputs[i]; best = i; }
+    return static_cast<resource_type>(best);
+}
+
 /// Per-building-type economic constants, authored in scripts/economy.lua.
 struct building_economics
 {

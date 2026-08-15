@@ -10,7 +10,77 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — BL-429 slice 2: the ancient roster gets names (2026-08-15, latest)
+## Session — BL-429 slice 3: the ancient roster gets glyphs (2026-08-15, latest)
+
+Full mode, direct continuation of slice 2 in the same session — Ben asked to close R5's glyph
+clause next rather than move on to BL-430/BL-431.
+
+**Built.** `icons::building()` gained a fourth parameter, `resource_type identity`: an
+extraction site's target resource, or a processing facility's PRIMARY OUTPUT. The output-lookup
+helper (`primary_output_resource`) moved from a construction_panel.cpp local into
+recipe_registry.hpp as a shared free function, so every UI file draws the same identity from one
+source. 14 new hand-drawn vector glyphs (icons.cpp) cover the 9 extraction + 5 processing
+resource keys the ancient roster reaches — Quarry, Woodcutter's Camp, Sand Pit, Clay Pit, Peat
+Cutting, Iron Mine, Copper Mine, Water Extractor, Farm/Fishing Wharf, plus a charcoal-kiln dome,
+a lump-cluster bloomery, a trapezoid ingot, a cinched goods sack, and a strapped ration pack for
+processing. All four `icons::building()` call sites updated to pass a real identity: the Build
+door, the Buildings-tab identity plate, the on-canvas marker, and the placement ghost preview.
+
+**A design call, not a gap: shared glyphs by resource, not by recipe.** Two or more named
+buildings that reach the same good share one glyph — Charcoal Burner and the Peat Kiln (both
+`-> charcoal`), Potter & Weaver and the Glassworks (both `-> trade_goods_misc`), and the ancient
+Smithy/Miller sharing with the industrial Smelter/Food Processor (it genuinely is the same steel,
+the same rations). Documented in ICONS.md's new § 1c as the deliberate identity model: the glyph
+says WHAT a building makes, not which specific recipe — the same rule that already lets two Iron
+Mines on different tiles share a glyph.
+
+**A real correctness fix found while wiring the canvas marker.** The pre-existing
+under_construction pattern in body_surface_canvas.cpp resolves its representative-building lookup
+only on `k == 0` of the wrap-copy loop (the tile's un-wrapped screen copy) and leaves the flag at
+its default for every other `k`. Mirroring that pattern for the new marker identity would have
+shown the WRONG glyph on every wrap copy of a non-default-resource building — instead, the
+target/recipe lookup was hoisted out of the k-loop entirely, computed once per tile alongside
+`built_type`, so every wrap copy reads the same (correct) identity. under_construction's own
+existing k==0-only quirk was left alone — pre-existing, out of scope, higher risk to touch without
+a build to verify against.
+
+**requirements.json's `ancient-chain-roster` group is now all six rows complete (R1-R6).**
+BL-429's own backlog status stays `designed` rather than flipping to `complete` — see the caveat
+below; `backlog_lint` now carries this as its 7th (of the same pre-existing shape) warning,
+consistent with how the project already tolerates a completed requirement group sitting ahead of
+its item's terminal status.
+
+**The caveat that matters most this entry (NR-240, NR-241).** None of this was compiled or
+rendered. This session ran remote with `codeload.github.com` blocked (SDL3/sol2/ImGui
+FetchContent — an organization policy denial, confirmed via the proxy's own README, not routed
+around). The 14 new vertex lists were hand-checked for angular ordering (each is a simple,
+non-self-intersecting perimeter) but never seen on screen — "silhouette distinct" is reasoned by
+shape family, not verified the way ICONS.md's own "Adding a new glyph" process asks for. NR-241
+is the follow-on: build, open the Build door on an ancient-band tile, the Buildings tab, and a
+built ancient building on the Planetary canvas, and fix proportions on sight before promoting
+BL-429 to `complete`.
+
+### Verification
+
+C++: **not compiled** — see NR-240/NR-241. Brace-balance checked across every touched file
+(`grep -o` count) as the cheapest available syntax sanity pass; every call site's field types and
+recipe/registry accessor usage manually re-traced against their declarations. `backlog_lint`: 0
+fail, 7 warnings (one new, same pre-existing shape as the other six). No visual or headless
+harness run this entry — icons.cpp only links in the GUI target.
+
+### Open for Ben
+
+- NR-241: the 14 new glyphs need an actual look before BL-429 can close.
+- The remaining `k_extractable` targets outside the ancient roster (coal, petroleum, silica,
+  rare-earth ore, iron-nickel ore, platinum-group metals, regolith) still fall through to the
+  generic ore-chunk — named in `extraction_building_name()` but not glyphed. Worth a follow-on,
+  or leave them generic since they're outside this item's ancient-arc scope?
+
+**Runtime:** not tracked this session (same standing gap NR-177's retro already named).
+
+---
+
+## Session — BL-429 slice 2: the ancient roster gets names (2026-08-15)
 
 Full mode, continuing Sprint 17 (economy breadth). Slice 1 landed the ancient production chains
 (BL-428 depth metric, BL-429's five recipes); this session picked up R5/R6, the roster's remaining

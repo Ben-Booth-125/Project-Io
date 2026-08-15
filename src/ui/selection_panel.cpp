@@ -1347,8 +1347,17 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
         {
             constexpr float gr = 9.0f;
             const ImVec2    gp = ImGui::GetCursorScreenPos();
+            // BL-429: extraction rows already carry their target in c.target; a
+            // processing row's c.target is always the placeholder iron_ore set
+            // when the candidate was built above, so the glyph is computed here
+            // from the row's own recipe instead, matching its name (Bloomery,
+            // Smithy, ...) rather than the placeholder.
+            const resource_type icon_identity =
+                (c.type == building_type::processing_facility && c.recipe != no_recipe)
+                    ? primary_output_resource(reg.recipe_at(building_type::processing_facility, c.recipe))
+                    : c.target;
             icons::building(cdl, {gp.x + gr, gp.y + ImGui::GetTextLineHeight() * 0.5f}, gr,
-                            c.type, IM_COL32(150, 235, 160, 255));
+                            c.type, icon_identity, IM_COL32(150, 235, 160, 255));
             ImGui::Dummy({gr * 2.0f, ImGui::GetTextLineHeight()});
             ImGui::SameLine();
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s",

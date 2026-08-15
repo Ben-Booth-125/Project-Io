@@ -12,12 +12,22 @@ namespace ui::icons {
 /// wider than tall), processing = square, port = triangle, none = dot. Filled
 /// in @p fill with a thin dark outline for contrast on any terrain.
 ///
-/// @param dl     Draw list to render into.
-/// @param centre Glyph centre, screen pixels.
-/// @param r      Half-extent (radius) of the glyph, screen pixels.
-/// @param type   Building type to depict.
-/// @param fill   Fill colour.
-void building(ImDrawList* dl, ImVec2 centre, float r, building_type type, ImU32 fill);
+/// BL-429: for `extraction_site` and `processing_facility`, @p identity picks a
+/// NAMED-building glyph over the generic ore-chunk/square — the extraction
+/// site's target resource, or a processing facility's PRIMARY OUTPUT resource
+/// (see `primary_output_resource`, recipe_registry.hpp). A resource with no
+/// bespoke glyph authored falls back to the generic shape, so this is always
+/// safe to pass. Ignored for every other type.
+///
+/// @param dl       Draw list to render into.
+/// @param centre   Glyph centre, screen pixels.
+/// @param r        Half-extent (radius) of the glyph, screen pixels.
+/// @param type     Building type to depict.
+/// @param identity Extraction target / processing primary-output resource;
+///                 ignored for non-extraction, non-processing types.
+/// @param fill     Fill colour.
+void building(ImDrawList* dl, ImVec2 centre, float r, building_type type,
+             resource_type identity, ImU32 fill);
 
 /// Draw a resource pip — a small filled diamond in the resource's identity
 /// colour (see presentation_of). For resource strips and deposit markers.

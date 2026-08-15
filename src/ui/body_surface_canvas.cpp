@@ -1619,6 +1619,26 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         const ImU32  owner_col  = has_owner ? corp_identity(corp_it->second)
                                             : IM_COL32(255, 255, 255, 255);
 
+        // BL-429: the representative building's extraction target / processing
+        // primary output, so the on-canvas marker draws the same named-building
+        // glyph as the Build door and the Buildings tab. Reuses tile_to_bld's
+        // lowest-id-wins representative (BL-367) — resolved once per tile, ahead
+        // of the k-loop below, so every wrap copy shares one identity.
+        resource_type marker_identity = resource_type::iron_ore;
+        if (built)
+        {
+            if (const auto ctb_it = tile_to_bld.find(id); ctb_it != tile_to_bld.end())
+                if (const auto cbld_it = w.buildings.find(ctb_it->second); cbld_it != w.buildings.end())
+                {
+                    const building_component& rep = cbld_it->second;
+                    marker_identity =
+                        (rep.type == building_type::processing_facility
+                         && reg.get_recipe(rep.recipe) != nullptr)
+                            ? primary_output_resource(*reg.get_recipe(rep.recipe))
+                            : rep.target_resource;
+                }
+        }
+
         // Fill starts as the tile's terrain colour — EXCEPT on a built tile, which is
         // swapped out wholesale for its owner plate (2026-07-22): a tile that carries a
         // building renders AS an installation, with no terrain showing through around
@@ -2112,7 +2132,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     if (under_construction)
                         icons::under_construction(dl, {cx, cy}, sil_r, marker_col);
                     else
-                        icons::building(dl, {cx, cy}, sil_r, built_type, marker_col);
+                        icons::building(dl, {cx, cy}, sil_r, built_type, marker_identity, marker_col);
                 }
 
                 // Owner-identity tag (BL-090): a small corp emblem tucked into the
@@ -2567,7 +2587,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             state.max_logistics_reach);
         const ImU32 ghost_col = pr ? palette::positive : palette::negative;
 
-        icons::building(dl, {gx, gy}, mr, state.construction.type, ghost_col);
+        // BL-429: only the extraction target is known here (armed placement mode
+        // carries no recipe field, verify_api.cpp being its one setter today) — a
+        // processing ghost falls through to the generic square, same as before
+        // this item.
+        icons::building(dl, {gx, gy}, mr, state.construction.type, state.construction.target, ghost_col);
 
         // 'Why not here': the rejection reason follows the cursor while build mode
         // is armed, sat just below the ghost with a dark backdrop for contrast.
