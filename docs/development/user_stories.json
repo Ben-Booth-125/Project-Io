@@ -434,6 +434,82 @@
       "friction": "Complements the at-a-glance lens read (US-006): the lens says WHERE broadly, these per-tile graphs say HOW GOOD this exact tile is. Only the prototype-extractable resources (iron ore / petroleum / water / agricultural produce) become buildable extraction; other deposits (stone, timber) show a production bar but no extraction option yet — a legible-but-inert read.",
       "written": "2026-07-11",
       "testing": {"mode": "mixed", "note": "The tile production graphs are golden-backed (tile-selection-layout: scripts/verify/selection_tile_layout.lua, single-deposit + multi-deposit built tile). Whether the Tile-vs-P10 framing actually guides a build decision is a manual UX read (walk it, BL-098)."}
+    },
+    {
+      "id": "US-014",
+      "cluster": "build",
+      "title": "Choose how I produce, not just what",
+      "story": "As the player, I want to see every alternate way a building of mine can make its output — inputs, wage, rate, switch cost — side by side, so that I can pick the method that fits my supply chain instead of guessing from a bare name.",
+      "coverage": "served",
+      "glyph": "●",
+      "traces": {
+        "pillars": ["Trade"],
+        "systems": ["Resources", "Infrastructure"],
+        "surfaces": [
+          { "doc": "docs/ui/SELECTION.md", "surface": "Building element — Production method selector (BL-431)" }
+        ],
+        "backlog": ["BL-431", "BL-430"],
+        "requirements": ["production-method-chain-ui"]
+      },
+      "walkthrough": [
+        "Single-click a player-owned processing_facility with more than one era-allowed recipe -> the Facts column shows Method: <active recipe> with a Compare toggle.",
+        "Pressing Compare lists every alternate recipe: its primary-output pip, input basket, the building type's wage/rate, and a Switch button for every recipe but the active one.",
+        "Switch cost or an active cooldown is named inline rather than the press silently doing nothing.",
+        "Switch calls the same try_switch_recipe seam the AI's margin-chase and the management panel dropdown use, so a refusal leaves the building untouched."
+      ],
+      "friction": "The method selector duplicates the mechanism construction_panel.cpp's management dropdown already has (same try_switch_recipe call); the two surfaces answer different questions (this one is 'compare before switching', that one is 'switch, already decided') and are expected to coexist rather than merge.",
+      "written": "2026-08-15",
+      "testing": {"mode": "manual", "note": "No headless/visual check yet — a build-time deferral logged in NEEDS_REVIEW.json. Compiles clean under the GUI target; live-app visual read owed."}
+    },
+    {
+      "id": "US-015",
+      "cluster": "build",
+      "title": "See what a good needs before I chase it",
+      "story": "As the player, I want to trace any good I can see back through its recipe chain to raws, so that I know what to build before I discover the gap the hard way.",
+      "coverage": "served",
+      "glyph": "●",
+      "traces": {
+        "pillars": ["Trade"],
+        "systems": ["Resources"],
+        "surfaces": [
+          { "doc": "docs/ui/SELECTION.md", "surface": "Building element — Chain trace (BL-431)" }
+        ],
+        "backlog": ["BL-431", "BL-428", "BL-429"],
+        "requirements": ["production-method-chain-ui"]
+      },
+      "walkthrough": [
+        "Single-click a player-owned building -> the Facts column shows a Chain toggle rooted at that building's own output (extraction target, or the active recipe's primary output).",
+        "Pressing it walks recipe_registry's own recipe list recursively — the same data BL-428's depth_of reads — down to raws, indenting each input under the recipe that consumes it.",
+        "At each non-raw good the trace follows the era-allowed recipe with the shallowest deepest-input, matching the registry's own min-across-recipes rule, so it can never disagree with the simulation."
+      ],
+      "friction": "Only rooted at a selected building's own output for this slice — reaching the trace from a market row or a bare resource pip elsewhere in the UI is a natural follow-on, not built here.",
+      "written": "2026-08-15",
+      "testing": {"mode": "manual", "note": "No headless/visual check yet — a build-time deferral logged in NEEDS_REVIEW.json. Compiles clean under the GUI target; live-app visual read owed."}
+    },
+    {
+      "id": "US-016",
+      "cluster": "operate",
+      "title": "Know how far my economy has actually reached",
+      "story": "As the player, I want to see my corporation's reached chain depth against the graph's ceiling, and what the next depth needs, so that chain depth reads as a growth target rather than an invisible gate.",
+      "coverage": "served",
+      "glyph": "●",
+      "traces": {
+        "pillars": ["Trade"],
+        "systems": ["Resources"],
+        "surfaces": [
+          { "doc": "docs/ui/SELECTION.md", "surface": "Building element — Depth readout (BL-431)" }
+        ],
+        "backlog": ["BL-431", "BL-428"],
+        "requirements": ["production-method-chain-ui"]
+      },
+      "walkthrough": [
+        "Single-click a player-owned building -> the Facts column shows Depth reached: <N> / <ceiling>, read from the corp's own completed extraction sites and processing facilities, against recipe_registry::max_depth().",
+        "Pressing 'What's next?' lists every good sitting exactly one depth past the corp's reached depth.",
+        "For each, the goods its recipe still needs that the corp has not reached are called out, so the gap is a shopping list rather than a mystery."
+      ],
+      "friction": "Reads the CORP's aggregate reached depth, not a per-building figure — a corp with one deep outlier building and many shallow ones reads as 'reached' at the outlier's depth, which is the intended growth-spine reading (Ben, BL-428 design note) but is worth watching if it proves misleading in play.",
+      "written": "2026-08-15",
+      "testing": {"mode": "manual", "note": "No headless/visual check yet — a build-time deferral logged in NEEDS_REVIEW.json. Compiles clean under the GUI target; live-app visual read owed."}
     }
   ]
 }

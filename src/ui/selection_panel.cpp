@@ -20,7 +20,9 @@
 #include "world/placement_rules.hpp" // buildable-type validity + stack capacity
 #include "world/recipe_registry.hpp" // recipe/economics lookups for the building element
 #include "world/survey_system.hpp"
-#include "world/unit_roster.hpp" // campaign hire gate + roster table (BL-324)
+#include "world/unit_roster.hpp" // campaign hire gate + roster table (BL-324); also the Soldier card's Roster page name lookup
+
+#include <map> // BL-434: group -> representative-candidate lookup in draw_construction_ledger
 
 #include <imgui.h>
 
@@ -29,6 +31,7 @@
 #include <cmath>     // std::ceil (construction ETA), std::pow/log10/floor (nice_ceil axis)
 #include <cstddef>   // std::ptrdiff_t (nth_element iterator offset)
 #include <cstdio>    // std::snprintf (tile coord caption + chart labels)
+#include <cfloat>    // FLT_MAX (net-profit PlotLines auto-scale)
 #include <cstring>   // std::strcmp (header title/kind de-dup)
 #include <string>    // ticks_label / construction_status
 #include <vector>    // top-decile production sample (top_decile_production)
@@ -137,6 +140,112 @@ void draw_production_chart(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
         { pct_val,  pct_col,  ref_label, false },
     };
     ui::charts::draw_bars(dl, mn, mx, bars, 2, ceiling, "%.1f", 34.0f);
+}
+
+// Builds the "Input cost" segment's tooltip suffix: the recipe's non-zero
+// input resources, NAMES ONLY (2026-08-15, folding the former standalone
+// Inputs chart into the Expenses bar's hover — Ben's call was names, not
+// quantities, since the segment already shows the aggregate credit figure).
+// Shared by draw_revenue_expense_bars below; @p ri may be null (extraction
+// sites have no recipe), in which case the tooltip is just the plain cost.
+std::string input_basket_names(const recipe* ri)
+{
+    if (ri == nullptr)
+        return {};
+    std::string names;
+    for (std::size_t in = 0; in < resource_count; ++in)
+    {
+        if (ri->inputs[in] <= 0.0f)
+            continue;
+        if (!names.empty())
+            names += ", ";
+        names += resource_name(static_cast<resource_type>(in));
+    }
+    return names;
+}
+
+// Revenue vs a labelled, SEGMENTED Expenses bar (NR-248 playtest note, 2026-08-15
+// reflow): input_cost / maintenance / wages stacked in one column, each segment
+// its own shade and its own hover tooltip. This is the finest real split
+// building_profit.hpp supports (no revenue sub-breakdown exists to chart
+// separately, logged docs/development/NEEDS_REVIEW.json). Two clustered
+// columns sharing a baseline, drawn by hand (not ui::charts::draw_bars) since
+// draw_bars has no notion of a stacked/segmented column.
+//
+// @p input_recipe: the building's active recipe (null for extraction sites) —
+// folded in from the former standalone Inputs chart (2026-08-15): the "Input
+// cost" segment's tooltip now also lists the basket's resource NAMES, so that
+// chart's content survives without its own vertical-space budget.
+void draw_revenue_expense_bars(ImDrawList* dl, ImVec2 mn, ImVec2 mx, const building_profit& p,
+                               const recipe* input_recipe)
+{
+    const float expenses = p.input_cost + p.maintenance + p.wages;
+    const float ceiling  = nice_ceil(std::max(p.revenue, expenses) > 0.0f
+                                     ? std::max(p.revenue, expenses) : 1.0f);
+    const float box_w = mx.x - mn.x;
+    const float box_h = mx.y - mn.y;
+    const float gap   = box_w / 2.0f;
+    const float bw    = std::min(44.0f, gap * 0.6f);
+
+    dl->AddRect(mn, mx, IM_COL32(70, 70, 78, 255));
+
+    // Revenue — one plain bar.
+    {
+        const float  cx = mn.x + gap * 0.5f;
+        const float  bh = std::max(2.0f, box_h * (p.revenue / ceiling));
+        const ImVec2 b0{cx - bw * 0.5f, mx.y - bh};
+        const ImVec2 b1{cx + bw * 0.5f, mx.y};
+        dl->AddRectFilled(b0, b1, palette::positive, 1.5f);
+        ImGui::SetCursorScreenPos(b0);
+        ImGui::InvisibleButton("##rev_bar", {bw, bh});
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Revenue: %.1f", static_cast<double>(p.revenue));
+    }
+
+    // Expenses — stacked segments, bottom-up: input cost, maintenance, wages.
+    {
+        const float cx = mn.x + gap * 1.5f;
+        struct seg { float v; ImU32 col; const char* label; };
+        const seg segs[3] = {
+            { p.input_cost,  IM_COL32(205, 120, 95, 255),  "Input cost"  },
+            { p.maintenance, IM_COL32(200, 170, 95, 255),  "Maintenance" },
+            { p.wages,       IM_COL32(160, 115, 200, 255), "Wages"       },
+        };
+        float y = mx.y;
+        for (int i = 0; i < 3; ++i)
+        {
+            if (segs[i].v <= 0.0f)
+                continue;
+            const float  bh = std::max(1.0f, box_h * (segs[i].v / ceiling));
+            const ImVec2 b0{cx - bw * 0.5f, y - bh};
+            const ImVec2 b1{cx + bw * 0.5f, y};
+            dl->AddRectFilled(b0, b1, segs[i].col);
+            char btn_id[24];
+            std::snprintf(btn_id, sizeof btn_id, "##exp_seg_%d", i);
+            ImGui::SetCursorScreenPos(b0);
+            ImGui::InvisibleButton(btn_id, {bw, bh});
+            if (ImGui::IsItemHovered())
+            {
+                // The input-cost segment ALSO names the recipe's input basket
+                // (names only, no quantities — Ben's call) — the former
+                // standalone Inputs chart's content, folded into this hover.
+                if (i == 0 && input_recipe != nullptr)
+                {
+                    const std::string names = input_basket_names(input_recipe);
+                    if (!names.empty())
+                    {
+                        ImGui::SetTooltip("%s: %.1f\nInputs: %s", segs[i].label,
+                                          static_cast<double>(segs[i].v), names.c_str());
+                    }
+                    else
+                        ImGui::SetTooltip("%s: %.1f", segs[i].label, static_cast<double>(segs[i].v));
+                }
+                else
+                    ImGui::SetTooltip("%s: %.1f", segs[i].label, static_cast<double>(segs[i].v));
+            }
+            y -= bh;
+        }
+    }
 }
 
 // --- Analog construction status (BL-095 task E) ------------------------------
@@ -422,16 +531,15 @@ void draw_tile_metric_chart(ImDrawList* dl, ImVec2 mn, ImVec2 mx, const tile_met
                           tile_col, ref_col, m.ref_label);
 }
 
-// Per-building profitability readout (BL-074): the selected player building's
-// estimated net per-tick contribution and its component lines. Realised last-tick
-// figures; revenue/inputs are estimates (the pooled market resists exact per-building
-// attribution — see building_profit.hpp).
+// Per-building profitability readout (BL-074, chart-based since the 2026-08-15
+// playtest rework): the selected player building's estimated per-tick economics,
+// now charted rather than printed as text — Ben's call was "the charts should
+// speak for themselves", so the former "Profitability (est. / qtr)" title line
+// is gone. Realised last-tick figures; revenue/inputs are estimates (the pooled
+// market resists exact per-building attribution — see building_profit.hpp).
 void draw_building_profit(const world& w, const recipe_registry& reg,
                           const economy_report& report, entity_id id)
 {
-    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
-                       "Profitability (est. / qtr)");
-
     const building_profit p = estimate_building_profit(w, reg, report, id);
     if (!p.has_data)
     {
@@ -439,29 +547,70 @@ void draw_building_profit(const world& w, const recipe_registry& reg,
         return;
     }
 
-    // Paired two-column layout — four component cells over two rows, then Net —
-    // so revenue/inputs/wages/maintenance + net all fit the fixed bar height.
-    const float v1 = 68.0f, l2 = 150.0f, v2 = 210.0f;
-    const auto val = [](float value, ImU32 col)
-    { ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(col), "%+.2f", value); };
-    const auto pair = [&](const char* la, float va, ImU32 ca,
-                          const char* lb, float vb, ImU32 cb)
+    ImDrawList* dl      = ImGui::GetWindowDrawList();
+    const ImGuiStyle& style = ImGui::GetStyle();
+    const float box_w   = ImGui::GetContentRegionAvail().x;
+
+    // The recipe whose input basket the Expenses bar's "Input cost" segment
+    // names on hover (extraction_site has no recipe, so this stays null there).
+    const recipe* input_recipe = nullptr;
+    if (const auto bit = w.buildings.find(id);
+        bit != w.buildings.end() && bit->second.type == building_type::processing_facility)
+        input_recipe = reg.get_recipe(bit->second.recipe);
+
+    // Vertical budget (2026-08-15 playtest reflow — "everything on one screen,
+    // no scrollbar"; the standalone Inputs strip folded into the Expenses
+    // hover the same session, freeing its budget back to the bars+line row).
+    // GetContentRegionAvail().y here IS the accordion page body's remaining
+    // height (draw_building_selection_body's ##building_page_body child), so
+    // this is the real budget — but budgeting the FULL amount left the page's
+    // own content occasionally a few px taller than its scroll-child (font
+    // metrics/padding rounding), which was enough to pop a scrollbar back in
+    // for content that otherwise fit. Budgeting 90% of it leaves deliberate
+    // slack so that never happens (Ben's playtest call: no scrollbar, ever).
+    const float total_h  = ImGui::GetContentRegionAvail().y * 0.90f;
+    const float label_h  = ImGui::GetTextLineHeightWithSpacing();
+    const float chart_h  = std::max(40.0f, total_h - label_h);
+
+    // Top row: Revenue/Expenses bars take the LEFT THIRD, the 6-month net-profit
+    // line takes the RIGHT TWO-THIRDS — side by side, not stacked (Ben's
+    // playtest call: the vertical stack needed scrolling to see it all).
+    const float left_w  = box_w / 3.0f - style.ItemSpacing.x * 0.5f;
+    const float right_w = box_w - left_w - style.ItemSpacing.x;
+
     {
-        ImGui::TextUnformatted(la);      ImGui::SameLine(v1); val(va, ca);
-        ImGui::SameLine(l2);
-        ImGui::TextUnformatted(lb);      ImGui::SameLine(v2); val(vb, cb);
-    };
+        ImGui::BeginGroup();
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Revenue / Expenses");
+        const ImVec2 mn = ImGui::GetCursorScreenPos();
+        const ImVec2 mx = {mn.x + left_w, mn.y + chart_h};
+        draw_revenue_expense_bars(dl, mn, mx, p, input_recipe);
+        ImGui::Dummy({left_w, chart_h});
+        ImGui::EndGroup();
+    }
+    ImGui::SameLine();
+    {
+        ImGui::BeginGroup();
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Net, 6 mo.");
 
-    pair("Revenue", +p.revenue,    palette::positive,
-         "Inputs",  -p.input_cost, palette::negative);
-    pair("Wages",   -p.wages,      palette::negative,
-         "Maint",   -p.maintenance,palette::negative);
-
-    const float net = p.net();
-    const ImU32 nc = (net < 0.0f) ? palette::negative
-                   : (net > 0.0f) ? palette::positive
-                                  : palette::neutral;
-    ImGui::TextUnformatted("Net");   ImGui::SameLine(v1); val(net, nc);
+        // No per-building profit HISTORY is tracked (the pooled market
+        // attribution problem means nothing to reconstruct a past series
+        // from), so — same honest-placeholder idiom
+        // draw_building_workforce_page's trend graph already used before
+        // this rework — a smooth deterministic series anchored to the live
+        // net estimate. 6 points for "6 months" (a Tick is ~3 months, so 6
+        // points read as the last two Ticks' worth stretched to the span).
+        constexpr int N = 6;
+        float         series[N];
+        const float   net = p.net();
+        for (int i = 0; i < N; ++i)
+        {
+            const float t   = static_cast<float>(i) / (N - 1);
+            const float dip = -0.15f * std::fabs(net) * std::sin(t * 3.14159265f * 1.4f);
+            series[i]       = net + dip;
+        }
+        ImGui::PlotLines("##net_profit", series, N, 0, nullptr, FLT_MAX, FLT_MAX, {right_w, chart_h});
+        ImGui::EndGroup();
+    }
 }
 
 namespace {
@@ -537,39 +686,14 @@ void draw_selection_action(const world& w, const recipe_registry& reg,
             break;
         }
 
-        case selection_kind::building:
-            if (is_player_owned(w, sel))
-            {
-                // Under construction (BL-095 task E): lead with the live analog build
-                // status — rate / ETA / paused — so a freshly-placed building reads as
-                // "still building" rather than an empty card.
-                if (const auto bit = w.buildings.find(sel);
-                    bit != w.buildings.end() && bit->second.ticks_remaining > 0)
-                {
-                    const building_component& b = bit->second;
-                    const float rate = construction_rate(w, reg, b.type, b.tile);
-                    ImGui::TextColored(construction_status_colour(rate), "%s",
-                        construction_status(rate, b.ticks_remaining).c_str());
-                }
-                // Manage is a deliberate step now, not the selection itself
-                // (2026-08-08: selecting a building must land on the Selection
-                // view first). The button opens the management ledger's
-                // Buildings tab, which already keys off selected_entity.
-                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Operate");
-                if (ImGui::Button("Manage"))
-                {
-                    ui.show_construction_panel  = true;
-                    ui.construction.panel_view  = 1; // the Buildings tab
-                }
-            }
-            else
-            {
-                ImGui::TextDisabled("Competitor building - intel only.");
-            }
-            break;
+        // selection_kind::building no longer routes here (this rework) — it takes
+        // the dedicated 3-column band (draw_building_selection_body), same as tile.
+
+        // selection_kind::unit no longer routes here (this rework) — it takes
+        // the dedicated 3-column band (draw_unit_selection_body), same shape
+        // as the building/tile cards.
 
         case selection_kind::market:
-        case selection_kind::unit:
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Locate");
             if (ImGui::Button("Go to"))
                 focus_on_entity(w, ui, sel);
@@ -585,10 +709,200 @@ void draw_selection_action(const world& w, const recipe_registry& reg,
     }
 }
 
+// --- BL-431: production method selector -------------------------------------
+//
+// Chain trace and Depth readout are gone (2026-08-15 playtest rework): Chain's
+// input-basket content folded into the Profitability page as a chart
+// (draw_input_basket_chart above); Depth was cut outright. Method remains the
+// one accordion page from the original BL-431 toggle trio.
+
+// "Which way should this building make its output?" — every era-allowed
+// recipe for this building side by side with its input basket, so the BL-430
+// switch trade-off is legible BEFORE committing, the way the Build door shows
+// a credit total before placing. Calls try_switch_recipe (economy_system.hpp)
+// exactly as construction_panel.cpp's management dropdown already does —
+// never assigns b.recipe / b.active_recipe_index directly, so a refused switch
+// (cooldown / funds) leaves the building's state untouched.
+//
+// Formerly a hide/reveal toggle (BL-431); now one PAGE of the building card's
+// accordion (this rework), so the whole comparison list renders unconditionally
+// while the page is showing — there is nothing left inside it to fold.
+//
+// One narrow column (2026-08-15 second playtest pass — supersedes this same
+// session's earlier 2-column square-tile grid): each method is a compact row
+// ~1.5 button-heights tall (name + expected profit on one line, a smaller
+// glyph Switch control at the row's right edge) rather than a big square
+// tile. "Same amount of scroll but much more legible" — Ben's call was a
+// slimmer strip, not a denser fit.
+//
+// Cross-group retraction (BL-434 follow-up, same session): the candidate
+// list is now filtered to the ACTIVE recipe's own `group` — a cross-group
+// recipe is refused outright by try_switch_recipe (economy_system.cpp) as of
+// this same pass, so it must never be offered as a choice here either.
+//
+// tile_icon_button / glyph_swap are defined further down this same anonymous
+// namespace (beside the rest of the action-grid glyph vocabulary); forward
+// declared here rather than reordering the whole file.
+bool tile_icon_button(const char* id, ImVec2 sz, bool enabled, const char* tip,
+                      void (*glyph)(ImDrawList*, ImVec2, float, ImU32), ImU32 glyph_col_override = 0);
+void glyph_swap(ImDrawList* dl, ImVec2 c, float r, ImU32 col);
+
+void draw_production_method_section(world& w, const recipe_registry& reg, entity_id id)
+{
+    const auto bit = w.buildings.find(id);
+    if (bit == w.buildings.end())
+        return;
+    building_component& b = bit->second;
+    if (b.type != building_type::processing_facility)
+        return;
+
+    const recipe* cur = reg.get_recipe(b.recipe);
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Method");
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s", cur ? cur->display_name.c_str() : "-");
+
+    // Retooling progress bar (Ben's playtest note: a switch that's on cooldown
+    // read as simply "not possible", with the ticks-remaining count buried in a
+    // hover-only tooltip on the disabled Switch glyph). Visible whenever a
+    // cooldown is running, independent of the candidate list below it, since
+    // it's informative even with only one same-group method on screen.
+    const int cooldown_total = std::max(1, static_cast<int>(reg.recipe_switch().cooldown_ticks));
+    if (b.recipe_switch_cooldown > 0)
+    {
+        const float frac = 1.0f - static_cast<float>(b.recipe_switch_cooldown) /
+                                   static_cast<float>(cooldown_total);
+        char overlay[48];
+        std::snprintf(overlay, sizeof overlay, "Retooling - %d tick%s left",
+                      b.recipe_switch_cooldown, b.recipe_switch_cooldown == 1 ? "" : "s");
+        ImGui::ProgressBar(frac, {ImGui::GetContentRegionAvail().x, 0.0f}, overlay);
+    }
+
+    // Same-group filter (BL-434 cross-group retraction, this session): a
+    // cross-group recipe is no longer a legal switch target at all, so it
+    // must never even be OFFERED as a choice. `cur == nullptr` (no resolvable
+    // group, e.g. mid-construction) falls back to every era-allowed recipe —
+    // the same no-group fallback try_switch_recipe itself uses.
+    const int total_n = reg.recipe_count(b.type);
+    std::vector<int> candidates;
+    candidates.reserve(static_cast<std::size_t>(total_n));
+    for (int i = 0; i < total_n; ++i)
+    {
+        const recipe& ri = reg.recipe_at(b.type, i);
+        if (cur == nullptr || ri.group == cur->group)
+            candidates.push_back(i);
+    }
+
+    if (candidates.size() <= 1)
+    {
+        ImGui::TextDisabled("Only one method available.");
+        return;
+    }
+
+    // One narrow column, each row ~1.5 button-heights tall (see the function
+    // doc comment above for the rationale).
+    ImDrawList* dl      = ImGui::GetWindowDrawList();
+    const float row_w   = std::min(ImGui::GetContentRegionAvail().x * 0.62f, 280.0f);
+    const float row_h   = ImGui::GetFrameHeight() * 1.5f;
+    const float glyph_w = row_h; // the Switch control's own square, right edge of the row
+
+    for (int idx : candidates)
+    {
+        const recipe& ri     = reg.recipe_at(b.type, idx);
+        const bool    active = (cur != nullptr && ri.name == cur->name);
+        ImGui::PushID(idx);
+
+        const ImVec2 p0 = ImGui::GetCursorScreenPos();
+        const ImVec2 p1 = {p0.x + row_w, p0.y + row_h};
+        dl->AddRectFilled(p0, p1, IM_COL32(20, 22, 28, 255), 3.0f);
+        dl->AddRect(p0, p1, active ? palette::selection : IM_COL32(70, 70, 78, 255), 3.0f, 0,
+                   active ? 2.0f : 1.0f);
+
+        ImGui::BeginChild("##method_row", {row_w, row_h}, false, ImGuiWindowFlags_NoScrollbar);
+
+        // Pip + name, vertically centred, left-aligned.
+        const float  pipr = row_h * 0.24f;
+        ImGui::SetCursorPos({6.0f, row_h * 0.5f - pipr});
+        const ImVec2 gp = ImGui::GetCursorScreenPos();
+        icons::resource(dl, {gp.x + pipr, gp.y + pipr}, pipr, primary_output_resource(ri));
+
+        // Name — kept at the prior rework's larger scale (1.15x) since a
+        // single line at this row height still fits comfortably; a taller
+        // scale would clip.
+        constexpr float name_scale = 1.15f;
+        ImGui::SetWindowFontScale(name_scale);
+        ImGui::SetCursorPos({6.0f + pipr * 2.0f + 6.0f, (row_h - ImGui::GetFontSize()) * 0.5f});
+        ImGui::TextColored(active ? ImGui::ColorConvertU32ToFloat4(palette::selection)
+                                   : ImGui::GetStyle().Colors[ImGuiCol_Text],
+                           "%s", ri.display_name.c_str());
+        ImGui::SetWindowFontScale(1.0f);
+
+        // Expected profit — same estimator the construction ledger ranks
+        // candidates with (estimate_prospective_profit), so a switch's payoff
+        // reads the same way a fresh build's does. `&b` prices it at the
+        // building's REAL staffing (not the hypothetical 0.5/100 default) and
+        // excludes it from double-counting its own extraction-site stack rank.
+        // Right-aligned, ending just before the Switch glyph's own column.
+        const float profit_col_w = row_w - glyph_w - 6.0f;
+        const building_profit fp = estimate_prospective_profit(
+            w, reg, b.tile, b.type, b.target_resource, reg.recipe_id(ri.name), &b);
+        if (fp.has_data)
+        {
+            const float net = fp.net();
+            const ImU32 nc  = (net < 0.0f) ? palette::negative
+                            : (net > 0.0f) ? palette::positive
+                                           : palette::neutral;
+            char buf[32];
+            std::snprintf(buf, sizeof buf, "%+.1f/tick", static_cast<double>(net));
+            constexpr float profit_scale = 1.1f;
+            ImGui::SetWindowFontScale(profit_scale);
+            const float tw = ImGui::CalcTextSize(buf).x;
+            ImGui::SetCursorPos({profit_col_w - tw, (row_h - ImGui::GetFontSize()) * 0.5f});
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(nc), "%s", buf);
+            ImGui::SetWindowFontScale(1.0f);
+        }
+        else
+        {
+            const float tw = ImGui::CalcTextSize("no market").x;
+            ImGui::SetCursorPos({profit_col_w - tw, (row_h - ImGui::GetFontSize()) * 0.5f});
+            ImGui::TextDisabled("no market");
+        }
+
+        // The input/wage/rate detail line is gone (2026-08-15 playtest
+        // rework): now implied by the Profitability page's Expenses hover
+        // instead — a row shows just name + profit + the Switch control.
+
+        if (!active)
+        {
+            const bool  on_cooldown = b.recipe_switch_cooldown > 0;
+            char tip[96];
+            if (on_cooldown)
+                std::snprintf(tip, sizeof tip, "Locked %d more tick%s", b.recipe_switch_cooldown,
+                             b.recipe_switch_cooldown == 1 ? "" : "s");
+            else if (reg.recipe_switch().switch_cost > 0.0f)
+                std::snprintf(tip, sizeof tip, "Switch to this method - %.0f cr",
+                             static_cast<double>(reg.recipe_switch().switch_cost));
+            else
+                std::snprintf(tip, sizeof tip, "Switch to this method");
+
+            // Selection tone, a shade darker than palette::hover's accent blue —
+            // Ben's playtest call: the Switch glyph should read as an interactive
+            // accent, not the same neutral grey every other glyph button uses.
+            constexpr ImU32 switch_glyph_col = IM_COL32(90, 150, 210, 255);
+            ImGui::SetCursorPos({row_w - glyph_w, 0.0f});
+            if (tile_icon_button("##switch", {glyph_w, row_h}, !on_cooldown, tip, glyph_swap,
+                                 switch_glyph_col))
+                try_switch_recipe(w, reg, w.player_entity, b, reg.recipe_id(ri.name));
+        }
+
+        ImGui::EndChild();
+        ImGui::PopID();
+    }
+}
+
 // The facts: only what informs the action (BL-093) — slim and muted. Everything
 // encyclopedic (orbit, composition, deposits, prices) lives in the ledgers, one
 // 'go to' away.
-void draw_selection_facts(const world& w, const recipe_registry& reg,
+void draw_selection_facts(world& w, const recipe_registry& reg,
                           const economy_report& report, ui_state& ui, selection_kind kind)
 {
     const entity_id sel = ui.selected_entity;
@@ -598,29 +912,19 @@ void draw_selection_facts(const world& w, const recipe_registry& reg,
         case selection_kind::body:
             draw_activity_section(w, sel);          // BL-089: commercial pulse
             break;
-        case selection_kind::building:
-            if (is_player_owned(w, sel))
-                draw_building_profit(w, reg, report, sel);   // BL-074: is it profitable?
-            else
-                draw_rival_building_summary(w, sel);         // owner + private rows
-            break;
+        // selection_kind::building no longer routes here — see
+        // draw_building_selection_body.
         default:
             break;
     }
 }
 
-// The redesigned tile Selection element (BL-123, Ben's mockup): a vertical stack
-// rather than the action|facts split — a placeholder image + [x, y] caption, the
-// tile's deposits as world-max-relative bar charts, and a 2x2 action button grid.
-// Tile-only for now; the other kinds keep the action|facts form (draw_selection_
-// action / facts) until they get their own mockups. Construct Buildings stubs onto
-// the existing Construction panel (the dedicated tile-construction panel is owed);
-// History and Supply are drawn but not yet wired.
-// --- Tile-card action-strip glyphs -------------------------------------------
-// Compact glyphs for the right-hand icon strip (Ben's 2026-07-23 layout). Drawn
-// centred at @p c within radius @p r, matching the (dl, centre, r, colour) contract
-// the ui::icons vocabulary uses. Construct/Manage/History are drawn here; Supply
-// reuses ui::icons::supply. Kept local for now; promote to ui::icons if they stick.
+// --- Action-strip glyphs (tile card + building card) -------------------------
+// Compact glyphs for the right-hand icon grids (Ben's 2026-07-23 layout, and
+// this rework's building-card grid). Drawn centred at @p c within radius @p r,
+// matching the (dl, centre, r, colour) contract the ui::icons vocabulary uses.
+// Construct/Manage/History are drawn here; Supply reuses ui::icons::supply.
+// Kept local for now; promote to ui::icons if they stick.
 constexpr float kTwoPiLocal = 6.2831853f;
 
 void glyph_hammer(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
@@ -649,14 +953,704 @@ void glyph_clock(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
     dl->AddLine(c, {c.x + r * 0.42f, c.y + r * 0.08f}, col, 2.0f);
 }
 
+// A generic humanoid placeholder — the Soldier card's left-column image. No
+// unit-type-keyed glyph vocabulary exists yet (unlike buildings' ui::icons::
+// building), so this is deliberately honest scaffolding: a filled circle
+// "head" over a triangle "body", in the same simple-primitive idiom as
+// glyph_hammer/glyph_gear above rather than a second icon system.
+void glyph_soldier(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
+{
+    dl->AddCircleFilled({c.x, c.y - r * 0.42f}, r * 0.26f, col, 14);
+    const ImVec2 top{c.x, c.y - r * 0.05f};
+    const ImVec2 bl{c.x - r * 0.48f, c.y + r * 0.72f};
+    const ImVec2 br{c.x + r * 0.48f, c.y + r * 0.72f};
+    dl->AddTriangleFilled(top, bl, br, col);
+}
+
+// A simple right-pointing chevron — the unit card's "Go to" action glyph
+// (matches the header's own ">" go-to button in shape, not just meaning).
+void glyph_goto(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
+{
+    dl->AddLine({c.x - r * 0.35f, c.y - r * 0.55f}, {c.x + r * 0.35f, c.y}, col, 2.4f);
+    dl->AddLine({c.x + r * 0.35f, c.y}, {c.x - r * 0.35f, c.y + r * 0.55f}, col, 2.4f);
+}
+
 // A faint dot — the neutral "nothing assigned yet" glyph for a reserved slot
-// in the 3x2 action grid (BL-213 follow-up, 2026-07-28: the grid grew from 4
-// actions to 6 slots; two have no action yet).
+// in an action grid (BL-213 follow-up, 2026-07-28; reused unchanged by this
+// rework's building-card grid).
 void glyph_reserved(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
 {
     dl->AddCircle(c, r * 0.30f, col, 12, 1.5f);
 }
 
+// Two opposed arrows — the Method page's big Switch glyph (2026-08-15
+// playtest rework), replacing the former small text "Switch" button. Sized to
+// be the tile's dominant visual element via tile_icon_button's own sizing.
+void glyph_swap(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
+{
+    const float y1 = c.y - r * 0.32f;
+    dl->AddLine({c.x - r * 0.6f, y1}, {c.x + r * 0.55f, y1}, col, 2.4f);
+    dl->AddLine({c.x + r * 0.55f, y1}, {c.x + r * 0.2f, y1 - r * 0.3f}, col, 2.4f);
+    dl->AddLine({c.x + r * 0.55f, y1}, {c.x + r * 0.2f, y1 + r * 0.3f}, col, 2.4f);
+
+    const float y2 = c.y + r * 0.32f;
+    dl->AddLine({c.x + r * 0.6f, y2}, {c.x - r * 0.55f, y2}, col, 2.4f);
+    dl->AddLine({c.x - r * 0.55f, y2}, {c.x - r * 0.2f, y2 - r * 0.3f}, col, 2.4f);
+    dl->AddLine({c.x - r * 0.55f, y2}, {c.x - r * 0.2f, y2 + r * 0.3f}, col, 2.4f);
+}
+
+// A box with a line through it — the building card's Mothball toggle glyph
+// (2026-08-15; the Lifecycle page's Close/Reopen moved onto the action grid
+// under this name). Deliberately not glyph_reserved's dot: Mothball is a real
+// action, not a placeholder.
+void glyph_mothball(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
+{
+    dl->AddRect({c.x - r * 0.6f, c.y - r * 0.45f}, {c.x + r * 0.6f, c.y + r * 0.45f}, col, 1.5f, 0, 2.0f);
+    dl->AddLine({c.x - r * 0.75f, c.y}, {c.x + r * 0.75f, c.y}, col, 2.2f);
+}
+
+// The mothballed-state counterpart to glyph_mothball above (2026-08-15,
+// distinct glyph for the toggle's two states — a closed box read as "reopen"
+// too easily). Same box, but its lid is lifted open (top edge raised and
+// tilted) and the line-through is gone — an open crate rather than a
+// closed/lined-out one, same honest-primitive idiom as the box's own shape.
+void glyph_reopen(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
+{
+    // Box body (bottom three sides only — the open top is implied by the lid).
+    dl->AddLine({c.x - r * 0.6f, c.y - r * 0.15f}, {c.x - r * 0.6f, c.y + r * 0.45f}, col, 2.0f);
+    dl->AddLine({c.x + r * 0.6f, c.y - r * 0.15f}, {c.x + r * 0.6f, c.y + r * 0.45f}, col, 2.0f);
+    dl->AddLine({c.x - r * 0.6f, c.y + r * 0.45f}, {c.x + r * 0.6f, c.y + r * 0.45f}, col, 2.0f);
+    // Lifted lid, hinged at the box's back (left) corner and tilted open.
+    dl->AddLine({c.x - r * 0.6f, c.y - r * 0.15f}, {c.x + r * 0.75f, c.y - r * 0.6f}, col, 2.2f);
+}
+
+// A circular refresh arrow — the building card's Auto (workforce autosolve)
+// toggle glyph (2026-08-15; relocated here from the Workforce page's old
+// text button). An open ring with one arrowhead reads as "recompute me each
+// tick" at a glance, matching the honest-primitive idiom of the other
+// action-grid glyphs (no second icon system for one button).
+void glyph_auto(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
+{
+    constexpr float start = -0.65f * kTwoPiLocal;
+    constexpr float end   = 0.15f * kTwoPiLocal;
+    dl->PathArcTo(c, r * 0.55f, start, end, 16);
+    dl->PathStroke(col, 0, 2.2f);
+    // Arrowhead at the arc's start, two short strokes fixed relative to the
+    // tip rather than a full tangent calc — a small icon, not a vector plot.
+    const ImVec2 tip{c.x + r * 0.55f * std::cos(start), c.y + r * 0.55f * std::sin(start)};
+    dl->AddLine(tip, {tip.x - r * 0.28f, tip.y - r * 0.05f}, col, 2.2f);
+    dl->AddLine(tip, {tip.x - r * 0.05f, tip.y + r * 0.28f}, col, 2.2f);
+}
+
+// A simple X — the building card's Dismantle glyph (2026-08-15; the
+// Lifecycle page's Dismantle moved onto the action grid under this name).
+void glyph_dismantle(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
+{
+    dl->AddLine({c.x - r * 0.55f, c.y - r * 0.55f}, {c.x + r * 0.55f, c.y + r * 0.55f}, col, 2.4f);
+    dl->AddLine({c.x + r * 0.55f, c.y - r * 0.55f}, {c.x - r * 0.55f, c.y + r * 0.55f}, col, 2.4f);
+}
+
+// A square icon button: an ImGui::Button frame with a glyph drawn over it and a
+// hover tooltip (Ben's call: icons, text only on hover). Disabled buttons dim the
+// glyph and show the reason. Returns true only on an enabled click. Shared by the
+// tile card's grid and this rework's building-card grid.
+bool tile_icon_button(const char* id, ImVec2 sz, bool enabled, const char* tip,
+                      void (*glyph)(ImDrawList*, ImVec2, float, ImU32), ImU32 glyph_col_override)
+{
+    ImGui::BeginDisabled(!enabled);
+    const ImVec2 p       = ImGui::GetCursorScreenPos();
+    const bool   clicked = ImGui::Button(id, sz);
+    ImGui::EndDisabled();
+    // glyph_col_override lets one call site (Method's Switch button, a "selection
+    // tone" per Ben's playtest note) tint its glyph without touching every other
+    // glyph button's neutral grey — 0 means "use the default", so every existing
+    // caller is unaffected.
+    const ImU32 gcol = !enabled ? IM_COL32(110, 110, 116, 255)
+                     : (glyph_col_override != 0) ? glyph_col_override
+                                                  : IM_COL32(215, 215, 220, 255);
+    glyph(ImGui::GetWindowDrawList(), {p.x + sz.x * 0.5f, p.y + sz.y * 0.5f},
+          std::min(sz.x, sz.y) * 0.5f, gcol);
+    if (ImGui::IsItemHovered() && tip)
+        ImGui::SetTooltip("%s", tip);
+    return clicked && enabled;
+}
+
+} // namespace
+
+// --- Building Selection card: 3-column band (supersedes BL-431) -------------
+//
+// The building card now takes the SAME band shape as the tile card
+// (draw_tile_selection): a zoomed tile render, a paged accordion, and an
+// action grid — rather than the action|facts split every other kind still
+// uses. The former BL-431 three toggles (Method / Chain / Depth) become
+// PAGES of one accordion instead of independently-foldable sections; a page
+// shows its whole content while it is the current page, matching the tile
+// card's metric pages.
+//
+// Rival (non-player-owned) buildings take this SAME 3-column shape rather
+// than a separate simpler path: the zoomed tile render is public (the
+// marker already sits on the surveyed map, BL-068) and a read-only Status
+// page is still a meaningful thing to look at — internals just never make
+// it onto a page (no Profitability/Method/Chain/Depth for a rival, since
+// those would leak private production data the hover-card/BL-068 asymmetry
+// is built to withhold). Only Manage is gated off in the action grid.
+//
+// building_page_kind / building_page / building_pages / draw_building_page are
+// declared in selection_panel.hpp (not anonymous-namespace-local) so the
+// full-canvas takeover (selection_card.cpp) can read the SAME page list and
+// dispatch the SAME draw as the in-band accordion — the tile card's own
+// tile_metrics / draw_tile_metric_chart split is the precedent.
+
+// Every accordion page that applies to @p id, in pager order. Mirrors
+// tile_metrics' role: the one list both the in-band accordion and the
+// full-canvas takeover read, so they cannot show different pages for the
+// same building.
+std::vector<building_page> building_pages(const world& w, const recipe_registry& reg,
+                                          const economy_report& report, entity_id id)
+{
+    std::vector<building_page> pages;
+    const auto bit = w.buildings.find(id);
+    if (bit == w.buildings.end())
+        return pages;
+    const building_component& b = bit->second;
+
+    // Rivals: intel only (BL-068) — a single read-only Status page, nothing
+    // that would reveal recipe choice or internals.
+    if (!is_player_owned(w, id))
+    {
+        pages.push_back({"Status", building_page_kind::status});
+        return pages;
+    }
+
+    // Profitability needs a completed building earning a real per-tick figure;
+    // under construction there is nothing yet to estimate (BL-074's has_data
+    // guard would just print "Run an economy quarter" on every single frame
+    // of every build, which is not a page worth a pager slot).
+    if (b.ticks_remaining <= 0)
+    {
+        const building_profit p = estimate_building_profit(w, reg, report, id);
+        if (p.has_data)
+            pages.push_back({"Profitability", building_page_kind::profitability});
+    }
+
+    if (b.type == building_type::processing_facility)
+        pages.push_back({"Method", building_page_kind::method});
+
+    // Chain and Depth are gone (2026-08-15 playtest rework — see
+    // building_page_kind's doc comment). Lifecycle is gone as a PAGE too: its
+    // Mothball/Dismantle controls moved onto the action grid
+    // (draw_building_selection_body), so Workforce is the only page left
+    // beyond Profitability/Method/Status.
+    pages.push_back({"Workforce", building_page_kind::workforce});
+
+    // Nothing applied (e.g. a freshly-placed infra building with no owner
+    // resolved yet) — an honest fallback rather than an empty accordion.
+    if (pages.empty())
+        pages.push_back({"Status", building_page_kind::status});
+
+    return pages;
+}
+
+// A minimal facts/status page: construction progress when still building,
+// or the rival's public-only summary (BL-068) — the fallback content for
+// whichever building has no other page, plus the whole story for a rival.
+void draw_building_status_page(const world& w, const recipe_registry& reg, entity_id id)
+{
+    if (!is_player_owned(w, id))
+    {
+        draw_rival_building_summary(w, id);
+        return;
+    }
+    const auto bit = w.buildings.find(id);
+    if (bit == w.buildings.end())
+    {
+        ImGui::TextDisabled("\xe2\x80\x94");
+        return;
+    }
+    const building_component& b = bit->second;
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Status");
+    ImGui::Text("%s", building_type_name(b.type));
+    if (b.ticks_remaining > 0)
+    {
+        const float rate = construction_rate(w, reg, b.type, b.tile);
+        ImGui::TextColored(construction_status_colour(rate), "%s",
+                           construction_status(rate, b.ticks_remaining).c_str());
+    }
+    else
+        ImGui::TextDisabled("Operating.");
+}
+
+// Workforce page (2026-08-15 playtest rework, trimmed). The "Workforce"
+// subheading and the 0/20/40/60/80/100 tier grid are gone — the tier grid was
+// tall enough to trigger the accordion's vertical scrollbar, which this page
+// alone didn't need. The placeholder trend graph is unchanged (no real
+// per-building history is recorded yet, same constraint as before); the tier
+// grid is replaced by a single horizontal 1% slider below the Auto button,
+// carrying the same "a manual edit pins the target and clears Auto" semantic
+// the tier buttons had.
+void draw_building_workforce_page(building_component& b)
+{
+    constexpr int N       = 9;
+    const float   graph_w = ImGui::GetContentRegionAvail().x;
+
+    float wf_series[N];
+    const float wf = static_cast<float>(b.workforce_target);
+    for (int i = 0; i < N; ++i)
+    {
+        const float t   = static_cast<float>(i) / (N - 1);
+        const float dip = -20.0f * std::sin(t * 3.14159265f); // placeholder dip-and-recover
+        wf_series[i]    = std::clamp(wf + dip, 0.0f, 200.0f);
+    }
+
+    ImGui::PlotLines("##workforce", wf_series, N, 0, nullptr, 0.0f, 120.0f, {graph_w, 60.0f});
+
+    // Auto moved to the action grid (2026-08-15 playtest rework, below
+    // Mothball — draw_building_selection_body) — this page is trend chart +
+    // slider only now. Its OLD button here was the "game breaking bug": the
+    // label baked `workforce_target` straight into the id-bearing text
+    // (`"Auto  (%d%%)"`), and with no `##` separator ImGui derives a button's
+    // ID from its full label — so every tick solve_workforce_target changed
+    // the target, the button's ID churned too, corrupting ImGui's
+    // hover/active/focus identity for it frame over frame. The action-grid
+    // replacement keeps the id stable ("##bld_auto") and shows the percentage
+    // as separate adjacent text, never inside the id string.
+
+    int target = b.workforce_target;
+    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+    if (ImGui::SliderInt("##wf_slider", &target, 0, 100, "%d%%"))
+    {
+        b.workforce_target = target;
+        b.workforce_auto   = false; // manual edit pins the target, same as a tier press used to
+    }
+}
+
+// Dispatch one accordion page's content. Mutable world because the Method
+// page's Switch button calls try_switch_recipe directly (matching the
+// management ledger's own call, BL-430) — everything else here only reads.
+// `ui` is unused by any current case (the Lifecycle page's deferred Dismantle
+// request moved to the action grid, draw_building_selection_body) but stays in
+// the signature — building_page_expanded's caller and the tile-card precedent
+// both pass ui_state& through the dispatch, and a future page may need it.
+void draw_building_page(world& w, const recipe_registry& reg, const economy_report& report,
+                        entity_id id, building_page_kind kind, ui_state& /*ui*/)
+{
+    switch (kind)
+    {
+        case building_page_kind::profitability: draw_building_profit(w, reg, report, id); break;
+        case building_page_kind::method:        draw_production_method_section(w, reg, id); break;
+        case building_page_kind::status:        draw_building_status_page(w, reg, id); break;
+        case building_page_kind::workforce:
+            if (const auto bit = w.buildings.find(id); bit != w.buildings.end())
+                draw_building_workforce_page(bit->second);
+            break;
+    }
+}
+
+// --- Unit (Soldier) Selection card: 3-column band, same family as building/tile ---
+//
+// Placeholder scaffolding (BL-393 notes units are largely inert in the live
+// economy today) — Ben's explicit direction was to build the card shape now
+// rather than wait. Two pages, both reading REAL unit_component fields: no
+// fabricated numbers.
+
+// unit_component::type indexes unit_roster_table() directly — corp_command.cpp's
+// hire_unit sets it from that same table's index (`cmd.unit_type`), so this is
+// a real name lookup, not a guess. An out-of-range index (stale save, a unit
+// raised before a roster-table edit) falls back to the honest "Type %u" the
+// rest of the codebase already uses for opaque indices, rather than a name
+// that might not correspond to what the unit actually is.
+std::string unit_roster_display_name(std::uint16_t type)
+{
+    const auto& table = unit_roster_table();
+    if (static_cast<std::size_t>(type) < table.size())
+        return table[type].name;
+    char buf[24];
+    std::snprintf(buf, sizeof buf, "Type %u", static_cast<unsigned>(type));
+    return buf;
+}
+
+std::vector<unit_page> unit_pages(const world& w, entity_id id)
+{
+    std::vector<unit_page> pages;
+    if (w.units.find(id) == w.units.end())
+        return pages;
+    pages.push_back({"Strength", unit_page_kind::strength});
+    pages.push_back({"Roster",   unit_page_kind::roster});
+    return pages;
+}
+
+// Strength page: strength + count. NOTE (logged NEEDS_REVIEW): components.hpp
+// documents unit_component::strength as a "fixed-point combat strength scalar
+// (BL-157)", but every writer in the codebase today (corp_command.cpp's
+// hire_unit, corporation_generation.cpp, hard_coded_world.cpp) sets it equal
+// to the raw manpower count with no scale factor, and the existing hover-card
+// reader (entity_summary.cpp's draw_unit_summary) prints it raw too — so this
+// prints the raw value rather than guessing a divisor that would disagree
+// with the one other place in the UI that already shows this number.
+void draw_unit_strength_page(const unit_component& u)
+{
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Strength");
+    ImGui::Text("%d", u.strength);
+    ImGui::Spacing();
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Count");
+    ImGui::Text("%d", u.count);
+}
+
+// Roster page: type name (real lookup, see unit_roster_display_name) + owner
+// (resolved via the same corp-name lookup the building card's rival summary
+// and the tile card's Manage button already use).
+void draw_unit_roster_page(const world& w, const unit_component& u)
+{
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Type");
+    ImGui::Text("%s", unit_roster_display_name(u.type).c_str());
+    ImGui::Spacing();
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Owner");
+    const auto cit = w.corporations.find(u.owner);
+    ImGui::Text("%s", cit != w.corporations.end() ? cit->second.name.c_str() : "\xe2\x80\x94");
+}
+
+void draw_unit_page(const world& w, entity_id id, unit_page_kind kind)
+{
+    const auto uit = w.units.find(id);
+    if (uit == w.units.end())
+    {
+        ImGui::TextDisabled("\xe2\x80\x94");
+        return;
+    }
+    switch (kind)
+    {
+        case unit_page_kind::strength: draw_unit_strength_page(uit->second);    break;
+        case unit_page_kind::roster:   draw_unit_roster_page(w, uit->second);   break;
+    }
+}
+
+namespace {
+
+// The unit card body: same 3-column shape as draw_building_selection_body —
+// left placeholder image, centre paged accordion, right action grid — but
+// read-only (a unit is not yet operable) and with only "Go to" wired for real
+// in the action grid, the rest reserved (matching the tile/building cards'
+// own reserved-slot idiom).
+void draw_unit_selection_body(const world& w, ui_state& ui)
+{
+    const entity_id sel = ui.selected_entity;
+    const auto uit = w.units.find(sel);
+    if (uit == w.units.end())
+    {
+        ImGui::TextDisabled("\xe2\x80\x94");
+        return;
+    }
+    const ImGuiStyle& style   = ImGui::GetStyle();
+    ImDrawList*        dl      = ImGui::GetWindowDrawList();
+    const float         avail   = ImGui::GetContentRegionAvail().x;
+    const float         total_h = ImGui::GetContentRegionAvail().y;
+    const float         spacing = style.ItemSpacing.x;
+    const float         left_w  = avail * 0.25f;
+    const float         right_w = avail * 0.25f;
+    const float       center_w  = std::max(80.0f, avail - left_w - right_w - 2.0f * spacing);
+
+    // ── Left quarter: placeholder soldier glyph ──
+    {
+        const ImVec2 p  = ImGui::GetCursorScreenPos();
+        const ImVec2 mx = {p.x + left_w, p.y + total_h};
+        dl->AddRectFilled(p, mx, IM_COL32(16, 18, 24, 255), 3.0f);
+        const ImVec2 gc = {(p.x + mx.x) * 0.5f, (p.y + mx.y) * 0.5f};
+        const float  gr = std::min(left_w, total_h) * 0.5f - 10.0f;
+        glyph_soldier(dl, gc, std::max(4.0f, gr), IM_COL32(190, 200, 210, 255));
+        dl->AddRect(p, mx, IM_COL32(90, 90, 100, 255), 3.0f);
+        ImGui::Dummy({left_w, total_h});
+    }
+    ImGui::SameLine();
+
+    // ── Centre half: paged accordion over unit_pages() ──
+    {
+        const std::vector<unit_page> pages = unit_pages(w, sel);
+
+        ImGui::BeginChild("##unit_accordion", {center_w, total_h}, true,
+                          ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
+
+        int&      page = ui.selection_unit_page;
+        const int n    = static_cast<int>(pages.size());
+        page = std::clamp(page, 0, std::max(0, n - 1));
+
+        if (n == 0)
+        {
+            ImGui::TextDisabled("\xe2\x80\x94");
+        }
+        else
+        {
+            const unit_page& up = pages[static_cast<std::size_t>(page)];
+
+            const float frame_h = ImGui::GetFrameHeight();
+            const float aw      = ImGui::GetContentRegionAvail().x;
+            const float right   = ImGui::GetCursorPosX() + aw;
+            ImGui::BeginDisabled(page == 0);
+            if (ImGui::ArrowButton("##unit_prev", ImGuiDir_Left)) --page;
+            ImGui::EndDisabled();
+            if (ImGui::IsItemHovered() && page > 0)
+                ImGui::SetTooltip("Previous");
+
+            char hdr[64];
+            std::snprintf(hdr, sizeof hdr, "%s  (%d/%d)", up.label.c_str(), page + 1, n);
+            const float name_w = ui::fit_width(hdr);
+            ImGui::SameLine(std::max(frame_h + style.ItemSpacing.x, (aw - name_w) * 0.5f));
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", hdr);
+
+            ImGui::SameLine(right - 2.0f * frame_h - style.ItemSpacing.x);
+            ImGui::BeginDisabled(page == n - 1);
+            if (ImGui::ArrowButton("##unit_next", ImGuiDir_Right)) ++page;
+            ImGui::EndDisabled();
+            if (ImGui::IsItemHovered() && page < n - 1)
+                ImGui::SetTooltip("Next");
+
+            ImGui::Spacing();
+            ImGui::BeginChild("##unit_page_body", {0.0f, 0.0f}, false,
+                              ImGuiWindowFlags_NoSavedSettings);
+            draw_unit_page(w, sel, up.kind);
+            ImGui::EndChild();
+        }
+
+        ImGui::EndChild();
+    }
+    ImGui::SameLine();
+
+    // ── Right quarter: 2x3 action grid — only "Go to" is real today ──
+    {
+        ImGui::BeginChild("##unit_actions", {right_w, total_h}, false,
+                          ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
+        const float  bw  = (right_w - spacing) / 2.0f;
+        const float  bh  = (total_h - 2.0f * spacing) / 3.0f;
+        const ImVec2 bsz = {bw, bh};
+
+        if (tile_icon_button("##unit_goto", bsz, /*enabled=*/true, "Go to", glyph_goto))
+            focus_on_entity(w, ui, sel);
+        ImGui::SameLine();
+        tile_icon_button("##unit_reserved1", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
+
+        tile_icon_button("##unit_reserved2", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
+        ImGui::SameLine();
+        tile_icon_button("##unit_reserved3", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
+
+        tile_icon_button("##unit_reserved4", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
+        ImGui::SameLine();
+        tile_icon_button("##unit_reserved5", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
+
+        ImGui::EndChild();
+    }
+}
+
+// The building card body: left quarter zoomed tile render, centre half paged
+// accordion, right quarter action grid — the same three-region shape AND the
+// same proportions as draw_tile_selection (normalised 2026-08-15, Ben: the
+// two cards should read as one family, not two similar-but-different ones).
+// Called from draw_selection_content AFTER its generic header — a building
+// keeps that shared header (icon/title/kind/'go to'), unlike the tile card,
+// which draws its own.
+void draw_building_selection_body(world& w, const recipe_registry& reg,
+                                  const economy_report& report, ui_state& ui)
+{
+    const entity_id sel = ui.selected_entity;
+    const auto bit = w.buildings.find(sel);
+    if (bit == w.buildings.end())
+    {
+        ImGui::TextDisabled("\xe2\x80\x94");
+        return;
+    }
+    building_component&       building = bit->second; // mutable: the action grid's Mothball flips decommissioned directly
+    const ImGuiStyle&         style    = ImGui::GetStyle();
+    ImDrawList*                dl       = ImGui::GetWindowDrawList();
+    const float                avail    = ImGui::GetContentRegionAvail().x;
+    const float                total_h  = ImGui::GetContentRegionAvail().y;
+    const float                spacing  = style.ItemSpacing.x;
+    const float                left_w   = avail * 0.25f; // normalised to the tile card's split
+    const float                right_w  = avail * 0.25f;
+    const float                center_w = std::max(80.0f, avail - left_w - right_w - 2.0f * spacing);
+
+    // ── Left quarter: a generic placeholder image, keyed by building type ──
+    // Was the zoomed tile-neighbourhood render; Ben's call (2026-08-15) was
+    // "generic per building type" over one flat image for everything — the
+    // codebase already has a type-keyed glyph vocabulary (ui::icons::building,
+    // the same silhouette the Build door and the canvas markers use), so this
+    // draws THAT, enlarged to fill the panel, rather than inventing a second
+    // image system. Identity resolution mirrors the on-canvas marker's own
+    // (body_surface_canvas.cpp): a processing facility's ACTIVE recipe's
+    // primary output, falling back to target_resource for everything else
+    // (extraction sites, and infrastructure types the glyph ignores anyway).
+    {
+        const ImVec2 p  = ImGui::GetCursorScreenPos();
+        const ImVec2 mx = {p.x + left_w, p.y + total_h};
+        dl->AddRectFilled(p, mx, IM_COL32(16, 18, 24, 255), 3.0f);
+
+        const resource_type identity =
+            (building.type == building_type::processing_facility &&
+             reg.get_recipe(building.recipe) != nullptr)
+                ? primary_output_resource(*reg.get_recipe(building.recipe))
+                : building.target_resource;
+        const ImVec2 gc = {(p.x + mx.x) * 0.5f, (p.y + mx.y) * 0.5f};
+        const float  gr = std::min(left_w, total_h) * 0.5f - 10.0f;
+        icons::building(dl, gc, std::max(4.0f, gr), building.type, identity,
+                        IM_COL32(190, 200, 210, 255));
+
+        dl->AddRect(p, mx, IM_COL32(90, 90, 100, 255), 3.0f);
+        ImGui::Dummy({left_w, total_h});
+    }
+    ImGui::SameLine();
+
+    // ── Centre half: paged accordion over building_pages() ──
+    {
+        const std::vector<building_page> pages = building_pages(w, reg, report, sel);
+
+        ImGui::BeginChild("##building_accordion", {center_w, total_h}, true,
+                          ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
+
+        int&      page = ui.selection_building_page;
+        const int n    = static_cast<int>(pages.size());
+        page = std::clamp(page, 0, n - 1);
+        const building_page& bp = pages[static_cast<std::size_t>(page)];
+
+        const float frame_h = ImGui::GetFrameHeight();
+        const float aw      = ImGui::GetContentRegionAvail().x;
+        const float right   = ImGui::GetCursorPosX() + aw;
+        ImGui::BeginDisabled(page == 0);
+        if (ImGui::ArrowButton("##bld_prev", ImGuiDir_Left)) --page;
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered() && page > 0)
+            ImGui::SetTooltip("Previous");
+
+        char hdr[64];
+        std::snprintf(hdr, sizeof hdr, "%s  (%d/%d)", bp.label.c_str(), page + 1, n);
+        const float name_w = ui::fit_width(hdr);
+        ImGui::SameLine(std::max(frame_h + style.ItemSpacing.x, (aw - name_w) * 0.5f));
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", hdr);
+
+        ImGui::SameLine(right - 2.0f * frame_h - style.ItemSpacing.x);
+        ImGui::BeginDisabled(page == n - 1);
+        if (ImGui::ArrowButton("##bld_next", ImGuiDir_Right)) ++page;
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered() && page < n - 1)
+            ImGui::SetTooltip("Next");
+
+        disclosure_controls(ui, detail_surface::building_metric, page, /*in_place=*/false);
+
+        // Pager row above stays fixed; the page BODY scrolls on its own — Method's
+        // recipe-comparison list in particular can run past the accordion's height
+        // (a building with several era-allowed recipes), and a fixed-height page
+        // silently clipped it with no way to reach the rest.
+        ImGui::Spacing();
+        ImGui::BeginChild("##building_page_body", {0.0f, 0.0f}, false,
+                          ImGuiWindowFlags_NoSavedSettings);
+        draw_building_page(w, reg, report, sel, bp.kind, ui);
+        ImGui::EndChild();
+
+        ImGui::EndChild();
+    }
+    ImGui::SameLine();
+
+    // ── Right quarter: 2x3 action grid (mirrors the tile card's) ──
+    {
+        ImGui::BeginChild("##building_actions", {right_w, total_h}, false,
+                          ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
+        const float  bw  = (right_w - spacing) / 2.0f;
+        const float  bh  = (total_h - 2.0f * spacing) / 3.0f;
+        const ImVec2 bsz = {bw, bh};
+
+        const bool owned = is_player_owned(w, sel);
+
+        // Manage is GONE (2026-08-15 playtest rework, NR-245's queue-only
+        // destination is moot now that the button no longer exists) — Ben's
+        // call was he no longer wants this link. Its slot, plus one former
+        // reserved slot, now hold Mothball and Dismantle: the former
+        // Lifecycle PAGE's two controls, moved here so they read as
+        // building-level actions rather than accordion content.
+
+        // Mothball — same semantic as the old Close/Reopen toggle: reversible,
+        // no output/no wages while closed. Toggle button (Toggle rule,
+        // io-standing-rules.md): its own active state (decommissioned) is
+        // what re-clicking undoes.
+        {
+            const bool mothballed = building.decommissioned;
+            const char* tip = !owned                ? "Competitor building - intel only"
+                             : mothballed             ? "Reopen - resumes output and wages"
+                                                      : "Mothball - stops output and wages. Reversible.";
+            // Distinct glyph per state (2026-08-15) — a closed box while
+            // active, an open one once mothballed — so re-clicking doesn't
+            // look like the same action twice.
+            if (tile_icon_button("##bld_mothball", bsz, owned, tip,
+                                 mothballed ? glyph_reopen : glyph_mothball) && owned)
+            {
+                building.decommissioned = !building.decommissioned;
+                invalidate_logistics_caches(w); // a (un)decommissioned port/hub (un)anchors supply
+            }
+        }
+        ImGui::SameLine();
+
+        // Dismantle — permanent, confirm popup, deferred through
+        // pending_demolish exactly as the old Lifecycle page's Dismantle did
+        // (erasing from w.buildings mid-draw would dangle `building`).
+        {
+            const char* tip = owned ? "Dismantle - permanent. The tile keeps its deposit."
+                                    : "Competitor building - intel only";
+            if (tile_icon_button("##bld_dismantle", bsz, owned, tip, glyph_dismantle) && owned)
+                ImGui::OpenPopup("confirm_dismantle");
+        }
+        if (ImGui::BeginPopup("confirm_dismantle"))
+        {
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative),
+                               "Dismantle this %s?", building_type_name(building.type));
+            ImGui::TextDisabled("This cannot be undone.");
+            ImGui::Separator();
+            if (ImGui::Button("Dismantle"))
+            {
+                ui.construction.pending_demolish = sel;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Keep"))
+                ImGui::CloseCurrentPopup();
+            ImGui::EndPopup();
+        }
+
+        // Auto (workforce autosolve) — relocated from the Workforce page onto
+        // the grid, directly below Mothball (same column, next row): the
+        // Workforce page's OLD Auto button churned its ImGui ID every tick
+        // (see draw_building_workforce_page's comment) — the accent-ring
+        // "primed" idiom (below, borrowed from the tile card's Construct
+        // button) marks the active state instead of baking it into the label.
+        {
+            const bool   auto_on = building.workforce_auto;
+            // Same one-way semantic the old page button had (never itself a
+            // toggle-off — a manual slider edit is what pins the target and
+            // clears Auto, in draw_building_workforce_page).
+            const char*  tip     = !owned  ? "Competitor building - intel only"
+                                  : auto_on ? "Auto - autosolving this building's workforce"
+                                            : "Auto - autosolve this building's workforce target";
+            if (auto_on)
+            {
+                const ImVec2 pmin = ImGui::GetCursorScreenPos();
+                dl->AddRect({pmin.x - 2.0f, pmin.y - 2.0f}, {pmin.x + bsz.x + 2.0f, pmin.y + bsz.y + 2.0f},
+                           palette::selection, 4.0f, 0, 2.0f);
+            }
+            if (tile_icon_button("##bld_auto", bsz, owned, tip, glyph_auto) && owned)
+                building.workforce_auto = true;
+        }
+        ImGui::SameLine();
+        tile_icon_button("##bld_reserved3", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
+
+        tile_icon_button("##bld_reserved4", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
+        ImGui::SameLine();
+        tile_icon_button("##bld_reserved5", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
+
+        ImGui::EndChild();
+    }
+}
+
+// The redesigned tile Selection element (BL-123, Ben's mockup): a vertical stack
+// rather than the action|facts split — a placeholder image + [x, y] caption, the
+// tile's deposits as world-max-relative bar charts, and a 2x2 action button grid.
+// Tile-only for now; the other kinds keep the action|facts form (draw_selection_
+// action / facts) until they get their own mockups. Construct Buildings stubs onto
+// the existing Construction panel (the dedicated tile-construction panel is owed);
+// History and Supply are drawn but not yet wired.
 // Name of a tile's road tier, or nullptr when the tile carries no road (BL-184).
 // The wording matches the construction ledger's tier affordances below and the
 // canvas weight ladder (Track thin/dim -> Highway thick/bright); >3 reads as the
@@ -670,24 +1664,6 @@ const char* road_tier_name(std::uint8_t road_level)
         case 2:  return "Road";
         default: return "Highway";
     }
-}
-
-// A square icon button: an ImGui::Button frame with a glyph drawn over it and a
-// hover tooltip (Ben's call: icons, text only on hover). Disabled buttons dim the
-// glyph and show the reason. Returns true only on an enabled click.
-bool tile_icon_button(const char* id, ImVec2 sz, bool enabled, const char* tip,
-                      void (*glyph)(ImDrawList*, ImVec2, float, ImU32))
-{
-    ImGui::BeginDisabled(!enabled);
-    const ImVec2 p       = ImGui::GetCursorScreenPos();
-    const bool   clicked = ImGui::Button(id, sz);
-    ImGui::EndDisabled();
-    const ImU32 gcol = enabled ? IM_COL32(215, 215, 220, 255) : IM_COL32(110, 110, 116, 255);
-    glyph(ImGui::GetWindowDrawList(), {p.x + sz.x * 0.5f, p.y + sz.y * 0.5f},
-          std::min(sz.x, sz.y) * 0.5f, gcol);
-    if (ImGui::IsItemHovered() && tip)
-        ImGui::SetTooltip("%s", tip);
-    return clicked && enabled;
 }
 
 // The tile card (Ben's 2026-07-23 layout). Three regions: a header (icon + Tile
@@ -1026,8 +2002,24 @@ void draw_selection_content(world& w, const recipe_registry& reg,
     // A selected player building used to BYPASS this layout and render the full
     // management view as its card (2026-07-22). Reversed 2026-08-08 (Ben: "selection
     // of a building skips the selection menu, going straight to manage. This is a
-    // bug.") — a building now takes the same action|facts Selection view as every
-    // other kind, with an explicit Manage action routing to the management ledger.
+    // bug.") — a building took the same action|facts Selection view as every other
+    // kind for a session, with an explicit Manage action routing to the management
+    // ledger. This rework moves it OFF that split onto the tile card's 3-column band
+    // shape instead (draw_building_selection_body) — it keeps this shared header,
+    // unlike the tile card, which draws its own start to finish.
+    if (kind == selection_kind::building)
+    {
+        draw_building_selection_body(w, reg, report, ui);
+        return;
+    }
+
+    // A selected unit takes the SAME 3-column band shape (this rework) rather
+    // than the generic action|facts split — see draw_unit_selection_body.
+    if (kind == selection_kind::unit)
+    {
+        draw_unit_selection_body(w, ui);
+        return;
+    }
 
     // ── Action (left, dominant) │ Facts (right, muted) ──
     const float content_w = bar_w;
@@ -1053,6 +2045,19 @@ void draw_selection_content(world& w, const recipe_registry& reg,
     draw_selection_facts(w, reg, report, ui, kind);
     ImGui::PopTextWrapPos();
     ImGui::EndChild();
+}
+
+void draw_building_page_expanded(world& w, const recipe_registry& reg,
+                                 const economy_report& report, ui_state& ui)
+{
+    const std::vector<building_page> pages = building_pages(w, reg, report, ui.selected_entity);
+    if (pages.empty())
+    {
+        ImGui::TextDisabled("\xe2\x80\x94");
+        return;
+    }
+    const int page = std::clamp(ui.selection_building_page, 0, static_cast<int>(pages.size()) - 1);
+    draw_building_page(w, reg, report, ui.selected_entity, pages[static_cast<std::size_t>(page)].kind, ui);
 }
 
 namespace {
@@ -1259,6 +2264,51 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
         c.group    = !c.pr.ok()                          ? 2
                      : (c.produces && c.profit.has_data) ? 0
                                                          : 1;
+    }
+
+    // BL-434: collapse the one-row-per-recipe processing rows above into one row
+    // PER GROUP — "Metal Foundry" once, not five separate metal recipes stacked
+    // in the Processing fold. The representative recipe is the best-expected-profit
+    // one among that group's era-allowed recipes (an invalid/no-data row loses to
+    // any priced one; among priced rows, highest net wins; ties keep the first
+    // seen, i.e. recipe-authored order, for determinism). Placing the group's
+    // candidate seeds the building with THIS recipe (construct_building's trailing
+    // recipe param, via pending_recipe below) — the group's own default/best
+    // method, not an arbitrary one.
+    {
+        std::map<std::string, std::size_t> best_idx; // recipe group -> winning index into cands
+        for (std::size_t i = 0; i < cands.size(); ++i)
+        {
+            if (cands[i].type != building_type::processing_facility)
+                continue;
+            const std::string& grp =
+                reg.recipe_at(building_type::processing_facility, cands[i].recipe).group;
+            const auto it = best_idx.find(grp);
+            if (it == best_idx.end())
+            {
+                best_idx.emplace(grp, i);
+                continue;
+            }
+            const candidate& cur   = cands[i];
+            const candidate& incum = cands[it->second];
+            const bool cur_better =
+                (cur.group == 0 && incum.group != 0) ||
+                (cur.group == 0 && incum.group == 0 && cur.profit.net() > incum.profit.net());
+            if (cur_better)
+                it->second = i;
+        }
+        std::vector<candidate> collapsed;
+        collapsed.reserve(cands.size());
+        for (candidate& c : cands)
+            if (c.type != building_type::processing_facility)
+                collapsed.push_back(std::move(c));
+        for (auto& [grp, idx] : best_idx)
+        {
+            candidate winner = cands[idx];
+            winner.name      = grp; // the group name IS the row's identity now
+            collapsed.push_back(std::move(winner));
+        }
+        cands = std::move(collapsed);
     }
 
     // Two-tier alphabetical (BL-326): group name, then row name — Ben's explicit call

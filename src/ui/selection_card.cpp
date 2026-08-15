@@ -295,6 +295,25 @@ void draw_selection_band(world& w, const recipe_registry& reg,
         }
     }
 
+    // The building card's accordion pages take the same takeover (this rework)
+    // — no per-page scan cost worth guarding here (building_pages walks one
+    // building's own state, not every tile on the body), so unlike the tile
+    // branch above this reads unconditionally rather than behind the surface
+    // check first.
+    if (ui.expanded.surface == detail_surface::building_metric &&
+        selection_kind_of(w, sel) == selection_kind::building)
+    {
+        const entity_id real_sel = ui.selected_entity;
+        ui.selected_entity       = sel;
+        if (fold_overlay_begin(ui, detail_surface::building_metric, ui.expanded.key,
+                               building_type_name(w.buildings.at(sel).type)))
+        {
+            draw_building_page_expanded(w, reg, report, ui);
+            fold_overlay_end(ui);
+        }
+        ui.selected_entity = real_sel;
+    }
+
     // NB: Esc is handled by app.cpp (it must take precedence over the system-menu
     // toggle, and unwind the drill stack one level in BL-196). The band does not
     // consume Esc itself — doing so would double-fire with the app's SDL handler.

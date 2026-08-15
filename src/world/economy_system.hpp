@@ -170,6 +170,8 @@ enum class recipe_switch_result : uint8_t
     invalid,              ///< Unknown recipe id, or already the active recipe.
     on_cooldown,          ///< b.recipe_switch_cooldown has not reached 0 yet.
     insufficient_funds,   ///< The owning corp cannot cover recipe_switch().switch_cost.
+    cross_group,          ///< BL-434 retraction: new recipe is a DIFFERENT `group` — refused
+                          ///< outright, not priced. See try_switch_recipe's comment.
 };
 
 /// Attempt a PLAYER-grade recipe switch on `b`, gated by `economy.recipe_switch`
@@ -185,6 +187,16 @@ enum class recipe_switch_result : uint8_t
 /// recipe_switch_params for the full reasoning.
 ///
 /// A rejection mutates nothing.
+///
+/// BL-434 retraction (2026-08-16, same session BL-434 landed): a switch to a
+/// recipe in a DIFFERENT `group` than `b`'s current recipe is REFUSED outright
+/// (recipe_switch_result::cross_group), never priced. Ben's call: switching
+/// methods can mean changing to a different building type in effect, and the
+/// only sanctioned way to change building type is dismantle + rebuild via the
+/// tile selector. The cross-group cost tier this superseded (a steep
+/// switch_cost multiplier) lived here for a matter of minutes in the same
+/// session — see the removed `cross_group_multiplier` field's former doc
+/// comment in recipe_registry.hpp if the history matters.
 ///
 /// @param w             World; `corp`'s balance is debited on success.
 /// @param reg           Loaded recipe/economy registry (recipe_switch() reads the gate).

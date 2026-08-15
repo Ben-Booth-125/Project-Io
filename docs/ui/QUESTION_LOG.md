@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**19 surfaces** — 3 settled, 16 awaiting Ben's wording.
+**21 surfaces** — 3 settled, 18 awaiting Ben's wording.
 
 ---
 
@@ -124,6 +124,14 @@ alphabetical order.
 
 *Demanded by BL-090, BL-091 · `src/ui/profile_panel.cpp` · id `profile_panel`*
 
+### Selection band - Building card (3-column band)
+
+**Answers:** What's the state of this building, how much workforce does it have, can I close or dismantle it, and what can I do about it?
+
+**Because:** The building card previously split action|facts like every other selection kind, with three MORE independently-toggled sections stacked below the facts column (Method/Chain/Depth, BL-431) - a tall, scrolling stack that read nothing like the tile card sitting one selection away. Moving the building onto the SAME 3-column band shape (zoomed tile render / paged accordion / action grid) makes 'select a thing, get its picture + a pager + its actions' one shape across the two entity kinds that actually get selected in play, rather than two competing layouts a player has to relearn. The former toggles become PAGES for the same reason the tile card's resource graphs are pages, not accordions: a page IS the opened state, so there is nothing left inside it to fold. 2026-08-15: Workforce (graph/Auto/tier grid) and Lifecycle (Close-Reopen/Dismantle) joined the accordion as two more pages, absorbed from the construction panel's deleted Buildings tab - this card is now the single home for a building's full detail, not a duplicate of it.
+
+*Demanded by BL-431, BL-430, BL-428, BL-074 · `src/ui/selection_panel.cpp`, `src/ui/selection_panel.hpp`, `src/ui/selection_card.cpp`, `src/ui/detail_level.hpp`, `src/ui/ui_state.hpp` · id `selection_building_card`*
+
 ### Selection element
 
 **Answers:** What have I selected, and what can I do with it?
@@ -131,6 +139,14 @@ alphabetical order.
 **Because:** The pinned, polymorphic detail surface for the current selection. It is the answer to the click model's promise: single-click selects, and something must visibly happen when it does.
 
 *Demanded by BL-067, BL-068, BL-071, BL-367 · `src/ui/selection_panel.cpp` · id `selection_panel`*
+
+### Selection band - Unit (Soldier) card (3-column band)
+
+**Answers:** What is this unit/unit-stack, how strong is it, what type is it, who owns it, and can I do anything with it?
+
+**Because:** selection_kind::unit existed but fell through to the generic action/facts split with a bare Go to button - the only selection kind still on that path once the tile (BL-123) and building (BL-431 rework) cards moved to the 3-column band shape. BL-393 (UNITS_ARE_WRITE_ONLY_AND_INERT) already flags that units are largely inert in the live economy; Ben's direction was to build the CARD shape now anyway rather than wait on combat, so a unit selected today reads real unit_component fields (strength, count, roster type, owner) in the same picture/pager/actions shape as everything else, instead of standing out as the one kind that still looks unfinished. Paired with a repeat-click tile-cycle (Soldier -> Building -> Tile) in body_surface_canvas.cpp so a tile carrying a unit is actually reachable by clicking.
+
+*Demanded by BL-393 · `src/ui/selection_panel.cpp`, `src/ui/selection_panel.hpp`, `src/ui/ui_state.hpp`, `src/ui/body_surface_canvas.cpp` · id `selection_unit_card`*
 
 ### Tech tree viewer (F9)
 

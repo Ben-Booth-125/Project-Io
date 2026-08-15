@@ -96,8 +96,7 @@ Each kind routes its 'go to' to the right place:
 |---|---|---|---|
 | **Tile** | *(Superseded by the vertical tile layout, BL-123 — see § The tile element's layout below. The two-column action/facts split no longer renders for a tile.)* | | **No-op for now.** A tile is selected from the surface it lives on, so 'go to' has nothing to descend to; pan-to-tile is out of scope. |
 | **Body** (planet/moon/asteroid/station/star) | Unsurveyed → **Dispatch Survey** (BL-067). Surveyed → **Go to surface** (descends via `focus_on_entity`). The star carries neither. | **Commercial activity** pulse (activity fog, BL-089) — see below. | Canvas: `focus_on_surface` — descend to the body's **Planetary tile surface**, the most informative rung. (Not `focus_on_body` / the orbital framing: landing on a sparse circumplanetary view reads as "nothing happened", which was the *only-works-for-Kepler* symptom.) |
-| **Building** (player-owned) | **Manage ▸** — routes to the building-management surface (`construction_panel.cpp`, which already owns the workforce slider / recipe / decommission controls). The panel does not duplicate those controls. | **Profitability readout** (BL-074) — Net/tick, the one decision fact — see below. | Canvas: `focus_on_tile` (host tile). |
-| **Building** (rival) | None — **"Competitor building - intel only."** | Owner name + explicit `private` rows for production/stockpile (BL-068). | Canvas: `focus_on_tile` (host tile). |
+| **Building** (any) | *(Superseded — see § The building element's layout below. Both player-owned and rival buildings take the 3-column band, not the action/facts split.)* | | Canvas: `focus_on_tile` (host tile). |
 | **Market / Unit** | **Go to** — locate on the canvas. | (none yet; stubbed) | Canvas: `focus_on_surface` / entity's position. |
 | **Nation / Corporation** | None — **"Open its ledger via [>]."** | (none yet; stubbed) | A ledger (no canvas of its own). |
 
@@ -232,16 +231,171 @@ exception). The fix is **reposition, not fold** — folding the reason string in
 panel would have rescued only the reason line, leaving the Thrives/Valid affordance readout
 occluded; both must stay visible at the placement moment.
 
-### The building element's fact is a profitability readout (BL-074)
+### The building element's layout (supersedes BL-074/BL-431, 2026-08-15 rework)
 
-A selected player-owned **Building**'s Facts column carries a **"Profitability (est. / tick)"**
-section (`draw_building_profit`) — the one decision fact for the Manage ▸ action: the estimated
-net per-tick contribution of that single building, broken into four component lines plus Net —
-**Revenue**, **Inputs** (input cost), **Wages**, **Maintenance**, laid out as two paired columns,
-then **Net** (coloured positive/negative/neutral by sign). Figures come from
-`estimate_building_profit` (`src/world/building_profit.hpp`) — realised last-tick revenue/cost
-where attributable, estimated where the pooled market resists exact per-building attribution.
-Before an economy tick has run, the section shows "Run an economy tick to estimate." instead.
+A selected **Building** — player-owned or rival — no longer takes the action/facts split at all.
+It takes the **same 3-column band shape as the tile element** (§ below), just at different
+proportions (`draw_building_selection_body`, `src/ui/selection_panel.cpp`), reached through the
+Selection element's shared header (icon/title/kind/'go to' — unlike the tile element, the building
+does not draw its own header):
+
+1. **Left quarter — a generic placeholder image, keyed by building type** (2026-08-15). Was the
+   zoomed hex-neighbourhood render; Ben's call was "generic per building type" over one flat image
+   for everything. Draws `ui::icons::building` — the SAME type-keyed glyph vocabulary the Build door
+   and the on-canvas markers use — enlarged to fill the panel. Identity (which named silhouette a
+   `processing_facility` draws) resolves the same way the on-canvas marker does
+   (`body_surface_canvas.cpp`): the active recipe's primary output, falling back to
+   `target_resource` for extraction sites and infrastructure types the glyph ignores. Drawn for a
+   rival building too — the type is already public (BL-068).
+2. **Centre 5/12 — a paged accordion** (‹ Name (i/N) › pager, the same `disclosure_controls`
+   full-canvas hook as the tile element's, `detail_surface::building_metric`). **Playtest rework,
+   2026-08-15** (supersedes the 2026-08-15 BL-431 page split described above in earlier revisions
+   of this doc): Chain and Depth are gone as pages — Chain's content folded into Profitability;
+   Depth was cut outright — and Lifecycle is gone as a page too, its two controls moved onto the
+   action grid (§ 3 below). `building_pages()` now builds a shorter list per building, in order:
+   - **Profitability** (`building_page_kind::profitability`, wrapping `draw_building_profit`) —
+     now **chart-based**, not text: no title line ("Profitability (est. / qtr)" is gone; the
+     charts speak for themselves). **Reflowed to one screen (2026-08-15 playtest pass)** — no
+     scrollbar: a top ROW holds the bars and the line chart side by side (left third / right
+     two-thirds) rather than the earlier fully-stacked layout, and the vertical budget is derived
+     from `ImGui::GetContentRegionAvail().y` at the top of the function (the accordion page body's
+     real remaining height, not a guess — logged `NEEDS_REVIEW.json` NR-250 on the specific clamp
+     numbers chosen). Three elements:
+     - **Left third — Revenue vs a SEGMENTED Expenses bar** (`draw_revenue_expense_bars`, hand-drawn
+       rather than `ui::charts::draw_bars` since draw_bars has no stacked-column notion). Revenue is
+       one plain bar; Expenses stacks `input_cost` / `maintenance` / `wages` as three shaded
+       segments in one column — the finest split `building_profit.hpp` tracks, since no revenue
+       sub-breakdown exists to chart separately (logged NR-248). **Hovering a segment** shows a
+       tooltip naming that segment ("Input cost: 12.4", etc.), mirroring the Inputs chart's
+       hover-legend idiom below.
+     - **Right two-thirds — a "Net, 6 mo." line chart** (`ImGui::PlotLines`) — no per-building
+       profit HISTORY is tracked, so this is a smooth deterministic series anchored to the live
+       net-profit estimate, 6 points for "6 months" (the same honest-placeholder idiom the
+       Workforce trend graph already used, just with 6 points instead of 9; logged NR-249).
+     - **Below the row — an "Inputs" bar chart** (`draw_input_basket_chart`) — the former Chain
+       page's content, folded in: the active recipe's input quantities as bars, with a **hover
+       tooltip** naming each input resource rather than a permanent legend. Absent for a building
+       with no recipe (`extraction_site`), in which case the row above gets the full page height.
+     Included only once the building is complete (`ticks_remaining <= 0`) **and**
+     `estimate_building_profit` reports `has_data`; a still-building building has nothing here yet
+     (its **Status** page below covers it instead).
+   - **Method** (`building_page_kind::method`, `draw_production_method_section`) — "Which way
+     should this building make its output?" Only for `processing_facility`. **Tiled grid layout**
+     (2 columns) since the playtest rework, superseding the former single-column list: each
+     era-allowed recipe gets its own bordered tile with just the recipe name and its expected
+     profit (`estimate_prospective_profit`, priced at the building's real staffing) set in a
+     **larger font** — the input-basket / wage-rate detail line under the profit figure is **gone**
+     (2026-08-15 playtest pass; that detail is now implied by the Profitability page's Inputs chart
+     and labelled Expenses segments instead) — and, for every recipe but the active one, a **big
+     glyph Switch button** (`glyph_swap`, a two-arrow swap icon) sized to be the tile's dominant
+     visual element. Calls `try_switch_recipe` exactly as `construction_panel.cpp`'s management
+     dropdown does. A single-recipe building still gets the page (reads "Only one method
+     available.").
+
+     **BL-434 note (2026-08-15): no group label added here, by design.** The tile grid still lists
+     every era-allowed recipe regardless of `group` — both the cheap intra-group switch and the
+     pricier cross-group retool go through the same `try_switch_recipe` seam and the same Switch
+     button, and `try_switch_recipe` already refuses (or silently prices) whichever the corp cannot
+     afford. The Build door is where GROUP membership is the organizing axis (PRODUCTION.md § Sub-
+     facility groups — one row per group, not per recipe); here on an existing building the axis is
+     "every method this specific building could run", which a group label would not sharpen. Revisit
+     only if playtest shows a player surprised by a cross-group switch's cost — the fix then is
+     pricing the tile's Switch button, not adding a group tag to the grid.
+   - **Workforce** (`building_page_kind::workforce`, `draw_building_workforce_page`) — "How much
+     workforce, and by whose hand?" **Further trimmed (2026-08-15 playtest pass)**: the Auto button
+     is **gone from this page** — moved to the action grid (§ 3 below) alongside a real bug fix (see
+     there) — leaving just the placeholder trend graph (unchanged, still no per-building
+     history — NR-249) and a single **horizontal 1% slider** (`ImGui::SliderInt`, 0–100) — editing
+     it sets `workforce_target` directly and clears `workforce_auto`, the same "manual edit pins the
+     target" semantic the old tier buttons and Auto button both had. Applies to any player-owned
+     building regardless of type.
+   - **Status** (`building_page_kind::status`) — the fallback: construction rate/ETA for a
+     still-building building, "Operating." otherwise. **Rival buildings get ONLY this page** — the
+     public building type plus (via `draw_rival_building_summary`) owner name, tile, and explicit
+     `private` rows for production/stockpile (BL-068); nothing above would resolve for a rival
+     without leaking withheld data, so `building_pages()` short-circuits to a single Status page
+     for any non-player-owned building rather than testing each page's guard against data it must
+     not show.
+
+   `building_pages()` / `draw_building_page()` are the shared list+dispatch pair the in-band
+   accordion and the full-canvas takeover (`draw_building_page_expanded`, `selection_card.cpp`)
+   both read — the same precedent as the tile element's `tile_metrics` / `draw_tile_metric_chart`.
+3. **Right quarter — a 2×3 action grid**, mirroring the tile element's grid. **Manage is gone**
+   (playtest rework, 2026-08-15) — Ben's call was he no longer wants this link now that every
+   control it used to route to lives on this card already (NR-245, resolved). Its slot plus one
+   former reserved slot now hold the former Lifecycle page's two controls, moved here as
+   building-level actions:
+   - **Mothball** (`glyph_mothball`, a box with a line through it) — the old Close/Reopen toggle,
+     relabelled: flips `decommissioned` (reversible — no output, no wages while closed) and
+     invalidates the logistics anchor cache. A **toggle button** per the standing Toggle rule — its
+     own active state (`decommissioned`) is what re-clicking undoes; the tooltip reads
+     "Mothball..."/"Un-mothball..." depending on state.
+   - **Dismantle** (`glyph_dismantle`, a simple X) — permanent, asks once via a confirm popup, then
+     defers through `ui_state::construction.pending_demolish` for `app::render` to execute
+     (`demolish_building`) — erasing mid-draw would dangle the `building_component&` the grid is
+     reading.
+   - **Auto** (`glyph_auto`, an open circular-arrow "refresh" primitive) — **relocated here from the
+     Workforce page (2026-08-15 playtest pass)**, in Mothball's column, one row down: sets
+     `b.workforce_auto = true` on press, the same one-way semantic the old page button had (a
+     manual slider edit on the Workforce page is what clears it, unchanged). Active state
+     (`workforce_auto == true`) is shown with the same accent-ring idiom the tile card's "primed"
+     Construct button uses, rather than baking the state into the button's label text — **this was
+     the fix for a real bug**: the old Workforce-page button built its label as
+     `"Auto  (%d%%)"` with no `##` separator, so ImGui derived the button's identity from that
+     text — which changed every tick while autosolving was live (`solve_workforce_target` re-solves
+     `workforce_target` continuously), churning the button's ImGui ID frame over frame and
+     corrupting its hover/active/focus state. The new grid button's id (`"##bld_auto"`) is stable;
+     the percentage is not shown on this button at all (the Workforce page's own trend chart and
+     slider still read it).
+   Mothball, Dismantle and Auto are all disabled with "Competitor building - intel only" for a
+   rival, same as Manage used to be. **Three slots remain reserved** (`glyph_reserved`).
+
+`ui_state::selection_building_page` is the pager index — the sole survivor of the former
+`selection_method_open` / `selection_chain_open` / `selection_chain_target` / `selection_depth_open`
+quartet, reset to 0 alongside `card_resource_page` on every new selection (`app.cpp`).
+
+### The unit (Soldier) element's layout (placeholder, 2026-08-15)
+
+A selected **Unit** (`selection_kind::unit`) takes the **same 3-column band shape** as the
+building/tile elements (`draw_unit_selection_body`, `src/ui/selection_panel.cpp`) instead of the
+generic action/facts split — explicit scaffolding: BL-393 notes units are largely inert in the live
+economy today, but Ben's direction was to build the card's shape now rather than wait for combat to
+land.
+
+1. **Left quarter — a generic humanoid placeholder glyph** (`glyph_soldier`): a filled circle head
+   over a triangle body. No unit-type-keyed glyph vocabulary exists yet (unlike buildings'
+   `ui::icons::building`), so this is an honest placeholder rather than a faked per-type icon.
+2. **Centre half — a paged accordion** (`unit_pages()` / `draw_unit_page()`, the same
+   list+dispatch-pair precedent as `tile_metrics` and `building_pages`), reading real
+   `unit_component` fields only:
+   - **Strength** — `strength` and `count`. NOTE: `unit_component::strength` is documented in
+     `components.hpp` as a "fixed-point combat strength scalar (BL-157)", but every current writer
+     (`corp_command.cpp`'s `hire_unit`, `corporation_generation.cpp`, `hard_coded_world.cpp`) sets
+     it equal to the raw manpower count with no scale factor, and the existing hover-card reader
+     (`entity_summary.cpp::draw_unit_summary`) already prints it raw — so this page prints the raw
+     value too rather than guess a divisor that would disagree with the one other UI surface that
+     shows this number. Logged to `NEEDS_REVIEW.json`.
+   - **Roster** — `type` resolved through `unit_roster_table()` (real name: `hire_unit` sets
+     `unit_component::type` from that table's own index, so this is a genuine lookup, not a guess;
+     an out-of-range index falls back to `"Type %u"`) and `owner` resolved via the same corp-name
+     lookup the building card's rival summary uses.
+3. **Right quarter — a 2×3 action grid**: only **Go to** (`focus_on_entity`) is wired; the other
+   five slots are reserved (`glyph_reserved`), matching the tile/building cards' own pattern.
+
+`ui_state::selection_unit_page` is the pager index, mirroring `selection_building_page`.
+
+### Tile repeat-click selection cycle (placeholder, 2026-08-15)
+
+`body_surface_canvas.cpp`'s click handler now cycles **Soldier → Building → Tile → Soldier** on a
+**repeat** click at the same tile the selection already sits on, skipping any stage with nothing
+there (no unit on the tile skips straight to Building; no building skips to Tile).
+`ui_state::selection_cycle_tile` / `selection_cycle_stage` track the anchor tile and current stage.
+
+A click on a **different** tile (or the first click anywhere) leaves the existing marker-hit /
+tile-fallback precedence (BL-031: building > market_centre > tile) completely untouched — it only
+additionally seeds the cycle anchor so a follow-up repeat click knows where to advance from. This is
+scaffolding ahead of units mostly existing in the live economy (BL-393) — deliberately built now per
+Ben's direction, not gated on combat landing first.
 
 ### The body element's action is the survey front door (then go-to-surface)
 

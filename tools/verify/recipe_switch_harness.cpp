@@ -165,6 +165,45 @@ void run_mechanism_checks()
         check(w.corporations[corp].balance == before_balance,
               "...and leaves the corp's balance untouched (free/instant, as designed)");
     }
+
+    // S6 — BL-434 retraction (2026-08-16, same session BL-434 landed): cross-GROUP
+    // switching is now REFUSED outright, not priced at a steep multiplier (the
+    // mechanism S6 originally checked). Same three dummy recipes (Group A x2,
+    // Group B x1), isolating the group lookup from the real authored roster —
+    // this checks the MECHANISM; R1 above is the real-roster sanity check
+    // (unaffected by this retraction, since it never priced group switching).
+    {
+        recipe rA1; rA1.name = "groupA_1"; rA1.group = "Group A";
+        rA1.outputs[static_cast<std::size_t>(resource_type::steel)] = 1.0f;
+        recipe rA2; rA2.name = "groupA_2"; rA2.group = "Group A";
+        rA2.outputs[static_cast<std::size_t>(resource_type::steel)] = 1.0f;
+        recipe rB1; rB1.name = "groupB_1"; rB1.group = "Group B";
+        rB1.outputs[static_cast<std::size_t>(resource_type::steel)] = 1.0f;
+        const uint16_t idA1 = reg.add_recipe(rA1);
+        const uint16_t idA2 = reg.add_recipe(rA2);
+        const uint16_t idB1 = reg.add_recipe(rB1);
+
+        const entity_id bld6 = make_processor(w, body, idA1);
+        w.corporations[corp].assets.push_back(bld6);
+        w.corporations[corp].balance = 1000.0f;
+
+        building_component& b6 = w.buildings.at(bld6);
+        const recipe_switch_result r6a = try_switch_recipe(w, reg, corp, b6, idA2); // intra-group
+        const float intra_cost = 1000.0f - w.corporations[corp].balance;
+        check(r6a == recipe_switch_result::applied, "S6a intra-group switch applies");
+        check(b6.recipe == idA2, "S6b ...and the recipe actually changed");
+        check(intra_cost == sw.switch_cost,
+              "S6c intra-group switch costs exactly the base switch_cost (" +
+                  std::to_string(intra_cost) + ")");
+
+        b6.recipe_switch_cooldown = 0; // clear S6's own cooldown so the next switch is testable
+        const float before_cross = w.corporations[corp].balance;
+        const recipe_switch_result r6b = try_switch_recipe(w, reg, corp, b6, idB1); // cross-group
+        const float cross_cost = before_cross - w.corporations[corp].balance;
+        check(r6b == recipe_switch_result::cross_group, "S6d cross-group switch is refused outright");
+        check(b6.recipe == idA2, "S6e ...and the recipe did NOT change");
+        check(cross_cost == 0.0f, "S6f ...and nothing was debited (a rejection mutates nothing)");
+    }
 }
 
 // --- R1: no-dominance guard over the real authored roster ------------------

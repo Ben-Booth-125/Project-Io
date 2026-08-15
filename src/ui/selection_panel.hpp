@@ -46,6 +46,65 @@ void draw_tile_metric_chart(ImDrawList* dl, ImVec2 mn, ImVec2 mx, const tile_met
 void draw_building_profit(const world& w, const recipe_registry& reg,
                           const economy_report& report, entity_id id);
 
+/// One page of the building Selection card's accordion (supersedes BL-431's three
+/// independently-toggled Method / Chain / Depth sections — a page IS the opened
+/// state, so there is nothing left inside it to fold). Mirrors `tile_metric`'s role
+/// for the tile card.
+///
+/// Chain, Depth and Lifecycle are gone (2026-08-15 playtest rework): Chain's
+/// input-basket content folded into Profitability as a chart; Depth was cut
+/// outright; Lifecycle's Mothball/Dismantle controls moved onto the building
+/// card's action grid (see draw_building_selection_body) instead of a page.
+enum class building_page_kind { profitability, method, workforce, status };
+
+/// A titled accordion page — the pager label plus which content to dispatch.
+struct building_page
+{
+    std::string        label;
+    building_page_kind kind;
+};
+
+/// Every accordion page that applies to @p id, in pager order. The one list both
+/// the in-band accordion (draw_building_selection_body) and the full-canvas
+/// takeover (selection_card.cpp) read, so they cannot show different pages for
+/// the same building — the same shared-list precedent as `tile_metrics`.
+std::vector<building_page> building_pages(const world& w, const recipe_registry& reg,
+                                          const economy_report& report, entity_id id);
+
+/// Draw one accordion page's content, dispatched by kind. Shared by the in-band
+/// accordion and the full-canvas takeover so the two cannot drift apart. Takes
+/// `ui_state&` (was world+reg+report+id only) because the Lifecycle page's
+/// Dismantle control defers through `ui.construction.pending_demolish` — the
+/// same deferred-erase seam the old construction-panel detail used, needed
+/// here because erasing from `w.buildings` mid-draw would invalidate the
+/// iteration that is drawing it.
+void draw_building_page(world& w, const recipe_registry& reg, const economy_report& report,
+                        entity_id id, building_page_kind kind, ui_state& ui);
+
+/// One page of the unit Selection card's accordion — mirrors building_page_kind's
+/// role for the new Soldier card (placeholder, BL-393 notes units are largely
+/// inert today). Strength: strength + count; Roster: roster-type name + owner.
+enum class unit_page_kind { strength, roster };
+
+/// A titled accordion page for the unit card — mirrors `building_page`.
+struct unit_page
+{
+    std::string   label;
+    unit_page_kind kind;
+};
+
+/// Every accordion page for @p id (a unit/unit-stack entity). Always both
+/// pages today — a unit_component always carries strength/count/type/owner —
+/// but kept as a list (not hard-coded two pages) so the shared draw dispatch
+/// below stays the one thing both this and a future full-canvas takeover read,
+/// the same precedent as tile_metrics/building_pages.
+std::vector<unit_page> unit_pages(const world& w, entity_id id);
+
+/// Draw one unit accordion page's content, dispatched by kind. Read-only —
+/// unlike the building card, nothing on this placeholder card mutates the
+/// unit.
+void draw_unit_page(const world& w, entity_id id, unit_page_kind kind);
+
 /// Draw the **Selection content** — the polymorphic detail of the current
 /// selection (ui_state::selected_entity), emitted into whatever window the caller
 /// has opened. This is **frame-agnostic**: it owns no window and takes no layout
@@ -85,6 +144,16 @@ void draw_building_profit(const world& w, const recipe_registry& reg,
 ///                 the close button (hide), and the tile "Construct Buildings" button.
 void draw_selection_content(world& w, const recipe_registry& reg,
                             const economy_report& report, ui_state& ui);
+
+/// Draw the CURRENT page of the building Selection card's accordion (the page
+/// named by ui_state::selection_building_page against that building's own
+/// building_pages() list) at whatever size the caller's container gives it.
+/// The full-canvas takeover (selection_card.cpp, detail_surface::building_metric)
+/// uses this so the overlay renders the exact same page content the in-band
+/// accordion does — the pager index is the fold key, same idiom as the tile
+/// card's card_resource_page / tile_metrics pairing.
+void draw_building_page_expanded(world& w, const recipe_registry& reg,
+                                 const economy_report& report, ui_state& ui);
 
 /// Draw the **tile construction ledger** (BL-162) — the tile-contextual surface that
 /// actually lets the player build. Opened by the tile Selection element's "Construct

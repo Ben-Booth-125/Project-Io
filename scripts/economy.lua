@@ -175,9 +175,22 @@ economy = {
     -- a strategic choice. Cost is a round, legible number (half a Track road);
     -- cooldown is short enough that a genuine trade-off is still worth chasing,
     -- long enough that a corp cannot flip-flop every tick for a marginal margin.
+    -- BL-434: a group-tagged recipe roster splits the generic processing_facility
+    -- into recognizable sub-facility kinds (Metal Foundry, Food Processing, ...).
+    -- Switching WITHIN a group (Bloomery -> Smithy, both Metal Foundry) is the
+    -- cost/cooldown below; switching ACROSS groups is refused outright by
+    -- try_switch_recipe (economy_system.cpp) — retracted from an earlier
+    -- cross_group_multiplier price tier in this same session. The only way to
+    -- change a building's group is dismantle + rebuild via the tile selector.
     recipe_switch = {
         switch_cost    = 12.0,
-        cooldown_ticks = 6,
+        -- Was 6 (Ben's playtest, 2026-08-16): 6 ticks x 90 days/tick is ~1.5
+        -- in-game years to change what a building makes, which read as "not
+        -- possible" rather than as a deliberate commitment. Dropped to 1 tick
+        -- (one quarter) — still a real cooldown, not an instant flip, but not
+        -- multi-year friction on a routine dial. Flagged for further playtest
+        -- tuning, see NR-253.
+        cooldown_ticks = 1,
     },
 
     -- Player-placeable roads, now a three-tier ladder (BL-172; BL-147 shipped a single tier). A

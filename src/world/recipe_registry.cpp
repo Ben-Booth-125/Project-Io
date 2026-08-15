@@ -165,6 +165,11 @@ void recipe_registry::load_from_lua(lua_state& lua)
         if (r.display_name.empty())
             r.display_name = title_case(r.name);
 
+        // BL-434: sub-facility kind. Falls back to the struct default "General"
+        // (not "") when absent — see recipe_registry.hpp's field comment for why
+        // an empty string is not the fallback.
+        r.group = entry->get_or<std::string>("group", "General");
+
         m_recipes.push_back(std::move(r));
     }
 
@@ -324,6 +329,8 @@ void recipe_registry::load_from_lua(lua_state& lua)
         recipe_switch_params rs;
         rs.switch_cost    = recipe_switch->get_or("switch_cost",    rs.switch_cost);
         rs.cooldown_ticks = recipe_switch->get_or("cooldown_ticks", rs.cooldown_ticks);
+        // cross_group_multiplier retired (BL-434 retraction, 2026-08-16): cross-group
+        // switching is refused outright now, not priced — see recipe_switch_params.
         m_recipe_switch = rs;
     }
 

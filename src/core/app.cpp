@@ -1508,7 +1508,8 @@ void app::render()
     if (m_ui.selected_entity != m_prev_selection)
     {
         m_ui.card_stack.clear();        // a new selection resets any drill-down (BL-196)
-        m_ui.card_resource_page = 0;    // ...and its resource accordion page
+        m_ui.card_resource_page = 0;    // ...and its tile resource accordion page
+        m_ui.selection_building_page = 0; // ...and the building card's accordion page
         m_prev_selection = m_ui.selected_entity;
     }
 

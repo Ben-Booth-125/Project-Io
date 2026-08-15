@@ -203,6 +203,31 @@ struct ui_state
     /// value. Held as int so "all" has a home the enum does not have to invent.
     int decision_feed_reason = -1;
 
+    // --- Building Selection card accordion (supersedes BL-431's three toggles) ---
+    // The building card now takes the tile card's 3-column band shape: Profitability /
+    // Method / Chain / Depth (whichever apply) each get a PAGE rather than a
+    // stack of independently-toggled sections, so one pager index replaces the
+    // former selection_method_open / selection_chain_open / selection_chain_target /
+    // selection_depth_open quartet — a page is always fully rendered while shown,
+    // there is nothing left to hide-and-reveal within it. Not clamped to the
+    // current building's page count here (that vector is rebuilt per-frame); the
+    // draw site clamps against it, same as the tile card's card_resource_page.
+    int selection_building_page = 0;
+
+    /// Unit Selection card accordion page index (mirrors selection_building_page's
+    /// role for the new Soldier card) — Strength / Roster, whichever apply.
+    int selection_unit_page = 0;
+
+    // --- Tile repeat-click selection cycle (placeholder unit-loop scaffolding) ---
+    // Which tile the loop is currently anchored to, and which of the three fixed
+    // stages (0 = unit, 1 = building, 2 = tile) the selection currently sits on.
+    // A click on hovered_tile == selection_cycle_tile advances the stage
+    // (skipping stages with nothing there); a click elsewhere reseeds both.
+    // Mirrors card_resource_page's per-selection reset idiom rather than adding a
+    // separate "is this a repeat click" flag.
+    entity_id selection_cycle_tile  = null_entity;
+    int       selection_cycle_stage = 0;
+
     /// Spectator mode (BL-409): no human seat. Presentation-side flag only —
     /// `world/*` never reads it; the sim's copy travels as corp_ai_params
     /// .spectating through run_economy_step's defaulted argument.
