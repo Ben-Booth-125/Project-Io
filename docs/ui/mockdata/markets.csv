@@ -1,103 +1,307 @@
 market_id,market_label,body_id,body_name,resource,supply,demand,price,base_price
-30288,"Kumere",15124,"Kepler",Iron Ore,323.685,355.137,2.70787,2.5
-30288,"Kumere",15124,"Kepler",Petroleum,57.7228,198.134,6.48441,3.5
-30288,"Kumere",15124,"Kepler",Agricultural Produce,502.048,571.75,3.20148,3
-30288,"Kumere",15124,"Kepler",Water,120.185,300.055,2.37009,1.5
-30288,"Kumere",15124,"Kepler",Tobacco,0,0,7.55798,7.55798
-30288,"Kumere",15124,"Kepler",Coffee,0,0,2.44206,2.44206
-30288,"Kumere",15124,"Kepler",Steel,0,160.564,31.9996,8
-30288,"Kumere",15124,"Kepler",Refined Fuel,0,142.724,39.9995,10
-30288,"Kumere",15124,"Kepler",Food Rations,0,249.767,23.9997,6
-30288,"Kumere",15124,"Kepler",(unnamed resource),0,0,2,2
-30288,"Kumere",15124,"Kepler",(unnamed resource),0,0,1.2,1.2
-30288,"Kumere",15124,"Kepler",(unnamed resource),0,0,2,2
-30288,"Kumere",15124,"Kepler",(unnamed resource),0,0,5,5
-30288,"Kumere",15124,"Kepler",(unnamed resource),0,0,4,4
-30288,"Kumere",15124,"Kepler",(unnamed resource),0,0,6,6
-30288,"Kumere",15124,"Kepler",(unnamed resource),0,0,50,50
-30288,"Kumere",15124,"Kepler",(unnamed resource),0,0,15,15
-30289,"New WaeVaillham",15124,"Kepler",Iron Ore,94.4592,94.4591,2.63523,2.5
-30289,"New WaeVaillham",15124,"Kepler",Petroleum,0,27.8586,13.9998,3.5
-30289,"New WaeVaillham",15124,"Kepler",Agricultural Produce,131.81,151.456,3.2158,3
-30289,"New WaeVaillham",15124,"Kepler",Water,97.158,107.953,1.58114,1.5
-30289,"New WaeVaillham",15124,"Kepler",Tobacco,0,0,7.2997,7.2997
-30289,"New WaeVaillham",15124,"Kepler",Coffee,0,0,2.12092,2.12092
-30289,"New WaeVaillham",15124,"Kepler",Steel,0,41.7879,31.9996,8
-30289,"New WaeVaillham",15124,"Kepler",Refined Fuel,0,37.1448,39.9995,10
-30289,"New WaeVaillham",15124,"Kepler",Food Rations,0,65.0034,23.9997,6
-30289,"New WaeVaillham",15124,"Kepler",(unnamed resource),0,0,2,2
-30289,"New WaeVaillham",15124,"Kepler",(unnamed resource),0,0,1.2,1.2
-30289,"New WaeVaillham",15124,"Kepler",(unnamed resource),0,0,2,2
-30289,"New WaeVaillham",15124,"Kepler",(unnamed resource),0,0,5,5
-30289,"New WaeVaillham",15124,"Kepler",(unnamed resource),0,0,4,4
-30289,"New WaeVaillham",15124,"Kepler",(unnamed resource),0,0,6,6
-30289,"New WaeVaillham",15124,"Kepler",(unnamed resource),0,0,50,50
-30289,"New WaeVaillham",15124,"Kepler",(unnamed resource),0,0,15,15
-30290,"Flaullmarch",15124,"Kepler",Iron Ore,80.219,80.219,2.63523,2.5
-30290,"Flaullmarch",15124,"Kepler",Petroleum,61.8832,68.7591,3.68932,3.5
-30290,"Flaullmarch",15124,"Kepler",Agricultural Produce,112.026,128.474,3.21268,3
-30290,"Flaullmarch",15124,"Kepler",Water,82.5109,91.6788,1.58114,1.5
-30290,"Flaullmarch",15124,"Kepler",Tobacco,0,0,1.92645,1.92645
-30290,"Flaullmarch",15124,"Kepler",Coffee,0,0,7.70333,7.70333
-30290,"Flaullmarch",15124,"Kepler",Steel,0,35.4882,31.9996,8
-30290,"Flaullmarch",15124,"Kepler",Refined Fuel,0,31.5451,39.9995,10
-30290,"Flaullmarch",15124,"Kepler",Food Rations,0,55.2039,23.9997,6
-30290,"Flaullmarch",15124,"Kepler",(unnamed resource),0,0,2,2
-30290,"Flaullmarch",15124,"Kepler",(unnamed resource),0,0,1.2,1.2
-30290,"Flaullmarch",15124,"Kepler",(unnamed resource),0,0,2,2
-30290,"Flaullmarch",15124,"Kepler",(unnamed resource),0,0,5,5
-30290,"Flaullmarch",15124,"Kepler",(unnamed resource),0,0,4,4
-30290,"Flaullmarch",15124,"Kepler",(unnamed resource),0,0,6,6
-30290,"Flaullmarch",15124,"Kepler",(unnamed resource),0,0,50,50
-30290,"Flaullmarch",15124,"Kepler",(unnamed resource),0,0,15,15
-30291,"Kroundmarch",15124,"Kepler",Iron Ore,12912.7,92.4219,0.625029,2.5
-30291,"Kroundmarch",15124,"Kepler",Petroleum,375.336,96.0984,1.61091,3.5
-30291,"Kroundmarch",15124,"Kepler",Agricultural Produce,1661.93,159.234,0.928622,3
-30291,"Kroundmarch",15124,"Kepler",Water,0,13.9379,5.99985,1.5
-30291,"Kroundmarch",15124,"Kepler",Tobacco,0,0,8.059,8.059
-30291,"Kroundmarch",15124,"Kepler",Coffee,0,0,3.61855,3.61855
-30291,"Kroundmarch",15124,"Kepler",Steel,0,34.1828,22.0398,8
-30291,"Kroundmarch",15124,"Kepler",Refined Fuel,16,14.3975,23.9471,10
-30291,"Kroundmarch",15124,"Kepler",Food Rations,0,24.3913,23.9994,6
-30291,"Kroundmarch",15124,"Kepler",(unnamed resource),0,0,2,2
-30291,"Kroundmarch",15124,"Kepler",(unnamed resource),0,0,1.2,1.2
-30291,"Kroundmarch",15124,"Kepler",(unnamed resource),0,0,2,2
-30291,"Kroundmarch",15124,"Kepler",(unnamed resource),0,0,5,5
-30291,"Kroundmarch",15124,"Kepler",(unnamed resource),0,0,4,4
-30291,"Kroundmarch",15124,"Kepler",(unnamed resource),0,0,6,6
-30291,"Kroundmarch",15124,"Kepler",(unnamed resource),0,0,50,50
-30291,"Kroundmarch",15124,"Kepler",(unnamed resource),0,0,15,15
-30292,"Kidford",15124,"Kepler",Iron Ore,94.3247,102.303,2.63523,2.5
-30292,"Kidford",15124,"Kepler",Petroleum,78.9193,87.6881,3.68932,3.5
-30292,"Kidford",15124,"Kepler",Agricultural Produce,0,60.3152,11.9999,3
-30292,"Kidford",15124,"Kepler",Water,105.226,116.917,1.58114,1.5
-30292,"Kidford",15124,"Kepler",Tobacco,0,0,4.16999,4.16999
-30292,"Kidford",15124,"Kepler",Coffee,0,0,4.48392,4.48392
-30292,"Kidford",15124,"Kepler",Steel,0,45.2579,31.9996,8
-30292,"Kidford",15124,"Kepler",Refined Fuel,0,40.2292,39.9995,10
-30292,"Kidford",15124,"Kepler",Food Rations,0,70.4012,23.9997,6
-30292,"Kidford",15124,"Kepler",(unnamed resource),0,0,2,2
-30292,"Kidford",15124,"Kepler",(unnamed resource),0,0,1.2,1.2
-30292,"Kidford",15124,"Kepler",(unnamed resource),0,0,2,2
-30292,"Kidford",15124,"Kepler",(unnamed resource),0,0,5,5
-30292,"Kidford",15124,"Kepler",(unnamed resource),0,0,4,4
-30292,"Kidford",15124,"Kepler",(unnamed resource),0,0,6,6
-30292,"Kidford",15124,"Kepler",(unnamed resource),0,0,50,50
-30292,"Kidford",15124,"Kepler",(unnamed resource),0,0,15,15
-30293,"Boundmarch",15124,"Kepler",Iron Ore,72.2241,80.2194,2.63522,2.5
-30293,"Boundmarch",15124,"Kepler",Petroleum,61.8836,68.7596,3.68931,3.5
-30293,"Boundmarch",15124,"Kepler",Agricultural Produce,111.324,129.693,3.23805,3
-30293,"Boundmarch",15124,"Kepler",Water,82.5113,91.6793,1.58113,1.5
-30293,"Boundmarch",15124,"Kepler",Tobacco,0,0,2.49829,2.49829
-30293,"Boundmarch",15124,"Kepler",Coffee,0,0,8.01784,8.01784
-30293,"Boundmarch",15124,"Kepler",Steel,0,35.4889,31.9993,8
-30293,"Boundmarch",15124,"Kepler",Refined Fuel,0,31.5456,39.9991,10
-30293,"Boundmarch",15124,"Kepler",Food Rations,0,55.2048,23.9995,6
-30293,"Boundmarch",15124,"Kepler",(unnamed resource),0,0,2,2
-30293,"Boundmarch",15124,"Kepler",(unnamed resource),0,0,1.2,1.2
-30293,"Boundmarch",15124,"Kepler",(unnamed resource),0,0,2,2
-30293,"Boundmarch",15124,"Kepler",(unnamed resource),0,0,5,5
-30293,"Boundmarch",15124,"Kepler",(unnamed resource),0,0,4,4
-30293,"Boundmarch",15124,"Kepler",(unnamed resource),0,0,6,6
-30293,"Boundmarch",15124,"Kepler",(unnamed resource),0,0,50,50
-30293,"Boundmarch",15124,"Kepler",(unnamed resource),0,0,15,15
+46808,"Huhaidar",15124,"Huhaidar",Iron Ore,715.189,0,0.625029,2.5
+46808,"Huhaidar",15124,"Huhaidar",Coal,0,0,2,2
+46808,"Huhaidar",15124,"Huhaidar",Petroleum,0,0,3.49996,3.5
+46808,"Huhaidar",15124,"Huhaidar",Silica,0,0,2,2
+46808,"Huhaidar",15124,"Huhaidar",Copper Ore,0,0,3,3
+46808,"Huhaidar",15124,"Huhaidar",Rare Earth Ore,0,0,6,6
+46808,"Huhaidar",15124,"Huhaidar",Agricultural Produce,0,0.329891,11.9997,3
+46808,"Huhaidar",15124,"Huhaidar",Water,0,0.494836,5.99985,1.5
+46808,"Huhaidar",15124,"Huhaidar",Iron-Nickel Ore,0,0,3,3
+46808,"Huhaidar",15124,"Huhaidar",Platinum Group,0,0,40,40
+46808,"Huhaidar",15124,"Huhaidar",Tobacco,0,0,2.46968,2.46968
+46808,"Huhaidar",15124,"Huhaidar",Spices,0,0,2.9816,2.9816
+46808,"Huhaidar",15124,"Huhaidar",Coffee,0,0,6.95498,6.95498
+46808,"Huhaidar",15124,"Huhaidar",Steel,0,0,8.0043,8
+46808,"Huhaidar",15124,"Huhaidar",Refined Fuel,0,0,9.99989,10
+46808,"Huhaidar",15124,"Huhaidar",Food Rations,0,0.989672,23.9994,6
+46808,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,2,2
+46808,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,1.2,1.2
+46808,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,2,2
+46808,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,5,5
+46808,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,4,4
+46808,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,6,6
+46808,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,50,50
+46808,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,15,15
+46808,"Huhaidar",15124,"Huhaidar",Silicon,0,4.28848,19.9998,5
+46808,"Huhaidar",15124,"Huhaidar",Refined Copper,0,4.28848,29.9997,7.5
+46808,"Huhaidar",15124,"Huhaidar",REE Alloy,0,3.21636,63.9993,16
+46808,"Huhaidar",15124,"Huhaidar",Machinery,0,3.21636,87.999,22
+46808,"Huhaidar",15124,"Huhaidar",Alloys,0,3.21636,135.998,34
+46808,"Huhaidar",15124,"Huhaidar",Electronics,0,3.21636,115.999,29
+46808,"Huhaidar",15124,"Huhaidar",Spacecraft Components,0,0,140,140
+46808,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0.577295,11.9999,3
+46808,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0.412354,47.9995,12
+46808,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0.247412,55.9994,14
+46809,"Khuanmin",15124,"Huhaidar",Iron Ore,14399.5,0,0.625029,2.5
+46809,"Khuanmin",15124,"Huhaidar",Coal,0,0,2,2
+46809,"Khuanmin",15124,"Huhaidar",Petroleum,0,0,3.49996,3.5
+46809,"Khuanmin",15124,"Huhaidar",Silica,0,0,2,2
+46809,"Khuanmin",15124,"Huhaidar",Copper Ore,0,0,3,3
+46809,"Khuanmin",15124,"Huhaidar",Rare Earth Ore,0,0,6,6
+46809,"Khuanmin",15124,"Huhaidar",Agricultural Produce,0,0.197934,11.9997,3
+46809,"Khuanmin",15124,"Huhaidar",Water,0,0.296902,5.99985,1.5
+46809,"Khuanmin",15124,"Huhaidar",Iron-Nickel Ore,0,0,3,3
+46809,"Khuanmin",15124,"Huhaidar",Platinum Group,0,0,40,40
+46809,"Khuanmin",15124,"Huhaidar",Tobacco,0,0,5.06013,5.06013
+46809,"Khuanmin",15124,"Huhaidar",Spices,0,0,4.82402,4.82402
+46809,"Khuanmin",15124,"Huhaidar",Coffee,0,0,2.88022,2.88022
+46809,"Khuanmin",15124,"Huhaidar",Steel,0,0,8.00284,8
+46809,"Khuanmin",15124,"Huhaidar",Refined Fuel,0,0,9.99989,10
+46809,"Khuanmin",15124,"Huhaidar",Food Rations,0,0.593803,23.9994,6
+46809,"Khuanmin",15124,"Huhaidar",(unnamed resource),0,0,2,2
+46809,"Khuanmin",15124,"Huhaidar",(unnamed resource),0,0,1.2,1.2
+46809,"Khuanmin",15124,"Huhaidar",(unnamed resource),0,0,2,2
+46809,"Khuanmin",15124,"Huhaidar",(unnamed resource),0,0,5,5
+46809,"Khuanmin",15124,"Huhaidar",(unnamed resource),0,0,4,4
+46809,"Khuanmin",15124,"Huhaidar",(unnamed resource),0,0,6,6
+46809,"Khuanmin",15124,"Huhaidar",(unnamed resource),0,0,50,50
+46809,"Khuanmin",15124,"Huhaidar",(unnamed resource),0,0,15,15
+46809,"Khuanmin",15124,"Huhaidar",Silicon,0,4.28848,19.9998,5
+46809,"Khuanmin",15124,"Huhaidar",Refined Copper,0,4.28848,29.9997,7.5
+46809,"Khuanmin",15124,"Huhaidar",REE Alloy,0,3.21636,63.9993,16
+46809,"Khuanmin",15124,"Huhaidar",Machinery,0,3.21636,87.999,22
+46809,"Khuanmin",15124,"Huhaidar",Alloys,0,3.21636,135.998,34
+46809,"Khuanmin",15124,"Huhaidar",Electronics,0,3.21636,115.999,29
+46809,"Khuanmin",15124,"Huhaidar",Spacecraft Components,0,0,140,140
+46809,"Khuanmin",15124,"Huhaidar",(unnamed resource),0,0.34643,11.9987,3
+46809,"Khuanmin",15124,"Huhaidar",(unnamed resource),0,0.247412,47.9995,12
+46809,"Khuanmin",15124,"Huhaidar",(unnamed resource),0,0.148447,55.9994,14
+46810,"Kai Saithai",15124,"Huhaidar",Iron Ore,2194.34,0,0.625029,2.5
+46810,"Kai Saithai",15124,"Huhaidar",Coal,0,0,2,2
+46810,"Kai Saithai",15124,"Huhaidar",Petroleum,0,0,3.49996,3.5
+46810,"Kai Saithai",15124,"Huhaidar",Silica,0,0,2,2
+46810,"Kai Saithai",15124,"Huhaidar",Copper Ore,411.723,0,0.750034,3
+46810,"Kai Saithai",15124,"Huhaidar",Rare Earth Ore,0,0,6,6
+46810,"Kai Saithai",15124,"Huhaidar",Agricultural Produce,0,0.461847,11.9997,3
+46810,"Kai Saithai",15124,"Huhaidar",Water,0,0.69277,5.99985,1.5
+46810,"Kai Saithai",15124,"Huhaidar",Iron-Nickel Ore,0,0,3,3
+46810,"Kai Saithai",15124,"Huhaidar",Platinum Group,0,0,40,40
+46810,"Kai Saithai",15124,"Huhaidar",Tobacco,0,0,3.14908,3.14908
+46810,"Kai Saithai",15124,"Huhaidar",Spices,0,0,3.43665,3.43665
+46810,"Kai Saithai",15124,"Huhaidar",Coffee,0,0,7.94461,7.94461
+46810,"Kai Saithai",15124,"Huhaidar",Steel,0,0,8.0043,8
+46810,"Kai Saithai",15124,"Huhaidar",Refined Fuel,0,0,9.99989,10
+46810,"Kai Saithai",15124,"Huhaidar",Food Rations,0,1.38554,23.9994,6
+46810,"Kai Saithai",15124,"Huhaidar",(unnamed resource),0,0,2,2
+46810,"Kai Saithai",15124,"Huhaidar",(unnamed resource),0,0,1.2,1.2
+46810,"Kai Saithai",15124,"Huhaidar",(unnamed resource),0,0,2,2
+46810,"Kai Saithai",15124,"Huhaidar",(unnamed resource),0,0,5,5
+46810,"Kai Saithai",15124,"Huhaidar",(unnamed resource),0,0,4,4
+46810,"Kai Saithai",15124,"Huhaidar",(unnamed resource),0,0,6,6
+46810,"Kai Saithai",15124,"Huhaidar",(unnamed resource),0,0,50,50
+46810,"Kai Saithai",15124,"Huhaidar",(unnamed resource),0,0,15,15
+46810,"Kai Saithai",15124,"Huhaidar",Silicon,0,4.28848,19.9998,5
+46810,"Kai Saithai",15124,"Huhaidar",Refined Copper,0,4.28848,29.9997,7.5
+46810,"Kai Saithai",15124,"Huhaidar",REE Alloy,0,3.21636,63.9993,16
+46810,"Kai Saithai",15124,"Huhaidar",Machinery,0,3.21636,87.999,22
+46810,"Kai Saithai",15124,"Huhaidar",Alloys,0,3.21636,135.998,34
+46810,"Kai Saithai",15124,"Huhaidar",Electronics,0,3.21636,115.999,29
+46810,"Kai Saithai",15124,"Huhaidar",Spacecraft Components,0,0,140,140
+46810,"Kai Saithai",15124,"Huhaidar",(unnamed resource),0,0.808213,11.9999,3
+46810,"Kai Saithai",15124,"Huhaidar",(unnamed resource),0,0.577295,47.9995,12
+46810,"Kai Saithai",15124,"Huhaidar",(unnamed resource),0,0.346377,55.9994,14
+46811,"Huhaidar",15124,"Huhaidar",Iron Ore,28132.6,0,0.625429,2.5
+46811,"Huhaidar",15124,"Huhaidar",Coal,0,0,2,2
+46811,"Huhaidar",15124,"Huhaidar",Petroleum,0,0,3.49996,3.5
+46811,"Huhaidar",15124,"Huhaidar",Silica,0,0,2,2
+46811,"Huhaidar",15124,"Huhaidar",Copper Ore,479.496,0,0.750034,3
+46811,"Huhaidar",15124,"Huhaidar",Rare Earth Ore,0,0,6,6
+46811,"Huhaidar",15124,"Huhaidar",Agricultural Produce,271.119,7,0.750054,3
+46811,"Huhaidar",15124,"Huhaidar",Water,1233.22,10.5,0.375017,1.5
+46811,"Huhaidar",15124,"Huhaidar",Iron-Nickel Ore,0,0,3,3
+46811,"Huhaidar",15124,"Huhaidar",Platinum Group,0,0,40,40
+46811,"Huhaidar",15124,"Huhaidar",Tobacco,0,0,1.79561,1.79561
+46811,"Huhaidar",15124,"Huhaidar",Spices,0,0,1.61824,1.61824
+46811,"Huhaidar",15124,"Huhaidar",Coffee,0,0,5.68768,5.68768
+46811,"Huhaidar",15124,"Huhaidar",Steel,0,0,7.89111,8
+46811,"Huhaidar",15124,"Huhaidar",Refined Fuel,0,0,9.99989,10
+46811,"Huhaidar",15124,"Huhaidar",Food Rations,0,2.77178,23.9956,6
+46811,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,2,2
+46811,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,1.2,1.2
+46811,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,2,2
+46811,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,5,5
+46811,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,4,4
+46811,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,6,6
+46811,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,50,50
+46811,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,15,15
+46811,"Huhaidar",15124,"Huhaidar",Silicon,0,4.28848,19.9998,5
+46811,"Huhaidar",15124,"Huhaidar",Refined Copper,0,4.28848,29.9997,7.5
+46811,"Huhaidar",15124,"Huhaidar",REE Alloy,0,3.21636,63.9993,16
+46811,"Huhaidar",15124,"Huhaidar",Machinery,0,3.21636,87.999,22
+46811,"Huhaidar",15124,"Huhaidar",Alloys,0,3.21636,135.998,34
+46811,"Huhaidar",15124,"Huhaidar",Electronics,0,3.21636,115.999,29
+46811,"Huhaidar",15124,"Huhaidar",Spacecraft Components,0,0,140,140
+46811,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,1.61643,11.9999,3
+46811,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,1.15459,47.9995,12
+46811,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0.692754,55.9994,14
+46812,"Huhaidar",15124,"Huhaidar",Iron Ore,0,0,2.5,2.5
+46812,"Huhaidar",15124,"Huhaidar",Coal,0,0,2,2
+46812,"Huhaidar",15124,"Huhaidar",Petroleum,0,0,3.5,3.5
+46812,"Huhaidar",15124,"Huhaidar",Silica,0,0,2,2
+46812,"Huhaidar",15124,"Huhaidar",Copper Ore,0,0,3,3
+46812,"Huhaidar",15124,"Huhaidar",Rare Earth Ore,0,0,6,6
+46812,"Huhaidar",15124,"Huhaidar",Agricultural Produce,0,0.527813,11.9999,3
+46812,"Huhaidar",15124,"Huhaidar",Water,0,0.791719,5.99993,1.5
+46812,"Huhaidar",15124,"Huhaidar",Iron-Nickel Ore,0,0,3,3
+46812,"Huhaidar",15124,"Huhaidar",Platinum Group,0,0,40,40
+46812,"Huhaidar",15124,"Huhaidar",Tobacco,0,0,2.68392,2.68392
+46812,"Huhaidar",15124,"Huhaidar",Spices,0,0,3.87448,3.87448
+46812,"Huhaidar",15124,"Huhaidar",Coffee,0,0,5.3119,5.3119
+46812,"Huhaidar",15124,"Huhaidar",Steel,0,0,8,8
+46812,"Huhaidar",15124,"Huhaidar",Refined Fuel,0,0,10,10
+46812,"Huhaidar",15124,"Huhaidar",Food Rations,0,1.58344,23.9997,6
+46812,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,2,2
+46812,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,1.2,1.2
+46812,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,2,2
+46812,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,5,5
+46812,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,4,4
+46812,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,6,6
+46812,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,50,50
+46812,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,15,15
+46812,"Huhaidar",15124,"Huhaidar",Silicon,0,4.28848,19.9998,5
+46812,"Huhaidar",15124,"Huhaidar",Refined Copper,0,4.28848,29.9997,7.5
+46812,"Huhaidar",15124,"Huhaidar",REE Alloy,0,3.21636,63.9993,16
+46812,"Huhaidar",15124,"Huhaidar",Machinery,0,3.21636,87.999,22
+46812,"Huhaidar",15124,"Huhaidar",Alloys,0,3.21636,135.998,34
+46812,"Huhaidar",15124,"Huhaidar",Electronics,0,3.21636,115.999,29
+46812,"Huhaidar",15124,"Huhaidar",Spacecraft Components,0,0,140,140
+46812,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0.923672,11.9999,3
+46812,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0.659766,47.9995,12
+46812,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0.39586,55.9994,14
+46813,"Sus Didu",15124,"Huhaidar",Iron Ore,36498.9,0,0.625029,2.5
+46813,"Sus Didu",15124,"Huhaidar",Coal,0,0,2,2
+46813,"Sus Didu",15124,"Huhaidar",Petroleum,1211.58,0,0.87504,3.5
+46813,"Sus Didu",15124,"Huhaidar",Silica,0,0,2,2
+46813,"Sus Didu",15124,"Huhaidar",Copper Ore,0,0,3,3
+46813,"Sus Didu",15124,"Huhaidar",Rare Earth Ore,0,0,6,6
+46813,"Sus Didu",15124,"Huhaidar",Agricultural Produce,241.326,5.5,0.750034,3
+46813,"Sus Didu",15124,"Huhaidar",Water,0,1.08864,5.99985,1.5
+46813,"Sus Didu",15124,"Huhaidar",Iron-Nickel Ore,0,0,3,3
+46813,"Sus Didu",15124,"Huhaidar",Platinum Group,0,0,40,40
+46813,"Sus Didu",15124,"Huhaidar",Tobacco,0,0,5.69935,5.69935
+46813,"Sus Didu",15124,"Huhaidar",Spices,0,0,5.57944,5.57944
+46813,"Sus Didu",15124,"Huhaidar",Coffee,0,0,7.52758,7.52758
+46813,"Sus Didu",15124,"Huhaidar",Steel,0,0,8.01016,8
+46813,"Sus Didu",15124,"Huhaidar",Refined Fuel,0,0,9.99989,10
+46813,"Sus Didu",15124,"Huhaidar",Food Rations,0,2.17735,23.9989,6
+46813,"Sus Didu",15124,"Huhaidar",(unnamed resource),0,0,2,2
+46813,"Sus Didu",15124,"Huhaidar",(unnamed resource),0,0,1.2,1.2
+46813,"Sus Didu",15124,"Huhaidar",(unnamed resource),0,0,2,2
+46813,"Sus Didu",15124,"Huhaidar",(unnamed resource),0,0,5,5
+46813,"Sus Didu",15124,"Huhaidar",(unnamed resource),0,0,4,4
+46813,"Sus Didu",15124,"Huhaidar",(unnamed resource),0,0,6,6
+46813,"Sus Didu",15124,"Huhaidar",(unnamed resource),0,0,50,50
+46813,"Sus Didu",15124,"Huhaidar",(unnamed resource),0,0,15,15
+46813,"Sus Didu",15124,"Huhaidar",Silicon,0,4.28848,19.9998,5
+46813,"Sus Didu",15124,"Huhaidar",Refined Copper,0,4.28848,29.9997,7.5
+46813,"Sus Didu",15124,"Huhaidar",REE Alloy,0,3.21636,63.9993,16
+46813,"Sus Didu",15124,"Huhaidar",Machinery,0,3.21636,87.999,22
+46813,"Sus Didu",15124,"Huhaidar",Alloys,0,3.21636,135.998,34
+46813,"Sus Didu",15124,"Huhaidar",Electronics,0,3.21636,115.999,29
+46813,"Sus Didu",15124,"Huhaidar",Spacecraft Components,0,0,140,140
+46813,"Sus Didu",15124,"Huhaidar",(unnamed resource),0,1.27005,11.9999,3
+46813,"Sus Didu",15124,"Huhaidar",(unnamed resource),0,0.907308,47.9952,12
+46813,"Sus Didu",15124,"Huhaidar",(unnamed resource),0,0.544307,55.9994,14
+46814,"Huhaidar",15124,"Huhaidar",Iron Ore,30096.9,0,0.625029,2.5
+46814,"Huhaidar",15124,"Huhaidar",Coal,0,0,2,2
+46814,"Huhaidar",15124,"Huhaidar",Petroleum,331.162,0,0.87504,3.5
+46814,"Huhaidar",15124,"Huhaidar",Silica,654.332,0,0.500023,2
+46814,"Huhaidar",15124,"Huhaidar",Copper Ore,0,0,3,3
+46814,"Huhaidar",15124,"Huhaidar",Rare Earth Ore,0,0,6,6
+46814,"Huhaidar",15124,"Huhaidar",Agricultural Produce,350.511,2.5,0.750034,3
+46814,"Huhaidar",15124,"Huhaidar",Water,0,0.494836,5.99985,1.5
+46814,"Huhaidar",15124,"Huhaidar",Iron-Nickel Ore,0,0,3,3
+46814,"Huhaidar",15124,"Huhaidar",Platinum Group,0,0,40,40
+46814,"Huhaidar",15124,"Huhaidar",Tobacco,0,0,5.7453,5.7453
+46814,"Huhaidar",15124,"Huhaidar",Spices,0,0,5.65878,5.65878
+46814,"Huhaidar",15124,"Huhaidar",Coffee,0,0,7.71038,7.71038
+46814,"Huhaidar",15124,"Huhaidar",Steel,0,0,8.01016,8
+46814,"Huhaidar",15124,"Huhaidar",Refined Fuel,0,0,9.99828,10
+46814,"Huhaidar",15124,"Huhaidar",Food Rations,0,0.989672,23.9994,6
+46814,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,2,2
+46814,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,1.2,1.2
+46814,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,2,2
+46814,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,5,5
+46814,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,4,4
+46814,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,6,6
+46814,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,50,50
+46814,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,15,15
+46814,"Huhaidar",15124,"Huhaidar",Silicon,0,4.28848,19.9998,5
+46814,"Huhaidar",15124,"Huhaidar",Refined Copper,0,4.28848,29.9997,7.5
+46814,"Huhaidar",15124,"Huhaidar",REE Alloy,0,3.21636,63.9993,16
+46814,"Huhaidar",15124,"Huhaidar",Machinery,0,3.21636,87.999,22
+46814,"Huhaidar",15124,"Huhaidar",Alloys,0,3.21636,135.998,34
+46814,"Huhaidar",15124,"Huhaidar",Electronics,0,3.21636,115.999,29
+46814,"Huhaidar",15124,"Huhaidar",Spacecraft Components,0,0,140,140
+46814,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0.577295,11.9999,3
+46814,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0.412354,47.9995,12
+46814,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0.247429,55.997,14
+46815,"Huhaidar",15124,"Huhaidar",Iron Ore,310.221,0,0.625029,2.5
+46815,"Huhaidar",15124,"Huhaidar",Coal,0,0,2,2
+46815,"Huhaidar",15124,"Huhaidar",Petroleum,0,0,3.49996,3.5
+46815,"Huhaidar",15124,"Huhaidar",Silica,0,0,2,2
+46815,"Huhaidar",15124,"Huhaidar",Copper Ore,0,0,3,3
+46815,"Huhaidar",15124,"Huhaidar",Rare Earth Ore,0,0,6,6
+46815,"Huhaidar",15124,"Huhaidar",Agricultural Produce,0,0.263912,11.9997,3
+46815,"Huhaidar",15124,"Huhaidar",Water,0,0.395869,5.99985,1.5
+46815,"Huhaidar",15124,"Huhaidar",Iron-Nickel Ore,0,0,3,3
+46815,"Huhaidar",15124,"Huhaidar",Platinum Group,0,0,40,40
+46815,"Huhaidar",15124,"Huhaidar",Tobacco,0,0,8.1965,8.1965
+46815,"Huhaidar",15124,"Huhaidar",Spices,0,0,8.04364,8.04364
+46815,"Huhaidar",15124,"Huhaidar",Coffee,0,0,5.43108,5.43108
+46815,"Huhaidar",15124,"Huhaidar",Steel,0,0,8.00284,8
+46815,"Huhaidar",15124,"Huhaidar",Refined Fuel,0,0,9.99989,10
+46815,"Huhaidar",15124,"Huhaidar",Food Rations,0,0.791964,23.9951,6
+46815,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,2,2
+46815,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,1.2,1.2
+46815,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,2,2
+46815,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,5,5
+46815,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,4,4
+46815,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,6,6
+46815,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,50,50
+46815,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0,15,15
+46815,"Huhaidar",15124,"Huhaidar",Silicon,0,4.28848,19.9998,5
+46815,"Huhaidar",15124,"Huhaidar",Refined Copper,0,4.28848,29.9997,7.5
+46815,"Huhaidar",15124,"Huhaidar",REE Alloy,0,3.21636,63.9993,16
+46815,"Huhaidar",15124,"Huhaidar",Machinery,0,3.21636,87.999,22
+46815,"Huhaidar",15124,"Huhaidar",Alloys,0,3.21636,135.998,34
+46815,"Huhaidar",15124,"Huhaidar",Electronics,0,3.21636,115.999,29
+46815,"Huhaidar",15124,"Huhaidar",Spacecraft Components,0,0,140,140
+46815,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0.461905,11.9987,3
+46815,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0.329883,47.9995,12
+46815,"Huhaidar",15124,"Huhaidar",(unnamed resource),0,0.19793,55.9994,14
+46816,"Thaivuathraith",15124,"Huhaidar",Iron Ore,11508.3,0,0.625429,2.5
+46816,"Thaivuathraith",15124,"Huhaidar",Coal,0,0,2,2
+46816,"Thaivuathraith",15124,"Huhaidar",Petroleum,0,0,3.49996,3.5
+46816,"Thaivuathraith",15124,"Huhaidar",Silica,0,0,2,2
+46816,"Thaivuathraith",15124,"Huhaidar",Copper Ore,0,0,3,3
+46816,"Thaivuathraith",15124,"Huhaidar",Rare Earth Ore,0,0,6,6
+46816,"Thaivuathraith",15124,"Huhaidar",Agricultural Produce,508.759,4,0.750034,3
+46816,"Thaivuathraith",15124,"Huhaidar",Water,0,0.791737,5.99985,1.5
+46816,"Thaivuathraith",15124,"Huhaidar",Iron-Nickel Ore,0,0,3,3
+46816,"Thaivuathraith",15124,"Huhaidar",Platinum Group,0,0,40,40
+46816,"Thaivuathraith",15124,"Huhaidar",Tobacco,0,0,6.29802,6.29802
+46816,"Thaivuathraith",15124,"Huhaidar",Spices,0,0,5.54675,5.54675
+46816,"Thaivuathraith",15124,"Huhaidar",Coffee,0,0,2.5642,2.5642
+46816,"Thaivuathraith",15124,"Huhaidar",Steel,0,0,8.0087,8
+46816,"Thaivuathraith",15124,"Huhaidar",Refined Fuel,0,0,9.99828,10
+46816,"Thaivuathraith",15124,"Huhaidar",Food Rations,0,1.58347,23.9994,6
+46816,"Thaivuathraith",15124,"Huhaidar",(unnamed resource),0,0,2,2
+46816,"Thaivuathraith",15124,"Huhaidar",(unnamed resource),0,0,1.2,1.2
+46816,"Thaivuathraith",15124,"Huhaidar",(unnamed resource),0,0,2,2
+46816,"Thaivuathraith",15124,"Huhaidar",(unnamed resource),0,0,5,5
+46816,"Thaivuathraith",15124,"Huhaidar",(unnamed resource),0,0,4,4
+46816,"Thaivuathraith",15124,"Huhaidar",(unnamed resource),0,0,6,6
+46816,"Thaivuathraith",15124,"Huhaidar",(unnamed resource),0,0,50,50
+46816,"Thaivuathraith",15124,"Huhaidar",(unnamed resource),0,0,15,15
+46816,"Thaivuathraith",15124,"Huhaidar",Silicon,0,4.28848,19.9998,5
+46816,"Thaivuathraith",15124,"Huhaidar",Refined Copper,0,4.28848,29.9997,7.5
+46816,"Thaivuathraith",15124,"Huhaidar",REE Alloy,0,3.21636,63.9993,16
+46816,"Thaivuathraith",15124,"Huhaidar",Machinery,0,3.21636,87.999,22
+46816,"Thaivuathraith",15124,"Huhaidar",Alloys,0,3.21636,135.998,34
+46816,"Thaivuathraith",15124,"Huhaidar",Electronics,0,3.21636,115.999,29
+46816,"Thaivuathraith",15124,"Huhaidar",Spacecraft Components,0,0,140,140
+46816,"Thaivuathraith",15124,"Huhaidar",(unnamed resource),0,0.923672,11.9999,3
+46816,"Thaivuathraith",15124,"Huhaidar",(unnamed resource),0,0.65978,47.9988,12
+46816,"Thaivuathraith",15124,"Huhaidar",(unnamed resource),0,0.39586,55.9994,14

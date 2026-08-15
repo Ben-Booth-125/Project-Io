@@ -10,7 +10,7 @@ the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
-| 2026-08-14 | [Gate hygiene becomes a measurement saga: batch verify, the 70% map, and the golden question](DEVLOG.md) | BL-402 BL-415 BL-416 BL-423 BL-424 BL-425 BL-426 BL-427 | DEVLOG.md |
+| 2026-08-14 | [Gate hygiene becomes a measurement saga: batch verify, the 70% map, and the golden demotion](DEVLOG.md) | BL-402 BL-415 BL-416 BL-423 BL-424 BL-425 BL-426 BL-427 | DEVLOG.md |
 | 2026-08-14 | [Seam batch: the money printer closed and the word interface given a door](DEVLOG.md) | BL-351 BL-386 BL-387 BL-396 BL-397 BL-416 BL-422 | DEVLOG.md |
 | 2026-08-14 | [Doc-system weight: requirements hot/cold split + DEVLOG rollover](DEVLOG.md) | BL-421 | DEVLOG.md |
 | 2026-08-13 | [AI gameplay: the word interface made runnable, and the rival's idle/resume oscillation measured](DEVLOG.md) | BL-049 BL-079 BL-094 BL-193 BL-202 BL-203 BL-278 BL-293 BL-315 BL-324 BL-350 BL-366 BL-377 BL-381 BL-384 BL-386 BL-387 BL-388 BL-389 BL-390 BL-393 BL-394 | DEVLOG.md |

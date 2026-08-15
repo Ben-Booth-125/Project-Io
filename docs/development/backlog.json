@@ -9180,7 +9180,7 @@
    "design": "RULED 2026-08-13 (NR-104). BL-266 made the Selection band always open, and the Continent lens key (BL-226/BL-376 lineage) now shares that corner. Ben chose moving the key over keeping the shared corner.\n\nBefore building: report the current measurements (key size, corner offsets, band extents) and confirm the destination corner with Ben against the live app (Rule 0b + the open-the-game memory). Update the QUESTION_LOG entry for the lens key if its placement rationale changes, and expect the continents_lens goldens to need re-blessing - fold that into BL-402's pass if it has not yet run."
   },
   {
-   "status": "designed",
+   "status": "complete",
    "glyph": "✓",
    "parked": false,
    "blocked_on": [],
@@ -9199,7 +9199,9 @@
     "scripts/verify/"
    ],
    "summary": "Ben ruled (NR-104, 2026-08-13): re-bless now, on the Windows box - not held for the unexplained Linux 20-35% diff. Covers the BL-266 Selection-band set (sticky_card_*, selection_*, walk_04, v009_emblem, continents_lens_kepler_key), deletes the orphaned sticky_card_01_dismissed.png, and clears the ~119-commit drift NR-130 recorded.",
-   "design": "RULED 2026-08-13 (NR-104). Run every visual check on the Windows box, bless the diffs routinely (goldens are disposable - flag only unexplained diffs), delete sticky_card_01_dismissed.png. NR-130's drift list and NR-131's empty-tile pop_markers frame are in scope: fix the pop_markers framing rather than blessing an empty capture. Sequence after BL-401 (key move) if both run in the same block, so the continents goldens are blessed once, not twice. The Linux-box 20-35% universal diff stays open as its own question - a Windows bless is valid regardless.\n\nProgress note 2026-08-15: pop_markers framing fixed (dynamic largest-settlement idiom), sticky_card_01_dismissed.png deleted, history_ages parked (BL-425). The wholesale bless itself is ON HOLD: Ben has twice questioned whether golden-diffing earns its cost at all (NR-237 carries the assessment and options). Resolve the policy before blessing 200+ files that a demotion would delete."
+   "resolved": "2026-08-15",
+   "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q3.json"
   },
   {
    "status": "designed",

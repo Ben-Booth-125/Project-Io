@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*7 entries — 7 open, 0 resolved.*
+*6 entries — 6 open, 0 resolved.*
 
 ---
 
@@ -94,21 +94,6 @@ Moved scripts/verify/history_ages.lua to scripts/verify/parked/ (excluded from -
 > **Recommendation:** Accept the park; take BL-425 (ages run cost) in a session with BL-403 (profiling harness), which wants the same instrument.
 
 *Files: `scripts/verify/parked/history_ages.lua`*
-
-### NR-237 — Golden-diffing policy: keep, demote to a curated world-independent set, or drop
-*question · raised 2026-08-15 · from Ben, twice on 2026-08-15: "What's your defence for keeping goldens?... I have never personally needed to use a golden... we are often changing significant amounts of the UI."*
-
-The measured case FOR his instinct: every diff in this week's passes was either intended change or world drift (35-39% everywhere after the Selection band change — zero information beyond "something changed", answer always "bless"); the genuine catches were harness-infrastructure bugs (capture-size poisoning, batch state leaks) — goldens policing the harness, not the game; there is no CI to run them, so they fire only in manual stewardship passes; and every world change obligates a ~30min pass plus a 200-file binary commit. The case AGAINST dropping entirely: captures (the PNGs) are how Claude verifies UI work and must stay regardless; a small WORLD-INDEPENDENT golden set (icon_silhouettes, header layout, text-fit surfaces) has high signal and near-zero churn; and assertion-based checks (the text_overflow_floor model — "the integer is the verdict") already cover the clipping class better than pixels do.
-
-**Why it matters.** Decides whether ~239 committed goldens and the re-bless obligation stay, shrink to ~10-15 stable surfaces, or go. Also decides BL-402's remaining scope.
-
-- A) Keep the full set + routine blessing (status quo, now cheap-ish via --verify-all)
-- B) Demote: goldens only for world-independent surfaces; everywhere else captures + targeted assertions (verify API grows draw-count/non-empty assertions); delete the rest
-- C) Drop golden-diffing entirely; captures + assertions only
-
-> **Recommendation:** B. It matches the project's own stated preference (text_overflow_floor: PNGs incidental, never the pass criterion) and the measured signal. Re-introduce goldens per surface as each UI area freezes approaching v0.1.0 — freezing is what makes a golden pay.
-
-*Files: `scripts/verify/golden/`*
 
 ---
 

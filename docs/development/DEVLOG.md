@@ -10,7 +10,7 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — Gate hygiene becomes a measurement saga: batch verify, the 70% map, and the golden question (2026-08-14/15, latest)
+## Session — Gate hygiene becomes a measurement saga: batch verify, the 70% map, and the golden demotion (2026-08-14/15, latest)
 
 Mixed mode, and the block that kept reframing itself. Started as three gate-hygiene items;
 ended with the visual harness rebuilt, the map resized, five stale-state classes measured out
@@ -43,7 +43,15 @@ the entry: demote to a world-independent curated set + assertion-based checks, r
 surface approaching v0.1.0. The suite-wide bless (BL-402's remainder) is HELD on that ruling —
 ~200 binary files should not be committed the day before a demotion deletes them.
 
-**Status:** BL-415/416/423/424 complete; BL-402 paused on NR-237; BL-425/426/427 filed.
+**Ruled and executed (2026-08-15): option B — goldens demoted.** Ben: golden-diffing kept only
+for a curated world-independent set (currently the icon_silhouettes pair, PASS 0.0000%);
+everywhere else captures are the product and assertions are the verdict. 221 tracked + 16
+untracked goldens deleted; `--bless` hardened to refresh-only so the set cannot silently
+regrow (app_capture.cpp); policy rewritten in DEVELOPMENT_PRACTICES § Visual verification and
+the verifier-visual skill (skill edit = executing the ruling). Reintroduction criterion:
+freezing — a surface joins the set when its pixels stop being expected to change.
+
+**Status:** BL-402/415/416/423/424 complete; BL-425/426/427 filed; NR-237 resolved-and-pruned.
 **Runtime:** ~5 h across the two days' boundary, Full, measurement-heavy.
 
 ---

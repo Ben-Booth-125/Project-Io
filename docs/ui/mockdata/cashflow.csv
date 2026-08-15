@@ -1,9 +1,29 @@
 corp_id,corp_name,income,expenditure,maintenance,wages,interest,net
-30312,"Faros-YelenKalen International",4427.19,0,30,9.43576,0,4387.75
-30313,"Exoar-Exoex Enterprises",1362.92,0,15,4.71788,0,1343.2
-30314,"Corix Industries",1314.64,0,15,4.71788,0,1294.92
-30315,"Calyx Industries",0,0,8,0,0,-8
-30316,"FararAthar Holdings",1371.83,51.5492,50,12.581,0,1257.7
-30317,"CalonIntus-PaxisAthen Ventures",1858.99,0,15,4.71788,0,1839.27
-30318,"Genom Systems",0,0,8,0,0,-8
-30319,"Terel-Coron Holdings",0,0,8,0,0,-8
+46798,"Faros-YelenKalen International",0,0,28,5.12927,0,-33.1293
+46799,"Exoar-Exoex Enterprises",1167.12,0,45,8.64298,0,1113.48
+46800,"Corix Industries",1296.7,0,50,9.60331,0,1237.09
+46801,"Calyx Industries",7579.24,0,41.5,7.68265,0,7530.06
+46802,"FararAthar Holdings",1105.54,0,53,9.60331,0,1042.94
+46803,"CalonIntus-PaxisAthen Ventures",1010.34,0,45,8.64298,0,956.698
+46804,"Genom Systems",0,0,21,0,0,-21
+46805,"Terel-Coron Holdings",5751.31,0,26,3.84133,0,5721.47
+51022,"Nexis Logistics",0,0,26,3.84133,0,-29.8413
+51025,"Lukuk Resources",0,0,21,2.88099,0,-23.881
+51028,"YelorCalur Operations",21983.5,0,26,3.84133,0,21953.7
+51031,"Orban-GenenOrbos Resources",0,0,26,3.84133,0,-29.8413
+51035,"HexyxCorix-CalosFaran Enterprises",462.478,0,50,9.60331,0,402.875
+51038,"Nexos-Calel Logistics",0,0,21,2.88099,0,-23.881
+51042,"Ruzumz Enterprises",17798.3,0,36,5.76199,0,17756.5
+51046,"BorosGenan-Zenom Industries",8825.81,0,36,5.76199,0,8784.05
+51049,"Sualak Systems",0,0,26,3.84133,0,-29.8413
+51053,"CoraxCoros Operations",193.897,0,31,4.80166,0,158.095
+51057,"Maikka Processing Group",513.208,0,36,5.76199,0,471.446
+51061,"Tei Extraction Co.",430.051,0,36,5.76199,0,388.289
+51065,"Dynan Resources",359.638,0,36,5.76199,0,317.876
+51068,"Luxan Industries",0,0,21,2.88099,0,-23.881
+51071,"JorenRexax Enterprises",11247.9,0,26,3.84133,0,11218.1
+51075,"Rexar Dynamics",630.131,0,36,5.76199,0,588.369
+51078,"PaxonNexen Enterprises",0,0,26,3.84133,0,-29.8413
+51082,"Zenus-Orbon Operations",174.296,0,31,4.80166,0,138.495
+51086,"Roteit Logistics",447.013,0,36,5.76199,0,405.251
+51090,"He Holdings",289.78,0,36,5.76199,0,248.018
