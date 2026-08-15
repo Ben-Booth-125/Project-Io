@@ -133,7 +133,7 @@ struct generation_progress
     /// The homeworld grid the carve is published over. static_assert'd against
     /// home_grid_width/height below — begin_carve publishes a zero grid rather
     /// than truncating if a bigger body ever arrives.
-    static constexpr int carve_capacity = 312 * 145;
+    static constexpr int carve_capacity = 261 * 121;
 
     /// Asset markers plotted on the carve. Each corp stakes a small cluster, so
     /// this bounds the ~8 generated charters at a comfortable ceiling. Overflow
@@ -417,9 +417,13 @@ world make_hard_coded_world(world_params params = {}, generation_report* report 
 /// The homeworld's tile grid dimensions — one authority the build and the
 /// wizard preview both read.
 ///
-/// **312×145 = 45,240 tiles since 2026-08-12 (Ben), three times the area of the
-/// old 180×84 = 15,120.** The aspect ratio is held at ~2.15:1 so the cylinder
-/// still maps a plausible globe: columns wrap as the equator, rows do not.
+/// **261×121 = 31,581 tiles since 2026-08-14 (Ben): 70% of the 2026-08-12
+/// 312×145 = 45,240 area, which was itself three times the original
+/// 180×84 = 15,120.** The 3× map priced Debug-build world generation at ~38 s
+/// and the lazy Era −1 ages run past ten minutes; 70% area claws back cost
+/// while keeping roughly double the original playfield. The aspect ratio is
+/// held at ~2.15:1 so the cylinder still maps a plausible globe: columns wrap
+/// as the equator, rows do not.
 ///
 /// The scale-up is only half a change on its own. Travel time used to be
 /// `1 / distance_in_AU`, which is zero for two markets on the same body — so
@@ -428,8 +432,8 @@ world make_hard_coded_world(world_params params = {}, generation_report* report 
 /// rather than slower. The distance→time model in logistics.hpp
 /// (`body_km_per_tile`, `convoy_travel_ticks`) landed with this constant for
 /// that reason; changing one without the other is a regression.
-inline constexpr int home_grid_width  = 312;
-inline constexpr int home_grid_height = 145;
+inline constexpr int home_grid_width  = 261;
+inline constexpr int home_grid_height = 121;
 
 // The carve sink is sized for exactly this grid. Declared up beside the struct
 // (which precedes these constants) and tied back here, so a future map resize

@@ -498,16 +498,21 @@ float output. Bless a set from a fresh Clang run and add its own block."
 // table below is the observed run, verbatim; the bands are computed by the
 // slack constants beside `derive()` above. To re-bless: run twice, confirm
 // identical, replace these seven numbers per seed, done.
+// --- RE-BLESSED 2026-08-15 (BL-424): the homeworld grid fell to 70% area
+// (312x145 -> 261x121, Ben's call), so every benchmark seed generates a smaller
+// world — fewer deposits, fewer siting choices, tighter margins. Identical
+// across two consecutive runs before blessing. First use of the derived form's
+// intended workflow: seven numbers per seed replaced, nothing else touched.
 const std::vector<seed_observed> observed = {
-    { 0, 800815.2f, 89085.5f, 8, 1.00f, 5, 48 },
-    { 1, 219294.1f, 36179.5f, 3, 0.71f, 4, 52 },
-    { 2, 157906.7f, 27058.0f, 7, 0.86f, 4, 42 },
-    { 3, 401188.2f, 49017.7f, 0, 1.00f, 6, 63 },
-    { 4, 180382.9f, 29935.0f, 4, 0.86f, 3, 44 },
+    { 0, 181559.0f, 27753.7f, 10, 0.86f, 3, 33 },
+    { 1, 110288.8f, 26750.3f,  0, 0.86f, 5, 50 },
+    { 2, 173754.4f, 18886.7f,  5, 1.00f, 5, 43 },
+    { 3, 621949.7f, 60971.8f,  0, 0.86f, 6, 62 },
+    { 4, 205193.4f, 30406.2f,  7, 0.57f, 2, 42 },
 };
 const std::vector<seed_golden> goldens = derive_all(observed);
 const char* const k_bands_blessed =
-    "2026-08-14 (MSVC, post-BL-386 reservation-rule economy)";
+    "2026-08-15 (MSVC, post-BL-424 70%-area map)";
 #elif defined(__GNUC__)
 // --- Linux / GCC -O2 — RE-BLESSED 2026-08-09 (BL-285 task 1, at the v0.1.8 cut).
 // Observed on that run:
