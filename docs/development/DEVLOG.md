@@ -10,7 +10,117 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — BL-429 slice 3: the ancient roster gets glyphs (2026-08-15, latest)
+## Session — building Selection card playtest, sub-facility groups (BL-431, BL-434) (2026-08-16, latest)
+
+Full mode. Started by pulling a mobile session's BL-429 finish (slices 2-3, already merged via
+PR #40), then a long iterative playtest pass over the just-landed BL-430/BL-431 economy-breadth
+UI, driven turn-by-turn against Ben opening the live app and reporting back.
+
+**Buildings tab retired.** The management ledger's "Buildings" tab (`draw_buildings_tab` /
+`draw_selected_section`, ~620 lines) duplicated what the Selection card now covers — deleted
+outright. Its two real capabilities that had no home yet (Workforce controls, Close/Dismantle)
+moved into the Selection card's own accordion and action grid. The foldout panel is Construction-
+only now (`"Building"` -> `"Construction"`); the Manage action-grid button that used to route
+there was removed once it had nowhere useful left to point.
+
+**Building card normalised to the tile card's shape and proportions.** 3-column band (1/4 zoomed
+tile view . 1/2 paged accordion . 1/4 action grid), matching `draw_tile_selection` exactly rather
+than the original rework's 1/3 . 5/12 . 1/4 split. The tile-neighbourhood render in the left
+column was replaced by a per-building-type glyph placeholder (`icons::building`, the same glyph
+the Build door and canvas markers use). A placeholder Soldier/unit selection card was added,
+sharing the same 3-column family, reading real `unit_component` fields (`strength`, `count`,
+roster-table `type` lookup, `owner`) rather than fabricated numbers. A repeat-click tile-cycle
+(Soldier -> Building -> Tile) was added to `body_surface_canvas.cpp`'s click handler — its first
+implementation was checked on `marker_hit == null_entity`, which almost never held on a built
+tile (the building's marker covers nearly the whole hex), so the cycle silently never fired
+there; fixed by checking the anchored-tile match first, before marker resolution.
+
+**Profitability, Method, Workforce, Lifecycle — several playtest rounds each.** Final shape:
+Profitability shows Revenue/Expenses bars (Expenses segmented into input cost / maintenance /
+wages, each hover-labelled, folding in what was briefly a separate Inputs chart) beside a
+6-month net-profit line, budgeted to 90% of the accordion's available height so it never pops a
+scrollbar even at a near-exact fit. Method is a single narrow tiled column (was a 2-column grid),
+Switch drawn as a large glyph in a deliberate accent blue rather than the neutral grey every other
+glyph button uses, offering only same-group recipes, with an "(active)" text tag dropped in
+favour of the row's existing border/text highlighting. Workforce lost its heading and 6-button
+tier grid for a 1% `SliderInt`, and a visible "Retooling - N ticks left" progress bar replaced a
+hover-only cooldown tooltip. Depth and Chain were dropped as standalone pages (Depth's info
+wasn't landing as useful; Chain folded into Profitability's input breakdown). Lifecycle stopped
+being a page — Mothball/Reopen (distinct glyphs, not a shared toggle label) and Dismantle live as
+action-grid buttons instead, alongside a relocated Workforce-Auto toggle.
+
+**A real ImGui bug, not a design complaint.** Ben reported the Workforce Auto button as
+"game breaking." Root cause: `ImGui::Button(autolbl, ...)` had no `##` separator, so the widget's
+id *was* its label text — and the label baked in the live `workforce_target` percentage, which
+`solve_workforce_target` re-solves every tick while Auto is active. The button's identity churned
+every frame the number moved, corrupting ImGui's hover/active/focus state continuously. Fixed
+with a stable `"Auto##wf_auto"` id, percentage shown as separate text.
+
+**BL-434 (sub-facility groups), filed and landed same session, then partly retracted in the
+same session.** Ben, mid-playtest: "Now is also the time to implement the building splits...
+It should also cost money for any building to undergo a large change, making it in some cases
+cheaper to just build another." First cut: every recipe gained a `group` field (Metal Foundry,
+Refinery, Food Processing, Chemical Works, Electronics, Advanced Fabrication, Welfare Goods,
+Fuel Production, Artisan Goods), the Build door collapsed to one candidate row per group instead
+of one per recipe, and a cross-group recipe switch was priced at a steep multiplier
+(`cross_group_multiplier`, first-cut 6.0x) on top of BL-430's existing switch cost. Minutes after
+it landed, Ben reconsidered: "switching methods can mean changing to a different building type —
+we should retire that completely." Retracted to a hard refusal (`recipe_switch_result::
+cross_group`) rather than a price; the Method page's candidate list now filters to same-group
+recipes so a cross-group option is never even offered. Dismantle + rebuild via the tile selector
+is the only way left to change a building's group. `cross_group_multiplier` was removed rather
+than left dead. The BL-434 item and its retraction are both recorded in its `design`/`resolution`
+fields rather than only in code comments, since the reversal happened inside the same session a
+future reader might otherwise assume was linear.
+
+**The recipe-switch cooldown, separately.** Ben asked how long a switch actually takes; the
+honest answer was 6 economy ticks x 90 days/tick, ~1.5 in-game years — long enough that the
+disabled Switch glyph just read as "not possible," not as a running cooldown (compounded by the
+progress bar not existing yet). Dropped to 1 tick, flagged (NR-253) as a first cut needing real
+playtest pacing, not a measured value.
+
+**One correctness sweep, at housekeeping time.** A background implementation agent had invented
+a plausible-looking but nonexistent backlog id (`BL-436`) across a dozen files' comments while
+building the sub-facility-groups work — `next_id.js` confirmed no such item existed. Renamed to
+the real next free id, **BL-434**, and filed it retroactively in `backlog.json` (status
+`complete`, both the tiered-price design and its retraction recorded) so the many code comments
+citing it resolve to something real.
+
+**Time panel:** the 5x speed button was riding the screen edge — the six speed buttons divided
+`ctrl_w` exactly, with no margin for rounding. Narrowed to 92% of the exact division.
+
+**Two agent-coordination near-misses, both self-corrected.** One background agent returned a
+plausible-sounding completion report after making zero file changes — caught by checking
+`git status` before trusting the report, and relaunched with an explicit "you have no sub-agent
+access, implement directly" instruction. Two separately-launched agents ended up mid-session
+editing the same file; each detected the other's in-progress work on disk and reconciled onto one
+consistent design rather than silently overwriting it — verified by an independent rebuild
+afterward rather than trusting either self-report. Both incidents reinforce the same practice:
+verify a background agent's report against the actual working tree before acting on it.
+
+**Verification.** Every step of this session rebuilt (`build_app.bat`) before proceeding to the
+next; the final combined diff (25 files) builds clean. `recipe_switch_harness`: S1-S5 (BL-430's
+original mechanism) and the new S6a-f (BL-434's refusal path) all PASS; R1's pre-existing
+no-dominance finding (NR-243, four dominated recipe pairs, unrelated to this session) is
+unchanged and still fails as documented. No visual harness exists yet for the Selection card
+rework itself (BL-431's own requirement group is still open) — every visual check this session
+was Ben looking at the live app directly, turn by turn, which is how the playtest iteration
+loop actually ran.
+
+**Open for Ben (NEEDS_REVIEW).** NR-248 (Expenses' revenue/expense split is the finest real data
+`building_profit.hpp` tracks — no sub-breakdown of revenue exists). NR-249/NR-250 (two placeholder
+trend graphs and a fixed-clamp layout budget, both first-cut numbers). NR-252 (two recipe-group
+taxonomy calls: Hydroponics Bay's group, and whether Advanced Fabrication should split). NR-253
+(the 1-tick cooldown needs real playtest pacing). NR-245 is resolved-in-place (the Manage button's
+destination changed, then the button was removed entirely once the Buildings tab it pointed to no
+longer existed).
+
+**Runtime:** ~5 hours, Full mode, iterative playtest/build/verify loop across roughly a dozen
+background implementation passes plus direct edits for small contained fixes.
+
+---
+
+## Session — BL-429 slice 3: the ancient roster gets glyphs (2026-08-15)
 
 Full mode, direct continuation of slice 2 in the same session — Ben asked to close R5's glyph
 clause next rather than move on to BL-430/BL-431.
