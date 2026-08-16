@@ -170,6 +170,19 @@ int main(int argc, char** argv)
     long active_but_zero = 0;
     std::vector<long> limiting_by_resource(resource_count, 0);
 
+    // R4 accumulators: is each recipe input actually supplied?
+    std::vector<long>   tiles_with(resource_count, 0);      // tiles carrying a deposit
+    std::vector<long>   sites_targeting(resource_count, 0); // extraction sites mining it
+    std::vector<double> supply_units(resource_count, 0.0);  // units extracted, all seeds/ticks
+    std::vector<long>   input_demand(resource_count, 0);    // recipes naming it as an input
+    for (int i = 0; i < reg.recipe_count(building_type::processing_facility); ++i)
+    {
+        const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (rc.inputs[r] > 0.0f)
+                ++input_demand[r];
+    }
+
     for (int s = 0; s < n_seeds; ++s)
     {
         world_params p = no_prehistory();
@@ -183,6 +196,16 @@ int main(int argc, char** argv)
         if (seed_recipes)
             seed_default_recipes(w, reg);
         generate_background_firms(w, reg, static_cast<uint32_t>(s) ^ 0x8A21F00Du);
+
+        // Static structure, counted once per seed: what the world CONTAINS and
+        // what is pointed at it, independent of any tick.
+        for (const auto& [tid, tc] : w.tiles)
+            for (std::size_t r = 0; r < resource_count; ++r)
+                if (tc.resource_deposit[r] > 0.0f)
+                    ++tiles_with[r];
+        for (const auto& [bid, b] : w.buildings)
+            if (b.type == building_type::extraction_site)
+                ++sites_targeting[static_cast<std::size_t>(b.target_resource)];
 
         for (int t = 1; t <= n_ticks; ++t)
         {
@@ -212,6 +235,10 @@ int main(int argc, char** argv)
                 if (bp.revenue > 0.0f)
                     ++acc.earning;
             }
+
+            for (const building_report& br : report.buildings)
+                if (br.type == building_type::extraction_site && br.output_quantity > 0.0f)
+                    supply_units[static_cast<std::size_t>(br.target_resource)] += br.output_quantity;
 
             // R3's classification, read off the report rows the same tick
             // produced them.
@@ -303,6 +330,42 @@ int main(int argc, char** argv)
                             100.0 * static_cast<double>(limiting_by_resource[r])
                                   / static_cast<double>(why_starved));
     }
+
+    // --- R4: is every recipe input actually SUPPLIED? ------------------------
+    //
+    // R3 found starvation dominated by one resource, which raises a question the
+    // profit columns cannot answer: is that input scarce because the market fails
+    // to route it, or because nothing mines it in the first place? Those want
+    // completely different fixes, and the difference is visible here.
+    //
+    // The suspicion this exists to test: placement_rules::richest_extractable
+    // gives a site the SINGLE richest deposit on its tile, so a resource that is
+    // present but never the richest on any tile is never mined at all — no matter
+    // how many tiles carry it, and no matter how much a recipe needs it.
+    std::printf("\nR4 — is every recipe input actually produced?\n");
+    std::printf("  %-4s %10s %10s %12s %14s\n",
+                "id", "tiles", "sites", "units/tick", "needed-by");
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        if (input_demand[r] == 0)
+            continue; // nothing consumes it; not this row's business
+        std::printf("  %-4zu %10ld %10ld %12.1f %14ld%s\n", r,
+                    tiles_with[r], sites_targeting[r],
+                    supply_units[r] / static_cast<double>(n_seeds * n_ticks),
+                    input_demand[r],
+                    (tiles_with[r] > 0 && sites_targeting[r] == 0) ? "   <-- MINED BY NOTHING" : "");
+    }
+
+    // The invariant that R4's table exists to state. A resource a recipe needs,
+    // which is PRESENT on thousands of tiles and which nothing mines, is not a
+    // balance problem — it is a chain that can never run at all.
+    long unmined_but_needed = 0;
+    for (std::size_t r = 0; r < resource_count; ++r)
+        if (input_demand[r] > 0 && tiles_with[r] > 0 && sites_targeting[r] == 0)
+            ++unmined_but_needed;
+    check(unmined_but_needed == 0,
+          "every recipe input that has deposits is mined by at least one site ("
+              + std::to_string(unmined_but_needed) + " are not)");
 
     // --- R1: the report is non-vacuous ---------------------------------------
     std::printf("\nR1 — the measurement actually happened\n");
