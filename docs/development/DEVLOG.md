@@ -10,7 +10,90 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — building Selection card playtest, sub-facility groups (BL-431, BL-434) (2026-08-16, latest)
+## Session — chain depth becomes the growth gate (BL-428 slice 2), Method-page fix, seed sweep (2026-08-16, latest)
+
+Full mode. Sprint opened by triaging the review queue as asked: nothing blocking (no `blocked` rows,
+`review.json` empty), so two cheap entries were cleared as part of the sprint and the rest left for
+Ben. One correction worth recording — the queue holds **18 entries, 15 open**, not the 36 first
+reported; the initial count accidentally measured `_note`'s lines rather than `items`.
+
+**BL-428's gate half landed — the part that makes chain depth the growth TRACK.** The metric
+(`depth_of`, `is_raw`, `max_depth`) shipped 2026-08-15 with BL-429/430/431, but nothing consumed it:
+there was no `reached_depth` anywhere and `placement_rules` had no depth check, so a corp's reach
+down the graph opened nothing. Now `recipe_required_depth` (a recipe's deepest input, computed in
+the same bounded fixed point as `depth_of` so it cannot drift from the graph or the era mask) meets
+`corp_reached_depth` over a new `corporation_component::produced_ever`, set at the two sites a good
+is genuinely made. **Produced-once-ever and never cleared**: progress must not evaporate because a
+building idled, and monotonicity is the property the gate rests on — a placement that was legal must
+not silently become illegal. It also means a corp cannot buy its way up the ladder, since the bit is
+set by the act of making rather than by holding.
+
+**Gated at both doors, and that is not redundancy.** Guarding only `construct_building` left a
+one-click bypass: place the shallowest ancient method reachable, retool onto the deepest sibling in
+the same group, and the ladder is never climbed. `try_switch_recipe` refuses too; both map to
+`corp_command_result::rejected_depth_locked` so the seam cannot tell the routes apart. Ben's call
+was **ancient roster only**, and the band check sits on the RECIPE, so an `any`-band recipe stays
+ungated even in an ancient campaign and no 1960 campaign changes shape.
+
+**A real pre-existing wrong-recipe bug, found by wiring the gate (NR-254).** The Build door stored
+the era-MASKED browse index in `candidate.recipe` and passed it where an ABSOLUTE id was expected.
+The two spaces coincide exactly while the mask is the identity — every `any`-band campaign — so it
+was invisible in normal play and would have stayed invisible, while naming the wrong recipe in
+precisely the ancient campaigns BL-429/430/431 have been building out. Two sibling call sites in the
+same file already converted correctly via `recipe_id(name)`; the door did not.
+
+**The verify script could not reach the pages it claimed to check (NR-246).** Rewriting
+`building_management_shell.lua` onto the Selection pager needed a new verb,
+`verify.building_page(n)` — `fold("building_metric", k)` sets the drill KEY, not the page, so the
+first rewrite still captured page 1 three times. **The first honest photograph of the Method page
+immediately showed a live defect**: the profit figure printed straight through the method name
+("Food Rations" with "+7.0/tick" over it), both of the row's load-bearing values illegible at once.
+That is the whole argument for the check existing, and it had gone unseen because the old script was
+photographing a tab BL-431 deleted.
+
+**Fixing that overlap took two changes, and the first alone made it worse.** Measuring the profit
+first and eliding the name (through `ui::fit_text`, so an over-long name records in BL-215's
+overflow ledger instead of clipping silently) turned the name into "...". The measured reason:
+the row was `avail * 0.62` = **160 px** trying to hold **248 px** — pip 27.8 + name 103 + gap 8 +
+profit 70 + Switch 33 + padding 6, leaving the name **16 px**. The 0.62 was arbitrary; the
+2026-08-15 "slimmer strip, not a denser fit" call was about row HEIGHT against the square tiles it
+replaced, and argues against cramming rather than for it. Full width now, capped at 280.
+
+**Opening the app for Ben exposed a flag misuse, then a seed problem.** `--autostart-windowed` is a
+SMOKE TEST — 120 frames then exit 0 — so pointing a human at it looks exactly like a crash two
+seconds in, which is what happened. Added `--autostart-play`: same wizard walk, no cap, with
+`run()`'s bool widened to an `autostart_mode` so the two intents cannot be confused again.
+
+That live look then found the real problem: **the player's corp had no processing facility at all**,
+so the Method page had nothing to show. `tools/verify/player_seed_sweep.cpp` was written to measure
+it, and **corrected the premise it was written under**. Ben asked to keep only *profitable* seeds;
+across 24 seeds every one ends positive (1.3k-55k cr) and **not one dips below zero**. The single
+failing condition is that **13 of 24 hand the player a pure-extraction corp**, three with no
+production building at all. So a seed filter would have discarded half the generator's output to fix
+what is really an ASSIGNMENT problem — every one of those 13 worlds contains corporations that do
+have processors. Ben's ruling: do not filter; build the selection screen. Filed as **BL-435**
+(starting-corp selection, v0.1.18), with rejection-sampling and a curated whitelist both recorded as
+deliberately-not-doing, since each hides the distribution rather than exposing it.
+
+**Toolchain correction.** The `verifier-headless` skill's documented `vcvars64` path (VS18 Community,
+recorded 2026-07-28) **cannot build the configured tree**: it puts 14.51 STL headers on `INCLUDE`
+while CMake invokes the 14.44 `cl.exe`, and `yvals_core.h` hard-fails on the first translation unit.
+The skill now pins `-vcvars_ver=14.44` against the BuildTools 2022 path and prefers
+`cmake --build build --target <name>` over the raw `cl` line.
+
+**Left open.** NR-256: `--autostart-play` worked interactively but terminated on its own three times
+unattended (~20s/34s/~60s, exit 0, no error, frame cap ruled out) — either a stray window-close event
+or the background shell reaping a GUI process, and "it worked while a human watched" is not a
+diagnosis. NR-243's four dominated recipe pairs are still the one red row in
+`recipe_switch_harness`, untouched by this work. BL-432 still owes `chain_depth` its remaining two
+roster invariants.
+
+**Runtime:** ~3 hours, Full mode — one Delivery lifecycle (BL-428, 6 tasks / 4 requirements) run in
+the main session rather than fanned out, plus two Light follow-ons driven by live playtest.
+
+---
+
+## Session — building Selection card playtest, sub-facility groups (BL-431, BL-434) (2026-08-16)
 
 Full mode. Started by pulling a mobile session's BL-429 finish (slices 2-3, already merged via
 PR #40), then a long iterative playtest pass over the just-landed BL-430/BL-431 economy-breadth

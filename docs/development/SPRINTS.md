@@ -1075,3 +1075,73 @@ clean auto-merge, and that is why the Ages view and the disclosure controls surv
 - **Windows work is owed**: visual goldens are stale wherever a body name renders, the MSVC skill
   goldens are stale for two separate reasons, and **BL-341** (the from-cold configure check) is
   parked until someone is at that machine.
+
+
+---
+
+## Sprint 18 retro — the growth gate, and four things measurement overturned (2026-08-16)
+
+**Goal.** Finish BL-428: make chain depth actually gate something, rather than compute a number
+nothing reads.
+
+### What landed
+
+- **BL-428 complete** — `recipe_required_depth` + `corporation_component::produced_ever` +
+  refusal at both `construct_building` and `try_switch_recipe`. 6 tasks, 4 requirements, all met.
+  `chain_depth` gained 11 assertions (G1–G4), including BL-432's no-stranded-building row.
+- **Two review-queue entries cleared** (NR-246, NR-244's headless half) and **three filed**
+  (NR-254, NR-255, NR-256).
+- **BL-435 filed** — starting-corp selection, with a measurement behind it rather than a hunch.
+- **`player_seed_sweep`** added and catalogued in the `verifier-headless` skill.
+
+### What this sprint is actually worth remembering for
+
+**Every substantive finding came from measuring something, and four times the measurement
+overturned the plausible story.** The pattern is the same one Sprint 11's retro recorded, which
+suggests it is the method working rather than a coincidence:
+
+| The story | What measurement said |
+|---|---|
+| "Keep only *profitable* player seeds" | Profitability is **not** the discriminator — all 24 seeds end positive, none dip. 13/24 fail on having no processing facility |
+| The Method page overlap is a draw-order bug | Draw order was half of it; fixing only that gave `"..."`. The row was **160 px holding 248 px** of content |
+| The app crashed after ~3 s | `--autostart-windowed` is a smoke test that **exits by design** at 120 frames |
+| The queue has 36 open entries | It has **18, 15 open** — the count had measured `_note`'s lines |
+
+**A gate on one door is not a gate.** BL-428's design named placement as what depth gates, and
+implementing exactly that would have shipped a one-click bypass via retooling. Worth generalising:
+when a rule is added to one seam, ask what the *other* routes to the same state are before calling
+it done.
+
+**The check that had never actually run was hiding a live defect.** `building_management_shell.lua`
+had been pointing at a deleted tab (NR-246) and still passing — capture-only, no golden, nothing
+comparing anything. Its first honest photograph immediately showed the Method page's two
+load-bearing numbers printed on top of each other. A check that runs green while looking at the
+wrong thing is worse than no check, because it is counted as coverage.
+
+**A stale tool doc costs a session's first hour.** The `verifier-headless` vcvars path had been
+wrong since 2026-07-28 and failed on the first translation unit every time. Corrected, with the
+symptom quoted so the next person recognises it in one read rather than diagnosing it again.
+
+### Where the method held, and where it did not
+
+**Held.** Rule 0b (report measurements, then ask) was used twice — once on the row width, once on
+the seed filter — and both times the numbers changed the answer rather than merely supporting it.
+The second was the more valuable: it stopped a filter that would have discarded half the seed space
+to fix an assignment problem.
+
+**Did not.** The sprint ran entirely in the main session with no fan-out. Defensible for one
+vertical seam of ~5 files with `construction.cpp` as the hotspot, but it means the parallel-agent
+machinery got no exercise, and the session length was dominated by serial build/verify cycles.
+
+### Left for another session
+
+- **NR-256** — `--autostart-play` terminates unattended and the cause is unsettled. The two-line
+  diagnostic that would separate the candidates is written down; it just needs running from a real
+  terminal.
+- **NR-243** — the four genuinely dominated recipe pairs remain the one red row in
+  `recipe_switch_harness`. Pre-existing, and a content decision rather than a code one.
+- **NR-253** — the recipe-switch cooldown at 1 tick is still an unplayed first cut.
+- **BL-432** — two roster invariants (no orphan resources, no dominant method) still owed to
+  `chain_depth`.
+- **The gate is ancient-only.** Chain depth gates nothing a 1960 campaign can see, by design. Whether
+  the industrial roster ever opts in is an open question BL-428 deliberately did not answer.

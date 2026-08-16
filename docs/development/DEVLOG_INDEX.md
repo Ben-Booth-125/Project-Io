@@ -3,13 +3,14 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 164 entries across 2 volume(s).
+One line per session, newest first — 165 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
+| 2026-08-16 | [chain depth becomes the growth gate (BL-428 slice 2), Method-page fix, seed sweep](DEVLOG.md) | BL-215 BL-428 BL-429 BL-431 BL-432 BL-435 | DEVLOG.md |
 | 2026-08-16 | [building Selection card playtest, sub-facility groups (BL-431, BL-434)](DEVLOG.md) | BL-429 BL-430 BL-431 BL-434 BL-436 | DEVLOG.md |
 | 2026-08-15 | [BL-429 slice 3: the ancient roster gets glyphs](DEVLOG.md) | BL-429 BL-430 BL-431 | DEVLOG.md |
 | 2026-08-15 | [BL-429 slice 2: the ancient roster gets names](DEVLOG.md) | BL-428 BL-429 BL-430 BL-431 | DEVLOG.md |
