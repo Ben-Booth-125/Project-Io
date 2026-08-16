@@ -240,11 +240,23 @@ std::pair<int, int> holdings_range(industrial_focus focus)
 ///              (with wrap) when more slots are needed than the pattern lists.
 const std::vector<building_type>& focus_asset_pattern(industrial_focus focus)
 {
+    // BL-435 (2026-08-16): the processor moved from slot 3 to slot 2. It is not a
+    // rebalance — it makes this pattern do what the comment above it has always
+    // promised. Extraction holdings draw 3-4 (holdings_range), so at slot 3 the
+    // "single processor to consume some of their own output" only ever landed on
+    // a 4-draw: half of all extraction corps opened as pure mines, and the code
+    // silently disagreed with its own documentation.
+    //
+    // MEASURED, not assumed: across 24 seeds only 2.96 of the 8 selectable
+    // specialists (37%) opened with any processing facility, and on one seed in
+    // 24 NOT ONE did — so on that seed BL-435's selection screen would have had
+    // nothing better to offer. A 4-draw is unchanged (3 extraction + 1 processor);
+    // a 3-draw now opens 2 + 1 instead of 3 + 0.
     static const std::vector<building_type> extraction_mix = {
         building_type::extraction_site,     // anchor
         building_type::extraction_site,
-        building_type::extraction_site,
         building_type::processing_facility, // consumes some own output
+        building_type::extraction_site,
     };
     static const std::vector<building_type> processing_mix = {
         building_type::processing_facility, // anchor
@@ -252,6 +264,13 @@ const std::vector<building_type>& focus_asset_pattern(industrial_focus focus)
         building_type::extraction_site,     // feeds the processors
         building_type::extraction_site,
     };
+    // Trade is DELIBERATELY left alone by BL-435, and the processor at slot 2 is
+    // therefore still unreachable (trade holdings draw 1-2). A pure-trade opening
+    // — a port and maybe one mine, buying and moving what others make — is a real
+    // archetype, and the item's whole point is a choice worth making. Giving all
+    // three foci a processor would raise the count by flattening the very variety
+    // the selection screen exists to present. The slot stays so that a future
+    // widening of trade's holdings range reaches it naturally.
     static const std::vector<building_type> trade_mix = {
         building_type::port,                // anchor
         building_type::extraction_site,

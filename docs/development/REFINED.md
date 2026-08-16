@@ -1,5 +1,65 @@
 # Project Io — REFINED (active worklist)
 
+## Starting-corp selection (promoted from BL-435) — **IN PROGRESS** (1/6, 2026-08-16)
+
+Requirements: requirements.json § starting-corp-selection (R1–R4)
+
+The seed hands the player a corporation by lottery, and on 13 of 24 seeds that corp has no
+processing facility — so the Method page (BL-430/431) and the chain-depth ladder (BL-428) have
+nothing to stand on. Ben's two calls, 2026-08-16:
+
+- **Pool = the 8 specialist corps**, not BL-365's background firms — *and raise how many of the 8
+  open with a processor*, so the choice has substance rather than one obvious answer.
+- **The choice happens BEFORE the pre-game warm start.** That keeps the standing prohibition
+  intact: the corp the player picks is the corp `corp_ai` excludes for the whole 80 ticks.
+
+**What the measurement found before any work** (`player_seed_sweep --roster`, task A). The premise
+holds — a better specialist existed in every bad world — but the pool is thinner than BL-435's
+filing suggests: only **1–5 of 8** specialists carry a processor, and the "plenty of corporations
+with processing facilities" in the item's text are overwhelmingly the 17–29 background firms.
+Root cause is not tuning: `focus_asset_pattern`'s own comments promise extraction corps "a single
+processor" and trade corps "light … processing", but the processor sits at a pattern index the
+holdings draw frequently never reaches — index 3 for extraction (holdings 3–4, so a 4-draw only)
+and index 2 for trade (holdings 1–2, so **never**).
+
+- **[1] A — `player_seed_sweep --roster <seed>`: every corp's generated opening for one seed,
+  split SPECIALIST vs background firm.** The measurement BL-435's premise rests on, and the same
+  per-corp shape the screen renders. Files: `tools/verify/player_seed_sweep.cpp`. Deps: foundation.
+  Satisfies: R2. — **COMPLETE 2026-08-16.**
+- **[2] B — Make `focus_asset_pattern` realise its own documented intent: move the processor to a
+  slot the holdings draw actually reaches for extraction. Trade keeps none — a pure-trade opening
+  is a real archetype.** Measure the before/after across 24 seeds and report it; do NOT clamp,
+  reject-sample or whitelist. Files: `src/world/corporation_generation.cpp`. Deps: A.
+  Satisfies: R3.
+- **[3] C — The selection state: a `pending_corp_choice` on the app, the candidate list built from
+  the specialist set, and `apply_corp_choice` re-pointing `is_player` / `world::player_entity`.
+  The generator's seeded pick stays and remains the "surprise me" default, so every harness that
+  never opens the screen is bit-identical.** Files: `src/core/app.{hpp,cpp}`,
+  `src/world/corporation_generation.{hpp,cpp}`. Deps: B. Satisfies: R1, R4.
+- **[3] D — The screen: a stage between generation completing and the warm start starting, listing
+  name / focus / home nation / holdings by type, plus "surprise me".** Balance is deliberately not
+  a column — it is seeded BY the warm start, so it reads 0.0 for every corp at this point. Files:
+  `src/ui/startup_screens.cpp`, `src/core/app.cpp`. Deps: C. Satisfies: R1.
+- **[2] E — Guard: a headless row asserting the specialist/background split and the raised
+  processor count, and a `scripts/verify/*.lua` visual check for the screen.** Files:
+  `tools/verify/player_seed_sweep.cpp`, `scripts/verify/`, `.claude/skills/verifier-*/SKILL.md`.
+  Deps: D. Satisfies: R1, R2, R3.
+- **[1] F — Propagate: CORPORATION_GENERATION.md (the deferred selection screen it already names,
+  and the asset-pattern change), STARTUP.md (the new stage), question_log.json (the surface's
+  question).** Files: `docs/generation/CORPORATION_GENERATION.md`, `docs/ui/STARTUP.md`,
+  `docs/ui/question_log.json`. Deps: D.
+
+**Parallelisation.** Strictly sequential A → B → C → D → {E, F}: B changes what C's candidate list
+contains, C provides the state D renders, and E/F both describe D. One vertical seam, so it runs
+in the main session — a fan-out would spend more on merge than it saves, the same call the
+chain-depth group made for the same reason.
+
+**Watch for.** `corporation_generation.cpp` is the hotspot: B changes generated holdings, which
+moves every world. Expect `world_audit`, `world_determinism`, `ai_skill_harness` and the
+`earthlike_*` set to need re-running, and expect some to move — a deliberate generation change is
+exactly the case their golden policy says to re-bless, with the reason recorded.
+
+
 > Drained 2026-08-12: BL-132 (market cogeneration), Sprint 10's last item — 3 sequential slices
 > COMPLETE per the item's own settled sequencing (population resource-awareness -> trade-flow
 > market siting -> corp-level carving reorder, deliberately not entangled) — removed per the

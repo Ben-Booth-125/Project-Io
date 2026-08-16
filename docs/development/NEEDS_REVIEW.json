@@ -437,6 +437,29 @@
       "resolution": null
     },
     {
+      "id": "NR-260",
+      "title": "A processing facility earns LESS than the extraction site it replaces — so BL-435's 'better opening' is deeper, not richer",
+      "raised": "2026-08-16",
+      "kind": "decision-taken",
+      "status": "open",
+      "source": "BL-435 task B (focus_asset_pattern fix), measured with player_seed_sweep and ai_skill_harness before and after.",
+      "what": "Ben's call was to raise how many of the 8 selectable specialists open with a processing facility. Root cause was not tuning: focus_asset_pattern's own comment promises extraction corps 'a single processor', but the processor sat at slot 3 while extraction holdings draw 3-4, so only a 4-draw ever got one. Moving it to slot 2 makes the code match its documentation and works exactly as intended - specialists with a processor went 2.96/8 (37%) to 5.83/8 (73%) across 24 seeds, and the one seed in 24 where NOT ONE specialist had a processor is gone. The player's own generator-assigned corp went 11/24 to 18/24 'playable'. THE SIDE EFFECT IS THE PROBLEM: every measured net worth fell. Player corp, seed 0: 3 extraction/0 processing = 55,179 cr, becomes 2 extraction/1 processing = 28,288 cr - HALVED, same corp, same seed, one building swapped. ai_skill_harness's five seeds all fell too: -71%, -37%, -9%, -20%, -38% on final net worth (only seed 0 fell outside its golden band).",
+      "why_it_matters": "It undercuts the premise BL-435 is built on. The item argues a pure-extraction corp is a POORER opening because the Method page (BL-430/431) and the chain-depth ladder (BL-428) have nothing to stand on - which is true about DEPTH and appears to be false about MONEY. In the current economy a mine outearns the processor that replaced it, so the corp the selection screen would present as the better pick is the financially weaker one. Two readings, and they need different responses: (a) this is correct and interesting - depth costs money, the player trades income for reach, and the selection screen should say so rather than implying one option dominates; or (b) processing is simply underpriced relative to extraction, which is an economy-balance defect that predates this item and that BL-435 has merely made visible. I have NOT re-blessed ai_skill_harness's seed-0 band, deliberately: re-blessing would bake a 35%-ish economy-wide net-worth reduction into the baseline as though it were intended, and that is Ben's call, not a bookkeeping step.",
+      "options": [
+        "A) Keep the generation change and treat the income drop as the honest cost of depth. The selection screen presents holdings without ranking them, and NR-260 closes.",
+        "B) Keep the change, and file the extraction-vs-processing margin as its own economy-balance item - the drop is evidence that processing is underpriced, independent of BL-435.",
+        "C) Narrow the generation change (e.g. only extraction corps drawing 4 holdings keep the processor, restoring most of the old economy) and accept a smaller rise in selectable processors.",
+        "D) Revert task B entirely and let the selection screen do all the work, choosing from the 1-5 specialists that already have a processor."
+      ],
+      "recommendation": "B. The change does exactly what it was asked to do and fixes a real code-vs-comment contradiction; the income finding is genuine information about the economy rather than a reason to undo it. But A vs B is Ben's - and if the answer is that processing SHOULD outearn extraction, the balance item wants filing before the selection screen teaches players otherwise.",
+      "files": [
+        "src/world/corporation_generation.cpp",
+        "tools/verify/ai_skill_harness.cpp",
+        "tools/verify/player_seed_sweep.cpp"
+      ],
+      "resolution": null
+    },
+    {
       "id": "NR-259",
       "title": "player_seed_sweep had never once passed under ctest — a 60s timeout on a 69s tool, silent because a Timeout looks like nothing",
       "raised": "2026-08-16",

@@ -42,8 +42,10 @@
 #include "world/supply_system.hpp"
 #include "world/world.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
+#include <string>
 #include <vector>
 
 namespace {
@@ -86,15 +88,129 @@ bool playable(const seed_row& r)
     return !r.threw && r.processing >= 1 && r.final_bal > 0.0f && !r.went_negative;
 }
 
+// --- BL-435: the roster mode ------------------------------------------------
+//
+// `player_seed_sweep --roster <seed>` prints EVERY corporation's opening for one
+// seed, not just the one the generator handed the player. Two jobs, and it is one
+// mode because they want exactly the same numbers:
+//
+//   * It is the measurement behind BL-435. The sweep's headline finding — 13/24
+//     seeds give the player a pure-extraction corp — says nothing about whether
+//     a BETTER corp existed in the same world to be chosen instead. This answers
+//     that directly, and a selection screen is only worth building if it does.
+//   * It is the data the selection screen renders. Name, focus, buildings by
+//     type, balance, per corp. Producing it here first means the screen is built
+//     against a shape already known to be reachable, rather than the other way
+//     round.
+//
+// It deliberately does NOT run the warm start: these are the GENERATED openings,
+// which is what a player choosing before the first tick would be choosing between.
+struct corp_row
+{
+    entity_id   id         = null_entity;
+    std::string name;
+    int         processing = 0;
+    int         extraction = 0;
+    int         other      = 0;
+    float       balance    = 0.0f;
+    bool        is_player  = false;
+    bool        specialist = false;
+};
+
+int run_roster(uint32_t seed, const recipe_registry& reg)
+{
+    world_params p = no_prehistory();
+    p.seed = seed;
+    world w = make_hard_coded_world(p);
+    seed_default_recipes(w, reg);
+
+    // Snapshot the corp set BEFORE background firms are added. The distinction is
+    // load-bearing for BL-435 and invisible afterwards: the generator's player
+    // pick draws only from these SPECIALIST corps (corporation_generation.cpp's
+    // uniform draw over corp_ids), while generate_background_firms (BL-365) adds
+    // the mundane industry that saturates the market. "The world contains corps
+    // with processors" is true of the background firms almost by construction, so
+    // counting them together would answer a question nobody asked.
+    std::vector<entity_id> specialists;
+    for (const auto& [id, cc] : w.corporations)
+        specialists.push_back(id);
+    std::sort(specialists.begin(), specialists.end());
+
+    generate_background_firms(w, reg, seed ^ 0x8A21F00Du);
+
+    std::vector<corp_row> rows;
+    for (const auto& [id, cc] : w.corporations)
+    {
+        corp_row r;
+        r.id        = id;
+        r.name      = cc.name;
+        r.balance   = cc.balance;
+        r.is_player = (cc.is_player || id == w.player_entity);
+        r.specialist = std::binary_search(specialists.begin(), specialists.end(), id);
+        for (const entity_id bid : cc.assets)
+        {
+            const auto bit = w.buildings.find(bid);
+            if (bit == w.buildings.end())
+                continue;
+            switch (bit->second.type)
+            {
+                case building_type::processing_facility: ++r.processing; break;
+                case building_type::extraction_site:     ++r.extraction; break;
+                default:                                 ++r.other;      break;
+            }
+        }
+        rows.push_back(std::move(r));
+    }
+    // Sort by entity id: w.corporations is an unordered map, and an unordered
+    // walk would make this table differ run to run on the same seed (the BL-406
+    // lesson). Ids are assigned in generation order, so this is also the order
+    // a selection screen would list them in.
+    std::sort(rows.begin(), rows.end(),
+              [](const corp_row& a, const corp_row& b) { return a.id < b.id; });
+
+    std::printf("player_seed_sweep --roster %u — every corporation's generated opening\n\n", seed);
+    std::printf("  #  kind  proc  extr  other  player  name\n");
+    std::printf("---  ----  ----  ----  -----  ------  ----\n");
+    int spec_total = 0, spec_proc = 0, bg_total = 0, bg_proc = 0;
+    int with_proc = 0, idx = 0;
+    for (const corp_row& r : rows)
+    {
+        if (r.specialist) { ++spec_total; if (r.processing >= 1) ++spec_proc; }
+        else              { ++bg_total;   if (r.processing >= 1) ++bg_proc;   }
+        if (r.processing >= 1)
+            ++with_proc;
+        std::printf("%3d  %4s  %4d  %4d  %5d  %6s  %s\n",
+                    idx++, r.specialist ? "SPEC" : "bg",
+                    r.processing, r.extraction, r.other,
+                    r.is_player ? "<<<" : "", r.name.c_str());
+    }
+
+    std::printf("\n=== seed %u ===\n", seed);
+    std::printf("  SPECIALIST corps (the pool the player pick draws from): %2d, %2d with a processor\n",
+                spec_total, spec_proc);
+    std::printf("  background firms (BL-365, not currently selectable):    %2d, %2d with a processor\n",
+                bg_total, bg_proc);
+    for (const corp_row& r : rows)
+        if (r.is_player)
+            std::printf("  generator handed the player: %s [%s] — %d proc, %d extr, %d other\n",
+                        r.name.c_str(), r.specialist ? "specialist" : "background",
+                        r.processing, r.extraction, r.other);
+    std::printf("  BL-435's premise needs spec_proc >= 1 while the player's own proc == 0.\n");
+    return 0;
+}
+
 } // namespace
 
 int main(int argc, char** argv)
 {
-    const int n_seeds   = (argc > 1) ? std::atoi(argv[1]) : 24;
-    const int warm_ticks = (argc > 2) ? std::atoi(argv[2]) : 12;
-    if (n_seeds <= 0 || warm_ticks <= 0)
+    const bool roster_mode = (argc > 1 && std::string(argv[1]) == "--roster");
+    const int n_seeds   = (!roster_mode && argc > 1) ? std::atoi(argv[1]) : 24;
+    const int warm_ticks = (!roster_mode && argc > 2) ? std::atoi(argv[2]) : 12;
+    if (!roster_mode && (n_seeds <= 0 || warm_ticks <= 0))
     {
-        std::printf("usage: %s [seed_count] [warm_ticks]  (both positive)\n", argv[0]);
+        std::printf("usage: %s [seed_count] [warm_ticks]  (both positive)\n"
+                    "       %s --roster <seed>   (every corp's opening, one seed)\n",
+                    argv[0], argv[0]);
         return 2;
     }
 
@@ -110,6 +226,11 @@ int main(int argc, char** argv)
         std::printf("FATAL: no recipes loaded — run from the repo root.\n");
         return 2;
     }
+
+    // BL-435 roster mode. Placed after the vacuity guard on purpose: a roster
+    // printed from an empty registry would show every corp as equally poor.
+    if (roster_mode)
+        return run_roster(static_cast<uint32_t>(argc > 2 ? std::atoi(argv[2]) : 0), reg);
 
     std::printf("player_seed_sweep — %d seeds, %d warm ticks (%.2f in-game years)\n\n",
                 n_seeds, warm_ticks, warm_ticks / 4.0);
