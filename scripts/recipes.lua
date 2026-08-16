@@ -349,6 +349,77 @@ recipes = {
         inputs       = { peat = 2.0 },
         outputs      = { charcoal = 1.0 },
     },
+
+    -- =====================================================================
+    -- NR-257 (2026-08-16) — consumers for the three one-directional orphans
+    -- chain_depth's R1 row found: machinery, platinum_group_metals and
+    -- regolith were each obtainable and consumed by nothing.
+    --
+    -- APPENDED, not inserted, per id 6's note: recipe ids are POSITIONAL and
+    -- inserting would silently repoint every saved building's selection.
+    --
+    -- Each is authored with inputs DISJOINT from its output's existing
+    -- recipes, so chain_depth's R2 classifies it as a supply route (a second
+    -- raw reaching a good) rather than an interchangeable method to be
+    -- price-compared. That is the honest classification, not a way around the
+    -- guard: all three are gated on reaching a PLACE — the belt, an airless
+    -- body — rather than on picking the cheaper of two options at one building.
+    -- =====================================================================
+
+    -- id 24 — Assembly Plant, HEAVY route: machinery + steel -> spacecraft
+    -- components. The crude counterpart to id 13's alloys + electronics: more
+    -- structural mass and worked machinery, none of the refined-electronics
+    -- chain. This is machinery's first consumer — before it, the Fabricator
+    -- produced machinery and nothing in the roster wanted any.
+    {
+        name         = "spacecraft_components_heavy",
+        display_name = "Heavy Assembly Plant",
+        era          = "industrial",
+        group        = "Advanced Fabrication", -- same group as id 13
+        inputs       = { machinery = 2.0, steel = 2.0 },
+        outputs      = { spacecraft_components = 1.0 },
+    },
+
+    -- id 25 — Electronics Lab, CONTACT-GRADE route: platinum group metals ->
+    -- electronics. PGM are catalytic and contact metals (RESOURCES.md), and at
+    -- base_price 40 this is a deliberately EXPENSIVE premium route rather than
+    -- a cheap bypass of id 12's silicon + copper + REE chain.
+    --
+    -- A REAL TENSION, recorded rather than papered over: world_gen.lua tags PGM
+    -- "terminal: the belt's high-value trade good", so its documented role was
+    -- to be SOLD, not consumed. This gives it a consumer per Ben's instruction
+    -- (NR-257 option D) without displacing that role — selling to the belt
+    -- market stays the obvious use, and this is the route for a corp that would
+    -- rather refine its own than ship it out.
+    {
+        name         = "electronics_contact_grade",
+        display_name = "Contact-Grade Electronics Lab",
+        era          = "industrial",
+        group        = "Electronics", -- same group as id 12
+        inputs       = { platinum_group_metals = 0.5 },
+        outputs      = { electronics = 1.0 },
+    },
+
+    -- id 26 — Smelter, IN-SITU route: regolith -> steel. Regolith reduction on
+    -- an airless body, which is exactly the "in-situ build mass" role
+    -- RESOURCES.md already gives it. Deliberately poor grade — 8 regolith per
+    -- steel against id 0's 2 iron ore — because regolith is abundant (present
+    -- on every tile of every airless body, deposits 20-50) and the point is
+    -- that you can build FROM WHERE YOU ARE, not that it is efficient.
+    --
+    -- SAME TENSION as id 25: RESOURCES.md says regolith "does not appear in
+    -- market supply or demand tables" and exists so building-cost formulas can
+    -- reference it — and no cost formula ever did. A recipe input is the
+    -- nearest consumer that keeps the doc's in-situ intent intact. Whether
+    -- regolith should now also carry a base_price is Ben's call (NR-257).
+    {
+        name         = "steel_from_regolith",
+        display_name = "In-Situ Smelter",
+        era          = "industrial",
+        group        = "Metal Foundry", -- same group as ids 0, 4 and 19
+        inputs       = { regolith = 8.0 },
+        outputs      = { steel = 1.0 },
+    },
 }
 
 print(string.format("[Lua] recipes.lua loaded  recipe_count=%d", #recipes))

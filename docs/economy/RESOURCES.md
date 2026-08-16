@@ -123,6 +123,21 @@ ever price one in play; the base price is scaffolding for when the behaviour lan
 
 **Regolith note.** Regolith is present on every tile of every airless body and serves as a local construction material rather than a tradeable commodity. It has no base price and does not appear in market supply or demand tables. It is defined in the resource enum so that building cost formulas referencing it are consistent with the rest of the model.
 
+> **Amended 2026-08-16 (NR-257).** The claim above about building cost formulas was never true in
+> code — no cost formula ever referenced regolith, so it sat obtainable and consumed by nothing,
+> which is how `chain_depth`'s R1 orphan row found it. Ben's call was to give it a consumer, so
+> `steel_from_regolith` "In-Situ Smelter" (scripts/recipes.lua) now reduces regolith to steel at a
+> deliberately poor 8:1. The **in-situ intent above is unchanged and is what the recipe encodes** —
+> it is the route for building where you already are, not a trade good. Still open, and Ben's:
+> whether regolith should now carry a `base_price`. Being a recipe input pulls it into market
+> demand at the tiles that run it, which sits in tension with "excluded from market tables".
+
+> **Amended 2026-08-16 (NR-257).** **Platinum group metals** likewise had no consumer — `world_gen.lua`
+> tags it `terminal: the belt's high-value trade good`, i.e. a good to be *sold*. It now also has
+> `electronics_contact_grade`, a contact-grade/catalytic route to electronics at 0.5 PGM per unit.
+> At base price 40 this is a premium alternative rather than a cheap bypass, so the belt export
+> remains the obvious use and the terminal framing above still holds for most play.
+
 ### Ambient raw materials (Tier 1)
 
 Ambient resources are present at low deposit values on almost every eligible tile type. They ensure that every tile has at least one resource that can be extracted, even if it is not economically compelling to do so. They feed local construction and low-value production chains.
