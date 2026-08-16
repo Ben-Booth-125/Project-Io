@@ -406,6 +406,46 @@
         "src/main.cpp"
       ],
       "resolution": null
+    },
+    {
+      "id": "NR-257",
+      "title": "BL-432's orphan row finds eight real orphan resources, five of them the exact BL-286 values the item was filed over",
+      "raised": "2026-08-16",
+      "kind": "observation",
+      "status": "open",
+      "source": "tools/verify/chain_depth.cpp R1, first run against the real scripts/recipes.lua + the k_extractable table.",
+      "what": "R1 asserts every resource_type is OBTAINABLE (a recipe produces it or a deposit yields it) and WANTED (a recipe consumes it, or a named actor does). It ships RED on eight resources. Five are orphaned in BOTH directions - grain (23), fodder (24), salt (25), transport_capacity (26) and bullion (29): nothing produces them, no deposit yields them, nothing consumes them. These are exactly BL-286's 'behaviour unfiled' values, and exactly the five BL-432's own design text predicted ('eleven resource values were added with behaviour unfiled, and five of them still have no consumer today, months later'). The check reproduced that claim independently rather than being told it. Three more are obtainable but unwanted: platinum_group_metals (9) and regolith (10) are both extractable with no consumer, and machinery (35) is produced by the Fabricator and consumed by nothing.",
+      "why_it_matters": "This is the check doing its job on its first run, not a defect in the check - so it is left RED rather than exempted quiet, the same call NR-243 recorded. But a permanently-red row decays into background noise, which is the failure mode Sprint 18's retro named from the other direction (a green check looking at the wrong thing). The five double-orphans are a content decision: either they get producers and consumers, or they are removed from the enum until their behaviour is filed. The three one-directional ones are smaller - machinery in particular looks like it simply wants a consumer in the fabrication chain. Note the save-format constraint on removal: components.hpp records that resource_type is a serialised width and every per-resource array is sized off count, so deleting a value is a save-format break once BL-107 lands.",
+      "options": [
+        "A) File a content item to give the five BL-286 values producers + consumers (the roster-completion reading).",
+        "B) Remove the five from resource_type until their behaviour is filed, and re-add when it is (cheap now, a save-format break after BL-107).",
+        "C) Add them to R1's actor-consumed exemption table with a named future actor, converting a red row to a documented promise.",
+        "D) Give machinery/platinum_group_metals/regolith consumers separately - these are a smaller, more obviously-correct fix than the five."
+      ],
+      "recommendation": "D first (three small, uncontroversial consumers), then A or B on the five as one decision. NOT C - an exemption naming an actor that does not exist is how an orphan hides, which is the precise thing BL-432's design says the explicit table must prevent.",
+      "files": [
+        "tools/verify/chain_depth.cpp",
+        "scripts/recipes.lua",
+        "src/world/components.hpp"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-258",
+      "title": "NR-243's four dominated pairs were a grouping artefact - the no-dominance guard was asking the wrong question",
+      "raised": "2026-08-16",
+      "kind": "decision-taken",
+      "status": "open",
+      "source": "Ben's call on NR-243, 2026-08-16: option C first - settle the tier-vs-alternate axis before retuning any numbers.",
+      "what": "The axis did not need inventing: scripts/recipes.lua already states it twice in its own comments (ids 22 and 23) - distinct raws feeding a shared good is 'an ordinary multi-producer economy fact, NOT BL-430's alternate-METHOD feature (one building offering interchangeable recipes for the same output)'. Measured against that, three of NR-243's four pairs have DISJOINT input sets (steel {iron_ore,coal} vs {iron_nickel_ore}; charcoal {timber} vs {peat}; trade_goods {clay,timber} vs {sand}) and the fourth differs by a placement precondition rather than cost (propellant atmospheric vs electrolysis - the airless route is run because the cheap one is unavailable). So all four were false positives of grouping by (primary output, era), not balance defects. No recipe magnitude was changed. The guard moved to chain_depth.cpp's R2 row, regrouped: every sibling pair is bucketed as a supply route (disjoint raws), an explicitly-exempted precondition pair, or a genuine interchangeable method, and only the third is price-compared. recipe_switch_harness's duplicate R1 was deleted rather than left as a second answer to the same question - it now runs ALL PASS.",
+      "why_it_matters": "Today the roster contains ZERO genuine interchangeable methods - 4 sibling pairs, 3 supply routes, 1 precondition, 0 methods. That is a real finding about BL-430: the alternate-method FEATURE shipped, but no content yet uses it, and the four pairs that looked like alternates are multi-producer economics. The bucketing is what keeps R2 from being a vacuous green - a pair cannot escape by being unclassifiable, and the counts print on every run - but Ben should know the dominance half is currently guarding an empty set, and will only start biting when BL-430's own alternates are authored.",
+      "recommendation": "No action needed on the numbers. Worth deciding separately whether BL-430 should author at least one genuine same-inputs alternate pair, so the feature it built has content and R2's dominance half has something to guard.",
+      "files": [
+        "tools/verify/chain_depth.cpp",
+        "tools/verify/recipe_switch_harness.cpp",
+        "scripts/recipes.lua"
+      ],
+      "resolution": null
     }
   ]
 }

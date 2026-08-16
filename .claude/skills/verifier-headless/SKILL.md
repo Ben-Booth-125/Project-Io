@@ -227,9 +227,35 @@ in `tools/verify/README.md`.
   **ancient climbs to depth 3** as of 2026-08-16, so the gate has genuine rungs rather than passing
   vacuously on a flat roster.
 
-  **BL-432 still owes** this file its remaining two roster invariants: no orphan resources in either
-  direction, and no production method dominating a sibling on every axis (the latter currently lives
-  in `recipe_switch_harness`, where it FAILS on four real pre-existing pairs — see NR-243).
+  **R1-R2 are BL-432's roster invariants** (landed 2026-08-16), completing the item — its third
+  assertion (every building's minimum depth reachable) is G3 above.
+
+  **R1 — no orphan resources, EITHER direction.** Every `resource_type` must be obtainable (a recipe
+  produces it, a deposit yields it, or it is an endemic good — the second deposit route, off
+  `planetology::endemics` in `tile_generation.cpp`, which is *not* in `k_extractable` and whose
+  omission makes all four endemics read as orphans) and wanted (a recipe consumes it, or a named
+  actor does via an **explicit** exemption table, so an orphan cannot hide as an assumed terminal).
+  **This row ships RED on eight resources and that is the check working** — five of them
+  (grain, fodder, salt, transport_capacity, bullion) are orphaned in both directions and are exactly
+  the BL-286 "behaviour unfiled" values BL-432 was filed over; three more (platinum_group_metals,
+  regolith, machinery) are obtainable but unconsumed. See NR-257 for the content decision.
+
+  **R2 — no dominant production method, between recipes a corp can actually choose between.** The
+  grouping is the whole content of this row. `recipe_switch_harness`'s old R1 grouped by (primary
+  output, era) and reported four dominated pairs (NR-243); measured against the axis `recipes.lua`
+  already states in its own comments, three of those have **disjoint raws** — supply routes, where
+  deposit access rather than price decides which you run — and the fourth differs by a placement
+  precondition. All four were grouping artefacts, and no recipe magnitude was changed (NR-258). Every
+  sibling pair is now bucketed as a supply route, an explicitly-exempted precondition pair, or a
+  genuine interchangeable method, and **only the third is price-compared**; bucketing every pair is
+  what stops a pair escaping by being unclassifiable, and the counts print on every run. Current
+  reading: **4 sibling pairs — 3 supply routes, 1 precondition, 0 interchangeable methods**, so the
+  dominance half currently guards an empty set and will only bite once BL-430's own alternates are
+  authored. The duplicate in `recipe_switch_harness` was **deleted**, not left as a second answer.
+
+  **Run it with the unmasked band.** Both R rows call `set_era(era_band::any)`. `industrial` is a
+  band like any other and hides the entire ancient roster — measured mid-build, that misreported
+  charcoal, iron_blooms, timber, clay and peat as orphans and hid two of the four sibling pairs.
 - **`player_seed_sweep`** — Which seeds hand the PLAYER a corp worth playing? A live-Lua sweep (real
   `scripts/recipes.lua` + `economy.lua`, real economy ticks) that generates one world per seed and
   reports, per seed, the player corp's buildings by type, its opening and post-warm-start balance,

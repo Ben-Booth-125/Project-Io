@@ -9977,7 +9977,7 @@
    "resolution": "Landed 2026-08-16 across two passes in one session (price-tiered, then retracted to refuse-outright — see design). Group taxonomy: Metal Foundry, Refinery, Food Processing, Chemical Works, Electronics, Advanced Fabrication, Welfare Goods, Fuel Production, Artisan Goods (docs/economy/PRODUCTION.md § Sub-facility groups has the full recipe table). Two taxonomy judgment calls (Hydroponics Bay's group; the merged Advanced Fabrication group) logged as NR-252, open. Guard: tools/verify/recipe_switch_harness.cpp S6a-f assert the refusal path (cross-group switch declined, recipe unchanged, nothing debited); S1-S5 (BL-430's original mechanism) and R1 (the pre-existing no-dominance finding, NR-243) untouched. Build door (draw_construction_ledger) collapses per-recipe processing candidates to one row per group, seeded with the best-expected-profit recipe in that group."
   },
   {
-   "status": "designed",
+   "status": "complete",
    "glyph": "✓",
    "parked": false,
    "blocked_on": [],
@@ -9989,6 +9989,8 @@
     "BL-428"
    ],
    "id": "BL-432",
+   "completed": "2026-08-16",
+   "resolution": "Landed 2026-08-16 as the R1/R2 rows of tools/verify/chain_depth.cpp, completing the item — its third assertion (every building's minimum depth reachable) had already landed as G3 with BL-428's gate, and the first (acyclicity) as D4. R1 (no orphan resources, either direction) SHIPS RED on eight resources and is left that way deliberately: five (grain, fodder, salt, transport_capacity, bullion) are orphaned in both directions and are exactly the BL-286 'behaviour unfiled' values this item's own design predicted, reproduced independently rather than asserted; three more (platinum_group_metals, regolith, machinery) are obtainable but unconsumed. Content decision logged as NR-257. R2 (no dominant method) resolved NR-243's four red pairs WITHOUT changing any recipe magnitude: measured against the axis scripts/recipes.lua already states in its own comments, three pairs have disjoint raws (supply routes, where deposit access rather than price decides) and the fourth differs by a placement precondition, so all four were artefacts of grouping by (primary output, era). Every sibling pair is now bucketed as supply route / precondition / genuine interchangeable method, and only the third is price-compared; the duplicate guard in recipe_switch_harness was deleted rather than left as a second answer, and that harness now runs ALL PASS. Current reading: 4 sibling pairs — 3 supply routes, 1 precondition, 0 interchangeable methods, so the dominance half guards an empty set until BL-430's own alternates are authored (NR-258). Two measurement traps found and closed while building: era_band::industrial is a band like any other and masks the whole ancient roster (misreported charcoal/iron_blooms/timber/clay/peat as orphans, hid two of the four sibling pairs) — both rows use era_band::any; and endemic goods reach the world via planetology::endemics in tile_generation.cpp, NOT via k_extractable, so without that second obtainability route all four endemics read as orphans.",
    "short_name": "ECONOMY_BREADTH_GUARD_HARNESS",
    "title": "One harness for the roster invariants — no orphan resources, no unplaceable buildings, no dominant method, no cyclic graph",
    "priority": "B",
