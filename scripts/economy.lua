@@ -58,6 +58,28 @@ economy = {
             build_cost  = 100.0,
             build_duration_ticks = 2.0,
             resource_costs = { steel = 20.0 },
+
+            -- BL-436: how a deposit's richness becomes an extraction RATE.
+            --
+            -- base_rate has always documented itself as "units/tick AT RICHNESS 1",
+            -- but tile deposits are generated as QUANTITIES — measured mean 53.3,
+            -- max 72,321 — and were multiplied in raw. A mine therefore ran at
+            -- ~1067 units/tick against a processing facility's flat 8: a 133:1
+            -- structural gap that no price or wage could offset, and the reason
+            -- refining could not pay (tier_margin R6).
+            --
+            -- `reference` is the MEASURED mean richness, so a typical deposit lands
+            -- at ~1.0 and a mine runs at roughly its authored base_rate. The band
+            -- keeps a spectacular tile worth ~2x a poor one rather than ~200x.
+            --
+            -- The design statement: richness decides how LONG a deposit lasts, not
+            -- how fast you can pull it out. Reserve still scales with raw richness
+            -- (resource_remaining, seeded at generation), so a rich tile is still
+            -- worth far more over its life — it simply cannot also run a thousand
+            -- times faster. Set richness_reference = 0 to restore raw behaviour.
+            richness_reference = 53.3,
+            richness_min       = 0.25,
+            richness_max       = 2.0,
         },
         processing_facility = {
             base_rate   = 8.0,

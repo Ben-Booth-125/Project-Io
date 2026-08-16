@@ -94,8 +94,9 @@ float extraction_nominal(const world& w, const recipe_registry& reg,
     const std::size_t     ri = static_cast<std::size_t>(b.target_resource);
     // Apply the player's workforce target (0–200 % of nominal capacity).
     const float wt_scalar = std::clamp(b.workforce_target / 100.0f, 0.0f, 2.0f);
-    return reg.economics(building_type::extraction_site).base_rate
-         * tc.resource_deposit[ri]
+    const building_economics& e = reg.economics(building_type::extraction_site);
+    return e.base_rate
+         * richness_rate_scalar(e, tc.resource_deposit[ri])
          * (b.workforce_assigned * contention)
          * wt_scalar
          * (1.0f - tc.hazard_level);
@@ -461,7 +462,12 @@ int solve_workforce_target(const world& w, const recipe_registry& reg,
         if (b.type == building_type::extraction_site && tit != w.tiles.end())
         {
             const std::size_t ri = static_cast<std::size_t>(b.target_resource);
-            const float rich = tit->second.resource_deposit[ri];
+            // BL-436: the same richness->rate conversion the live tick uses.
+            // The workforce solver optimises against this curve, so a raw
+            // richness here would solve for a rate the building cannot reach.
+            const float rich = richness_rate_scalar(
+                reg.economics(building_type::extraction_site),
+                tit->second.resource_deposit[ri]);
             // Stack decay (BL-193), applied here for the same reason run_extraction
             // applies it: a rank-3 site never yields the lone-site rate, so a dial
             // solved against the lone-site rate is solved against a curve this

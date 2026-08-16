@@ -177,6 +177,8 @@ int main(int argc, char** argv)
     std::vector<double> supply_units(resource_count, 0.0);  // units extracted, all seeds/ticks
     std::vector<long>   input_demand(resource_count, 0);    // recipes naming it as an input
     std::vector<long>   richest_on(resource_count, 0);      // tiles where it IS the richest (R5)
+    double richness_sum = 0.0; long richness_n = 0;         // R6: what IS a typical richness?
+    double richness_max = 0.0;
     for (int i = 0; i < reg.recipe_count(building_type::processing_facility); ++i)
     {
         const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
@@ -205,7 +207,13 @@ int main(int argc, char** argv)
         {
             for (std::size_t r = 0; r < resource_count; ++r)
                 if (tc.resource_deposit[r] > 0.0f)
+                {
                     ++tiles_with[r];
+                    richness_sum += tc.resource_deposit[r];
+                    ++richness_n;
+                    if (tc.resource_deposit[r] > richness_max)
+                        richness_max = tc.resource_deposit[r];
+                }
             // R5: what richest_extractable WOULD return here. Uses the real
             // function, since its behaviour is the subject of the question.
             bool any = false;
@@ -395,6 +403,23 @@ int main(int argc, char** argv)
     // "Richest" is computed with the real richest_extractable, not a
     // reimplementation of it — a hand-rolled copy could disagree with the
     // function whose behaviour is the entire subject of the question.
+    // R6: the number the rate asymmetry turns on. `resource_deposit` is
+    // documented in components.hpp as "the extraction rate MULTIPLIER", so
+    // whatever this mean is, it is the factor by which a mine out-produces its
+    // own authored base_rate — and nothing does the same for a processor.
+    const double mean_rich = richness_n ? richness_sum / static_cast<double>(richness_n) : 0.0;
+    std::printf("\nR6 — deposit richness, the extraction rate multiplier\n");
+    std::printf("  non-zero deposits %ld   mean richness %.2f   max %.2f\n",
+                richness_n, mean_rich, richness_max);
+    std::printf("  a mine's effective rate is base_rate(%.0f) x ~%.1f = ~%.0f,\n"
+                "  against a processor's FLAT base_rate(%.0f)  ->  ratio ~%.0f:1\n",
+                static_cast<double>(ex.base_rate), mean_rich,
+                static_cast<double>(ex.base_rate) * mean_rich,
+                static_cast<double>(pr.base_rate),
+                pr.base_rate > 0.0f
+                    ? (static_cast<double>(ex.base_rate) * mean_rich) / pr.base_rate
+                    : 0.0);
+
     std::printf("\nR5 — for each unmined input, is it ever the RICHEST on any tile?\n");
     std::printf("  %-4s %12s %14s %8s %8s\n",
                 "id", "tiles-with", "tiles-RICHEST", "win%", "sites");
