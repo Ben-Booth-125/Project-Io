@@ -126,7 +126,18 @@ constexpr int      k_ticks = 300;
 // R2 row (two independently built worlds, same seed) reproduces 359F55D3EFC3CA21,
 // and every other assertion in this file, including the prohibition and the cadence
 // rows, passed unchanged across the removal.
-constexpr uint64_t k_unspectated_golden = 0x359F55D3EFC3CA21ull;
+// Re-blessed 2026-08-16 (BL-435 task B), same session as the bless above and for
+// an unrelated reason: `focus_asset_pattern` moved the extraction corps' processor
+// to a slot the holdings draw actually reaches, so affected corps now open 2
+// extraction + 1 processing instead of 3 + 0. That changes generated holdings,
+// which changes the world, which changes every downstream number this hash walks.
+// A deliberate generation change is the case this file's policy names. Confirmed
+// reproducible across two independently built worlds (84E876A1596FE090 twice)
+// before blessing, and every other assertion — the prohibition, the cadence rows,
+// the A/B seating rows — passed unchanged. The economy-wide income drop this
+// generation change also caused is NOT this harness's business; it is measured
+// and filed as BL-436.
+constexpr uint64_t k_unspectated_golden = 0x84E876A1596FE090ull;
 
 /// Hand-built registry mirroring scripts/economy.lua + scripts/recipes.lua for
 /// the building types the generator places. Copied from ai_skill_harness so the
