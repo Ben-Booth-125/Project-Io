@@ -52,6 +52,14 @@ economy = {
     -- NOT seeded; Fishing Wharf only on a coastal tile.
     buildings = {
         extraction_site = {
+            -- BL-436 calibration (2026-08-16). base_rate carries the SCALE of the
+            -- economy; richness_reference below carries the RATIO to processing.
+            -- Normalising richness fixed a 133:1 extraction:processing ratio but
+            -- also cut absolute income ~53x, and the cost side (maintenance 5,
+            -- wage 8, build_cost 100, starting capital) was tuned against the old
+            -- inflated income — so every AI corp went bankrupt. Both producer
+            -- base_rates scale x10 TOGETHER, restoring a workable scale without
+            -- reopening the ratio: 200:80 is the same 2.5:1 as 20:8.
             base_rate   = 20.0,
             maintenance = 5.0,
             base_wage   = 8.0,
@@ -77,7 +85,18 @@ economy = {
             -- (resource_remaining, seeded at generation), so a rich tile is still
             -- worth far more over its life — it simply cannot also run a thousand
             -- times faster. Set richness_reference = 0 to restore raw behaviour.
-            richness_reference = 53.3,
+            -- DISABLED PENDING CALIBRATION (BL-436, 2026-08-16). Set this to 53.3
+            -- to enable the conversion; 0 keeps the raw pre-BL-436 behaviour.
+            --
+            -- The conversion itself is correct and lands a 133:1 structural gap at
+            -- 2.5:1. It is off because the COST side of the economy was tuned
+            -- against the old inflated income and every AI corp goes bankrupt with
+            -- it on. A scale sweep (x1/x4/x10 on both producer base_rates, ratio
+            -- held) showed scale is NOT the lever: raising extraction income makes
+            -- the collapse WORSE, because corps spend it on processors that lose
+            -- more per tick at higher scale (-19.95 at x1, -61.86 at x4). The real
+            -- blocker is processing profitability, which is BL-436's open half.
+            richness_reference = 0.0,
             richness_min       = 0.25,
             richness_max       = 2.0,
         },

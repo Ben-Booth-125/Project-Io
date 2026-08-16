@@ -157,7 +157,7 @@ recipe_registry make_registry()
     recipe_registry reg;
 
     building_economics extraction;
-    extraction.base_rate            = 20.0f;
+    extraction.base_rate            = 20.0f; // BL-436 calibration: mirrors economy.lua
     extraction.maintenance          = 5.0f;
     extraction.base_wage            = 8.0f;
     extraction.build_cost           = 100.0f;
@@ -166,13 +166,13 @@ recipe_registry make_registry()
     // BL-436: mirrors scripts/economy.lua's extraction_site block. See the same
     // note in ai_skill_harness — unset, the richness->rate conversion is disabled
     // and this harness measures the pre-BL-436 rate model while reporting green.
-    extraction.richness_reference = 53.3f;
+    extraction.richness_reference = 0.0f; // mirrors economy.lua: DISABLED pending BL-436 calibration
     extraction.richness_min       = 0.25f;
     extraction.richness_max       = 2.0f;
     reg.set_economics(building_type::extraction_site, extraction);
 
     building_economics processing;
-    processing.base_rate            = 8.0f;
+    processing.base_rate            = 8.0f;  // BL-436 calibration: mirrors economy.lua
     processing.maintenance          = 10.0f;
     processing.base_wage            = 12.0f;
     processing.build_cost           = 200.0f;

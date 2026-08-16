@@ -76,7 +76,7 @@ recipe_registry make_registry()
     recipe_registry reg;
 
     building_economics extraction;
-    extraction.base_rate            = 20.0f;
+    extraction.base_rate            = 20.0f; // BL-436 calibration: mirrors economy.lua
     extraction.maintenance          = 5.0f;
     extraction.base_wage            = 8.0f;
     extraction.build_cost           = 100.0f;
@@ -88,13 +88,13 @@ recipe_registry make_registry()
     // measures the PRE-BL-436 rate model while reporting green — which is exactly
     // what happened on the run that landed BL-436, and why its goldens were
     // vacuous with respect to the change they were supposed to be guarding.
-    extraction.richness_reference = 53.3f;
+    extraction.richness_reference = 0.0f; // mirrors economy.lua: DISABLED pending BL-436 calibration
     extraction.richness_min       = 0.25f;
     extraction.richness_max       = 2.0f;
     reg.set_economics(building_type::extraction_site, extraction);
 
     building_economics processing;
-    processing.base_rate            = 8.0f;
+    processing.base_rate            = 8.0f;  // BL-436 calibration: mirrors economy.lua
     processing.maintenance          = 10.0f;
     processing.base_wage            = 12.0f;
     processing.build_cost           = 200.0f;
