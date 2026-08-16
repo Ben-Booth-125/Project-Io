@@ -474,8 +474,48 @@ lesson, where an unordered container decided a number the economy read).
 Measured on the shipped recipes, 2026-08-15: **industrial max depth 4, ancient max depth 3** — the
 ancient figure was **1** before BL-429's chain landed (one layer above raws and nothing beyond).
 
-Guard: `tools/verify/chain_depth.cpp`. **Still owed** (BL-428 slice 2): depth gating placement, and
-the per-corp record of what a corp has *reached*.
+### The gate — what depth actually unlocks (BL-428 slice 2, 2026-08-16)
+
+Depth as a *readout* is only half the ruling. The half that makes it the **growth track** is the
+gate: a corporation may run a recipe only once it has already learned to make what that recipe
+needs. Build a Charcoal Burner and the Bloomery becomes placeable **because charcoal exists** — not
+because a flag was set somewhere.
+
+Two numbers meet at the gate, and neither is authored:
+
+- **A recipe's required depth** is the depth of its **deepest input**
+  (`recipe_registry::recipe_required_depth`, derived in the same fixed point that computes
+  `depth_of`, so the two cannot drift). An input-free recipe requires 0; a recipe with an
+  unreachable input requires -1, matching `depth_of`'s code for the same fact.
+- **A corp's reached depth** is the depth of the deepest good it has **ever produced**
+  (`corp_reached_depth` over `corporation_component::produced_ever`, set by `run_extraction` /
+  `run_processing` at the moment a good is actually made).
+
+**Produced-once-ever, never cleared**, and that is deliberate: progress must not evaporate because a
+building idled for a tick or was demolished for a better site. A corp that has smelted iron once
+knows how to smelt iron. Monotonicity is the property the gate rests on — a placement that was legal
+must never silently become illegal. It also means a corp cannot buy its way up the ladder: the bit
+is set by the *event of making* something, not by holding it.
+
+The bit is set only where a good is genuinely produced, so **extraction seeds the ladder** — mining
+is how a corp reaches depth 0 goods in the first place, and every rung above is earned by processing.
+
+**Ancient roster only, for now** (Ben, 2026-08-16). The band check is on the **recipe**, not on the
+campaign: only content authored `era = "ancient"` opts into the ladder, so no existing industrial
+campaign changes shape. Refusals surface as `construction_result::depth_locked` /
+`corp_command_result::rejected_depth_locked` — a third lock distinct from both `tech_locked` (earned
+by research) and `era_locked` (never available at all), because this one is earned by **building**.
+The Build door filters locked methods out rather than offering what the gate would refuse.
+
+Guard: `tools/verify/chain_depth.cpp` (D1–D6 the metric, G1–G4 the gate — including the
+no-stranded-ancient-recipe row, which is BL-432's "an unplaceable building is the roster's orphan"
+assertion). Measured 2026-08-16: the ancient ladder climbs to **depth 3** with nothing stranded.
+
+The gate is applied at **both** doors, and that is not redundancy. `construct_building` guards
+placement; `try_switch_recipe` guards retooling (`recipe_switch_result::depth_locked`). Guarding only
+placement would leave a one-click bypass — place the shallowest method the corp can reach, retool
+onto the deepest sibling in the same group, and the ladder never has to be climbed. Both refusals map
+to the same `rejected_depth_locked` on the seam, so an agent cannot tell the two routes apart.
 
 ---
 

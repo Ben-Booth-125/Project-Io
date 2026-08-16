@@ -610,6 +610,15 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         else                           ui::expand(m_ui, s, key.value_or(0));
     });
 
+    // Park the building Selection card's pager on one of its pages (NR-246,
+    // 2026-08-16). `fold("building_metric", k)` sets the drill KEY, not the page,
+    // so before this a script had no way to reach the Method or Workforce page and
+    // every capture showed page 1 — which is exactly how the old
+    // building_management_shell.lua came to claim it verified a surface it never
+    // photographed. The page index is clamped by building_pages() at draw time, so
+    // an out-of-range value parks on the last page rather than drawing nothing.
+    v.set_function("building_page", [this](int page) { m_ui.selection_building_page = page; });
+
     // Drill one row into the expanded Corporation-dashboard roll-up (BL-248), or
     // -1 to return to the roll-up itself.
     v.set_function("rollup_drill", [this](int row) { m_ui.corp_rollup_drill = row; });
@@ -689,7 +698,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 r == construction_result::slot_occupied          ? "slot_occupied" :
                 r == construction_result::insufficient_materials ? "insufficient_materials" :
                 r == construction_result::tech_locked            ? "tech_locked" :
-                r == construction_result::era_locked             ? "era_locked" : "failed";
+                r == construction_result::era_locked             ? "era_locked" :
+                r == construction_result::depth_locked           ? "depth_locked" : "failed";
             if (r == construction_result::placed)
                 m_ui.selected_entity = built;
             SDL_Log("verify.build_first_valid: %s at tile (%d,%d)", name, tc.grid_x, tc.grid_y);
@@ -725,7 +735,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 r == construction_result::slot_occupied          ? "slot_occupied" :
                 r == construction_result::insufficient_materials ? "insufficient_materials" :
                 r == construction_result::tech_locked            ? "tech_locked" :
-                r == construction_result::era_locked             ? "era_locked" : "failed";
+                r == construction_result::era_locked             ? "era_locked" :
+                r == construction_result::depth_locked           ? "depth_locked" : "failed";
             if (r == construction_result::placed)
                 m_ui.selected_entity = built;
             SDL_Log("verify.build_at: %s at tile (%d,%d)", name, col, row);

@@ -31,8 +31,23 @@
 //   D6  Against the REAL authored economy: depth is well-defined for every good
 //       the shipped recipes produce, and the ancient band is not deeper than the
 //       industrial one (BL-433 masks routes out; masking must never ADD depth).
+//
+// THE GATE (BL-428 second half, 2026-08-16). The rows above cover the metric as a
+// READOUT. These cover it as a GATE - the half that makes depth the growth track:
+//
+//   G1  A recipe's required depth is its DEEPEST input's depth, and 0 for an
+//       input-free recipe. Derived, so it cannot drift from the graph.
+//   G2  Monotonicity: a corp's reached depth is produced-once-ever. Clearing a
+//       stockpile, idling, or demolishing never lowers it - the property the
+//       gate rests on, since a placement that was legal must not become illegal.
+//   G3  No unreachable ancient recipe: every ancient-band recipe's required depth
+//       is climbable from a fresh corp by some chain of ancient recipes. An
+//       unplaceable building is the roster's orphan (BL-432 assertion 3).
+//   G4  Determinism: the required-depth vector is byte-identical across two
+//       loads, and independent of insertion order (the BL-406 lesson).
 
 #include "scripting/lua_state.hpp"
+#include "world/components.hpp"
 #include "world/recipe_registry.hpp"
 
 #include <cstdio>
@@ -200,6 +215,130 @@ int main()
               "the industrial graph is genuinely layered (anti-vacuity: not all depth 1)");
         check(ancient_max <= industrial_max,
               "masking routes out (BL-433) never ADDS depth");
+    }
+
+    // --- G1-G4: the gate ------------------------------------------------------
+    std::printf("\nG1 - required depth is the deepest input's depth\n");
+    {
+        recipe_registry reg;
+        reg.add_recipe(make("mid",  {{RAW_A, 1.0f}},              {{MID, 1.0f}}));
+        reg.add_recipe(make("deep", {{MID, 1.0f}, {RAW_B, 1.0f}}, {{DEEP, 1.0f}}));
+
+        const std::uint16_t mid  = reg.recipe_id("mid");
+        const std::uint16_t deep = reg.recipe_id("deep");
+        check(reg.recipe_required_depth(mid) == 0,
+              "a recipe drawing only on raws requires depth 0 (a fresh corp can run it)");
+        // MAX within the recipe: RAW_B sits at 0, MID at 1, so the pair costs 1.
+        check(reg.recipe_required_depth(deep) == 1,
+              "a recipe mixing a raw and a depth-1 good requires 1, not 0 and not 2");
+        check(reg.recipe_required_depth(no_recipe) == -1,
+              "no_recipe requires -1 rather than accidentally reading as depth 0");
+    }
+
+    std::printf("\nG2 - reached depth is produced-once-ever and monotonic\n");
+    {
+        recipe_registry reg;
+        reg.add_recipe(make("mid",  {{RAW_A, 1.0f}},              {{MID, 1.0f}}));
+        reg.add_recipe(make("deep", {{MID, 1.0f}, {RAW_B, 1.0f}}, {{DEEP, 1.0f}}));
+
+        corporation_component c;
+        check(corp_reached_depth(c, reg) == 0, "a fresh corp has reached depth 0");
+
+        c.produced_ever[static_cast<std::size_t>(MID)] = true;
+        const int after_mid = corp_reached_depth(c, reg);
+        check(after_mid == 1, "producing a depth-1 good raises reached depth to 1");
+
+        // The monotonicity property, stated as the thing that would break it: the
+        // bit is the ONLY input, so no stockpile or building state whose loss
+        // could lower the number even exists. Assert the invariant directly.
+        c.produced_ever[static_cast<std::size_t>(DEEP)] = true;
+        c.produced_ever[static_cast<std::size_t>(MID)]  = false; // as if MID were "forgotten"
+        check(corp_reached_depth(c, reg) >= after_mid,
+              "losing a shallower good never lowers reached depth below what a deeper one earned");
+    }
+
+    std::printf("\nG3 - every ancient recipe is reachable from a fresh corp\n");
+    {
+        lua_state lua;
+        lua.load("scripts/recipes.lua");
+        lua.load("scripts/economy.lua");
+        recipe_registry reg;
+        reg.load_from_lua(lua);
+        reg.set_era(era_band::ancient);
+
+        // Climb: start at reached 0, admit every ancient recipe the current depth
+        // allows, bank what they produce, repeat until nothing new opens. Anything
+        // still shut out at the fixed point is unplaceable for the whole campaign.
+        corporation_component c;
+        for (std::size_t pass = 0; pass < resource_count; ++pass)
+        {
+            const int reached = corp_reached_depth(c, reg);
+            bool      grew    = false;
+            for (int i = 0; i < reg.recipe_count(building_type::processing_facility); ++i)
+            {
+                const recipe&       rc   = reg.recipe_at(building_type::processing_facility, i);
+                const std::uint16_t id   = reg.recipe_id(rc.name);
+                const int           need = reg.recipe_required_depth(id);
+                if (need < 0 || need > reached)
+                    continue;
+                for (std::size_t r = 0; r < resource_count; ++r)
+                    if (rc.outputs[r] > 0.0f && !c.produced_ever[r])
+                    {
+                        c.produced_ever[r] = true;
+                        grew               = true;
+                    }
+            }
+            if (!grew)
+                break;
+        }
+
+        const int final_reached = corp_reached_depth(c, reg);
+        std::vector<std::string> stranded;
+        for (int i = 0; i < reg.recipe_count(building_type::processing_facility); ++i)
+        {
+            const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
+            if (rc.era != era_band::ancient)
+                continue;
+            const int need = reg.recipe_required_depth(reg.recipe_id(rc.name));
+            if (need < 0 || need > final_reached)
+                stranded.push_back(rc.display_name.empty() ? rc.name : rc.display_name);
+        }
+        for (const std::string& n : stranded)
+            std::printf("      stranded ancient recipe: %s\n", n.c_str());
+        std::printf("      ancient ladder climbs to depth %d\n", final_reached);
+        check(stranded.empty(),
+              "no ancient recipe is permanently unplaceable (the roster's orphan)");
+        check(final_reached >= 1,
+              "the ancient ladder actually has a rung above raw (anti-vacuity)");
+    }
+
+    std::printf("\nG4 - required depth is deterministic\n");
+    {
+        lua_state lua;
+        lua.load("scripts/recipes.lua");
+        lua.load("scripts/economy.lua");
+        recipe_registry a, b;
+        a.load_from_lua(lua);
+        b.load_from_lua(lua);
+
+        bool same = true;
+        for (int i = 0; i < a.recipe_count(building_type::processing_facility); ++i)
+        {
+            const std::uint16_t id = a.recipe_id(
+                a.recipe_at(building_type::processing_facility, i).name);
+            if (a.recipe_required_depth(id) != b.recipe_required_depth(id))
+                same = false;
+        }
+        check(same, "two loads of the shipped recipes agree on every required depth");
+
+        recipe_registry x, y;
+        x.add_recipe(make("mid",  {{RAW_A, 1.0f}},              {{MID, 1.0f}}));
+        x.add_recipe(make("deep", {{MID, 1.0f}, {RAW_B, 1.0f}}, {{DEEP, 1.0f}}));
+        y.add_recipe(make("deep", {{MID, 1.0f}, {RAW_B, 1.0f}}, {{DEEP, 1.0f}}));
+        y.add_recipe(make("mid",  {{RAW_A, 1.0f}},              {{MID, 1.0f}}));
+        check(x.recipe_required_depth(x.recipe_id("deep"))
+                  == y.recipe_required_depth(y.recipe_id("deep")),
+              "insertion order does not change a recipe's required depth");
     }
 
     std::printf("\n=== %s (%d failure%s) ===\n",

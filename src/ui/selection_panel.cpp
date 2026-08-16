@@ -874,8 +874,28 @@ void draw_production_method_section(world& w, const recipe_registry& reg, entity
         if (!active)
         {
             const bool  on_cooldown = b.recipe_switch_cooldown > 0;
+
+            // BL-428: the same chain-depth gate the Build door and
+            // try_switch_recipe apply, shown rather than discovered by a refused
+            // click. Ancient-band methods only, matching the first-cut scope.
+            const std::uint16_t row_id = reg.recipe_id(ri.name);
+            bool depth_locked = false;
+            if (ri.era == era_band::ancient)
+            {
+                const auto cit = w.corporations.find(w.player_entity);
+                const int  need = reg.recipe_required_depth(row_id);
+                const int  have = (cit != w.corporations.end())
+                                      ? corp_reached_depth(cit->second, reg) : 0;
+                depth_locked = (need < 0 || need > have);
+            }
+
             char tip[96];
-            if (on_cooldown)
+            if (depth_locked)
+                // Names the act, not the number — a reached-depth integer means
+                // nothing to a player who has never seen one.
+                std::snprintf(tip, sizeof tip,
+                              "Your industry cannot make what this needs yet");
+            else if (on_cooldown)
                 std::snprintf(tip, sizeof tip, "Locked %d more tick%s", b.recipe_switch_cooldown,
                              b.recipe_switch_cooldown == 1 ? "" : "s");
             else if (reg.recipe_switch().switch_cost > 0.0f)
@@ -889,9 +909,9 @@ void draw_production_method_section(world& w, const recipe_registry& reg, entity
             // accent, not the same neutral grey every other glyph button uses.
             constexpr ImU32 switch_glyph_col = IM_COL32(90, 150, 210, 255);
             ImGui::SetCursorPos({row_w - glyph_w, 0.0f});
-            if (tile_icon_button("##switch", {glyph_w, row_h}, !on_cooldown, tip, glyph_swap,
-                                 switch_glyph_col))
-                try_switch_recipe(w, reg, w.player_entity, b, reg.recipe_id(ri.name));
+            if (tile_icon_button("##switch", {glyph_w, row_h}, !on_cooldown && !depth_locked,
+                                 tip, glyph_swap, switch_glyph_col))
+                try_switch_recipe(w, reg, w.player_entity, b, row_id);
         }
 
         ImGui::EndChild();
@@ -2177,11 +2197,28 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
     // on a tile where food rations clear well. The chosen recipe survives to construction
     // via construction.pending_recipe → construct_building's trailing recipe parameter,
     // so the bar always prices what the Build button would actually build.
+    // BL-428: absolute-id group lookup, replacing a browse-position recipe_at.
+    // A null id falls back to the same literal "General" recipe_registry.hpp
+    // documents as the absent-group default, so a caller never sees an empty key.
+    static const auto recipe_group_of = [](const recipe_registry& r,
+                                           std::uint16_t id) -> const std::string&
+    {
+        static const std::string general = "General";
+        const recipe* rc = r.get_recipe(id);
+        return rc ? rc->group : general;
+    };
+
     struct candidate
     {
         building_type type;
         resource_type target;
         std::string   name;
+        /// ABSOLUTE recipe id (the get_recipe / recipe_id space), NOT a browse
+        /// position. Load-bearing: this value is handed to construct_building via
+        /// ui.construction.pending_recipe, and construct_building indexes it
+        /// absolutely. It used to hold the browse index, which is the same number
+        /// only while the era mask is the identity — under an ancient campaign it
+        /// silently named a different recipe (found wiring BL-428's depth gate).
         std::uint16_t recipe = no_recipe;
 
         placement_rules::placement_result pr;
@@ -2208,9 +2245,12 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
     // One processing row per recipe (BL-429: its authored display_name, "Bloomery"
     // rather than "Processing: Iron Blooms"), each priced on its own economics.
     for (int ri = 0; ri < reg.recipe_count(building_type::processing_facility); ++ri)
+    {
+        const recipe& browsed = reg.recipe_at(building_type::processing_facility, ri);
         cands.push_back({building_type::processing_facility, resource_type::iron_ore,
-                         reg.recipe_at(building_type::processing_facility, ri).display_name,
-                         static_cast<std::uint16_t>(ri)});
+                         browsed.display_name,
+                         reg.recipe_id(browsed.name)}); // browse -> ABSOLUTE, see candidate::recipe
+    }
     cands.push_back({building_type::port,                 resource_type::iron_ore, "Port"});
     cands.push_back({building_type::launchpad,            resource_type::iron_ore, "Launchpad"});
     cands.push_back({building_type::inland_logistics_hub, resource_type::iron_ore, "Inland Logistics Hub"}); // BL-149
@@ -2222,9 +2262,28 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
     // built from recipe_count/recipe_at, which are the era-masked browse path.
     // construct_building refuses these anyway (construction_result::era_locked);
     // this is the door not showing what the gate would refuse.
+    //
+    // BL-428 adds the second half of the same argument: an ancient recipe whose
+    // chain the corp has not yet reached is refused by construct_building
+    // (depth_locked), so the door should not offer it either. Ancient-band
+    // recipes only, per the 2026-08-16 first-cut ruling — an `any`-band recipe is
+    // never depth-filtered.
+    const int reached = [&]
+    {
+        const auto it = w.corporations.find(w.player_entity);
+        return (it != w.corporations.end()) ? corp_reached_depth(it->second, reg) : 0;
+    }();
     cands.erase(std::remove_if(cands.begin(), cands.end(),
-                               [&reg](const candidate& c)
-                               { return !reg.building_available(c.type); }),
+                               [&reg, reached](const candidate& c)
+                               {
+                                   if (!reg.building_available(c.type))
+                                       return true;
+                                   const recipe* rc = reg.get_recipe(c.recipe);
+                                   if (!rc || rc->era != era_band::ancient)
+                                       return false;
+                                   const int need = reg.recipe_required_depth(c.recipe);
+                                   return need < 0 || need > reached;
+                               }),
                 cands.end());
 
     // BL-326: fold group by building family — Ben rejected the profit-ranked flat list
@@ -2282,7 +2341,7 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
             if (cands[i].type != building_type::processing_facility)
                 continue;
             const std::string& grp =
-                reg.recipe_at(building_type::processing_facility, cands[i].recipe).group;
+                recipe_group_of(reg, cands[i].recipe);
             const auto it = best_idx.find(grp);
             if (it == best_idx.end())
             {
@@ -2404,7 +2463,7 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
             // Smithy, ...) rather than the placeholder.
             const resource_type icon_identity =
                 (c.type == building_type::processing_facility && c.recipe != no_recipe)
-                    ? primary_output_resource(reg.recipe_at(building_type::processing_facility, c.recipe))
+                    ? primary_output_resource(*reg.get_recipe(c.recipe))
                     : c.target;
             icons::building(cdl, {gp.x + gr, gp.y + ImGui::GetTextLineHeight() * 0.5f}, gr,
                             c.type, icon_identity, IM_COL32(150, 235, 160, 255));

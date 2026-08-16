@@ -534,6 +534,30 @@ public:
         return m_depth[static_cast<std::size_t>(r)] == 0;
     }
 
+    /// BL-428 THE GATE: how far down the graph a corp must already have reached
+    /// before it may run this recipe — the depth of the recipe's DEEPEST input,
+    /// which is exactly the `deepest_input` term `rebuild_depth` already computes.
+    ///
+    /// DERIVED, never authored, and that is the ruling's own argument: a
+    /// hand-authored per-building minimum would be a second system to keep in
+    /// agreement with the economy, which is the cost chain depth was chosen to
+    /// avoid. Build a Charcoal Burner (charcoal, depth 1) and the Bloomery becomes
+    /// placeable because charcoal exists — not because a flag was set.
+    ///
+    /// Addressed by ABSOLUTE recipe id (the `get_recipe`/`recipe_id` space), not by
+    /// browse position, because a gate is asked about a *stored*
+    /// `building_component.recipe`.
+    ///
+    /// 0 for an input-free recipe (extraction — nothing must precede it), and -1
+    /// when an input is unreachable under this band, matching `depth_of`'s code so
+    /// the two never disagree about what "you cannot get there" means.
+    int recipe_required_depth(uint16_t id) const
+    {
+        if (id == no_recipe || id >= m_required_depth.size())
+            return -1;
+        return m_required_depth[id];
+    }
+
     /// The deepest reachable good under the current band — the ceiling a corp can
     /// climb to. Useful to a UI readout and as an anti-vacuity bound in tests.
     int max_depth() const
@@ -700,6 +724,29 @@ private:
             if (!changed)
                 break; // settled
         }
+
+        // Required depth per recipe, from the settled table. Walked over ALL
+        // recipes in authored order (not m_allowed), so a stored recipe id always
+        // indexes a valid entry even when the era mask hides that recipe from
+        // browsing — the same absolute/browse split get_recipe keeps.
+        m_required_depth.assign(m_recipes.size(), -1);
+        for (std::size_t i = 0; i < m_recipes.size(); ++i)
+        {
+            const recipe& rc = m_recipes[i];
+            int  deepest     = 0;
+            bool ready       = true;
+            for (std::size_t r = 0; r < resource_count && ready; ++r)
+            {
+                if (rc.inputs[r] <= 0.0f)
+                    continue;
+                const int d = m_depth[r];
+                if (d == unreachable)
+                    ready = false;
+                else if (d > deepest)
+                    deepest = d;
+            }
+            m_required_depth[i] = ready ? deepest : unreachable;
+        }
     }
 
     std::vector<recipe> m_recipes;
@@ -717,6 +764,12 @@ private:
     /// anything. Every entry is 0 until the first rebuild — a registry with no
     /// recipes is all raws, which is the truthful answer for an empty graph.
     std::array<int, resource_count> m_depth = {};
+
+    /// BL-428 gate: required reached-depth per recipe, indexed by ABSOLUTE recipe
+    /// id. Rebuilt with m_depth from the same settled table, so the gate and the
+    /// readout can never disagree. Sized to m_recipes (not m_allowed) — see
+    /// rebuild_depth's tail.
+    std::vector<int> m_required_depth;
 
     /// Indexed by building_type (none / extraction_site / processing_facility / port /
     /// launchpad / inland_logistics_hub / military_base / research_institute — BL-332

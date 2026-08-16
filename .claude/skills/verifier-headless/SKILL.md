@@ -217,9 +217,19 @@ in `tools/verify/README.md`.
   *adds* depth. Prints the real ceilings — **industrial 4, ancient 1** as of 2026-08-15, the latter
   being the measurement that says the ancient roster has no chain yet (BL-429).
 
-  **BL-432 extends this same file** with the three roster invariants that need a fuller roster to
-  mean anything: no orphan resources in either direction, every building's minimum depth reachable,
-  and no production method dominating a sibling on every axis.
+  **G1-G4 cover the GATE** (BL-428 slice 2, 2026-08-16) — the half that makes depth the growth track
+  rather than a readout: a recipe's required depth is its deepest input's (derived, never authored);
+  a corp's reached depth is produced-once-ever and **monotonic** (the property the gate rests on,
+  since a placement that was legal must not become illegal); **no ancient recipe is stranded** — the
+  ladder is climbed from a fresh corp to a fixed point and anything still shut out is named, which is
+  BL-432's "an unplaceable building is the roster's orphan" assertion; and the required-depth vector
+  is identical across two loads and independent of insertion order. Prints the real ladder height —
+  **ancient climbs to depth 3** as of 2026-08-16, so the gate has genuine rungs rather than passing
+  vacuously on a flat roster.
+
+  **BL-432 still owes** this file its remaining two roster invariants: no orphan resources in either
+  direction, and no production method dominating a sibling on every axis (the latter currently lives
+  in `recipe_switch_harness`, where it FAILS on four real pre-existing pairs — see NR-243).
 - **`era_roster`** — The era gate over the authored economy data (BL-433). The **fourth live-Lua
   harness**: it asks what the *authored* `era` tags do, so it loads the real `scripts/economy.lua`
   + `recipes.lua` rather than hand-building a registry — a hand-built fixture could only confirm
@@ -279,10 +289,23 @@ only when building outside the CMake tree.
 
 ## Procedure
 
-1. **Compile** from the repo root, after sourcing the VS `vcvars64`
-   (`C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat`
-   — verified 2026-07-28; the old 2022 BuildTools path in this file was stale. From Git Bash
-   the quoting fails, so write a one-off `.bat` that `call`s vcvars then `cl`, and run that),
+1. **Compile** from the repo root, after sourcing the VS `vcvars64`. From Git Bash the quoting
+   fails, so write a one-off `.bat` that `call`s vcvars then builds, and invoke it by **absolute
+   path** (`cmd //c "C:\Users\benbo\Project-Io\build_x.bat"` — a bare name is not found).
+
+   **Use the BuildTools 2022 vcvars, pinned to 14.44** (corrected 2026-08-16):
+
+   ```
+   call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat" -vcvars_ver=14.44
+   ```
+
+   The VS18 Community path this file recommended between 2026-07-28 and 2026-08-16 **does not work
+   against the configured `build/` tree**: it puts the 14.51 STL headers on `INCLUDE` while CMake
+   still invokes the 14.44 `cl.exe`, and `yvals_core.h` hard-fails on the first translation unit
+   with *"STL1001: Unexpected compiler version, expected MSVC Compiler 19.50 or newer"*. Pinning
+   the toolset makes both halves agree. With the environment set, prefer
+   `cmake --build build --target <name>` — every harness is already a declared target — and fall
+   back to the raw `cl` line only when building outside the CMake tree,
    with the harness's own source list (see `tools/verify/README.md`), e.g.:
    ```
    cl /nologo /std:c++20 /EHsc /I src tools\verify\econ_harness.cpp ^

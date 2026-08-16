@@ -32,6 +32,25 @@ construction_result construct_building(world& w, const recipe_registry& reg,
     if (!reg.building_available(type))
         return construction_result::era_locked;
 
+    // BL-428 chain-depth gate — the growth spine. A corp may only run a recipe
+    // whose inputs it has already learned to make: the recipe's required depth
+    // (its deepest input) must not exceed the depth the corp has actually reached
+    // (the deepest good it has ever produced). Sits with the era gate for the same
+    // reason — a method you cannot yet reach is refused on every tile alike.
+    //
+    // ANCIENT ROSTER ONLY for this first cut (Ben, 2026-08-16), so no existing
+    // industrial campaign changes shape. The band check is on the RECIPE, not on
+    // the campaign, so an `any`-band recipe stays ungated even in an ancient
+    // campaign — only content authored as `ancient` opts into the ladder.
+    // `::recipe` qualified because construct_building's own parameter is named
+    // `recipe` and shadows the type here — the standing footgun in this codebase.
+    if (const ::recipe* rc = reg.get_recipe(recipe); rc && rc->era == era_band::ancient)
+    {
+        const int required = reg.recipe_required_depth(recipe);
+        if (required < 0 || required > corp_reached_depth(corp_it->second, reg))
+            return construction_result::depth_locked;
+    }
+
     // Tile-level validity check (ocean / deposit / terrain).
     if (!placement_rules::can_place(tile_it->second, type, target))
         return construction_result::invalid_tile;

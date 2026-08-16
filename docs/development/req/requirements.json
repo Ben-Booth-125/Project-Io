@@ -3499,7 +3499,9 @@
      "id": "R1",
      "status": "active",
      "requirement": "ITEM-SPANNING (visual): a player-owned processing_facility with more than one era-allowed recipe shows a Method toggle on the Selection panel's Facts column; opening it lists every alternate recipe's input basket, wage, rate and (for non-active recipes) a Switch control, without pushing the profitability readout or workforce dial off screen.",
-     "verification": ["visual"],
+     "verification": [
+      "visual"
+     ],
      "result_metric": "",
      "notes": "Implemented (draw_production_method_section, selection_panel.cpp) and compiles clean under the GUI target. No scripts/verify/*.lua check authored yet — the calling session opens the live app per standing practice; a visual check (scripts/verify/selection_method_selector.lua) is the natural follow-on once the layout is eyeballed. Logged as a deferral in NEEDS_REVIEW.json."
     },
@@ -3507,7 +3509,9 @@
      "id": "R2",
      "status": "active",
      "requirement": "The Chain toggle, opened from a player-owned building's own output, walks recipe_registry's OWN recipe data down to raws and never disagrees with recipe_registry::depth_of for the same resource (i.e. the trace terminates at a good with depth_of == 0).",
-     "verification": ["headless"],
+     "verification": [
+      "headless"
+     ],
      "result_metric": "",
      "notes": "draw_chain_trace reads reg.recipe_at/reg.depth_of directly (no parallel graph); a headless harness asserting trace termination against depth_of for a sample of the ancient + industrial rosters is the natural tools/verify/*.cpp check and is not yet authored."
     },
@@ -3515,11 +3519,63 @@
      "id": "R3",
      "status": "active",
      "requirement": "The Depth readout's corp_reached_depth never exceeds recipe_registry::max_depth() for the same era, and reads -1 (shown as '-') for a corp with no completed extraction site or processing facility.",
-     "verification": ["headless"],
+     "verification": [
+      "headless"
+     ],
      "result_metric": "",
      "notes": "corp_reached_depth (selection_panel.cpp) is a pure function over w.buildings + reg; a headless assertion is straightforward once a harness world with completed buildings exists. Not yet authored — deferral logged in NEEDS_REVIEW.json alongside R1/R2."
     }
    ]
+  },
+  {
+   "brief": "chain-depth-growth-gate",
+   "batch": "2026-08-16-sprint-18",
+   "title": "BL-428 — Chain depth gates placement (ancient roster)",
+   "status": "complete",
+   "promoted_from": "backlog.json BL-428 CHAIN_DEPTH_IS_THE_GROWTH_SPINE",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "",
+     "requirement": "ITEM-SPANNING: a corporation may place an ancient-band processing recipe only once it has PRODUCED every good that recipe needs at the depth below it. A fresh corp can place a depth-0 ancient recipe; the same corp is refused a depth-N recipe until it has produced a depth-(N-1) good, and is admitted immediately after.",
+     "notes": "Met. chain_depth G1 (required depth = deepest input, 0 for input-free, -1 for no_recipe) and G3 (fresh corp climbs the real ancient roster to depth 3). Gate applied at BOTH doors: construct_building (placement) and try_switch_recipe (retool) — guarding only placement left a one-click bypass."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "",
+     "requirement": "reached_depth is monotonic and produced-once-ever: idling or demolishing the building that produced a good never lowers the owning corp’s reached depth.",
+     "notes": "Met. chain_depth G2: fresh corp reads 0; producing a depth-1 good raises it to 1; clearing a shallower good never lowers it below what a deeper one earned. produced_ever is set-only, never cleared, and is the sole input to corp_reached_depth so no stockpile/building state can lower it."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "",
+     "requirement": "No ancient recipe is unreachable: for every era-allowed ancient recipe, a path of ancient recipes exists from a fresh corp (reached depth 0) to that recipe’s required depth. An unplaceable building is the roster’s orphan (BL-432 assertion 3).",
+     "notes": "Met. chain_depth G3 climbs to a fixed point and names any stranded ancient recipe; none stranded, ladder height 3 (anti-vacuity row asserts >= 1)."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "",
+     "requirement": "Determinism: the per-recipe required-depth vector is byte-identical across two registry loads in the same process, and does not depend on container iteration order (BL-406 lesson).",
+     "notes": "Met. chain_depth G4: two loads of the shipped recipes agree on every required depth, and insertion order does not change one. m_required_depth is rebuilt inside the same bounded fixed point as m_depth, walked in authored order over all recipes."
+    }
+   ],
+   "resolution": "Complete 2026-08-16. BL-428's gate half landed: recipe_required_depth (derived in the same fixed point as depth_of, so it cannot drift), corporation_component::produced_ever + corp_reached_depth, mark_produced at the two real production sites, and the gate at both construct_building and try_switch_recipe as construction_result::depth_locked / recipe_switch_result::depth_locked, both mapping to corp_command_result::rejected_depth_locked. Build door and Method page filter/disable rather than let the player discover the lock by refusal. ANCIENT-BAND RECIPES ONLY (Ben's 2026-08-16 call) — the band check is on the recipe, so no industrial campaign changes shape. chain_depth 11 new assertions ALL PASS; econ_harness, construction_harness, era_roster green; ProjectIo builds clean. Found and fixed a real pre-existing defect en route: the Build door stored a browse recipe index and passed it as an absolute id (NR-254). Two review entries filed: NR-254, NR-255 (Method-page text overlap)."
   }
  ]
 }

@@ -19,6 +19,21 @@
 namespace {
 
 // --- Deposit depletion constants (backlog.json § Environment, settled 2026-06-15) ---
+/// BL-428: record that @p corp has now produced @p r, raising its reached chain
+/// depth if this good sits deeper than anything it had made before. Called from
+/// the two places a good is actually created (run_extraction, run_processing)
+/// rather than from a per-tick sweep, so the bit is set by the *event* of making
+/// something — a corp cannot inherit depth from stock it merely bought.
+///
+/// Set-only. See corporation_component::produced_ever for why it never clears.
+void mark_produced(world& w, entity_id corp, resource_type r)
+{
+    const auto it = w.corporations.find(corp);
+    if (it == w.corporations.end())
+        return;
+    it->second.produced_ever[static_cast<std::size_t>(r)] = true;
+}
+
 /// Body that a building sits on (via its tile). null_entity if the tile is gone.
 entity_id building_body(const world& w, const building_component& b)
 {
@@ -164,6 +179,7 @@ building_report run_extraction(world& w, const recipe_registry& reg,
     if (output > 0.0f)
     {
         w.pool_for(corp, body).quantities[ri] += output;
+        mark_produced(w, corp, b.target_resource); // BL-428 growth spine
         rep.active          = true;
         rep.output_quantity = output;
     }
@@ -291,6 +307,7 @@ building_report run_processing(world& w, const recipe_registry& reg,
             continue;
         pool.quantities[r] += outq;
         produced           += outq;
+        mark_produced(w, corp, static_cast<resource_type>(r)); // BL-428 growth spine
     }
 
     rep.active          = true;
@@ -572,6 +589,18 @@ recipe_switch_result try_switch_recipe(world& w, const recipe_registry& reg,
     const recipe* new_r = reg.get_recipe(new_recipe_id);
     if (old_r != nullptr && new_r != nullptr && old_r->group != new_r->group)
         return recipe_switch_result::cross_group;
+
+    // BL-428 chain-depth gate, mirroring construct_building's. Without it the gate
+    // has a trivial bypass: place the shallowest ancient method the corp can
+    // reach, then immediately retool onto the deepest one in the same group, and
+    // the ladder never has to be climbed at all. A gate that only guards the front
+    // door is not a gate. Ancient-band recipes only, same first-cut scope.
+    if (new_r != nullptr && new_r->era == era_band::ancient)
+    {
+        const int need = reg.recipe_required_depth(new_recipe_id);
+        if (need < 0 || need > corp_reached_depth(cit->second, reg))
+            return recipe_switch_result::depth_locked;
+    }
 
     const float cost = sw.switch_cost;
     if (cit->second.balance < cost)
