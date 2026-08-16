@@ -579,6 +579,25 @@ target_link_libraries(player_seed_sweep PRIVATE io_world_obj lua54)
 target_compile_features(player_seed_sweep PRIVATE cxx_std_20)
 target_compile_options(player_seed_sweep PRIVATE ${IO_WARNING_FLAGS})
 
+# tier_margin (BL-436, 2026-08-16) — live-Lua for the same reason: it asks
+# whether REFINING PAYS in the shipped economy, so it must read the authored
+# prices, rates and recipes rather than a hand-built mirror of them. It also
+# reads estimate_building_profit, the same per-building breakdown the
+# Profitability page shows a player, so what it reports is what the game itself
+# believes rather than a parallel model that could be wrong on its own.
+add_executable(tier_margin
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/tier_margin.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(tier_margin PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(tier_margin PRIVATE io_world_obj lua54)
+target_compile_features(tier_margin PRIVATE cxx_std_20)
+target_compile_options(tier_margin PRIVATE ${IO_WARNING_FLAGS})
+
 # font_glyph_harness (BL-234) is the one harness that links ImGui rather than
 # ${IO_WORLD_SOURCES}: the defect it guards is the ImFontConfig handed to
 # AddFontFromFileTTF, which lives in src/ui/fonts.cpp, not in world/*. It still
