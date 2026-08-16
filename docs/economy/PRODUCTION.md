@@ -218,9 +218,14 @@ nothing in the roster wanted any.
 Two further routes exist to give `regolith` and `platinum_group_metals` consumers. Both are
 deliberately **poor value per unit** — they are about reaching a *place*, not about efficiency.
 
+At authored prices the three industrial steel routes clear, per unit of steel: iron-nickel **2.0**,
+Smelter **1.0**, in-situ **0.8**. That ordering is the design, and it is why the regolith ratio and
+regolith's `base_price` (0.6) cannot be tuned independently of each other — see the note on the
+recipe in `scripts/recipes.lua`.
+
 | Inputs | Output | Era | Why it exists |
 |--------|--------|-----|---------------|
-| Regolith ×8 | Steel | 1 | In-situ reduction on an airless body. Eight regolith per steel against the Smelter's two iron ore: regolith is on every tile of every airless body, so the point is that you can build **from where you are**. |
+| Regolith ×12 | Steel | 1 | In-situ reduction on an airless body. Twelve regolith per steel against the Smelter's two iron ore: regolith is on every tile of every airless body, so the point is that you can build **from where you are**. |
 | Platinum group metals ×0.5 | Electronics | 1 | Contact-grade/catalytic route. At base price 40 this is a premium alternative to the silicon + copper + REE chain, not a cheap bypass of it. |
 
 #### Food Processor

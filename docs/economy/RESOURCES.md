@@ -127,10 +127,20 @@ ever price one in play; the base price is scaffolding for when the behaviour lan
 > code — no cost formula ever referenced regolith, so it sat obtainable and consumed by nothing,
 > which is how `chain_depth`'s R1 orphan row found it. Ben's call was to give it a consumer, so
 > `steel_from_regolith` "In-Situ Smelter" (scripts/recipes.lua) now reduces regolith to steel at a
-> deliberately poor 8:1. The **in-situ intent above is unchanged and is what the recipe encodes** —
-> it is the route for building where you already are, not a trade good. Still open, and Ben's:
-> whether regolith should now carry a `base_price`. Being a recipe input pulls it into market
-> demand at the tiles that run it, which sits in tension with "excluded from market tables".
+> deliberately poor 12:1. The **in-situ intent above is unchanged and is what the recipe encodes** —
+> it is the route for building where you already are, not a trade good.
+>
+> **Regolith now carries a `base_price` of 0.6** (Ben's call, same date), so the "no base price /
+> excluded from market tables" sentence above is superseded: a recipe input pulls the good into
+> market demand at the tiles that run one, and an unpriced input stalls the building forever — the
+> same minable-but-unsellable asymmetry BL-340 closed for the space chain and BL-429 for the ancient
+> one. 0.6 is the cheapest good in the table, below the stone/sand bulk floor of 1.0, which is what
+> "high mass, low unit value" should mean for something on every tile of every airless body.
+>
+> The recipe ratio moved from 8:1 to 12:1 **with** the price, and had to: at 8:1 a price low enough
+> to read as bulk would have made the deliberately poor route the most profitable steel in the game
+> (clearing 3.2 against the Smelter's 1.0). At 12:1 it clears 0.8, the worst of the three industrial
+> routes, which is the authored intent. The two numbers are one decision.
 
 > **Amended 2026-08-16 (NR-257).** **Platinum group metals** likewise had no consumer — `world_gen.lua`
 > tags it `terminal: the belt's high-value trade good`, i.e. a good to be *sold*. It now also has

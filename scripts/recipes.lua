@@ -402,22 +402,25 @@ recipes = {
 
     -- id 26 — Smelter, IN-SITU route: regolith -> steel. Regolith reduction on
     -- an airless body, which is exactly the "in-situ build mass" role
-    -- RESOURCES.md already gives it. Deliberately poor grade — 8 regolith per
+    -- RESOURCES.md already gives it. Deliberately poor grade — 12 regolith per
     -- steel against id 0's 2 iron ore — because regolith is abundant (present
     -- on every tile of every airless body, deposits 20-50) and the point is
     -- that you can build FROM WHERE YOU ARE, not that it is efficient.
     --
-    -- SAME TENSION as id 25: RESOURCES.md says regolith "does not appear in
-    -- market supply or demand tables" and exists so building-cost formulas can
-    -- reference it — and no cost formula ever did. A recipe input is the
-    -- nearest consumer that keeps the doc's in-situ intent intact. Whether
-    -- regolith should now also carry a base_price is Ben's call (NR-257).
+    -- THE RATIO IS TIED TO regolith's base_price (0.6, world_gen.lua, NR-257)
+    -- and cannot be read without it. At 12 the basket costs 7.2 against steel's
+    -- 8.0 — clearing 0.8, thinner than the Smelter's 1.0 and the iron-nickel
+    -- route's 2.0, so this is the worst of the three industrial steel routes as
+    -- intended. It was authored at 8 while regolith was unpriced; pricing the
+    -- good at anything low enough to mean "high mass, low unit value" would
+    -- have made 8:1 the MOST profitable steel in the game. Change either number
+    -- and check the other.
     {
         name         = "steel_from_regolith",
         display_name = "In-Situ Smelter",
         era          = "industrial",
         group        = "Metal Foundry", -- same group as ids 0, 4 and 19
-        inputs       = { regolith = 8.0 },
+        inputs       = { regolith = 12.0 },
         outputs      = { steel = 1.0 },
     },
 }
