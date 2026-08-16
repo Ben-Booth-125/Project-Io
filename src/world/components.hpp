@@ -55,22 +55,23 @@ enum class resource_type : uint8_t
     steel                 = 20, ///< Smelted from iron ore (+ coal).
     refined_fuel          = 21, ///< Refined from petroleum.
     food_rations          = 22, ///< Processed from agricultural produce.
-    // --- Logistics goods (BL-286, 2026-08-04) ---
+    // --- Ancient intermediates (BL-286, 2026-08-04) ---
     //
-    // Enum + serialization + base-price wiring only (BL-286). The follow-on
-    // behaviours — consumption, transport-capacity range cap, salt shelf-life
-    // gate, bullion purchase — are NOT yet filed; ids get allocated via
-    // `node tools/session/next_id.js` when they are. Do not cite placeholder
-    // ids here: a wrong id routes the reader to unrelated work, which is worse
-    // than no id. See docs/economy/RESOURCES.md § Logistics goods.
-    grain                 = 23, ///< Human ration staple; per-tick army/unit draw (behaviour unfiled).
-    fodder                = 24, ///< Draft-animal/cavalry feed; per-tick draw alongside grain (behaviour unfiled).
-    salt                  = 25, ///< Preservative; gates ration shelf-life (behaviour unfiled).
-    transport_capacity    = 26, ///< Abstract logistics-train throughput good; caps supply range (behaviour unfiled).
-    charcoal              = 27, ///< Refined fuel-wood; pre-coal smelting/heating input.
-    iron_blooms           = 28, ///< Bloomery-refined iron intermediate — distinct from raw iron/iron-nickel ore.
-    bullion               = 29, ///< Minted precious-metal specie; local purchase medium (behaviour unfiled).
-    trade_goods_misc      = 30, ///< Placeholder endemic-luxury-class good; a specific luxury name is a later design step.
+    // REMOVED 2026-08-16 (Ben's call on NR-257, option B): grain, fodder, salt,
+    // transport_capacity and bullion were five of BL-286's eleven values, added
+    // with "behaviour unfiled" and still, twelve days later, produced by nothing,
+    // yielded by no deposit and consumed by nothing. chain_depth's R1 row found
+    // them; they are gone rather than exempted, and the ids below shifted down
+    // by five to close the gap.
+    //
+    // Re-adding one is an APPEND at the end of the enum with its behaviour filed
+    // in the same change — never a re-insertion here, which would repoint every
+    // id after it. The admission rule (PRODUCTION.md, BL-340) is the standing
+    // answer: a value earns its place by being consumed by an authored recipe or
+    // contracted for by a named actor, and nothing else gets in.
+    charcoal              = 23, ///< Refined fuel-wood; pre-coal smelting/heating input.
+    iron_blooms           = 24, ///< Bloomery-refined iron intermediate — distinct from raw iron/iron-nickel ore.
+    trade_goods_misc      = 25, ///< Placeholder endemic-luxury-class good; a specific luxury name is a later design step.
     // --- Tier 2: propellant (BL-308, 2026-08-09) ---
     //
     // The good a Launchpad burns to put a convoy into space. Two authored
@@ -88,7 +89,7 @@ enum class resource_type : uint8_t
     // not landed, so this append is free right now. It stops being free the
     // moment saves exist: from then on, a new resource_type value is a
     // save-format break and needs a version bump + migration.
-    propellant            = 31, ///< Launch propellant; consumed per space-mode convoy dispatch.
+    propellant            = 26, ///< Launch propellant; consumed per space-mode convoy dispatch.
     // --- Tier 2/3: processing chain roster (BL-340, 2026-08-11) ---
     //
     // Closes the minable-but-unsellable asymmetry on silica/copper_ore/
@@ -97,13 +98,13 @@ enum class resource_type : uint8_t
     // applied (PRODUCTION.md / this item's design): every value here is
     // consumed by an authored recipe, or is a terminal object a named actor
     // contracts for. No orphans — see BL-286 for the cautionary precedent.
-    silicon                = 32, ///< Refined from silica. Refinery.
-    refined_copper         = 33, ///< Refined from copper ore. Smelter.
-    ree_alloy              = 34, ///< Refined from rare earth ore. Refinery.
-    machinery              = 35, ///< Steel + refined copper. Fabricator. Alloys' alternative path.
-    alloys                 = 36, ///< Steel + REE alloy. Fabricator.
-    electronics            = 37, ///< Silicon + refined copper + REE alloy. Electronics Lab.
-    spacecraft_components  = 38, ///< Alloys + electronics. Assembly Plant. Terminal — the militia's
+    silicon                = 27, ///< Refined from silica. Refinery.
+    refined_copper         = 28, ///< Refined from copper ore. Smelter.
+    ree_alloy              = 29, ///< Refined from rare earth ore. Refinery.
+    machinery              = 30, ///< Steel + refined copper. Fabricator. Alloys' alternative path.
+    alloys                 = 31, ///< Steel + REE alloy. Fabricator.
+    electronics            = 32, ///< Silicon + refined copper + REE alloy. Electronics Lab.
+    spacecraft_components  = 33, ///< Alloys + electronics. Assembly Plant. Terminal — the militia's
                                  ///< procurement contract object (BL-350); no background demand.
     // --- Habitability tranche (BL-368, 2026-08-11) ---
     //
@@ -115,10 +116,10 @@ enum class resource_type : uint8_t
     // identity of its own. Admission rule satisfied on both ends: population
     // centres are the consumer (inject_population_demand, market_clearing.cpp),
     // each has a producing recipe (recipes.lua).
-    clean_water            = 39, ///< Water Treatment Plant, from water. Reduces habitability if undersupplied.
-    consumer_goods         = 40, ///< Consumer Goods Factory, from food_rations + steel. Reduces workforce efficiency if undersupplied.
-    medical_supplies       = 41, ///< Pharmaceutical Lab, from water + agricultural_produce. Reduces habitability if undersupplied.
-    count                  = 42
+    clean_water            = 34, ///< Water Treatment Plant, from water. Reduces habitability if undersupplied.
+    consumer_goods         = 35, ///< Consumer Goods Factory, from food_rations + steel. Reduces workforce efficiency if undersupplied.
+    medical_supplies       = 36, ///< Pharmaceutical Lab, from water + agricultural_produce. Reduces habitability if undersupplied.
+    count                  = 37
 };
 
 static constexpr std::size_t resource_count = static_cast<std::size_t>(resource_type::count);

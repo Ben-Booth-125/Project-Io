@@ -118,7 +118,41 @@ constexpr int      k_ticks = 300;
 // tile and everything downstream of it. Confirmed reproducible across two
 // independent same-seed runs before blessing. MSVC-derived; this golden is
 // toolchain-specific (float clearing arithmetic differs under g++).
-constexpr uint64_t k_unspectated_golden = 0x06FB73D17BC054DDull;
+// Re-blessed 2026-08-16 (NR-257): five resource_type values were REMOVED — grain,
+// fodder, salt, transport_capacity, bullion — taking resource_count 42 -> 37. Every
+// per-resource array this hash walks changed length, so the move is structural and
+// expected rather than behavioural: no scorer, price or verb changed with it. The
+// move was confirmed to be the intended one before blessing — the harness's other
+// R2 row (two independently built worlds, same seed) reproduces 359F55D3EFC3CA21,
+// and every other assertion in this file, including the prohibition and the cadence
+// rows, passed unchanged across the removal.
+// Re-blessed 2026-08-16 (BL-435 task B), same session as the bless above and for
+// an unrelated reason: `focus_asset_pattern` moved the extraction corps' processor
+// to a slot the holdings draw actually reaches, so affected corps now open 2
+// extraction + 1 processing instead of 3 + 0. That changes generated holdings,
+// which changes the world, which changes every downstream number this hash walks.
+// A deliberate generation change is the case this file's policy names. Confirmed
+// reproducible across two independently built worlds (84E876A1596FE090 twice)
+// before blessing, and every other assertion — the prohibition, the cadence rows,
+// the A/B seating rows — passed unchanged. The economy-wide income drop this
+// generation change also caused is NOT this harness's business; it is measured
+// and filed as BL-436.
+// Re-blessed 2026-08-16 (BL-437 co-extraction): an extraction site now works
+// EVERY deposit on its tile, sharing its unchanged capacity across them by
+// richness, instead of spending all of it on the single richest. Five raws that
+// were produced in zero quantity — coal, rare_earth_ore, sand, clay, peat — now
+// flow, so pools, prices and every downstream number this hash walks change. A
+// deliberate economy change, which is the case this file's policy names.
+// Confirmed reproducible across two independently built worlds (AB53A812799BA2A4
+// twice) before blessing; every other assertion passed unchanged, and
+// ai_skill_harness's bands held without needing a bless of their own.
+// Re-blessed 2026-08-16 (BL-435 dead-start fix): trade corps' holdings range
+// went 1-2 -> 2-3, because a 1-draw opened a corp holding nothing but a port and
+// a port produces nothing at all. That changes generated holdings on every seed,
+// so the world changes and so does every number this hash walks. Confirmed
+// reproducible across two independently built worlds (855E07DE529684EC twice)
+// before blessing; every other assertion passed unchanged.
+constexpr uint64_t k_unspectated_golden = 0x855E07DE529684ECull;
 
 /// Hand-built registry mirroring scripts/economy.lua + scripts/recipes.lua for
 /// the building types the generator places. Copied from ai_skill_harness so the
@@ -129,16 +163,22 @@ recipe_registry make_registry()
     recipe_registry reg;
 
     building_economics extraction;
-    extraction.base_rate            = 20.0f;
+    extraction.base_rate            = 20.0f; // BL-436 calibration: mirrors economy.lua
     extraction.maintenance          = 5.0f;
     extraction.base_wage            = 8.0f;
     extraction.build_cost           = 100.0f;
     extraction.build_duration_ticks = 2.0f;
     extraction.resource_build_cost[static_cast<std::size_t>(resource_type::steel)] = 20.0f;
+    // BL-436: mirrors scripts/economy.lua's extraction_site block. See the same
+    // note in ai_skill_harness — unset, the richness->rate conversion is disabled
+    // and this harness measures the pre-BL-436 rate model while reporting green.
+    extraction.richness_reference = 0.0f; // mirrors economy.lua: DISABLED pending BL-436 calibration
+    extraction.richness_min       = 0.25f;
+    extraction.richness_max       = 2.0f;
     reg.set_economics(building_type::extraction_site, extraction);
 
     building_economics processing;
-    processing.base_rate            = 8.0f;
+    processing.base_rate            = 8.0f;  // BL-436 calibration: mirrors economy.lua
     processing.maintenance          = 10.0f;
     processing.base_wage            = 12.0f;
     processing.build_cost           = 200.0f;

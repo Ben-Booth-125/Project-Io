@@ -578,7 +578,9 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 const tile_component& tc  = w.tiles.at(s.tile);
                 const std::size_t     ri  = static_cast<std::size_t>(s.target);
                 const float           wf  = 0.5f; // construct_building staffs at 0.5
-                const float rich          = tc.resource_deposit[ri];
+                // BL-436: same conversion as the tick. A raw richness made the
+                // scorer expect ~50x the revenue a site actually delivers.
+                const float rich          = richness_rate_scalar(ex, tc.resource_deposit[ri]);
                 const float price         = local_price(w, s.tile, ri);
                 const float revenue       = ex.base_rate * rich * wf * (1.0f - tc.hazard_level) * price;
                 const float net           = revenue - ex.maintenance - ex.base_wage * wf;

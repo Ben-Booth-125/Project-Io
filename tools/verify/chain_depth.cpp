@@ -15,10 +15,10 @@
 // The asymmetry only starts to bite when BL-430 adds alternate methods, which is
 // exactly why it is pinned by a test now rather than discovered then.
 //
-// WHAT IS ASSERTED HERE (BL-428). This harness covers the METRIC. BL-432 (the
-// roster guard) extends this same file with the three roster invariants that
-// need a fuller roster to be meaningful — no orphan resources either direction,
-// every building's minimum depth reachable, no dominant production method.
+// WHAT IS ASSERTED HERE (BL-428, then BL-432). The D/G rows cover the METRIC and
+// the GATE. The R rows are BL-432's roster invariants, which needed a fuller
+// roster to be meaningful. BL-432's third assertion — every building's minimum
+// depth reachable — is G3 below, landed with the gate.
 //
 //   D1  Raws are depth 0, and a good is deeper than every one of its inputs.
 //   D2  MAX-within-a-recipe: a two-input recipe takes the deeper input's depth.
@@ -45,13 +45,30 @@
 //       unplaceable building is the roster's orphan (BL-432 assertion 3).
 //   G4  Determinism: the required-depth vector is byte-identical across two
 //       loads, and independent of insertion order (the BL-406 lesson).
+//
+// THE ROSTER INVARIANTS (BL-432, 2026-08-16):
+//
+//   R1  No orphan resources, EITHER direction: every resource_type is obtainable
+//       (a recipe produces it or a deposit yields it) and wanted (a recipe
+//       consumes it, or a named actor does, via an explicit exemption table).
+//       BL-286 is the precedent this exists for — eleven values added with
+//       "behaviour unfiled", and no diff review ever caught the ones with no
+//       consumer.
+//   R2  No dominant production method — but only between recipes a corp can
+//       actually choose between. See the axis note at the row itself: disjoint-raw
+//       siblings are supply routes, not methods, and comparing them on price is
+//       the wrong question. Every sibling pair is bucketed, so none escapes by
+//       being unclassifiable.
 
 #include "scripting/lua_state.hpp"
 #include "world/components.hpp"
+#include "world/placement_rules.hpp"
 #include "world/recipe_registry.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace {
@@ -339,6 +356,249 @@ int main()
         check(x.recipe_required_depth(x.recipe_id("deep"))
                   == y.recipe_required_depth(y.recipe_id("deep")),
               "insertion order does not change a recipe's required depth");
+    }
+
+    // --- R1: no orphan resources, either direction ----------------------------
+    //
+    // BL-432 assertion 2. Every resource_type must be OBTAINABLE (produced by a
+    // recipe or extractable from a deposit) and must be WANTED (consumed by a
+    // recipe, or by a named non-recipe actor from the table below).
+    //
+    // Resource NAMES are not printed: the only lookup table lives in the UI
+    // layer, and BL-414 (resource name triple-desync) owns consolidating it.
+    // Adding a fourth hand-rolled copy here to prettify a harness would make
+    // that item worse. Ids match components.hpp's enum, same as D6 above.
+    std::printf("\nR1 - no orphan resources, either direction\n");
+    {
+        lua_state lua;
+        lua.load("scripts/recipes.lua");
+        lua.load("scripts/economy.lua");
+        recipe_registry reg;
+        reg.load_from_lua(lua);
+        // `any` is the UNMASKED roster — both arcs at once. `industrial` is a
+        // band like any other and hides every ancient recipe, which would report
+        // charcoal, iron_blooms, timber, clay, peat and the rest as orphans when
+        // they are only masked. The roster invariant is about the whole authored
+        // file, not about one campaign's view of it.
+        reg.set_era(era_band::any);
+
+        // The EXPLICIT exemption list BL-432's design asks for — a good that is
+        // consumed by a named actor rather than by a recipe. Each entry names
+        // the actor, so an orphan cannot hide here as an assumed terminal.
+        struct exemption { resource_type res; const char* consumer; };
+        static const exemption k_actor_consumed[] = {
+            { resource_type::spacecraft_components, "BL-350 procurement contracts (terminal object)" },
+            { resource_type::propellant,            "per-convoy dispatch, space mode (BL-308)" },
+            { resource_type::clean_water,           "population centres, inject_population_demand" },
+            { resource_type::consumer_goods,        "population centres, inject_population_demand" },
+            { resource_type::medical_supplies,      "population centres, inject_population_demand" },
+            { resource_type::tobacco,               "mercantile demand, endemic good (BL-191)" },
+            { resource_type::spices,                "mercantile demand, endemic good (BL-191)" },
+            { resource_type::coffee,                "mercantile demand, endemic good (BL-191)" },
+            { resource_type::furs,                  "mercantile demand, endemic good (BL-191)" },
+            { resource_type::trade_goods_misc,      "mercantile demand, endemic-luxury placeholder" },
+        };
+        auto exempt_consumer = [&](std::size_t r) -> const char* {
+            for (const exemption& e : k_actor_consumed)
+                if (static_cast<std::size_t>(e.res) == r)
+                    return e.consumer;
+            return nullptr;
+        };
+
+        std::vector<bool> produced(resource_count, false);
+        std::vector<bool> consumed(resource_count, false);
+        for (int i = 0; i < reg.recipe_count(building_type::processing_facility); ++i)
+        {
+            const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
+            for (std::size_t r = 0; r < resource_count; ++r)
+            {
+                if (rc.outputs[r] > 0.0f) produced[r] = true;
+                if (rc.inputs[r]  > 0.0f) consumed[r] = true;
+            }
+        }
+        std::vector<bool> extractable(resource_count, false);
+        for (const resource_type e : placement_rules::k_extractable)
+            extractable[static_cast<std::size_t>(e)] = true;
+
+        // The SECOND obtainability route, and it is not k_extractable. Endemic
+        // goods (BL-191) are deposited by tile_generation.cpp's C->D pass off a
+        // body's `planetology::endemics`, which ADDS a deposit rather than
+        // scaling one — so they never appear in the extractable table. The
+        // eligible set is the terrain switch at tile_generation.cpp:1401.
+        // Without this, all four read as orphans and the row cries wolf.
+        for (const resource_type e : { resource_type::tobacco, resource_type::spices,
+                                       resource_type::coffee,  resource_type::furs })
+            extractable[static_cast<std::size_t>(e)] = true;
+
+        std::vector<std::size_t> unobtainable, unwanted;
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            if (!produced[r] && !extractable[r])
+                unobtainable.push_back(r);
+            if (!consumed[r] && exempt_consumer(r) == nullptr)
+                unwanted.push_back(r);
+        }
+
+        for (std::size_t r : unobtainable)
+            std::printf("      UNOBTAINABLE: resource id %zu - no recipe produces it and no deposit yields it\n", r);
+        for (std::size_t r : unwanted)
+            std::printf("      UNWANTED: resource id %zu - no recipe consumes it and no actor is named for it\n", r);
+        std::printf("      %zu resources: %zu unobtainable, %zu unwanted, %zu actor-consumed exemptions\n",
+                    resource_count, unobtainable.size(), unwanted.size(),
+                    sizeof(k_actor_consumed) / sizeof(k_actor_consumed[0]));
+
+        check(unobtainable.empty(),
+              "every resource is obtainable - produced by a recipe or extractable from a deposit");
+        check(unwanted.empty(),
+              "every resource is wanted - consumed by a recipe, or by a named actor on the exemption list");
+    }
+
+    // --- R2: no dominant production method ------------------------------------
+    //
+    // BL-432 assertion 4, and NR-243's answer (Ben's call, 2026-08-16: settle the
+    // tier-vs-alternate axis FIRST, then retune only what is genuinely dominated).
+    //
+    // THE AXIS, and why the old grouping was wrong. recipe_switch_harness's R1
+    // groups by (primary output, era) and finds four "dominated" pairs. But
+    // recipes.lua already states the distinction twice in its own comments (ids 22
+    // and 23): distinct raws feeding a shared good is "an ordinary multi-producer
+    // economy fact, NOT BL-430's alternate-METHOD feature (one building offering
+    // interchangeable recipes for the same output)". Cost dominance is only
+    // meaningful between recipes a corp can actually CHOOSE BETWEEN. If their raws
+    // are disjoint, which one you run is decided by deposit access, not by price.
+    //
+    // So every same-output sibling pair must fall into exactly one bucket:
+    //   (a) DISJOINT inputs      -> a supply route, not a method. Exempt, counted.
+    //   (b) explicitly exempted  -> differs by a placement precondition the recipe
+    //                               data does not carry. Named, with a reason.
+    //   (c) everything else      -> a genuine interchangeable method. Must not
+    //                               dominate on both cost and depth.
+    // Bucketing every pair is what keeps this non-vacuous: a pair cannot escape by
+    // being unclassifiable, and the counts are printed so a green row is never silent.
+    std::printf("\nR2 - no production method dominates an interchangeable sibling\n");
+    {
+        lua_state lua;
+        lua.load("scripts/recipes.lua");
+        lua.load("scripts/economy.lua");
+        recipe_registry reg;
+        reg.load_from_lua(lua);
+        reg.set_era(era_band::any); // the whole authored roster — see R1's note
+
+        // Reference prices: world_gen.lua's base_price for the goods the sibling
+        // pairs actually use. A fixed snapshot — this asks about recipe SHAPE, not
+        // a moment's market state. Mirrors recipe_switch_harness's table.
+        auto reference_price = [](resource_type r) -> float {
+            switch (r)
+            {
+                case resource_type::timber: return 1.5f;
+                case resource_type::peat:   return 1.2f;
+                case resource_type::clay:   return 1.2f;
+                case resource_type::sand:   return 1.0f;
+                default:                    return 1.0f; // untabled input: neutral
+            }
+        };
+
+        // Pairs that differ by a PLACEMENT precondition rather than by cost. The
+        // recipe carries no atmosphere field, so the distinction cannot be derived
+        // and is declared here with its reason.
+        auto precondition_exempt = [](const std::string& a, const std::string& b) -> const char* {
+            const bool prop = (a == "propellant_atmospheric" && b == "propellant_electrolysis") ||
+                              (b == "propellant_atmospheric" && a == "propellant_electrolysis");
+            return prop ? "atmosphere vs airless body (BL-308): the airless route is run because the "
+                          "cheap one is unavailable, not because it is preferred"
+                        : nullptr;
+        };
+
+        const int n = reg.recipe_count(building_type::processing_facility);
+        std::unordered_map<std::string, std::vector<int>> siblings;
+        for (int i = 0; i < n; ++i)
+        {
+            const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
+            const std::string key =
+                std::to_string(static_cast<int>(primary_output_resource(rc))) + "/" +
+                std::to_string(static_cast<int>(rc.era));
+            siblings[key].push_back(i);
+        }
+
+        // Deterministic walk: sort the group keys, and each group's members are
+        // already in authored order. The BL-406 lesson — never let container
+        // iteration order decide an assertion.
+        std::vector<std::string> keys;
+        keys.reserve(siblings.size());
+        for (const auto& [k, v] : siblings)
+            if (v.size() >= 2)
+                keys.push_back(k);
+        std::sort(keys.begin(), keys.end());
+
+        int routes = 0, exempted = 0, methods = 0, dominated = 0;
+        for (const std::string& k : keys)
+        {
+            const std::vector<int>& ids = siblings[k];
+            for (std::size_t a = 0; a < ids.size(); ++a)
+                for (std::size_t b = a + 1; b < ids.size(); ++b)
+                {
+                    const recipe& ra = reg.recipe_at(building_type::processing_facility, ids[a]);
+                    const recipe& rb = reg.recipe_at(building_type::processing_facility, ids[b]);
+
+                    bool shares_input = false;
+                    for (std::size_t r = 0; r < resource_count; ++r)
+                        if (ra.inputs[r] > 0.0f && rb.inputs[r] > 0.0f)
+                            shares_input = true;
+
+                    if (!shares_input)
+                    {
+                        ++routes;
+                        std::printf("      supply route (disjoint raws): '%s' vs '%s'\n",
+                                    ra.name.c_str(), rb.name.c_str());
+                        continue;
+                    }
+                    if (const char* why = precondition_exempt(ra.name, rb.name))
+                    {
+                        ++exempted;
+                        std::printf("      precondition pair: '%s' vs '%s' - %s\n",
+                                    ra.name.c_str(), rb.name.c_str(), why);
+                        continue;
+                    }
+
+                    ++methods;
+                    float cost_a = 0.0f, cost_b = 0.0f;
+                    int   depth_a = 0,   depth_b = 0;
+                    for (std::size_t r = 0; r < resource_count; ++r)
+                    {
+                        const resource_type rt = static_cast<resource_type>(r);
+                        if (ra.inputs[r] > 0.0f)
+                        {
+                            cost_a += ra.inputs[r] * reference_price(rt);
+                            depth_a = std::max(depth_a, reg.depth_of(rt));
+                        }
+                        if (rb.inputs[r] > 0.0f)
+                        {
+                            cost_b += rb.inputs[r] * reference_price(rt);
+                            depth_b = std::max(depth_b, reg.depth_of(rt));
+                        }
+                    }
+                    const bool a_dom = cost_a <= cost_b && depth_a <= depth_b &&
+                                       (cost_a < cost_b || depth_a < depth_b);
+                    const bool b_dom = cost_b <= cost_a && depth_b <= depth_a &&
+                                       (cost_b < cost_a || depth_b < depth_a);
+                    if (a_dom || b_dom)
+                    {
+                        ++dominated;
+                        std::printf("      DOMINATED METHOD: '%s' (cost %.1f, depth %d) vs '%s' (cost %.1f, depth %d)\n",
+                                    ra.name.c_str(), cost_a, depth_a,
+                                    rb.name.c_str(), cost_b, depth_b);
+                    }
+                }
+        }
+
+        std::printf("      %d sibling pair%s: %d supply route%s, %d precondition, %d interchangeable method%s\n",
+                    routes + exempted + methods, (routes + exempted + methods) == 1 ? "" : "s",
+                    routes, routes == 1 ? "" : "s", exempted, methods, methods == 1 ? "" : "s");
+
+        check(routes + exempted + methods > 0,
+              "ANTI-VACUITY: the roster actually contains sibling pairs to classify");
+        check(dominated == 0,
+              "no interchangeable method dominates a sibling on both input cost and chain depth");
     }
 
     std::printf("\n=== %s (%d failure%s) ===\n",

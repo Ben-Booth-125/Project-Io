@@ -10,27 +10,25 @@
 //          BL-079 reflex switch (economy_system.cpp's floored-recipe rescue,
 //          which does NOT go through try_switch_recipe) staying free/instant —
 //          the one behaviour this item must NOT change.
-//   R1     THE NO-DOMINANCE GUARD, against the REAL authored roster
-//          (scripts/recipes.lua via scripts/economy.lua). For every pair of
-//          recipes sharing a primary output resource AND an era band, neither
-//          may beat the other on EVERY one of two axes at once:
-//            - input basket cost, at REFERENCE prices (world_gen.lua's
-//              base_price for the resources these recipes actually use — a
-//              fixed snapshot, not live market data, since the guard asks
-//              about the recipes' shape, not a moment's market state)
-//            - chain depth of the recipe's deepest input (recipe_registry's
-//              own BL-428 metric) — a proxy for "how much industry you need
-//              built before this route is even open"
-//          A pair identical on both axes, or where one recipe is strictly
-//          worse on one axis and strictly better on the other, is a REAL
-//          trade-off and passes. A pair where recipe A beats recipe B on BOTH
-//          axes (or ties on both, which is a de-facto dominance — B is never
-//          worth choosing) fails. Two singleton axes were chosen over wage/
-//          build-cost because those live on building_type, not recipe — a
-//          processing_facility offers every era-allowed recipe as an
-//          interchangeable method (see recipe_registry.hpp's browse path), so
-//          the building-level axes are identical for every sibling by
-//          construction and cannot be part of a recipe-level dominance test.
+//   R1     THE NO-DOMINANCE GUARD — MOVED to tools/verify/chain_depth.cpp's R2
+//          row (BL-432, 2026-08-16), and deliberately not kept in both places.
+//
+//          It lived here and failed on four real authored pairs (NR-243): steel,
+//          propellant, charcoal and trade_goods. Ben's call, 2026-08-16, was to
+//          settle the tier-vs-alternate axis BEFORE retuning anything — and the
+//          axis turned out to be already written in scripts/recipes.lua's own
+//          comments (ids 22 and 23): distinct raws feeding a shared good is an
+//          ordinary multi-producer fact, NOT an alternate METHOD. This guard's
+//          grouping — (primary output, era) — could not see that distinction, so
+//          it was comparing supply routes on price when which route a corp runs
+//          is decided by deposit access. All four pairs were false positives of
+//          the grouping, not balance defects.
+//
+//          The replacement buckets every sibling pair as a supply route, an
+//          explicitly-exempted precondition pair, or a genuine interchangeable
+//          method, and only the third is price-compared. Keeping a second copy
+//          here would mean maintaining two reference-price tables and two
+//          answers to the same question.
 
 #include "scripting/lua_state.hpp"
 #include "world/components.hpp"
@@ -206,112 +204,11 @@ void run_mechanism_checks()
     }
 }
 
-// --- R1: no-dominance guard over the real authored roster ------------------
-
-// Reference prices (world_gen.lua's base_price), for the goods the sibling
-// pairs below actually use. A fixed snapshot — the guard asks about the
-// recipes' SHAPE, not a moment's live market state.
-float reference_price(resource_type r)
-{
-    static const std::unordered_map<int, float> table = {
-        { static_cast<int>(resource_type::timber), 1.5f },
-        { static_cast<int>(resource_type::peat),   1.2f },
-        { static_cast<int>(resource_type::clay),   1.2f },
-        { static_cast<int>(resource_type::sand),   1.0f },
-    };
-    const auto it = table.find(static_cast<int>(r));
-    return (it != table.end()) ? it->second : 1.0f; // untabled input: neutral 1.0
-}
-
-float input_basket_cost(const recipe& r)
-{
-    float total = 0.0f;
-    for (std::size_t i = 0; i < resource_count; ++i)
-        if (r.inputs[i] > 0.0f)
-            total += r.inputs[i] * reference_price(static_cast<resource_type>(i));
-    return total;
-}
-
-int deepest_input_depth(const recipe_registry& reg, const recipe& r)
-{
-    int deepest = 0;
-    for (std::size_t i = 0; i < resource_count; ++i)
-        if (r.inputs[i] > 0.0f)
-        {
-            const int d = reg.depth_of(static_cast<resource_type>(i));
-            if (d > deepest) deepest = d; // treats unreachable (-1) as shallower — fine here: no
-                                          // authored sibling pair below has an unreachable input.
-        }
-    return deepest;
-}
-
-void run_dominance_guard()
-{
-    std::printf("\n=== R1: no-dominance guard (real scripts/recipes.lua) ===\n\n");
-
-    lua_state lua;
-    lua.load("scripts/recipes.lua");
-    lua.load("scripts/economy.lua");
-    recipe_registry reg;
-    reg.load_from_lua(lua);
-
-    const std::size_t n = reg.recipe_count();
-    std::printf("authored recipes: %zu\n", n);
-
-    // Group by (primary output, era band) — only these are real ALTERNATE
-    // METHODS on the same building_type, per recipe_registry.hpp's browse path.
-    std::unordered_map<std::string, std::vector<uint16_t>> groups;
-    for (std::size_t i = 0; i < n; ++i)
-    {
-        const recipe* r = reg.get_recipe(static_cast<uint16_t>(i));
-        const std::string key = std::to_string(static_cast<int>(primary_output_resource(*r))) +
-                                "/" + std::to_string(static_cast<int>(r->era));
-        groups[key].push_back(static_cast<uint16_t>(i));
-    }
-
-    int pairs_checked   = 0;
-    int dominant_pairs  = 0;
-    for (const auto& [key, ids] : groups)
-    {
-        if (ids.size() < 2)
-            continue;
-        for (std::size_t a = 0; a < ids.size(); ++a)
-            for (std::size_t bIdx = a + 1; bIdx < ids.size(); ++bIdx)
-            {
-                const recipe* ra = reg.get_recipe(ids[a]);
-                const recipe* rb = reg.get_recipe(ids[bIdx]);
-                const float cost_a  = input_basket_cost(*ra);
-                const float cost_b  = input_basket_cost(*rb);
-                const int   depth_a = deepest_input_depth(reg, *ra);
-                const int   depth_b = deepest_input_depth(reg, *rb);
-
-                const bool a_dominates = (cost_a <= cost_b) && (depth_a <= depth_b) &&
-                                         (cost_a < cost_b || depth_a < depth_b);
-                const bool b_dominates = (cost_b <= cost_a) && (depth_b <= depth_a) &&
-                                         (cost_b < cost_a || depth_b < depth_a);
-                ++pairs_checked;
-                if (a_dominates || b_dominates)
-                {
-                    ++dominant_pairs;
-                    std::printf("      DOMINATED PAIR: '%s' (cost %.1f, depth %d) vs '%s' (cost %.1f, depth %d)\n",
-                               ra->name.c_str(), cost_a, depth_a, rb->name.c_str(), cost_b, depth_b);
-                }
-            }
-    }
-
-    check(pairs_checked > 0,
-          "ANTI-VACUITY: at least one real sibling pair exists to check (else this guard checks nothing)");
-    check(dominant_pairs == 0,
-          "no sibling pair (same primary output + era band) dominates on both input-basket cost AND chain depth (" +
-              std::to_string(pairs_checked) + " pair" + (pairs_checked == 1 ? "" : "s") + " checked)");
-}
-
 } // namespace
 
 int main()
 {
     run_mechanism_checks();
-    run_dominance_guard();
 
     std::printf("\n=== %s (%d failure%s) ===\n",
                 g_failures == 0 ? "ALL PASS" : "FAILURES",

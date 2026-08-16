@@ -216,7 +216,10 @@ building_profit estimate_prospective_profit(const world& w, const recipe_registr
             }
         }
 
-        const float nominal = econ.base_rate * tc.resource_deposit[ri] * wf
+        // BL-436: convert richness to a rate multiplier exactly as the tick
+        // does — this figure is shown to the player on the Build door.
+        const float nominal = econ.base_rate
+                              * richness_rate_scalar(econ, tc.resource_deposit[ri]) * wf
                               * (1.0f - tc.hazard_level)
                               * placement_rules::stack_output_scalar(rank);
 

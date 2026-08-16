@@ -88,7 +88,23 @@ Available in Era 1 and beyond. Found predominantly on moons, asteroids, and oute
 |----------|-----------------|-------|
 | Water | Icy | Deposits on icy terrain, extracted as liquid water; also the baseline life-support input for off-world populations. Trades terrestrially from tick 0 — see note above. |
 
-### Logistics goods (BL-286, 2026-08-04)
+### Logistics goods (BL-286, 2026-08-04) — five of the eight REMOVED 2026-08-16
+
+> **Removed 2026-08-16 (Ben's call, NR-257 option B).** **Grain, fodder, salt, transport capacity
+> and bullion are gone from `resource_type`.** They were added here with "behaviour unfiled" and
+> twelve days later were still produced by nothing, yielded by no deposit and consumed by nothing.
+> `chain_depth`'s R1 orphan row is what found them, and it now runs green. `resource_count` fell
+> 42 → 37, and the ids after them shifted down by five.
+>
+> The three that stayed — **charcoal**, **iron blooms** and **trade goods (misc)** — earned their
+> place in the meantime: BL-429's ancient chain gave the first two real recipes (Charcoal Burner /
+> Peat Kiln, Bloomery) and the third a producer (Potter & Weaver, Glassworks). That difference is
+> exactly what the admission rule names, and it is why this section is kept as a cautionary record
+> rather than deleted.
+>
+> **Re-adding one is an append at the END of the enum, with its behaviour filed in the same
+> change** — never a re-insertion at the old position, which would repoint every id after it. The
+> five rows below are a record of what was intended, not a statement of what exists.
 
 Eight resources added for the army/unit logistics family. This entry is **BL-286 only** — enum +
 serialisation + authored base price. None of the consumption, range-cap, shelf-life or purchase
@@ -103,25 +119,57 @@ BL-288 is the Release-only test failures — and BL-289–291 do not exist. BL-2
 
 | Resource | Tier | Notes |
 |----------|------|-------|
-| Grain | 1 (raw) | Human ration staple. Per-tick army/unit draw is a follow-on, unfiled. |
-| Fodder | 1 (raw) | Draft-animal/cavalry feed, drawn down alongside grain. Follow-on, unfiled. |
-| Salt | 1 (raw) | Preservative. Intended to gate ration shelf-life. Follow-on, unfiled. |
-| Transport capacity | 1 (abstract) | Logistics-train throughput good; intended to cap supply range. Follow-on, unfiled. |
+| ~~Grain~~ *(removed)* | 1 (raw) | Human ration staple. Per-tick army/unit draw is a follow-on, unfiled. |
+| ~~Fodder~~ *(removed)* | 1 (raw) | Draft-animal/cavalry feed, drawn down alongside grain. Follow-on, unfiled. |
+| ~~Salt~~ *(removed)* | 1 (raw) | Preservative. Intended to gate ration shelf-life. Follow-on, unfiled. |
+| ~~Transport capacity~~ *(removed)* | 1 (abstract) | Logistics-train throughput good; intended to cap supply range. Follow-on, unfiled. |
 | Charcoal | 2 (refined) | Refined fuel-wood; pre-coal smelting/heating input. No recipe yet. |
 | Iron blooms | 2 (refined) | Bloomery-refined iron intermediate — distinct from raw iron ore / iron-nickel ore. No recipe yet. |
-| Bullion | 2 (refined) | Minted precious-metal specie; intended as a local purchase medium via `resolve_price`. Follow-on, unfiled. |
+| ~~Bullion~~ *(removed)* | 2 (refined) | Minted precious-metal specie; intended as a local purchase medium via `resolve_price`. Follow-on, unfiled. |
 | Trade goods (misc) | 1 (endemic, placeholder) | Generic endemic-luxury-class placeholder. Not a specific named luxury — that naming is a separate design step. |
 
-All eight carry an authored mid-tier `base_price` in the Kepler market template
+~~All eight carry an authored mid-tier `base_price` in the Kepler market template
 (`src/world/world_gen_config.hpp`). **They are priced but inert** — none has a tile deposit
 (`generate_deposits` never emits them), a recipe (`recipes.lua` holds four, none producing them),
 or a `demand_basket` entry. A good with no supply and no demand never clears, so no market will
-ever price one in play; the base price is scaffolding for when the behaviour lands.
+ever price one in play; the base price is scaffolding for when the behaviour lands.~~
+
+**Superseded 2026-08-16.** "Priced but inert" is precisely the state that got five of these
+deleted — a base price is not a behaviour, and scaffolding that nothing ever stands on is
+indistinguishable from an orphan two weeks later. The three survivors are now priced *and* wired:
+charcoal 4.0 and iron blooms 9.0 sit in `world_gen.lua`'s ancient tier with real recipes on both
+sides, and trade goods (misc) 8.0 has two producers. The `world_gen_config.hpp` defaults for the
+removed five went with the enum values.
 | Iron-nickel ore | Rocky (metallic asteroid) | Found in metallic asteroids; feeds the same smelting chain as iron ore and eliminates dependence on Earth-side steel once accessible. |
 | Platinum group metals | Rocky, volcanic (asteroid) | Ultra-rare catalytic and industrial metals. Very low deposit concentration; extremely high base price. The primary high-value trade good of the asteroid belt. |
 | Regolith | All terrain (airless bodies) | Loose surface dust and broken rock. Used for bulk construction in-situ; not typically traded (high mass, low unit value). Included in the resource model but excluded from market tables; see note below. |
 
 **Regolith note.** Regolith is present on every tile of every airless body and serves as a local construction material rather than a tradeable commodity. It has no base price and does not appear in market supply or demand tables. It is defined in the resource enum so that building cost formulas referencing it are consistent with the rest of the model.
+
+> **Amended 2026-08-16 (NR-257).** The claim above about building cost formulas was never true in
+> code — no cost formula ever referenced regolith, so it sat obtainable and consumed by nothing,
+> which is how `chain_depth`'s R1 orphan row found it. Ben's call was to give it a consumer, so
+> `steel_from_regolith` "In-Situ Smelter" (scripts/recipes.lua) now reduces regolith to steel at a
+> deliberately poor 12:1. The **in-situ intent above is unchanged and is what the recipe encodes** —
+> it is the route for building where you already are, not a trade good.
+>
+> **Regolith now carries a `base_price` of 0.6** (Ben's call, same date), so the "no base price /
+> excluded from market tables" sentence above is superseded: a recipe input pulls the good into
+> market demand at the tiles that run one, and an unpriced input stalls the building forever — the
+> same minable-but-unsellable asymmetry BL-340 closed for the space chain and BL-429 for the ancient
+> one. 0.6 is the cheapest good in the table, below the stone/sand bulk floor of 1.0, which is what
+> "high mass, low unit value" should mean for something on every tile of every airless body.
+>
+> The recipe ratio moved from 8:1 to 12:1 **with** the price, and had to: at 8:1 a price low enough
+> to read as bulk would have made the deliberately poor route the most profitable steel in the game
+> (clearing 3.2 against the Smelter's 1.0). At 12:1 it clears 0.8, the worst of the three industrial
+> routes, which is the authored intent. The two numbers are one decision.
+
+> **Amended 2026-08-16 (NR-257).** **Platinum group metals** likewise had no consumer — `world_gen.lua`
+> tags it `terminal: the belt's high-value trade good`, i.e. a good to be *sold*. It now also has
+> `electronics_contact_grade`, a contact-grade/catalytic route to electronics at 0.5 PGM per unit.
+> At base price 40 this is a premium alternative rather than a cheap bypass, so the belt export
+> remains the obvious use and the terminal framing above still holds for most play.
 
 ### Ambient raw materials (Tier 1)
 

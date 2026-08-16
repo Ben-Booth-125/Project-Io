@@ -198,6 +198,13 @@ int app::run_autostart()
     while (m_screen != app_screen::in_game && std::chrono::steady_clock::now() < deadline)
     {
         poll_worldgen();
+        // BL-435: an automated run has nobody to press Choose, so it takes the
+        // generator's own seeded pick — the same corp `Surprise me` selects, and
+        // the same corp every run before BL-435 got. That is what keeps every
+        // verify capture and golden bit-identical across this change: the screen
+        // is a fork the automated path deliberately never takes.
+        if (m_screen == app_screen::choosing_corp)
+            apply_corp_choice(m_world.player_entity);
         std::this_thread::sleep_for(std::chrono::milliseconds(16)); // ~60 Hz, as the app polls
     }
     if (m_screen != app_screen::in_game)

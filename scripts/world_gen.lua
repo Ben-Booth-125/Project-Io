@@ -73,6 +73,27 @@ world_gen = {
             clay                   = 1.2,
             peat                   = 1.2,
 
+            -- NR-257 (2026-08-16, Ben's call). Regolith had no price by design —
+            -- RESOURCES.md had it "excluded from market tables", present only so
+            -- building cost formulas could reference it, which none ever did.
+            -- Giving it the In-Situ Smelter as a consumer put it into market
+            -- demand at the tiles that run one, so the exclusion stopped being
+            -- tenable.
+            --
+            -- 0.6 is the CHEAPEST good in this table, below the stone/sand bulk
+            -- floor of 1.0, which is what "high mass, low unit value" should mean
+            -- for something present on every tile of every airless body at
+            -- deposits of 20-50.
+            --
+            -- The recipe ratio moved WITH it, and had to. At 8 regolith per steel
+            -- the in-situ route would clear 8.0 - 4.8 = 3.2 against the Smelter's
+            -- 1.0 and the iron-nickel route's 2.0 — making the deliberately poor
+            -- route the most profitable steel in the game. At 12 it clears 0.8:
+            -- thin, positive, and the worst of the three industrial routes, which
+            -- is the shape the recipe was authored for. Pricing a good is not
+            -- separable from the recipes that consume it.
+            regolith               = 0.6,
+
             -- The ancient intermediates. Charcoal is dearer than the timber it
             -- comes from (a burn takes days and loses mass); blooms carry the
             -- charcoal plus the ore.

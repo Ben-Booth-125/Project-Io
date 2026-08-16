@@ -649,15 +649,21 @@ int main()
     // corp is a going concern (>= 1 asset). Counts below the focus minimum are
     // legitimate on a cramped, deposit-poor nation, so they are reported but do
     // not fail. Focus ceilings mirror holdings_range in corporation_generation.cpp:
-    // extraction 3..4, processing 2..3, trade 1..2. ---
+    // extraction 3..4, processing 2..3, trade 2..3 (trade was 1..2 until
+    // 2026-08-16: a 1-draw opened a corp holding nothing but a port, which has
+    // base_rate 0 and so no income at all — see holdings_range's own note). ---
+    //
+    // THIRD hand-mirrored table to drift out of date in one session, after
+    // ai_skill_harness's richness fields and both harnesses' base_rate. Each time
+    // the harness reported confidently against numbers the game no longer used.
     auto focus_bounds = [](industrial_focus f) -> std::pair<int,int> {
         switch (f)
         {
             case industrial_focus::extraction: return { 3, 4 };
             case industrial_focus::processing: return { 2, 3 };
-            case industrial_focus::trade:      return { 1, 2 };
+            case industrial_focus::trade:      return { 2, 3 };
         }
-        return { 1, 2 };
+        return { 2, 3 };
     };
     auto focus_name = [](industrial_focus f) -> const char* {
         switch (f)

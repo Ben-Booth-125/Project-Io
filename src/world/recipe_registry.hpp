@@ -113,6 +113,30 @@ struct building_economics
     /// behaviour), authored in scripts/economy.lua as `build_duration_ticks`.
     float build_duration_ticks = 0.0f;
 
+    /// BL-436: how a deposit's richness converts into an extraction RATE
+    /// multiplier. Extraction only; ignored for every other building type.
+    ///
+    /// `base_rate` above has always documented itself as "units/tick AT RICHNESS
+    /// 1", but `tile_component::resource_deposit` is generated as a quantity —
+    /// measured mean 53.3, max 72,321 — and was fed in raw. A mine therefore ran
+    /// at ~1067 units/tick against a processor's flat 8: a 133:1 structural gap
+    /// that no price or wage could offset, and the reason refining could not pay.
+    ///
+    /// The fix restores the documented contract rather than inventing a new one.
+    /// Richness is divided by `richness_reference` and clamped to
+    /// [`richness_min`, `richness_max`], so a typical deposit lands near 1.0 and
+    /// a mine runs at roughly its authored base_rate.
+    ///
+    /// The DESIGN statement behind the clamp: richness should decide how LONG a
+    /// deposit lasts, not how fast you can pull it out. Reserve still scales with
+    /// raw richness (`resource_remaining`, seeded at generation), so a rich tile
+    /// is still worth far more over its life — it simply cannot also run a
+    /// thousand times faster. A reference of 0 disables the conversion entirely
+    /// and restores the raw pre-BL-436 behaviour.
+    float richness_reference = 0.0f;
+    float richness_min       = 0.25f;
+    float richness_max       = 2.0f;
+
     /// BL-433: the product this building type belongs to. Authored as
     /// `era = "..."` in economy.lua; absent means `any`. Unlike recipes, a
     /// building type is addressed by its enum value rather than by position, so
@@ -120,6 +144,22 @@ struct building_economics
     /// this directly.
     era_band era = era_band::any;
 };
+
+/// Convert a raw deposit richness into the extraction RATE multiplier, per the
+/// contract on `building_economics::richness_reference`. A free function rather
+/// than a member so every preview path — building_profit's expected-output
+/// estimate, the AI scorer's candidate valuation — applies exactly the same
+/// conversion as the live tick. A preview that disagreed with the tick would
+/// have the AI and the Build door pricing a site the economy will not deliver.
+inline float richness_rate_scalar(const building_economics& e, float richness)
+{
+    if (e.richness_reference <= 0.0f)
+        return richness; // conversion disabled: raw, pre-BL-436 behaviour
+    const float s = richness / e.richness_reference;
+    return (s < e.richness_min) ? e.richness_min
+         : (s > e.richness_max) ? e.richness_max
+                                : s;
+}
 
 /// BL-365 population-growth-gate tunables, authored in scripts/economy.lua under
 /// `economy.population_growth`. Read only by the population-growth step in

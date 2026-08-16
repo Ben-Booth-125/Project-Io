@@ -10,7 +10,84 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — chain depth becomes the growth gate (BL-428 slice 2), Method-page fix, seed sweep (2026-08-16, latest)
+## Session — the roster invariants land, and the roster shrinks (BL-432, NR-243, NR-257) (2026-08-16, latest)
+
+Full mode. Opened on triage as asked. The queue's three named entries all moved, and two of them
+moved because a measurement contradicted the filed premise — the same pattern Sprint 18's retro
+recorded, now three sprints running.
+
+**BL-432 complete.** Its two owed invariants landed as `chain_depth`'s R1/R2 rows; the other two
+assertions had already shipped as D4 (acyclicity) and G3 (building reachability) with BL-428's gate.
+
+**NR-243 dissolved rather than fixed, and no recipe magnitude changed.** Ben's call was option C —
+settle the tier-vs-alternate axis before retuning anything. The axis turned out to be **already
+written in `recipes.lua`'s own comments** (ids 22 and 23): distinct raws feeding a shared good is an
+ordinary multi-producer fact, *not* an alternate METHOD. Measured against it, three of the four
+"dominated" pairs have **disjoint inputs** — supply routes, where deposit access rather than price
+decides which you run — and the fourth (propellant) differs by a placement precondition. All four
+were artefacts of grouping by `(primary output, era)`. The guard was regrouped and moved: every
+sibling pair is now bucketed as a supply route, an explicitly-exempted precondition pair, or a
+genuine interchangeable method, and **only the third is price-compared**. Bucketing every pair is
+what stops one escaping by being unclassifiable. The duplicate in `recipe_switch_harness` was
+**deleted** rather than left as a second answer to the same question; that harness went ALL PASS.
+
+A finding worth carrying: the roster contains **zero genuine interchangeable methods**. BL-430 built
+the alternate-method feature and no content yet uses it, so R2's dominance half guards an empty set
+until BL-430 authors a real same-inputs pair (NR-258).
+
+**Two measurement traps, both of which gave a confident wrong answer first.** `era_band::industrial`
+is a band like any other and masks the *entire ancient roster* — mid-build it reported charcoal,
+iron_blooms, timber, clay and peat as orphans and hid two of the four sibling pairs; both rows use
+`era_band::any`. And endemic goods reach the world via `planetology::endemics` in
+`tile_generation.cpp`, **not** `k_extractable`, so without that second obtainability route all four
+endemics read as orphans. Neither was visible by reading; both took a run.
+
+**R1 shipped RED on eight resources, and that was the check working.** Five were orphaned in both
+directions — grain, fodder, salt, transport_capacity, bullion — which are *exactly* the five BL-432's
+own design text predicted ("eleven values added with behaviour unfiled, and five of them still have
+no consumer today"). The check reproduced that claim independently rather than being told it.
+
+**Then Ben cleared it, in two calls.** First: give the three one-directional orphans consumers
+(NR-257 option D) — three recipes **appended** as ids 24–26 (machinery → Heavy Assembly Plant, PGM →
+Contact-Grade Electronics Lab, regolith → In-Situ Smelter), each with inputs disjoint from its
+sibling's. A first attempt **inserted** them mid-file and was reverted: recipe ids are positional, and
+that would have silently repointed the Peat Kiln from 23 to 26 along with every saved building's
+selection. The file's own id-6 note is what caught it.
+
+Then: price regolith — which forced a second change nobody asked for. At 8 regolith per steel, any
+price low enough to mean "high mass, low unit value" makes the deliberately *poor* in-situ route the
+**most profitable steel in the game** (clearing 3.2 against the Smelter's 1.0). The ratio moved to
+12:1 alongside `base_price` 0.6, giving 0.8 — the worst of the three industrial routes, as authored.
+**Pricing a good and setting the ratio of the recipe that consumes it are one decision, not two**,
+and both files now say so at both ends.
+
+**Finally: remove the five (NR-257 option B).** `resource_count` 42 → 37, every id after them shifted
+down by five. Six sites carried them and all six were cleaned — the enum, two name→enum maps, the
+**positional** presentation table (the dangerous one: indexed by enum order, so a missed row
+silently mis-colours every good after it — alignment re-verified at six checkpoints), the default
+base-price block, and a name switch in `corp_terrain_matrix`. `chain_depth` is now **ALL PASS for the
+first time since it was written**: 37 resources, 0 unobtainable, 0 unwanted.
+
+One golden moved and was re-blessed **with its reason in the file**, per that harness's own stated
+policy: `spectator_determinism`'s BL-409 byte-identity hash, because `state_hash` walks every
+per-resource array and those arrays changed length. Structural, not behavioural — every other
+assertion in the file, including the prohibition and cadence rows, passed unchanged.
+
+**NR-256 advanced without being closed.** The diagnostic it specified is now in the code — all three
+of `run()`'s exits print `[exit] <name>`. An unattended re-run did not reproduce the termination, and
+then the accident that mattered: hours later a build failed with LNK1168 because **PID 3036 was still
+alive**. The app never self-terminated at all; the earlier run's apparent end was a harness timeout
+failing to propagate a kill. That points hard at candidate (b), but the three original terminations
+reported a clean exit 0, which a non-propagating kill does not obviously explain. Left open; the
+interactive-terminal run is cheap now that the diagnostic prints.
+
+**NR-253** left at 1 tick on Ben's call, pending playtest.
+
+Runtime: not summed (the format's Runtime line remains uncollected — fifth consecutive entry).
+
+---
+
+## Session — chain depth becomes the growth gate (BL-428 slice 2), Method-page fix, seed sweep (2026-08-16)
 
 Full mode. Sprint opened by triaging the review queue as asked: nothing blocking (no `blocked` rows,
 `review.json` empty), so two cheap entries were cleared as part of the sprint and the rest left for

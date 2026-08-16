@@ -40,13 +40,8 @@ resource_type resource_from_name(const std::string& name, bool& ok)
         // claim above was false for eleven of them, so any recipe naming one threw
         // "Unknown resource" at load. Found 2026-08-15 by BL-429's ancient chain,
         // which is the first authored recipe to reference them.
-        { "grain",                 resource_type::grain },
-        { "fodder",                resource_type::fodder },
-        { "salt",                  resource_type::salt },
-        { "transport_capacity",    resource_type::transport_capacity },
         { "charcoal",              resource_type::charcoal },
         { "iron_blooms",           resource_type::iron_blooms },
-        { "bullion",               resource_type::bullion },
         { "trade_goods_misc",      resource_type::trade_goods_misc },
         { "steel",                 resource_type::steel },
         { "refined_fuel",          resource_type::refined_fuel },
@@ -286,6 +281,11 @@ void recipe_registry::load_from_lua(lua_state& lua)
             e.base_wage   = b->get_or("base_wage",   0.0f);
             e.build_cost  = b->get_or("build_cost",  0.0f);
             e.build_duration_ticks = b->get_or("build_duration_ticks", 0.0f);
+            // BL-436: richness -> rate conversion. Absent reference = 0 keeps the
+            // raw pre-BL-436 behaviour, so an un-migrated economy.lua is unchanged.
+            e.richness_reference   = b->get_or("richness_reference", 0.0f);
+            e.richness_min         = b->get_or("richness_min", 0.25f);
+            e.richness_max         = b->get_or("richness_max", 2.0f);
             // Optional resource material cost (BL-044).
             sol::optional<sol::table> rcosts = (*b)["resource_costs"];
             if (rcosts)

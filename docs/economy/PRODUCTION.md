@@ -199,6 +199,35 @@ On a body with an atmosphere, liquid oxygen is produced in Era 0 by cryogenic ai
 | Steel + refined copper | Machinery | 0 |
 | Steel + REE alloy | Alloys | 0 |
 
+#### Assembly Plant
+
+| Inputs | Output | Era |
+|--------|--------|-----|
+| Alloys + electronics | Spacecraft components | 1 |
+| Machinery + steel | Spacecraft components | 1 |
+
+The second route is the **heavy** one (NR-257, 2026-08-16): more structural mass and worked
+machinery, none of the refined-electronics chain. It is a *supply route* rather than an alternate
+method in BL-430's sense — its inputs are disjoint from the first's, so which one a corp runs is
+decided by what its industry already reaches, not by comparing two prices at one building. It is
+also the consumer that closed `machinery`'s orphan status: the Fabricator produced machinery and
+nothing in the roster wanted any.
+
+#### In-situ and premium routes (NR-257)
+
+Two further routes exist to give `regolith` and `platinum_group_metals` consumers. Both are
+deliberately **poor value per unit** — they are about reaching a *place*, not about efficiency.
+
+At authored prices the three industrial steel routes clear, per unit of steel: iron-nickel **2.0**,
+Smelter **1.0**, in-situ **0.8**. That ordering is the design, and it is why the regolith ratio and
+regolith's `base_price` (0.6) cannot be tuned independently of each other — see the note on the
+recipe in `scripts/recipes.lua`.
+
+| Inputs | Output | Era | Why it exists |
+|--------|--------|-----|---------------|
+| Regolith ×12 | Steel | 1 | In-situ reduction on an airless body. Twelve regolith per steel against the Smelter's two iron ore: regolith is on every tile of every airless body, so the point is that you can build **from where you are**. |
+| Platinum group metals ×0.5 | Electronics | 1 | Contact-grade/catalytic route. At base price 40 this is a premium alternative to the silicon + copper + REE chain, not a cheap bypass of it. |
+
 #### Food Processor
 
 | Inputs | Output | Era |
@@ -620,12 +649,12 @@ sibling — nothing was left in the `"General"` catch-all:
 
 | Group | Recipes (era) | Notes |
 |---|---|---|
-| Metal Foundry | `steel` (industrial), `steel_from_iron_nickel` (industrial), `refined_copper` (any), `iron_blooms` "Bloomery" (ancient), `steel_from_blooms` "Smithy" (ancient) | Every route that smelts or shapes a structural metal — the industrial Smelter and the ancient Bloomery/Smithy chain both land here, since they reach the same terminal goods (steel, refined copper) by different roads. |
+| Metal Foundry | `steel` (industrial), `steel_from_iron_nickel` (industrial), `steel_from_regolith` "In-Situ Smelter" (industrial, NR-257), `refined_copper` (any), `iron_blooms` "Bloomery" (ancient), `steel_from_blooms` "Smithy" (ancient) | Every route that smelts or shapes a structural metal — the industrial Smelter and the ancient Bloomery/Smithy chain both land here, since they reach the same terminal goods (steel, refined copper) by different roads. |
 | Refinery | `refined_fuel` (industrial) | Currently a singleton — a real, specific kind (distinct from Metal Foundry's smelting), not a forced catch-all; more refined-fuel-family recipes would join it rather than needing a rename. |
 | Food Processing | `food_rations` (any), `hydroponics_bay` (industrial), `food_rations_milled` "Miller" (ancient) | Feeding the population, whether growing the produce (Hydroponics Bay) or milling it into rations (Food Processor, Miller). |
 | Chemical Works | `propellant_atmospheric` (industrial), `propellant_electrolysis` (industrial) | The Chemical Plant's two propellant routes (BL-308). |
-| Electronics | `silicon` (industrial), `ree_alloy` (industrial), `electronics` (industrial) | The silicon/REE/electronics chain — named explicitly by this item's own design brief. |
-| Advanced Fabrication | `machinery` (industrial), `alloys` (industrial), `spacecraft_components` (industrial) | Fabricator + Assembly Plant: goods assembled from refined inputs rather than smelted from ore. |
+| Electronics | `silicon` (industrial), `ree_alloy` (industrial), `electronics` (industrial), `electronics_contact_grade` "Contact-Grade Electronics Lab" (industrial, NR-257) | The silicon/REE/electronics chain — named explicitly by this item's own design brief. |
+| Advanced Fabrication | `machinery` (industrial), `alloys` (industrial), `spacecraft_components` (industrial), `spacecraft_components_heavy` "Heavy Assembly Plant" (industrial, NR-257) | Fabricator + Assembly Plant: goods assembled from refined inputs rather than smelted from ore. |
 | Welfare Goods | `clean_water` (industrial), `consumer_goods` (industrial), `medical_supplies` (industrial) | The BL-368 habitability tranche — Water Treatment Plant, Consumer Goods Factory, Pharmaceutical Lab. |
 | Fuel Production | `charcoal` "Charcoal Burner" (ancient), `peat_charcoal` "Peat Kiln" (ancient) | Two independent producers of the same fuel good (`charcoal`) — an ordinary multi-producer economy fact (see the Alternate production methods section above), not itself an alternate-method pair since they're already grouped. |
 | Artisan Goods | `trade_goods` "Potter & Weaver" (ancient), `glass` "Glassworks" (ancient) | Two independent producers of `trade_goods_misc`, same shape as Fuel Production above. |

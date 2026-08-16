@@ -103,13 +103,8 @@ const char* resource_name(resource_type r)
         case resource_type::steel:                 return "steel";
         case resource_type::refined_fuel:          return "refined_fuel";
         case resource_type::food_rations:          return "food_rations";
-        case resource_type::grain:                 return "grain";
-        case resource_type::fodder:                return "fodder";
-        case resource_type::salt:                  return "salt";
-        case resource_type::transport_capacity:    return "transport_capacity";
         case resource_type::charcoal:              return "charcoal";
         case resource_type::iron_blooms:           return "iron_blooms";
-        case resource_type::bullion:               return "bullion";
         case resource_type::trade_goods_misc:      return "trade_goods_misc";
         case resource_type::propellant:            return "propellant";
         case resource_type::count:                 return "count";

@@ -3576,6 +3576,55 @@
     }
    ],
    "resolution": "Complete 2026-08-16. BL-428's gate half landed: recipe_required_depth (derived in the same fixed point as depth_of, so it cannot drift), corporation_component::produced_ever + corp_reached_depth, mark_produced at the two real production sites, and the gate at both construct_building and try_switch_recipe as construction_result::depth_locked / recipe_switch_result::depth_locked, both mapping to corp_command_result::rejected_depth_locked. Build door and Method page filter/disable rather than let the player discover the lock by refusal. ANCIENT-BAND RECIPES ONLY (Ben's 2026-08-16 call) — the band check is on the recipe, so no industrial campaign changes shape. chain_depth 11 new assertions ALL PASS; econ_harness, construction_harness, era_roster green; ProjectIo builds clean. Found and fixed a real pre-existing defect en route: the Build door stored a browse recipe index and passed it as an absolute id (NR-254). Two review entries filed: NR-254, NR-255 (Method-page text overlap)."
+  },
+  {
+   "brief": "starting-corp-selection",
+   "batch": "2026-08-16-bl435",
+   "title": "BL-435 — Let the player choose their starting corporation",
+   "status": "pending",
+   "promoted_from": "backlog.json BL-435 STARTING_CORP_SELECTION",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING (visual): after generation completes and BEFORE the pre-game warm start, the campaign presents the world's specialist corporations as selectable openings — each showing name, industrial focus, home nation and holdings by building type — and the corporation the player picks becomes world::player_entity. A 'surprise me' option reproduces today's seeded pick.",
+     "verification": [
+      "visual"
+     ],
+     "result_metric": "",
+     "notes": "Ben's call 2026-08-16: the choice happens BEFORE the warm start, so the chosen corp is the one corp_ai excludes for the whole 80-tick pre-game history. Balance is deliberately NOT a column: opening balances are seeded BY the warm start, so every corp reads 0.0 at selection time — showing it would be showing a number that means nothing yet."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "The selectable pool is the SPECIALIST corporations (the set generate_corporations creates), not BL-365's background firms. Ben's call 2026-08-16.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "8 specialists vs 17-29 background firms per seed (measured)",
+     "notes": "player_seed_sweep --roster reports the split. Background firms are the mundane industry that saturates the market; they are not openings, and counting them was what made BL-435's filed premise read stronger than it was."
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "Materially more of the 8 specialists open with a processing facility than the 1-5 measured on 2026-08-16 — achieved by making focus_asset_pattern realise the intent already documented above it, not by clamping an outcome or rejection-sampling.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "",
+     "notes": "Root cause measured, not guessed: the processor sits at a pattern index the holdings draw often never reaches. Extraction corps (holdings 3-4) carry it at index 3, so only a 4-draw gets one; trade corps (holdings 1-2) carry it at index 2 and can NEVER reach it. Both patterns' own comments already promise a processor. Trade corps deliberately keep none - a pure-trade opening is a real archetype and erasing it would flatten the choice this item exists to create."
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "requirement": "Determinism holds: for a fixed seed and a fixed choice, the world is reproducible. The selection must not consume from any generation RNG stream, and 'surprise me' must reproduce the pre-BL-435 pick exactly.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "",
+     "notes": "The generator's own seeded pick stays where it is and remains the default; selection RE-POINTS is_player/player_entity afterwards rather than replacing the draw. That keeps every existing golden and harness that never opens the screen bit-identical."
+    }
+   ]
   }
  ]
 }

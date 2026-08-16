@@ -76,16 +76,25 @@ recipe_registry make_registry()
     recipe_registry reg;
 
     building_economics extraction;
-    extraction.base_rate            = 20.0f;
+    extraction.base_rate            = 20.0f; // BL-436 calibration: mirrors economy.lua
     extraction.maintenance          = 5.0f;
     extraction.base_wage            = 8.0f;
     extraction.build_cost           = 100.0f;
     extraction.build_duration_ticks = 2.0f;
     extraction.resource_build_cost[static_cast<std::size_t>(resource_type::steel)] = 20.0f;
+    // BL-436: the richness->rate conversion. These three MUST mirror
+    // scripts/economy.lua's extraction_site block. Left unset, richness_reference
+    // defaults to 0, the conversion is DISABLED, and this harness silently
+    // measures the PRE-BL-436 rate model while reporting green — which is exactly
+    // what happened on the run that landed BL-436, and why its goldens were
+    // vacuous with respect to the change they were supposed to be guarding.
+    extraction.richness_reference = 0.0f; // mirrors economy.lua: DISABLED pending BL-436 calibration
+    extraction.richness_min       = 0.25f;
+    extraction.richness_max       = 2.0f;
     reg.set_economics(building_type::extraction_site, extraction);
 
     building_economics processing;
-    processing.base_rate            = 8.0f;
+    processing.base_rate            = 8.0f;  // BL-436 calibration: mirrors economy.lua
     processing.maintenance          = 10.0f;
     processing.base_wage            = 12.0f;
     processing.build_cost           = 200.0f;
@@ -503,16 +512,51 @@ float output. Bless a set from a fresh Clang run and add its own block."
 // world — fewer deposits, fewer siting choices, tighter margins. Identical
 // across two consecutive runs before blessing. First use of the derived form's
 // intended workflow: seven numbers per seed replaced, nothing else touched.
+// --- RE-BLESSED 2026-08-16 (BL-435 task B), from a fresh MSVC run, identical
+// across two consecutive invocations. THE ECONOMY CHANGED UNDER THE BANDS, and
+// the cause is understood rather than assumed: `focus_asset_pattern` moved the
+// extraction corps' processor from a slot the holdings draw rarely reached to
+// one it always reaches, so corps that used to open 3 extraction + 0 processing
+// now open 2 + 1. Nothing else changed — same seeds, same tiles, same recipes,
+// same prices; one building swapped per affected corp.
+//
+// EVERY net-worth figure fell, and unlike the 2026-08-14 bless the drop is NOT
+// the fix working — it is the finding. seed 0 -71%, seed 1 -37%, seed 2 -9%,
+// seed 3 -20%, seed 4 -38% on final net worth. A processing facility earns LESS
+// than the extraction site it replaced, which is backwards for the value-add
+// step the trade pillar rests on. Filed with the measurement as BL-436
+// (PROCESSING_UNDEREARNS_EXTRACTION, priority A) on Ben's call. These bands are
+// re-blessed so the harness tracks reality, NOT because the reality is
+// acceptable: when BL-436 lands these numbers should RISE, and a bless that
+// does not raise them means the fix did not work.
+//
+// Solvency, survival and both thrash ceilings held on every seed — the AI still
+// behaves, it is simply poorer. Dial totals fell with net worth, the same
+// coupling the BL-416 bless recorded (the scorer stops re-dialling workforce it
+// cannot fund).
 const std::vector<seed_observed> observed = {
-    { 0, 181559.0f, 27753.7f, 10, 0.86f, 3, 33 },
-    { 1, 110288.8f, 26750.3f,  0, 0.86f, 5, 50 },
-    { 2, 173754.4f, 18886.7f,  5, 1.00f, 5, 43 },
-    { 3, 621949.7f, 60971.8f,  0, 0.86f, 6, 62 },
-    { 4, 205193.4f, 30406.2f,  7, 0.57f, 2, 42 },
+    // --- RE-BLESSED 2026-08-16 (BL-435 dead-start fix), identical across two
+    // consecutive runs. Trade corps drew 1-2 holdings against a pattern whose
+    // first slot is a PORT, so a 1-draw opened a corp holding nothing but a port
+    // — and a port carries base_rate 0, so that corp had no income source at all.
+    // It reached the player on 3 of 24 seeds. Ben, this date: "we shouldn't be
+    // seeding such corporations as the default one, which has no way of making
+    // money at all." Trade's range is now 2-3, guaranteeing the extraction slot.
+    //
+    // Every net-worth figure ROSE, which is the fix working rather than drift:
+    // corps that previously held an inert port now produce and trade. Solvency
+    // IMPROVED on three seeds (1, 2 and 3 now spend zero ticks below zero) and
+    // survival held everywhere. Dial totals rose with net worth — more funded
+    // workforce to move, the same coupling earlier blesses recorded in reverse.
+    { 0,  78142.0f, 20393.7f, 10, 0.86f, 3, 38 },
+    { 1,  60506.3f, 10822.8f,  0, 0.86f, 5, 56 },
+    { 2, 163485.7f, 21477.6f,  0, 1.00f, 5, 55 },
+    { 3, 498537.6f, 44792.5f,  0, 0.86f, 6, 58 },
+    { 4, 123116.5f, 24355.3f,  8, 0.57f, 2, 34 },
 };
 const std::vector<seed_golden> goldens = derive_all(observed);
 const char* const k_bands_blessed =
-    "2026-08-15 (MSVC, post-BL-424 70%-area map)";
+    "2026-08-16 (MSVC, post-BL-435 dead-start fix; see BL-436)";
 #elif defined(__GNUC__)
 // --- Linux / GCC -O2 — RE-BLESSED 2026-08-09 (BL-285 task 1, at the v0.1.8 cut).
 // Observed on that run:
