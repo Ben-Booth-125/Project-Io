@@ -163,6 +163,12 @@ recipe_registry make_registry()
     extraction.build_cost           = 100.0f;
     extraction.build_duration_ticks = 2.0f;
     extraction.resource_build_cost[static_cast<std::size_t>(resource_type::steel)] = 20.0f;
+    // BL-436: mirrors scripts/economy.lua's extraction_site block. See the same
+    // note in ai_skill_harness — unset, the richness->rate conversion is disabled
+    // and this harness measures the pre-BL-436 rate model while reporting green.
+    extraction.richness_reference = 53.3f;
+    extraction.richness_min       = 0.25f;
+    extraction.richness_max       = 2.0f;
     reg.set_economics(building_type::extraction_site, extraction);
 
     building_economics processing;
