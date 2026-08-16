@@ -363,6 +363,14 @@ int app::run(autostart_mode autostart)
             std::fflush(stdout);
             break;
         }
+
+        // NR-256: the third exit path, named like the other two. Checked here
+        // rather than at the loop head so it prints before the loop drops out.
+        if (m_quit_requested)
+        {
+            std::printf("[exit] m_quit_requested\n");
+            std::fflush(stdout);
+        }
     }
 
     // Persist any free drag-resize captured this session (toggles/presets already
@@ -1143,7 +1151,15 @@ void app::process_events(bool& running)
         // with no visible window. Treat either as "shut the app down".
         if (event.type == SDL_EVENT_QUIT ||
             event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED)
+        {
+            // NR-256 diagnostic: name which exit fired, so an unattended
+            // termination separates "stray close event" from "shell reaped us".
+            std::printf("[exit] %s\n", event.type == SDL_EVENT_QUIT
+                                           ? "SDL_EVENT_QUIT"
+                                           : "SDL_EVENT_WINDOW_CLOSE_REQUESTED");
+            std::fflush(stdout);
             running = false;
+        }
         else if (event.type == SDL_EVENT_KEY_DOWN)
             handle_key_down(event.key);
         else if (event.type == SDL_EVENT_WINDOW_RESIZED && !m_settings.fullscreen)
