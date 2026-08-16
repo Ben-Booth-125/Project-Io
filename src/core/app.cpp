@@ -1650,6 +1650,12 @@ void app::render()
                 // research reaches this one, so saying "not researched yet" would
                 // send the player looking for a tech that does not exist.
                 m_ui.construction.last_message = "Not in this era."; break;
+            case construction_result::depth_locked:
+                // BL-428: the third distinct lock, and it is the only one the
+                // player clears by BUILDING. Names the act, not the number — a
+                // reached-depth integer means nothing on its own.
+                m_ui.construction.last_message =
+                    "Your industry cannot make what this needs yet."; break;
             default:
                 m_ui.construction.last_message = "Construction failed."; break;
         }

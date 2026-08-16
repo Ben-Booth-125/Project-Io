@@ -223,7 +223,7 @@
       "title": "building_management_shell.lua verify script targets the deleted Buildings tab",
       "raised": "2026-08-15",
       "kind": "observation",
-      "status": "open",
+      "status": "resolved",
       "source": "Same BL-431-follow-on delivery that deleted the construction panel's Buildings tab.",
       "what": "scripts/verify/building_management_shell.lua calls verify.show_panel('construction', true) then verify.construction_view(1) to land on the (now-deleted) Buildings tab and capture its production-method/profit/workforce UI shell. View 1 no longer exists - the construction panel is queue-only (view 0). The script was left un-rewritten rather than adapted, per this delivery's scope.",
       "why_it_matters": "The script still runs (construction_view(1) just sets an int nobody reads for dispatch anymore) but its capture no longer shows what its own comment says it verifies - the workforce/profit UI shell now lives on the building Selection card's Workforce/Profitability pages instead, reached via selection + verify.fold('building_metric', page) rather than construction_view.",
@@ -232,7 +232,7 @@
         "scripts/verify/building_management_shell.lua",
         "src/ui/selection_panel.cpp"
       ],
-      "resolution": null
+      "resolution": "Resolved 2026-08-16 with BL-428 slice 2. building_management_shell.lua rewritten: it now selects a player PROCESSING building (falling back to any player building) and walks the Selection card's pager, capturing all three pages separately. It also needed a new verify verb — verify.building_page(n) — because fold('building_metric', k) sets the drill KEY, not the page, so the first rewrite still captured page 1 three times. Confirmed by capture: the Method page now shows 'Method (2/3)' with both alternates and the Switch control. That first honest photograph immediately surfaced a real layout defect, filed as NR-255."
     },
     {
       "id": "NR-247",
@@ -355,6 +355,38 @@
       "files": [
         "scripts/economy.lua",
         "src/ui/selection_panel.cpp"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-254",
+      "title": "Build door passed a BROWSE recipe index where construct_building expects an ABSOLUTE id",
+      "raised": "2026-08-16",
+      "kind": "observation",
+      "status": "open",
+      "source": "Found while wiring BL-428 chain-depth gate, which needed candidate.recipe to mean what it says.",
+      "what": "selection_panel.cpp built its processing candidates with `static_cast<uint16_t>(ri)`, where `ri` is the loop index over reg.recipe_count()/recipe_at() — the BL-433 era-MASKED browse path. That value flowed unchanged into ui.construction.pending_recipe and from there into construct_building, whose `recipe` parameter is indexed ABSOLUTELY (the get_recipe/recipe_id space). Two sibling call sites in the same file (the Method selector, ~line 847/894) already did the right thing via reg.recipe_id(ri.name); the build door did not. Fixed this pass: candidate.recipe now stores reg.recipe_id(browsed.name), and the two readers that indexed it as a browse position (the group lookup and the output-pip lookup) were moved onto get_recipe.",
+      "why_it_matters": "The two id spaces coincide exactly while the era mask is the identity, which is every any-band campaign — so this was invisible in normal play and would have stayed invisible. In an ANCIENT campaign the mask hides the industrial recipes, browse index k names a different recipe than absolute id k, and placing a building from the Build door seeds it with the wrong recipe. Ancient campaigns are precisely the content BL-429/BL-430/BL-431 have been building out. No harness caught it because no harness drives the Build door under a non-identity mask.",
+      "recommendation": "Fixed. The residual question is whether the browse/absolute split wants a TYPE (a distinct browse_index struct) rather than two uint16_t spaces that convert silently — this is the second time the split has bitten (BL-433 called it out in recipe_registry.hpp and still shipped a raw uint16_t). Worth a small backlog item if a third instance appears.",
+      "files": [
+        "src/ui/selection_panel.cpp",
+        "src/world/recipe_registry.hpp"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-255",
+      "title": "Method page: the per-method profit figure overlaps the method name",
+      "raised": "2026-08-16",
+      "kind": "observation",
+      "status": "open",
+      "source": "screenshots/building_management_method.png, captured by the rewritten building_management_shell.lua (NR-246 fix).",
+      "what": "The Method page's rows draw the method name left-aligned and the profit figure right-aligned to a profit column, but at the Selection card's current width the two collide: the capture shows 'Food Rations' with '7/tick' printed through it and 'Miller' with '4.4/tick' through it. The profit column offset (profit_col_w) is computed against a row width that the narrow Selection band does not actually provide.",
+      "why_it_matters": "This is the surface BL-430/BL-431 built to make alternate production methods choosable, and its two load-bearing numbers are the ones being overprinted — the player cannot read either the method name or its profit cleanly. It went unseen because the old verify script captured the deleted Buildings tab (NR-246) and the new one had no golden, so nothing was comparing this page to anything. Found the first time the page was actually photographed.",
+      "recommendation": "Either right-align the profit into a reserved column measured off the ACTUAL child width, or drop the profit to a second line on narrow layouts. Worth a golden on all three building pages once the layout is settled, so the next regression is caught by comparison rather than by eye.",
+      "files": [
+        "src/ui/selection_panel.cpp",
+        "scripts/verify/building_management_shell.lua"
       ],
       "resolution": null
     }

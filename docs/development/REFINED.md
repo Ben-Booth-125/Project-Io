@@ -130,6 +130,74 @@
 > post-fix numbers recorded in its design note. Follow-on filed: BL-422 (held-order phantom
 > inventory).
 
+## Chain-depth growth gate (promoted from BL-428) — **COMPLETE** (6/6, 2026-08-16)
+
+Requirements: requirements.json § chain-depth-growth-gate (R1–R4)
+
+BL-428's metric half landed with BL-429/430/431 (`depth_of` / `is_raw` / `max_depth`, and the
+min-across-recipes / max-within-recipe asymmetry). This group builds the **gate** — the half that
+makes depth the growth track rather than a readout. Ben's 2026-08-16 call: **ancient roster only**
+for the first cut, so no existing industrial campaign changes shape.
+
+Required depth is **derived, never authored**: a recipe's requirement is the depth of its deepest
+input, read straight off the graph. That is the ruling's own argument — a hand-authored per-type
+minimum would be the second system chain depth was chosen to avoid.
+
+- **[2] A — `recipe_registry::recipe_required_depth(id)`: max `depth_of` over the recipe's
+  inputs, 0 for an input-free recipe, -1 if any input is unreachable. Precomputed alongside
+  `m_depth` in the same rebuild, so it cannot drift from the graph or from the era mask.**
+  Files: `src/world/recipe_registry.hpp`. Deps: foundation. Satisfies: R1, R4.
+- **[2] B — Per-corp reached depth: `corporation_component.produced_ever` (a
+  `std::array<bool, resource_count>`, produced-ONCE-EVER per the design's legibility call) plus
+  `reached_depth(reg)`. Never cleared — idling or demolishing must not lower it.**
+  Files: `src/world/components.hpp`. Deps: foundation. Parallel-safe with A. Satisfies: R2.
+- **[1] C — Record production: set the owning corp's `produced_ever` bit wherever a good is
+  actually made, in both `run_processing` and `run_extraction`.** Files:
+  `src/world/economy_system.cpp`. Deps: B. Satisfies: R1, R2.
+- **[2] D — The gate: refuse an ancient-band recipe whose required depth exceeds the corp's
+  reached depth, as `construction_result::depth_locked`, beside the existing `era_locked`.
+  Mirror it into `corp_command_result` (the seam's switch is exhaustive — the BL-433 lesson) and
+  filter the Build door so a locked method is not offered in the first place.** Files:
+  `src/world/construction.{hpp,cpp}`, `src/world/corp_command.{hpp,cpp}`,
+  `src/ui/construction_panel.cpp`. Deps: A, C. Satisfies: R1, R3.
+- **[2] E — Guard: extend `tools/verify/chain_depth.cpp` with the four rows, including BL-432's
+  no-unreachable-building assertion and the two-load byte-identity check.** Files:
+  `tools/verify/chain_depth.cpp`, `.claude/skills/verifier-headless/SKILL.md`. Deps: D.
+  Satisfies: R1, R2, R3, R4.
+- **[1] F — Propagate to the authority doc and retire NR-246's dead check.** Files:
+  `docs/economy/PRODUCTION.md`, `scripts/verify/building_management_shell.lua`. Deps: D.
+
+**Parallelisation.** A ∥ B (disjoint headers, no shared type); C after B; D after A+C; E, F after
+D. The whole group is one vertical seam of ~5 logic files with `construction.cpp` as the hotspot —
+merge cost exceeds the saving, so it runs in the main session rather than fanning out.
+
+**Closed 2026-08-16. All six tasks complete; `chain_depth` reports 11 new assertions ALL PASS
+(ancient ladder climbs to depth 3, nothing stranded); `econ_harness`, `construction_harness`,
+`era_roster` green; `ProjectIo` builds clean.** Three things were found mid-build and folded in
+rather than deferred, each because leaving it would have made the gate a half-gate:
+
+- **The retool path needed the same gate.** Guarding only `construct_building` left a one-click
+  bypass — place the shallowest ancient method the corp can reach, then switch onto the deepest
+  sibling in the same group, and the ladder never has to be climbed. `try_switch_recipe` now
+  refuses with `recipe_switch_result::depth_locked`, mapping to the same
+  `rejected_depth_locked` on the seam so an agent cannot tell the two routes apart.
+- **A real pre-existing wrong-recipe bug (NR-254).** The Build door stored the *browse* index
+  (era-masked) in `candidate.recipe` and passed it where an *absolute* id was expected. The two
+  spaces coincide exactly while the mask is the identity — every `any`-band campaign — so it was
+  invisible in normal play and would have stayed invisible, while silently naming the wrong
+  recipe in precisely the ancient campaigns BL-429/430/431 have been building out.
+- **The verify script could not reach the pages it claimed to check.** NR-246's rewrite needed a
+  new verb, `verify.building_page(n)`: `fold("building_metric", k)` sets the drill *key*, not the
+  page, so the first rewrite still captured page 1 three times. The first honest photograph of the
+  Method page immediately surfaced a live layout defect (NR-255, profit figure overprinting the
+  method name) — which is the argument for the check existing.
+
+One limitation stated rather than hidden: the gate is scoped to **ancient-band recipes** by Ben's
+first-cut ruling, so the industrial roster is ungated and chain depth does not yet gate anything a
+1960 campaign can see.
+
+---
+
 ## Era-gated economy roster (promoted from BL-433) — **COMPLETE** (5/5, 2026-08-15)
 
 Requirements: requirements.json § era-gated-roster

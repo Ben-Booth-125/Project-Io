@@ -172,6 +172,8 @@ enum class recipe_switch_result : uint8_t
     insufficient_funds,   ///< The owning corp cannot cover recipe_switch().switch_cost.
     cross_group,          ///< BL-434 retraction: new recipe is a DIFFERENT `group` — refused
                           ///< outright, not priced. See try_switch_recipe's comment.
+    depth_locked,         ///< BL-428: the corp has not reached the chain depth the new recipe needs.
+                          ///< Closes the retool bypass — see try_switch_recipe's comment.
 };
 
 /// Attempt a PLAYER-grade recipe switch on `b`, gated by `economy.recipe_switch`

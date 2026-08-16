@@ -18,6 +18,7 @@ enum class construction_result : uint8_t
     insufficient_materials, ///< Unreachable since BL-095-lite folded material cost into credits (kept for switch compat).
     tech_locked,         ///< BL-344: the corporation has not earned the tech that unlocks this type.
     era_locked,          ///< BL-433: this building type is not part of the campaign's era band (e.g. a Launchpad at 0 CE).
+    depth_locked,        ///< BL-428: the corp has not yet produced a good deep enough to run this recipe. Unlike tech_locked, it is earned by BUILDING, not by researching.
 };
 
 /// Attempt to construct a building of `type` (targeting `target` for an extraction

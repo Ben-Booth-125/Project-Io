@@ -721,7 +721,50 @@ struct corporation_component
     /// (band progress) is the intended sink, not built by this item.
     float military_points = 0.0f;
     float science          = 0.0f;
+
+    /// BL-428 growth spine: every good this corporation has EVER produced, set the
+    /// tick a building of its actually makes some (economy_system.cpp's
+    /// run_extraction / run_processing). Read through `recipe_registry` to obtain
+    /// the corp's reached chain depth, which gates what it may build next.
+    ///
+    /// PRODUCED-ONCE-EVER, never cleared, and that is the design's legibility call
+    /// (Ben, 2026-08-15): progress must not evaporate because a building idled for
+    /// a tick or was demolished for a better site. A corp that has smelted iron
+    /// once knows how to smelt iron. Monotonicity is the property the gate rests
+    /// on — a placement that was legal must not silently become illegal.
+    ///
+    /// A bool per resource rather than a bitset: `resource_count` is small, and a
+    /// plain array keeps this trivially copyable and order-independent, which
+    /// matters because the economy reads a number off it (the BL-406 lesson).
+    std::array<bool, resource_count> produced_ever = {};
 };
+
+/// BL-428: how far down the production graph @p c has actually reached — the
+/// deepest good it has ever produced. 0 for a fresh corporation (it has reached
+/// the raws and nothing beyond), which is exactly what an untouched
+/// `produced_ever` should mean.
+///
+/// Unreachable goods (`depth_of` == -1) cannot raise it: a corp cannot have
+/// produced a good the current era's graph says is unmakeable, and if a stale bit
+/// survived a band change it must not be allowed to unlock anything.
+///
+/// @param c    The corporation.
+/// @param reg  Loaded registry, read for `depth_of` under the campaign's band.
+/// @return     The corp's reached depth (>= 0).
+template <typename Registry>
+int corp_reached_depth(const corporation_component& c, const Registry& reg)
+{
+    int best = 0;
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        if (!c.produced_ever[r])
+            continue;
+        const int d = reg.depth_of(static_cast<resource_type>(r));
+        if (d > best)
+            best = d;
+    }
+    return best;
+}
 
 // ---------------------------------------------------------------------------
 // Nation enumerations
