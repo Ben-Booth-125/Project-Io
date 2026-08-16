@@ -103,12 +103,20 @@ float extraction_nominal(const world& w, const recipe_registry& reg,
 
 namespace {
 
-/// Extraction: credit the (corp, body) pool with the target resource and draw the
-/// same amount from the tile's finite reserve. Nominal output is
+/// Extraction: credit the (corp, body) pool from EVERY deposit on the site's tile
+/// and draw each from its own finite reserve. Nominal output is
 /// base_rate × richness × workforce × (1 − hazard), diminished by this site's rank
 /// in its tile's stack (BL-193); it tapers as the *stack's* shared reserve nears
-/// empty and the building reports `exhausted` once that reserve falls below the
-/// minimum taper. Deposits never refill.
+/// empty and the building reports `exhausted` once it can draw nothing. Deposits
+/// never refill.
+///
+/// BL-437 (2026-08-16): a site works the whole tile, not just `target_resource`.
+/// That field survives as the PRIMARY — it still sets the rate, the stack key and
+/// the taper, and it is what the UI and the AI scorer name the site by — but the
+/// site's capacity is now SHARED across the tile's deposits in proportion to
+/// richness rather than spent entirely on one. Total output per site is
+/// unchanged; what changes is that it arrives as a basket. See the co-extraction
+/// block below for why sharing rather than multiplying is the load-bearing call.
 building_report run_extraction(world& w, const recipe_registry& reg,
                                entity_id corp, entity_id building_id,
                                const building_component& b, float contention,
@@ -172,19 +180,77 @@ building_report run_extraction(world& w, const recipe_registry& reg,
         return rep;
     }
 
-    // Never extract more than the reserve still holds.
-    const float output = std::min(nominal * taper, remaining);
-    remaining -= output;
+    // The site's total capacity this tick, before it is shared out below. NOT
+    // capped by the primary's reserve any more: each deposit is capped by its
+    // own below, and capping the whole basket by one member's reserve would let
+    // a nearly-spent primary throttle deposits that are still full.
+    const float capacity = nominal * taper;
 
-    if (output > 0.0f)
+    // --- BL-437: co-extraction — a site works EVERY deposit on its tile ------
+    //
+    // Before this, a site mined only `target_resource`, chosen by
+    // placement_rules::richest_extractable as the single richest deposit on the
+    // tile. Measured 2026-08-16 (tier_margin R4/R5), that left EIGHT raws with
+    // deposits and zero extraction sites — coal among them, which is the reagent
+    // of `steel`, which is the era-aware DEFAULT recipe. The default recipe could
+    // not run in a shipped campaign because nothing anywhere mined its reagent.
+    //
+    // The measurement also chose this fix over the alternatives: the affected
+    // resources are richest on 0-12% of the tiles carrying them (clay 0.0%, sand
+    // 0.1%, coal 1.1%, peat 1.3%), i.e. they COEXIST with a richer deposit on the
+    // same tile. Reaching the whole tile therefore reaches all of them at once,
+    // where re-biasing the winner would only ever swap which single resource is
+    // starved.
+    //
+    // CAPACITY IS SHARED, NOT MULTIPLIED, and that is the load-bearing decision.
+    // Yielding every deposit at the full rate would multiply extraction output
+    // several-fold — widening the very extraction-vs-processing gap BL-436 exists
+    // to close, and inflating an economy that already measures 1947 cr/tick per
+    // mine. Instead the site's total stays exactly what it was and is apportioned
+    // by richness, so a mine now yields a BASKET rather than one good. Richness
+    // still decides what it mostly produces.
+    //
+    // Determinism: k_extractable is a fixed-order constexpr array and the shares
+    // are pure functions of the tile's own richness — no container iteration
+    // order, no RNG (the BL-406 lesson).
+    float richness_total = 0.0f;
+    for (const resource_type r : placement_rules::k_extractable)
+        richness_total += tc.resource_deposit[static_cast<std::size_t>(r)];
+
+    float produced_total = 0.0f;
+    if (capacity > 0.0f && richness_total > 0.0f)
     {
-        w.pool_for(corp, body).quantities[ri] += output;
-        mark_produced(w, corp, b.target_resource); // BL-428 growth spine
+        stockpile_component& pool = w.pool_for(corp, body);
+        for (const resource_type r : placement_rules::k_extractable)
+        {
+            const std::size_t rr    = static_cast<std::size_t>(r);
+            const float       rich  = tc.resource_deposit[rr];
+            if (rich <= 0.0f)
+                continue;
+            // Each deposit draws only its own share, and only what its own
+            // reserve still holds — a spent secondary simply stops contributing
+            // rather than blocking the site.
+            const float share = capacity * (rich / richness_total);
+            const float got   = std::min(share, tc.resource_remaining[rr]);
+            if (got <= 0.0f)
+                continue;
+            tc.resource_remaining[rr] -= got;
+            pool.quantities[rr]       += got;
+            mark_produced(w, corp, r); // BL-428 growth spine, now for every good worked
+            produced_total += got;
+        }
+    }
+
+    if (produced_total > 0.0f)
+    {
         rep.active          = true;
-        rep.output_quantity = output;
+        rep.output_quantity = produced_total;
     }
     else
     {
+        // Unchanged semantics: a site reports exhausted when it can draw nothing.
+        // The taper check above still keys on the PRIMARY reserve, so a site is
+        // retired on the same tick it always was.
         rep.exhausted = true;
     }
     return rep;

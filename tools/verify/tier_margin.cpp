@@ -217,6 +217,16 @@ int main(int argc, char** argv)
             if (b.type == building_type::extraction_site)
                 ++sites_targeting[static_cast<std::size_t>(b.target_resource)];
 
+        // Units extracted are measured as RESERVE DEPLETION, not from the report.
+        // building_report carries one target_resource and a single total, so once
+        // BL-437 made a site work a basket, attributing its whole output to the
+        // primary reported coal as unmined while coal was being pulled out of the
+        // ground. Reserves cannot lie: nothing but extraction moves them.
+        std::vector<double> reserve_before(resource_count, 0.0);
+        for (const auto& [tid, tc] : w.tiles)
+            for (std::size_t r = 0; r < resource_count; ++r)
+                reserve_before[r] += tc.resource_remaining[r];
+
         for (int t = 1; t <= n_ticks; ++t)
         {
             dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
@@ -245,10 +255,6 @@ int main(int argc, char** argv)
                 if (bp.revenue > 0.0f)
                     ++acc.earning;
             }
-
-            for (const building_report& br : report.buildings)
-                if (br.type == building_type::extraction_site && br.output_quantity > 0.0f)
-                    supply_units[static_cast<std::size_t>(br.target_resource)] += br.output_quantity;
 
             // R3's classification, read off the report rows the same tick
             // produced them.
@@ -282,6 +288,13 @@ int main(int argc, char** argv)
                     ++why_other;
             }
         }
+
+        // Per-seed reserve delta: everything extracted this seed, by resource.
+        for (const auto& [tid, tc] : w.tiles)
+            for (std::size_t r = 0; r < resource_count; ++r)
+                reserve_before[r] -= tc.resource_remaining[r];
+        for (std::size_t r = 0; r < resource_count; ++r)
+            supply_units[r] += reserve_before[r];
     }
 
     auto row = [](const char* label, const tier_acc& a) {
@@ -363,7 +376,7 @@ int main(int argc, char** argv)
                     tiles_with[r], sites_targeting[r],
                     supply_units[r] / static_cast<double>(n_seeds * n_ticks),
                     input_demand[r],
-                    (tiles_with[r] > 0 && sites_targeting[r] == 0) ? "   <-- MINED BY NOTHING" : "");
+                    (tiles_with[r] > 0 && supply_units[r] <= 0.0) ? "   <-- PRODUCED BY NOTHING" : "");
     }
 
     // --- R5: never the richest ANYWHERE, or never where corps build? ---------
@@ -412,13 +425,18 @@ int main(int argc, char** argv)
     // The invariant that R4's table exists to state. A resource a recipe needs,
     // which is PRESENT on thousands of tiles and which nothing mines, is not a
     // balance problem — it is a chain that can never run at all.
-    long unmined_but_needed = 0;
+    // Keyed on PRODUCTION, not on how many sites name it as their primary.
+    // BL-437 made a site work its whole tile, so `sites_targeting` counts only
+    // what a site is NAMED for — it reported coal as unmined on the very run
+    // where coal was coming out of the ground. The reserve-depletion figure is
+    // the one that answers the question.
+    long unproduced_but_needed = 0;
     for (std::size_t r = 0; r < resource_count; ++r)
-        if (input_demand[r] > 0 && tiles_with[r] > 0 && sites_targeting[r] == 0)
-            ++unmined_but_needed;
-    check(unmined_but_needed == 0,
-          "every recipe input that has deposits is mined by at least one site ("
-              + std::to_string(unmined_but_needed) + " are not)");
+        if (input_demand[r] > 0 && tiles_with[r] > 0 && supply_units[r] <= 0.0)
+            ++unproduced_but_needed;
+    check(unproduced_but_needed == 0,
+          "every recipe input that has deposits is actually produced ("
+              + std::to_string(unproduced_but_needed) + " are not)");
 
     // --- R1: the report is non-vacuous ---------------------------------------
     std::printf("\nR1 — the measurement actually happened\n");

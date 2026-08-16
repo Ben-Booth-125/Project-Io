@@ -137,7 +137,16 @@ constexpr int      k_ticks = 300;
 // the A/B seating rows — passed unchanged. The economy-wide income drop this
 // generation change also caused is NOT this harness's business; it is measured
 // and filed as BL-436.
-constexpr uint64_t k_unspectated_golden = 0x84E876A1596FE090ull;
+// Re-blessed 2026-08-16 (BL-437 co-extraction): an extraction site now works
+// EVERY deposit on its tile, sharing its unchanged capacity across them by
+// richness, instead of spending all of it on the single richest. Five raws that
+// were produced in zero quantity — coal, rare_earth_ore, sand, clay, peat — now
+// flow, so pools, prices and every downstream number this hash walks change. A
+// deliberate economy change, which is the case this file's policy names.
+// Confirmed reproducible across two independently built worlds (AB53A812799BA2A4
+// twice) before blessing; every other assertion passed unchanged, and
+// ai_skill_harness's bands held without needing a bless of their own.
+constexpr uint64_t k_unspectated_golden = 0xAB53A812799BA2A4ull;
 
 /// Hand-built registry mirroring scripts/economy.lua + scripts/recipes.lua for
 /// the building types the generator places. Copied from ai_skill_harness so the
