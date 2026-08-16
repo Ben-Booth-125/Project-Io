@@ -535,15 +535,28 @@ float output. Bless a set from a fresh Clang run and add its own block."
 // coupling the BL-416 bless recorded (the scorer stops re-dialling workforce it
 // cannot fund).
 const std::vector<seed_observed> observed = {
-    { 0,  51950.5f, 15742.6f, 10, 0.86f, 3, 19 },
-    { 1,  69803.6f, 18473.4f,  0, 0.86f, 5, 30 },
-    { 2, 157313.9f, 23131.8f,  5, 1.00f, 5, 30 },
-    { 3, 500635.3f, 61970.3f,  0, 0.86f, 6, 45 },
-    { 4, 126637.2f, 27169.7f,  7, 0.57f, 2, 27 },
+    // --- RE-BLESSED 2026-08-16 (BL-435 dead-start fix), identical across two
+    // consecutive runs. Trade corps drew 1-2 holdings against a pattern whose
+    // first slot is a PORT, so a 1-draw opened a corp holding nothing but a port
+    // — and a port carries base_rate 0, so that corp had no income source at all.
+    // It reached the player on 3 of 24 seeds. Ben, this date: "we shouldn't be
+    // seeding such corporations as the default one, which has no way of making
+    // money at all." Trade's range is now 2-3, guaranteeing the extraction slot.
+    //
+    // Every net-worth figure ROSE, which is the fix working rather than drift:
+    // corps that previously held an inert port now produce and trade. Solvency
+    // IMPROVED on three seeds (1, 2 and 3 now spend zero ticks below zero) and
+    // survival held everywhere. Dial totals rose with net worth — more funded
+    // workforce to move, the same coupling earlier blesses recorded in reverse.
+    { 0,  78142.0f, 20393.7f, 10, 0.86f, 3, 38 },
+    { 1,  60506.3f, 10822.8f,  0, 0.86f, 5, 56 },
+    { 2, 163485.7f, 21477.6f,  0, 1.00f, 5, 55 },
+    { 3, 498537.6f, 44792.5f,  0, 0.86f, 6, 58 },
+    { 4, 123116.5f, 24355.3f,  8, 0.57f, 2, 34 },
 };
 const std::vector<seed_golden> goldens = derive_all(observed);
 const char* const k_bands_blessed =
-    "2026-08-16 (MSVC, post-BL-435 asset-pattern fix; see BL-436)";
+    "2026-08-16 (MSVC, post-BL-435 dead-start fix; see BL-436)";
 #elif defined(__GNUC__)
 // --- Linux / GCC -O2 — RE-BLESSED 2026-08-09 (BL-285 task 1, at the v0.1.8 cut).
 // Observed on that run:

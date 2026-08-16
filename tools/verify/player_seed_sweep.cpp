@@ -185,7 +185,19 @@ int run_roster(uint32_t seed, const recipe_registry& reg)
                     r.is_player ? "<<<" : "", r.name.c_str());
     }
 
+    // Ben, 2026-08-16: "we shouldn't be seeding such corporations as the default
+    // one, which has no way of making money at all." A port and a military_base
+    // both carry base_rate 0 — they produce NOTHING — so a corp holding only
+    // those has no income source whatsoever. That is a different and worse
+    // failure than "no processor": not a poor opening, a dead one.
+    int spec_dead = 0;
+    for (const corp_row& r : rows)
+        if (r.specialist && r.processing == 0 && r.extraction == 0)
+            ++spec_dead;
+
     std::printf("\n=== seed %u ===\n", seed);
+    std::printf("  CANNOT PRODUCE AT ALL (no extraction, no processing): %d of %d specialists%s\n",
+                spec_dead, spec_total, spec_dead ? "   <-- DEAD START" : "");
     std::printf("  SPECIALIST corps (the pool the player pick draws from): %2d, %2d with a processor\n",
                 spec_total, spec_proc);
     std::printf("  background firms (BL-365, not currently selectable):    %2d, %2d with a processor\n",

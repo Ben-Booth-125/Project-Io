@@ -146,7 +146,13 @@ constexpr int      k_ticks = 300;
 // Confirmed reproducible across two independently built worlds (AB53A812799BA2A4
 // twice) before blessing; every other assertion passed unchanged, and
 // ai_skill_harness's bands held without needing a bless of their own.
-constexpr uint64_t k_unspectated_golden = 0xAB53A812799BA2A4ull;
+// Re-blessed 2026-08-16 (BL-435 dead-start fix): trade corps' holdings range
+// went 1-2 -> 2-3, because a 1-draw opened a corp holding nothing but a port and
+// a port produces nothing at all. That changes generated holdings on every seed,
+// so the world changes and so does every number this hash walks. Confirmed
+// reproducible across two independently built worlds (855E07DE529684EC twice)
+// before blessing; every other assertion passed unchanged.
+constexpr uint64_t k_unspectated_golden = 0x855E07DE529684ECull;
 
 /// Hand-built registry mirroring scripts/economy.lua + scripts/recipes.lua for
 /// the building types the generator places. Copied from ai_skill_harness so the

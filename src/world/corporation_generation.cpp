@@ -220,9 +220,20 @@ std::pair<int, int> holdings_range(industrial_focus focus)
     {
     case industrial_focus::extraction: return { 3, 4 };
     case industrial_focus::processing: return { 2, 3 };
-    case industrial_focus::trade:      return { 1, 2 };
+    // BL-435 (2026-08-16, Ben): trade was { 1, 2 }, and a 1-draw opened a corp
+    // holding NOTHING BUT A PORT. Ports carry base_rate 0 — they produce nothing —
+    // so that corp had no income source at all: not a lean start, a dead one. It
+    // reached the player on 3 of 24 seeds (9, 12, 22 read "0 proc, 0 extr").
+    // Ben's ruling: "we shouldn't be seeding such corporations as the default one,
+    // which has no way of making money at all."
+    //
+    // A minimum of 2 makes the trade pattern's second slot — an extraction site —
+    // guaranteed, so every trade corp can earn from tick one. The 3-draw also
+    // reaches the pattern's processing slot, which is why this lifts processor
+    // coverage as a side effect rather than by design.
+    case industrial_focus::trade:      return { 2, 3 };
     }
-    return { 1, 2 }; // defensive default — keep a corp a going concern
+    return { 2, 3 }; // defensive default — keep a corp a going concern
 }
 
 /// The building-type mix a corporation of the given focus opens with, expressed
