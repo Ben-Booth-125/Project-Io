@@ -592,6 +592,115 @@ int main()
         }
     }
 
+    // -----------------------------------------------------------------------
+    // R7 — market inventory is credited with what LEFT a pool, never with what
+    //      was merely listed (BL-422)
+    // -----------------------------------------------------------------------
+    // R6 above establishes that a held order earns nothing and keeps its stock.
+    // That left half the reservation rule unenforced: clear_markets credited the
+    // LISTED quantity to market_component::inventory before clearing ran, so a
+    // held order still put stock on the shelf. inventory is not a display field —
+    // economy_system draws processor inputs from it — so the phantom was bought,
+    // decremented, and never paid for by anyone.
+    //
+    // The assertions are stated as an EQUALITY between inventory gain and pool
+    // loss, so an under-credit fails them as loudly as an over-credit.
+    {
+        const std::size_t r_steel = ri(resource_type::steel);
+        auto inventory_steel = [&](const scenario& s) {
+            return s.w.markets.at(s.market).inventory[r_steel];
+        };
+
+        // HOLD: floor 6.0 against a resolved price of 5.0 (the R6.1 fixture).
+        {
+            scenario s = make_scenario(100.0f);
+            apply_corp_command(s.w, reg, place_cmd(s, 40.0f, 6.0f));
+            economy_report empty;
+            clear_markets(s.w, reg, empty);
+            check(s.w.markets.at(s.market).price[r_steel] < 6.0f,
+                  "R7.1 fixture: the resolved price sits below the order's floor");
+            check(inventory_steel(s) == 0.0f,
+                  "R7.2 HOLD: a held order puts NO stock into the market's real inventory");
+            check(pool_steel(s) == 100.0f && inventory_steel(s) == 0.0f,
+                  "R7.3 HOLD: nothing left the pool, so nothing arrived on the shelf");
+        }
+
+        // CLEARS: floor 3.0, below the resolved price — the mirror case.
+        {
+            scenario s = make_scenario(100.0f);
+            apply_corp_command(s.w, reg, place_cmd(s, 40.0f, 3.0f));
+            economy_report empty;
+            clear_markets(s.w, reg, empty);
+            const float pool_loss = 100.0f - pool_steel(s);
+            check(pool_loss > 39.99f && pool_loss < 40.01f,
+                  "R7.4 fixture: the clearing order emptied its listed quantity from the pool");
+            check(std::fabs(inventory_steel(s) - pool_loss) < 0.01f,
+                  "R7.5 CONSERVATION: inventory gains exactly what left the pool");
+        }
+
+        // AUTO-SURPLUS: no order at all, so the greedy path sells the whole pool.
+        // The third credit site, and the one that was already correct — asserted
+        // so a later tidy of the three cannot quietly drop it.
+        {
+            scenario s = make_scenario(100.0f);
+            economy_report empty;
+            clear_markets(s.w, reg, empty);
+            const float pool_loss = 100.0f - pool_steel(s);
+            check(pool_loss > 0.0f,
+                  "R7.6 fixture: with no standing order the auto-surplus path sells");
+            check(std::fabs(inventory_steel(s) - pool_loss) < 0.01f,
+                  "R7.7 CONSERVATION: the auto-surplus path credits exactly what it sold");
+        }
+
+        // MIXED TICK: a held order and a clearing order against the same
+        // (market, resource). The single-order cases both pass if the credit is
+        // computed per-resource rather than per-order; this one does not.
+        {
+            scenario s = make_scenario(100.0f);
+            apply_corp_command(s.w, reg, place_cmd(s, 40.0f, 6.0f));  // holds
+            apply_corp_command(s.w, reg, place_cmd(s, 30.0f, 1.0f));  // clears
+            economy_report empty;
+            clear_markets(s.w, reg, empty);
+            const float rp = s.w.markets.at(s.market).price[r_steel];
+            check(rp > 1.0f && rp < 6.0f,
+                  "R7.8 fixture: the resolved price separates the two orders");
+            const float pool_loss = 100.0f - pool_steel(s);
+            check(pool_loss > 29.99f && pool_loss < 30.01f,
+                  "R7.9 MIXED: only the clearing order's 30 units leave the pool");
+            check(std::fabs(inventory_steel(s) - 30.0f) < 0.01f,
+                  "R7.10 MIXED: the held order is not rescued by its clearing neighbour");
+        }
+
+        // MATCHED TRADE: the second credit site. No press authors a buy order yet
+        // (components.hpp), so the buy side is pushed directly — the same
+        // hand-built-world licence the rest of this harness runs on.
+        {
+            scenario s = make_scenario(100.0f);
+            apply_corp_command(s.w, reg, place_cmd(s, 40.0f, 3.0f));
+
+            const entity_id buyer = s.w.create_entity();
+            corporation_component bc;
+            bc.balance = 1000.0f;
+            s.w.corporations[buyer] = bc;
+
+            buy_order bo;
+            bo.corp      = buyer;
+            bo.body      = s.body;
+            bo.resource  = resource_type::steel;
+            bo.quantity  = 25.0f;
+            bo.max_price = 999.0f;
+            s.w.buy_orders.push_back(bo);
+
+            economy_report empty;
+            const auto flows = clear_markets(s.w, reg, empty);
+            check(flows.count(buyer) && flows.at(buyer).expenditure > 0.0f,
+                  "R7.11 fixture: the buy order matched and the buyer paid");
+            const float pool_loss = 100.0f - pool_steel(s);
+            check(std::fabs(inventory_steel(s) - pool_loss) < 0.01f,
+                  "R7.12 CONSERVATION: matched fills and the auto-cleared remainder both credit once");
+        }
+    }
+
     std::printf("\n%s  (%d passed, %d failed)\n",
                 g_fail == 0 ? "ALL PASS" : "FAILURES", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;

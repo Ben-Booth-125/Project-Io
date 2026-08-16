@@ -491,6 +491,70 @@
         "scripts/recipes.lua"
       ],
       "resolution": null
+    },
+    {
+      "id": "NR-261",
+      "title": "BL-422: held stock stays visible to the price signal, against the item's own stated default — the alternative is a fixed point",
+      "raised": "2026-08-16",
+      "kind": "decision-taken",
+      "status": "open",
+      "source": "BL-422 design: \"Decide whether the supply-side price signal should still see held stock (an argument exists both ways) — default to NOT visible, matching the reservation semantics BL-386 established.\"",
+      "what": "The default was NOT adopted, and the reason is mechanical rather than a preference. Whether an order holds is decided by comparing its floor to the RESOLVED price; the resolved price is computed FROM market_component::supply (resolve_price(price, base, supply, demand)). Removing held quantity from supply raises the resolved price, which can un-hold the very order that was removed, which puts its stock back into supply. Reaching a consistent answer means iterating to a fixed point inside clear_markets. So the two arrays are now deliberately asymmetric and MARKETS.md says so in as many words: supply is the OFFER (listed stock is a real offer at a price), inventory is the DELIVERY (only what actually changed hands). Only the inventory half of BL-422 was implemented.",
+      "why_it_matters": "The phantom-BUYING defect is fully fixed — no processor can draw stock a seller never released. What remains is a pricing nicety: a held order still depresses the resolved price by appearing as supply, which in a thin market can hold the price below the floor that caused the hold, so an order can hold itself down. That is a real (if second-order) feedback loop and Ben may judge it worth the iteration cost; it is not worth spending determinism risk on unmeasured.",
+      "recommendation": "Leave as implemented. If it is to be revisited, the cheap first step is a measurement rather than a fix: count how often a held order is the marginal supply that keeps the price below its own floor. File as a follow-on to BL-422 if that count is non-trivial.",
+      "files": [
+        "src/world/market_clearing.cpp",
+        "docs/economy/MARKETS.md"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-262",
+      "title": "An explicit matched trade pays the seller and delivers the goods to the shared market shelf, not to the buyer",
+      "raised": "2026-08-16",
+      "kind": "observation",
+      "status": "open",
+      "source": "Found while scoping BL-422's credit sites, 2026-08-16.",
+      "what": "In clear_markets, a matched explicit trade debits the seller pool and charges the buyer expenditure, but never credits the BUYER stockpile. The goods land in market_component::inventory (true before BL-422 via the listing-time credit, and still true after it via the matched-trade credit). Any corp on that body can then draw them through the ordinary processor path. So a buy order is closer to \"pay to put stock on the local shelf\" than to \"acquire these goods\".",
+      "why_it_matters": "It is currently invisible because nothing writes world::buy_orders in play — MARKETS.md § Known limitations records the buy-order book as engine-only, waiting on BL-160. The moment BL-160 derive_exchange_orders becomes the first live emitter, a player who wins a matched trade will pay for goods a competitor on the same body can consume. BL-422 deliberately did NOT change this: routing matched fills to the buyer pool is a behaviour change to the buy side, outside a fix scoped to phantom supply. order_book_harness R7.12 pins the current behaviour as conservation (pool loss == inventory gain), so a future correction will fail that row loudly rather than silently.",
+      "recommendation": "Fold into BL-160 (auto-exchange policy) rather than filing separately — that is the item that makes the buy side reachable, and the delivery question has to be answered there anyway.",
+      "files": [
+        "src/world/market_clearing.cpp",
+        "tools/verify/order_book_harness.cpp"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-263",
+      "title": "BL-422 moves nothing in the five AI benchmark seeds — the defect it fixes is unreached by the benchmark",
+      "raised": "2026-08-16",
+      "kind": "observation",
+      "status": "open",
+      "source": "Before/after measurement on ai_skill_harness and spectator_determinism, 2026-08-16.",
+      "what": "ai_skill_harness reports byte-identical net worth, solvency, survival and action counts on all five seeds before and after the fix (final = 499896.2 / -115203.9 / 183828.8 / 306437.4 / 396557.7 in both runs), and spectator_determinism is unchanged. The AI places standing sell orders in these worlds (action[place_sell_order] = 9-10 per seed), so orders exist; either none of them hold, or no processor ever drew the phantom stock they created. order_book_harness R7.2/R7.3/R7.10 DO fail against the pre-fix code, so the guard is real — it is the benchmark that does not reach the case.",
+      "why_it_matters": "Two things follow. First, the fix is safe to land: provably behaviour-neutral in the benchmark worlds while provably corrective in the case that produces the defect. Second, and more useful, the AI benchmark does not exercise a held order at all, which means corp_ai trade_floor_multiple currently prices its orders low enough to always clear. That is worth knowing before BL-436 calibration moves prices under it: a re-tune that pushes resolved prices down turns the AI standing orders into holds, and the benchmark has never measured that regime.",
+      "recommendation": "No action on BL-422. Worth carrying into BL-436: when the cost/income calibration is settled, re-check whether the AI standing orders still clear, since a held order is stock the corp neither sells nor consumes.",
+      "files": [
+        "tools/verify/ai_skill_harness.cpp",
+        "src/world/corp_ai.cpp"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-264",
+      "title": "A remote Linux session CAN build and run the headless suite — CMake configure is what is blocked, not compilation",
+      "raised": "2026-08-16",
+      "kind": "observation",
+      "status": "open",
+      "source": "This session, working around the NR-240 symptom (BL-429 slice 2 authored but never compiled because of the remote network policy).",
+      "what": "cmake configure fails outright in the remote container: SDL3 and Lua come in by FetchContent and the download is refused by the network policy, so no target is ever generated and every harness looks unbuildable. But the 43 src/world/*.cpp sources (the io_world_obj set, minus the four registry TUs) need neither, and every harness in the CMake glob batch links io_world_obj ALONE. Compiling them directly works: build the 43 objects once with xargs -P8 (~14 s), ar them into a static lib, then link each harness against it (~5 s each). 63 of the 77 harnesses build and run this way. The exceptions are the 8 Lua-linked ones (chain_depth, tier_margin, era_roster, player_seed_sweep, recipe_switch_harness, interbody_pull_harness, pregame_balance_harness, persona_counsel_harness), font_glyph_harness (ImGui), and the long sweeps.",
+      "why_it_matters": "NR-240 and NR-241 record work that shipped uncompiled and visually unverified because a remote session believed it could not build. It can — for two thirds of the gate, including every economy, determinism and generation harness that does not read a Lua script. That is the difference between a remote session that verifies its own work and one that hands Ben unverified changes.",
+      "recommendation": "Worth saving as a tool rather than a note (CLAUDE.md § Tool creation is skill creation): a tools/verify/build_linux.sh doing the lib-then-link build, named in the verifier-headless skill as the fallback when cmake configure fails. Creating or modifying a skill needs Ben permission, so it is proposed here rather than done. Vendoring Lua would close the remaining 8.",
+      "files": [
+        "CMakeLists.txt",
+        ".claude/skills/verifier-headless/SKILL.md"
+      ],
+      "resolution": null
     }
   ]
 }

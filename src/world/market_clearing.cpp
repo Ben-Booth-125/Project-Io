@@ -568,18 +568,20 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         sell_books[mid][r].push_back({order.corp, available, order.floor_price, available});
     }
 
-    // BL-130: fill real inventory from this tick's REAL corp-sourced sales only —
-    // auto-surplus (auto_sells) and the standing sell orders just listed above
-    // (sell_books). Deliberately NOT read off mc.supply[r] as a whole: that array
-    // also carries inject_population_demand's/inject_background_demand's pure
-    // demand-side pulls and any residual pricing-only signal, which must not
-    // inflate real stock.
-    for (const auto_sell_entry& se : auto_sells)
-        w.markets.at(se.market).inventory[se.r] += se.qty;
-    for (const auto& [mid, sell_by_r] : sell_books)
-        for (const auto& [r, entries] : sell_by_r)
-            for (const ob_sell_entry& e : entries)
-                w.markets.at(mid).inventory[r] += e.qty;
+    // BL-130 fills real inventory from this tick's REAL corp-sourced sales only —
+    // never read off mc.supply[r] as a whole, which also carries
+    // inject_population_demand's/inject_background_demand's pure demand-side pulls
+    // and any residual pricing-only signal.
+    //
+    // BL-422: the credit used to happen HERE, at listing time, on every listed
+    // quantity. That was true while everything listed also sold; under BL-386's
+    // reservation rule an order whose floor exceeds the resolved price holds its
+    // stock, and inventory is not a display field — economy_system draws processor
+    // inputs from it — so a held order's listed quantity became stock a buyer paid
+    // for that no seller ever parted with. The credit now happens at each of the
+    // three points a pool is actually debited (auto-surplus clearing, matched
+    // trades, auto-clear), so inventory gains exactly what pools lose. Keeping the
+    // two in the same statement is the whole point: they cannot drift apart.
 
     // Auto-demand: processor input shortfalls from the economy report.
     for (const auto& [key, bought] : report.purchases)
@@ -634,7 +636,9 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         if (pkit != w.corp_body_pools.end())
         {
             float& q = pkit->second.quantities[se.r];
-            q = std::max(0.0f, q - se.qty); // defensive: a pool never goes negative
+            const float left = std::min(q, se.qty); // defensive: a pool never goes negative
+            q -= left;
+            w.markets.at(se.market).inventory[se.r] += left; // BL-422: credit what left
         }
         flows[se.corp].income += se.qty * ref_price[se.market][se.r];
     }
@@ -764,7 +768,9 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         if (pkit != w.corp_body_pools.end())
         {
             float& q = pkit->second.quantities[t.r];
-            q = std::max(0.0f, q - t.qty); // defensive: a pool never goes negative
+            const float left = std::min(q, t.qty); // defensive: a pool never goes negative
+            q -= left;
+            w.markets.at(t.market).inventory[t.r] += left; // BL-422: credit what left
         }
         flows[t.seller].income     += t.qty * t.price;
         flows[t.buyer].expenditure += t.qty * t.price;
@@ -802,7 +808,9 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
                     // over-selling (BL-351; BL-293 fixed the same fault by drawing
                     // a matched total down, which `rem` expresses directly).
                     float& q = pkit->second.quantities[r];
-                    q = std::max(0.0f, q - se.rem); // defensive: a pool never goes negative
+                    const float left = std::min(q, se.rem); // defensive: never negative
+                    q -= left;
+                    w.markets.at(mid).inventory[r] += left; // BL-422: credit what left
                 }
                 flows[se.corp].income += se.rem * rp;
             }

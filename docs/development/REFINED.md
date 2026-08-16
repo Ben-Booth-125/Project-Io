@@ -1,5 +1,60 @@
 # Project Io — REFINED (active worklist)
 
+## Held-order phantom inventory (promoted from BL-422) — **COMPLETE** (3/3, 2026-08-16)
+
+Requirements: requirements.json § held-order-phantom-inventory (R1–R4)
+
+Sprint 19's early-clearing item: phantom supply distorts every price BL-436's margin work is
+measured against, so it is worth removing before more numbers are read off this seam.
+
+`market_clearing.cpp` credits a standing order's **listed** quantity to `mc.inventory` at listing
+time, before clearing runs. Pre-BL-386 that was harmless — everything listed also sold. Under the
+reservation rule a held order (floor above the resolved price) sells nothing, yet the market gains
+stock that never left the seller's pool. `inventory` is not a display field: `economy_system.cpp`
+draws processor inputs from it (lines 312/363/563), so a held order's phantom stock is bought by a
+processor, decrements, and is never paid for — **goods from nothing, and money destroyed**, the
+same family as BL-351's over-listing.
+
+- **[2] A — Credit inventory where stock actually leaves a pool.** Delete the listing-time credit;
+  credit inside the three places a pool is debited instead — the auto-surplus clearing loop, the
+  matched-trade debit loop, and the auto-clear pass (`se.rem`, floor ≤ resolved only). Files:
+  `src/world/market_clearing.cpp`. Deps: foundation. Satisfies: R1, R2, R3.
+- **[2] B — Guard: an R7 group on `order_book_harness`,** beside BL-386's R6 hold rows it extends
+  — held leaves inventory untouched, a clearing order credits exactly what left its pool, and a
+  mixed tick credits only the clearing half. Files: `tools/verify/order_book_harness.cpp`.
+  Deps: A. Satisfies: R1, R2, R3.
+- **[1] C — Propagate to MARKETS.md**: the real-inventory paragraph, and the recorded decision on
+  whether held stock stays visible to the supply-side price signal. Files:
+  `docs/economy/MARKETS.md`. Deps: A. Satisfies: R4.
+
+**Parallelisation.** Strictly A → {B, C}: B asserts what A changes and C describes it. Two logic
+files, one seam — main session, no fan-out.
+
+**Closed 2026-08-16. All three tasks complete; `order_book_harness` 64/64 (12 new R7 rows).**
+Three of the twelve — R7.2, R7.3, R7.10 — were run against the **pre-fix** build first and
+confirmed to fail there, so the guard discriminates rather than merely passing. The R6 hold rows
+it sits beside were the reason the rest of BL-386's rule looked complete when half of it was not.
+
+Two things surfaced that are recorded rather than folded in, because each is a change to a
+*different* seam than the one this item names:
+
+- **Held stock stays visible to the price signal, against the item's own stated default**
+  (NR-261). Hiding it is not implementable as written: a hold is decided by comparing the floor
+  to the resolved price, and the resolved price is computed *from* `supply` — removing held stock
+  raises the price, which can un-hold the order that was removed. That is a fixed point, and it
+  costs determinism risk to reach. `supply` is now documented as the **offer** and `inventory` as
+  the **delivery**.
+- **A matched explicit trade still delivers to the shared market shelf, not to the buyer**
+  (NR-262). Pre-existing and currently unreachable — nothing writes `world::buy_orders` in play —
+  so it belongs to BL-160, which gives the buy side its first live emitter. R7.12 pins today's
+  behaviour as conservation, so a future correction fails it loudly.
+
+One measurement worth carrying rather than filing away (NR-263): `ai_skill_harness` is
+**byte-identical** on all five seeds before and after. The AI places 9–10 standing orders per seed
+and none of them hold, so the benchmark never reached the defect. That is a fact about the
+benchmark, not a defence of the old code — and it matters to BL-436, whose calibration will move
+resolved prices under those orders.
+
 ## Starting-corp selection (promoted from BL-435) — **PAUSED** (4/6, 2026-08-16)
 
 > **Paused 2026-08-16 at Ben's call to move to Sprint 19.** A, B, C and D are complete and

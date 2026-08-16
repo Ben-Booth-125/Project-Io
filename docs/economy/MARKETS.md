@@ -190,8 +190,21 @@ end of the market's old role as an unconditional, infinite counterparty on the *
 **Fills from real corp sales only** — auto-surplus and standing sell orders, tallied separately
 from `mc.supply[r]`. This is a residual note from before BL-365 removed the old
 nation-substrate's abstract supply (a pricing fiction, never actually sold by anyone); today
-every seller filling `mc.inventory` is a real corp, background or not. Filled during
-`clear_markets`, after all sell-side listing completes.
+every seller filling `mc.inventory` is a real corp, background or not.
+
+**Credited where stock leaves a pool, not where it is listed (BL-422, 2026-08-16).** The fill
+used to happen at listing time, on every listed quantity, which was true while everything listed
+also sold. BL-386's reservation rule ended that: an order whose floor exceeds the resolved price
+**holds**, and its stock never leaves the seller. Crediting it anyway put goods on the shelf that
+no seller had parted with — and `inventory` is not a display figure, so a processor bought that
+phantom stock, decremented it, and no counterparty was ever paid. The credit now sits in the same
+statement as each of the three pool debits — auto-surplus clearing, matched explicit trades, and
+the auto-clear pass — so **inventory gains exactly what pools lose**, and the two cannot drift
+apart in a later edit. It is a conservation law, not a tally.
+
+A side effect worth naming: the old fill iterated the sell books in `unordered_map` order, so a
+float sum accumulated in an unspecified sequence. All three new sites are ordered (`std::map`
+pools; sorted market and resource keys), so the credit is deterministic as well as correct.
 
 **Drains during production and construction — both of which run BEFORE `clear_markets` in the
 same tick** — against whatever stock survived from **prior ticks'** sales:
@@ -213,12 +226,25 @@ is bounded by the coverage-min across every input, the total drawn from a market
 never exceed what was actually on hand — no double-spend, no negative inventory, no ordering
 dependence beyond the tick's own fixed pass order.
 
-**The sell side is unchanged** — auto-surplus and standing sell orders still clear in full
-unconditionally (§ Known limitations), so a seller never sees different behaviour. What changed
-is only whether a *buyer* (a processor, a build) can get what it wants when the market's real
-shelf is bare.
+**The sell side was unchanged by BL-130** — auto-surplus and standing sell orders cleared in full
+unconditionally, so a seller saw no difference; what BL-130 changed was only whether a *buyer* (a
+processor, a build) could get what it wanted when the market's real shelf was bare. **That is no
+longer true**: BL-386 made the floor a reservation price, so a standing order can now hold, and
+BL-422 above is what stops a held order stocking the shelf regardless.
 
-Verified by `tools/verify/market_inventory_harness.cpp`.
+**Held stock stays visible to the price signal — deliberately, and for a mechanical reason.**
+BL-422's design defaulted to hiding held quantity from `mc.supply[r]` as well, on the argument
+that stock which is explicitly not for sale below its floor is not supply. That default is not
+implementable as written: whether an order holds is decided by comparing its floor to the
+*resolved* price, and the resolved price is computed **from** `supply`. Removing held stock raises
+the price, which can un-hold the order that was removed — a fixed point, reached only by iterating,
+at a cost in complexity and determinism risk that a pricing nicety does not repay. So the two
+arrays are deliberately asymmetric: `supply` is the **offer** (listed stock is a real offer at a
+price, and the market may price against knowing it exists), `inventory` is the **delivery** (only
+what actually changed hands). Revisit only if a real defect is measured, not on the argument alone.
+
+Verified by `tools/verify/market_inventory_harness.cpp` and `order_book_harness` § R7 (BL-422's
+conservation rows).
 
 ## Where the order book lives
 
@@ -338,9 +364,12 @@ extracted there enter the economy only by convoy to a Kepler market.
 
 ## Known limitations (honest list)
 
-- **The SELL side still has no cap.** `market_component.supply` stays a derived per-tick flow for
-  pricing purposes, and the market still absorbs any listed sell quantity in full — BL-130 (below)
-  makes the BUY side real and finite; selling remains unconditional, same as before.
+- **The SELL side has no *volume* cap.** `market_component.supply` stays a derived per-tick flow
+  for pricing purposes, and the market absorbs any quantity a seller is willing to release at the
+  resolved price — BL-130 made the BUY side real and finite; sell volume remains unconditional.
+  What is no longer unconditional is the *price*: since BL-386 an order whose floor exceeds the
+  resolved price holds rather than selling (§ Real market inventory), so a listed quantity is a
+  ceiling on what may clear, not a guarantee that it will.
 - **Anchored prices.** The [0.25×, 4×] band caps every scarcity signal at 4× base. This is the
   band the BL-078 (product-market inertness) diagnosis found products pegged against — resolved
   in *shape* first by the elastic substrate and now by real background-firm supply (BL-365,

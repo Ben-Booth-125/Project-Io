@@ -3625,6 +3625,55 @@
      "notes": "The generator's own seeded pick stays where it is and remains the default; selection RE-POINTS is_player/player_entity afterwards rather than replacing the draw. That keeps every existing golden and harness that never opens the screen bit-identical."
     }
    ]
+  },
+  {
+   "brief": "held-order-phantom-inventory",
+   "batch": "2026-08-16-bl422",
+   "title": "BL-422 — A held sell order still credits market inventory at listing time",
+   "status": "complete",
+   "promoted_from": "backlog.json BL-422 HELD_ORDER_PHANTOM_INVENTORY",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "ITEM-SPANNING (headless): a standing sell order whose floor sits ABOVE the resolved price leaves the market real inventory unchanged for that resource. It already earns nothing and retains its pool (BL-386, R6.2/R6.3); it must also contribute no stock a processor can draw.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. order_book_harness R7.2/R7.3: an order at floor 6.0 against a resolved price of 5.0 leaves inventory at exactly 0.0 and its pool at 100.0. Confirmed to FAIL against the pre-fix build.",
+     "notes": "market_component::inventory is the real finite stock economy_system.cpp draws processor inputs from (lines 312/363/563). Crediting a held order there is goods from nothing: the buyer pays and the stock decrements, while the seller was never paid and never lost the goods."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "CONSERVATION: over one clear_markets tick, the market inventory gain for a resource equals exactly the quantity that LEFT seller pools for it — auto-surplus, matched explicit fills, and auto-cleared remainders. No listed-but-held quantity is included.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. R7.5 (clearing order), R7.7 (auto-surplus) and R7.12 (matched fill + auto-cleared remainder) each assert |inventory gain - pool loss| < 0.01 over one clear_markets tick.",
+     "notes": "Stated as an equality rather than a bound so an under-credit is caught as well as an over-credit."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "MIXED TICK: with a held order and a clearing order against the same (market, resource) in the same tick, inventory gains the clearing order quantity only. The held order is not rescued by its neighbour, and the clearing one is not suppressed by it.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. R7.9/R7.10: with a held 40 @ 6.0 and a clearing 30 @ 1.0 on the same (market, resource), pool loss is 30 and inventory gain is 30. Confirmed to FAIL against the pre-fix build (R7.10).",
+     "notes": "The single-order cases can both pass while the credit is computed per-resource rather than per-order."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "RECORDED DECISION: MARKETS.md states whether held stock remains visible to the supply-side price signal (market_component::supply) and why, so the asymmetry between supply and inventory is deliberate and readable rather than accidental.",
+     "verification": [
+      "inspection"
+     ],
+     "result_metric": "MET. MARKETS.md § Real market inventory states the supply/inventory asymmetry and its mechanical reason — the hold decision reads the resolved price, which is computed from supply, so hiding held stock is a fixed point. Reasoning recorded in NR-261.",
+     "notes": "BL-422 design defaults to NOT visible. See the NEEDS_REVIEW entry filed with this work for why that default is not implementable without a fixed-point iteration: whether an order holds depends on the resolved price, which is computed FROM supply."
+    }
+   ]
   }
  ]
 }

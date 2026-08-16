@@ -238,6 +238,23 @@ likely to erode across four items in one sprint.
 military engagement surface below — now deferred a **third** time. Name that at this sprint's
 retro rather than letting a fourth accumulate silently.
 
+**Progress (amended as it happens, not at the retro).**
+
+- **BL-436 (processing underearns extraction)** — measured, part-fixed, **open on a Ben-owned
+  call**. The rate asymmetry is fixed but *disabled* (`richness_reference = 0.0`) because the
+  cost side was calibrated against the old inflated income; a scale sweep killed the obvious
+  hypothesis (raising extraction income makes the collapse worse). Also produced **BL-437**
+  (landed) and a corrected measurement instrument.
+- **BL-422 (held sell order phantom inventory)** — **landed 2026-08-16**. Bigger than filed:
+  `inventory` is what processors actually draw inputs from, so a held order's phantom stock was
+  bought and never paid for — goods from nothing, money destroyed. Fixed as a conservation law
+  (inventory gains exactly what pools lose), guarded by `order_book_harness` R7 with three rows
+  proven to fail pre-fix, and it took a latent `unordered_map` float-accumulation nondeterminism
+  with it. **Byte-identical in the five AI benchmark seeds** — which says the benchmark never
+  reached the case, and is a warning for BL-436's calibration (NR-263).
+- **Still to run:** BL-417 (build score is quadratic), BL-406 (home market is an arbitrary pick)
+  → BL-404 (inter-body pull unnetted).
+
 ---
 
 # Sprint 18 — The military engagement surface (planned 2026-08-15; NOT opened — deferred again 2026-08-16 for Sprint 19)

@@ -10,7 +10,75 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — the roster invariants land, and the roster shrinks (BL-432, NR-243, NR-257) (2026-08-16, latest)
+## Session — the shelf stops carrying goods nobody sold (BL-422) (2026-08-16, latest)
+
+Full mode. Continued Sprint 19 at its own sequencing: BL-436's remaining half is a calibration
+call that is Ben's, and the previous session stopped there deliberately, so this session took the
+sprint's other early item — the one its plan says to clear first *because* phantom supply distorts
+every price BL-436 is measured against.
+
+**The defect was larger than "a pricing nicety", and the reason is one line of `components.hpp`.**
+`market_clearing.cpp` credited a standing order's **listed** quantity to `market_component::inventory`
+before clearing ran. Harmless while everything listed also sold; BL-386 ended that by making the
+floor a reservation price. But `inventory` is not a display figure — `economy_system.cpp` draws
+processor inputs from it (lines 312/363/563) — so a held order's stock was bought by a processor,
+decremented, and **never paid for by anyone**. Goods from nothing on one side, money destroyed on
+the other. Same family as BL-351's over-listing, found the same way: by asking what a field is
+actually read by rather than what it is called.
+
+**The fix is a conservation law, not a tally.** The credit now sits in the same statement as each
+of the three pool debits — auto-surplus clearing, matched trades, the auto-clear pass. Inventory
+gains exactly what pools lose, and the two cannot drift apart in a later edit because separating
+them means deleting a line next to the one that pays for it.
+
+**A determinism bug fixed as a side effect, unnoticed until the sites were counted.** The old
+credit iterated the sell books in `unordered_map` order — a float sum accumulated in an
+unspecified sequence, inside the economy tick. All three new sites are ordered (`std::map` pools,
+sorted market and resource keys). Nothing was looking for this; it fell out of moving the credit
+to where the debits already were, which is the argument for that shape independent of BL-422.
+
+**Three of the twelve new guard rows were run against the pre-fix build first**, and fail there
+(R7.2, R7.3, R7.10). Sprint 18's retro recorded a check that ran green while pointed at a deleted
+tab; the cheap inoculation is to make the new rows fail once, on purpose, before accepting them.
+`order_book_harness` 64/64.
+
+**The measurement that is worth more than the fix.** `ai_skill_harness` is **byte-identical** on
+all five benchmark seeds before and after — same net worth, same solvency, same action counts. The
+AI places 9–10 standing sell orders per seed, so orders exist; none of them hold. That makes the
+change provably safe to land, but the useful half is the other reading: the AI benchmark has never
+measured the held-order regime at all, because `trade_floor_multiple` currently prices every AI
+order low enough to clear. BL-436's calibration moves resolved prices *down*, straight under those
+floors. Recorded as NR-263 against BL-436 rather than as a footnote here.
+
+**Scoped out deliberately, both recorded.** Held stock stays visible to the supply-side price
+signal, against BL-422's own stated default (NR-261) — hiding it is a fixed point, since a hold is
+decided by the resolved price and the resolved price is computed from `supply`. And an explicit
+matched trade still delivers to the shared market shelf rather than the buyer's stockpile
+(NR-262), which is dormant until BL-160 gives the buy side a verb. MARKETS.md now states the
+`supply` = offer / `inventory` = delivery asymmetry rather than leaving it to be rediscovered, and
+two stale claims in that doc — "the sell side is unchanged", "the SELL side still has no cap" —
+were corrected in passing; both predate BL-386.
+
+**A method finding, and it may be worth more than the item (NR-264).** NR-240 and NR-241 record
+work that shipped uncompiled from a remote session, on the belief that a remote container cannot
+build. It can. What is blocked is `cmake` *configure* — SDL3 and Lua arrive by FetchContent and the
+download is refused — not compilation. The 43 `src/world/*.cpp` sources need neither, and every
+harness in the CMake glob batch links that set alone: build the objects once (~14 s with `-P8`),
+`ar` them into a static lib, link each harness against it (~5 s). **63 of 77 harnesses build and
+run this way**, including every economy, determinism and generation check that does not read a Lua
+script. That is how this session verified its own work, and it is proposed as a saved tool rather
+than left as a note.
+
+Suite swept: the only failures anywhere are pre-existing and identical before and after —
+`ai_skill_harness`'s stale GCC bands (self-declared in its own output), `spectator_determinism`'s
+R2 byte-identity against the MSVC-blessed pre-BL-409 golden, and `history_sim_harness`'s five
+Era −1 rows. None are reachable from this change.
+
+**Runtime:** not summed (seventh consecutive entry — see the standing caution in SPRINTS.md).
+
+---
+
+## Session — the roster invariants land, and the roster shrinks (BL-432, NR-243, NR-257) (2026-08-16)
 
 Full mode. Opened on triage as asked. The queue's three named entries all moved, and two of them
 moved because a measurement contradicted the filed premise — the same pattern Sprint 18's retro
