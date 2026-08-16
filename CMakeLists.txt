@@ -665,6 +665,13 @@ set(IO_TEST_LONG_HARNESSES
     earthlike_tile_census
     mediterranean_sweep
     notable_worlds
+    # player_seed_sweep added 2026-08-16: it generates one full world per seed
+    # (24 by default) and takes ~69 s on this box, so the 60 s default tier
+    # timed it out EVERY run since it was added the day before — it had never
+    # once passed under ctest, while passing standalone. Found by the NR-257
+    # suite run, not by the harness reporting anything: a Timeout is a silent
+    # failure mode, since the tool prints its findings and exits 0 either way.
+    player_seed_sweep
 )
 
 # EXCLUDED FROM THE ROUTINE GATE - labelled `sweep`. TWO REASONS live here, and

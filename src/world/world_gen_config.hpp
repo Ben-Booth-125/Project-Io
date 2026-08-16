@@ -58,13 +58,8 @@ struct world_gen_config
         a[static_cast<std::size_t>(resource_type::food_rations)]         = 6.0f;
         // --- Logistics goods (BL-286, 2026-08-04) — mid-tier authored placeholders;
         // no consumption/gate mechanic reads these yet (BL-287-290). ---
-        a[static_cast<std::size_t>(resource_type::grain)]              = 2.0f;
-        a[static_cast<std::size_t>(resource_type::fodder)]             = 1.2f;
-        a[static_cast<std::size_t>(resource_type::salt)]               = 2.0f;
-        a[static_cast<std::size_t>(resource_type::transport_capacity)] = 5.0f;
         a[static_cast<std::size_t>(resource_type::charcoal)]           = 4.0f;
         a[static_cast<std::size_t>(resource_type::iron_blooms)]        = 6.0f;
-        a[static_cast<std::size_t>(resource_type::bullion)]            = 50.0f;
         a[static_cast<std::size_t>(resource_type::trade_goods_misc)]   = 15.0f;
         return a;
     }();

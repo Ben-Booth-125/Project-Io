@@ -51,13 +51,8 @@ constexpr resource_presentation resource_table[resource_count] = {
     // --- Logistics goods (BL-286) — still unauthored; these eight rows are
     // explicit nulls so presentation_of()'s fallback keeps handling them, and so
     // a later row can be authored past them without a silent index shift.
-    { nullptr, nullptr, 0 }, // grain
-    { nullptr, nullptr, 0 }, // fodder
-    { nullptr, nullptr, 0 }, // salt
-    { nullptr, nullptr, 0 }, // transport_capacity
     { nullptr, nullptr, 0 }, // charcoal
     { nullptr, nullptr, 0 }, // iron_blooms
-    { nullptr, nullptr, 0 }, // bullion
     { nullptr, nullptr, 0 }, // trade_goods_misc
     // --- Propellant (BL-308). Authored, unlike the eight above: a corp holds it
     // in its (corp, body) pool and the Launchpad burns it, so it reaches the

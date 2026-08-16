@@ -40,13 +40,8 @@ resource_type resource_from_name(const std::string& name, bool& ok)
         // claim above was false for eleven of them, so any recipe naming one threw
         // "Unknown resource" at load. Found 2026-08-15 by BL-429's ancient chain,
         // which is the first authored recipe to reference them.
-        { "grain",                 resource_type::grain },
-        { "fodder",                resource_type::fodder },
-        { "salt",                  resource_type::salt },
-        { "transport_capacity",    resource_type::transport_capacity },
         { "charcoal",              resource_type::charcoal },
         { "iron_blooms",           resource_type::iron_blooms },
-        { "bullion",               resource_type::bullion },
         { "trade_goods_misc",      resource_type::trade_goods_misc },
         { "steel",                 resource_type::steel },
         { "refined_fuel",          resource_type::refined_fuel },

@@ -118,7 +118,15 @@ constexpr int      k_ticks = 300;
 // tile and everything downstream of it. Confirmed reproducible across two
 // independent same-seed runs before blessing. MSVC-derived; this golden is
 // toolchain-specific (float clearing arithmetic differs under g++).
-constexpr uint64_t k_unspectated_golden = 0x06FB73D17BC054DDull;
+// Re-blessed 2026-08-16 (NR-257): five resource_type values were REMOVED — grain,
+// fodder, salt, transport_capacity, bullion — taking resource_count 42 -> 37. Every
+// per-resource array this hash walks changed length, so the move is structural and
+// expected rather than behavioural: no scorer, price or verb changed with it. The
+// move was confirmed to be the intended one before blessing — the harness's other
+// R2 row (two independently built worlds, same seed) reproduces 359F55D3EFC3CA21,
+// and every other assertion in this file, including the prohibition and the cadence
+// rows, passed unchanged across the removal.
+constexpr uint64_t k_unspectated_golden = 0x359F55D3EFC3CA21ull;
 
 /// Hand-built registry mirroring scripts/economy.lua + scripts/recipes.lua for
 /// the building types the generator places. Copied from ai_skill_harness so the
