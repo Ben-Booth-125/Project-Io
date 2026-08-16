@@ -77,12 +77,23 @@ struct tier_acc
     double per_tick() const { return samples ? net() / static_cast<double>(samples) : 0.0; }
 };
 
+/// Replicates app::load_economy's default-recipe pass, which is a REAL STAGE of
+/// startup and not a harness convenience: generation cannot author recipe ids
+/// (they are registry indices that do not exist yet — corporation_generation.cpp
+/// says so at the assignment site), so every generated processor sits at
+/// no_recipe until load_economy assigns one. Crucially this runs BEFORE
+/// generate_background_firms, which authors its own recipes, so the ordering
+/// below is the app's ordering.
+///
+/// Uses default_recipe_id() rather than naming "steel", because BL-429 made the
+/// default era-aware; hard-naming it would measure an industrial default in an
+/// ancient world.
 void seed_default_recipes(world& w, const recipe_registry& reg)
 {
-    const entity_id steel = reg.recipe_id("steel");
+    const uint16_t def = reg.default_recipe_id();
     for (auto& [id, b] : w.buildings)
         if (b.type == building_type::processing_facility && b.recipe == no_recipe)
-            b.recipe = static_cast<uint16_t>(steel);
+            b.recipe = def;
 }
 
 const char* type_name(building_type t)
@@ -101,6 +112,12 @@ int main(int argc, char** argv)
 {
     const int n_seeds = (argc > 1) ? std::atoi(argv[1]) : 3;
     const int n_ticks = (argc > 2) ? std::atoi(argv[2]) : 20;
+    // Third arg: 0 to SKIP load_economy's default-recipe pass. Default 1 (run
+    // it), because skipping it does not measure "the shipped economy" — it
+    // measures a startup sequence the game never performs, and reports every
+    // generated processor as recipe-less. Kept as an opt-out only because it
+    // isolates how many processors the default pass is carrying.
+    const bool seed_recipes = (argc > 3) ? (std::atoi(argv[3]) != 0) : true;
     if (n_seeds <= 0 || n_ticks <= 0)
     {
         std::printf("usage: %s [seeds] [ticks]  (both positive)\n", argv[0]);
@@ -141,12 +158,30 @@ int main(int argc, char** argv)
     extraction.capex = ex.build_cost;
     processing.capex = pr.build_cost;
 
+    // --- R3: WHY a processor produced nothing (BL-436, second pass) ----------
+    //
+    // The first pass measured that processors earn on only 22% of their
+    // building-ticks. That number alone cannot tell a rate problem from an input
+    // problem, and the two want opposite fixes — so this classifies every
+    // non-producing processing tick by the reason the economy itself recorded,
+    // rather than by inference. building_report already carries all of it.
+    long proc_ticks = 0, proc_active = 0;
+    long why_unstaffed = 0, why_no_recipe = 0, why_starved = 0, why_other = 0;
+    long active_but_zero = 0;
+    std::vector<long> limiting_by_resource(resource_count, 0);
+
     for (int s = 0; s < n_seeds; ++s)
     {
         world_params p = no_prehistory();
         p.seed = static_cast<uint32_t>(s);
         world w = make_hard_coded_world(p);
-        seed_default_recipes(w, reg);
+        // app ordering, and it is load-bearing: load_economy's default pass runs
+        // BEFORE generate_background_firms. Reversing them, or skipping the pass,
+        // reports a quarter of all processors as recipe-less — an artefact of the
+        // harness rather than a fact about the game. (Measured both ways while
+        // writing this: 26.5% no-recipe without the pass, 11.3% with it.)
+        if (seed_recipes)
+            seed_default_recipes(w, reg);
         generate_background_firms(w, reg, static_cast<uint32_t>(s) ^ 0x8A21F00Du);
 
         for (int t = 1; t <= n_ticks; ++t)
@@ -176,6 +211,38 @@ int main(int argc, char** argv)
                 ++acc.samples;
                 if (bp.revenue > 0.0f)
                     ++acc.earning;
+            }
+
+            // R3's classification, read off the report rows the same tick
+            // produced them.
+            for (const building_report& br : report.buildings)
+            {
+                if (br.type != building_type::processing_facility)
+                    continue;
+                ++proc_ticks;
+                if (br.active && br.output_quantity > 0.0f)
+                {
+                    ++proc_active;
+                    continue;
+                }
+                if (br.active)          // reported active but credited nothing
+                {
+                    ++active_but_zero;
+                    continue;
+                }
+                // Order matters: a building can satisfy more than one of these,
+                // and the FIRST is the one that would have to be fixed first.
+                if (br.recipe == no_recipe)
+                    ++why_no_recipe;
+                else if (br.effective_workforce <= 0.0f)
+                    ++why_unstaffed;
+                else if (br.has_limiting)
+                {
+                    ++why_starved;
+                    limiting_by_resource[static_cast<std::size_t>(br.limiting_input)]++;
+                }
+                else
+                    ++why_other;
             }
         }
     }
@@ -209,6 +276,33 @@ int main(int argc, char** argv)
                 processing.capex,
                 pp > 0.0 ? (std::to_string(static_cast<int>(pp)) + " ticks").c_str()
                          : "NEVER (net <= 0)");
+
+    // --- R3: why processors do not produce -----------------------------------
+    //
+    // Resource ids, not names: the only lookup table lives in the UI layer and
+    // BL-414 owns consolidating it. A fourth hand-rolled copy to prettify a
+    // harness would make that item worse. Same call chain_depth's rows made.
+    std::printf("\nR3 — of %ld processing building-ticks, why did they not produce?\n", proc_ticks);
+    auto pct = [&](long n) {
+        return proc_ticks ? 100.0 * static_cast<double>(n) / static_cast<double>(proc_ticks) : 0.0;
+    };
+    std::printf("  produced output          %8ld  %5.1f%%\n", proc_active,     pct(proc_active));
+    std::printf("  STARVED (input missing)  %8ld  %5.1f%%\n", why_starved,     pct(why_starved));
+    std::printf("  unstaffed                %8ld  %5.1f%%\n", why_unstaffed,   pct(why_unstaffed));
+    std::printf("  no recipe set            %8ld  %5.1f%%\n", why_no_recipe,   pct(why_no_recipe));
+    std::printf("  active but credited 0    %8ld  %5.1f%%\n", active_but_zero, pct(active_but_zero));
+    std::printf("  idle, no reason recorded %8ld  %5.1f%%\n", why_other,       pct(why_other));
+
+    if (why_starved > 0)
+    {
+        std::printf("\n  binding input when starved (resource id -> ticks):\n");
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (limiting_by_resource[r] > 0)
+                std::printf("    id %2zu  %8ld  %5.1f%% of starved ticks\n", r,
+                            limiting_by_resource[r],
+                            100.0 * static_cast<double>(limiting_by_resource[r])
+                                  / static_cast<double>(why_starved));
+    }
 
     // --- R1: the report is non-vacuous ---------------------------------------
     std::printf("\nR1 — the measurement actually happened\n");
