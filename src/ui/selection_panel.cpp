@@ -801,7 +801,14 @@ void draw_production_method_section(world& w, const recipe_registry& reg, entity
     // One narrow column, each row ~1.5 button-heights tall (see the function
     // doc comment above for the rationale).
     ImDrawList* dl      = ImGui::GetWindowDrawList();
-    const float row_w   = std::min(ImGui::GetContentRegionAvail().x * 0.62f, 280.0f);
+    // Full available width, capped (NR-255). This was `avail * 0.62` — an
+    // arbitrary factor that left the row 160 px to fit 248 px of content, so the
+    // name got 16 px against the 103 px "Food Rations" needs and the profit was
+    // painted straight over it. The 2026-08-15 "slimmer strip, not a denser fit"
+    // call was about row HEIGHT (1.5 button-heights, against the square tiles it
+    // replaced) and explicitly argues AGAINST cramming, so the width had no
+    // reason to be held back.
+    const float row_w   = std::min(ImGui::GetContentRegionAvail().x, 280.0f);
     const float row_h   = ImGui::GetFrameHeight() * 1.5f;
     const float glyph_w = row_h; // the Switch control's own square, right edge of the row
 
@@ -819,53 +826,81 @@ void draw_production_method_section(world& w, const recipe_registry& reg, entity
 
         ImGui::BeginChild("##method_row", {row_w, row_h}, false, ImGuiWindowFlags_NoScrollbar);
 
-        // Pip + name, vertically centred, left-aligned.
-        const float  pipr = row_h * 0.24f;
-        ImGui::SetCursorPos({6.0f, row_h * 0.5f - pipr});
-        const ImVec2 gp = ImGui::GetCursorScreenPos();
-        icons::resource(dl, {gp.x + pipr, gp.y + pipr}, pipr, primary_output_resource(ri));
-
-        // Name — kept at the prior rework's larger scale (1.15x) since a
-        // single line at this row height still fits comfortably; a taller
-        // scale would clip.
-        constexpr float name_scale = 1.15f;
-        ImGui::SetWindowFontScale(name_scale);
-        ImGui::SetCursorPos({6.0f + pipr * 2.0f + 6.0f, (row_h - ImGui::GetFontSize()) * 0.5f});
-        ImGui::TextColored(active ? ImGui::ColorConvertU32ToFloat4(palette::selection)
-                                   : ImGui::GetStyle().Colors[ImGuiCol_Text],
-                           "%s", ri.display_name.c_str());
-        ImGui::SetWindowFontScale(1.0f);
+        // Pip + name + profit share one line, so the PROFIT IS MEASURED FIRST and
+        // the name is fitted to whatever is genuinely left (NR-255). Before this
+        // the name drew at full length and the right-aligned profit was painted
+        // over the top of it — "Food Rations" with "+7.0/tick" printed through it,
+        // both of the row's load-bearing values illegible at once.
+        const float  pipr         = row_h * 0.24f;
+        const float  name_x       = 6.0f + pipr * 2.0f + 6.0f;
+        const float  profit_col_w = row_w - glyph_w - 6.0f;
 
         // Expected profit — same estimator the construction ledger ranks
         // candidates with (estimate_prospective_profit), so a switch's payoff
         // reads the same way a fresh build's does. `&b` prices it at the
         // building's REAL staffing (not the hypothetical 0.5/100 default) and
         // excludes it from double-counting its own extraction-site stack rank.
-        // Right-aligned, ending just before the Switch glyph's own column.
-        const float profit_col_w = row_w - glyph_w - 6.0f;
+        constexpr float profit_scale = 1.1f;
         const building_profit fp = estimate_prospective_profit(
             w, reg, b.tile, b.type, b.target_resource, reg.recipe_id(ri.name), &b);
+
+        char        profit_buf[32];
+        ImU32       profit_col = palette::neutral;
+        bool        profit_dim = false;
         if (fp.has_data)
         {
             const float net = fp.net();
-            const ImU32 nc  = (net < 0.0f) ? palette::negative
-                            : (net > 0.0f) ? palette::positive
-                                           : palette::neutral;
-            char buf[32];
-            std::snprintf(buf, sizeof buf, "%+.1f/tick", static_cast<double>(net));
-            constexpr float profit_scale = 1.1f;
-            ImGui::SetWindowFontScale(profit_scale);
-            const float tw = ImGui::CalcTextSize(buf).x;
-            ImGui::SetCursorPos({profit_col_w - tw, (row_h - ImGui::GetFontSize()) * 0.5f});
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(nc), "%s", buf);
-            ImGui::SetWindowFontScale(1.0f);
+            profit_col = (net < 0.0f) ? palette::negative
+                       : (net > 0.0f) ? palette::positive
+                                      : palette::neutral;
+            std::snprintf(profit_buf, sizeof profit_buf, "%+.1f/tick",
+                          static_cast<double>(net));
         }
         else
         {
-            const float tw = ImGui::CalcTextSize("no market").x;
-            ImGui::SetCursorPos({profit_col_w - tw, (row_h - ImGui::GetFontSize()) * 0.5f});
-            ImGui::TextDisabled("no market");
+            std::snprintf(profit_buf, sizeof profit_buf, "no market");
+            profit_dim = true;
         }
+
+        // Measure at the scale it will actually be drawn at — a width taken at
+        // 1.0x would under-reserve and put the overlap straight back.
+        ImGui::SetWindowFontScale(profit_scale);
+        const float profit_w = ImGui::CalcTextSize(profit_buf).x;
+        ImGui::SetWindowFontScale(1.0f);
+
+        // Resource pip, vertically centred.
+        ImGui::SetCursorPos({6.0f, row_h * 0.5f - pipr});
+        const ImVec2 gp = ImGui::GetCursorScreenPos();
+        icons::resource(dl, {gp.x + pipr, gp.y + pipr}, pipr, primary_output_resource(ri));
+
+        // Name — kept at the prior rework's larger scale (1.15x), now elided to
+        // the space the profit column leaves rather than overrunning it. Routed
+        // through ui::fit_text so a name that does not fit is elided with the
+        // full string one hover away AND recorded in BL-215's overflow ledger,
+        // instead of silently clipping. Box 9 (table_cell): this row is a fixed
+        // single line, so eliding is the sanctioned recovery, not wrapping.
+        constexpr float name_gap   = 8.0f;
+        const float     name_max_w = std::max(16.0f, profit_col_w - profit_w - name_gap - name_x);
+
+        constexpr float name_scale = 1.15f;
+        ImGui::SetWindowFontScale(name_scale);
+        ImGui::SetCursorPos({name_x, (row_h - ImGui::GetFontSize()) * 0.5f});
+        ImGui::PushStyleColor(ImGuiCol_Text,
+                              active ? ImGui::ColorConvertU32ToFloat4(palette::selection)
+                                     : ImGui::GetStyle().Colors[ImGuiCol_Text]);
+        ui::fit_text(ui::text_box::table_cell, "selection.method.name",
+                     ri.display_name.c_str(), name_max_w);
+        ImGui::PopStyleColor();
+        ImGui::SetWindowFontScale(1.0f);
+
+        // Profit, right-aligned, ending just before the Switch glyph's column.
+        ImGui::SetWindowFontScale(profit_scale);
+        ImGui::SetCursorPos({profit_col_w - profit_w, (row_h - ImGui::GetFontSize()) * 0.5f});
+        if (profit_dim)
+            ImGui::TextDisabled("%s", profit_buf);
+        else
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(profit_col), "%s", profit_buf);
+        ImGui::SetWindowFontScale(1.0f);
 
         // The input/wage/rate detail line is gone (2026-08-15 playtest
         // rework): now implied by the Profitability page's Expenses hover
