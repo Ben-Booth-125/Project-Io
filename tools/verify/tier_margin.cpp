@@ -45,6 +45,7 @@
 #include "world/hard_coded_world.hpp"
 #include "harness_params.hpp"
 #include "world/market_clearing.hpp"
+#include "world/placement_rules.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/supply_system.hpp"
 #include "world/world.hpp"
@@ -175,6 +176,7 @@ int main(int argc, char** argv)
     std::vector<long>   sites_targeting(resource_count, 0); // extraction sites mining it
     std::vector<double> supply_units(resource_count, 0.0);  // units extracted, all seeds/ticks
     std::vector<long>   input_demand(resource_count, 0);    // recipes naming it as an input
+    std::vector<long>   richest_on(resource_count, 0);      // tiles where it IS the richest (R5)
     for (int i = 0; i < reg.recipe_count(building_type::processing_facility); ++i)
     {
         const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
@@ -200,9 +202,17 @@ int main(int argc, char** argv)
         // Static structure, counted once per seed: what the world CONTAINS and
         // what is pointed at it, independent of any tick.
         for (const auto& [tid, tc] : w.tiles)
+        {
             for (std::size_t r = 0; r < resource_count; ++r)
                 if (tc.resource_deposit[r] > 0.0f)
                     ++tiles_with[r];
+            // R5: what richest_extractable WOULD return here. Uses the real
+            // function, since its behaviour is the subject of the question.
+            bool any = false;
+            const resource_type best = placement_rules::richest_extractable(tc, any);
+            if (any)
+                ++richest_on[static_cast<std::size_t>(best)];
+        }
         for (const auto& [bid, b] : w.buildings)
             if (b.type == building_type::extraction_site)
                 ++sites_targeting[static_cast<std::size_t>(b.target_resource)];
@@ -355,6 +365,49 @@ int main(int argc, char** argv)
                     input_demand[r],
                     (tiles_with[r] > 0 && sites_targeting[r] == 0) ? "   <-- MINED BY NOTHING" : "");
     }
+
+    // --- R5: never the richest ANYWHERE, or never where corps build? ---------
+    //
+    // BL-437 records three candidate fixes and they are not interchangeable, so
+    // this is the measurement that tells them apart — run before any of them is
+    // costed, per BL-436's own lesson.
+    //
+    //   * If a resource is the richest on ZERO tiles, then richest_extractable
+    //     can never return it and no amount of better SITING would help. The
+    //     rule itself has to change (option A or C).
+    //   * If it IS the richest somewhere but has no sites, the deposits exist in
+    //     reachable form and the problem is WHERE corps build (option B, or
+    //     siting), which is a much cheaper fix.
+    //
+    // "Richest" is computed with the real richest_extractable, not a
+    // reimplementation of it — a hand-rolled copy could disagree with the
+    // function whose behaviour is the entire subject of the question.
+    std::printf("\nR5 — for each unmined input, is it ever the RICHEST on any tile?\n");
+    std::printf("  %-4s %12s %14s %8s %8s\n",
+                "id", "tiles-with", "tiles-RICHEST", "win%", "sites");
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        if (input_demand[r] == 0 || tiles_with[r] == 0)
+            continue;
+        const double win = 100.0 * static_cast<double>(richest_on[r])
+                                 / static_cast<double>(tiles_with[r]);
+        // The WIN RATE is the number that matters, not the raw count. "Richest
+        // somewhere" is technically true of coal at 19 tiles out of 1671 and of
+        // regolith at 15,644 out of 16,361, and those are completely different
+        // situations wanting completely different fixes. A binary verdict here
+        // would have been the wrong answer stated confidently.
+        const char* verdict = "";
+        if (sites_targeting[r] == 0)
+        {
+            if (richest_on[r] == 0)          verdict = "  never richest anywhere";
+            else if (win >= 50.0)            verdict = "  usually richest, still unmined -> SITING/REACH";
+            else                             verdict = "  rarely richest -> out-ranked in practice";
+        }
+        std::printf("  %-4zu %12ld %14ld %7.1f%% %8ld%s\n",
+                    r, tiles_with[r], richest_on[r], win, sites_targeting[r], verdict);
+    }
+    std::printf("  (win%% = share of the tiles carrying it on which it is the richest —\n"
+                "   i.e. how often richest_extractable would actually return it)\n");
 
     // The invariant that R4's table exists to state. A resource a recipe needs,
     // which is PRESENT on thousands of tiles and which nothing mines, is not a
