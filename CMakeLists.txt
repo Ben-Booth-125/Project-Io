@@ -589,6 +589,11 @@ add_executable(tier_margin
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/tier_margin.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+    # world_gen_config.cpp: the harness loads scripts/world_gen.lua so markets
+    # carry the AUTHORED base_price table. Without it they fall back to the
+    # built-in defaults, which price only a subset of resources (not coal) and
+    # make processors look starved for a reason the real game does not have.
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
 )
 target_include_directories(tier_margin PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src"

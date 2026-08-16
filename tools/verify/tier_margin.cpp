@@ -43,6 +43,7 @@
 #include "world/corporation_generation.hpp"
 #include "world/economy_system.hpp"
 #include "world/hard_coded_world.hpp"
+#include "world/world_gen_config.hpp"
 #include "harness_params.hpp"
 #include "world/market_clearing.hpp"
 #include "world/placement_rules.hpp"
@@ -128,8 +129,19 @@ int main(int argc, char** argv)
     lua_state lua;
     lua.load("scripts/recipes.lua");
     lua.load("scripts/economy.lua");
+    // world_gen.lua carries the market base_price TABLE, and without it markets
+    // fall back to world_gen_config.hpp's built-in defaults — which price only a
+    // subset of resources and, notably, NOT coal. Measured before this line was
+    // added: the harness reported processors starving on coal for want of a
+    // market, when the market gap was the harness's own. That is precisely
+    // BL-389's defect (--serve never loads world_gen.lua either), reproduced
+    // here by omission. A harness that loads two of the three economy scripts
+    // measures an economy the game never runs.
+    lua.load("scripts/world_gen.lua");
     recipe_registry reg;
     reg.load_from_lua(lua);
+    world_gen_config gen_cfg;
+    gen_cfg.load_from_lua(lua);
     // The standing vacuity guard (interbody_pull_harness's lesson): a registry
     // that loaded nothing would report every tier as equally worthless, which is
     // a clean-looking answer about an economy that was not there.
@@ -179,6 +191,9 @@ int main(int argc, char** argv)
     std::vector<long>   richest_on(resource_count, 0);      // tiles where it IS the richest (R5)
     double richness_sum = 0.0; long richness_n = 0;         // R6: what IS a typical richness?
     double richness_max = 0.0;
+    // R7: live market price vs the authored base_price, per resource.
+    std::vector<double> price_sum(resource_count, 0.0), base_sum(resource_count, 0.0);
+    std::vector<long>   price_n(resource_count, 0);
     for (int i = 0; i < reg.recipe_count(building_type::processing_facility); ++i)
     {
         const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
@@ -191,7 +206,7 @@ int main(int argc, char** argv)
     {
         world_params p = no_prehistory();
         p.seed = static_cast<uint32_t>(s);
-        world w = make_hard_coded_world(p);
+        world w = make_hard_coded_world(p, nullptr, gen_cfg);
         // app ordering, and it is load-bearing: load_economy's default pass runs
         // BEFORE generate_background_firms. Reversing them, or skipping the pass,
         // reports a quarter of all processors as recipe-less — an artefact of the
@@ -263,6 +278,15 @@ int main(int argc, char** argv)
                 if (bp.revenue > 0.0f)
                     ++acc.earning;
             }
+
+            for (const auto& [mid, mc] : w.markets)
+                for (std::size_t r = 0; r < resource_count; ++r)
+                    if (mc.base_price[r] > 0.0f)
+                    {
+                        price_sum[r] += mc.price[r];
+                        base_sum[r]  += mc.base_price[r];
+                        ++price_n[r];
+                    }
 
             // R3's classification, read off the report rows the same tick
             // produced them.
@@ -462,6 +486,29 @@ int main(int argc, char** argv)
     check(unproduced_but_needed == 0,
           "every recipe input that has deposits is actually produced ("
               + std::to_string(unproduced_but_needed) + " are not)");
+
+    // --- R7: is the recipe value-destroying at LIVE prices? ------------------
+    //
+    // The gap this row exists to close. Steel's AUTHORED margin is positive —
+    // 2 iron ore (2.5) + 1 coal (2.0) = 7.0 in, 1 steel (8.0) out — yet the
+    // measured processor spends 15.20 on inputs to make 3.77 of output, a 4:1
+    // loss. Authored prices and live prices are evidently not the same thing,
+    // and which one is wrong decides the fix: a bad recipe wants retuning, a
+    // bad price wants the clearing model. Reported per resource so the divergence
+    // is attributable rather than aggregate.
+    std::printf("\nR7 — authored base_price vs LIVE mean market price\n");
+    std::printf("  %-4s %14s %14s %10s\n", "id", "base_price", "live mean", "ratio");
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        if (price_n[r] == 0)
+            continue;
+        const double live = price_sum[r] / static_cast<double>(price_n[r]);
+        const double base = base_sum[r] / static_cast<double>(price_n[r]);
+        std::printf("  %-4zu %14.2f %14.2f %9.2fx%s\n", r, base, live,
+                    base > 0.0 ? live / base : 0.0,
+                    (base > 0.0 && live / base < 0.5) ? "   <-- collapsed" :
+                    (base > 0.0 && live / base > 2.0) ? "   <-- spiked" : "");
+    }
 
     // --- R1: the report is non-vacuous ---------------------------------------
     std::printf("\nR1 — the measurement actually happened\n");
