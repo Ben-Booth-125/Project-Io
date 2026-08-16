@@ -230,6 +230,22 @@ in `tools/verify/README.md`.
   **BL-432 still owes** this file its remaining two roster invariants: no orphan resources in either
   direction, and no production method dominating a sibling on every axis (the latter currently lives
   in `recipe_switch_harness`, where it FAILS on four real pre-existing pairs — see NR-243).
+- **`player_seed_sweep`** — Which seeds hand the PLAYER a corp worth playing? A live-Lua sweep (real
+  `scripts/recipes.lua` + `economy.lua`, real economy ticks) that generates one world per seed and
+  reports, per seed, the player corp's buildings by type, its opening and post-warm-start balance,
+  and whether it ever dipped negative. `player_seed_sweep.exe [seed_count] [warm_ticks]`.
+
+  **A REPORTING tool, not a gate** — it exits 0 unless generation actually threw (that being
+  `seed_sweep_probe`'s job). It deliberately does not filter seeds, resample, or carry a whitelist:
+  which of those to do is a design call, and a sweep that silently enforced one would be making that
+  call by implication.
+
+  Written 2026-08-16 after a live campaign handed the player a corp with no processing facility, so
+  the Method page and the chain-depth ladder had nothing to work with. Its first run is the reason
+  BL-435 (starting-corp selection) exists and is worth quoting as the shape of its output: over 24
+  seeds, **11 playable, 13 pure-extraction**, and **solvency was not the discriminator at all** —
+  every seed ended positive (1.3k–55k cr) and not one dipped. Reach for it whenever a change could
+  plausibly move what the opening position looks like.
 - **`era_roster`** — The era gate over the authored economy data (BL-433). The **fourth live-Lua
   harness**: it asks what the *authored* `era` tags do, so it loads the real `scripts/economy.lua`
   + `recipes.lua` rather than hand-building a registry — a hand-built fixture could only confirm

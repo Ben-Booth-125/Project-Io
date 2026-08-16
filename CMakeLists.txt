@@ -562,6 +562,23 @@ target_link_libraries(chain_depth PRIVATE io_world_obj lua54)
 target_compile_features(chain_depth PRIVATE cxx_std_20)
 target_compile_options(chain_depth PRIVATE ${IO_WARNING_FLAGS})
 
+# player_seed_sweep (2026-08-16) — live-Lua for the same reason pregame_balance_harness
+# is: it runs the REAL economy over the REAL authored recipes, per seed. A hand-built
+# registry would make every seed look identically poor and the sweep would report
+# nothing about the game that actually ships.
+add_executable(player_seed_sweep
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/player_seed_sweep.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(player_seed_sweep PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(player_seed_sweep PRIVATE io_world_obj lua54)
+target_compile_features(player_seed_sweep PRIVATE cxx_std_20)
+target_compile_options(player_seed_sweep PRIVATE ${IO_WARNING_FLAGS})
+
 # font_glyph_harness (BL-234) is the one harness that links ImGui rather than
 # ${IO_WORLD_SOURCES}: the defect it guards is the ImFontConfig handed to
 # AddFontFromFileTTF, which lives in src/ui/fonts.cpp, not in world/*. It still
@@ -720,6 +737,7 @@ set(IO_TEST_BENCH_HARNESSES
 set(IO_TEST_SCRIPT_ROOTED_HARNESSES
     chain_depth
     era_roster
+    player_seed_sweep
     interbody_pull_harness
     pregame_balance_harness
     persona_counsel_harness

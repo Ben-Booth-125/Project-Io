@@ -238,8 +238,9 @@ app::~app()
     SDL_Quit();
 }
 
-int app::run(bool windowed_autostart)
+int app::run(autostart_mode autostart)
 {
+    const bool windowed_autostart = (autostart != autostart_mode::none);
     // Apply the player's persisted display settings before anything renders, so
     // the window opens at their last size/mode. Interactive-only: run_verify()
     // never touches settings, keeping golden captures at the fixed default size.
@@ -264,7 +265,8 @@ int app::run(bool windowed_autostart)
         m_pending_world_params = world_params{};
         open_new_world_wizard();
         m_autostart_wizard = 0; // the wizard's own draw advances rounds + presses Begin
-        std::printf("[autostart-windowed] walking the wizard, then Begin\n");
+        std::printf("[autostart-%s] walking the wizard, then Begin\n",
+                    autostart == autostart_mode::play ? "play" : "windowed");
         std::fflush(stdout);
     }
     int autostart_ingame_frames = 0;
@@ -351,7 +353,10 @@ int app::run(bool windowed_autostart)
         // Windowed autostart: a handful of real in-game frames is the coverage —
         // the first frame builds the raster caches and every shell surface; if
         // those survive, exit clean rather than sitting on an open window.
-        if (windowed_autostart && ++autostart_ingame_frames >= 120)
+        // The SMOKE mode's frame cap. `play` deliberately has none: it walked the
+        // wizard purely so a human could look at the running game, and exiting
+        // under them is indistinguishable from a crash.
+        if (autostart == autostart_mode::smoke && ++autostart_ingame_frames >= 120)
         {
             std::printf("[autostart-windowed] OK  %d in-game frames rendered\n",
                         autostart_ingame_frames);

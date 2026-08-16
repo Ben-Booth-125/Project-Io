@@ -733,7 +733,17 @@ int main(int argc, char* argv[])
         // whole tail of start_new_game had no automated coverage at all.
         for (int i = 1; i < argc; ++i)
             if (std::string(argv[i]) == "--autostart-windowed")
-                return app{}.run(/*windowed_autostart=*/true);
+                return app{}.run(app::autostart_mode::smoke);
+
+        // --autostart-play: walk the wizard like the smoke test, then STAY OPEN.
+        // Added 2026-08-16 after --autostart-windowed was used to open the game
+        // for Ben to look at: it renders 120 frames and exits, so from the far
+        // side of the screen it is indistinguishable from a crash ~2 s in. The
+        // standing practice is to open the live app whenever he is asked to weigh
+        // in on a visual, so that path needs a flag that does not self-terminate.
+        for (int i = 1; i < argc; ++i)
+            if (std::string(argv[i]) == "--autostart-play")
+                return app{}.run(app::autostart_mode::play);
 
         for (int i = 1; i < argc; ++i)
             if (std::string(argv[i]) == "--autostart")

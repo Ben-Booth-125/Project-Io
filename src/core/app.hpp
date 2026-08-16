@@ -47,7 +47,17 @@ public:
     /// loading-screen -> in_game transition, then exit after a few in-game frames.
     /// Exists to reproduce interactive-only startup crashes under a terminal where
     /// main()'s catch block can actually report them.
-    int run(bool windowed_autostart = false);
+    /// How run()'s windowed path boots.
+    ///
+    /// `smoke` is the --autostart-windowed SMOKE TEST: it walks the wizard, renders
+    /// a fixed 120 in-game frames and exits 0. It is not a way to open the game —
+    /// pointing a human at it looks exactly like a crash a couple of seconds in,
+    /// which is precisely what happened on 2026-08-16.
+    /// `play` walks the same wizard and then just keeps running, for when someone
+    /// needs to LOOK at the running game without clicking through the wizard first.
+    enum class autostart_mode : std::uint8_t { none = 0, smoke, play };
+
+    int run(autostart_mode autostart = autostart_mode::none);
 
     /// Run a non-interactive visual-verification session: set up a deterministic
     /// world (seeded, sim paused), expose the `verify` Lua API (which drives view
