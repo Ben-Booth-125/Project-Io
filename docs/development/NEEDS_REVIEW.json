@@ -389,6 +389,22 @@
         "scripts/verify/building_management_shell.lua"
       ],
       "resolution": "Fixed 2026-08-16, same session it was raised. Two causes, both real. (1) DRAW ORDER: the name drew at full length and the right-aligned profit was painted over it. The row now measures the profit FIRST (at its own 1.1x scale — a width taken at 1.0x would under-reserve) and fits the name to what is genuinely left, routed through ui::fit_text (box 9, table_cell) so an over-long name elides with the full string one hover away and is recorded in BL-215's overflow ledger rather than clipping silently. (2) WIDTH: fixing the draw order alone just turned the name into '...', because the row was `avail * 0.62` = 160 px trying to hold 248 px of content — measured: pip 27.8 + name 103 ('Food Rations') + gap 8 + profit 70 + Switch 33 + pad 6, leaving the name 16 px. The 0.62 factor was arbitrary; the 2026-08-15 'slimmer strip, not a denser fit' call was about row HEIGHT (1.5 button-heights, against the square tiles it replaced) and explicitly argues against cramming. Row is now full available width capped at 280. Verified by capture: both rows read name + profit cleanly."
+    },
+    {
+      "id": "NR-256",
+      "title": "--autostart-play still terminates unattended, cause not established",
+      "raised": "2026-08-16",
+      "kind": "observation",
+      "status": "open",
+      "source": "Three unattended launches while adding the flag (commit e4a087a).",
+      "what": "--autostart-play removes --autostart-windowed's 120-frame cap so the window stays open for a human to look at. It works interactively — Ben used it and reported on what he saw. But launched unattended from a background shell it has terminated on its own three times, at roughly 20s, 34s and ~60s: exit code 0, no crash log, no exception, output simply ending after the warm-start timings. The frame cap is definitely not the cause (it is gated on autostart_mode::smoke and the variable timing rules it out anyway). run()'s loop has only three exits: SDL_EVENT_QUIT, SDL_EVENT_WINDOW_CLOSE_REQUESTED, and m_quit_requested, so something is delivering a close.",
+      "why_it_matters": "Two candidate causes and I could not separate them from this session: (a) a genuine stray quit/window-close event in the autostart path, which would be a real defect, or (b) the background-shell environment reaping a GUI process whose launching shell is not interactive, which would make the flag fine in real use and only untestable the way I was testing it. The interactive evidence points at (b), but 'it worked when a human was watching' is not a diagnosis. Worth settling before anyone relies on this flag for an unattended soak or a long-running capture.",
+      "recommendation": "Instrument the three exit paths with a one-line printf naming which one fired, then launch once from a real terminal and once from a background shell. That distinguishes (a) from (b) in a single run each. Cheap, and it is the same two-line diagnostic NR-238 records as the thing that settled a similar this-looks-like-a-regression question.",
+      "files": [
+        "src/core/app.cpp",
+        "src/main.cpp"
+      ],
+      "resolution": null
     }
   ]
 }
