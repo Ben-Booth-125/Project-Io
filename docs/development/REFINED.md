@@ -1,6 +1,27 @@
 # Project Io — REFINED (active worklist)
 
-## Starting-corp selection (promoted from BL-435) — **IN PROGRESS** (1/6, 2026-08-16)
+## Starting-corp selection (promoted from BL-435) — **PAUSED** (4/6, 2026-08-16)
+
+> **Paused 2026-08-16 at Ben's call to move to Sprint 19.** A, B, C and D are complete and
+> committed (`d80ca55`, `2f0f929`); **E and F are owed**. This is a deliberate pause, not a
+> cancellation — the item works end-to-end today and nothing is half-written.
+>
+> **To resume, you need only this:**
+> - **E (the guard) is the real gap, and it has a catch worth knowing before you start.**
+>   `--verify` currently *cannot reach the screen at all*: both automated paths take the
+>   Surprise-me fallback deliberately, which is exactly what keeps every capture and golden
+>   bit-identical. So E is not "add a golden" — it first needs a verify hook that stops at
+>   `app_screen::choosing_corp` rather than auto-picking. Without that, any check written
+>   against this screen is green-but-blind, the NR-255 failure mode.
+> - **Eyeball it live before blessing anything.** A golden blessed on an unreviewed layout just
+>   pins whatever happened to get built. Ben has not seen the screen yet; `--autostart-play`
+>   will NOT show it (it auto-picks), so it needs a game started from the menu.
+> - **F is pure propagation** and independent of E: CORPORATION_GENERATION.md already names the
+>   deferred selection screen as an open item — that paragraph is now describable as built —
+>   plus STARTUP.md's stage list and a `question_log.json` entry for the surface.
+> - **BL-436 is the loose thread this item created**, not a blocker for E/F. Filed priority A
+>   with the measurement; until it lands, the screen presents a processing-heavy corp as the
+>   richer pick when it is measurably the poorer one.
 
 Requirements: requirements.json § starting-corp-selection (R1–R4)
 

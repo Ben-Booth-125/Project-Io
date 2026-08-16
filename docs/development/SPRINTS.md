@@ -48,6 +48,7 @@ and/or a version goal (v0.1.1 etc.).
 | 10–14 | Re-sequenced 2026-08-10 (the living world inserted) | **Overtaken** — Sprints 10/11 closed 2026-08-11; Sprints 12–14 superseded 2026-08-12 by the 0 CE refocus (NR-177), never opened — their minors parked with the space arc |
 | 15 | The 0 CE refocus (retro-recorded) | **Closed 2026-08-12** — the tangent that became the product; epoch 0, 3× map, Era −1 sim wired in, mercenary seam designed; see below |
 | 16 | The mercenary vertical slice | **Open 2026-08-12** — BL-377 playable end-to-end + BL-315 on the critical path; cuts v0.1.15 |
+| 19 | The roster tells the truth | **Open 2026-08-16** — see the entry at the top of this file |
 
 **Next up (2026-08-10).** Sprint 5 is closed on Ben's call — *"I am happy with the generation
 progress we made"* — and the board went momentarily to zero goaled sprints. The plan for
@@ -1145,3 +1146,71 @@ machinery got no exercise, and the session length was dominated by serial build/
   `chain_depth`.
 - **The gate is ancient-only.** Chain depth gates nothing a 1960 campaign can see, by design. Whether
   the industrial roster ever opts in is an open question BL-428 deliberately did not answer.
+
+---
+
+## Sprint 18b retro — the roster invariants, and what they found (2026-08-16, retro-recorded)
+
+**Recorded after the fact, and that is the fourth time.** This session ran a sprint's worth of work
+with no sprint entry open — the exact drift this file's own standing caution names (*amend when the
+goal changes, not at the retro*). It is numbered 18b rather than 19 because it is the direct
+continuation of Sprint 18's leftovers, not a new theme.
+
+**Goal (reconstructed).** Clear the three review-queue entries Ben named, then land BL-432's two
+owed roster invariants.
+
+### What landed
+
+- **BL-432 complete.** `chain_depth`'s R1/R2 rows; the item's other two assertions had already
+  shipped as D4 and G3.
+- **NR-243 dissolved without changing a single recipe number**, and **NR-257 answered in three
+  parts** — consumers for the three one-directional orphans, a `base_price` for regolith, and the
+  removal of the five double-orphans.
+- **Five `resource_type` values removed** (42 → 37), six dependent sites cleaned.
+- **BL-435 tasks A–D** (starting-corp selection), **paused at 4/6** on Ben's call to move on.
+- **BL-436 filed**, priority A, with a clean natural-experiment measurement behind it.
+- **NR-256 advanced**, NR-257/NR-260 resolved, NR-258/NR-259 filed.
+
+### What this sprint is actually worth remembering for
+
+**Every guard written this session immediately found something, and none of it was what the guard
+was written to look for.** That is three for three:
+
+| The guard | What it was for | What it actually found |
+|---|---|---|
+| R1 (orphan resources) | catch the *next* orphan | the five already there, exactly as BL-432's design predicted |
+| R2 (no dominant method) | police BL-430's alternates | that BL-430 has **zero** genuine alternates, and the four "dominated" pairs were a grouping artefact |
+| `--roster` (BL-435) | show the screen's data | that a processor *costs* income — undercutting the premise of the item it was written for |
+
+**The strongest single lesson: a measurement that contradicts the item that commissioned it is the
+most valuable thing a session produces.** BL-435 was filed on "a corp with a processor is a better
+opening". Its own first measurement says that corp is measurably *poorer*. The item survives —
+depth and money are different axes — but it now knows which axis it is on, and BL-436 exists.
+
+**Two ways a check can be worthless, both invisible from its own output.** Sprint 18's retro found
+a check running green while pointed at a deleted tab. This session found the mirror: `player_seed_sweep`
+had **never once passed under ctest** since it was added, because a 69 s tool sat under a 60 s
+timeout, and a Timeout reads as infrastructure noise rather than as "this has never verified
+anything" (NR-259). Standing habit worth adopting: when a harness joins the gate, run the *gate*,
+not the exe.
+
+**The code disagreed with its own comments twice, in the same session, in two unrelated files.**
+`recipes.lua` already stated the tier-vs-alternate axis NR-243 spent a review cycle asking for;
+`focus_asset_pattern` promised extraction corps "a single processor" while the ordering denied it
+half the time. Both fixes were *reading* rather than designing. Worth trying first next time a
+design question looks open: the answer may already be written above the code.
+
+### Where the method held, and where it did not
+
+**Held.** Rule 0b twice more, both times with the numbers changing the answer. Nothing was tuned to
+make a check pass: NR-243 resolved by fixing the question, not the recipes, and `ai_skill_harness`
+was left failing across one report rather than blessed before Ben ruled.
+
+**Did not.** (1) No sprint entry — fourth time. (2) A golden was missed: `spectator_determinism`
+broke with BL-435 task B and sat failing across a commit because only `ai_skill_harness` was
+re-blessed. The full gate caught it; a narrower run would not have. (3) Second session running with
+no fan-out, and the session was again dominated by serial build/verify cycles.
+
+- **Runtime:** not summed. Sixth consecutive entry — the format's Runtime line has now been
+  uncollected longer than it was ever collected. Either wire `tools/session/timer.js` in or drop
+  the line from the format block; carrying it as a permanent TODO is worse than either.
