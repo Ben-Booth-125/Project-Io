@@ -555,6 +555,278 @@ does not carry, in `REFINED.md`.
 
 ---
 
+# Sprints 22–24 — Spectate, and the diplomacy it makes watchable (proposed 2026-08-17, NOT opened — Ben picks)
+
+**These are proposals, not decisions.** Ben's brief this date asked for sprints aimed at spectator
+mode, padding out rival diplomatic thinking, and ensuring commands are reachable by both AI and UI.
+The brief offered a thesis: that those are one requirement, because spectate removes the human seat
+and forces every corp through one seam. This block tests that thesis before building on it, and the
+test changes the sequencing.
+
+## The thesis, verified in one half and refuted in the other
+
+**The half that holds.** Under `corp_ai_params::spectating` the player-corp prohibition is not
+excepted but *unsubscribed* — there is no owner to protect, so `world::player_entity` evaluates on
+the same staggered cadence as any rival. A spectated session therefore does drive every corp through
+`apply_corp_command`, exactly as claimed. Spectate makes an unreachable command **consequential**:
+a verb only the UI can issue is a capability the spectated world simply does not have.
+
+**The half that does not.** Consequential is not observable. When a UI-only verb never fires,
+nothing reports that it never fired, and the session looks fine. Spectate cannot see the UI axis at
+all, by construction — there is no UI in it to check against.
+
+**The evidence is in our own harness.** `tools/verify/spectator_determinism.cpp` buckets the fifteen
+verbs into four families. `place_sell_order` alone satisfies the whole `trade` family, hiding the
+four unemitted trade verbs behind it; `hire_unit` alone satisfies `other`, hiding `demolish` and
+`place_road`. The harness written to prove spectate exercises the seam does so at a granularity too
+coarse to notice that **seven of fifteen verbs never fire**.
+
+So spectate is the right forcing function, and it is not self-checking. That is why Sprint 22 leads
+with an instrument rather than with fixes, and it is the one structural change these proposals make
+to the brief. Recorded as NR-305.
+
+## The measured gap, which grounds all three sprints
+
+Three artefacts already answer the reachability question and no tool joins them:
+`src/world/corp_command.hpp` (the seam), `docs/ai/ACTIONS.json` (the dictionary), and each dictionary
+entry's own `surface` field (the press). A fourth column comes from grepping `cmd.verb = corp_verb::`
+in `corp_ai.cpp`, which returns **ten sites covering eight verbs**.
+
+| corp_verb | Dictionary | UI press | AI candidate | |
+|---|---|---|---|---|
+| `build` | ✓ | ✓ Tile construction ledger | ✓ ×3 sites | |
+| `set_recipe` | ✓ | ✓ Selection Method compare | ✓ | |
+| `set_workforce` | ✓ | ✓ Band slider / panel tiers | ✓ | |
+| `idle` | ✓ | ✓ Band bottom row | ✓ | |
+| `resume` | ✓ | ✓ Band, in place of Idle | ✓ | |
+| `survey` | ✓ | ✓ Band Survey section | ✓ | |
+| `hire_unit` | ✓ | ✓ Band Hire block | ✓ | |
+| `place_sell_order` | ✓ | ✓ Market Ledger tab | ✓ | **8 verbs complete** |
+| `demolish` | ✓ | ✓ Band + confirm popup | **✗** | contradicts a standing rule |
+| `place_road` | ✓ | ✓ Construction ledger tiers | **✗** | contradicts a standing rule |
+| `remove_sell_order` | ✓ | ✓ Sell Orders row button | **✗** | BL-293 gave placement, not withdrawal |
+| `set_workforce_auto` | ✓ | ✓ Auto checkbox / button | **✗** | judged **correctly** absent |
+| `request_quote` | ✓ | **✗ SEAM-ONLY** | **✗** | BL-350 landed no surface |
+| `accept_quote` | ✓ | **✗ SEAM-ONLY** | **✗** | BL-350 landed no surface |
+| `cancel_contract` | ✓ | **✗ SEAM-ONLY** | **✗** | BL-350 landed no surface |
+
+**The dictionary is the one axis with no gap** — 15 of 15, which is BL-270's discipline working.
+Two findings are defects rather than gaps. `.claude/rules/io-standing-rules.md` states the
+BL-202/BL-203 exception as rivals scoring *"build, demolish, survey and road decisions each tick"*,
+and two of those four are not emitted — a **standing rule asserting a behaviour that does not
+exist**. And BL-350 (procurement seam) landed complete world state, serialisation and a harness with
+no player surface, so an external agent can contract for goods and a human cannot. Recorded as
+NR-303.
+
+---
+
+## Sprint 22 — Every command reachable from both directions (proposed)
+
+**Goal.** Make the seam's fifteen verbs reachable by a human *and* by the scorer, and leave behind
+the instrument that says so. Not "add features": every verb below already exists, is validated, and
+is serialised. Build the two ends that were never attached.
+
+**Planned.**
+- **BL-451 — spectate asserts families, not verbs** (`designed`, B, d2): a per-verb histogram beside
+  the existing family assertion. Printed always, asserted never — a floor per verb would fail
+  legitimately whenever a verb is correctly rare, and a harness that fails legitimately gets muted.
+- **BL-444 — verb reachability coverage tool** (`designed`, A, d2): the static join across seam,
+  dictionary, surface field and scorer. Fails on a **dictionary** gap only; UI and AI gaps are
+  reported, since both are legitimate design states.
+- **BL-445 — procurement has no UI** (`designed`, A, d3): the largest gap, and the keystone. A
+  Contracts tab on the Market Ledger, beside Sell Orders. The four decline results are already
+  distinguishable at the seam and are currently read by nothing.
+- **BL-446 — the scorer cannot procure** (`designed`, B, d3): request/accept/cancel as ordinary
+  candidates, capped at one per evaluation. Blocked on BL-445, so the surface and the scorer are
+  argued against the same behaviour.
+- **BL-447 — the scorer never demolishes or roads** (`designed`, B, d3): three real gaps, plus the
+  standing-rules correction. `set_workforce_auto` is explicitly **out of scope and judged correct** —
+  it hands a dial to an auto-solver, and a scorer that already sets the dial has no use for it.
+
+**Sequencing.** The two instruments run **first and alone** — BL-451 and BL-444 share no file with
+anything and no fix should be judged without them. BL-445 then leads BL-446. BL-447 is independent
+of all of it and starts on day one; its three legs (`demolish`, `place_road`, `remove_sell_order`)
+are separable and any one may be cut without stranding the others.
+
+**Done when** the coverage tool reports every verb reachable from a human press and from a scorer
+candidate, or names in writing why a verb is deliberately not — and a spectated rollout's per-verb
+histogram shows the AI column actually walked, not merely wired.
+
+**The check that says it worked.** BL-444's tool is the check, and BL-451's histogram is its
+behavioural counterpart: one says the path exists, the other says it was taken. The pairing is the
+point — a static join alone would pass on a candidate site that never wins a score. Per CLAUDE.md
+§ Tool creation is skill creation, the tool is wrapped into a skill rather than left loose.
+
+**Risk.** BL-445 is a UI item on the Market Ledger, which BL-293 (order book on the seam) already
+touched, and UI work has been the reliably underestimated half of this project. The mitigation is
+that it adds **no fourth code path**: the presses issue `corp_command` records through
+`apply_corp_command`, exactly as the Sell Orders tab does today.
+
+**Second risk.** BL-446 walks `w.corporations` to pick a supplier, and that is an `unordered_map`.
+Iterating it directly is the precise nondeterminism BL-422 (held sell order) already caught once
+this month. Sort the id list first; treat any float accumulation over corps as suspect.
+
+---
+
+## Sprint 23 — Friend, neutral, hostile (proposed)
+
+**Goal.** Give the world a place to record that one corporation is at war with, or allied to,
+another. Substrate only, and deliberately **inert** — stance gates nothing in this sprint.
+
+**Why now, and why it is not optional.** The Sprint 21 audit above found that *"the capability
+everyone assumes exists and does not is a hostility model"*, and flagged it as a design call filed
+as work nowhere. Ben settled it on 2026-08-17: hostility is a declared war state corps opt into
+deliberately, with a friend state alongside it. This sprint is that ruling written as work.
+
+**A sequencing correction, stated plainly.** If Sprint 21 (military reach) opens, **this sprint must
+precede it or be folded in as its F2**. Sprint 21's own risk paragraph says its four fan-out slices
+stall behind the hostility model. Running 23 after 21 reproduces exactly the failure that paragraph
+predicts.
+
+**Planned.**
+- **BL-448 — friend/neutral/hostile stance** (`designed`, A, d4): world state, the declare/offer/
+  accept/return-to-neutral verbs, serialisation, and a determinism harness.
+- **BL-449 — stance needs a surface** (`designed`, A, d3): the Corporation panel column and presses.
+  Filed **separately on purpose** — BL-350 landed a complete seam with no press and nobody noticed
+  for weeks, and a surface that is a task inside the model item is the first thing cut under pressure.
+
+**Two things the audit found already built, which change the shape.**
+
+*Do not call it "standing".* `src/world/standing.{hpp,cpp}` exists and means the BL-262 coarse public
+**power** read — negligible through dominant, over reach, capital and market share. Overloaded, every
+future sentence about "a corp's standing" is ambiguous between how strong it is and how it feels
+about you. Proposed term: **stance**, in `src/world/stance.{hpp,cpp}`. Recorded as NR-304.
+
+*The substrate is half-built.* `world::corp_reputation` is already a
+`std::map<std::pair<entity_id, entity_id>, float>` — directed, serialised, sorted-key deterministic.
+And `rejected_embargo` already declines a quote when a supplier's `condition_set` evaluates false
+against the buyer. There is already a relationship-shaped gate in the economy, so stance should feed
+it rather than sit beside it.
+
+### The open question — symmetry. Ben's call, and not to be settled in implementation
+
+The ruling admits two readings, and they differ in the **data model**, not merely the logic.
+
+**Reading A — asymmetric hostility, mutual friendship.** War is done *to* you; friendship is agreed
+*with* you. `declare_hostile` applies unilaterally and at once. `offer_friendship` creates a pending
+offer that `accept_friendship` converts. Storage is a directed pair, matching `corp_reputation`
+exactly. The world then holds one-sided wars, so every consumer must ask *"is A hostile to B"* and
+none may ask *"are A and B at war"*.
+
+**Reading B — symmetric throughout.** Both modes belong to the pair. Declaring hostility drags the
+target into it. Storage is a canonicalised `(min id, max id)` key, one row per relationship, and the
+one-sided question cannot be asked because it does not exist.
+
+A models the fiction better and doubles the state. B is simpler at every consumer and cannot express
+an ambush. **Recommendation, offered as a recommendation:** A — the ruling's own words, "declared"
+and "opt into", are one-sided, and the reputation table proves the directed shape is already
+affordable. It remains Ben's call. Recorded as NR-302, with a hybrid third option.
+
+**Done when** a save round-trips a full stance table, two runs of one seed produce identical stance
+tables, and the player can see and change a stance from the Corporation panel — with nothing in the
+world yet behaving differently because of it.
+
+**The check that says it worked.** A determinism harness asserting: the table survives a save/load
+byte-identically; two rollouts of one seed agree; a rejected stance command mutates nothing; and
+under Reading A a one-sided pair is representable and stays one-sided until acted on. That last
+assertion is the one that fails loudly if the symmetry answer changes after the fact.
+
+**Risk.** Landing the model inert is deliberate and is also the risk — an inert system is easy to
+get subtly wrong, because nothing consumes it and nothing complains. The determinism harness is the
+only thing standing in for a consumer, so it has to be written first, not last.
+
+**Second risk.** A second, smaller question rides on BL-449 and should be answered in the same
+session: does a declaration **announce itself**, or is it discovered on contact under the BL-068
+competitor-visibility rule? It is a comms-dock question if it announces, and a discovery question if
+it does not.
+
+---
+
+## Sprint 24 — The rival decides who to fight (proposed)
+
+**Goal.** Let rivals choose stance for legible reasons, as ordinary candidates on the scorer that
+already exists. The payoff is squarely spectator-facing: a spectated war whose cause is invisible is
+a fight, not a story.
+
+**Planned.**
+- **BL-450 — rivals cannot reason about stance** (`designed`, A, d4): the scoring terms, hysteresis,
+  and new `corp_decision_reason` values. Blocked on BL-448.
+
+**What this is, in the terms the standing rules use.** A widening of the BL-202/BL-203 exception in
+exactly the way BL-324 (rival hiring) was — one more legal verb family on the same deterministic
+scored-utility layer. No negotiation state machine, no planner, and **no nation behaviour**: stance
+is corp-to-corp, and nation actors stay deferred as they are today.
+
+**The three scoring terms, and the one most likely to be forgotten.** Toward hostile: contested
+overlap and relative strength, damped by the target's military capacity and by shared market
+exposure. A corp does not open a war it is losing, nor burn a market it eats from. Toward friendly:
+complementarity, where `corp_reputation` and Sprint 22's completed contracts are already the scalar
+that says so. Toward **neutral**: the de-escalation term — without it, stances ratchet and every long
+game ends with everyone hostile to everyone.
+
+**Hysteresis is required, not optional.** Stance changes carry a margin the way the workforce and
+recipe dials do, one stance command per corp per evaluation, and a cooldown before a pair may move
+again. A stance that flips on a marginal score is worse than no stance model, because it makes the
+Decision Feed unreadable and would make any later military trigger fire on noise.
+
+**Sequencing.** One item, so sequencing is internal: the scoring terms land before the legibility
+values, and the hysteresis lands with the first term rather than after all three.
+
+**Done when** a spectated rollout produces at least one hostile and one friendly declaration, each
+readable in the Decision Feed with a stated cause, and the same seed reproduces the same declarations
+on the same ticks.
+
+**The check that says it worked.** Extend the stance determinism harness with a behavioural pass over
+several seeds asserting: declarations reproduce tick-for-tick; no pair oscillates within the cooldown;
+and **the neutral term actually fires** — an end-state where every pair is hostile is a failure, not a
+dramatic outcome. That last assertion is the one worth writing first, because it is the failure this
+design is most likely to reach.
+
+**Risk.** This is the sprint most able to talk itself into a planner. The scorer is a flat candidate
+list, and "diplomacy" invites intent, memory and negotiation, none of which are deterministic scored
+utility. Every term must be computable from state a rival may legitimately see under BL-068, in one
+pass, with no stored plan.
+
+**Second risk.** Stance terms read `compute_corp_standings`, whose header warns explicitly against
+unifying its published bands with the AI's internal scorer — a Goodhart trap where every AI optimises
+the number shown to the player. Reading it is fine; scoring *to* it is the thing to refuse.
+
+---
+
+## What these three sprints deliberately do not carry
+
+**The governing-body pivot (BL-094) stays out.** A diplomacy arc pulls toward it hard — stance looks
+like the first inch of law and policy reaching military outcomes, which is precisely the pivot's
+thesis. It stays out because it is a **v0.3.0** identity change and these are v0.1.16 items, and
+because the pivot changes who the player *is*. Landing that on top of an inert stance table, before
+anything consumes stance at all, would be building the roof first.
+
+**The political layer stays out** for the same reason, one minor further away.
+
+**Era −1 diplomacy stays out** — BL-297 (Era −1 diplomacy seam) and BL-298 (diplomacy test battery)
+are v0.1.16 and look adjacent. They are not: they are **nation**-level, inside the history sim, and
+corp stance is a campaign-level corp-to-corp relation. Sharing the word "diplomacy" is the only thing
+they share, and merging them would smuggle nation behaviour past a standing prohibition.
+
+**Nation behaviour stays deferred**, unchanged, per backlog.json § BL-054.
+
+**Military consequence stays out of Sprint 23 by design.** Stance gates nothing there. What hostility
+*permits* is BL-315 (armed house conflict spine), which is Sprint 21's business, and it is better for
+the stance model to be argued about against a real save than against prose.
+
+**Not proposed: a stance model for the Era −1 sim, reputation decay, treaties, or trade embargoes as
+a player verb.** The embargo path already half-exists through `condition_set` and
+`rejected_embargo`, and extending it is a genuine follow-on — but it is consequence, and these three
+sprints are reach, substrate and reasoning in that order.
+
+**Also not proposed: BL-412 (live agent control seam).** It is the natural companion to a
+reachability sprint and is deliberately left alone. Its own text says it does not need BL-409
+(spectator mode) and carries three open design problems — clock ownership, determinism under a wall
+clock, and transport. It is a research seam, not a reach gap, and folding it in would let its cost
+in through the side door.
+
+---
+
 # Sprint 18 — The military engagement surface (planned 2026-08-15; NOT opened — deferred again 2026-08-16 for Sprint 19)
 
 **Goal.** Finish what Sprint 16 started: make the fight *playable and visible*. Closes and cuts
