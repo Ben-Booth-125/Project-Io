@@ -3884,6 +3884,65 @@
    ]
   },
   {
+   "brief": "price-band-derived-ceiling",
+   "batch": "2026-08-17-bl442",
+   "title": "BL-442 step 2 - The scarcity ceiling is DERIVED from measured haulage, not authored as a round number",
+   "status": "complete",
+   "promoted_from": "backlog.json BL-442 PRICE_BAND_IS_CODE_NOT_DATA (step 2; step 1 landed 2026-08-17 as behaviour-identical plumbing and carried no requirement group)",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "ITEM-SPANNING (headless): the widened ceiling is DERIVED from the per-unit haulage the supply layer actually charges between adjacent markets in the real generated world, and the derivation is reproducible. A named tool must print the measured haulage, the base-price denominator, and the required ceil_mult that follows - so the number in scripts/economy.lua can be re-derived rather than trusted.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. haulage_measure over 5 seeds, 39 markets on 5 multi-market bodies: per-unit haulage market -> NEAREST market neighbour is p10 0.1160, median 0.6954, p90 1.6742, max 4.8347 credits (all same-body pairs: median 7.6843, max 12.6729). Cheapest good carrying a base_price is 0.600. Binding case = worst nearest-neighbour haul over cheapest good: ceil > 1 + 4.8347/0.600 = 9.06, rounded up to 10.0. The old 4.0 cleared the median pair (2.16) and only just the p90 (3.79), leaving the tail unservable at any scarcity. Independent agreement: within the ordinary raw tier (0.60 to 6.00 rare_earth_ore) the scarcity-outranks-abundance reading also demands ceil > 10 - the cross-tier reading demanding 233 was rejected and recorded as NR-291.",
+     "notes": "Home: tools/verify/haulage_measure.cpp, new this session. Measures logistics_cost(mode) x terrain-weighted A* cost between market centre tiles, exactly the cost dispatch_convoys charges."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "THE CHANGE IS DATA ONLY. scripts/economy.lua is the only behavioural file touched; no C++ is edited to make the widening work. Step 1 already routed both call sites through recipe_registry::price_band(), so if C++ needs editing here, step 1 was incomplete and that is the finding.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. The behavioural change is one literal: economy.price_band.ceil_mult 4.0 -> 10.0. No src/ file is touched at all - step 1's plumbing carried it end to end, and both consumers moved without being edited (price_band_harness P5 and P6 still pass, which is precisely the guard that fails if either site holds a private copy). Two NON-behavioural files did change and are named so the claim stays honest: tools/verify/price_band_harness.cpp P2, whose literal assertion states what the shipped Lua SAYS and therefore had to be updated 4.0 -> 10.0 (it got stronger, not weaker - the struct default is still 4.0, so an authored 10.0 now separates 'read from Lua' from 'fell through to defaults' on the ceiling too, and P1's defaults-are-0.25/4.0 row is untouched and green); and CMakeLists.txt, to declare the new measurement harness.",
+     "notes": "price_band_harness P5/P6 are the standing guard that both sites read the registry rather than a local constant; they must stay green across the value change."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "THE OUTCOME IS SHOWN, NOT ASSUMED. The claim 'inter-market trade now happens' is measured on the real generated world at BOTH bands and reported as a contrast. If the measurement contradicts the item's premise, the measurement wins and the contradiction is recorded rather than tuned away.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET AS A REQUIREMENT, AND IT REFUTED THE PREMISE - which is the outcome this row was written to allow. Measured over 5 seeds x 20 econ ticks. At the OLD band: 2146 convoys dispatched, 1677 of them intra-body market-to-market, 0 inter-body, 0 persistent trade_routes. At the NEW band: 2029 / 1576 / 0 / 0. Two findings, both recorded rather than tuned around. (a) Inter-market trade was NEVER ABSENT - 1677 market-to-market hauls at the old band. It looked absent because trade_routes is a body-level record (body_a/body_b) and is structurally blind to intra-body trade; the space lane it CAN see is zero at both bands because dispatch_convoys refuses it on the launchpad and propellant gates before consulting any price, so no ceiling can open it (NR-289). (b) Widening the ceiling REDUCED dispatch by ~5% - demand is price-elastic, a higher scarcity price cuts quantity demanded, the shortfall dispatch sizes from shrinks (NR-294). The landed ceiling stands on its haulage derivation; it is explicitly NOT recorded as having created inter-market trade.",
+     "notes": "haulage_measure's second section counts convoys split into intra-body market-to-market, inter-body space lane, and BL-088 persistent trade_routes."
+    },
+    {
+     "id": "R4",
+     "status": "partial",
+     "requirement": "STABILITY UNDER A WIDER BAND: a 2.5x wider ceiling must not destabilise clearing. Specifically - no price pegged at the ceiling for a whole run where it previously settled, and no oscillation introduced. econ_stability's assertions must hold; if a wider band breaks one, that is a finding to report, not a value to tune back.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "PARTIAL, and the shortfall is the most valuable thing this item found. NO OSCILLATION and no divergence: econ_stability is ALL PASS on both sides (R6 finiteness, sub-size^1.5 growth, no 4x doubling; exponent 0.96 after vs 1.04 before, worst rung 2.20x vs 2.55x - both inside tolerance and both timing noise on a loaded box). world_determinism, determinism_harness and order_book_harness (69/69) all green. BUT THE PEGGING TEST FAILS, and it failed BEFORE the change too, which is the finding: tier_margin R7 shows the entire refined/product tier already riding the OLD clamp at 3.35x-3.85x of base, and after the change riding the NEW one at 8.13x-9.55x (machinery 9.38x, alloys 9.37x, electronics 9.55x). Those prices are set by the clamp, not by supply and demand - widening moved the peg rather than releasing it. Consequence: processing input cost 14.86 -> 26.56 against revenue 12.55 -> 17.17, so processing net/tick fell -10.81 -> -17.68 while extraction was flat (8.09 -> 8.31, raws are not pegged). Recorded as NR-292, NOT tuned away: the fix is demand-side price discovery in the refined tier, not a different number in this field.",
+     "notes": "econ_stability is a labelled wall-clock bench as well; read its assertion rows, not its timings."
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "requirement": "REGRESSION GATE, REPORTED NOT BLESSED. The full ctest gate is run on both sides and every failure sorted into pre-existing / deliberate / NEW. NO golden and NO ai_skill_harness band is re-blessed - the benchmark is deliberately red (NR-269/271/272/278/280) and blessing is Ben's call. Every economy number that moved is reported with its attribution.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET, AND NOTHING BLESSED. Full ctest run on BOTH sides of the change from the same worktree. BEFORE: 82 tests, 3 failed - ai_skill_harness, spectator_determinism, tier_margin. AFTER: the same 3, plus 4 more that were each run down to a cause rather than accepted: history_ladder_harness (Timeout 60.03s), mediterranean_sweep (Timeout) and home_surface_bench (bench, worst preview 4286 ms vs its 3s ceiling, every CONTENT assertion green) were machine-load artefacts on a busy box - all three re-run standalone and PASS (26.45s / 97.15s / 13.76s); price_band_harness failed on the stale-build/scripts wiring defect and is green after the fix. NET NEW FAILURES: ZERO. Numbers that moved, all attributed: extraction net/tick 8.09 -> 8.31; processing net/tick -10.81 -> -17.68; processing input cost 14.86 -> 26.56; processing revenue 12.55 -> 17.17; refined/product prices 3.35x-3.85x -> 8.13x-9.55x of base (the pegging, NR-292); convoys 2146 -> 2029 and market-to-market 1677 -> 1576 (NR-294); starved share 45.4% -> 45.2%, extraction payback 12 ticks either side. ai_skill_harness is BYTE-IDENTICAL on both sides, all 20 bands still red and all five seeds' net_worth unchanged to the decimal - NOT because the change had no effect on the AI but because the harness hand-builds its registry and never reads economy.lua at all (NR-293). So the Sprint 19 question 'did the bands rise?' is still unanswered, and this item could not have answered it. Nothing re-blessed: not one golden, not one band, and tier_margin's 3 failures are the same 3 as before.",
+     "notes": "Named reads: tier_margin, ai_skill_harness, econ_stability, price_band_harness, spectator_determinism, order_book_harness - plus the full gate, because a per-item check is not a gate."
+    }
+   ]
+  },
+  {
    "brief": "demand-register-records-wants",
    "batch": "2026-08-17-bl441",
    "title": "BL-441 - The market demand register records the WANT, not the FILL, so a starved input can price like a scarce one",

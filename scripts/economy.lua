@@ -339,14 +339,40 @@ economy = {
     -- economy_system.cpp) — until BL-442 those were two hand-synchronised
     -- constexpr copies of the same two numbers.
     --
-    -- The values below are UNCHANGED from the constants they replace: this move
-    -- is behaviour-identical by construction, so any golden that shifts is a bug,
-    -- not a re-tune. Widening the band is a separate, later call (BL-442 step 2),
-    -- deliberately held until BL-441 makes the demand input non-zero — widening a
-    -- band whose input signal is structurally zero amplifies nothing.
+    -- STEP 2 (2026-08-17): the CEILING is now DERIVED, not authored. Ben's
+    -- requirement is that scarcity must price high enough to cross the margin for
+    -- a nearby market, so inter-market trading exists from day 1. That makes the
+    -- ceiling a function of the haulage the supply layer already charges:
+    --
+    --     ceil_mult * base_price  >  base_price + haulage_per_unit
+    --     ceil_mult               >  1 + haulage_per_unit / base_price
+    --
+    -- MEASURED, not assumed (tools/verify/haulage_measure.cpp, 5 seeds of the real
+    -- generated world): per-unit haulage from a market to its NEAREST market
+    -- neighbour is median 0.70, p90 1.67, max 4.83 credits. The cheapest good
+    -- carrying a base price is 0.60. The BINDING case — worst haul, cheapest
+    -- good — is therefore
+    --
+    --     ceil > 1 + 4.83 / 0.60 = 9.06   ->  10.0, the next round number above it
+    --
+    -- 4.0 satisfied only the MEDIAN neighbour pair (needs 2.16) and just barely
+    -- the p90 (needs 3.79); it left the tail — the worst-connected market pair
+    -- carrying the cheapest good — permanently unservable. 10.0 covers every
+    -- nearest-neighbour pair measured, for every priced good.
+    --
+    -- The derivation is stated in full in docs/economy/MARKETS.md § The price band
+    -- so it can be RE-DERIVED rather than trusted; re-run haulage_measure if the
+    -- logistics costs, the map scale or the base-price table change.
+    --
+    -- THE FLOOR IS DELIBERATELY UNCHANGED. Ben's requirement derives a ceiling and
+    -- says nothing about a floor. Lowering it would widen the arbitrage margin too,
+    -- but only by cutting the revenue of producers already selling into a glut —
+    -- the direction Sprint 19's falling numbers are already complaining about — and
+    -- it would be an authored guess sitting next to a derived number, which is the
+    -- exact confusion step 1 existed to remove.
     price_band = {
         floor_mult = 0.25, -- lowest a price may fall, x base_price
-        ceil_mult  = 4.0,  -- highest a price may rise, x base_price
+        ceil_mult  = 10.0, -- highest a price may rise, x base_price (derived; see above)
     },
 
     -- BL-263 (2026-08-11): spontaneous market emergence — a market appears the

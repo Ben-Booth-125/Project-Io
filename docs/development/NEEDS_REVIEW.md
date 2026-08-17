@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*53 entries — 40 open, 13 resolved.*
+*60 entries — 46 open, 14 resolved.*
 
 ---
 
@@ -516,6 +516,72 @@ BL-442's guard is a new harness, tools/verify/price_band_harness.cpp. The docume
 
 *Files: `.claude/skills/verifier-headless/SKILL.md`, `tools/verify/price_band_harness.cpp`*
 
+### NR-289 — The premise of BL-442 step 2 is wrong in its most important particular: inter-market trade ALREADY happens on day 1
+*observation · raised 2026-08-17 · from tools/verify/haulage_measure.cpp, new this session. 5 seeds of the real generated world, 20 econ ticks each, band unchanged at the old [0.25x, 4.0x].*
+
+BL-442 step 2 is written on the premise that the narrow ceiling is why nothing moves between markets, and that inter-market trading is a late-game unlock rather than a day-1 fact. Measured at the OLD band: 2146 convoys dispatched, of which 1677 are intra-body market-to-market hauls. Inter-market trade was never absent. What IS absent - and was zero at the old band and stayed zero at the new one - is inter-BODY trade: 0 space-lane convoys and 0 persistent trade_routes across all five seeds. trade_routes is a body-level record (body_a/body_b in components.hpp), so BL-088's persistent route store cannot see intra-body trade at all, which is very likely why the thread believed there was none: the surface everyone reads was structurally blind to the trade that was happening.
+
+**Why it matters.** The zero that matters is gated by the launchpad and the propellant burn in dispatch_convoys, not by the price band. No ceiling reachable by any sane number will open the space lane, because the lane is refused before any price is consulted. If the goal is 'inter-body trade from day 1', widening the band is the wrong lever and this item cannot deliver it. If the goal is the intra-body one, it was already met and the widening is a volume/reach change rather than an unlock.
+
+> **Recommendation:** Ben to say which trade he meant. If it is the space lane, that wants its own item against the launchpad/propellant gate in supply_system.cpp, not a price tunable. The widening landed here on its own honest merit - it extends the servable set from the median neighbour pair to every measured neighbour pair - but it should not be recorded as having created inter-market trade, because it did not.
+
+*Files: `tools/verify/haulage_measure.cpp`, `src/world/supply_system.cpp`, `scripts/economy.lua`*
+
+### NR-290 — Decision taken: the price band's FLOOR was left at 0.25 while the ceiling moved 4.0 -> 10.0
+*decision taken on your behalf · raised 2026-08-17 · from BL-442 step 2. The item's summary calls the whole [0.25x, 4x] band 'far too narrow'; Ben's 2026-08-17 requirement derives only a ceiling.*
+
+Widening symmetrically was the obvious reading of 'widen the band' and it was rejected. The derivation Ben gave - the ceiling must exceed base + haulage for a neighbouring market to be worth serving - constrains the ceiling and says nothing about the floor. A lower floor does widen the arbitrage margin, but it does so by cutting the price an abundant producer receives, which is the same direction Sprint 19's falling economy numbers already complain about, and it would have put an authored guess immediately beside a derived number.
+
+**Why it matters.** It is a deliberate half-execution of the item as written, so it should not read later as an oversight. It also leaves the band asymmetric - [0.25x, 10.0x] - which is a legitimate shape for a scarcity model but is a change in character from the roughly log-symmetric [0.25x, 4x] it replaces.
+
+> **Recommendation:** If Ben wants the floor moved too, it should get its own derivation rather than a matching round number - most naturally from the carry cost of holding unsold stock, which the model does not currently charge at all.
+
+*Files: `scripts/economy.lua`, `docs/economy/MARKETS.md`*
+
+### NR-291 — The scarcity-outranks-abundance constraint was measured at 233x and deliberately NOT used
+*decision taken on your behalf · raised 2026-08-17 · from haulage_measure's base-price report: min 0.60, max 140.00 (spacecraft_components), ratio 233.33.*
+
+Ben's second sentence - 'a resource nobody can obtain is still cheaper than the one everybody has', with coal 2.0 -> 8.0 against iron ore 2.5 - reads as a constraint that a scarce good must be able to outprice an abundant one. Taken literally across the whole authored price table that demands ceil_mult > 233, because the table spans three tiers from a 0.60 raw to a 140.00 Tier 3 product. That was not used. RESOURCES.md promises margin WIDENS up the tiers and BL-340 priced spacecraft_components at 56x iron ore on purpose; a ceiling that lets the cheapest raw outprice the dearest product would delete the tier model the whole Trade pillar rests on.
+
+**Why it matters.** The constraint is only coherent WITHIN a tier, and Ben's own worked example is two raws. Within the ordinary raw tier (0.60 to 6.00 rare_earth_ore) it demands ceil > 10, which the landed 10.0 satisfies exactly - so the two derivations agree, and that agreement is the reason to be comfortable with 10.0 rather than a number chosen only from haulage.
+
+> **Recommendation:** Ben to confirm the within-tier reading. If he meant it across tiers, the fix is not a bigger ceiling - it is that scarcity should scale a good's price against its OWN tier's neighbours, which is a different model and a different item.
+
+*Files: `scripts/world_gen.lua`, `docs/economy/MARKETS.md`*
+
+### NR-292 — The refined tier's price is CEILING-DETERMINED at any band - widening 4x -> 10x only moved the peg, and made processing lose more
+*observation · raised 2026-08-17 · from tier_margin R7 (authored base_price vs live mean market price), run on both sides of the BL-442 step 2 widening.*
+
+At the OLD 4.0x ceiling the whole refined/product tier already sat at 3.35x-3.85x of base - i.e. riding the clamp. At the NEW 10.0x ceiling the same resources sit at 8.13x-9.55x. They did not find a new equilibrium; they moved to the new clamp. ids 30/31/32 (machinery, alloys, electronics) read 9.38x, 9.37x, 9.55x. That is a price the band is setting, not one supply and demand are setting. Consequence, measured: processing input cost 14.86 -> 26.56 while processing revenue only 12.55 -> 17.17, so processing net/tick fell from -10.42/-10.81 to -17.68. Extraction barely moved (8.09 -> 8.31) because raws are NOT pegged.
+
+**Why it matters.** It is the exact failure mode the item's own brief warned about ('a price pegged at the ceiling for a whole run is a finding worth more than a landed number'), and it says the ceiling is doing a job it should not be doing. A processor buys refined inputs from the rung below it, so when every refined price rides the clamp, widening the clamp raises a processor's COSTS as fast as its prices - faster, in fact, because a lower-rung processor sells one pegged good and buys several. Widening the band cannot fix processing margin; it makes it worse, monotonically. BL-436's open calibration questions (richness_reference, processing upkeep, recipe input quantities - NR-271) are where that fix lives, and they are deliberately untouched here.
+
+> **Recommendation:** Ben to decide whether 10.0 stands. It is correctly derived for the question it was asked (crossing inter-market haulage) and it is actively harmful to the question Sprint 19 actually cares about (does refining pay). Those are two different levers and this item was pointed at the first. If the pegging is the priority, the real finding is that the refined tier has no demand-side price discovery at all - it is clamp, EMA, clamp - which is a market-model item, not a tunable.
+
+*Files: `scripts/economy.lua`, `src/world/market_clearing.cpp`, `tools/verify/tier_margin.cpp`*
+
+### NR-293 — ai_skill_harness is STRUCTURALLY BLIND to scripts/economy.lua - its 20 red bands cannot move for any data-only economy change
+*observation · raised 2026-08-17 · from BL-442 step 2. ai_skill_harness was run on both sides of a 2.5x price-ceiling widening and returned BYTE-IDENTICAL output: same 20 failures, and all five seeds' net_worth final/min identical to the decimal (-2220111.0, -3080723.2, -2914809.5, -3407154.2, -1947063.6).*
+
+The harness hand-builds its recipe_registry (make_registry, ai_skill_harness.cpp line ~78) rather than loading the shipped Lua - its own comment says 'mirrors scripts/economy.lua'. The mirror covers building economics; it does not cover economy.price_band, so the harness runs on recipe_registry.hpp's struct defaults (0.25/4.0) whatever the shipped file says. It is not in CMakeLists' IO_TEST_SCRIPT_ROOTED_HARNESSES and links no Lua.
+
+**Why it matters.** The thread has been asking all session whether the Sprint 19 bands RISE. For any change authored in economy.lua, that question is not merely unanswered by this harness - it is unanswerable, and the identical output reads exactly like 'the change had no effect on the AI' when the truth is 'the change never reached the AI'. A silent mirror that has fallen behind is worse than no mirror: it produces a confident null result. This is the same class of defect as BL-389 (--serve never loads world_gen.lua) and as tier_margin's own missing world_gen.lua load, both already recorded.
+
+> **Recommendation:** Either make the harness live-Lua like tier_margin and player_seed_sweep (it would then measure the shipped economy, at the cost of moving its bands once and deliberately), or add price_band to make_registry's mirror with a comment naming what else is NOT mirrored. Not done here: it would move all 20 bands in the same commit as a band change, making the two unattributable, and re-blessing is Ben's call. Filed rather than fixed.
+
+*Files: `tools/verify/ai_skill_harness.cpp`, `CMakeLists.txt`*
+
+### NR-294 — Widening the ceiling REDUCED convoy dispatch - higher scarcity prices suppress the demand that dispatch reads
+*observation · raised 2026-08-17 · from tools/verify/haulage_measure.cpp second section, 5 seeds x 20 econ ticks, both bands.*
+
+Convoys dispatched fell 2146 -> 2029, and the intra-body market-to-market subset fell 1677 -> 1576, when the ceiling went 4.0 -> 10.0. The mechanism is legible and is not a bug: dispatch_convoys sizes every haul from a market's shortfall (demand - supply), and demand is price-elastic (economy.demand.demand_elasticity, exponent on base_price/price). A higher ceiling lets a scarce good's price rise further, elasticity then cuts the quantity demanded, the shortfall shrinks, and fewer/smaller convoys are dispatched to fill it.
+
+**Why it matters.** It is the direct opposite of the item's stated goal. The premise was that a higher ceiling makes distant supply worth hauling; measured, the price and the quantity move in opposite directions and the quantity effect wins at this scale. A margin that is wide enough but on a demand that has shrunk is not more trade. Anyone reading the landed ceiling as 'more goods now move' would be wrong by 5%.
+
+> **Recommendation:** Read together with NR-289 (inter-market trade was never absent) this says the band was not the constraint on trade in either direction. Ben to weigh whether 10.0 still earns its place on the haulage derivation alone. The number is honestly derived; the outcome it was expected to produce did not occur, and that is reported rather than tuned around.
+
+*Files: `tools/verify/haulage_measure.cpp`, `src/world/supply_system.cpp`, `scripts/economy.lua`*
+
 ---
 
 ## Resolved
@@ -704,4 +770,17 @@ P2 writes a probe Lua script to build_gen/verify/ to prove the loader really rea
 > **RESOLVED.** Fixed 2026-08-17 at integration: create_directories before the probe write. price_band_harness is green under ctest.
 
 *Files: `tools/verify/price_band_harness.cpp`*
+
+### NR-295 — build/scripts/ goes STALE on any Lua-only edit, and two live-Lua harnesses were reading it under ctest
+*observation · raised 2026-08-17 · from BL-442 step 2's full gate. tier_margin reported extraction 8.09 / processing -10.81 under ctest - the PRE-change numbers - while the same binary standalone from the repo root reported 8.31 / -17.68. price_band_harness failed under ctest on an assertion that passes standalone.*
+
+Two compounding causes. (1) CMakeLists copies scripts/ to the output dir in a POST_BUILD on the ProjectIo TARGET. A Lua-only edit is not a build dependency of anything, so nothing relinks, the POST_BUILD never fires, and build/scripts/ silently keeps the previous contents - measured here still holding the original ceil_mult 4.0 after two full 'nmake all' runs against a repo tree saying 10.0. (2) price_band_harness and tier_margin were never listed in IO_TEST_SCRIPT_ROOTED_HARNESSES despite both loading scripts/*.lua by relative path and both SAYING SO in their own headers (price_band_harness's README entry: 'Run it from the repo root'; tier_margin's CMake block explains it must load scripts/world_gen.lua). So under ctest they ran from build/ and read the stale copy.
+
+**Why it matters.** It is the vacuity trap CMakeLists already warns about two comments further down ('without this they run from the build dir, load nothing, and pass vacuously'), found twice more - and this time it did not merely pass vacuously, it produced a confident WRONG number. tier_margin under ctest reported an economy that no longer exists, and it would have gone on doing so for every future Lua-only tuning change. The general hazard is worse than these two harnesses: any harness added to the script-rooted list still reads the repo tree, but ProjectIo --verify runs and anything else with cwd=build read a copy that only refreshes when C++ changes.
+
+> **Recommendation:** Fixed here for the two harnesses: both added to IO_TEST_SCRIPT_ROOTED_HARNESSES with the reasoning recorded at the list. The DEEPER fix is left for Ben: the POST_BUILD copy should hang off the scripts themselves (a custom target with the .lua files as DEPENDS) rather than off ProjectIo relinking, so build/scripts/ cannot lag the repo. Worth a backlog item - it is a trap that will keep firing on every data-only economy change, which is exactly the shape of change BL-442 step 1 was built to encourage.
+
+> **RESOLVED.** Harness wiring fixed 2026-08-17: price_band_harness and tier_margin are now script-rooted under ctest and read the repo's scripts/, so both report the shipped economy. The stale-copy mechanism itself is NOT fixed and remains open for Ben.
+
+*Files: `CMakeLists.txt`, `tools/verify/price_band_harness.cpp`, `tools/verify/tier_margin.cpp`*
 

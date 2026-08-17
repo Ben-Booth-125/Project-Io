@@ -27,6 +27,13 @@ hand-declared in `CMakeLists.txt`), because its P2 row asks what the shipped
 `scripts/economy.lua` actually delivers. Run it from the repo root — P2 writes a probe script
 to `build_gen/verify/`, and the Lua loads are relative paths.
 
+`haulage_measure` (BL-442 step 2) is CMake-only and live-Lua for the same reason, and must also
+run from the repo root. It is the harness that *derives* the price ceiling `price_band_harness`
+guards the plumbing of: it measures the per-unit haulage between adjacent markets in the real
+generated world and prints the `ceil_mult` that follows. Report-only apart from a vacuity guard —
+re-run it and re-derive `economy.price_band.ceil_mult` whenever the logistics cost table, the map
+scale, or the `base_price` table changes.
+
 Use that route for anything linking the world superset — `world_audit`, `ai_skill_harness`,
 `history_ladder_harness`, **`settlement_harness`**, `data_creep_harness`, `corp_terrain_matrix`,
 `trade_routes_harness` — and for `font_glyph_harness`, which links ImGui and is hand-declared in
