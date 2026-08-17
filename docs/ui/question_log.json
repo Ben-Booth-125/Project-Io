@@ -328,6 +328,21 @@
         "src/ui/body_surface_canvas.cpp"
       ],
       "status": "drafted"
+    },
+    "starting_corp_choice": {
+      "surface": "Starting-corp selection stage (app_screen::choosing_corp, app::draw_corp_choice_screen)",
+      "answers": "Which of this world's corporations am I going to run - and what does each one actually open with?",
+      "because": "Which corp the player ran was an invisible lottery: the generator drew one and flagged it. Measured over 24 seeds (tools/verify/player_seed_sweep), that handed the player a pure-extraction corp on 13 of them, so the chain-depth ladder (BL-428) and the Method page (BL-430/BL-431) had no rung to stand on - while better openings sat unchosen in the same world. The screen earns its space by converting a hidden draw into a stated choice, which is also the honest alternative to rejection-sampling seeds (that would have hidden the distribution instead of exposing it). It shows name, industrial focus, home nation and holdings as N proc / N extr / N other. BALANCE IS DELIBERATELY ABSENT: opening balances are seeded BY the pre-game warm start, which has not run at this point, so every corp would read 0.0. And the screen deliberately does NOT rank the openings - BL-436 measured a processing facility as currently earning LESS per tick than the extraction site it replaces, so a processor-bearing corp is the DEEPER opening, not the richer one.",
+      "backlog_item": [
+        "BL-435"
+      ],
+      "files": [
+        "src/core/app.cpp",
+        "src/core/app.hpp",
+        "src/core/verify_api.cpp",
+        "scripts/verify/corp_choice.lua"
+      ],
+      "status": "drafted"
     }
   }
 }

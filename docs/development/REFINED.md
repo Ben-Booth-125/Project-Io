@@ -1,27 +1,28 @@
 # Project Io — REFINED (active worklist)
 
-## Starting-corp selection (promoted from BL-435) — **PAUSED** (4/6, 2026-08-16)
+## Starting-corp selection (promoted from BL-435) — **COMPLETE** (6/6, 2026-08-17)
 
-> **Paused 2026-08-16 at Ben's call to move to Sprint 19.** A, B, C and D are complete and
-> committed (`d80ca55`, `2f0f929`); **E and F are owed**. This is a deliberate pause, not a
-> cancellation — the item works end-to-end today and nothing is half-written.
+> **Resumed and finished 2026-08-17.** A–D landed 2026-08-16 (`d80ca55`, `2f0f929`); **E and F
+> landed this pass**. All six tasks terminal, requirements R1–R6 complete.
 >
-> **To resume, you need only this:**
-> - **E (the guard) is the real gap, and it has a catch worth knowing before you start.**
->   `--verify` currently *cannot reach the screen at all*: both automated paths take the
->   Surprise-me fallback deliberately, which is exactly what keeps every capture and golden
->   bit-identical. So E is not "add a golden" — it first needs a verify hook that stops at
->   `app_screen::choosing_corp` rather than auto-picking. Without that, any check written
->   against this screen is green-but-blind, the NR-255 failure mode.
-> - **Eyeball it live before blessing anything.** A golden blessed on an unreviewed layout just
->   pins whatever happened to get built. Ben has not seen the screen yet; `--autostart-play`
->   will NOT show it (it auto-picks), so it needs a game started from the menu.
-> - **F is pure propagation** and independent of E: CORPORATION_GENERATION.md already names the
->   deferred selection screen as an open item — that paragraph is now describable as built —
->   plus STARTUP.md's stage list and a `question_log.json` entry for the surface.
-> - **BL-436 is the loose thread this item created**, not a blocker for E/F. Filed priority A
->   with the measurement; until it lands, the screen presents a processing-heavy corp as the
->   richer pick when it is measurably the poorer one.
+> **E cleared the catch the pause was called on.** `--verify` genuinely could not reach the
+> screen — both automated paths take the Surprise-me fallback by design, which is what keeps
+> every other capture bit-identical. `verify.show_corp_choice(true)` re-enters the stage from a
+> started world, `verify.corp_choices()` exposes the armed list, and
+> `scripts/verify/corp_choice.lua` asserts + captures. It paid for itself on the first run:
+> the Holdings cell was clipped to "/ 1 otl" behind the Choose button (NR-275). The headless
+> half is `player_seed_sweep --guard` (G1–G4, own ctest `player_seed_sweep_guard`).
+> `build_corp_choices` also now skips `is_background` explicitly, so the specialist-only pool
+> stops being a property of *when* it is called (NR-273).
+>
+> **Still owed — Ben's eyeball, and it is why there is no golden.** The capture is
+> capture-only on purpose; blessing now would pin a layout he has never seen.
+> `--autostart-play` will NOT show the screen (it auto-picks), so it needs a game started from
+> the menu. NR-275 carries the note.
+>
+> **BL-436 (processing loses money) remains the loose thread**, unchanged: the screen is a
+> **depth** choice, not a wealth one, and every doc and check touched this pass says so
+> explicitly rather than implying the processor-heavy corp is richer.
 
 Requirements: requirements.json § starting-corp-selection (R1–R4)
 
@@ -64,11 +65,11 @@ and index 2 for trade (holdings 1–2, so **never**).
 - **[2] E — Guard: a headless row asserting the specialist/background split and the raised
   processor count, and a `scripts/verify/*.lua` visual check for the screen.** Files:
   `tools/verify/player_seed_sweep.cpp`, `scripts/verify/`, `.claude/skills/verifier-*/SKILL.md`.
-  Deps: D. Satisfies: R1, R2, R3.
+  Deps: D. Satisfies: R1, R2, R3, R5, R6. — **COMPLETE 2026-08-17.**
 - **[1] F — Propagate: CORPORATION_GENERATION.md (the deferred selection screen it already names,
   and the asset-pattern change), STARTUP.md (the new stage), question_log.json (the surface's
   question).** Files: `docs/generation/CORPORATION_GENERATION.md`, `docs/ui/STARTUP.md`,
-  `docs/ui/question_log.json`. Deps: D.
+  `docs/ui/question_log.json`. Deps: D. — **COMPLETE 2026-08-17.**
 
 **Parallelisation.** Strictly sequential A → B → C → D → {E, F}: B changes what C's candidate list
 contains, C provides the state D renders, and E/F both describe D. One vertical seam, so it runs

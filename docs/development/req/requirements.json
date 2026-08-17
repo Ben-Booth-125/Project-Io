@@ -3581,22 +3581,22 @@
    "brief": "starting-corp-selection",
    "batch": "2026-08-16-bl435",
    "title": "BL-435 — Let the player choose their starting corporation",
-   "status": "pending",
+   "status": "complete",
    "promoted_from": "backlog.json BL-435 STARTING_CORP_SELECTION",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "requirement": "ITEM-SPANNING (visual): after generation completes and BEFORE the pre-game warm start, the campaign presents the world's specialist corporations as selectable openings — each showing name, industrial focus, home nation and holdings by building type — and the corporation the player picks becomes world::player_entity. A 'surprise me' option reproduces today's seeded pick.",
      "verification": [
       "visual"
      ],
-     "result_metric": "",
+     "result_metric": "scripts/verify/corp_choice.lua capture: 8 selectable openings + Surprise me, rendered pre-warm-start",
      "notes": "Ben's call 2026-08-16: the choice happens BEFORE the warm start, so the chosen corp is the one corp_ai excludes for the whole 80-tick pre-game history. Balance is deliberately NOT a column: opening balances are seeded BY the warm start, so every corp reads 0.0 at selection time — showing it would be showing a number that means nothing yet."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "requirement": "The selectable pool is the SPECIALIST corporations (the set generate_corporations creates), not BL-365's background firms. Ben's call 2026-08-16.",
      "verification": [
       "headless"
@@ -3606,25 +3606,46 @@
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "requirement": "Materially more of the 8 specialists open with a processing facility than the 1-5 measured on 2026-08-16 — achieved by making focus_asset_pattern realise the intent already documented above it, not by clamping an outcome or rejection-sampling.",
      "verification": [
       "headless"
      ],
-     "result_metric": "",
+     "result_metric": "specialists with a processor 2.96/8 -> 6.92/8 over 24 seeds; seeds with none 1/24 -> 0/24",
      "notes": "Root cause measured, not guessed: the processor sits at a pattern index the holdings draw often never reaches. Extraction corps (holdings 3-4) carry it at index 3, so only a 4-draw gets one; trade corps (holdings 1-2) carry it at index 2 and can NEVER reach it. Both patterns' own comments already promise a processor. Trade corps deliberately keep none - a pure-trade opening is a real archetype and erasing it would flatten the choice this item exists to create."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "requirement": "Determinism holds: for a fixed seed and a fixed choice, the world is reproducible. The selection must not consume from any generation RNG stream, and 'surprise me' must reproduce the pre-BL-435 pick exactly.",
      "verification": [
       "headless"
      ],
-     "result_metric": "",
+     "result_metric": "no world/* change in tasks E-F; selection re-points only, Surprise me = the generator pick",
      "notes": "The generator's own seeded pick stays where it is and remains the default; selection RE-POINTS is_player/player_entity afterwards rather than replacing the draw. That keeps every existing golden and harness that never opens the screen bit-identical."
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "requirement": "The properties selection depends on are ASSERTED per seed, not merely reported: every world offers a choice, the specialist/background split holds, no specialist can fail to produce at all, and processor coverage stays above the pre-BL-435 floor.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "player_seed_sweep --guard 24: G1-G4 ALL PASS; 8 specialists/seed, 166 of 192 with a processor (6.92 per 8, floor 4.00, pre-BL-435 2.96), 0 dead, 0 mis-flagged",
+     "notes": "Added 2026-08-16 (task E) as a --guard mode on the existing sweep, registered as its own ctest player_seed_sweep_guard at 12 seeds. The mode split is deliberate: the default sweep answers an arguable design question and exits 0 whatever it finds, so folding an assertion into it would have made the report a verdict. G4 is a DEPTH floor and must never be re-read as a profitability gate — BL-436 measured a processing facility as currently earning less per tick than the extraction site it replaces."
+    },
+    {
+     "id": "R6",
+     "status": "complete",
+     "requirement": "The stage is REACHABLE to --verify and rendered correctly at 1280x720 — the surface R1 describes is actually photographable rather than asserted blind.",
+     "verification": [
+      "visual"
+     ],
+     "result_metric": "scripts/verify/corp_choice.lua: 18 expects PASS, screenshots/corp_choice.png shows 8 openings with name/focus/nation/holdings, Surprise me, no clipping",
+     "notes": "The catch task E was paused on: --verify could not reach the screen at all, because --autostart and the harness's own start both take the Surprise-me fallback the instant it appears (deliberately — that is what keeps every other capture bit-identical). verify.show_corp_choice(true) re-enters the stage from the started world; without it any check here would have been green-but-blind, the NR-255 failure mode. Capture-only, NO GOLDEN: Ben has not eyeballed the layout and blessing an unreviewed screen would pin whatever got built (owed — review.json). The first capture immediately paid for itself: the Holdings cell was clipped to '/ 1 otl' behind the Choose button, fixed by rebalancing the column weights off the measurement."
     }
-   ]
+   ],
+   "resolution": "Complete 2026-08-16 (tasks A-D on 2026-08-16, E and F on 2026-08-17). The starting corporation is a stated choice rather than a seed lottery: app_screen::choosing_corp lists the specialist corps between generation and the pre-game warm start — the one frame where the corps exist, the background firms do not yet, and the corp the player picks is the corp corp_ai will exclude for all 80 warm ticks. apply_corp_choice RE-POINTS is_player/player_entity, so Surprise me reproduces the pre-BL-435 pick and every path that never opens the screen is bit-identical. build_corp_choices now also skips is_background explicitly, so the pool being specialists-only stops being a property of WHEN it is called. Task E added player_seed_sweep --guard (G1-G4, own ctest) and verify.show_corp_choice + verify.corp_choices() + scripts/verify/corp_choice.lua, which caught a real clipping defect on its first capture. Task F propagated to CORPORATION_GENERATION.md (the deferred selection screen it named is now described as built, with the still-deferred half named honestly: the analytical profile and the re-roll verbs), STARTUP.md (the five-state machine and a new stage section) and question_log.json. STANDING CORRECTION carried into every doc touched: the item was filed on 'a corp with a processing facility is a better opening', and its own measurement contradicted the money half — BL-436 found processing earns LESS than the extraction it replaces, so this is a DEPTH choice, not a wealth one. No copy or check may say otherwise until BL-436 lands. Owed: Ben's eyeball on the layout before any golden is blessed."
   }
  ]
 }
