@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*70 entries — 56 open, 14 resolved.*
+*74 entries — 60 open, 14 resolved.*
 
 ---
 
@@ -699,6 +699,34 @@ The brief called the friend/neutral/hostile model 'the standing model'. src/worl
 The thesis was that spectator mode (BL-409) is the forcing function making seam reachability observable, since with no human seat every corp must reach its goals through one seam. The first half holds exactly: under corp_ai_params::spectating the prohibition is unsubscribed, world::player_entity evaluates like any rival, so a spectated session genuinely does drive every corp through apply_corp_command. But spectate makes the gap CONSEQUENTIAL without making it OBSERVABLE. A UI-only verb simply never fires and nothing reports that it did not. A seam-only verb is not exercised either, since the scorer does not emit it. Spectate is silent on both.
 
 **Why it matters.** tools/verify/spectator_determinism.cpp confirms this concretely: it buckets 15 verbs into 4 families, so place_sell_order alone satisfies the whole 'trade' family and hides the four unemitted trade verbs behind it, while hire_unit alone satisfies 'other' and hides demolish and place_road. The harness built to prove spectate exercises the seam does so at a granularity too coarse to see that 7 of 15 verbs never fire. So spectate is the right forcing function only once paired with an instrument - which is why the reachability sprint leads with the instrument rather than the fixes.
+
+### NR-306 — What does a unit consume - credits, goods, or both? The data model differs by answer
+*question · raised 2026-08-17 · from Sprint 25 logistics/military audit, filing BL-454 (units cost nothing to keep).*
+
+w.units appears in no economic flow at all - verified by grep across economy_system.cpp, budget_system.cpp and construction.cpp. hire_unit debits once (BL-394) and a regiment is then free forever while every building beside it pays maintenance and wages each tick. Adding upkeep admits three readings. (a) Credits only: a sixth term in apply_budget, cheapest, composes with the runway header and the solvency gate for free, but says nothing about logistics. (b) Goods only: a per-tick consumable draw from the corp's pool on that body - the grain/fodder line BL-287 has been holding - which makes the reach field bite but needs a ration good in the roster. (c) Both: wages in credits, rations in goods; the honest model, roughly double the work.
+
+**Why it matters.** It is not a tuning constant, it is the shape of the unit pass. (a) resolves to a float per unit; (b) and (c) resolve to a cost vector against a pool that can be empty, which introduces a partial-supply case and therefore a decay or desertion rule - which is BL-325 S3's territory. Choosing (a) and later wanting (c) is a rewrite of the pass unless it is written as 'resolve a cost vector' from the start. This is also the item that couples the military layer to the logistics layer at all: BL-325's ruling 3 already made the economic reach field the military supply envelope, and upkeep is what makes that ruling cost something.
+
+### NR-307 — Two write-only accumulators: military_points and science are credited every tick and read by nothing
+*observation · raised 2026-08-17 · from Sprint 25 audit, grepping BL-332 military_points across src/.*
+
+corporation_component::military_points and ::science each have exactly three sites in src/: the declaration in components.hpp, the Lua param load in recipe_registry.cpp, and the write in economy_system.cpp's per-tick pass. No gate reads them, no UI surface shows them, the corp_ai scorer does not score them, and export_corp_blackboard does not export them. military_capability_harness verifies the accumulation faithfully - symmetry across player and non-player corps, no credit while under construction - which makes it a green check over a number nothing reads.
+
+**Why it matters.** This is NR-257's orphan-resource shape with the arrow reversed: produced by something, consumed by nothing. That precedent resolved by DELETING five resource_type values rather than by finding uses for them, and the roster got healthier. The same test should be applied rather than assumed away. science plausibly has a home (tech_gate.cpp exists, BL-344 landed one earned tech) and may just be unwired. military_points is the harder case and delete may be the honest answer - under BL-325 the economy-to-military interface is the base tile plus the reach field, and under BL-454 the recurring cost is credits and goods, so a third abstract military currency either gates something unnamed or duplicates those.
+
+### NR-308 — Sprint 22 counted verbs against surfaces; it could not see a subsystem that owns no verb
+*observation · raised 2026-08-17 · from Sprint 25 audit, re-reading the Sprint 22 reachability table against src/world/corp_command.hpp.*
+
+Sprint 22's audit joined four artefacts - the seam, the dictionary, each entry's surface field, and the scorer's emission sites - and found seven of fifteen verbs unreachable from one direction or another. Every one of the fifteen is reachable from at least one. The question it did not ask is the complementary one: which SUBSYSTEMS own no verb at all. The convoy layer owns none. corp_verb's fifteen values name eight buildings, three orders, two contracts, one body and one tile; not one names a convoy. That is ~340 lines of supply_system.cpp plus the whole of logistics.cpp plus four rendering paths, entirely automatic.
+
+**Why it matters.** A join over the verbs that exist can only find gaps in verbs that exist. It is structurally blind to the absent verb, and the absent verb is the larger gap here - SUPPLY.md's own Build status has carried the line 'Player-directed dispatch has no UI or code path yet' since the layer landed, and its Dispatch trigger section describes player-direction as a shipped exception that was never built. If BL-444's coverage tool is written as designed it will inherit the same blind spot, and a green coverage report will read as 'everything is reachable' over a game with an untouchable logistics layer.
+
+### NR-309 — Sprint 25 proposed as the seam between military and logistics, not as more of either
+*decision taken on your behalf · raised 2026-08-17 · from Sprint 25 proposal, answering the brief to pad out the military and logistics systems.*
+
+The brief asked what to build to pad out both systems. The obvious readings are more military content (units, rosters, battle detail) and more logistics content (modes, nodes, capacity), and both were rejected in favour of the seam between them - upkeep, dispatch, and the surfaces that read each. The reasoning: Sprints 21, 23 and 24 already propose the military reach arc end to end (verbs, hostility, rival stance reasoning), so a fourth military-content sprint would duplicate them; and v0.1.12 already holds four logistics items (BL-153, BL-173, BL-175, BL-188) whose theme is that distance costs more and reads better, none of which gives the player a lever. Padding either side alone adds to a stack that is already deep and still untouchable.
+
+**Why it matters.** It is a scoping call made on Ben's behalf and it excludes things he may have meant. Specifically excluded and named in the sprint block: convoy interdiction and escort (deferred behind BL-315 conflict spine and BL-448 stance - a convoy cannot be escorted until something can threaten it), per-node throughput capacity (SUPPLY.md puts it out of prototype scope), air mode and the airfield building, and any second reach field (BL-325's ruling 3 forbids it).
 
 ---
 

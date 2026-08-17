@@ -10444,6 +10444,137 @@
    "authority_doc": "docs/ai/AI_OPPONENT.md",
    "summary": "Filed 2026-08-17 from the Sprint 22 audit. spectator_determinism buckets the 15 verbs into four families (build / dial / survey / trade / other), so seven verbs no scorer emits are absorbed silently by families their siblings satisfy.",
    "design": "## The blind spot\n\n`family_of()` maps `place_sell_order`, `remove_sell_order`, `request_quote`,\n`accept_quote` and `cancel_contract` all to `verb_family::trade`. A rollout in which\nrivals place sell orders and do nothing else satisfies the trade family completely, and\nthe four unemitted verbs beside it are invisible. The same absorption hides `demolish` and\n`place_road` inside `other`, which `hire_unit` satisfies on its own.\n\nSo the harness that exists to prove spectate exercises the seam proves it at a granularity\ntoo coarse to notice that seven of fifteen verbs never fire.\n\n## Shape\n\nKeep the family assertion — it is doing a different job (BL-409 R1, that no single corp\nneeds all four families over a short run). **Add** a per-verb histogram over the rollout,\nprinted always and asserted never. A printed count is the right instrument here: asserting\na floor per verb would fail legitimately whenever a verb is correctly rare, and a harness\nthat fails legitimately is a harness that gets muted.\n\nThe histogram is then the behavioural half of BL-444 (verb coverage tool) static read —\none says the path exists, the other says it was walked.\n\n## Cheap and independent\n\nOne file, no world change, no golden movement. It should run first in any reachability\nwork, because it is the measurement everything else is judged against."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-17",
+   "created": "2026-08-17",
+   "id": "BL-452",
+   "short_name": "LOGISTICS_HAS_NO_VERB",
+   "category": "Economy",
+   "difficulty": 3,
+   "priority": "A",
+   "version_goal": "v0.1.12",
+   "requires": [],
+   "title": "The convoy layer is the largest built subsystem with no player verb at all",
+   "files": [
+    "src/world/corp_command.hpp",
+    "src/world/corp_command.cpp",
+    "src/world/supply_system.hpp",
+    "src/world/supply_system.cpp",
+    "docs/ai/ACTIONS.json",
+    "docs/economy/SUPPLY.md"
+   ],
+   "authority_doc": "docs/economy/SUPPLY.md",
+   "summary": "Filed 2026-08-17 from the Sprint 25 logistics audit. Layer 5 - convoy component, terrain-weighted A* routing, the km-per-tile travel-time model, road/river/node discounts, four rendering paths and a persistent trade-route store - is entirely automatic. None of the fifteen corp_verbs names a convoy. SUPPLY.md's own Build status has carried the line 'Player-directed dispatch (the Dispatch trigger exception has no UI or code path yet)' since the layer landed, and its Dispatch trigger section describes player-direction as a shipped exception that was never built.",
+   "design": "## The gap, measured\n\n`corp_verb` holds fifteen values. Eight name a building, three an order, two a\ncontract, one a body (`survey`), one a tile (`place_road`). **None names a convoy.**\n`dispatch_convoys` is called from the economy tick and from nowhere else; the only\nway a player influences a lane is indirectly, by building a port or a road and\nhoping the auto-dispatcher notices.\n\nThis is the same defect BL-393 (units are write-only and inert) describes one layer\nover, and it is larger: the convoy layer is ~340 lines of `supply_system.cpp` plus\nthe whole of `logistics.cpp`, and it is the *only* coupling between two markets'\nprices. SUPPLY.md § Convoy entity states it outright - \"there is no abstract\nprice-coupling term between bodies: the convoy *is* the coupling\". The player cannot\ntouch it.\n\n**Sprint 22's reachability audit could not see this.** It joined seam, dictionary,\nsurface and scorer over the verbs that exist, and every one of the fifteen is\nreachable from at least one direction. The question it did not ask is which\n*subsystems* own no verb. Recorded as NR-308.\n\n## Shape - two verbs, not a routing UI\n\n**`dispatch_convoy`** (subject = source market, `target` = resource, `quantity`,\n`counterparty` = destination market). Commits cargo from the source pool at once,\nexactly as the auto path does, prices the haul through the same `intra_body_path` /\n`body_distance_au` call, and appends a `convoy_component`. It is the auto-dispatcher's\nbody with the shortfall scan removed - **no second code path**, which is the same\nmitigation Sprint 22 named for BL-445.\n\n**`hold_convoy`** (subject = convoy). Not a cancel: cargo already left the pool, so\na cancel would have to invent a return leg or mint goods. A held convoy stops\nadvancing and pays nothing further; releasing it resumes. The narrow version is\nthe honest one - a full recall is a separate design question and is out of scope here.\n\nBoth go through `apply_corp_command` and are refused, not clamped, on a bad field:\nthe seam is an untrusted input boundary (standing rules, 2026-08-14), so quantity is\nrange-checked against the source pool as the value that lands, and a rejection\nmutates nothing.\n\n## What this deliberately does not add\n\nNo waypoint routing, no standing lane orders, no per-node throughput (SUPPLY.md puts\nthat out of prototype scope), no convoy escort. Escort is the interesting one and it\nbelongs after BL-315 (conflict spine) and BL-448 (stance) - a convoy cannot be escorted\nuntil something can threaten it.\n\n## Dictionary\n\nTwo new `gameplay` family entries in ACTIONS.json, **transcribed from the seam once it\nexists** and never authored ahead of it (BL-270's discipline). This is also the first\ntime the dictionary will carry a verb whose subject is a transient entity, which is\nworth getting right: a convoy id is valid for a handful of ticks.\n\n## Why this minor\n\nv0.1.12 (logistics modes) is themed *\"distance costs something, in more than one way,\nand the player can see it\"* and carries four items - freight premium (BL-153), rail\n(BL-173), coastal ports (BL-188), supply-lens flow (BL-175). Every one of them makes\ndistance cost more or read better. **After all four land, the player still cannot\ndispatch a convoy.** This item and BL-453 are what turn that minor from a tuning pass\ninto a lever."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-17",
+   "created": "2026-08-17",
+   "id": "BL-453",
+   "short_name": "CONVOYS_HAVE_NO_LEDGER",
+   "category": "UI",
+   "difficulty": 3,
+   "priority": "A",
+   "version_goal": "v0.1.12",
+   "requires": [
+    "BL-452"
+   ],
+   "title": "In-flight convoys are drawn on three canvases and listed nowhere",
+   "files": [
+    "src/ui/market_ledger.cpp",
+    "src/ui/market_ledger.hpp",
+    "src/ui/ui_state.hpp",
+    "docs/ui/question_log.json",
+    "docs/ui/LAYOUT.md"
+   ],
+   "authority_doc": "docs/economy/SUPPLY.md",
+   "summary": "Filed 2026-08-17 from the Sprint 25 logistics audit, and filed separately from BL-452 on purpose. Convoys render well - a moving beam with a trailing tail on the Planetary canvas, inter-body lines on the Solar canvas, a convoy glyph under the Supply lens, an aggregated trade-route graph under Supply-routes. What no surface gives is the list: what is in flight, carrying what, from where to where, arriving when, and at what haul cost. A player can watch a convoy and cannot read one.",
+   "design": "## Why separate from BL-452\n\nBL-350 (procurement seam) landed complete world state, serialisation, validation and a\nharness with **no player surface at all**, and nobody noticed for weeks - Sprint 22's\naudit found it. A surface that is a task inside the model item is the first thing cut\nunder pressure. So the press is its own item, blocked on the seam, and the two are\nargued against the same behaviour.\n\n## The surface\n\nA **Convoys tab on the Market Ledger**, beside Sell Orders and (per Sprint 22's BL-445)\nContracts. Same chrome, same toggle rule, no new ledger slot on the nav rail.\n\nOne row per in-flight convoy of the player's corp: cargo resource and quantity, source\nand destination market, mode glyph (land / sea / space - air is never dispatched), a\nprogress bar off `convoy_component::progress`, **ticks to arrival** derived from\n`speed`, and the haul cost already paid. Selecting a row focuses the lane on the active\ncanvas; the Hold press (BL-452's second verb) sits on the row.\n\nThe dispatch press itself belongs on the **market Selection card**, not here - a\ndispatch starts from a source you are looking at, and the ledger is the register of what\nis already moving.\n\n## The number worth showing that nothing shows today\n\n`ticks to arrival`. The travel-time model landed 2026-08-12 and is genuinely load-bearing\n- a long haul now takes several quarters where it used to take one - and **no surface\nreports it**. A player who cannot see arrival time cannot feel the change the model made,\nwhich makes it the strongest single argument for this tab.\n\n## Question log\n\nRequired, per BL-260: the question is *\"what is on its way to me, and when does it land\"*.\nDrafted rather than settled - Ben's wording."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-17",
+   "created": "2026-08-17",
+   "id": "BL-454",
+   "short_name": "UNITS_COST_NOTHING_TO_KEEP",
+   "category": "Military",
+   "difficulty": 3,
+   "priority": "A",
+   "version_goal": "v0.1.15",
+   "requires": [],
+   "title": "An army is bought once and then is free forever - w.units appears in no economic flow",
+   "files": [
+    "src/world/budget_system.hpp",
+    "src/world/budget_system.cpp",
+    "src/world/economy_system.cpp",
+    "src/world/construction.cpp",
+    "scripts/economy.lua",
+    "src/ui/selection_panel.cpp"
+   ],
+   "authority_doc": "docs/economy/FINANCE.md",
+   "summary": "Filed 2026-08-17 from the Sprint 25 audit, code-verified: `w.units` is referenced in economy_system.cpp, budget_system.cpp and construction.cpp exactly zero times. hire_unit debits a one-off resource draw plus a credit cost (BL-394) and after that a regiment is free in perpetuity, while every building beside it pays maintenance and wages every single tick. This is the cheapest possible coupling between the military and logistics systems and it does not exist.",
+   "design": "## The measured state\n\n`grep w.units` across `economy_system.cpp`, `budget_system.cpp` and `construction.cpp`\nreturns nothing. `apply_budget`'s five flows (income / expenditure / maintenance /\nwages / interest - FINANCE.md) are **all building-derived**. `operating_cost` takes a\n`building_component`. There is no unit pass anywhere in the economy tick.\n\nSo the standing rules' concern about rival hiring - BL-324's \"never on cash\" for\navailability, and Ben's 2026-08-13 ruling that spending is still gated by solvency -\ncurrently prices only the **moment of hire**. A rival that hires twelve units carries\nno recurring burden for them, which means the solvency gate it passes at hire time is\nthe only pressure the roster ever applies.\n\n**The second half of the same gap: `demolish_building` erases the asset, the building\nand its stockpile, and never touches `w.units`.** Demolishing a military base silently\norphans every unit mustered there - BL-393 names this and the code confirms it\n(`construction.cpp`, the three erase calls).\n\n## Why this is the military-logistics seam and not just a cost\n\nBL-325's ruling 3 already settled the substrate: *\"a nation's reach for economy is also\nthe military reach\"* - `body_reach_field` is the supply envelope, and there is no second\nfield. Upkeep is what makes that ruling **bite**. An army inside the network draws\nthrough the network the economy already built; an army outside it cannot be paid or fed,\nwhich is exactly what BL-325 S3's decay expresses. Upkeep and decay are the same rule\nread at two distances, and upkeep is the half that does not need BL-315 to exist first.\n\n## The open question - what does a unit consume\n\n**This is Ben's call and the data model differs by answer.** Recorded as NR-306.\n\n- **(a) Credits only.** A per-tick wage per unit, a sixth term beside the existing five.\n  Cheapest, composes with the runway header and the budget ledger for free, and the\n  solvency gate already knows what to do with it. Says nothing about logistics.\n- **(b) Goods only.** A per-tick draw of a consumable from the corp's pool on that body -\n  the grain/fodder line BL-287 has been holding. Makes supply physical and makes the\n  reach field matter, and needs the roster to actually carry a ration good.\n- **(c) Both.** Wages in credits, rations in goods. The honest model and the one that\n  makes hiring a standing commitment rather than a purchase; roughly double the work,\n  and it is the one that most wants a surface before it is playable.\n\n**Recommendation, offered as a recommendation: (a) first, shaped so (b) drops in.**\nA per-tick cost keyed on unit type through the roster, landed as a sixth budget flow,\nis one session and immediately makes the AI's hiring decisions cost something over time.\nThe consumable draw is a genuine follow-on rather than a rewrite, provided the pass is\nwritten as \"per unit, per tick, resolve a cost vector\" rather than \"add a float\".\n\n## Slices\n\n**U1 - the unit pass.** A pass over `w.units` in the economy tick, deterministic, sorted\nby unit id. Orphan cleanup rides here: a unit whose owning corp no longer holds a\ncompleted military_base on its body is the demolish defect's fix, and the pass is the\nonly place that can see it.\n\n**U2 - the flow.** Upkeep as its own term in `apply_budget`'s decomposition, not folded\ninto wages - the budget ledger reads the split and a hidden term is a term nobody tunes.\n\n**U3 - the surface.** Upkeep on the unit Selection card and a force line in the budget\nledger. A cost the player cannot see is a cost they cannot respond to.\n\n## The check\n\nExtend `tools/verify/econ_harness.cpp` or a new `unit_upkeep` harness: (1) a corp with N\nunits pays exactly N x rate per tick and nothing else changes, (2) demolishing the base\nleaves no orphan unit, (3) two runs of one seed produce identical balances, (4) the\npre-item save replays byte-identically when the rate is zero - the same\ndefaults-off proof `spectator_determinism` used for BL-409.\n\n## Risk\n\nThis touches `economy_system.cpp` and `economy.lua`, which Sprint 21's own risk paragraph\nnames as the hot seam. It also **moves every economy golden**, because every seed with a\nhiring rival now spends differently. Bless with a stated cause, and take the measurement\nof how much rival balances move *before* changing the rate from zero."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-17",
+   "created": "2026-08-17",
+   "id": "BL-455",
+   "short_name": "MILITARY_POINTS_AND_SCIENCE_ARE_WRITE_ONLY",
+   "category": "Military",
+   "difficulty": 2,
+   "priority": "B",
+   "version_goal": "v0.1.16",
+   "requires": [],
+   "title": "military_points and science are credited every tick and read by nothing, anywhere",
+   "files": [
+    "src/world/components.hpp",
+    "src/world/economy_system.cpp",
+    "src/world/recipe_registry.cpp",
+    "tools/verify/military_capability_harness.cpp"
+   ],
+   "authority_doc": "docs/economy/FINANCE.md",
+   "summary": "Filed 2026-08-17 from the Sprint 25 audit. BL-332 gave every completed military_base a per-tick credit to corporation_component::military_points and every completed research_institute a credit to ::science. A full grep across src/ finds three sites for each: the declaration, the Lua param load, and the write. No gate reads them, no surface shows them, no scorer scores them, and the AI blackboard does not export them. They accumulate forever and mean nothing.",
+   "design": "## Same shape as the orphan resources\n\nNR-257 removed five `resource_type` values that were produced by nothing and consumed by\nnothing. These two are the mirror: **produced by something and consumed by nothing.** The\nprecedent is the point - the roster got healthier by deleting rather than by finding uses,\nand the same test should be applied here rather than assumed away.\n\n`military_capability_harness` verifies the accumulation faithfully - symmetry across player\nand non-player corps, no credit while under construction or decommissioned. It is a green\ncheck over a number nothing reads, which is the Sprint 18 lesson in a different key.\n\n## This is a measurement first, not a build\n\nDo not design a consumer before asking whether one is wanted. The item's first output is\nthe answer to one question per accumulator:\n\n- **`science`** most likely has a home: `tech_gate.cpp` exists and BL-344 landed one earned\n  tech. If the tech ladder's unlock currency is meant to be this field, the gap is a wiring\n  job and the item is small. If the ladder is gated some other way, the field is redundant.\n- **`military_points`** is the harder one, and the honest answer may be **delete**. Under\n  BL-325 the economy->military interface is the base tile plus the reach field, and under\n  BL-454 the recurring cost is credits and goods. A third abstract military currency beside\n  those either gates something (what?) or duplicates them. If BL-094's governing-body pivot\n  wants it, it is a v0.3.0 field arriving three minors early.\n\n## Either outcome is a result\n\nWire it or remove it. What is not acceptable is a third state where it keeps accumulating\nand a future reader assumes it means something - the exact failure the orphan resources\ncaused. If it is removed, the harness rows go with it and the removal is a save-format\nchange (BL-107's magic header is the thing that would reject a stale save).\n\nRecorded as NR-307."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-17",
+   "created": "2026-08-17",
+   "id": "BL-456",
+   "short_name": "NO_MILITARY_AUTHORITY_DOC",
+   "category": "Documentation",
+   "difficulty": 2,
+   "priority": "B",
+   "version_goal": "v0.1.15",
+   "requires": [],
+   "title": "The military layer has no authority doc, so eleven items point at the AI doc or at nothing",
+   "files": [
+    "docs/military/MILITARY.md",
+    "CLAUDE.md",
+    "docs/development/backlog.json"
+   ],
+   "authority_doc": "docs/military/MILITARY.md",
+   "summary": "Filed 2026-08-17 from the Sprint 25 audit. docs/ has economy/, generation/, ui/, ai/, lore/, tech/ and development/ - and no military/. BL-325 (military bases and supply) names docs/ai/AI_OPPONENT.md as its authority, which is the doc about the rival's decision-making, not about how force works. The battle resolvers, the terrain scalars, the roster, the reach-as-supply ruling and the unit model are spread across campaign_battle.hpp, combat.hpp, terrain_combat.cpp, unit_roster.cpp and eleven backlog items, with no doc that owns the subject.",
+   "design": "## Why it matters here rather than as tidying\n\nCLAUDE.md's § Documents is a **traversal map** - the instruction is to find the doc that\nowns the question and read that, because the corpus is ~650K tokens and reading it all\nstopped being possible. The military subject has no entry in that map. A session asked to\nwork on units, supply decay or a battle trigger has nowhere to start and reads source, which\nis how Sprint 21's audit found that BL-315's resolver was *already built* while three sprint\nblocks in a row described it as unbuilt.\n\nThat is the concrete cost, and it has already been paid once.\n\n## What the doc owns\n\nWritten as an authority for what is **built**, in the SUPPLY.md style - a status banner and\na Build status section separating landed from outstanding, so it cannot rot into an\naspiration doc:\n\n- The two resolvers and the difference between them: `resolve_battle` (Era -1, nation-scale,\n  called by the history sim) and `resolve_campaign_battle` (campaign-scale, seeded rounds,\n  priced withdrawal, **zero callers**).\n- The unit model: `unit_component`'s five fields, tile-canonical position (BL-157), and the\n  `strength` fixed-point inconsistency NR-247 is still open on.\n- The roster and its era bands; the corp-side gate.\n- The muster interface: `military_base`, hire-at-base, and BL-325's ruling 3 - one reach\n  field, economic equals military - which is the single most load-bearing military decision\n  taken so far and currently lives only in a backlog item's `design` field.\n- Terrain defence and attrition scalars.\n- What is absent and known to be: hostility (BL-448), unit verbs (BL-393/BL-314), engagement\n  trigger, battle state in the world, upkeep (BL-454), out-of-supply decay (BL-325 S3).\n\n## Mechanical tail\n\nAdd the § Documents entry to CLAUDE.md, and repoint the `authority_doc` field on the military\nitems that currently name AI_OPPONENT.md. Both are small; the doc is the work.\n\n## Not in scope\n\nThis writes down what exists and what is known missing. It does **not** settle hostility,\nthe symmetry question (BL-448/NR-302), or anything Sprint 21's audit lists as absent - a\ndoc that decides open design questions on the way past is how authority docs get ahead of\ntheir work, which DELIVERY.md § Design state prohibits."
   }
  ]
 }
