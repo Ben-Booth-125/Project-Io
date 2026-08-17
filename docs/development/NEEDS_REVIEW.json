@@ -813,6 +813,52 @@
         "src/world/market_clearing.cpp"
       ],
       "resolution": null
-    }
+    },
+   {
+     "id": "NR-281",
+     "title": "BL-441: the want registered is NET of the corp's own pool, not the gross full-run need — a deliberate narrowing of the item's wording",
+     "raised": "2026-08-17",
+     "kind": "decision-taken",
+     "status": "open",
+     "source": "Implementing BL-441 in run_processing (economy_system.cpp), reading the item's design against what mc.demand means to resolve_price.",
+     "what": "BL-441's design says the demand to register is 'the full-run need per input'. Taken literally that is the GROSS need — 2 units per batch times the full batch count — regardless of how much of it the corp already holds in its own (corp, body) pool. I registered `max(0, need_full - pool_on_hand)` instead: the want the corp has OF THE MARKET. In the item's own worked example the two are identical, because a starved processor's pool is empty by construction, and the guard (order_book_harness R8) is written on an empty pool so it cannot tell them apart.",
+     "why_it_matters": "They differ for a corp that is NOT starved. mc.supply is an offer made to the market and mc.inventory is a delivery to it — BL-422's distinction. resolve_price compares supply against demand, so demand has to be the BID to the market for the comparison to be apples-to-apples. Under the gross reading, a vertically integrated corp that feeds its smelter entirely from its own mine would register full market demand for an input it never intends to buy, permanently inflating that input's price for everyone else. That is BL-422's defect in a third direction: crediting a transaction nobody made. Under the net reading, demand appears exactly when the buffer drains, which is when the corp actually competes for the good.",
+     "recommendation": "Keep the net reading; it is the one that makes demand the counterpart of supply. If Ben wants gross — a defensible alternative if mc.demand is meant to express total CONSUMPTION of a good rather than market pressure on it — it is a one-line change at the same site, but the two meanings should not be mixed and MARKETS.md should then say which it is.",
+     "files": [
+       "src/world/economy_system.cpp",
+       "docs/economy/MARKETS.md"
+     ],
+     "resolution": null
+   },
+   {
+     "id": "NR-282",
+     "title": "BL-441 necessarily pulled run_construction into scope — otherwise the fix would have silently ZEROED construction's market demand",
+     "raised": "2026-08-17",
+     "kind": "decision-taken",
+     "status": "open",
+     "source": "Tracing every writer of economy_report::purchases before splitting the demand read in market_clearing.cpp.",
+     "what": "BL-441's design names run_processing only. But run_construction (economy_system.cpp, BL-095 pay-as-you-build) is the OTHER writer of report.purchases, and market_clearing's single demand loop was reading both. Had I pointed demand at a new `wants` map fed only by processing, construction sites would have gone from registering their drawn materials as demand to registering NOTHING — a regression introduced by the fix. So run_construction now records its want too: the full-rate material need, registered BEFORE the `rate <= 0` continue, so a build paused for want of steel finally says so. This is the same defect in the same file, and arguably the starker case: a fully stalled build site previously registered zero demand for the exact material stalling it.",
+     "why_it_matters": "It widens the diff beyond the item's stated file scope while a parallel worktree (BL-442, price band as data) is editing the same two files. Worth Ben knowing it was forced by coherence rather than chosen, and worth knowing that construction demand is now a want and will read higher than before across the whole economy.",
+     "recommendation": "Accept as part of BL-441. If it should have been its own item, the split point is clean — the construction want is one added block in run_construction.",
+     "files": [
+       "src/world/economy_system.cpp"
+     ],
+     "resolution": null
+   },
+   {
+     "id": "NR-283",
+     "title": "NR-276's dependency-cache fix does not reach a git WORKTREE — the default cache path resolves inside the worktree, where there is no cache",
+     "raised": "2026-08-17",
+     "kind": "observation",
+     "status": "open",
+     "source": "Cold-configuring build/ in the BL-441 worktree at .claude/worktrees/agent-ae85f8b7ecd01345e.",
+     "what": "CMakeLists.txt defaults IO_DEPS_CACHE to ${CMAKE_CURRENT_SOURCE_DIR}/_deps_cache. In the main checkout that is C:/Users/benbo/Project-Io/_deps_cache and the fix works. In a worktree, CMAKE_CURRENT_SOURCE_DIR is the worktree root, which has no _deps_cache — so a cold configure there finds nothing to seed from and falls through to downloading. I got a zero-download configure only by exporting IO_DEPS_CACHE=C:/Users/benbo/Project-Io/_deps_cache by hand.",
+     "why_it_matters": "Worktrees are the project's primary sub-agent isolation mechanism (DELIVERY.md), so the case where the cache matters most — several agents each cold-configuring at once — is exactly the case the default misses. Each pays the ~120 MB download NR-276 exists to prevent.",
+     "recommendation": "Make the default cache path resolve against the main repository rather than the source dir — `git rev-parse --path-format=absolute --git-common-dir` gives the shared .git, whose parent is the main checkout, and it degrades to the current behaviour outside a worktree. Small change to CMakeLists.txt; not done here because it is outside BL-441 and touching the build config mid-flight would disturb the parallel worktrees.",
+     "files": [
+       "CMakeLists.txt"
+     ],
+     "resolution": null
+   }
   ]
 }

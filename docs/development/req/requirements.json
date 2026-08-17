@@ -3882,6 +3882,65 @@
      "notes": "The pre-change defect was NOT a determinism violation (same-seed reproducibility within a binary always held); it was a cross-toolchain instability in which market got read. R1's order-independence assertion is what closes that."
     }
    ]
+  },
+  {
+   "brief": "demand-register-records-wants",
+   "batch": "2026-08-17-bl441",
+   "title": "BL-441 - The market demand register records the WANT, not the FILL, so a starved input can price like a scarce one",
+   "status": "complete",
+   "promoted_from": "backlog.json BL-441 UNMET_DEMAND_IS_NEVER_REGISTERED",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "ITEM-SPANNING (headless): a consumer that could not get what it needed registers market demand equal to what it WANTED, not to what it managed to draw. Asserted on observable market state (market_component::demand) so the check compiles and runs against the PRE-CHANGE build and is seen to fail there - a guard never seen to fail is not a guard.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. order_book_harness R8.1: a processor with a full-run need of 8 iron ore and an EMPTY market shelf now registers demand of exactly 8.000. Shown to FAIL on the pre-change build first, printing \"R8 starved: demand=0.000 supply=0.000 price=5.000\" - the register was completely silent about the one input the body was short of. Post-change: \"demand=8.000 supply=0.000 price=12.500\". R8.4 covers the partial case (2 of 8 on the shelf): pre-change demand=2.000, post-change demand=8.000, which is the item summary verbatim at scale.",
+     "notes": "Home: tools/verify/order_book_harness.cpp, group R8. The defect: market_clearing.cpp registered demand[r] += bought[r] - the fill. A processor needing 16 of an input that could draw 2 registered demand of 2."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "THE PRICE SIGNAL ACTUALLY LIGHTS: a resource with real unmet demand and no supply resolves to the TOP of the price band rather than sitting at base. resolve_price already handles this correctly given real numbers (its own comment reads \"demand with no supply - top of the band\"); the assertion is that it is no longer being starved of input.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. order_book_harness R8.2: the starved resource price moved 5.000 -> 12.500 in one tick, exactly base + 0.5*(4*base - base) for base 5 under the 0.25x-4x band and 0.5 EMA smoothing. Pre-change it sat at 5.000, i.e. at base, because supply 0 and demand 0 took resolve_price no-signal branch. R8.2a asserts the fixture premise (nobody supplied the resource this tick) so the assertion cannot pass for the wrong reason.",
+     "notes": "order_book_harness R8. Pre-change this resolves to base exactly, because supply 0 and demand 0 take the no-signal branch."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "WANT AND FILL STAY SEPARATE, as SUPPLY and INVENTORY were separated by BL-422. Only the price-resolution input reads the want. The purchase record - auto_buys, the VWAP accumulator, and the money actually paid - must keep reading the FILL, and each site must say in a comment which of the two it wants. Paying for goods nobody delivered is BL-422 defect in the opposite direction.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. order_book_harness R8.3 captures report.purchases before clear_markets consumes it and asserts the fill is still 2.000 while demand reads 8.000 - the two registers demonstrably differ within the same tick. econ_harness passes unchanged (ALL PASS, 0 failures), including R4.2 \"market demand = auto-bought (iron 4)\": in that fixture the pool holds 4 against a need of 8, so the net want and the fill coincide at 4. Comments naming which of the two each site wants are at all four sites - run_processing want and fill, run_construction want and fill, and both loops in clear_markets.",
+     "notes": "econ_harness R4.2 asserts the fill (purchases) directly and must keep passing unchanged; that is the standing evidence the fill was not disturbed."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "DETERMINISM: the want is accumulated over a SORTED key set, never a hash order. This exact seam is where BL-422 found a latent unordered_map float-accumulation nondeterminism; it must not be reintroduced. spectator_determinism must still report its two hashes stably.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. economy_report::wants is a std::map keyed by (corp, body) - the same container and key type as purchases - so both accumulations run over a sorted key set, and no unordered_map was introduced. spectator_determinism reproducibility holds on both hashes: played=1C96F04629DFB584 twice and spectated=F9204FE9A8F063BE twice, from two independently built worlds. Its R2 byte-identity row against the pinned golden fails, but it ALREADY failed pre-change (NR-280 measured 6D546B281FFA4A68), and the control build on this branch reads played=944D0523A002B255 - so the change moved the world hash as expected, and that golden was already stale before it.",
+     "notes": "economy_report::purchases is already std::map; the new want register uses the identical key type and container for the same reason."
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "requirement": "REGRESSION GATE, REPORTED NOT BLESSED: the economy-wide reads are run and every number that moved is reported. The change is expected to move prices and margins. NO golden and NO ai_skill_harness band is re-blessed - the benchmark is deliberately red (NR-269/271/272/278) and tier_margin is red on its R4b rows by design. Blessing is Ben call.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET, and NOTHING BLESSED. tier_margin was built and run on BOTH sides of the change from the same worktree (the pre-change side via a stash of the three src files). Moved: extraction net/tick 7.27 -> 7.11; processing net/tick -9.52 -> -10.42; processing input cost 10.86 -> 11.59 (the intended effect - scarce inputs stopped being free); processing revenue 10.08 -> 9.64; processing samples 1758 -> 1701; produced-output ticks 777 (44.2%) -> 711 (41.8%); STARVED ticks 771 (43.9%) -> 772 (45.4%); extraction payback 13 -> 14 ticks. Prices left the floor on several resources: id 1 1.91 (0.95x base) -> 3.66 (1.83x), id 9 40.00 (1.00x) -> 51.05 (1.28x), id 3 1.48 -> 1.71, id 4 2.36 -> 2.83, id 5 5.27 -> 5.91, id 20 8.95 -> 9.94. The FAILING ASSERTION SET IS IDENTICAL on both sides - the same 3 failures (3 inputs unproduced, 6 inputs unsiteable, processing does not out-earn extraction). No new failure, and none masked.",
+     "notes": "tier_margin is the economy-wide read named by the item."
+    }
+   ]
   }
  ]
 }
