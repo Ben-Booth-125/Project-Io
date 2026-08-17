@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*74 entries — 60 open, 14 resolved.*
+*77 entries — 61 open, 16 resolved.*
 
 ---
 
@@ -700,13 +700,6 @@ The thesis was that spectator mode (BL-409) is the forcing function making seam 
 
 **Why it matters.** tools/verify/spectator_determinism.cpp confirms this concretely: it buckets 15 verbs into 4 families, so place_sell_order alone satisfies the whole 'trade' family and hides the four unemitted trade verbs behind it, while hire_unit alone satisfies 'other' and hides demolish and place_road. The harness built to prove spectate exercises the seam does so at a granularity too coarse to see that 7 of 15 verbs never fire. So spectate is the right forcing function only once paired with an instrument - which is why the reachability sprint leads with the instrument rather than the fixes.
 
-### NR-306 — What does a unit consume - credits, goods, or both? The data model differs by answer
-*question · raised 2026-08-17 · from Sprint 25 logistics/military audit, filing BL-454 (units cost nothing to keep).*
-
-w.units appears in no economic flow at all - verified by grep across economy_system.cpp, budget_system.cpp and construction.cpp. hire_unit debits once (BL-394) and a regiment is then free forever while every building beside it pays maintenance and wages each tick. Adding upkeep admits three readings. (a) Credits only: a sixth term in apply_budget, cheapest, composes with the runway header and the solvency gate for free, but says nothing about logistics. (b) Goods only: a per-tick consumable draw from the corp's pool on that body - the grain/fodder line BL-287 has been holding - which makes the reach field bite but needs a ration good in the roster. (c) Both: wages in credits, rations in goods; the honest model, roughly double the work.
-
-**Why it matters.** It is not a tuning constant, it is the shape of the unit pass. (a) resolves to a float per unit; (b) and (c) resolve to a cost vector against a pool that can be empty, which introduces a partial-supply case and therefore a decay or desertion rule - which is BL-325 S3's territory. Choosing (a) and later wanting (c) is a rewrite of the pass unless it is written as 'resolve a cost vector' from the start. This is also the item that couples the military layer to the logistics layer at all: BL-325's ruling 3 already made the economic reach field the military supply envelope, and upkeep is what makes that ruling cost something.
-
 ### NR-307 — Two write-only accumulators: military_points and science are credited every tick and read by nothing
 *observation · raised 2026-08-17 · from Sprint 25 audit, grepping BL-332 military_points across src/.*
 
@@ -721,12 +714,26 @@ Sprint 22's audit joined four artefacts - the seam, the dictionary, each entry's
 
 **Why it matters.** A join over the verbs that exist can only find gaps in verbs that exist. It is structurally blind to the absent verb, and the absent verb is the larger gap here - SUPPLY.md's own Build status has carried the line 'Player-directed dispatch has no UI or code path yet' since the layer landed, and its Dispatch trigger section describes player-direction as a shipped exception that was never built. If BL-444's coverage tool is written as designed it will inherit the same blind spot, and a green coverage report will read as 'everything is reachable' over a game with an untouchable logistics layer.
 
-### NR-309 — Sprint 25 proposed as the seam between military and logistics, not as more of either
-*decision taken on your behalf · raised 2026-08-17 · from Sprint 25 proposal, answering the brief to pad out the military and logistics systems.*
+### NR-310 — Interdiction: is intercepted cargo captured or destroyed?
+*question · raised 2026-08-17 · from Sprint 25 rescope, filing BL-458 (supply lines cannot be cut).*
 
-The brief asked what to build to pad out both systems. The obvious readings are more military content (units, rosters, battle detail) and more logistics content (modes, nodes, capacity), and both were rejected in favour of the seam between them - upkeep, dispatch, and the surfaces that read each. The reasoning: Sprints 21, 23 and 24 already propose the military reach arc end to end (verbs, hostility, rival stance reasoning), so a fourth military-content sprint would duplicate them; and v0.1.12 already holds four logistics items (BL-153, BL-173, BL-175, BL-188) whose theme is that distance costs more and reads better, none of which gives the player a lever. Padding either side alone adds to a stack that is already deep and still untouchable.
+Cargo leaves the source pool at dispatch (SUPPLY.md § Convoy entity), so the goods are already committed and both answers conserve correctly. DESTROY erases the convoy and the cargo - simple, symmetric, pure denial, and it pays the interceptor nothing. CAPTURE credits the cargo to the interceptor's (corp, body) pool at the interception body - it pays for itself, creates a raiding economy, and needs one guard (an interceptor with no market access holds goods it cannot sell, which is a fine outcome and should not be special-cased away).
 
-**Why it matters.** It is a scoping call made on Ben's behalf and it excludes things he may have meant. Specifically excluded and named in the sprint block: convoy interdiction and escort (deferred behind BL-315 conflict spine and BL-448 stance - a convoy cannot be escorted until something can threaten it), per-node throughput capacity (SUPPLY.md puts it out of prototype scope), air mode and the airfield building, and any second reach field (BL-325's ruling 3 forbids it).
+**Why it matters.** It decides whether interdiction is a mechanic a rival will ever CHOOSE. The corp AI is a deterministic scored-utility layer: it prices candidates by payoff. Destroy-only gives an interception a payoff of zero to the interceptor and a cost in exposure, so BL-450's stance scorer would correctly never rank it - interdiction would exist and never fire outside player use, which is the same unreachable-capability defect this whole sprint is about. It also decides whether BL-315's third derived reading is earned: 'pirate' is a company that TAKES cargo. A company that only burns it is reading closer to a saboteur.
+
+### NR-311 — BL-325's design prose still cites BL-287 for grain/fodder draws that no longer exist
+*observation · raised 2026-08-17 · from Sprint 25 rescope, writing BL-454 against BL-325 and checking the citation.*
+
+BL-325's design says out-of-supply decay 'gives BL-287's future grain/fodder draws a place to land'. Three things are wrong with that sentence now. BL-287 is a verify-harness item ('Verify tier rebuilds the world layer once per harness'); the logistics-goods item is BL-286. Grain and fodder were REMOVED from resource_type by Ben's call on NR-257 (2026-08-16) as produced-by-nothing and consumed-by-nothing. And BL-295 - complete, v0.1.1 - was filed for exactly this stale citation and fixed it in components.hpp, but did not reach the backlog copy.
+
+**Why it matters.** It propagated. BL-454's first draft repeated the sentence almost verbatim, because BL-325 is the correct doc to read when writing an upkeep item and the citation looked authoritative. A stale cross-reference in a design field is read as settled design by the next session, and this one pointed at two goods that no longer exist - which under Ben's reading (c) is precisely the question being answered. Caught here only because the enum was audited rather than trusted.
+
+### NR-312 — The rescope costs Sprint 25 its independence - half of it now waits on two unopened sprints
+*decision taken on your behalf · raised 2026-08-17 · from Sprint 25 rescope, sequencing BL-458 against BL-315 and BL-448.*
+
+As first proposed, Sprint 25 shared no dependency with Sprints 21-24 and could have run next. Rescoped to carry interdiction it cannot: BL-458 requires BL-315 (units must be commandable), BL-448 (stance is the interception predicate) and BL-452. Rather than propose a sprint that stalls - the exact failure Sprint 23's block warns about, and that BL-440's open fork caused in Sprint 19 - the block is split into 25a (the draw: BL-457, BL-454, BL-452, BL-453, BL-455, BL-456 - independent, runnable now) and 25b (the cut: BL-458 - gated). The split is the decision taken.
+
+**Why it matters.** It changes what 'run Sprint 25 next' means, and it should not be discovered at promotion time. 25a is a full sprint on its own and lands the substrate 25b needs; 25b is one item that cannot start until two other proposals have landed. The honest sequence is now 21 -> 23 -> 25b, with 25a insertable anywhere before it. Ben should know that accepting the rescope moved the payoff item behind two things he has not yet opened.
 
 ---
 
@@ -929,4 +936,22 @@ Two compounding causes. (1) CMakeLists copies scripts/ to the output dir in a PO
 > **RESOLVED.** Harness wiring fixed 2026-08-17: price_band_harness and tier_margin are now script-rooted under ctest and read the repo's scripts/, so both report the shipped economy. The stale-copy mechanism itself is NOT fixed and remains open for Ben.
 
 *Files: `CMakeLists.txt`, `tools/verify/price_band_harness.cpp`, `tools/verify/tier_margin.cpp`*
+
+### NR-306 — What does a unit consume - credits, goods, or both? The data model differs by answer
+*question · raised 2026-08-17 · from Sprint 25 logistics/military audit, filing BL-454 (units cost nothing to keep).*
+
+w.units appears in no economic flow at all - verified by grep across economy_system.cpp, budget_system.cpp and construction.cpp. hire_unit debits once (BL-394) and a regiment is then free forever while every building beside it pays maintenance and wages each tick. Adding upkeep admits three readings. (a) Credits only: a sixth term in apply_budget, cheapest, composes with the runway header and the solvency gate for free, but says nothing about logistics. (b) Goods only: a per-tick consumable draw from the corp's pool on that body - the grain/fodder line BL-287 has been holding - which makes the reach field bite but needs a ration good in the roster. (c) Both: wages in credits, rations in goods; the honest model, roughly double the work.
+
+**Why it matters.** It is not a tuning constant, it is the shape of the unit pass. (a) resolves to a float per unit; (b) and (c) resolve to a cost vector against a pool that can be empty, which introduces a partial-supply case and therefore a decay or desertion rule - which is BL-325 S3's territory. Choosing (a) and later wanting (c) is a rewrite of the pass unless it is written as 'resolve a cost vector' from the start. This is also the item that couples the military layer to the logistics layer at all: BL-325's ruling 3 already made the economic reach field the military supply envelope, and upkeep is what makes that ruling cost something.
+
+> **RESOLVED.** ANSWERED 2026-08-17 (Ben): reading (c) - BOTH credits and military goods (supplies, rations, weapons). BL-454 rewritten to (c) and its difficulty raised 3 -> 4. Three consequences taken as part of the answer rather than deferred: the per-tick cost is a VECTOR resolved from the roster (not a float with extras bolted on later); an empty pool creates a partial-supply case, whose shortfall rule is ONE decay rule with two triggers shared with BL-325 S3 rather than a second parallel rule; and the goods must exist, which they do not - weapons are absent from the 37-value enum entirely, so BL-457 (no military terminal good) is filed and BL-454 now requires it.
+
+### NR-309 — Sprint 25 proposed as the seam between military and logistics, not as more of either
+*decision taken on your behalf · raised 2026-08-17 · from Sprint 25 proposal, answering the brief to pad out the military and logistics systems.*
+
+The brief asked what to build to pad out both systems. The obvious readings are more military content (units, rosters, battle detail) and more logistics content (modes, nodes, capacity), and both were rejected in favour of the seam between them - upkeep, dispatch, and the surfaces that read each. The reasoning: Sprints 21, 23 and 24 already propose the military reach arc end to end (verbs, hostility, rival stance reasoning), so a fourth military-content sprint would duplicate them; and v0.1.12 already holds four logistics items (BL-153, BL-173, BL-175, BL-188) whose theme is that distance costs more and reads better, none of which gives the player a lever. Padding either side alone adds to a stack that is already deep and still untouchable.
+
+**Why it matters.** It is a scoping call made on Ben's behalf and it excludes things he may have meant. Specifically excluded and named in the sprint block: convoy interdiction and escort (deferred behind BL-315 conflict spine and BL-448 stance - a convoy cannot be escorted until something can threaten it), per-node throughput capacity (SUPPLY.md puts it out of prototype scope), air mode and the airfield building, and any second reach field (BL-325's ruling 3 forbids it).
+
+> **RESOLVED.** ANSWERED 2026-08-17 (Ben): 'Rescope' - read as accepting the interdiction option this entry offered ('say so and it becomes the sprint that follows 23'). Sprint 25 rewritten as 'Supply lines are a military object' in two phases: 25a the draw (upkeep + the ordnance good + dispatch + ledger, runnable now) and 25b the cut (BL-458 interdiction, gated on Sprints 21 and 23). Interdiction filed as BL-458 with capture-vs-destroy raised as NR-310. The cost of the rescope is stated in the sprint block and in NR-312: the sprint is no longer runnable end-to-end next, because half of it now depends on two unopened proposals. If 'Rescope' meant only 'rescope BL-454 for answer (c)' and NOT interdiction, BL-458 should be unfiled and the block reverts to one phase - say so and it is a five-minute reversal.
 

@@ -827,14 +827,21 @@ in through the side door.
 
 ---
 
-# Sprint 25 — Armies that cost something, convoys you can steer (proposed 2026-08-17, NOT opened — Ben picks)
+# Sprint 25 — Supply lines are a military object (proposed 2026-08-17, rescoped the same day on Ben's steer; NOT opened — Ben picks)
 
-**This is a proposal, not a decision.** Ben's brief this date asked what to build to pad out the
-military and logistics systems. This block answers by auditing both against source, and the audit
-argues for the **seam between them** rather than for more of either. Recorded as NR-309, because it
-is a scoping call taken on Ben's behalf and it excludes readings he may have meant.
+**This is a proposal, not a decision.** Ben's brief asked what to build to pad out the military and
+logistics systems. The first draft of this block answered *the seam between them* and put two
+questions to him. Both came back the same day and both **widened** it:
 
-## Why not more of either, stated first
+- **NR-306 — what does a unit consume?** *"Both Credits and Military goods (supplies, rations,
+  weapons)."* Reading (c), the largest of the three offered.
+- **NR-309 — was interdiction what you meant?** *"Rescope."*
+
+Those two answers are one answer. An army that eats goods gives an enemy something to starve, and a
+convoy that can be cut is what makes the network worth defending. The sprint is rewritten around
+that: **armies draw on the logistics network, and the network can be attacked.**
+
+## Why not more of either system, which was the first draft's argument and still holds
 
 **The military side is already proposed, three times over.** Sprint 21 carries the reach arc
 (unit verbs, engagement trigger, battle state), Sprint 23 the hostility substrate, Sprint 24 the
@@ -845,9 +852,6 @@ items — freight premium (**BL-153**), rail as a distinct mode (**BL-173**), co
 (**BL-188**), supply-lens flow legibility (**BL-175**) — under the theme *"distance costs
 something, in more than one way, and the player can see it."* Every one makes distance cost more or
 read better. **After all four land, the player still cannot dispatch a single convoy.**
-
-So padding either side alone adds to a stack that is already deep and still untouchable. What is
-missing is the coupling: armies that draw on the network, and a network the player can direct.
 
 ## The audit
 
@@ -865,122 +869,212 @@ missing is the coupling: armies that draw on the network, and a network the play
 | **A list of what is in flight** | **ABSENT** | no ledger tab, no Selection section |
 | **Arrival time on any surface** | **ABSENT** | the 2026-08-12 travel model is invisible |
 | **Any recurring cost of a unit** | **ABSENT** | `w.units` in **no** budget or economy flow |
+| **A military good to draw on** | **ABSENT** | no ordnance/munitions in the 37-value enum |
+| **Any interaction between a convoy and a unit** | **ABSENT** | the two layers share a world and touch nowhere |
 | **Orphan cleanup on demolish** | **DEFECT** | `demolish_building` erases asset/building/stockpile, never units |
 | **A consumer for `military_points`** | **ABSENT** | 3 sites in `src/`: decl, param load, write |
 | **A consumer for `science`** | **ABSENT** | same three-site shape |
 | **A military authority doc** | **ABSENT** | no `docs/military/`; BL-325 points at the AI doc |
-| Out-of-supply decay | DESIGN-ONLY | BL-325 S3, held behind BL-315 |
+| Out-of-supply decay | DESIGN-ONLY | BL-325 S3, now converging with BL-454 |
 | Sea-mode port gate | ABSENT | sea fires on any ocean-crossing path (BL-188) |
 | Per-node throughput | out of scope | SUPPLY.md § Infrastructure gates |
 
-### Three findings that re-frame the brief
+### Four findings that shaped the block
 
 **1. The convoy layer is the largest built subsystem in the game with no player verb at all.**
 `corp_verb`'s fifteen values name eight buildings, three orders, two contracts, one body and one
 tile. Layer 5 — the *only* coupling between two markets' prices, in SUPPLY.md's own words
 (*"there is no abstract price-coupling term between bodies: the convoy **is** the coupling"*) — is
-entirely automatic. This is not a new discovery so much as an unread one: SUPPLY.md's Build status
-has carried the line *"Player-directed dispatch (the § Dispatch trigger 'exception' has no UI or
-code path yet)"* since the layer landed, and its § Dispatch trigger describes player-direction as a
-shipped exception that was never built.
+entirely automatic. SUPPLY.md's Build status has carried the line *"Player-directed dispatch (the
+§ Dispatch trigger 'exception' has no UI or code path yet)"* since the layer landed.
 
 **Sprint 22's reachability audit could not see this**, and the reason is structural: it joined the
 seam, the dictionary, the surface field and the scorer *over the verbs that exist*, and all fifteen
 are reachable from at least one direction. A join over existing verbs is blind to the absent one.
-If BL-444's coverage tool ships as designed it inherits that blind spot, and a green report will
-read as *everything is reachable* over a game with an untouchable logistics layer. Recorded as
-NR-308, with a suggested subsystem column for BL-444.
+Recorded as NR-308, with a suggested subsystem column for BL-444.
 
 **2. An army is bought once and is then free forever.** Verified by grep, not inferred: `w.units`
 appears in `economy_system.cpp`, `budget_system.cpp` and `construction.cpp` **zero times**.
-`apply_budget`'s five flows are all building-derived; `operating_cost` takes a `building_component`.
-So a building pays maintenance and wages every tick and a regiment beside it pays nothing, ever.
+`apply_budget`'s five flows are all building-derived. So the standing rules' hiring exception prices
+only the *moment* of hire, and the solvency gate a rival passes once is the only pressure the roster
+ever applies. Twelve units cost a rival nothing to keep.
 
-That makes the standing rules' hiring exception weaker than it reads. BL-324's *"never on cash"*
-governs availability and Ben's 2026-08-13 ruling put spending under the solvency gate — but the
-only spend is the **moment of hire**, so the gate a rival passes once is the only pressure the
-roster ever applies. Twelve units cost a rival nothing to keep.
+**3. There is no military good in the game, and that is half the refocus missing.** Ben's answer
+names supplies, rations and weapons. Audited against the enum: `food_rations` exists;
+`medical_supplies` exists but is a *habitability* good consumed by population centres, so borrowing
+it would make an army compete with a city for medicine on a shared price; **weapons do not exist at
+all**. No ordnance, no munitions, no small arms.
 
-**3. Two write-only accumulators, and the precedent says one of them should probably go.**
-`military_points` and `science` are each credited per tick by BL-332's pass and read by **nothing**
-— no gate, no surface, no scorer, not the blackboard. `military_capability_harness` verifies the
-accumulation faithfully, which makes it a green check over a number nothing reads. This is NR-257's
-orphan-resource shape with the arrow reversed, and that precedent resolved by *deleting* five
-resource types rather than by inventing uses. Recorded as NR-307.
+The larger reading: the 2026-08-10 refocus (NR-120) put the player as a militia whose trade is
+*"coloured directly with military use, and space equipment"*. BL-340's chain terminates in
+`spacecraft_components` and BL-350's contracts buy it — **the space half landed and the military
+half has no object**. It went unnoticed because nothing consumed one; BL-454 is the first consumer,
+which is exactly what makes the value admissible now under PRODUCTION.md's rule and not before.
 
-**And a fourth, smaller but load-bearing: there is no military authority doc.** `docs/` has
-economy, generation, ui, ai, lore, tech and development — and no military. BL-325 names
-`AI_OPPONENT.md`, which is the doc about the rival's decision-making, not about how force works.
-The cost has already been paid once: three sprint blocks in a row described BL-315's resolver as
-unbuilt while `campaign_battle.cpp` sat compiled in the shipping binary, and Sprint 21's audit
-found it only by reading source.
+**4. A convoy already has a position, so interdiction needs no new state.** `convoy_component`
+stores no path and no tile, which reads like a blocker. It is not: `body_surface_canvas.cpp` already
+derives the full tile path from the two markets' centre tiles via `intra_body_path` and interpolates
+a head along it by `progress`, deterministically, off the existing cache. The work is to lift that
+into `logistics.hpp` as `convoy_tile_at()` and have the renderer consume it — which also kills a
+duplication before it drifts.
 
-**Planned.**
-- **BL-454 — units cost nothing to keep** (`designed`, A, d3): the keystone, and the only item here
-  that couples the two systems directly. Carries the demolish-orphan fix, because the unit pass is
-  the only place that can see it. **One open question first** — credits, goods, or both (NR-306).
+One caution, load-bearing: the canvas conditionally **reverses** the cached path because
+`intra_body_path` caches on a canonicalised key. The shared function must own that orientation rule.
+Get it wrong and the convoy's head sits at the wrong end of the lane half the time — invisible on
+screen, because the beam looks fine either way, and fatal to interdiction.
+
+**And a fifth, smaller but load-bearing: there is no military authority doc.** `docs/` has economy,
+generation, ui, ai, lore, tech — and no military. BL-325 names `AI_OPPONENT.md`, which is about the
+rival's decision-making, not about how force works. The cost has already been paid: three sprint
+blocks in a row described BL-315's resolver as unbuilt while `campaign_battle.cpp` sat compiled in
+the shipping binary.
+
+## Phase 25a — the draw (independent, runnable now)
+
+- **BL-457 — no military terminal good** (`designed`, A, d3): `ordnance`, appended, from
+  `steel + machinery` at the Fabricator. **Deliberately one value, not three** — `food_rations`
+  already covers rations, and a "supplies" value with no distinct consumer is exactly the
+  produced-by-nothing shape NR-257 deleted five of. Blocking: nothing below draws without a good.
+- **BL-454 — units cost nothing to keep** (`designed`, A, d4, ↑ from d3): the keystone, rewritten
+  for reading (c). Carries the demolish-orphan fix, because the unit pass is the only place that
+  can see it.
 - **BL-452 — logistics has no verb** (`designed`, A, d3): `dispatch_convoy` and `hold_convoy` at
   the seam. The auto-dispatcher's body with the shortfall scan removed — **no fourth code path**,
   the same mitigation Sprint 22 named for BL-445.
 - **BL-453 — convoys have no ledger** (`designed`, A, d3): the Convoys tab, blocked on BL-452 and
   **filed separately on purpose**. BL-350 landed a complete seam with no press and nobody noticed
-  for weeks; a surface that is a task inside the model item is the first thing cut under pressure.
+  for weeks.
 - **BL-455 — `military_points` and `science` are write-only** (`designed`, B, d2): a measurement,
   not a build. Wire it or remove it; the third state is what caused the orphan resources.
-- **BL-456 — no military authority doc** (`designed`, B, d2): `docs/military/MILITARY.md`, written
-  in SUPPLY.md's style with a Build status section so it cannot rot into an aspiration doc.
+- **BL-456 — no military authority doc** (`designed`, B, d2): `docs/military/MILITARY.md`, in
+  SUPPLY.md's style with a Build status section so it cannot rot into an aspiration doc.
 
-**Riders already on the board, if the sprint has room:** BL-153 (freight premium — parked, and it
-is the revenue half of the same lever), BL-405 (hire has no price on screen), BL-188 (port gating
-for sea mode, design-owed).
+### What reading (c) costs, stated plainly
 
-**Sequencing.** NR-306 is answered **first and in the session that opens the sprint** — it decides
-the shape of BL-454's unit pass, not a constant, and leaving it open reproduces exactly the stall
-BL-440's fork caused in Sprint 19. After that three tracks run with no file overlap: BL-454 in
-`budget_system` / `economy_system`; BL-452 → BL-453 in `corp_command` / `supply_system` → the
-Market Ledger; BL-455 and BL-456 independent of everything and startable on day one.
+It is roughly double reading (a) and it adds a real design surface. Three consequences, none
+optional:
+
+**The cost is a vector, not a float.** Per unit type per tick: a credit wage plus a set of
+`{resource_type, qty}` draws against the pool on that unit's body. Written as a float with extras
+bolted on later, the second good is a rewrite.
+
+**A pool can be empty, so there is a shortfall rule.** Reading (a) did not have this. When the goods
+do not arrive the unit must do something, and the honest answer is decay — **which is already
+designed**. BL-325 S3 is out-of-supply decay, a deterministic scalar with no RNG. Under (c) the two
+converge: S3 fires when the unit is beyond the reach field, BL-454 fires when the goods did not
+come, and they are the same subtraction for the same reason. **One decay rule with two triggers,
+not two rules.** This is the single biggest structural gain from Ben's answer.
+
+**It moves every economy golden *and* every pool.** Measure how far rival balances and stocks move
+before raising the rate off zero.
+
+## Phase 25b — the cut (gated; cannot start before Sprints 21 and 23)
+
+- **BL-458 — supply lines cannot be cut** (`designed`, A, d4): the interception trigger in the
+  economy tick, `convoy_tile_at` lifted out of the renderer, stance as the sole predicate, and the
+  comms/ledger/canvas surfaces that stop it being silent. `requires` **BL-315**, **BL-448**,
+  **BL-452**.
+
+**This item is why BL-315's own ruling has been waiting.** That item settled that army, mercenary
+and pirate are three *derived* readings of one company — *the reading is derived, never authored*.
+Army and mercenary have paths to being read. **Pirate has no mechanic at all**: there is nothing a
+company can currently do that would make "pirate" the honest reading of it. Taking a convoy is
+exactly that act, and the naming rule has been waiting since 2026-08-07 for the verb that earns the
+third reading.
+
+**Open question — capture or destroy (NR-310, Ben's call).** Cargo leaves the source pool at
+dispatch, so both conserve. Destroy is pure denial and pays the interceptor nothing; capture credits
+the interceptor's pool, creates a raiding economy, and is the reading that earns "pirate".
+*Recommendation, offered as a recommendation:* capture, with destruction as the fallback when the
+interceptor cannot hold the goods. Destroy-only gives an interception a payoff of zero, so BL-450's
+stance scorer would correctly never rank it — and a capability no rival ever chooses is the same
+unreachable-capability defect this whole sprint exists to fix.
+
+**Not a battle by default.** A convoy is cargo, not a force. The first cut resolves interception as
+an *outcome*. Escort — a unit assigned to a convoy, turning interception into a real
+`resolve_campaign_battle` call — is the obvious follow-on and is deliberately out, because it needs
+BL-315's engagement machinery *shipped* rather than merely built.
+
+## Sequencing, and what the rescope cost
+
+**The rescope cost this sprint its independence, and that is stated rather than hidden** (NR-312).
+As first proposed it shared no dependency with Sprints 21–24 and could have run next. It no longer
+can, end to end: BL-458 waits on two unopened proposals. Rather than propose a sprint that stalls —
+the exact failure Sprint 23's block warns about, and that BL-440's open fork caused in Sprint 19 —
+the work is split at the gate.
+
+**25a is a full sprint on its own** and lands the substrate 25b needs. Inside it: BL-457 first and
+alone (nothing draws without a good), then BL-454; BL-452 → BL-453 in parallel on different files;
+BL-455 and BL-456 independent and startable on day one.
+
+**The honest sequence is 21 → 23 → 25b, with 25a insertable anywhere before it.** If the interdiction
+work is wanted sooner, the shorter path is to open **Sprint 23 (stance) first** — it is substrate-only
+and deliberately inert, and it is the harder of BL-458's two blockers to work around.
 
 **Done when** a player can dispatch a named cargo down a lane they chose, see it listed with an
-arrival tick, hold it, and watch an army they raised draw a visible cost every quarter it stands —
-with the same seed replaying identically and the pre-item save byte-identical at a zero rate.
+arrival tick, watch an army they raised draw credits *and* ordnance every quarter it stands, feel it
+weaken when the goods do not arrive — and, once 25b lands, lose a convoy to a hostile company and be
+told exactly what was taken and by whom.
 
-**The check that says it worked.** A `unit_upkeep` harness asserting: N units cost exactly N × rate
-and nothing else moves; demolishing the base leaves no orphan; two runs of one seed agree; and the
-**rate-zero run is byte-identical to the pre-item build** — the same defaults-off proof
-`spectator_determinism` used for BL-409, and the one that makes the golden re-bless honest. Plus a
-`--verify` capture of the Convoys tab, and a dispatch→hold→resume round-trip through
+## The checks
+
+**`unit_upkeep`** — N units cost exactly N × the type's credit rate and debit exactly N × each good,
+nothing else moves; an empty pool decays at the authored scalar and never goes negative; demolishing
+the base leaves no orphan; two runs of one seed agree on balances, pools *and* strengths; and the
+**rate-zero run is byte-identical to the pre-item build**, the same defaults-off proof
+`spectator_determinism` used for BL-409, which is what makes the golden re-bless honest.
+
+**`interdiction`** (25b) — `convoy_tile_at` agrees with the renderer on every lane in a generated
+world **in both key orientations** (the bug this item is most likely to ship); a hostile unit on the
+head tile intercepts and a neutral one does not; goods conserved exactly under capture and destroyed
+exactly under destroy, no minting either way; two runs of one seed intercept the same convoys on the
+same ticks; and an interception with no stance entry never fires.
+
+Plus a `--verify` capture of the Convoys tab, and a dispatch→hold→resume round-trip through
 `apply_corp_command` asserting a rejection mutates nothing.
 
-**Risk.** BL-454 touches `economy_system.cpp` and `economy.lua` — the seam Sprint 21's own risk
-paragraph names as hot — and it **moves every economy golden**, because every seed with a hiring
-rival now spends differently. Take the measurement of how far rival balances move *before* raising
-the rate off zero, and bless with a stated cause. This is also the fifth consecutive sprint whose
-goldens are downstream of an economy change, which is an argument for landing it at rate zero and
+## Risks
+
+**BL-454 touches `economy_system.cpp` and `economy.lua`** — the seam Sprint 21's own risk paragraph
+names as hot — and under (c) it moves goldens *and* pools. This is the fifth consecutive sprint whose
+goldens are downstream of an economy change, which is the argument for landing at rate zero and
 tuning in a separate pass.
 
-**Second risk.** `dispatch_convoy` is a seam verb taking a quantity and two market ids, so it is an
-untrusted input boundary (standing rules, 2026-08-14): the quantity must be range-checked against
-the source pool **as the value that lands**, and a rejection must mutate nothing — not clamp, not
-truncate. The auto-dispatcher never had to care because it computed its own arguments.
+**`dispatch_convoy` is a seam verb taking a quantity and two market ids**, so it is an untrusted
+input boundary (standing rules, 2026-08-14): range-check the quantity against the source pool **as
+the value that lands**, and refuse rather than clamp. The auto-dispatcher never had to care because
+it computed its own arguments.
+
+**BL-457 briefly breaks a green guard.** `chain_depth`'s R1 row (no orphan resources) is exactly the
+check that would have caught ordnance's absence of a consumer — so the value and BL-454's consumer
+must land in the same batch, or R1 goes red in between.
+
+**25b's real risk is scope creep into a combat system.** Interception is a trigger plus an outcome.
+The moment it grows escorts, blockades, ambient banditry or neutral interception it stops being a
+logistics item and becomes BL-315's job done twice.
 
 ## What this sprint deliberately does not carry
 
-**Interdiction and escort stay out**, and this is the exclusion most likely to be the one Ben meant.
-A convoy cannot be escorted until something can threaten it, which needs BL-315 (conflict spine) for
-the engagement and BL-448 (stance) to name a legal target. It is the natural sprint *after* 23, and
-folding it in here would make this block depend on two unopened proposals.
+**Escort stays out** — see 25b above. It needs BL-315 shipped, not merely built.
 
-**BL-325 S3 (out-of-supply decay) stays out**, unchanged from Sprint 21's reasoning — but note that
-BL-454 is its economic twin and lands the substrate it needs. Upkeep and decay are the same rule
-read at two distances; upkeep is the half that does not need BL-315 first.
+**Ambient banditry, neutral interception and terrain blockade stay out.** Stance is the sole
+predicate. Hostility is a declared state a corp opts into (Ben, 2026-08-17), and making interception
+follow from anything else turns it into a random tax on trade.
+
+**BL-325 S3 is not cut but not separately scoped** — under reading (c) it converges with BL-454's
+shortfall rule, and the two should land as one decay rule with two triggers.
 
 **Per-node throughput capacity** is out of prototype scope by SUPPLY.md's own § Infrastructure
 gates. **Air mode and the airfield building** stay deferred. **A second reach field** is forbidden
 outright by BL-325's ruling 3, and no item here proposes one.
 
-**Waypoint routing and standing lane orders stay out.** BL-452 gives dispatch and hold, not a
-routing UI — the pathfinder already picks the route, and letting a player override it is a
-different item with a real design question behind it.
+**Waypoint routing and standing lane orders stay out.** BL-452 gives dispatch and hold, not a routing
+UI — the pathfinder already picks the route, and letting a player override it is a different item
+with a real design question behind it.
+
+**A second and third military good stay out.** Ben named three; one is filed. `food_rations` already
+covers rations, and a distinct field ration or medical draw is an append with its behaviour filed in
+the same change — the standing rule, unchanged.
 
 ---
 
