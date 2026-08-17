@@ -458,6 +458,103 @@ after it.
 
 ---
 
+# Sprint 21 — The fight becomes reachable (proposed 2026-08-17, NOT opened — Ben picks)
+
+**This is a proposal, not a decision.** Sprint 20's recommendation pre-committed Sprint 21 to
+candidate B, the military engagement surface. This block is what B looks like once someone reads
+the source rather than the plan — and the reading changes the shape substantially.
+
+**Goal.** Close the gap between a battle resolver that works and a campaign that cannot start one.
+Not "build combat": combat is built. Build the **reach** to it — a verb that moves a unit, a rule
+that says who may be fought, a trigger that opens a battle, and a screen that shows it.
+
+## What the audit found, because it re-frames the whole sprint
+
+Sprint 18's block says BL-315 (armed house conflict spine) is *"designed, with nothing built against
+it"*. That is now wrong in the direction that matters. `src/world/campaign_battle.{hpp,cpp}` is
+**written, compiled into the shipping binary, and covered by `campaign_battle_harness`** — seeded
+rounds, priced withdrawal, a measured uncertainty curve. It has **zero callers outside its own
+harness**. The same is true of `resolve_battle`, whose only caller is the Era −1 sim.
+
+So the sprint's unknown is not the resolver. It is everything that would ever call one, and none of
+that exists at all:
+
+| Capability | State | Evidence |
+|---|---|---|
+| Campaign battle resolver (rounds, seeded swing, withdrawal) | **BUILT** | `campaign_battle.cpp`, harness green |
+| Era −1 battle resolver (`resolve_battle`) | **BUILT** | `combat.cpp`, `combat_harness` |
+| Terrain defence / attrition scalars | **BUILT** | `terrain_combat.cpp` |
+| Unit roster, era bands, corp-side gating | **BUILT** | `unit_roster.cpp` |
+| `hire_unit` verb + AI use of it | **BUILT** | `corp_command.cpp`; observed 6–12 hires/seed |
+| `military_base` building, hire gated on it | **BUILT** | BL-325 (military bases and supply) S1+S2 |
+| Unit marker, Selection card, tile click-cycle | **BUILT** | `body_surface_canvas.cpp`, `selection_panel.cpp` |
+| **A verb that takes a unit as its subject** | **ABSENT** | every `corp_verb` names a building, body or order |
+| **Any hostility / standing model** | **ABSENT** | no corp may be "at war with" another, anywhere |
+| **Any engagement trigger** | **ABSENT** | nothing detects two forces on one tile |
+| **Battle state in the world** | **ABSENT** | `world` has no battle store; nothing steps a round |
+| **Unit facts on the blackboard** | **ABSENT** | `export_corp_blackboard` has no unit section |
+| **Out-of-supply decay** | DESIGN-ONLY | BL-325 (military bases and supply) S3, held behind BL-315 |
+| **Unit verb dictionary entries** | DESIGN-OWED | BL-314 (unit verb family), waiting on a seam |
+| Hire price on screen | ABSENT | BL-405 (hire has no price on screen), d1 |
+| Demolish vs garrisoned units | **DEFECT** | `demolish_building` never touches `w.units` |
+
+**The capability everyone assumes exists and does not is a HOSTILITY MODEL.** Every plan in this
+file — Sprint 16, Sprint 18, Sprint 20's candidate B — talks about fighting, and no document owns
+the question *who is allowed to fight whom*. BL-315 (armed house conflict spine) settled that army,
+mercenary and pirate are three derived readings of one company, which is a **naming** rule and
+answers nothing about targeting. Without it there is no legal predicate on an attack verb, no
+trigger condition, and no way for the AI scorer to price an engagement. It is not written down as
+work anywhere, and it blocks every other slice.
+
+**Second finding, cheaper but real:** `resolve_battle` and `resolve_campaign_battle` both take
+fully-resolved `army_stack_entry` values, and **nothing converts a live `unit_component` into one**.
+`unit_component::strength` is written raw by all three of its writers despite a "fixed-point" doc
+comment (NR-247). The adapter is small, but it is a real missing piece, and it is where that
+inconsistency has to be settled rather than deferred again.
+
+**Planned.**
+- **BL-393 — units are write-only and inert** (`designed`, A, d3): the foundation, and now the item
+  that must grow the `unit_command` seam rather than defer it. Its own text proposes leaving
+  movement to BL-315; that split no longer helps, because BL-315's resolver is the half already
+  built.
+- **BL-315 — armed house conflict spine** (`designed`, A, d4): re-scoped by the audit to what is
+  actually missing — hostility, movement, the engagement trigger, battle state in the world, and the
+  stack adapter. The resolver itself is done.
+- **BL-405 — hire has no price on screen** (`designed`, B, d1): rides in the UI slice.
+- **BL-314 — unit verb family** (`design-owed`, B, d3): unblocks the moment the seam exists, and is
+  transcribed from it, never authored ahead of it (BL-270's discipline).
+- **BL-384 — the Era −1 sim conquers nothing** (`designed`, A, d5): 267 battles, zero provinces
+  taken. Shares no file with anything above and can run from day one.
+
+**Sequencing.** Two foundation slices run **alone and first**: the `unit_command` seam (F1) and the
+hostility model (F2). F1 blocks every verb; F2 blocks every trigger and every AI score. After both
+land, four slices fan out with no file overlap. BL-384 (Era −1 conquest) is independent of all of
+it and starts immediately alongside F1. Full task decomposition and collision map: `REFINED.md`.
+
+**Done when** a player can select a unit, order it onto a tile held by a hostile force, watch the
+battle run round by round, choose to withdraw partway, and see the surviving strength on both sides
+— with the same save replaying the same fight. Anything less leaves the resolver as unreachable as
+it is today.
+
+**The check that says it worked.** A new `tools/verify/engagement_harness.cpp` driving the whole
+path headlessly: hire → move → contact → resolve, asserting (1) two runs of one seed produce
+byte-identical battle outcomes, (2) a withdrawal at round 3 costs strictly more than one at round 1,
+(3) no verb mutates anything on a rejection. Plus a `--verify` capture of the battle screen. The
+determinism assertion is the load-bearing one: `campaign_battle` earns its seeded stream only if the
+*caller* feeds it a stable identity, and the caller is exactly what this sprint writes.
+
+**Risk.** The hostility model is a **design call, not an implementation**, and it is not filed as an
+item. If Ben does not settle it early, F2 stalls and the four fan-out slices stall behind it — the
+same failure mode as BL-440's open fork in Sprint 19. File it and answer it in the first session, or
+the sprint's parallelism does not exist.
+
+**Second risk.** BL-325 (military bases and supply) tail — out-of-supply decay — touches
+`economy_system.cpp` and `scripts/economy.lua`, which is the seam three concurrent agents are live
+in right now. It is **cut** from this sprint for that reason, not for scope. See § what this sprint
+does not carry, in `REFINED.md`.
+
+---
+
 # Sprint 18 — The military engagement surface (planned 2026-08-15; NOT opened — deferred again 2026-08-16 for Sprint 19)
 
 **Goal.** Finish what Sprint 16 started: make the fight *playable and visible*. Closes and cuts

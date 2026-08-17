@@ -853,3 +853,145 @@ home body carries **9** markets holding 3861.3 supply and 34.0 demand; the marke
 
 ---
 
+# Sprint 21 — the fight becomes reachable (PROPOSED, not promoted; Ben has not opened Sprint 21)
+
+Decomposition for the military engagement surface, carved for **parallelism**. Written 2026-08-17
+from a source audit, not from the item text — see SPRINTS.md § Sprint 21 for the BUILT / ABSENT
+table and why the sprint's shape changed.
+
+**The one-sentence framing.** The battle resolvers are built and unreachable. Everything below
+exists to give them a caller: a verb, a target rule, a trigger, a state store, and a screen.
+
+## The collision map
+
+| File | Slice that OWNS it | Also read by |
+|---|---|---|
+| `src/world/corp_command.hpp` / `.cpp` | **F1** | S1, S3 (read-only) |
+| `src/world/construction.cpp` (demolish) | **F1** | — |
+| `src/world/standing.{hpp,cpp}` *(new)* | **F2** | S1, S2, S3 |
+| `src/world/battle_system.{hpp,cpp}` *(new)* | **S1** | S2, S4 |
+| `src/world/unit_movement.{hpp,cpp}` *(new)* | **S1** | — |
+| `src/world/world.hpp` (one new store) | **F1** *(declared once, up front)* | S1 |
+| `src/world/corp_ai.cpp` | **S2** | — |
+| `src/ui/*` (`selection_panel`, `body_surface_canvas`, new battle window) | **S3** | — |
+| `docs/ai/ACTIONS.json`, `docs/ui/question_log.json` | **S4** | — |
+| `src/world/history_sim.cpp`, `tools/verify/history_sim_harness.cpp` | **S5** | — |
+
+**No slice below writes `market_clearing.cpp`, `economy_system.cpp`, `budget_system.cpp` or
+`scripts/economy.lua`.** That is deliberate and it is the reason BL-325's out-of-supply decay is cut
+(§ what this does not carry). Three agents are live in that seam; nothing here goes near it.
+
+## Foundation — run ALONE, and first
+
+These two are not parallelisable with anything, including each other's review. F1 defines the seam
+every later slice calls; F2 defines the predicate every later slice tests.
+
+- **[F1] The `unit_command` seam** — BL-393 (units are write-only and inert).
+  Files: `src/world/corp_command.hpp`, `src/world/corp_command.cpp`, `src/world/construction.cpp`,
+  `src/world/world.hpp`.
+  Append (**append-only**, after `cancel_contract` — the enum is serialised by contract even though
+  no serialiser exists yet) `move_unit`, `disband_unit`, `merge_unit`, `engage`. Validate each: the
+  acting corp owns the unit, the destination tile exists, a rejection mutates **nothing**. Settle
+  BL-393's third gap explicitly — `demolish_building` currently never touches `w.units`, so a
+  demolished muster base orphans its garrison; refuse the demolish (`rejected_state`) or disband
+  with an agency event, but do not leave it silent. Declare the battle store on `world` here, in one
+  pass, so S1 does not have to reopen `world.hpp` later.
+  Deps: none. **Blocks: everything except S5.** Cannot fan out.
+
+- **[F2] Hostility and standing** — the missing capability, and it needs a Ben ruling before code.
+  Files: `src/world/standing.{hpp,cpp}` *(new)*, `docs/SYSTEMS.md`.
+  There is no model anywhere of who may fight whom. A pure, deterministic predicate
+  `may_engage(w, attacker_corp, defender_corp)` plus whatever minimal state it reads. BL-315 (armed
+  house conflict spine) settled that army/mercenary/pirate are **derived readings** of one company —
+  that is a naming rule and answers nothing about targeting, so the ruling is genuinely open.
+  **File this as a backlog item and get it answered in session one**; it is Sprint 21's equivalent of
+  BL-440's fork, and leaving it open serialises the whole sprint.
+  Deps: none (can be *designed* alongside F1; its code lands after F1 only because S1 needs both).
+  **Blocks: S1, S2, S3.** Cannot fan out.
+
+## Fan-out — all four run CONCURRENTLY once F1 and F2 land
+
+Disjoint write sets by construction. Each is a coherent vertical slice, narrow enough for one agent
+reading two or three docs.
+
+- **[S1] Movement, contact, and the battle loop** — BL-315 (armed house conflict spine), the half
+  that is actually missing.
+  Files: `src/world/unit_movement.{hpp,cpp}` *(new)*, `src/world/battle_system.{hpp,cpp}` *(new)*,
+  `tools/verify/engagement_harness.cpp` *(new)*.
+  Three things, all headless: (a) apply `move_unit` over ticks with a deterministic step rule;
+  (b) detect contact — two units on one tile whose owners satisfy `may_engage` — and open a
+  `campaign_battle_state`; (c) **the stack adapter**, `unit_component` → `army_stack_entry`, which
+  does not exist and is where NR-247's raw-vs-fixed-point `strength` must finally be settled rather
+  than deferred a fourth time. Step rounds from the sim loop; apply the per-mille losses to real
+  units on end, since neither resolver mutates anything itself.
+  Docs to read: `campaign_battle.hpp`, `unit_roster.hpp`. **Not** the design corpus.
+  Deps: F1, F2. Concurrent with S2, S3, S4, S5.
+
+- **[S2] The AI can see and use its force** — BL-393 gap 1, plus military scoring.
+  Files: `src/world/corp_ai.cpp`.
+  `export_corp_blackboard` has four sections and none mentions units; add unit facts (id, tile,
+  type, count, strength) as `own_asset` — a corp reading its own force engages no visibility rule.
+  Then score the new verbs in the same deterministic scored-utility layer, under the standing rules'
+  existing BL-202/BL-203 grant. Availability is cash-free, spend is not (the NR-218 ruling).
+  Deps: F1, F2. Concurrent with S1 — the seam is F1's, so S2 codes against the enum, not against S1.
+
+- **[S3] The player can see and drive the fight** — the UI half, plus BL-405.
+  Files: `src/ui/selection_panel.cpp`, `src/ui/body_surface_canvas.cpp`, `src/ui/icons.{hpp,cpp}`,
+  new battle window, `scripts/verify/engagement.lua` *(new)*.
+  Move orders from the unit Selection card; a battle window that steps rounds with a **Withdraw**
+  button whose displayed cost rises per round (the withdrawal price is already modelled — surface
+  it); outcomes into the comms dock; a force ledger. **BL-405 (hire has no price on screen) rides
+  here** — one line, same file, and shipping it separately is ceremony.
+  Deps: F1, F2. Concurrent with S1 — render from world state; a stub battle store is enough to build
+  against.
+
+- **[S4] The dictionary and the justification store** — BL-314 (unit verb family), docs only.
+  Files: `docs/ai/ACTIONS.json`, `docs/ui/question_log.json`, regenerated mirrors.
+  **Transcribed from F1's seam, never authored ahead of it** — preconditions mirror the rejection
+  enum exactly, as the gameplay family already mirrors `corp_command_result`. A `question_log` entry
+  per new surface S3 adds.
+  Deps: F1 only (not F2, not S1). Concurrent with everything. Cheapest slice on the board.
+
+## Independent — starts on day one, alongside F1
+
+- **[S5] The Era −1 sim conquers nothing** — BL-384.
+  Files: `src/world/history_sim.cpp`, `tools/verify/history_sim_harness.cpp`.
+  267 battles and zero provinces taken across 1960 years; no assertion covers conquest count, which
+  is why six existing reds never surfaced it. Shares **no file** with any slice above and depends on
+  none of them. Give it to an agent immediately.
+  Deps: none. Concurrent with F1, F2 and all of S1–S4.
+
+## Recommended first fan-out
+
+**Two agents, not five.** Session one runs **F1** and **S5** in parallel — the only two slices with
+no dependency and no shared file — while **F2's ruling goes to Ben as a question**, because it is a
+design call and no agent should take it. Session two lands F2's code. Session three fans out to
+four agents across S1–S4.
+
+Fanning out wider before F1 lands produces exactly the three-incompatible-designs failure this
+decomposition exists to prevent: S1, S2 and S3 all code against a verb enum that would not yet exist.
+
+## What this sprint does NOT carry, and why
+
+- **BL-325 (military bases and supply) tail — out-of-supply decay.** Cut on the seam, not on scope:
+  it needs `economy_system.cpp` and `scripts/economy.lua`, where three agents are live. Its own item
+  already sequences it behind the conflict spine (NR-177). It stays designed-but-unbuilt, and it is
+  the first thing to pick up in the sprint that follows.
+- **Unit-vs-building interaction — capturing or razing.** No model exists for a building changing
+  hands, and inventing one drags ownership, reach and the corp border into a combat sprint. Battles
+  resolve between forces; ground changes nothing yet.
+- **Healing, reinforcement, veterancy.** Each is a state field and a UI surface for a system with no
+  proven loop. Land the loop first.
+- **Naval and siege resolution.** `resolve_battle` already excludes naval from the tactical
+  calculation by design, and sieges are a doctrine stance rather than a code path. Neither is missing
+  — both are deliberately out of the first cut, and stay there.
+- **Diplomacy verbs at nation grain.** BL-297's, not this sprint's, and F2 must be careful to define
+  hostility narrowly enough that it does not quietly become a diplomacy system.
+- **Unifying the two resolvers.** Ben ruled the two-path split 2026-08-13 and `campaign_battle.hpp`
+  says "do not unify it back" in its own header. The roster and calibration stay single-sourced;
+  the resolvers do not merge.
+- **BL-094 (player militia pivot) and the governing-body arc.** Parked with the space arc. BL-315 no
+  longer requires it.
+
+---
+

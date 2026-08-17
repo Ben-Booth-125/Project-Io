@@ -937,6 +937,66 @@
         "tools/verify/price_band_harness.cpp"
       ],
       "resolution": "Fixed 2026-08-17 at integration: create_directories before the probe write. price_band_harness is green under ctest."
+    },
+    {
+      "id": "NR-289",
+      "title": "There is no hostility model anywhere in the codebase, and every military plan assumes one",
+      "raised": "2026-08-17",
+      "kind": "question",
+      "status": "open",
+      "source": "Sprint 21 scoping audit (docs only). Source read: corp_command.{hpp,cpp}, campaign_battle.{hpp,cpp}, combat.{hpp,cpp}, corp_ai.cpp, world.hpp.",
+      "what": "Nothing in src/ expresses that one corporation may fight another. There is no standing, no war state, no allegiance, no target-legality predicate. Sprint 16, Sprint 18 and Sprint 20's candidate B all describe fighting and none of them names this. BL-315 (armed house conflict spine) settled that army, mercenary and pirate are three derived readings of one company - that is a NAMING rule and it answers nothing about who may be attacked.",
+      "why_it_matters": "It blocks three things at once and is filed as none of them: an attack verb has no legal precondition, an engagement trigger has no condition to test, and the corp_ai scorer cannot price an engagement it has no rule to bound. It is the load-bearing unknown of the whole military theme, and it is a design call rather than an implementation - so no agent should take it. Left open it serialises a sprint the decomposition otherwise parallelises four ways.",
+      "recommendation": "Answer before Sprint 21 opens, and file it as a backlog item so it has an id. The narrow version is probably enough for a first cut: a deterministic may_engage(w, attacker_corp, defender_corp) over minimal state, defined tightly enough that it does not quietly grow into the diplomacy system BL-297 owns. Decomposition and consequences: REFINED.md Sprint 21 slice F2.",
+      "files": [
+        "docs/development/REFINED.md",
+        "docs/development/SPRINTS.md"
+      ]
+    },
+    {
+      "id": "NR-290",
+      "title": "Sprint 18's block says BL-315 has nothing built against it - the campaign battle resolver is fully built and has zero callers",
+      "raised": "2026-08-17",
+      "kind": "observation",
+      "status": "open",
+      "source": "Sprint 21 scoping audit. src/world/campaign_battle.{hpp,cpp} (~190 line header, full params block), tools/verify/campaign_battle_harness.cpp, commits f8dc6eb / 841759a / 825ca46.",
+      "what": "Sprint 18's planned block and Sprint 20's candidate B both describe BL-315 (armed house conflict spine) as designed with nothing built against it, and name it as the sprint's largest unknown. In fact resolve_campaign_battle is written, compiled into the shipping binary (CMake globs src/world/*.cpp), harnessed, and its swing parameter was measured and retuned over 1000 seeds. It has no caller outside its own harness - and neither does combat.cpp's resolve_battle, whose only live caller is the Era -1 sim.",
+      "why_it_matters": "It changes what the military sprint IS. The estimate of four to six sessions was priced against building a resolver that already exists; what is actually absent is everything that would call one - a unit verb, a hostility rule, a contact trigger, a battle store, a unit-to-stack adapter, and a screen. That is a different and more parallelisable shape, and it is why the Sprint 21 block was rewritten around reach rather than around combat.",
+      "recommendation": "No action beyond reading the corrected block. Recorded because the stale premise survived two sprint plans, which is the failure mode NR-265 and NR-266 both hit this week: a plan describing a world the code did not match.",
+      "files": [
+        "docs/development/SPRINTS.md",
+        "src/world/campaign_battle.hpp"
+      ]
+    },
+    {
+      "id": "NR-291",
+      "title": "Nothing converts a unit_component into an army_stack_entry, so NR-247's strength ambiguity is now blocking rather than cosmetic",
+      "raised": "2026-08-17",
+      "kind": "observation",
+      "status": "open",
+      "source": "Sprint 21 scoping audit. components.hpp unit_component, combat.hpp army_stack_entry, campaign_battle.hpp, NR-247.",
+      "what": "Both resolvers take fully-resolved army_stack_entry values and deliberately never look a roster up. No adapter exists anywhere that turns the live w.units store into those values. When one is written it must decide what unit_component::strength means - and NR-247 already recorded that the field is documented as a fixed-point scalar while all three of its writers (corp_command hire_unit, corporation_generation, hard_coded_world) set it equal to raw manpower, with both readers printing it raw.",
+      "why_it_matters": "NR-247's own recommendation was to reconcile this whenever combat starts consuming strength values. That is exactly the moment the Sprint 21 decomposition reaches, in slice S1. Deferring it a fourth time means the adapter silently picks one reading and the doc comment stays wrong.",
+      "recommendation": "Settle it inside S1 rather than as separate work: either drop the fixed-point doc comment and treat strength as raw manpower, or introduce a divisor and update components.hpp, entity_summary.cpp and selection_panel.cpp together. Resolve NR-247 with whichever is chosen.",
+      "files": [
+        "src/world/components.hpp",
+        "docs/development/REFINED.md"
+      ]
+    },
+    {
+      "id": "NR-292",
+      "title": "BL-325's out-of-supply decay cut from the Sprint 21 proposal on the economy seam, not on scope",
+      "raised": "2026-08-17",
+      "kind": "decision-taken",
+      "status": "open",
+      "source": "Sprint 21 scoping audit, deciding what the proposed sprint carries.",
+      "what": "BL-325 (military bases and supply) slice S3, deterministic out-of-supply strength decay, is the last leg of that item and reads naturally as part of a military sprint. It needs economy_system.cpp and scripts/economy.lua. Three agents are live in the market_clearing / economy_system / budget_system / economy.lua seam right now, and the Sprint 21 decomposition is otherwise entirely clear of it - no proposed slice writes any of those four files.",
+      "why_it_matters": "Including it would put the one sequencing hazard into an otherwise four-way-parallel sprint, for a slice whose own item already sequences it behind the conflict spine (NR-177). The call was taken rather than escalated because it is a sequencing decision, not a design one - but it is a deliberate narrowing of a theme already deferred three times, so it is recorded rather than left in the prose.",
+      "recommendation": "Pick it up in the sprint after, once the conflict layer gives units something to be out of supply FROM and the economy seam has quiesced. If Ben would rather it rode along, sequence it last and alone - never concurrent with the other slices.",
+      "files": [
+        "docs/development/REFINED.md",
+        "docs/development/SPRINTS.md"
+      ]
     }
   ]
 }
