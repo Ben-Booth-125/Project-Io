@@ -78,6 +78,37 @@ if(NOT IO_DEPS_CACHE)
     set(IO_DEPS_CACHE "${CMAKE_CURRENT_SOURCE_DIR}/_deps_cache")
 endif()
 
+# A WORKTREE HAS NO CACHE OF ITS OWN (NR-283, 2026-08-17). The default above
+# resolves inside the source tree, and a sub-agent worktree at
+# .claude/worktrees/agent-<id> carries no `_deps_cache` — so the seeding fell
+# straight through to COLD and every parallel agent re-downloaded ~120 MB. The
+# env-var comment above documented the manual export as the answer, which meant
+# the fix only worked for whoever remembered to type it; the case the cache
+# exists FOR is precisely the one that missed it.
+#
+# Ask git where the real checkout is rather than guessing a `../../..` depth,
+# which would silently break if the worktree location ever moves.
+# `--git-common-dir` resolves to the MAIN repo's .git for a linked worktree and
+# to our own for a normal checkout, so this is a no-op in the normal case.
+if(NOT EXISTS "${IO_DEPS_CACHE}")
+    find_package(Git QUIET)
+    if(GIT_EXECUTABLE)
+        execute_process(
+            COMMAND "${GIT_EXECUTABLE}" rev-parse --path-format=absolute --git-common-dir
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            OUTPUT_VARIABLE IO_GIT_COMMON_DIR
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET)
+        if(IO_GIT_COMMON_DIR)
+            get_filename_component(IO_MAIN_CHECKOUT "${IO_GIT_COMMON_DIR}" DIRECTORY)
+            if(EXISTS "${IO_MAIN_CHECKOUT}/_deps_cache")
+                set(IO_DEPS_CACHE "${IO_MAIN_CHECKOUT}/_deps_cache")
+                message(STATUS "Deps: worktree — using the main checkout's cache at ${IO_DEPS_CACHE}")
+            endif()
+        endif()
+    endif()
+endif()
+
 # Where THIS build tree keeps its own populated deps. FETCHCONTENT_BASE_DIR is
 # not defaulted until include(FetchContent) below, so mirror its default here.
 if(FETCHCONTENT_BASE_DIR)
@@ -101,7 +132,18 @@ foreach(dep_spec IN ITEMS
 
     string(TOUPPER "${dep_name}" dep_upper)
     set(dep_var "FETCHCONTENT_SOURCE_DIR_${dep_upper}")
-    set(dep_cached_src "${IO_DEPS_CACHE}/${dep_name}-src")
+    # NO `-src` SUFFIX HERE (NR-276, fixed 2026-08-17). The suffix is a
+    # FetchContent BUILD-TREE convention — `_deps/<name>-src` — and the
+    # IS_DIRECTORY test below is right to use it. The shared CACHE is a plain
+    # checkout that carries `sdl3`, `lua_src`, `sol2_src`, `imgui_src`, so
+    # appending `-src` here matched nothing, every dep classified COLD, and the
+    # BL-302 seeding this loop exists to perform never fired once.
+    #
+    # It went unseen because the main repo's build/ tree has been warm since
+    # before BL-302, so the IS_DIRECTORY branch above answered first every time
+    # and no one configured cold. It surfaced only when sub-agent worktrees
+    # started each trying to download ~120 MB.
+    set(dep_cached_src "${IO_DEPS_CACHE}/${dep_name}")
 
     if(NOT "${${dep_var}}" STREQUAL "")
         # Explicitly pointed somewhere by the caller — never second-guess it.
@@ -603,6 +645,26 @@ target_link_libraries(tier_margin PRIVATE io_world_obj lua54)
 target_compile_features(tier_margin PRIVATE cxx_std_20)
 target_compile_options(tier_margin PRIVATE ${IO_WARNING_FLAGS})
 
+# haulage_measure (BL-442 step 2, 2026-08-17) — live-Lua for the same reason as
+# tier_margin: it measures the per-unit haulage the supply layer ACTUALLY charges
+# between adjacent markets, which is the authored logistics cost table times the
+# terrain-weighted A* cost in the real generated world. It exists so the widened
+# price ceiling is a derived number rather than a guess, and so it can be
+# re-derived later rather than trusted.
+add_executable(haulage_measure
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/haulage_measure.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
+)
+target_include_directories(haulage_measure PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(haulage_measure PRIVATE io_world_obj lua54)
+target_compile_features(haulage_measure PRIVATE cxx_std_20)
+target_compile_options(haulage_measure PRIVATE ${IO_WARNING_FLAGS})
+
 # font_glyph_harness (BL-234) is the one harness that links ImGui rather than
 # ${IO_WORLD_SOURCES}: the defect it guards is the ImFontConfig handed to
 # AddFontFromFileTTF, which lives in src/ui/fonts.cpp, not in world/*. It still
@@ -624,6 +686,23 @@ target_include_directories(font_glyph_harness PRIVATE
 target_link_libraries(font_glyph_harness PRIVATE imgui)
 target_compile_features(font_glyph_harness PRIVATE cxx_std_20)
 target_compile_options(font_glyph_harness PRIVATE ${IO_WARNING_FLAGS})
+
+# price_band_harness (BL-442) is live-Lua for one row only, P2: it asserts that
+# the band the SHIPPED scripts/economy.lua authors is the band that reaches
+# recipe_registry, which a hand-built fixture cannot answer without becoming the
+# thing under test. Its remaining rows are hand-built fixtures.
+add_executable(price_band_harness
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/price_band_harness.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(price_band_harness PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(price_band_harness PRIVATE io_world_obj lua54)
+target_compile_features(price_band_harness PRIVATE cxx_std_20)
+target_compile_options(price_band_harness PRIVATE ${IO_WARNING_FLAGS})
 
 file(GLOB IO_VERIFY_HARNESSES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/*.cpp")
 
@@ -768,11 +847,25 @@ set(IO_TEST_BENCH_HARNESSES
 set(IO_TEST_SCRIPT_ROOTED_HARNESSES
     chain_depth
     era_roster
+    haulage_measure
     player_seed_sweep
     interbody_pull_harness
     pregame_balance_harness
     persona_counsel_harness
     recipe_switch_harness
+    # ADDED 2026-08-17 (BL-442 step 2). Both load scripts/*.lua by relative path
+    # and both say so in their own headers — price_band_harness's README entry
+    # reads "Run it from the repo root", tier_margin's CMake block says it loads
+    # scripts/world_gen.lua — but neither was ever listed here, so under ctest
+    # they ran from build/ and read build/scripts/, which the POST_BUILD copy only
+    # refreshes when the ProjectIo TARGET relinks. A Lua-only edit does not relink
+    # anything, so that copy goes stale silently and these two measured the OLD
+    # economy while the repo held the new one. That is how BL-442 step 2's ceiling
+    # change reached tier_margin standalone (net/tick -17.68) and NOT under ctest
+    # (-10.81, the pre-change number) in the same session. Exactly the vacuity trap
+    # the comment at the foreach below already warns about, found twice more.
+    price_band_harness
+    tier_margin
 )
 
 foreach(harness_src ${IO_VERIFY_HARNESSES})
@@ -819,3 +912,20 @@ foreach(harness_src ${IO_VERIFY_HARNESSES})
             WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
     endif()
 endforeach()
+
+# BL-435 task E — the same exe, its ASSERTING mode, as its own test. The default
+# player_seed_sweep run reports a design question and exits 0 whatever it finds;
+# `--guard` asserts the four properties the starting-corp selection screen needs
+# to hold in EVERY world (a choice exists, the specialist/background split holds,
+# no specialist that cannot produce, processor coverage above the pre-BL-435
+# floor) and exits non-zero when one breaks. Registering it separately is what
+# makes it a gate rather than a thing someone remembers to run.
+#
+# 12 seeds, not the sweep's 24: each seed is a full world generation, and the
+# properties are per-seed invariants rather than a distribution needing a large
+# sample. Script-rooted for the same reason the sweep is — it loads the real
+# recipes.lua/economy.lua and would otherwise measure an empty registry.
+add_test(NAME player_seed_sweep_guard COMMAND player_seed_sweep --guard 12)
+set_tests_properties(player_seed_sweep_guard PROPERTIES
+    TIMEOUT ${IO_TEST_TIMEOUT_LONG}
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")

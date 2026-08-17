@@ -1,27 +1,244 @@
 # Project Io — REFINED (active worklist)
 
-## Starting-corp selection (promoted from BL-435) — **PAUSED** (4/6, 2026-08-16)
+## Widen the price band (promoted from BL-442 step 2) — **5/5 DONE** (2026-08-17)
 
-> **Paused 2026-08-16 at Ben's call to move to Sprint 19.** A, B, C and D are complete and
-> committed (`d80ca55`, `2f0f929`); **E and F are owed**. This is a deliberate pause, not a
-> cancellation — the item works end-to-end today and nothing is half-written.
+Requirements: requirements.json § price-band-derived-ceiling (R1–R5)
+
+Step 1 made the band data (`economy.price_band`, read by `resolve_price` and `wf_target_price`
+through `recipe_registry::price_band()`) and deliberately left the values alone. Step 2 changes
+the values, and only the values — Ben's requirement makes the ceiling **derived**: scarcity must
+price high enough to cross the margin for a nearby market.
+
+- **[3] A — Measure the haulage first.** A ceiling picked before the number is known is a guess
+  wearing a derivation's clothes. New harness walks every market in the real generated world,
+  finds its nearest market neighbour by the terrain-weighted A* cost, and reports
+  `logistics_cost(mode) x path.cost` — exactly what `dispatch_convoys` charges. **DONE.**
+  Measured: median **0.70**, p90 **1.67**, max **4.83** credits per unit; cheapest priced good
+  **0.60**. Files: `tools/verify/haulage_measure.cpp`, `CMakeLists.txt`. Satisfies: R1.
+- **[1] B — Change the value, data only.** `ceil_mult` 4.0 → **10.0**, from
+  `1 + 4.83/0.60 = 9.06` rounded up. Floor left at 0.25 (NR-290). No C++ touched. **DONE.**
+  Files: `scripts/economy.lua`. Deps: A. Satisfies: R2.
+- **[3] C — Prove the outcome instead of assuming it.** Count convoys at both bands, split
+  intra-body market-to-market / inter-body / BL-088 trade routes. **DONE, and it contradicted the
+  premise** — intra-body inter-market trade was already happening at the old band, and the space
+  lane is zero at both because it is launchpad-gated, not price-gated (NR-289). Files:
+  `tools/verify/haulage_measure.cpp`. Deps: A. Satisfies: R3.
+- **[2] D — Run the full gate, report every number that moved, bless nothing.** **DONE.**
+  Deps: B. Satisfies: R4, R5.
+- **[1] E — Propagate the derivation to MARKETS.md** so the number can be re-derived rather than
+  trusted. **DONE.** Files: `docs/economy/MARKETS.md`. Deps: B.
+
+## Unmet demand is never registered (promoted from BL-441) — **5/5 DONE** (2026-08-17)
+
+Requirements: requirements.json § demand-register-records-wants (R1–R5)
+
+`market_clearing.cpp` registers `demand[r] += bought[r]` — what a corp **actually bought**. A
+processor that needed 16 units of an input and could draw only 2 registers demand of 2, so the
+resource reads to `resolve_price` as one almost nobody wants and scarcity is invisible. The fix is
+to register the **want** alongside the **fill**: `run_processing` already computes the full-run need
+per input *before* deciding coverage, and that figure is the demand.
+
+The distinction is the one BL-422 landed for the sell side — SUPPLY is an offer, INVENTORY is a
+delivery. Demand needs the same split: what was **wanted** versus what was **bought**. Only the
+price-resolution input changes; the purchase record (`auto_buys`, the VWAP accumulator, the money
+actually paid) keeps reading the fill.
+
+- **[2] A — Guard first, run against the pre-change build.** Two assertions on observable market
+  state, so they compile and run *before* the fix and are seen to fail there: a starved processor
+  registers demand equal to its full-run NEED, not the quantity it drew; and a resource with real
+  demand and no supply resolves to the TOP of the price band, not to base. Files:
+  `tools/verify/order_book_harness.cpp`. Deps: foundation. Satisfies: R1, R2.
+- **[2] B — The want register.** A `wants` map on `economy_report`, keyed and containered exactly
+  as `purchases` (`std::map` over `(corp, body)` — a **sorted** key set; this is the seam where
+  BL-422 found a latent `unordered_map` float-accumulation nondeterminism). Files:
+  `src/world/economy_system.hpp`. Deps: foundation. Satisfies: R4.
+- **[3] C — Record the want at both consumer sites.** `run_processing`: the full-run need net of
+  the corp's own pool, recorded in the coverage loop so it survives the early return that a starved
+  building takes. `run_construction`: the full-rate material need, recorded **before** the
+  `rate <= 0` continue, so a paused build still says what it wanted. C is not optional scope — once
+  demand reads `wants`, a construction site with no want row would register zero demand where it
+  previously registered its draw. Files: `src/world/economy_system.cpp`. Deps: B. Satisfies: R1, R3.
+- **[2] D — Split the read in the clearing pass.** `mc.demand` reads `report.wants`; `auto_buys`,
+  the VWAP accumulator and the money paid keep reading `report.purchases`. Both loops iterate a
+  `std::map`. Each site states in a comment which of the two it wants. Files:
+  `src/world/market_clearing.cpp`. Deps: B, C. Satisfies: R3, R4.
+- **[2] E — Measure the economy, report it, bless nothing.** Run `tier_margin` and the determinism
+  reads; report every number that moved. Propagate the settled design into `docs/economy/MARKETS.md`
+  as part of landing. Files: `docs/economy/MARKETS.md`. Deps: D. Satisfies: R5. **DONE.**
+
+**All five tasks complete.** The guard was run against the pre-change build first and failed there
+on all three new assertions — `demand=0.000 price=5.000` starved, `fill=2 demand=2` partial.
+`tier_margin` was measured on **both** sides from the same worktree: processing input cost
+10.86 → 11.59, processing net −9.52 → −10.42, extraction net 7.27 → 7.11, and several resources left
+the price floor for the first time. The failing assertion set is **identical** on both sides — three
+pre-existing failures, none new, none masked. **Nothing was blessed**; that stays Ben's call
+(NR-269). Two delegated calls are logged: NR-281 (the want is net of the corp's own pool) and
+NR-282 (`run_construction` was pulled into scope, because leaving it out would have zeroed
+construction's market demand).
+
+## Mines only target the richest (promoted from BL-440) — **2/4, C SUPERSEDED BY BL-441/442** (2026-08-17)
+
+Requirements: none written yet — the item is mid-flight and (c) is a design call, not an
+implementation detail. Write them with (c)'s shape, so decomposition is shaped by it.
+
+`richest_extractable` gives a site the single richest deposit on its tile, so a resource that is
+common but rarely dominant is structurally unmineable — it loses every richness comparison it is
+entered into, so no scorer is ever offered it.
+
+- **[3] A — Guard first: tier_margin R4b.** Assert no wanted recipe input sits on 200+ tiles with
+  zero sites naming it. **DONE**, and run against the pre-change build where it fails by
+  construction on **seven** resources, one of them on 16,361 tiles. Files: `tools/verify/tier_margin.cpp`.
+- **[3] B — Enumerate, and weight by unmet demand.** `rank_extraction_sites` emits a candidate per
+  extractable deposit rather than one for the richest, weighted by `input_demand_weights()`
+  (recipes-wanting-it over sites-already-named-for-it, self-limiting). `input_demand_pull` in
+  `corp_ai_params` makes it a data change. **DONE.** Files: `src/world/corp_ai.{hpp,cpp}`.
+- **[3] C — Generation sites by the same broken rule.** **SUPERSEDED 2026-08-17, do not build.**
+  Ben chose the static demand hint, then redirected past it the same session on a better reading:
+  the price signal was never structurally unable to do this job. It was starved, because the demand
+  register records FILLS rather than WANTS. Fix that and price sites the mine by itself, with task
+  B's per-deposit enumeration as the thing that lets the scorer act on it. Now BL-441 (unmet demand
+  is never registered) and BL-442 (price band is code, not data).
+- **[1] D — Propagate to PRODUCTION.md.** Not started. Deps: C.
+
+**The measurement that says C is the load-bearing half.** tier_margin is **byte-identical** across
+A+B — extraction 14.53/7.82, processing 12.37/−10.44, samples 2993/1916, all seven R4b rows still
+red. A 3-seed 20-tick run is dominated by generated assets, and generation still calls
+`richest_extractable`. The AI-side fix cannot show until generation stops digging the hole.
+
+The blocker on C is the same ordering constraint that produced the no-recipe defect:
+`generate_corporations` runs inside `make_hard_coded_world`, before the Lua economy layer loads, so
+it can see neither recipe ids nor recipe demand.
+
+## AI never builds processors (promoted from BL-439) — **3/4, C HELD FOR BEN** (2026-08-17)
+
+Requirements: requirements.json § ai-builds-processors (R1–R7)
+
+The structural finding behind Sprint 19's keystone. `corp_ai.cpp` emits `corp_verb::build` from
+exactly two sites — the `ranked_sites` loop hard-coded to `extraction_site` (line 606) and one
+`military_base` (line 960). A rival therefore owns only the processors it was *generated* with,
+for the whole campaign. "The AI prefers mines" is not a scoring-curve artefact (NR-265); BL-428's
+growth ladder has no AI player (NR-267); and BL-436's calibration narrative describes a mechanism
+that cannot happen (NR-266).
+
+- **[3] A — The processor build candidate.** Add a `processing_facility` candidate to
+  `run_corp_strategic_step`'s enumeration, on the same score curve and the same solvency / glut /
+  reserve gates as the extraction candidate. Three things extraction does not have to solve:
+  **siting** (no deposit ranks a processor — site it on the corp's own asset tiles, which is
+  literally "next to its own input supply", shares the body pool and the market, and costs
+  O(assets) not O(tiles)); **recipe choice** (`recipe_margin` scores it; the id must cross from
+  the BROWSE space to the ABSOLUTE one — NR-254's exact trap); **input access** (pool + local
+  market inventory against the tick's own coverage threshold). Files: `src/world/corp_ai.cpp`.
+  Deps: foundation. Satisfies: R2, R3, R4, R5.
+- **[2] B — Guard: a rival actually builds one.** Extend `ai_skill_harness` with the assertion
+  that at least one rival constructs at least one processing facility over the run — and run it
+  against the **pre-change** build first, where it must fail by construction. Files:
+  `tools/verify/ai_skill_harness.cpp`. Deps: A. Satisfies: R1.
+- **[2] C — Pay the golden reshuffle deliberately.** Every evolved world changes, so goldens and
+  bands move. Re-bless with the cause recorded, confirmed across two runs. The bands lowered on
+  2026-08-16 are expected to **rise**; if they do not, that is a finding about the item, not a
+  number to bless. Deps: A, B. Satisfies: R6.
+- **[1] D — Propagate to AI_OPPONENT.md.** The doc describes a scorer that only ranks extraction
+  sites. Files: `docs/ai/AI_OPPONENT.md`. Deps: A. Satisfies: R7.
+
+**Parallelisation.** Strictly A → {B, D} → C. One logic file with `corp_ai.cpp` as the hotspot —
+main session, no fan-out.
+
+**Status 2026-08-17. A, B and D complete; C is held, not skipped.** The guard was written and run
+against the pre-change build *first*, where it failed by construction (`processors_gained = 0` on
+all five seeds); after the change it reads 12/15/16/16/10, 69 across the set. So the structural
+defect is closed and demonstrated in both directions.
+
+What it then found is why C stops here. Three of five seeds go insolvent — seed 0 from 498k to
+−295k — and `ai_skill_harness` is 18 rows red. The estimator was **ruled out rather than assumed
+innocent**: scored with the inline model and with `estimate_prospective_profit`, the candidate picks
+the same recipes and builds the same counts, and net worth moves only on seed 0. The new
+per-building read shows processors realising **−6 to −12 per tick against a predicted −0.4 to
++0.1**, on the same buildings.
+
+Sprint 19's success criterion was written before the work started: these bands should **rise**, and
+a bless that does not raise them means the fix did not work. They fell. Blessing here would record
+bankruptcy as the expected outcome, so the goldens are **left red** and the call is Ben's —
+NR-269 lays out the three options and states the one taken in the meantime (change nothing, bless
+nothing).
+
+## Held-order phantom inventory (promoted from BL-422) — **COMPLETE** (3/3, 2026-08-16)
+
+Requirements: requirements.json § held-order-phantom-inventory (R1–R4)
+
+Sprint 19's early-clearing item: phantom supply distorts every price BL-436's margin work is
+measured against, so it is worth removing before more numbers are read off this seam.
+
+`market_clearing.cpp` credits a standing order's **listed** quantity to `mc.inventory` at listing
+time, before clearing runs. Pre-BL-386 that was harmless — everything listed also sold. Under the
+reservation rule a held order (floor above the resolved price) sells nothing, yet the market gains
+stock that never left the seller's pool. `inventory` is not a display field: `economy_system.cpp`
+draws processor inputs from it (lines 312/363/563), so a held order's phantom stock is bought by a
+processor, decrements, and is never paid for — **goods from nothing, and money destroyed**, the
+same family as BL-351's over-listing.
+
+- **[2] A — Credit inventory where stock actually leaves a pool.** Delete the listing-time credit;
+  credit inside the three places a pool is debited instead — the auto-surplus clearing loop, the
+  matched-trade debit loop, and the auto-clear pass (`se.rem`, floor ≤ resolved only). Files:
+  `src/world/market_clearing.cpp`. Deps: foundation. Satisfies: R1, R2, R3.
+- **[2] B — Guard: an R7 group on `order_book_harness`,** beside BL-386's R6 hold rows it extends
+  — held leaves inventory untouched, a clearing order credits exactly what left its pool, and a
+  mixed tick credits only the clearing half. Files: `tools/verify/order_book_harness.cpp`.
+  Deps: A. Satisfies: R1, R2, R3.
+- **[1] C — Propagate to MARKETS.md**: the real-inventory paragraph, and the recorded decision on
+  whether held stock stays visible to the supply-side price signal. Files:
+  `docs/economy/MARKETS.md`. Deps: A. Satisfies: R4.
+
+**Parallelisation.** Strictly A → {B, C}: B asserts what A changes and C describes it. Two logic
+files, one seam — main session, no fan-out.
+
+**Closed 2026-08-16. All three tasks complete; `order_book_harness` 64/64 (12 new R7 rows).**
+Three of the twelve — R7.2, R7.3, R7.10 — were run against the **pre-fix** build first and
+confirmed to fail there, so the guard discriminates rather than merely passing. The R6 hold rows
+it sits beside were the reason the rest of BL-386's rule looked complete when half of it was not.
+
+Two things surfaced that are recorded rather than folded in, because each is a change to a
+*different* seam than the one this item names:
+
+- **Held stock stays visible to the price signal, against the item's own stated default**
+  (NR-261). Hiding it is not implementable as written: a hold is decided by comparing the floor
+  to the resolved price, and the resolved price is computed *from* `supply` — removing held stock
+  raises the price, which can un-hold the order that was removed. That is a fixed point, and it
+  costs determinism risk to reach. `supply` is now documented as the **offer** and `inventory` as
+  the **delivery**.
+- **A matched explicit trade still delivers to the shared market shelf, not to the buyer**
+  (NR-262). Pre-existing and currently unreachable — nothing writes `world::buy_orders` in play —
+  so it belongs to BL-160, which gives the buy side its first live emitter. R7.12 pins today's
+  behaviour as conservation, so a future correction fails it loudly.
+
+One measurement worth carrying rather than filing away (NR-263): `ai_skill_harness` is
+**byte-identical** on all five seeds before and after. The AI places 9–10 standing orders per seed
+and none of them hold, so the benchmark never reached the defect. That is a fact about the
+benchmark, not a defence of the old code — and it matters to BL-436, whose calibration will move
+resolved prices under those orders.
+
+## Starting-corp selection (promoted from BL-435) — **COMPLETE** (6/6, 2026-08-17)
+
+> **Resumed and finished 2026-08-17.** A–D landed 2026-08-16 (`d80ca55`, `2f0f929`); **E and F
+> landed this pass**. All six tasks terminal, requirements R1–R6 complete.
 >
-> **To resume, you need only this:**
-> - **E (the guard) is the real gap, and it has a catch worth knowing before you start.**
->   `--verify` currently *cannot reach the screen at all*: both automated paths take the
->   Surprise-me fallback deliberately, which is exactly what keeps every capture and golden
->   bit-identical. So E is not "add a golden" — it first needs a verify hook that stops at
->   `app_screen::choosing_corp` rather than auto-picking. Without that, any check written
->   against this screen is green-but-blind, the NR-255 failure mode.
-> - **Eyeball it live before blessing anything.** A golden blessed on an unreviewed layout just
->   pins whatever happened to get built. Ben has not seen the screen yet; `--autostart-play`
->   will NOT show it (it auto-picks), so it needs a game started from the menu.
-> - **F is pure propagation** and independent of E: CORPORATION_GENERATION.md already names the
->   deferred selection screen as an open item — that paragraph is now describable as built —
->   plus STARTUP.md's stage list and a `question_log.json` entry for the surface.
-> - **BL-436 is the loose thread this item created**, not a blocker for E/F. Filed priority A
->   with the measurement; until it lands, the screen presents a processing-heavy corp as the
->   richer pick when it is measurably the poorer one.
+> **E cleared the catch the pause was called on.** `--verify` genuinely could not reach the
+> screen — both automated paths take the Surprise-me fallback by design, which is what keeps
+> every other capture bit-identical. `verify.show_corp_choice(true)` re-enters the stage from a
+> started world, `verify.corp_choices()` exposes the armed list, and
+> `scripts/verify/corp_choice.lua` asserts + captures. It paid for itself on the first run:
+> the Holdings cell was clipped to "/ 1 otl" behind the Choose button (NR-275). The headless
+> half is `player_seed_sweep --guard` (G1–G4, own ctest `player_seed_sweep_guard`).
+> `build_corp_choices` also now skips `is_background` explicitly, so the specialist-only pool
+> stops being a property of *when* it is called (NR-273).
+>
+> **Still owed — Ben's eyeball, and it is why there is no golden.** The capture is
+> capture-only on purpose; blessing now would pin a layout he has never seen.
+> `--autostart-play` will NOT show the screen (it auto-picks), so it needs a game started from
+> the menu. NR-275 carries the note.
+>
+> **BL-436 (processing loses money) remains the loose thread**, unchanged: the screen is a
+> **depth** choice, not a wealth one, and every doc and check touched this pass says so
+> explicitly rather than implying the processor-heavy corp is richer.
 
 Requirements: requirements.json § starting-corp-selection (R1–R4)
 
@@ -64,11 +281,11 @@ and index 2 for trade (holdings 1–2, so **never**).
 - **[2] E — Guard: a headless row asserting the specialist/background split and the raised
   processor count, and a `scripts/verify/*.lua` visual check for the screen.** Files:
   `tools/verify/player_seed_sweep.cpp`, `scripts/verify/`, `.claude/skills/verifier-*/SKILL.md`.
-  Deps: D. Satisfies: R1, R2, R3.
+  Deps: D. Satisfies: R1, R2, R3, R5, R6. — **COMPLETE 2026-08-17.**
 - **[1] F — Propagate: CORPORATION_GENERATION.md (the deferred selection screen it already names,
   and the asset-pattern change), STARTUP.md (the new stage), question_log.json (the surface's
   question).** Files: `docs/generation/CORPORATION_GENERATION.md`, `docs/ui/STARTUP.md`,
-  `docs/ui/question_log.json`. Deps: D.
+  `docs/ui/question_log.json`. Deps: D. — **COMPLETE 2026-08-17.**
 
 **Parallelisation.** Strictly sequential A → B → C → D → {E, F}: B changes what C's candidate list
 contains, C provides the state D renders, and E/F both describe D. One vertical seam, so it runs
@@ -623,6 +840,186 @@ later waves. After each wave the integrator wires hooks, **builds, and verifies*
 (headless harness for pure `world/*` logic per `reference_headless_build`; a full
 `cmake` build to confirm the real target still links) before starting the next
 wave. Verify retroactively — do not assume an agent's self-reported success.
+
+---
+
+## The inter-body pull reads a counterpart market (promoted from BL-406, then BL-404) — 2026-08-17
+
+Requirements: requirements.json § interbody-pull-counterpart (R1–R4)
+
+Two items, strictly in order: **BL-406 (home market is an arbitrary pick)** first, because it
+defines *what* is being netted against; **BL-404 (inter-body pull is unnetted)** second.
+
+Ben's ruling 2026-08-15 took **BL-406 option (c)** — a per-counterpart-market pull — and deferred
+BL-404's own a/b/c to the same pass. Outpost prices are cleared to move.
+
+> **Closed 2026-08-17, all five tasks complete, in ONE commit rather than the usual one-per-item.**
+> The two items rewrite the same twenty lines, and BL-404's own ruling put its decision inside the
+> pass that lands BL-406. Splitting them would mean committing an intermediate whose own guard
+> (C3) fails by design — a red commit for the sake of a boundary the ruling had already dissolved.
+
+**Baseline, measured before any change** (`interbody_pull_harness`, seed 0, 60 ticks, MSVC): the
+home body carries **9** markets holding 3861.3 supply and 34.0 demand; the market
+`market_for_body` hands the pull holds **0.0 supply and 1.81 demand — 5% of the body's**.
+
+### Tasks
+
+- **A — define the counterpart relation** (`src/world/market_clearing.cpp`). A per-resource
+  `counterpart_home_market(w, r)`: the home-body market with the greatest demand for `r`,
+  lowest market id as tiebreak. Order-independent by construction, so it is stable across
+  standard-library container orders. — **complete**
+- **B — the pull reads it** (`src/world/market_clearing.{hpp,cpp}`). Retire the single
+  `market_for_body(w.home_body)` read; select per resource inside the loop. — **complete**
+- **C — the netting becomes real** (BL-404; `market_clearing.{hpp,cpp}`). Snapshot every market's
+  supply **before** `clear_markets`' reset loop and net the counterpart's snapshot supply. This is
+  BL-404 option **(b)**, one tick of lag, no reordering, no new persisted state. — **complete**
+- **D — the guard** (`tools/verify/interbody_pull_harness.cpp`, `market_emergence_harness.cpp`).
+  Behavioural assertions on `inject_interbody_demand`'s observable output, run against the
+  **pre-change** build first and observed to fail — **3 of 3 did**. — **complete**
+- **E — propagate** (`docs/economy/MARKETS.md`). Authority time-slice: the settled design moves
+  out of the two items and into the market doc as part of landing. — **complete**
+
+---
+
+# Sprint 21 — the fight becomes reachable (PROPOSED, not promoted; Ben has not opened Sprint 21)
+
+Decomposition for the military engagement surface, carved for **parallelism**. Written 2026-08-17
+from a source audit, not from the item text — see SPRINTS.md § Sprint 21 for the BUILT / ABSENT
+table and why the sprint's shape changed.
+
+**The one-sentence framing.** The battle resolvers are built and unreachable. Everything below
+exists to give them a caller: a verb, a target rule, a trigger, a state store, and a screen.
+
+## The collision map
+
+| File | Slice that OWNS it | Also read by |
+|---|---|---|
+| `src/world/corp_command.hpp` / `.cpp` | **F1** | S1, S3 (read-only) |
+| `src/world/construction.cpp` (demolish) | **F1** | — |
+| `src/world/standing.{hpp,cpp}` *(new)* | **F2** | S1, S2, S3 |
+| `src/world/battle_system.{hpp,cpp}` *(new)* | **S1** | S2, S4 |
+| `src/world/unit_movement.{hpp,cpp}` *(new)* | **S1** | — |
+| `src/world/world.hpp` (one new store) | **F1** *(declared once, up front)* | S1 |
+| `src/world/corp_ai.cpp` | **S2** | — |
+| `src/ui/*` (`selection_panel`, `body_surface_canvas`, new battle window) | **S3** | — |
+| `docs/ai/ACTIONS.json`, `docs/ui/question_log.json` | **S4** | — |
+| `src/world/history_sim.cpp`, `tools/verify/history_sim_harness.cpp` | **S5** | — |
+
+**No slice below writes `market_clearing.cpp`, `economy_system.cpp`, `budget_system.cpp` or
+`scripts/economy.lua`.** That is deliberate and it is the reason BL-325's out-of-supply decay is cut
+(§ what this does not carry). Three agents are live in that seam; nothing here goes near it.
+
+## Foundation — run ALONE, and first
+
+These two are not parallelisable with anything, including each other's review. F1 defines the seam
+every later slice calls; F2 defines the predicate every later slice tests.
+
+- **[F1] The `unit_command` seam** — BL-393 (units are write-only and inert).
+  Files: `src/world/corp_command.hpp`, `src/world/corp_command.cpp`, `src/world/construction.cpp`,
+  `src/world/world.hpp`.
+  Append (**append-only**, after `cancel_contract` — the enum is serialised by contract even though
+  no serialiser exists yet) `move_unit`, `disband_unit`, `merge_unit`, `engage`. Validate each: the
+  acting corp owns the unit, the destination tile exists, a rejection mutates **nothing**. Settle
+  BL-393's third gap explicitly — `demolish_building` currently never touches `w.units`, so a
+  demolished muster base orphans its garrison; refuse the demolish (`rejected_state`) or disband
+  with an agency event, but do not leave it silent. Declare the battle store on `world` here, in one
+  pass, so S1 does not have to reopen `world.hpp` later.
+  Deps: none. **Blocks: everything except S5.** Cannot fan out.
+
+- **[F2] Hostility and standing** — the missing capability, and it needs a Ben ruling before code.
+  Files: `src/world/standing.{hpp,cpp}` *(new)*, `docs/SYSTEMS.md`.
+  There is no model anywhere of who may fight whom. A pure, deterministic predicate
+  `may_engage(w, attacker_corp, defender_corp)` plus whatever minimal state it reads. BL-315 (armed
+  house conflict spine) settled that army/mercenary/pirate are **derived readings** of one company —
+  that is a naming rule and answers nothing about targeting, so the ruling is genuinely open.
+  **File this as a backlog item and get it answered in session one**; it is Sprint 21's equivalent of
+  BL-440's fork, and leaving it open serialises the whole sprint.
+  Deps: none (can be *designed* alongside F1; its code lands after F1 only because S1 needs both).
+  **Blocks: S1, S2, S3.** Cannot fan out.
+
+## Fan-out — all four run CONCURRENTLY once F1 and F2 land
+
+Disjoint write sets by construction. Each is a coherent vertical slice, narrow enough for one agent
+reading two or three docs.
+
+- **[S1] Movement, contact, and the battle loop** — BL-315 (armed house conflict spine), the half
+  that is actually missing.
+  Files: `src/world/unit_movement.{hpp,cpp}` *(new)*, `src/world/battle_system.{hpp,cpp}` *(new)*,
+  `tools/verify/engagement_harness.cpp` *(new)*.
+  Three things, all headless: (a) apply `move_unit` over ticks with a deterministic step rule;
+  (b) detect contact — two units on one tile whose owners satisfy `may_engage` — and open a
+  `campaign_battle_state`; (c) **the stack adapter**, `unit_component` → `army_stack_entry`, which
+  does not exist and is where NR-247's raw-vs-fixed-point `strength` must finally be settled rather
+  than deferred a fourth time. Step rounds from the sim loop; apply the per-mille losses to real
+  units on end, since neither resolver mutates anything itself.
+  Docs to read: `campaign_battle.hpp`, `unit_roster.hpp`. **Not** the design corpus.
+  Deps: F1, F2. Concurrent with S2, S3, S4, S5.
+
+- **[S2] The AI can see and use its force** — BL-393 gap 1, plus military scoring.
+  Files: `src/world/corp_ai.cpp`.
+  `export_corp_blackboard` has four sections and none mentions units; add unit facts (id, tile,
+  type, count, strength) as `own_asset` — a corp reading its own force engages no visibility rule.
+  Then score the new verbs in the same deterministic scored-utility layer, under the standing rules'
+  existing BL-202/BL-203 grant. Availability is cash-free, spend is not (the NR-218 ruling).
+  Deps: F1, F2. Concurrent with S1 — the seam is F1's, so S2 codes against the enum, not against S1.
+
+- **[S3] The player can see and drive the fight** — the UI half, plus BL-405.
+  Files: `src/ui/selection_panel.cpp`, `src/ui/body_surface_canvas.cpp`, `src/ui/icons.{hpp,cpp}`,
+  new battle window, `scripts/verify/engagement.lua` *(new)*.
+  Move orders from the unit Selection card; a battle window that steps rounds with a **Withdraw**
+  button whose displayed cost rises per round (the withdrawal price is already modelled — surface
+  it); outcomes into the comms dock; a force ledger. **BL-405 (hire has no price on screen) rides
+  here** — one line, same file, and shipping it separately is ceremony.
+  Deps: F1, F2. Concurrent with S1 — render from world state; a stub battle store is enough to build
+  against.
+
+- **[S4] The dictionary and the justification store** — BL-314 (unit verb family), docs only.
+  Files: `docs/ai/ACTIONS.json`, `docs/ui/question_log.json`, regenerated mirrors.
+  **Transcribed from F1's seam, never authored ahead of it** — preconditions mirror the rejection
+  enum exactly, as the gameplay family already mirrors `corp_command_result`. A `question_log` entry
+  per new surface S3 adds.
+  Deps: F1 only (not F2, not S1). Concurrent with everything. Cheapest slice on the board.
+
+## Independent — starts on day one, alongside F1
+
+- **[S5] The Era −1 sim conquers nothing** — BL-384.
+  Files: `src/world/history_sim.cpp`, `tools/verify/history_sim_harness.cpp`.
+  267 battles and zero provinces taken across 1960 years; no assertion covers conquest count, which
+  is why six existing reds never surfaced it. Shares **no file** with any slice above and depends on
+  none of them. Give it to an agent immediately.
+  Deps: none. Concurrent with F1, F2 and all of S1–S4.
+
+## Recommended first fan-out
+
+**Two agents, not five.** Session one runs **F1** and **S5** in parallel — the only two slices with
+no dependency and no shared file — while **F2's ruling goes to Ben as a question**, because it is a
+design call and no agent should take it. Session two lands F2's code. Session three fans out to
+four agents across S1–S4.
+
+Fanning out wider before F1 lands produces exactly the three-incompatible-designs failure this
+decomposition exists to prevent: S1, S2 and S3 all code against a verb enum that would not yet exist.
+
+## What this sprint does NOT carry, and why
+
+- **BL-325 (military bases and supply) tail — out-of-supply decay.** Cut on the seam, not on scope:
+  it needs `economy_system.cpp` and `scripts/economy.lua`, where three agents are live. Its own item
+  already sequences it behind the conflict spine (NR-177). It stays designed-but-unbuilt, and it is
+  the first thing to pick up in the sprint that follows.
+- **Unit-vs-building interaction — capturing or razing.** No model exists for a building changing
+  hands, and inventing one drags ownership, reach and the corp border into a combat sprint. Battles
+  resolve between forces; ground changes nothing yet.
+- **Healing, reinforcement, veterancy.** Each is a state field and a UI surface for a system with no
+  proven loop. Land the loop first.
+- **Naval and siege resolution.** `resolve_battle` already excludes naval from the tactical
+  calculation by design, and sieges are a doctrine stance rather than a code path. Neither is missing
+  — both are deliberately out of the first cut, and stay there.
+- **Diplomacy verbs at nation grain.** BL-297's, not this sprint's, and F2 must be careful to define
+  hostility narrowly enough that it does not quietly become a diplomacy system.
+- **Unifying the two resolvers.** Ben ruled the two-path split 2026-08-13 and `campaign_battle.hpp`
+  says "do not unify it back" in its own header. The roster and calibration stay single-sourced;
+  the resolvers do not merge.
+- **BL-094 (player militia pivot) and the governing-body arc.** Parked with the space arc. BL-315 no
+  longer requires it.
 
 ---
 

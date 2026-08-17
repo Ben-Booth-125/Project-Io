@@ -79,24 +79,19 @@ struct tier_acc
     double per_tick() const { return samples ? net() / static_cast<double>(samples) : 0.0; }
 };
 
-/// Replicates app::load_economy's default-recipe pass, which is a REAL STAGE of
-/// startup and not a harness convenience: generation cannot author recipe ids
-/// (they are registry indices that do not exist yet — corporation_generation.cpp
-/// says so at the assignment site), so every generated processor sits at
-/// no_recipe until load_economy assigns one. Crucially this runs BEFORE
-/// generate_background_firms, which authors its own recipes, so the ordering
-/// below is the app's ordering.
+/// The default-recipe pass is a REAL STAGE of startup, not a harness convenience:
+/// generation cannot author recipe ids (they are registry indices that do not
+/// exist yet — corporation_generation.cpp says so at the assignment site), so
+/// every generated processor sits at no_recipe until the pass assigns one.
 ///
-/// Uses default_recipe_id() rather than naming "steel", because BL-429 made the
-/// default era-aware; hard-naming it would measure an industrial default in an
-/// ancient world.
-void seed_default_recipes(world& w, const recipe_registry& reg)
-{
-    const uint16_t def = reg.default_recipe_id();
-    for (auto& [id, b] : w.buildings)
-        if (b.type == building_type::processing_facility && b.recipe == no_recipe)
-            b.recipe = def;
-}
+/// This harness's PRIVATE COPY of it was retired 2026-08-17 — it is now world/'s
+/// `assign_default_recipes` (corporation_generation.hpp), which app::load_economy
+/// now calls too. A harness holding its own copy of an initialisation the game
+/// performs elsewhere is how the two drift, and here the drift was the finding:
+/// the app ran this pass only BEFORE generate_background_firms, so every
+/// background firm's processor kept no_recipe for the whole campaign. That is
+/// fixed at the source; this harness now calls the same function, in both
+/// positions, so it measures the game's real ordering rather than its own.
 
 const char* type_name(building_type t)
 {
@@ -191,6 +186,11 @@ int main(int argc, char** argv)
     std::vector<long>   richest_on(resource_count, 0);      // tiles where it IS the richest (R5)
     double richness_sum = 0.0; long richness_n = 0;         // R6: what IS a typical richness?
     double richness_max = 0.0;
+    // R6b: the DISTRIBUTION, not just its mean. richness_reference is authored as
+    // the mean, and the mean of a distribution running to 72,321 says almost
+    // nothing about a typical tile — if the median sits far below it, most mines
+    // clamp at richness_min and the conversion under-supplies the whole economy.
+    std::vector<double> richness_all;
     // R7: live market price vs the authored base_price, per resource.
     std::vector<double> price_sum(resource_count, 0.0), base_sum(resource_count, 0.0);
     std::vector<long>   price_n(resource_count, 0);
@@ -213,8 +213,13 @@ int main(int argc, char** argv)
         // harness rather than a fact about the game. (Measured both ways while
         // writing this: 26.5% no-recipe without the pass, 11.3% with it.)
         if (seed_recipes)
-            seed_default_recipes(w, reg);
+            assign_default_recipes(w, reg);
         generate_background_firms(w, reg, static_cast<uint32_t>(s) ^ 0x8A21F00Du);
+        // The SECOND call, mirroring app.cpp: background firms author processors
+        // after the first pass, and without this they never get a recipe at all.
+        // This is the 11.3% the comment above measured and left standing.
+        if (seed_recipes)
+            assign_default_recipes(w, reg);
 
         // Static structure, counted once per seed: what the world CONTAINS and
         // what is pointed at it, independent of any tick.
@@ -226,6 +231,7 @@ int main(int argc, char** argv)
                     ++tiles_with[r];
                     richness_sum += tc.resource_deposit[r];
                     ++richness_n;
+                    richness_all.push_back(tc.resource_deposit[r]);
                     if (tc.resource_deposit[r] > richness_max)
                         richness_max = tc.resource_deposit[r];
                 }
@@ -435,6 +441,39 @@ int main(int argc, char** argv)
     std::printf("\nR6 — deposit richness, the extraction rate multiplier\n");
     std::printf("  non-zero deposits %ld   mean richness %.2f   max %.2f\n",
                 richness_n, mean_rich, richness_max);
+    // R6b — the DISTRIBUTION, not just its mean (2026-08-17). richness_reference
+    // is authored AS the mean, and the mean of a distribution running to 72,321
+    // says almost nothing about a typical tile. If the median sits far below the
+    // mean, most mines clamp at richness_min and the conversion silently
+    // under-supplies the entire economy — which is invisible from the mean alone,
+    // and is exactly what the first enabled run showed.
+    if (!richness_all.empty())
+    {
+        std::sort(richness_all.begin(), richness_all.end());
+        auto pct = [&](double q) {
+            return richness_all[static_cast<std::size_t>(q * (richness_all.size() - 1))];
+        };
+        std::printf("  percentiles: p10 %.2f  p25 %.2f  MEDIAN %.2f  p75 %.2f  p90 %.2f  p99 %.2f\n",
+                    pct(0.10), pct(0.25), pct(0.50), pct(0.75), pct(0.90), pct(0.99));
+        const double ref = static_cast<double>(ex.richness_reference);
+        if (ref > 0.0)
+        {
+            const double lo = static_cast<double>(ex.richness_min);
+            const double hi = static_cast<double>(ex.richness_max);
+            long clamped_lo = 0, clamped_hi = 0;
+            for (const double v : richness_all)
+            {
+                if (v / ref < lo) ++clamped_lo;
+                else if (v / ref > hi) ++clamped_hi;
+            }
+            std::printf("  at richness_reference %.2f: %.1f%% of deposits clamp at the FLOOR (%.2f), "
+                        "%.1f%% at the ceiling (%.2f)\n",
+                        ref, 100.0 * clamped_lo / richness_all.size(), lo,
+                        100.0 * clamped_hi / richness_all.size(), hi);
+            std::printf("  a reference at the MEDIAN (%.2f) would put a typical tile at 1.0\n",
+                        pct(0.50));
+        }
+    }
     std::printf("  a mine's effective rate is base_rate(%.0f) x ~%.1f = ~%.0f,\n"
                 "  against a processor's FLAT base_rate(%.0f)  ->  ratio ~%.0f:1\n",
                 static_cast<double>(ex.base_rate), mean_rich,
@@ -486,6 +525,39 @@ int main(int argc, char** argv)
     check(unproduced_but_needed == 0,
           "every recipe input that has deposits is actually produced ("
               + std::to_string(unproduced_but_needed) + " are not)");
+
+    // --- R4b (BL-440): is any wanted input UNSITEABLE? -----------------------
+    //
+    // R4 above asks whether a needed input reaches the economy AT ALL, and it is
+    // satisfied by incidental supply: since BL-437 a site works every deposit on
+    // its tile, so coal comes out of the ground wherever a mine was placed for
+    // something richer. That is why R4 passes on coal while coal binds 54% of all
+    // starved processing ticks — the supply exists, it is just an order of
+    // magnitude short of demand, because it only ever arrives as a by-product.
+    //
+    // This row asks the sharper question: is any wanted input never DELIBERATELY
+    // mined? placement_rules::richest_extractable gives a site the single richest
+    // deposit on its tile, so a resource that is common but rarely dominant is
+    // structurally unsiteable — no scorer can choose it, because no scorer is ever
+    // offered it. A resource carrying deposits on hundreds of tiles with zero
+    // sites NAMED for it is that defect, not a market outcome.
+    //
+    // The threshold is deliberately loose. This is not a balance bar; it separates
+    // "nothing wants this here" from "the siting rule cannot express wanting it",
+    // and a resource on 200+ tiles with no site is unambiguously the second.
+    constexpr long k_unsiteable_tile_threshold = 200;
+    long unsiteable = 0;
+    for (std::size_t r = 0; r < resource_count; ++r)
+        if (input_demand[r] > 0 && tiles_with[r] >= k_unsiteable_tile_threshold
+            && sites_targeting[r] == 0)
+        {
+            ++unsiteable;
+            std::printf("  UNSITEABLE: id %2zu — %ld tiles carry it, %ld recipes want it, "
+                        "0 sites target it\n", r, tiles_with[r], input_demand[r]);
+        }
+    check(unsiteable == 0,
+          "every wanted recipe input can actually be SITED for ("
+              + std::to_string(unsiteable) + " are on 200+ tiles with no site naming them)");
 
     // --- R7: is the recipe value-destroying at LIVE prices? ------------------
     //

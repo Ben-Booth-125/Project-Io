@@ -130,7 +130,7 @@ int main()
     {
         market_component& om = w.markets.at(new_market);
         om.demand.fill(0.0f); // isolate this call's effect
-        inject_interbody_demand(w, reg);
+        inject_interbody_demand(w, reg, snapshot_market_supply(w));
         // home shortfall = 100 - 20 = 80; falloff = 1 + 0.15*4 = 1.6
         // pulled = 80 * 0.50 / 1.6 = 25.0
         check(near(om.demand[ri(resource_type::iron_ore)], 25.0f),
@@ -143,7 +143,7 @@ int main()
     {
         market_component& hm = w.markets.at(home_market);
         const float before = hm.demand[ri(resource_type::iron_ore)];
-        inject_interbody_demand(w, reg);
+        inject_interbody_demand(w, reg, snapshot_market_supply(w));
         check(near(hm.demand[ri(resource_type::iron_ore)], before),
               "R6 the home market's own demand is untouched by inject_interbody_demand");
     }
@@ -163,7 +163,7 @@ int main()
         bool all_zero = true;
         for (float p : w2.markets.at(mid2).base_price) if (p != 0.0f) all_zero = false;
         check(all_zero, "R7 with no home market, opening prices are all-zero (untradeable, not a crash)");
-        inject_interbody_demand(w2, reg); // must not throw/crash with home_body == null_entity
+        inject_interbody_demand(w2, reg, snapshot_market_supply(w2)); // must not throw/crash with home_body == null_entity
         check(true, "R7 inject_interbody_demand is a clean no-op with no home body");
     }
 

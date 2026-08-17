@@ -753,6 +753,15 @@ void app::build_corp_choices()
 
     for (const auto& [id, cc] : m_world.corporations)
     {
+        // The pool is the SPECIALIST set (R2). In the real flow this filter never
+        // fires — the stage opens in the one frame before generate_background_firms
+        // runs, so nothing here is a background firm yet. It is stated anyway
+        // because the pool being specialists-only is currently a property of WHEN
+        // this is called, and a positional guarantee is one refactor from silently
+        // becoming false. It is also what lets verify.show_corp_choice render the
+        // real pool from an already-started world.
+        if (cc.is_background)
+            continue;
         corp_choice ch;
         ch.id   = id;
         ch.name = cc.name;
@@ -844,10 +853,13 @@ void app::draw_corp_choice_screen()
                           ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerH |
                           ImGuiTableFlags_SizingStretchProp))
     {
-        ImGui::TableSetupColumn("Corporation", ImGuiTableColumnFlags_WidthStretch, 0.42f);
-        ImGui::TableSetupColumn("Focus",       ImGuiTableColumnFlags_WidthStretch, 0.16f);
-        ImGui::TableSetupColumn("Nation",      ImGuiTableColumnFlags_WidthStretch, 0.24f);
-        ImGui::TableSetupColumn("Holdings",    ImGuiTableColumnFlags_WidthStretch, 0.18f);
+        // Holdings carries the widest cell — "2 proc / 0 extr / 1 other" — and the
+        // first capture (2026-08-16) caught it clipped to "/ 1 otl" against the
+        // Choose column. Weights rebalanced off that measurement, not by eye.
+        ImGui::TableSetupColumn("Corporation", ImGuiTableColumnFlags_WidthStretch, 0.36f);
+        ImGui::TableSetupColumn("Focus",       ImGuiTableColumnFlags_WidthStretch, 0.14f);
+        ImGui::TableSetupColumn("Nation",      ImGuiTableColumnFlags_WidthStretch, 0.22f);
+        ImGui::TableSetupColumn("Holdings",    ImGuiTableColumnFlags_WidthStretch, 0.28f);
         ImGui::TableSetupColumn("",            ImGuiTableColumnFlags_WidthFixed,   72.0f);
         ImGui::TableHeadersRow();
 
@@ -965,6 +977,16 @@ void app::start_new_game_prelude()
     generate_background_firms(m_world, m_registry, m_active_world_params.seed ^ 0x8A21F00Du);
     mark("background_firms");
 
+    // AGAIN, and this one is not belt-and-braces (2026-08-17). load_economy's
+    // pass above runs BEFORE this generation pass, so every processor a
+    // background firm authors here kept `no_recipe` for the whole campaign — a
+    // live defect, not a harness artefact: those buildings pay maintenance every
+    // tick and can never produce, and they report as ordinary idleness.
+    // tier_margin measured 26.5% of processing building-ticks recipe-less with no
+    // pass at all and still 11.3% with only the pre-firms pass; this call is the
+    // remaining 11.3%. Idempotent, so running it twice costs one map walk.
+    assign_default_recipes(m_world, m_registry);
+
     // Pre-game warm start ([C3] pre-game profit): seed the balance history with the
     // opening capital, then run the real economy loop forward a notional operating
     // history before the first frame, so every corp opens onto non-empty pools,
@@ -1081,11 +1103,15 @@ void app::load_economy()
 
     // Author processing recipes onto generated assets. The recipe id is a registry
     // index, unknown at generation time, so it is assigned here once the registry
-    // exists. Every unconfigured processor defaults to the steel recipe.
-    const uint16_t default_recipe = m_registry.default_recipe_id(); // BL-429: era-aware, not hard-named
-    for (auto& [id, b] : m_world.buildings)
-        if (b.type == building_type::processing_facility && b.recipe == no_recipe)
-            b.recipe = default_recipe;
+    // exists.
+    //
+    // The loop that used to sit here now lives in world/ as assign_default_recipes
+    // (2026-08-17). It was a world-generation invariant enforced by the UI's
+    // startup sequence, so every path that builds a world WITHOUT app — the
+    // headless harnesses, --serve, --verify — ran generated processors that could
+    // never produce, reported as ordinary idleness. 20.3% of processing
+    // building-ticks in tier_margin, silently dragging the BL-436 calibration.
+    assign_default_recipes(m_world, m_registry);
 
     // Seat the persona counsel mountain bench (BL-207 slice 1). Every non-player
     // corp seats the same bench this slice (bench diversity by industrial focus

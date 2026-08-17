@@ -179,13 +179,36 @@ struct growth_params
     float growth_met_threshold = 0.50f; ///< basket met-supply ratio a centre needs to grow.
 };
 
+/// BL-442 price-band tunables, authored in scripts/economy.lua under
+/// `economy.price_band`. THE single authority for how far a market price may
+/// travel from its rarity-derived `base_price`: the clamp `resolve_price`
+/// (market_clearing.cpp) applies to every market price each tick, and the
+/// identical clamp the BL-181 workforce auto-solver applies to its forward price
+/// estimate (`wf_target_price`, economy_system.cpp) so the solver prices a
+/// candidate against the same band the market will actually clear it in.
+///
+/// Both sites used to hold their own `constexpr` copy, hand-synchronised — the
+/// second literally commented "mirror market_clearing.cpp price band". That is
+/// what this struct removes: the band is authored once, in data, and both sites
+/// read it off the registry. `tools/verify/price_band_harness.cpp` is the guard
+/// that they cannot drift apart again.
+///
+/// The defaults reproduce the pre-BL-442 hard-coded band exactly, so a harness
+/// that hand-builds a registry and never authors this table is unchanged. See
+/// docs/economy/MARKETS.md § The price band.
+struct price_band_params
+{
+    float floor_mult = 0.25f; ///< Lowest a price may fall: 0.25x base_price.
+    float ceil_mult  = 4.0f;  ///< Highest a price may rise: 4x base_price.
+};
+
 /// BL-263 spontaneous-market-emergence tunables, authored in scripts/economy.lua
 /// under `economy.market_emergence`. Two independent uses, both keyed off distance
 /// from the home body (world::home_body), the only body with a market at world
 /// generation: seeding a newly-spawned outpost market's opening prices
-/// (maybe_spawn_market), and pulling a discounted slice of the home body's own
-/// unmet demand onto every outpost market each tick so an outpost with supply and
-/// no local population does not collapse to the price floor
+/// (maybe_spawn_market), and pulling a discounted slice of a home-body
+/// COUNTERPARTY's unmet demand onto every outpost market each tick so an outpost
+/// with supply and no local population does not collapse to the price floor
 /// (inject_interbody_demand). See docs/economy/MARKETS.md § Spontaneous market
 /// emergence.
 struct market_emergence_params
@@ -196,11 +219,17 @@ struct market_emergence_params
     /// mirroring BL-191's endemic-good distance pricing but keyed to a real
     /// per-resource base price rather than a flat source price.
     float price_distance_gain = 0.08f;
-    /// Fraction of the home body's own unmet demand (demand - supply, when
-    /// positive) pulled onto each outpost market per tick, before the distance
-    /// falloff below.
+    /// Fraction of the counterpart home-body market's unmet demand (its demand
+    /// less its PREVIOUS tick's supply, when positive) pulled onto each outpost
+    /// market per tick, before the distance falloff below. The counterpart is
+    /// chosen per resource — the home-body market wanting that resource most
+    /// (BL-406); it is not "the home market" and not a body-level aggregate.
+    ///
+    /// NOT re-tuned when BL-406/BL-404 landed (2026-08-17), though the ruling
+    /// cleared it to be: on seed 0 the corrected pull is 2.8x its old size where
+    /// it fires at all. Folded into BL-440's repricing pass — NR-277.
     float pull_fraction = 0.50f;
-    /// Falloff denominator per AU: pulled_demand = home_shortfall * pull_fraction
+    /// Falloff denominator per AU: pulled_demand = shortfall * pull_fraction
     /// / (1 + distance_falloff * distance_au). Further outposts feel less of the
     /// home body's pull — plausible if a haul is expensive, and it keeps a distant
     /// outpost's price from being yanked to Kepler's exactly.
@@ -474,6 +503,11 @@ public:
     /// BL-340/BL-365 background-industrial-demand tunables (economy.background_demand in Lua).
     const background_demand_params& background_demand() const { return m_background_demand; }
 
+    /// BL-442 price band (economy.price_band in Lua) — the ONE authority for the
+    /// [floor x, ceil x] clamp around base_price, read by both resolve_price
+    /// (market_clearing.cpp) and wf_target_price (economy_system.cpp).
+    const price_band_params& price_band() const { return m_price_band; }
+
     /// BL-263 spontaneous-market-emergence tunables (economy.market_emergence in Lua).
     const market_emergence_params& market_emergence() const { return m_market_emergence; }
 
@@ -658,6 +692,7 @@ public:
     void set_growth(const growth_params& s) { m_growth = s; }
     void set_population_demand(const population_demand_params& p) { m_population_demand = p; }
     void set_background_demand(const background_demand_params& b) { m_background_demand = b; }
+    void set_price_band(const price_band_params& p) { m_price_band = p; }
     void set_market_emergence(const market_emergence_params& m) { m_market_emergence = m; }
     void set_construction(const construction_params& c) { m_construction = c; }
     void set_military(const military_capability_params& m) { m_military = m; }
@@ -824,6 +859,7 @@ private:
     growth_params m_growth = {};
     population_demand_params m_population_demand = {};
     background_demand_params m_background_demand = {};
+    price_band_params m_price_band = {};
     market_emergence_params m_market_emergence = {};
 
     /// BL-095 construction-gate tunables (economy.construction). Defaults match

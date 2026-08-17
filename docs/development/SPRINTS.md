@@ -49,7 +49,8 @@ and/or a version goal (v0.1.1 etc.).
 | 15 | The 0 CE refocus (retro-recorded) | **Closed 2026-08-12** — the tangent that became the product; epoch 0, 3× map, Era −1 sim wired in, mercenary seam designed; see below |
 | 16 | The mercenary vertical slice | **Open 2026-08-12** — BL-377 playable end-to-end + BL-315 on the critical path; cuts v0.1.15 |
 | 18b | Roster invariants (retro-recorded) | **Closed 2026-08-16** — BL-432 landed; BL-435 paused 4/6; BL-436 filed |
-| 19 | The economy tells the truth | **Open 2026-08-16** — the value-add step is upside-down; fix the substrate the last two sprints built on |
+| 19 | The economy tells the truth | **Closed 2026-08-17 — goal NOT met.** The blame moved three times and landed on supply; goldens left red and unblessed |
+| 20 | Not yet chosen | **Proposed 2026-08-17** — three candidates laid out below; Ben's call |
 
 **Next up (2026-08-10).** Sprint 5 is closed on Ben's call — *"I am happy with the generation
 progress we made"* — and the board went momentarily to zero goaled sprints. The plan for
@@ -237,6 +238,320 @@ likely to erode across four items in one sprint.
 **Carried, not dropped.** BL-435's tasks E and F (paused 4/6, resume note in REFINED.md), and the
 military engagement surface below — now deferred a **third** time. Name that at this sprint's
 retro rather than letting a fourth accumulate silently.
+
+**Progress (amended as it happens, not at the retro).**
+
+- **BL-436 (processing underearns extraction)** — measured, part-fixed, **open on a Ben-owned
+  call**. The rate asymmetry is fixed but *disabled* (`richness_reference = 0.0`) because the
+  cost side was calibrated against the old inflated income; a scale sweep killed the obvious
+  hypothesis (raising extraction income makes the collapse worse). Also produced **BL-437**
+  (landed) and a corrected measurement instrument.
+- **BL-422 (held sell order phantom inventory)** — **landed 2026-08-16**. Bigger than filed:
+  `inventory` is what processors actually draw inputs from, so a held order's phantom stock was
+  bought and never paid for — goods from nothing, money destroyed. Fixed as a conservation law
+  (inventory gains exactly what pools lose), guarded by `order_book_harness` R7 with three rows
+  proven to fail pre-fix, and it took a latent `unordered_map` float-accumulation nondeterminism
+  with it. **Byte-identical in the five AI benchmark seeds** — which says the benchmark never
+  reached the case, and is a warning for BL-436's calibration (NR-263).
+- **Still to run:** BL-417 (build score is quadratic), BL-406 (home market is an arbitrary pick)
+  → BL-404 (inter-body pull unnetted).
+
+---
+
+## Sprint 19 retro — the blame moved three times, and the goldens are red (closed 2026-08-17)
+
+### The done-when was NOT met, and the success criterion inverted
+
+The sprint's done-when: *a processing facility fed by its own inputs outearns the extraction site
+it replaced, or a written deliberate reason why not.* Neither holds.
+
+Processing reads **−10.44** per building-tick against extraction's **+7.82**. There is no
+deliberate written reason, because the reason turned out to be a defect chain rather than a design
+call.
+
+The named success criterion inverted outright. `ai_skill_harness`'s bands were re-blessed downward
+on 2026-08-16 with the file saying *these should RISE when the fix lands*. They **fell** — three of
+five seeds insolvent, corps at **−2M to −3.4M** final net worth.
+
+**The goldens are deliberately left red and unblessed.** That is this sprint's defining event, and
+it is the criterion working rather than failing. Blessing here would have recorded bankruptcy as
+the expected state.
+
+### The blame was reassigned three times in two days
+
+Nothing else about the sprint matters as much as this sequence. Each stage was measured, and each
+measurement killed the previous story.
+
+| Stage | The story | What measurement said |
+|---|---|---|
+| 1 (opened) | the scoring curve — `net/payback` is net²/capex, so the AI prefers mines | **wrong, and not even reachable.** `corp_ai.cpp` had **no** `processing_facility` build candidate at all (NR-265). A rival owned only the processors it was *generated* with, for the whole campaign. Retuning a curve that only ranks mines against mines could never have produced a processor |
+| 2 | the richness rate ratio — a mine's rate is multiplied by raw deposit richness (mean ~53), a processor's by nothing | **right, and fixed.** Extraction fell 1666.69 → 14.53 revenue per building-tick, capex payback 0 ticks → 12. Two tiers finally at the same order of magnitude |
+| 3 (where it landed) | with the ratio fixed, price is the binding constraint — reprice refined goods +72% | **wrong to act on.** Seven wanted recipe inputs cannot be mined **at all**. Coal binds 54% of starved processor ticks: 1,671 tiles carry it, **zero** sites target it, because `richest_extractable` gives a site only the single richest deposit on its tile (NR-272) |
+
+Two corrections fell out of stage 1 that were worth more than the item that found them. BL-436's
+own calibration narrative explained a collapse by *corps building processors with extra income* — a
+mechanism with no middle link, since no corp could build one (NR-266). And BL-428's chain-depth
+ladder, the growth spine Sprint 17 built, had **no AI player**: depth is climbed by operating
+deeper processors (NR-267).
+
+A retro that reads "processing underearns extraction, cause unknown" would be missing the sprint.
+The cause is now named and it is **supply**, not price and not upkeep.
+
+### What actually landed
+
+- **BL-422 (held sell order credits phantom inventory)** — **complete**. Bigger than filed:
+  `inventory` is what processors draw inputs from, so held stock was bought and never paid for.
+  Refixed as a conservation law, and it took a latent `unordered_map` float-accumulation
+  nondeterminism with it.
+- **BL-417 (the build score is quadratic)** — step 1 landed, honestly. The "zero behavioural
+  change" claim was **not** established when written; measured A/B on pinned MSVC and byte-identical
+  by rounding luck, not by algebra (NR-268). Step 2 stays Ben's, and is now a smaller question than
+  filed.
+- **BL-439 (AI never builds processors)** — 3/4. The candidate is in, on the same score curve and
+  gates as extraction. Rivals build 69 processors across the benchmark set, against 0. Task C, the
+  golden re-bless, is **held** rather than skipped.
+- **BL-440 (mines only target the richest)** — 2/4. `rank_extraction_sites` now emits a candidate
+  per extractable deposit, weighted by unmet recipe demand. Task C is **held on a design fork**.
+- **BL-437 (a site works every deposit on its tile)**, **BL-435 (no corporation is seeded that
+  cannot make money)** — both landed, both filed and closed inside the sprint.
+- **Instruments:** `tier_margin` was written, then found to be measuring a world with **no prices**
+  — it loaded two of the three economy scripts. Corrected mid-sprint; every figure taken before
+  that is suspect wherever prices are involved.
+- **`richness_reference` enabled at the MEDIAN (24.9), not the mean.** The authored promise is "a
+  typical deposit lands at ~1.0", and the mean sits at the 78th percentile.
+
+### What this sprint is actually worth remembering for
+
+**Every guard written this sprint was run against the pre-change build first, and shown to fail by
+construction.** BL-439's R5 read `processors_gained = 0` on all five seeds before the change and
+12/15/16/16/10 after. BL-440's R4b failed on seven resources. Three of BL-422's twelve R7 rows
+failed pre-fix.
+
+That is the direct answer to the two previous retros' findings — a check pointing at a deleted tab
+and still passing, a harness reporting ALL PASS on code it never exercised. A guard that has never
+been seen to fail is not coverage.
+
+**And the same trap was still caught twice more this sprint.** `ai_skill_harness` hand-builds its
+recipe registry and had fallen out of date with `economy.lua`; it reported ALL PASS on exactly the
+code BL-436 changed. `tier_margin` was written *to diagnose the economy* and omitted the script
+carrying the prices. A hand-built fixture drifts silently by default.
+
+**Half of BL-436's starvation was a live-game defect, not a harness one.** The default-recipe
+backfill lived inline in `app::load_economy` — a world-generation invariant depending on the UI's
+startup sequence — and it ran *before* `generate_background_firms` authored more processors. Every
+background firm's processor kept `no_recipe` for the whole campaign, paying maintenance and
+reporting as ordinary idleness. Fixing it made the economics **worse** (−9.08 → −10.44) because the
+starvation became visible. The defect was hiding the reason, not causing it.
+
+### Where the method held, and where it did not
+
+**Held.** Measure-then-act was applied at every fork and paid three times. The −3M net worths were
+explained rather than tuned around: `k_debt_interest_per_quarter` 0.02 over 300 ticks is
+1.02³⁰⁰ ≈ 380×, against per-building extraction nets of +5 to +11. Nothing was blessed, nothing was
+repriced, and the reason is written down rather than assumed.
+
+**Did not — the recurring three, all now overdue.**
+
+1. **No sprint entry was kept live. This is the FIFTH consecutive sprint.** The previous retro said
+   fourth. The Progress block above was amended once, on the sprint's second day, then not again
+   across the three sessions that reassigned the blame twice. The standing caution — *amend when
+   the goal changes, not at the retro* — is now the single most-repeated finding in this file.
+2. **The Runtime line has been uncollected for SEVEN entries.** The previous retro said *"either
+   wire `tools/session/timer.js` in or drop the line"*, and neither happened. **Recommendation:
+   drop it from the format block.** Seven misses is not a tooling gap, it is a signal nobody wants;
+   keeping a field that always reads "not tracked" trains readers to skip the retro's own checklist.
+   If pacing is wanted later, derive it from commit timestamps, which are already collected.
+3. **The military engagement surface is deferred a THIRD time.** Sprint 19's own block said to name
+   that here rather than let a fourth accumulate. Named. Three deferrals all point the same way,
+   and the argument for each was sound in isolation — which is exactly how a fourth happens.
+   Sprint 20's choice below is where that stops or does not.
+
+### Left for another session
+
+- **BL-440 task C (generation sites use the same broken rule)** — held on a design fork, and it is
+  the load-bearing half: `tier_margin` is byte-identical across tasks A and B, because a 3-seed
+  20-tick run is dominated by *generated* assets and generation still calls `richest_extractable`.
+- **NR-271's repricing (a/b/c)** — **blocked behind BL-440 (c)**. Every option was sized on a chain
+  whose second input is unobtainable, so all must be re-derived.
+- **BL-439 task C and BL-435 tasks E/F** — the golden re-bless and the corp-screen guard, both
+  waiting on the same substrate settling.
+- **BL-406 (the home market is an arbitrary pick) → BL-404 (the inter-body pull is unnetted)** —
+  planned this sprint, never started.
+- **NR-269's option (c)** — the debt-interest amplifier as its own item. A corp that cannot recover
+  from one bad quarter makes every economy measurement noisier.
+
+---
+
+# Sprint 20 — the choice (drafted 2026-08-17, NOT opened — Ben picks)
+
+Sprint 19 closed with its keystone open and its instruments finally honest. Three candidates, laid
+out with cost and consequence. **This is a proposal, not a decision.**
+
+### Candidate A — finish the economy thread (v0.1.17)
+
+**The work.** BL-440 (mines only target the richest) task C is one design call from buildable — Ben
+chooses between (i) a post-registry retarget pass and (ii) a static demand hint at world-gen time.
+Then re-run `tier_margin`, re-derive NR-271's price options on a chain whose inputs exist, and
+re-bless the red goldens with a cause.
+
+**What it costs.** Two to three sessions, most of it measurement rather than code. One design call
+up front, which is the actual gate.
+
+**What it unblocks.** Everything currently parked: the repricing, BL-439's golden re-bless
+(AI never builds processors), BL-435's corp-screen guard (starting-corp selection), and the honest
+closure of BL-436 (processing underearns extraction). It also settles the substrate Sprints 17 and
+18b built on, which was Sprint 19's whole argument for existing.
+
+**The risk.** This is the fourth session in a row on the same substrate, and the blame has moved
+three times already. It may move again.
+
+### Candidate B — the military engagement surface (v0.1.15)
+
+**The work.** Sprint 18 as written: BL-393 (units are write-only and inert), BL-315 (conflict
+spine), BL-384 (the Era −1 sim conquers nothing), plus the unit UI half.
+
+**What it costs.** The largest of the three. BL-315 is the item it leans on — designed, with
+nothing built against it. Four to six sessions.
+
+**What it unblocks.** The mercenary vertical slice, uncut since Sprint 16, and the only thing on the
+board that makes the ancient product *play* rather than *tick*. A player who raised 25 units still
+has nothing to do with any of them.
+
+**The risk.** It starts on a substrate whose value-add step is measurably upside-down. Sprint 19's
+opening argument applies unchanged.
+
+### Candidate C — the debt amplifier alone (a short sprint)
+
+**The work.** NR-269's option (c): make insolvency recoverable before more economy numbers are read
+off it. `k_debt_interest_per_quarter` at 0.02 over 300 ticks compounds 380×, so a corp a few
+thousand down ends at −3M and every rollout carries that noise.
+
+**What it costs.** One session, possibly less. Smallest by a wide margin.
+
+**What it unblocks.** Cleaner numbers for whichever of A or B follows, and a golden set that could
+plausibly be blessed again.
+
+**The risk.** It is not a sprint goal, it is a task. Running it alone spends a week's framing on
+something that should ride inside A.
+
+### Recommendation
+
+**Candidate A, with Candidate C folded in as a rider — and Sprint 21 pre-committed to B.**
+
+The reason is not that the economy matters more than the fight. It is that A is **one design call
+from done** and B is **four sessions from its first playable tick**, and A's open half currently
+blocks five parked items across three sprints.
+
+Candidate C rides along because it is a day's work that makes A's own measurements readable.
+Running it as its own sprint would be ceremony over a task.
+
+**The honest counterweight, stated plainly: this defers the military surface a fourth time**, which
+is exactly what three retros in a row have warned against. Naming a deferral is not the same as
+fixing it.
+
+If Ben's read is that the fight has waited long enough, **B is a defensible call and the economy
+thread pauses cleanly** — BL-440's fork is written down and REFINED.md holds the resume note.
+
+The one option worth arguing against is starting B *without* answering A's fork. It is cheap to
+answer and expensive to leave open, because it silently invalidates every economy number taken
+after it.
+
+---
+
+# Sprint 21 — The fight becomes reachable (proposed 2026-08-17, NOT opened — Ben picks)
+
+**This is a proposal, not a decision.** Sprint 20's recommendation pre-committed Sprint 21 to
+candidate B, the military engagement surface. This block is what B looks like once someone reads
+the source rather than the plan — and the reading changes the shape substantially.
+
+**Goal.** Close the gap between a battle resolver that works and a campaign that cannot start one.
+Not "build combat": combat is built. Build the **reach** to it — a verb that moves a unit, a rule
+that says who may be fought, a trigger that opens a battle, and a screen that shows it.
+
+## What the audit found, because it re-frames the whole sprint
+
+Sprint 18's block says BL-315 (armed house conflict spine) is *"designed, with nothing built against
+it"*. That is now wrong in the direction that matters. `src/world/campaign_battle.{hpp,cpp}` is
+**written, compiled into the shipping binary, and covered by `campaign_battle_harness`** — seeded
+rounds, priced withdrawal, a measured uncertainty curve. It has **zero callers outside its own
+harness**. The same is true of `resolve_battle`, whose only caller is the Era −1 sim.
+
+So the sprint's unknown is not the resolver. It is everything that would ever call one, and none of
+that exists at all:
+
+| Capability | State | Evidence |
+|---|---|---|
+| Campaign battle resolver (rounds, seeded swing, withdrawal) | **BUILT** | `campaign_battle.cpp`, harness green |
+| Era −1 battle resolver (`resolve_battle`) | **BUILT** | `combat.cpp`, `combat_harness` |
+| Terrain defence / attrition scalars | **BUILT** | `terrain_combat.cpp` |
+| Unit roster, era bands, corp-side gating | **BUILT** | `unit_roster.cpp` |
+| `hire_unit` verb + AI use of it | **BUILT** | `corp_command.cpp`; observed 6–12 hires/seed |
+| `military_base` building, hire gated on it | **BUILT** | BL-325 (military bases and supply) S1+S2 |
+| Unit marker, Selection card, tile click-cycle | **BUILT** | `body_surface_canvas.cpp`, `selection_panel.cpp` |
+| **A verb that takes a unit as its subject** | **ABSENT** | every `corp_verb` names a building, body or order |
+| **Any hostility / standing model** | **ABSENT** | no corp may be "at war with" another, anywhere |
+| **Any engagement trigger** | **ABSENT** | nothing detects two forces on one tile |
+| **Battle state in the world** | **ABSENT** | `world` has no battle store; nothing steps a round |
+| **Unit facts on the blackboard** | **ABSENT** | `export_corp_blackboard` has no unit section |
+| **Out-of-supply decay** | DESIGN-ONLY | BL-325 (military bases and supply) S3, held behind BL-315 |
+| **Unit verb dictionary entries** | DESIGN-OWED | BL-314 (unit verb family), waiting on a seam |
+| Hire price on screen | ABSENT | BL-405 (hire has no price on screen), d1 |
+| Demolish vs garrisoned units | **DEFECT** | `demolish_building` never touches `w.units` |
+
+**The capability everyone assumes exists and does not is a HOSTILITY MODEL.** Every plan in this
+file — Sprint 16, Sprint 18, Sprint 20's candidate B — talks about fighting, and no document owns
+the question *who is allowed to fight whom*. BL-315 (armed house conflict spine) settled that army,
+mercenary and pirate are three derived readings of one company, which is a **naming** rule and
+answers nothing about targeting. Without it there is no legal predicate on an attack verb, no
+trigger condition, and no way for the AI scorer to price an engagement. It is not written down as
+work anywhere, and it blocks every other slice.
+
+**Second finding, cheaper but real:** `resolve_battle` and `resolve_campaign_battle` both take
+fully-resolved `army_stack_entry` values, and **nothing converts a live `unit_component` into one**.
+`unit_component::strength` is written raw by all three of its writers despite a "fixed-point" doc
+comment (NR-247). The adapter is small, but it is a real missing piece, and it is where that
+inconsistency has to be settled rather than deferred again.
+
+**Planned.**
+- **BL-393 — units are write-only and inert** (`designed`, A, d3): the foundation, and now the item
+  that must grow the `unit_command` seam rather than defer it. Its own text proposes leaving
+  movement to BL-315; that split no longer helps, because BL-315's resolver is the half already
+  built.
+- **BL-315 — armed house conflict spine** (`designed`, A, d4): re-scoped by the audit to what is
+  actually missing — hostility, movement, the engagement trigger, battle state in the world, and the
+  stack adapter. The resolver itself is done.
+- **BL-405 — hire has no price on screen** (`designed`, B, d1): rides in the UI slice.
+- **BL-314 — unit verb family** (`design-owed`, B, d3): unblocks the moment the seam exists, and is
+  transcribed from it, never authored ahead of it (BL-270's discipline).
+- **BL-384 — the Era −1 sim conquers nothing** (`designed`, A, d5): 267 battles, zero provinces
+  taken. Shares no file with anything above and can run from day one.
+
+**Sequencing.** Two foundation slices run **alone and first**: the `unit_command` seam (F1) and the
+hostility model (F2). F1 blocks every verb; F2 blocks every trigger and every AI score. After both
+land, four slices fan out with no file overlap. BL-384 (Era −1 conquest) is independent of all of
+it and starts immediately alongside F1. Full task decomposition and collision map: `REFINED.md`.
+
+**Done when** a player can select a unit, order it onto a tile held by a hostile force, watch the
+battle run round by round, choose to withdraw partway, and see the surviving strength on both sides
+— with the same save replaying the same fight. Anything less leaves the resolver as unreachable as
+it is today.
+
+**The check that says it worked.** A new `tools/verify/engagement_harness.cpp` driving the whole
+path headlessly: hire → move → contact → resolve, asserting (1) two runs of one seed produce
+byte-identical battle outcomes, (2) a withdrawal at round 3 costs strictly more than one at round 1,
+(3) no verb mutates anything on a rejection. Plus a `--verify` capture of the battle screen. The
+determinism assertion is the load-bearing one: `campaign_battle` earns its seeded stream only if the
+*caller* feeds it a stable identity, and the caller is exactly what this sprint writes.
+
+**Risk.** The hostility model is a **design call, not an implementation**, and it is not filed as an
+item. If Ben does not settle it early, F2 stalls and the four fan-out slices stall behind it — the
+same failure mode as BL-440's open fork in Sprint 19. File it and answer it in the first session, or
+the sprint's parallelism does not exist.
+
+**Second risk.** BL-325 (military bases and supply) tail — out-of-supply decay — touches
+`economy_system.cpp` and `scripts/economy.lua`, which is the seam three concurrent agents are live
+in right now. It is **cut** from this sprint for that reason, not for scope. See § what this sprint
+does not carry, in `REFINED.md`.
 
 ---
 

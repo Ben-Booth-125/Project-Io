@@ -211,18 +211,154 @@ int run_roster(uint32_t seed, const recipe_registry& reg)
     return 0;
 }
 
+// --- BL-435 task E: the guard ------------------------------------------------
+//
+// `player_seed_sweep --guard [n_seeds]` is the one ASSERTING mode of an otherwise
+// reporting tool, and the split is deliberate. The default sweep answers a design
+// question ("how good are the openings?") whose answer is arguable, so it prints
+// and exits 0. This mode asserts only the properties the selection screen NEEDS to
+// be true of every world, which are not arguable:
+//
+//   G1  Every seed offers a CHOICE — at least two specialist corps. A selection
+//       screen over a pool of one is a dialog box.
+//   G2  Specialists and background firms stay DISJOINT and the specialist pool
+//       stays small. R2: the pool is the 8 specialists, not the 17-29 background
+//       firms; if a refactor started flagging specialists as background (or the
+//       reverse) the screen would quietly offer the wrong world.
+//   G3  No DEAD specialist — none with neither extraction nor processing. Ben's
+//       2026-08-16 call; a corp holding only base_rate-0 buildings cannot earn.
+//   G4  Every seed contains at least one specialist WITH a processing facility,
+//       and the mean coverage stays materially above the pre-BL-435 2.96/8.
+//
+// G4 is the only band, and it is stated as depth, not wealth. BL-436 measured a
+// processing facility as currently earning LESS per tick than the extraction site
+// it replaces, so a processor-bearing corp is the DEEPER opening (the chain-depth
+// ladder and the Method page have something to stand on) and NOT the richer one.
+// This guard must never be re-read as a profitability floor.
+constexpr float guard_mean_proc_floor = 4.0f; // pre-BL-435 2.96/8, post-B measured 5.83/8
+
+int run_guard(int n_seeds, const recipe_registry& reg)
+{
+    std::printf("player_seed_sweep --guard — %d seeds, the properties selection depends on\n\n",
+                n_seeds);
+
+    int  min_spec = 9999, max_spec = 0, dead_specs = 0, seeds_no_proc = 0, overlap = 0;
+    int  total_spec = 0, total_spec_proc = 0;
+    bool threw = false;
+
+    for (int i = 0; i < n_seeds; ++i)
+    {
+        const uint32_t seed = static_cast<uint32_t>(i);
+        try
+        {
+            world_params p = no_prehistory();
+            p.seed = seed;
+            world w = make_hard_coded_world(p);
+            seed_default_recipes(w, reg);
+
+            std::vector<entity_id> specialists;
+            for (const auto& [id, cc] : w.corporations)
+            {
+                specialists.push_back(id);
+                if (cc.is_background) ++overlap; // a specialist already flagged background
+            }
+            std::sort(specialists.begin(), specialists.end());
+
+            generate_background_firms(w, reg, seed ^ 0x8A21F00Du);
+
+            int spec = 0, spec_proc = 0, dead = 0;
+            for (const entity_id id : specialists)
+            {
+                const auto cit = w.corporations.find(id);
+                if (cit == w.corporations.end()) continue;
+                if (cit->second.is_background) ++overlap; // flipped by background generation
+                int proc = 0, extr = 0;
+                for (const entity_id bid : cit->second.assets)
+                {
+                    const auto bit = w.buildings.find(bid);
+                    if (bit == w.buildings.end()) continue;
+                    if (bit->second.type == building_type::processing_facility) ++proc;
+                    else if (bit->second.type == building_type::extraction_site) ++extr;
+                }
+                ++spec;
+                if (proc >= 1)            ++spec_proc;
+                if (proc == 0 && extr == 0) ++dead;
+            }
+
+            min_spec = std::min(min_spec, spec);
+            max_spec = std::max(max_spec, spec);
+            total_spec += spec;
+            total_spec_proc += spec_proc;
+            dead_specs += dead;
+            if (spec_proc == 0) ++seeds_no_proc;
+
+            std::printf("seed %3u  specialists %2d  with processor %2d  dead %d\n",
+                        seed, spec, spec_proc, dead);
+            std::fflush(stdout);
+        }
+        catch (...)
+        {
+            threw = true;
+            std::printf("seed %3u  THREW\n", seed);
+        }
+    }
+
+    const float mean_proc =
+        total_spec > 0 ? static_cast<float>(total_spec_proc) * 8.0f / static_cast<float>(total_spec)
+                       : 0.0f;
+
+    auto row = [](const char* id, bool ok, const char* what) {
+        std::printf("%s  %-4s  %s\n", ok ? "PASS" : "FAIL", id, what);
+        return ok;
+    };
+
+    std::printf("\n=== guard ===\n");
+    bool all = true;
+    char buf[192];
+
+    std::snprintf(buf, sizeof buf, "every seed offers a choice (min specialists %d, need >= 2)",
+                  min_spec);
+    all &= row("G1", !threw && min_spec >= 2, buf);
+
+    std::snprintf(buf, sizeof buf,
+                  "specialist/background split holds (max specialists %d, need <= 12; "
+                  "mis-flagged %d, need 0)", max_spec, overlap);
+    all &= row("G2", max_spec <= 12 && overlap == 0, buf);
+
+    std::snprintf(buf, sizeof buf,
+                  "no specialist that cannot produce at all (%d dead of %d)",
+                  dead_specs, total_spec);
+    all &= row("G3", dead_specs == 0, buf);
+
+    std::snprintf(buf, sizeof buf,
+                  "processor coverage: %d of %d specialists (%.2f per 8), every seed has "
+                  ">= 1 (%d seeds without); floor %.2f/8, pre-BL-435 2.96/8",
+                  total_spec_proc, total_spec, static_cast<double>(mean_proc), seeds_no_proc,
+                  static_cast<double>(guard_mean_proc_floor));
+    all &= row("G4", seeds_no_proc == 0 && mean_proc >= guard_mean_proc_floor, buf);
+
+    if (threw)
+        all &= row("G0", false, "generation threw on at least one seed");
+
+    std::printf("\n%s\n", all ? "ALL PASS" : "FAILURES ABOVE");
+    return all ? 0 : 1;
+}
+
 } // namespace
 
 int main(int argc, char** argv)
 {
     const bool roster_mode = (argc > 1 && std::string(argv[1]) == "--roster");
-    const int n_seeds   = (!roster_mode && argc > 1) ? std::atoi(argv[1]) : 24;
-    const int warm_ticks = (!roster_mode && argc > 2) ? std::atoi(argv[2]) : 12;
-    if (!roster_mode && (n_seeds <= 0 || warm_ticks <= 0))
+    const bool guard_mode  = (argc > 1 && std::string(argv[1]) == "--guard");
+    const bool mode_arg = roster_mode || guard_mode;
+    const int n_seeds   = (!mode_arg && argc > 1) ? std::atoi(argv[1]) : 24;
+    const int warm_ticks = (!mode_arg && argc > 2) ? std::atoi(argv[2]) : 12;
+    if (!mode_arg && (n_seeds <= 0 || warm_ticks <= 0))
     {
         std::printf("usage: %s [seed_count] [warm_ticks]  (both positive)\n"
-                    "       %s --roster <seed>   (every corp's opening, one seed)\n",
-                    argv[0], argv[0]);
+                    "       %s --roster <seed>       (every corp's opening, one seed)\n"
+                    "       %s --guard [seed_count]  (assert what selection depends on)\n",
+                    argv[0], argv[0], argv[0]);
         return 2;
     }
 
@@ -243,6 +379,14 @@ int main(int argc, char** argv)
     // printed from an empty registry would show every corp as equally poor.
     if (roster_mode)
         return run_roster(static_cast<uint32_t>(argc > 2 ? std::atoi(argv[2]) : 0), reg);
+
+    // Same placement, same reason: a guard run against an empty registry would
+    // measure a world where nothing can be processed.
+    if (guard_mode)
+    {
+        const int g_seeds = (argc > 2) ? std::atoi(argv[2]) : 24;
+        return run_guard(g_seeds > 0 ? g_seeds : 24, reg);
+    }
 
     std::printf("player_seed_sweep — %d seeds, %d warm ticks (%.2f in-game years)\n\n",
                 n_seeds, warm_ticks, warm_ticks / 4.0);

@@ -36,8 +36,10 @@
 // REAL generated world, not a hand-built scene.
 
 #include "world/budget_system.hpp"
+#include "world/building_profit.hpp" // BL-439: the predicted-vs-realised processor read
 #include "world/components.hpp"
 #include "world/corp_ai.hpp"
+#include "world/corporation_generation.hpp" // assign_default_recipes
 #include "world/corp_command.hpp"
 #include "world/economy_system.hpp"
 #include "world/hard_coded_world.hpp"
@@ -88,7 +90,7 @@ recipe_registry make_registry()
     // measures the PRE-BL-436 rate model while reporting green — which is exactly
     // what happened on the run that landed BL-436, and why its goldens were
     // vacuous with respect to the change they were supposed to be guarding.
-    extraction.richness_reference = 0.0f; // mirrors economy.lua: DISABLED pending BL-436 calibration
+    extraction.richness_reference = 24.9f; // mirrors economy.lua: ENABLED 2026-08-17 (BL-436)
     extraction.richness_min       = 0.25f;
     extraction.richness_max       = 2.0f;
     reg.set_economics(building_type::extraction_site, extraction);
@@ -176,10 +178,13 @@ recipe_registry make_registry()
 ///        difference the oscillation is unreadable — `action[idle]` counts one
 ///        tier's idlings while `action[resume]` counts reversals of both, so
 ///        resume outnumbers idle by ~20:1 with no visible cause.
-void run_tick(world& w, const recipe_registry& reg, int tick, int* out_idled_events = nullptr)
+void run_tick(world& w, const recipe_registry& reg, int tick, int* out_idled_events = nullptr,
+              economy_report* out_report = nullptr)
 {
     w.current_day_tick = tick;
     const economy_report rep = run_economy_step(w, reg);
+    if (out_report)
+        *out_report = rep;
     if (out_idled_events)
     {
         int n = 0;
@@ -204,7 +209,46 @@ struct rollout_metrics
     std::map<corp_verb, int> action_counts;        ///< Tally of every applied corp_command by verb.
     std::vector<uint64_t>    state_hashes;          ///< world::state_hash(tick) at every sample point.
     int                      reflex_idles = 0;      ///< BL-079 reflex-tier idlings (idled events minus the ring's own idle commands).
+    /// BL-439: processing facilities rival corps own at the END minus the ones
+    /// they were GENERATED with. Counted from the world, not from the decision
+    /// ring, so it measures the outcome rather than the intent — a build command
+    /// the seam rejects moves this by zero, which is the honest reading.
+    int                      processors_gained = 0;
+    /// BL-439 diagnostic, PRINTED not banded. Mean per-tick realised net of
+    /// rival-owned processing facilities against extraction sites, read off the
+    /// final tick's economy_report — the two figures NR-266 measured by hand,
+    /// now collected on the benchmark set itself. Paired with `predicted_*`,
+    /// the same buildings priced by the estimator the SCORER used, so the gap
+    /// between what the AI is promised and what it gets is readable directly.
+    ///
+    /// READ THE `n`. `estimate_building_profit` returns has_data == false for a
+    /// building with no row in the report, which is exactly the idle and starved
+    /// ones — so the sample is BIASED TOWARD THE WORKING PROCESSORS and the
+    /// realised figure below is the optimistic end of the range, not its mean.
+    /// n=2 against processors_gained=12 is the sample saying so, not a bug.
+    float realised_processor_net  = 0.0f;
+    float realised_extraction_net = 0.0f;
+    float predicted_processor_net = 0.0f;
+    int   processors_sampled      = 0;
+    int   extraction_sampled      = 0;
 };
+
+/// Processing facilities owned by non-player corporations right now.
+int rival_processor_count(const world& w)
+{
+    int n = 0;
+    for (const auto& [id, cc] : w.corporations)
+    {
+        if (cc.is_player) continue;
+        for (const entity_id bld : cc.assets)
+        {
+            const auto it = w.buildings.find(bld);
+            if (it != w.buildings.end() && it->second.type == building_type::processing_facility)
+                ++n;
+        }
+    }
+    return n;
+}
 
 constexpr int sample_every = 10;
 
@@ -214,12 +258,21 @@ rollout_metrics run_rollout(uint32_t seed, int ticks)
     params.seed = seed;
     world w = make_hard_coded_world(no_prehistory(params));
     const recipe_registry reg = make_registry();
+    // The default-recipe pass (2026-08-17). This harness never ran it, so every
+    // GENERATED processor in the benchmark carried no_recipe for all 300 ticks —
+    // paying maintenance, never producing, and reporting as ordinary idleness.
+    // The AI's own processors were unaffected (BL-439 names a recipe on the
+    // command), which is why the two read so differently. app::load_economy does
+    // this; a harness that skips it measures a startup the game never performs.
+    assign_default_recipes(w, reg);
 
     rollout_metrics m;
+    const int processors_at_start = rival_processor_count(w);
+    economy_report last_report;
     for (int t = 1; t <= ticks; ++t)
     {
         int idled_events = 0;
-        run_tick(w, reg, t, &idled_events);
+        run_tick(w, reg, t, &idled_events, &last_report);
 
         // Tally every decision applied THIS tick (the ring wraps at 256 entries
         // over a long rollout, so read it live rather than at the end).
@@ -263,6 +316,38 @@ rollout_metrics run_rollout(uint32_t seed, int ticks)
         }
     }
     m.survival_fraction = (ai_corps > 0) ? static_cast<float>(ai_active) / static_cast<float>(ai_corps) : 0.0f;
+    m.processors_gained = rival_processor_count(w) - processors_at_start;
+
+    // The predicted-vs-realised read (BL-439). Realised comes from the last
+    // tick's report; predicted re-runs `estimate_prospective_profit` on the same
+    // building with `existing` set, which is the model the build scorer priced
+    // it with. A large positive gap says the scorer is promised a full run and
+    // handed a starved one; a small gap says the economy really does pay this.
+    for (const auto& [id, cc] : w.corporations)
+    {
+        if (cc.is_player) continue;
+        for (const entity_id bld : cc.assets)
+        {
+            const auto it = w.buildings.find(bld);
+            if (it == w.buildings.end() || it->second.decommissioned) continue;
+            const building_component& b = it->second;
+            const building_profit bp = estimate_building_profit(w, reg, last_report, bld);
+            if (!bp.has_data) continue;
+            if (b.type == building_type::processing_facility)
+            {
+                m.realised_processor_net += bp.net();
+                const building_profit pp = estimate_prospective_profit(
+                    w, reg, b.tile, b.type, b.target_resource, b.recipe, &b);
+                if (pp.has_data) m.predicted_processor_net += pp.net();
+                ++m.processors_sampled;
+            }
+            else if (b.type == building_type::extraction_site)
+            {
+                m.realised_extraction_net += bp.net();
+                ++m.extraction_sampled;
+            }
+        }
+    }
 
     return m;
 }
@@ -751,6 +836,7 @@ int main()
     // glance (BL-416): a red run whose bands predate the last deliberate
     // economy/AI change is a re-bless owed, not a regression found.
     std::printf("\ngolden bands blessed: %s\n", k_bands_blessed);
+    int processors_gained_total = 0;
     for (const seed_golden& g : goldens)
     {
         char hdr[64];
@@ -802,7 +888,39 @@ int main()
 
         std::snprintf(label, sizeof label, "%s: dial-action count under thrash ceiling", hdr);
         check(dial_total <= g.dial_max, label);
+
+        std::printf("    processors_gained (BL-439) = %d\n", m.processors_gained);
+        {
+            const float pn = (m.processors_sampled > 0)
+                           ? m.realised_processor_net / static_cast<float>(m.processors_sampled) : 0.0f;
+            const float pp = (m.processors_sampled > 0)
+                           ? m.predicted_processor_net / static_cast<float>(m.processors_sampled) : 0.0f;
+            const float en = (m.extraction_sampled > 0)
+                           ? m.realised_extraction_net / static_cast<float>(m.extraction_sampled) : 0.0f;
+            std::printf("    per-building net: processor realised=%.2f predicted=%.2f (n=%d)  "
+                        "extraction realised=%.2f (n=%d)\n",
+                        pn, pp, m.processors_sampled, en, m.extraction_sampled);
+        }
+        processors_gained_total += m.processors_gained;
     }
+
+    // =========================================================================
+    // R5 (BL-439) — a rival can climb the production chain at all.
+    // =========================================================================
+    // Deliberately a SET-WIDE assertion, not a per-seed one. The claim under
+    // test is existential — "the scorer can reach a processing_facility" — and
+    // it fails BY CONSTRUCTION on the pre-BL-439 build, where corp_verb::build
+    // is emitted only for extraction_site and military_base (NR-265). A per-seed
+    // band would be fitting to noise on its first observation; that band is
+    // earned later, once there is a run to derive it from.
+    //
+    // Counted from the world (rival_processor_count), so a generated processor
+    // never counts and a rejected build command never counts — only a processor
+    // that was not there at tick 0 and is there at the end.
+    std::printf("\nprocessors_gained across the benchmark set = %d\n", processors_gained_total);
+    check(processors_gained_total >= 1,
+          "BL-439 R5: at least one rival corp BUILDS at least one processing facility "
+          "across the benchmark set (0 = the scorer has no processor candidate)");
 
     std::printf("\n%s (%d failure%s)  [bands blessed: %s]\n",
                 g_failures == 0 ? "ALL PASS" : "FAILURES",

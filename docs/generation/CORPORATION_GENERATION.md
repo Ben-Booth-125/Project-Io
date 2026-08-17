@@ -245,21 +245,46 @@ doc's; see its § Background corporations.
 
 ## Player corporation
 
-One generated corporation is flagged as `is_player = true`. In the prototype this is a
-fixed assignment — a corporation is selected from the generated set and marked as the
-player's. No special generation rules apply: the player starts on the same footing as
-any other corporation.
+One generated corporation is flagged as `is_player = true`. The generator still makes
+that draw, and no special generation rules apply: the player starts on the same footing
+as any other corporation. What changed with BL-435 is that the draw is now a **default**
+rather than a verdict — the player is offered the set and picks.
 
-**Corporation selection screen** — the intended flow is that the player is shown an
-analytical profile of each generated corporation (territory position, resource access,
-industrial focus, starting capital, home nation political context) and can cherry-pick
-the final stage of generation: accepting a generated corporation, re-rolling it within
-the same nation, or selecting a different nation to generate a corp within. This flow is
-**deferred from the prototype**. For now, a corporation is simply marked as the player's
-at generation time. The natural home for it is the **New World wizard** (BL-167 —
-`PLANETOLOGY.md` § Preferences, not parameters), which already walks generation in staged
-rounds with per-round rerolls; a corporation round would slot after round C. Note also
-BL-094 (player-nation pivot, designed) — if the player identity shifts to
+**Corporation selection screen — LANDED 2026-08-16 (BL-435).** A first cut of the
+long-deferred screen exists: `app_screen::choosing_corp`, a stage between generation
+completing and the pre-game warm start, listing every **specialist** corporation with its
+name, industrial focus, home nation and holdings by building type, plus a **Surprise me**
+that takes the generator's own seeded pick. Selection *re-points* `is_player` /
+`world::player_entity` (`app::apply_corp_choice`) rather than replacing the draw, so
+determinism is untouched and every path that never opens the screen is bit-identical.
+Surface detail is `docs/ui/STARTUP.md` § Starting-corp selection; that doc owns the screen.
+
+*Why this was worth building* — measured, not assumed. `tools/verify/player_seed_sweep`
+over 24 seeds found the generator handing the player a pure-extraction corp on 13 of them,
+so the chain-depth ladder (BL-428) and the Method page had no rung to stand on, while
+better openings existed unchosen in the very same world. Solvency was **not** the
+discriminator: all 24 ended positive. The economy was producing shallow openings, not
+broke ones — and rejection-sampling seeds would have hidden the distribution rather than
+exposing it.
+
+*The pool is the specialists.* Ben's call, 2026-08-16: the ~8 corps this pipeline's
+Passes 1–5 create, not Pass 6's 17–29 background firms. That is a property of *when* the
+stage opens (before `generate_background_firms`), belt-and-braced by an `is_background`
+skip in `build_corp_choices`, and asserted per-seed by `player_seed_sweep --guard`.
+
+*Depth, not wealth.* The item was filed on the premise that a processor-bearing corp is a
+better opening. Its own first measurement contradicted the money half: BL-436 found a
+processing facility currently earns **less** per tick than the extraction site it replaces.
+Such a corp is the **deeper** start, not the richer one, and neither this doc nor the
+screen may say otherwise until BL-436 lands.
+
+**Still deferred**, and this is the honest boundary of what landed: the *analytical
+profile* the original flow described — territory position, resource access, home-nation
+political context — and the **re-roll** verbs (accept / re-roll within the nation / pick a
+different nation to generate within). What exists is a chooser over the corps the world
+already made. Its natural fuller home remains the **New World wizard** (BL-167 —
+`PLANETOLOGY.md` § Preferences, not parameters), as a corporation round after round C.
+Note also BL-094 (player-nation pivot, designed) — if the player identity shifts to
 nation-with-chartered-corps, this screen's subject changes with it.
 
 ---

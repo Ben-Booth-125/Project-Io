@@ -1,13 +1,21 @@
-// interbody_pull_harness — the inter-body demand pull (BL-263), and whether its
-// netting means anything (BL-404).
+// interbody_pull_harness — the inter-body demand pull (BL-263): which market it
+// reads (BL-406) and whether its netting means anything (BL-404).
 //
-// WHAT THIS EXISTS TO SETTLE. `inject_interbody_demand` pulls a distance-
+// STATUS 2026-08-17: both landed. Sections R1/R2/R2a below are the ORIGINAL
+// MEASUREMENT that found the defects, kept because they are the record of what
+// was wrong and of the numbers that decided the fix; they no longer describe the
+// shipped code path. Section C is the live guard on the shipped behaviour, and
+// every one of its assertions was run against the pre-change build and observed
+// to FAIL (3 of 3). Read C for what the code does now.
+//
+// WHAT THIS EXISTED TO SETTLE. `inject_interbody_demand` pulls a distance-
 // discounted slice of the home body's *unmet* demand onto every outpost market,
 // so an outpost with real supply and no local population does not collapse to
-// the price floor. It expresses "unmet" as `home.demand[r] - home.supply[r]`.
+// the price floor. It expressed "unmet" as `home.demand[r] - home.supply[r]`,
+// where `home` was `market_for_body(w, w.home_body)`.
 //
-// Two separate things can be wrong with that expression, and they need different
-// fixes, so this harness measures both rather than asserting either:
+// Two separate things were wrong with that expression, and they needed different
+// fixes, so this harness measured both rather than asserting either:
 //
 //   R1  THE READ IS SEQUENCED WRONG. `clear_markets` zeroes every market's
 //       supply before the injection runs and writes supply after it, so the
@@ -28,12 +36,20 @@
 //     0.0 supply and 4.0 demand.
 //   * The body as a whole holds 2863.3 supply and 38.4 demand.
 //
-// So "home supply" is not the home body's supply, and "home demand" is a tenth
-// of the home body's demand. That makes BL-404 un-fixable by sequencing alone,
-// in both directions at once: net against THIS market's supply and the
-// correction is a no-op; net against the body's real supply and the shortfall
-// goes permanently negative, killing the price-floor support BL-263 added.
-// The market-selection defect is BL-406, and it has to be settled first.
+// So "home supply" was not the home body's supply, and "home demand" was a tenth
+// of the home body's demand. That made BL-404 un-fixable by sequencing alone, in
+// both directions at once: net against THAT market's supply and the correction is
+// a no-op; net against the body's real supply and the shortfall goes permanently
+// negative, killing the price-floor support BL-263 added.
+//
+// HOW IT WAS RESOLVED (2026-08-17). Neither, in the end. Ben's ruling took
+// BL-406 option (c): the pull reads a per-resource COUNTERPART market — the
+// home-body market that wants that resource most — so nothing is asked to stand
+// for a body, and the aggregate-vs-arbitrary dilemma above simply does not
+// arise. BL-404 then took option (b) on top, netting against that counterpart's
+// PREVIOUS-tick supply. The measured outcome on seed 0: two resources pull at
+// 2.8x their old size and one (whose counterpart holds 260.7 supply against 5.5
+// demand) is correctly silenced. Section C asserts exactly that.
 //
 // (BL-381's recorded "supply exceeds demand by two to three orders of
 // magnitude" is right at BODY level — 2863 vs 38 — and does not describe the
@@ -52,6 +68,9 @@
 #include "world/economy_system.hpp"
 #include "scripting/lua_state.hpp"
 
+#include <algorithm>
+#include <array>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
@@ -178,8 +197,8 @@ int main()
     std::printf("     (equal means the subtraction changed nothing)\n\n");
 
     check(gate_opens_at_read == resources_with_demand,
-          "R1 at the injector's read point the subtraction is a no-op — the gate opens for "
-          "every resource carrying any demand");
+          "R1 a LIVE supply read at the injector's read point would still be a no-op — the "
+          "reason the shipped netting reads a pre-reset snapshot instead (BL-404)");
 
     // ---- R2: the scale gap, per resource ------------------------------------
     //
@@ -290,11 +309,11 @@ int main()
           "R2a the read point is live — the home BODY lists real supply, so this measurement "
           "is of the economy and not of an empty fixture");
     check(home_markets > 1,
-          "R2a the home body carries SEVERAL markets, and market_for_body hands the pull "
-          "exactly one of them (BL-406)");
+          "R2a the home body carries SEVERAL markets, so no single one can stand for it — the "
+          "premise BL-406 dissolved, and the reason section C's counterpart relation is needed");
     check(body_demand > 0.0 && read_demand < body_demand,
-          "R2a 'home demand' is one market's slice of the home body's demand, not the body's "
-          "— the pull is scaled off a fraction of what it names");
+          "R2a the lowest-id market holds only a slice of the home body's demand — what the "
+          "pull used to be scaled off, kept as the record of the defect");
 
     // DELIBERATELY NOT ASSERTED: whether the read market happens to carry
     // supply. Measured 2026-08-13 it does on the MSVC build (1491.4 of the
@@ -342,6 +361,231 @@ int main()
         std::printf("     a corrected netting would silence %.0f%% of the pull that fires today"
                     " (%d of %d demand-bearing resources).\n\n",
                     kill_fraction * 100.0, killed_by_netting, demand_bearing);
+    }
+
+    // ---- C: the counterpart pull, asserted behaviourally --------------------
+    //
+    // BL-406 (Ben's ruling 2026-08-15, option c) and BL-404 land together, and
+    // these checks are written against `inject_interbody_demand`'s OBSERVABLE
+    // output rather than against any function it calls internally. That is
+    // deliberate: an assertion that named a new helper could not be compiled
+    // against the pre-change build, and a guard that has never been seen to fail
+    // is not a guard. In this form the identical assertions were run against the
+    // pre-change binary — see the recorded failures below each one.
+    //
+    // The relation: for resource r, an outpost's COUNTERPART is the home-body
+    // market with the greatest demand for r (lowest market id breaking ties).
+    // No single market stands for the body any more, so BL-406's defect is
+    // dissolved rather than repaired — and the pick is a fact about the economy,
+    // identical under any container traversal order.
+    {
+        const market_emergence_params& mp = reg.market_emergence();
+
+        // An outpost body: the lowest-id body that is neither home nor the star
+        // and carries at least one tile. Lowest id, so the pick is stable.
+        auto radius_au = [&](entity_id id) -> float {
+            const auto it = w.bodies.find(id);
+            if (it == w.bodies.end()) return 0.0f;
+            const body_component* bc = &it->second;
+            if (bc->parent != null_entity)
+            {
+                const auto pit = w.bodies.find(bc->parent);
+                if (pit != w.bodies.end()) bc = &pit->second;
+            }
+            return bc->orbital_radius_au;
+        };
+
+        entity_id outpost_body = null_entity;
+        entity_id outpost_tile = null_entity;
+        for (const auto& [bid, bc] : w.bodies)
+        {
+            (void)bc;
+            if (bid == w.home_body || bid == w.star_body) continue;
+            entity_id lowest_tile = null_entity;
+            for (const auto& [tid, tc] : w.tiles)
+                if (tc.body == bid && (lowest_tile == null_entity || tid < lowest_tile))
+                    lowest_tile = tid;
+            if (lowest_tile == null_entity) continue;
+            if (outpost_body == null_entity || bid < outpost_body)
+            {
+                outpost_body = bid;
+                outpost_tile = lowest_tile;
+            }
+        }
+        check(outpost_body != null_entity,
+              "C setup: the generated world carries a non-home body with tiles to host an "
+              "outpost market");
+
+        entity_id outpost_market = null_entity;
+        if (outpost_body != null_entity)
+            outpost_market = maybe_spawn_market(w, reg, outpost_body, outpost_tile);
+        check(outpost_market != null_entity,
+              "C setup: an outpost market spawns on that body (nothing had built there yet, so "
+              "the generated world has no off-home market of its own)");
+
+        if (outpost_market != null_entity)
+        {
+            const float dist    = std::fabs(radius_au(outpost_body) - radius_au(w.home_body));
+            const float falloff = 1.0f + mp.distance_falloff * dist;
+
+            // The two candidate answers to "whose demand is the pull scaled off".
+            // `lowest` is the pre-change behaviour (market_for_body's lowest-id
+            // pick); `counterpart` is the ruling's per-resource relation. Also
+            // capture the counterpart's PRIOR supply — the end-of-tick supply a
+            // snapshot taken before clear_markets' reset loop would carry, which
+            // is what BL-404's netting must subtract.
+            std::array<float, resource_count> lowest_demand{};
+            std::array<float, resource_count> counterpart_demand{};
+            std::array<float, resource_count> counterpart_supply{};
+            std::array<entity_id, resource_count> counterpart_id{};
+            std::array<entity_id, resource_count> counterpart_id_reversed{};
+            lowest_demand.fill(0.0f);
+            counterpart_demand.fill(0.0f);
+            counterpart_supply.fill(0.0f);
+            counterpart_id.fill(null_entity);
+            counterpart_id_reversed.fill(null_entity);
+
+            // Home-body markets, gathered once. Two traversals of the SAME set in
+            // opposite id orders re-derive the relation, so a tie-break that
+            // silently depended on visit order would disagree with itself.
+            std::vector<entity_id> home_ids;
+            for (const auto& [mid, mc] : w.markets)
+                if (mc.body == w.home_body) home_ids.push_back(mid);
+            std::sort(home_ids.begin(), home_ids.end());
+
+            auto derive = [&](const std::vector<entity_id>& order,
+                              std::array<entity_id, resource_count>& out) {
+                out.fill(null_entity);
+                std::array<float, resource_count> best{};
+                best.fill(0.0f);
+                for (entity_id mid : order)
+                {
+                    const market_component& mc = w.markets.at(mid);
+                    for (std::size_t r = 0; r < resource_count; ++r)
+                    {
+                        const float d = mc.demand[r];
+                        if (out[r] == null_entity || d > best[r] ||
+                            (d == best[r] && mid < out[r]))
+                        {
+                            out[r]  = mid;
+                            best[r] = d;
+                        }
+                    }
+                }
+            };
+            derive(home_ids, counterpart_id);
+            std::vector<entity_id> reversed(home_ids.rbegin(), home_ids.rend());
+            derive(reversed, counterpart_id_reversed);
+
+            for (std::size_t r = 0; r < resource_count; ++r)
+            {
+                lowest_demand[r] = w.markets.at(home_market).demand[r];
+                if (counterpart_id[r] != null_entity)
+                {
+                    const market_component& cm = w.markets.at(counterpart_id[r]);
+                    counterpart_demand[r] = cm.demand[r];
+                    counterpart_supply[r] = cm.supply[r];
+                }
+            }
+
+            bool order_stable = true;
+            for (std::size_t r = 0; r < resource_count; ++r)
+                if (counterpart_id[r] != counterpart_id_reversed[r]) order_stable = false;
+            check(order_stable,
+                  "C1 the counterpart relation is order-independent — re-derived over the "
+                  "home-body markets in reverse id order it names the same market for every "
+                  "resource (BL-406's cross-toolchain instability closed)");
+
+            // Fire the injector and read what actually landed.
+            market_component& om = w.markets.at(outpost_market);
+            om.demand.fill(0.0f);
+            inject_interbody_demand(w, reg, snapshot_market_supply(w));
+
+            std::printf("C — what the pull is scaled off (outpost market %u, body %u, %.2f AU)\n",
+                        outpost_market, outpost_body, dist);
+            std::printf("     %-14s %10s %12s %12s %12s %12s\n",
+                        "resource", "injected", "cpart short", "lowest short", "cpart demand",
+                        "cpart supply");
+
+            int differing        = 0;  // the two candidate sources disagree here
+            int matches_cpart    = 0;
+            int matches_lowest   = 0;
+            int netting_bites    = 0;  // counterpart supply >= its demand -> pull must be silenced
+            int netting_silenced = 0;
+            int netting_arith_ok = 0;
+            int netted_pulls     = 0;
+            for (std::size_t r = 0; r < resource_count; ++r)
+            {
+                if (om.base_price[r] <= 0.0f) continue;              // untradeable, never pulled
+                if (counterpart_demand[r] <= 0.0f && lowest_demand[r] <= 0.0f) continue;
+
+                const float injected = om.demand[r];
+
+                // The two candidate sources, each carried through the SAME
+                // shortfall-and-falloff arithmetic, so the comparison isolates
+                // WHICH MARKET is read and nothing else. Comparing the injected
+                // value against a gross demand instead would conflate BL-406's
+                // question with BL-404's: a counterpart whose pull the netting
+                // silences injects zero, which is the right answer to BL-406 and
+                // looks like the wrong one.
+                const float cpart_short  = counterpart_demand[r] - counterpart_supply[r];
+                const float lowest_short = lowest_demand[r] - w.markets.at(home_market).supply[r];
+                const float expect_cpart =
+                    cpart_short  > 0.0f ? cpart_short  * mp.pull_fraction / falloff : 0.0f;
+                const float expect_lowest =
+                    lowest_short > 0.0f ? lowest_short * mp.pull_fraction / falloff : 0.0f;
+
+                std::printf("     %-14s %10.4f %12.4f %12.4f %12.4f %12.2f\n",
+                            resource_label(r).c_str(), injected, cpart_short, lowest_short,
+                            counterpart_demand[r], counterpart_supply[r]);
+
+                if (std::fabs(expect_cpart - expect_lowest) > 1e-4f)
+                {
+                    ++differing;
+                    if (std::fabs(injected - expect_cpart)  < 1e-3f) ++matches_cpart;
+                    if (std::fabs(injected - expect_lowest) < 1e-3f) ++matches_lowest;
+                }
+                if (counterpart_supply[r] >= counterpart_demand[r] && counterpart_demand[r] > 0.0f)
+                {
+                    ++netting_bites;
+                    if (injected == 0.0f) ++netting_silenced;
+                }
+                else if (cpart_short > 0.0f)
+                {
+                    ++netted_pulls;
+                    if (std::fabs(injected * falloff / mp.pull_fraction - cpart_short) < 1e-3f)
+                        ++netting_arith_ok;
+                }
+            }
+            std::printf("\n     resources where the two sources disagree : %d\n", differing);
+            std::printf("     ...pull scaled off the COUNTERPART        : %d\n", matches_cpart);
+            std::printf("     ...pull scaled off the lowest-id market   : %d\n", matches_lowest);
+            std::printf("     resources the netting must silence        : %d (silenced %d)\n",
+                        netting_bites, netting_silenced);
+            std::printf("     resources with a positive netted pull     : %d (arithmetic ok %d)\n\n",
+                        netted_pulls, netting_arith_ok);
+
+            // C2 — BL-406. The load-bearing one. PRE-CHANGE THIS FAILED: the
+            // injector read market_for_body's lowest-id pick, so `implied`
+            // matched `lowest-id` on every differing resource and the
+            // counterpart on none.
+            check(differing > 0,
+                  "C2 setup: the counterpart and the lowest-id market imply different pulls for "
+                  "at least one resource, so the two answers are distinguishable here");
+            check(differing > 0 && matches_cpart == differing && matches_lowest == 0,
+                  "C2 the pull is scaled off the per-resource COUNTERPART market's demand, not "
+                  "off the lowest-id market market_for_body happens to return (BL-406)");
+
+            // C3 — BL-404. PRE-CHANGE THIS FAILED: the subtrahend was the
+            // identically-zero supply at the injector's read point, so a
+            // counterpart already supplying its own demand still pulled.
+            check(netting_bites == 0 || netting_silenced == netting_bites,
+                  "C3 a resource whose counterpart already meets its own demand from prior-tick "
+                  "supply pulls NOTHING — the netting is real, not a subtraction of zero (BL-404)");
+            check(netted_pulls == 0 || netting_arith_ok == netted_pulls,
+                  "C3 where a pull survives, its size is the counterpart's demand LESS its "
+                  "prior-tick supply — the shortfall the mechanism has always claimed to use");
+        }
     }
 
     std::printf("\n%s (%d failure%s)\n",

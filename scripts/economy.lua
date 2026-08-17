@@ -85,18 +85,32 @@ economy = {
             -- (resource_remaining, seeded at generation), so a rich tile is still
             -- worth far more over its life — it simply cannot also run a thousand
             -- times faster. Set richness_reference = 0 to restore raw behaviour.
-            -- DISABLED PENDING CALIBRATION (BL-436, 2026-08-16). Set this to 53.3
-            -- to enable the conversion; 0 keeps the raw pre-BL-436 behaviour.
+            -- ENABLED 2026-08-17 (BL-436, Ben's call), after sitting at 0 since
+            -- 2026-08-16.
             --
-            -- The conversion itself is correct and lands a 133:1 structural gap at
-            -- 2.5:1. It is off because the COST side of the economy was tuned
-            -- against the old inflated income and every AI corp goes bankrupt with
-            -- it on. A scale sweep (x1/x4/x10 on both producer base_rates, ratio
-            -- held) showed scale is NOT the lever: raising extraction income makes
-            -- the collapse WORSE, because corps spend it on processors that lose
-            -- more per tick at higher scale (-19.95 at x1, -61.86 at x4). The real
-            -- blocker is processing profitability, which is BL-436's open half.
-            richness_reference = 0.0,
+            -- 24.9 is the measured MEDIAN deposit richness, not the mean. The
+            -- promise above — "a typical tile lands at ~1.0" — is what this value
+            -- has to deliver, and the mean does not deliver it: the distribution
+            -- runs to 72,321, so its mean (53.34) sits at the 78th percentile.
+            -- Referenced against the mean, the median tile ran at 0.47 and 18% of
+            -- deposits clamped flat at the richness_min floor, halving raw supply
+            -- across the whole map. Measured: tier_margin R6b prints the
+            -- percentiles (p10 10.58 / p25 15.76 / MEDIAN 24.92 / p75 45.09 /
+            -- p90 98.34 / p99 360.91) so this number can be re-derived rather
+            -- than trusted.
+            --
+            -- The reason it was off is recorded rather than deleted, because the
+            -- reason turned out to be wrong. The old note read: "every AI corp goes
+            -- bankrupt with it on ... a scale sweep showed raising extraction income
+            -- makes the collapse WORSE, because corps spend it on processors that
+            -- lose more per tick at higher scale". That mechanism could not happen.
+            -- The AI had no processing_facility build candidate at all until BL-439
+            -- (2026-08-17), so no corp could spend income on a processor at any
+            -- scale, and the sweep's causal chain had no link in the middle
+            -- (NR-265/NR-266). Whatever it measured, it was not that.
+            --
+            -- Set to 0 to restore raw pre-BL-436 behaviour.
+            richness_reference = 24.9,
             richness_min       = 0.25,
             richness_max       = 2.0,
         },
@@ -315,6 +329,50 @@ economy = {
         elasticity_min    = 0.30,
         elasticity_max    = 2.50,
         demand_scale      = 1.00,
+    },
+
+    -- BL-442 (2026-08-17): THE price band. A market price is anchored to its
+    -- rarity-derived base_price and pushed by the tick's supply/demand ratio
+    -- (damped sqrt elasticity), then clamped to this band and eased toward it by
+    -- an EMA. Read by resolve_price (market_clearing.cpp) AND by the BL-181
+    -- workforce auto-solver's forward price estimate (wf_target_price,
+    -- economy_system.cpp) — until BL-442 those were two hand-synchronised
+    -- constexpr copies of the same two numbers.
+    --
+    -- STEP 2 (2026-08-17): the CEILING is now DERIVED, not authored. Ben's
+    -- requirement is that scarcity must price high enough to cross the margin for
+    -- a nearby market, so inter-market trading exists from day 1. That makes the
+    -- ceiling a function of the haulage the supply layer already charges:
+    --
+    --     ceil_mult * base_price  >  base_price + haulage_per_unit
+    --     ceil_mult               >  1 + haulage_per_unit / base_price
+    --
+    -- MEASURED, not assumed (tools/verify/haulage_measure.cpp, 5 seeds of the real
+    -- generated world): per-unit haulage from a market to its NEAREST market
+    -- neighbour is median 0.70, p90 1.67, max 4.83 credits. The cheapest good
+    -- carrying a base price is 0.60. The BINDING case — worst haul, cheapest
+    -- good — is therefore
+    --
+    --     ceil > 1 + 4.83 / 0.60 = 9.06   ->  10.0, the next round number above it
+    --
+    -- 4.0 satisfied only the MEDIAN neighbour pair (needs 2.16) and just barely
+    -- the p90 (needs 3.79); it left the tail — the worst-connected market pair
+    -- carrying the cheapest good — permanently unservable. 10.0 covers every
+    -- nearest-neighbour pair measured, for every priced good.
+    --
+    -- The derivation is stated in full in docs/economy/MARKETS.md § The price band
+    -- so it can be RE-DERIVED rather than trusted; re-run haulage_measure if the
+    -- logistics costs, the map scale or the base-price table change.
+    --
+    -- THE FLOOR IS DELIBERATELY UNCHANGED. Ben's requirement derives a ceiling and
+    -- says nothing about a floor. Lowering it would widen the arbitrage margin too,
+    -- but only by cutting the revenue of producers already selling into a glut —
+    -- the direction Sprint 19's falling numbers are already complaining about — and
+    -- it would be an authored guess sitting next to a derived number, which is the
+    -- exact confusion step 1 existed to remove.
+    price_band = {
+        floor_mult = 0.25, -- lowest a price may fall, x base_price
+        ceil_mult  = 10.0, -- highest a price may rise, x base_price (derived; see above)
     },
 
     -- BL-263 (2026-08-11): spontaneous market emergence — a market appears the

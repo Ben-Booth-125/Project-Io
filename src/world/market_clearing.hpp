@@ -5,6 +5,7 @@
 #include "recipe_registry.hpp"
 #include "world.hpp"
 
+#include <array>
 #include <unordered_map>
 #include <vector>
 
@@ -76,19 +77,51 @@ void inject_background_demand(world& w, const recipe_registry& reg);
 /// @return         The new market's id, or `null_entity` if none was created.
 entity_id maybe_spawn_market(world& w, const recipe_registry& reg, entity_id body, entity_id tile);
 
-/// BL-263: pulls a discounted slice of the home body's own unmet demand
-/// (demand - supply, when positive) onto every OTHER body's market, per
-/// resource — "an outpost market clears primarily against inter-body demand...
-/// nobody builds a mine on a moon to sell to the moon." Without this an outpost
-/// with real supply and no local population collapses to the price floor the
-/// instant it starts producing. Called from clear_markets after
-/// inject_population_demand (additive, same ordering contract). No-op if the
-/// home body has no market. Deterministic — no RNG, a pure function of the
-/// already-accumulated demand/supply this tick.
+/// Every market's supply arrays, keyed by market id — a snapshot, not a view.
+/// Exists for one caller: `clear_markets` takes one BEFORE its per-tick reset so
+/// `inject_interbody_demand` has a real supply to net against (BL-404). Never
+/// persisted; the save format knows nothing about it.
+using market_supply_snapshot =
+    std::unordered_map<entity_id, std::array<float, resource_count>>;
+
+/// Capture every market's current supply. Call before `clear_markets` zeroes it.
+market_supply_snapshot snapshot_market_supply(const world& w);
+
+/// BL-263: pulls a discounted slice of the home body's unmet demand onto every
+/// OTHER body's market, per resource — "an outpost market clears primarily
+/// against inter-body demand... nobody builds a mine on a moon to sell to the
+/// moon." Without this an outpost with real supply and no local population
+/// collapses to the price floor the instant it starts producing.
 ///
-/// @param w   World; every non-home-body market's demand is mutated in place.
-/// @param reg Loaded registry (market_emergence_params).
-void inject_interbody_demand(world& w, const recipe_registry& reg);
+/// **Which home market (BL-406, Ben's ruling 2026-08-15).** Per resource, the
+/// COUNTERPART: the home-body market carrying the greatest demand for that
+/// resource, lowest market id breaking ties. It used to be
+/// `market_for_body(w, w.home_body)` — the lowest-id market of the many BL-096
+/// carves onto the home body, holding 5% of the body's demand and a different
+/// market again under a different standard library. No single market stands for
+/// the body now, and the pick is a fact about the economy rather than about
+/// container order.
+///
+/// **What it nets against (BL-404).** @p prior_supply, the previous tick's
+/// end-of-tick supply. Reading `market.supply` directly made the subtraction a
+/// no-op: `clear_markets` zeroes supply immediately before this call and writes
+/// it after, so every outpost was pulled by GROSS home demand. One tick of lag
+/// is the price of not reordering a pass whose ordering is load-bearing.
+///
+/// Called from clear_markets after inject_population_demand and
+/// inject_background_demand — that order is now REQUIRED, not merely additive:
+/// the counterpart is chosen by this tick's demand, which those two deposit.
+/// No-op if the home body has no market. Deterministic — no RNG, and the
+/// counterpart rule is a total order, so no dependence on `w.markets`' traversal.
+///
+/// @param w             World; every non-home-body market's demand is mutated.
+/// @param reg           Loaded registry (market_emergence_params).
+/// @param prior_supply  Snapshot from before this tick's reset. Passing an empty
+///                      map means "no prior supply known" and nets against zero —
+///                      the pre-BL-404 behaviour, correct only for a fresh world.
+void inject_interbody_demand(world& w,
+                             const recipe_registry& reg,
+                             const market_supply_snapshot& prior_supply);
 
 /// Clear every body market for one economy tick using a per-(body, resource)
 /// matched order book. For each market and resource:

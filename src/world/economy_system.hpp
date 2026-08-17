@@ -124,9 +124,29 @@ struct economy_report
     /// deterministic order they were applied. See agency_event.
     std::vector<agency_event> agency_events;
 
-    /// Per (corporation, body): the input quantities a processor could not cover
-    /// from its own pool and auto-bought from the market this tick. Resource-indexed.
+    /// Per (corporation, body): the input quantities a consumer could not cover
+    /// from its own pool and auto-bought from the market this tick — the FILL.
+    /// Resource-indexed. This is goods actually RECEIVED, and it is what the
+    /// money follows: auto_buys, the VWAP accumulator, and corporate expenditure
+    /// all read this and must keep reading it (market_clearing.cpp).
     std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>> purchases;
+
+    /// BL-441. Per (corporation, body): the input quantities a consumer WANTED
+    /// from the market this tick — the WANT, whether or not the draw succeeded.
+    /// Resource-indexed, and the ONLY thing `mc.demand` is allowed to read.
+    ///
+    /// The distinction is the one BL-422 landed on the sell side, applied to the
+    /// buy side: SUPPLY is an offer and INVENTORY is a delivery; likewise a WANT
+    /// is a bid and a FILL is a receipt. The register used to record fills, so a
+    /// processor that needed 16 units of an input and could draw only 2 told the
+    /// market it wanted 2 — the resource then read to resolve_price as one almost
+    /// nobody wants, its price never rose, and scarcity was invisible. Never pay
+    /// against this map: doing so would credit deliveries nobody made.
+    ///
+    /// Same key type and same std::map as `purchases`, deliberately: this seam is
+    /// where BL-422 found a latent unordered_map float-accumulation
+    /// nondeterminism, so the accumulation order must stay SORTED.
+    std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>> wants;
 
     /// Per (corporation, body): the workforce contention scalar applied this tick —
     /// `min(1, supply/demand)`. 1.0 when the corp's labour demand on that body fits

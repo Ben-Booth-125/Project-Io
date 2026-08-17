@@ -3581,22 +3581,22 @@
    "brief": "starting-corp-selection",
    "batch": "2026-08-16-bl435",
    "title": "BL-435 — Let the player choose their starting corporation",
-   "status": "pending",
+   "status": "complete",
    "promoted_from": "backlog.json BL-435 STARTING_CORP_SELECTION",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "requirement": "ITEM-SPANNING (visual): after generation completes and BEFORE the pre-game warm start, the campaign presents the world's specialist corporations as selectable openings — each showing name, industrial focus, home nation and holdings by building type — and the corporation the player picks becomes world::player_entity. A 'surprise me' option reproduces today's seeded pick.",
      "verification": [
       "visual"
      ],
-     "result_metric": "",
+     "result_metric": "scripts/verify/corp_choice.lua capture: 8 selectable openings + Surprise me, rendered pre-warm-start",
      "notes": "Ben's call 2026-08-16: the choice happens BEFORE the warm start, so the chosen corp is the one corp_ai excludes for the whole 80-tick pre-game history. Balance is deliberately NOT a column: opening balances are seeded BY the warm start, so every corp reads 0.0 at selection time — showing it would be showing a number that means nothing yet."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "requirement": "The selectable pool is the SPECIALIST corporations (the set generate_corporations creates), not BL-365's background firms. Ben's call 2026-08-16.",
      "verification": [
       "headless"
@@ -3606,23 +3606,398 @@
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "requirement": "Materially more of the 8 specialists open with a processing facility than the 1-5 measured on 2026-08-16 — achieved by making focus_asset_pattern realise the intent already documented above it, not by clamping an outcome or rejection-sampling.",
      "verification": [
       "headless"
      ],
-     "result_metric": "",
+     "result_metric": "specialists with a processor 2.96/8 -> 6.92/8 over 24 seeds; seeds with none 1/24 -> 0/24",
      "notes": "Root cause measured, not guessed: the processor sits at a pattern index the holdings draw often never reaches. Extraction corps (holdings 3-4) carry it at index 3, so only a 4-draw gets one; trade corps (holdings 1-2) carry it at index 2 and can NEVER reach it. Both patterns' own comments already promise a processor. Trade corps deliberately keep none - a pure-trade opening is a real archetype and erasing it would flatten the choice this item exists to create."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "requirement": "Determinism holds: for a fixed seed and a fixed choice, the world is reproducible. The selection must not consume from any generation RNG stream, and 'surprise me' must reproduce the pre-BL-435 pick exactly.",
      "verification": [
       "headless"
      ],
-     "result_metric": "",
+     "result_metric": "no world/* change in tasks E-F; selection re-points only, Surprise me = the generator pick",
      "notes": "The generator's own seeded pick stays where it is and remains the default; selection RE-POINTS is_player/player_entity afterwards rather than replacing the draw. That keeps every existing golden and harness that never opens the screen bit-identical."
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "requirement": "The properties selection depends on are ASSERTED per seed, not merely reported: every world offers a choice, the specialist/background split holds, no specialist can fail to produce at all, and processor coverage stays above the pre-BL-435 floor.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "player_seed_sweep --guard 24: G1-G4 ALL PASS; 8 specialists/seed, 166 of 192 with a processor (6.92 per 8, floor 4.00, pre-BL-435 2.96), 0 dead, 0 mis-flagged",
+     "notes": "Added 2026-08-16 (task E) as a --guard mode on the existing sweep, registered as its own ctest player_seed_sweep_guard at 12 seeds. The mode split is deliberate: the default sweep answers an arguable design question and exits 0 whatever it finds, so folding an assertion into it would have made the report a verdict. G4 is a DEPTH floor and must never be re-read as a profitability gate — BL-436 measured a processing facility as currently earning less per tick than the extraction site it replaces."
+    },
+    {
+     "id": "R6",
+     "status": "complete",
+     "requirement": "The stage is REACHABLE to --verify and rendered correctly at 1280x720 — the surface R1 describes is actually photographable rather than asserted blind.",
+     "verification": [
+      "visual"
+     ],
+     "result_metric": "scripts/verify/corp_choice.lua: 18 expects PASS, screenshots/corp_choice.png shows 8 openings with name/focus/nation/holdings, Surprise me, no clipping",
+     "notes": "The catch task E was paused on: --verify could not reach the screen at all, because --autostart and the harness's own start both take the Surprise-me fallback the instant it appears (deliberately — that is what keeps every other capture bit-identical). verify.show_corp_choice(true) re-enters the stage from the started world; without it any check here would have been green-but-blind, the NR-255 failure mode. Capture-only, NO GOLDEN: Ben has not eyeballed the layout and blessing an unreviewed screen would pin whatever got built (owed — review.json). The first capture immediately paid for itself: the Holdings cell was clipped to '/ 1 otl' behind the Choose button, fixed by rebalancing the column weights off the measurement."
+    }
+   ],
+   "resolution": "Complete 2026-08-16 (tasks A-D on 2026-08-16, E and F on 2026-08-17). The starting corporation is a stated choice rather than a seed lottery: app_screen::choosing_corp lists the specialist corps between generation and the pre-game warm start — the one frame where the corps exist, the background firms do not yet, and the corp the player picks is the corp corp_ai will exclude for all 80 warm ticks. apply_corp_choice RE-POINTS is_player/player_entity, so Surprise me reproduces the pre-BL-435 pick and every path that never opens the screen is bit-identical. build_corp_choices now also skips is_background explicitly, so the pool being specialists-only stops being a property of WHEN it is called. Task E added player_seed_sweep --guard (G1-G4, own ctest) and verify.show_corp_choice + verify.corp_choices() + scripts/verify/corp_choice.lua, which caught a real clipping defect on its first capture. Task F propagated to CORPORATION_GENERATION.md (the deferred selection screen it named is now described as built, with the still-deferred half named honestly: the analytical profile and the re-roll verbs), STARTUP.md (the five-state machine and a new stage section) and question_log.json. STANDING CORRECTION carried into every doc touched: the item was filed on 'a corp with a processing facility is a better opening', and its own measurement contradicted the money half — BL-436 found processing earns LESS than the extraction it replaces, so this is a DEPTH choice, not a wealth one. No copy or check may say otherwise until BL-436 lands. Owed: Ben's eyeball on the layout before any golden is blessed."
+  },
+  {
+   "brief": "held-order-phantom-inventory",
+   "batch": "2026-08-16-bl422",
+   "title": "BL-422 — A held sell order still credits market inventory at listing time",
+   "status": "complete",
+   "promoted_from": "backlog.json BL-422 HELD_ORDER_PHANTOM_INVENTORY",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "ITEM-SPANNING (headless): a standing sell order whose floor sits ABOVE the resolved price leaves the market real inventory unchanged for that resource. It already earns nothing and retains its pool (BL-386, R6.2/R6.3); it must also contribute no stock a processor can draw.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. order_book_harness R7.2/R7.3: an order at floor 6.0 against a resolved price of 5.0 leaves inventory at exactly 0.0 and its pool at 100.0. Confirmed to FAIL against the pre-fix build.",
+     "notes": "market_component::inventory is the real finite stock economy_system.cpp draws processor inputs from (lines 312/363/563). Crediting a held order there is goods from nothing: the buyer pays and the stock decrements, while the seller was never paid and never lost the goods."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "CONSERVATION: over one clear_markets tick, the market inventory gain for a resource equals exactly the quantity that LEFT seller pools for it — auto-surplus, matched explicit fills, and auto-cleared remainders. No listed-but-held quantity is included.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. R7.5 (clearing order), R7.7 (auto-surplus) and R7.12 (matched fill + auto-cleared remainder) each assert |inventory gain - pool loss| < 0.01 over one clear_markets tick.",
+     "notes": "Stated as an equality rather than a bound so an under-credit is caught as well as an over-credit."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "MIXED TICK: with a held order and a clearing order against the same (market, resource) in the same tick, inventory gains the clearing order quantity only. The held order is not rescued by its neighbour, and the clearing one is not suppressed by it.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. R7.9/R7.10: with a held 40 @ 6.0 and a clearing 30 @ 1.0 on the same (market, resource), pool loss is 30 and inventory gain is 30. Confirmed to FAIL against the pre-fix build (R7.10).",
+     "notes": "The single-order cases can both pass while the credit is computed per-resource rather than per-order."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "RECORDED DECISION: MARKETS.md states whether held stock remains visible to the supply-side price signal (market_component::supply) and why, so the asymmetry between supply and inventory is deliberate and readable rather than accidental.",
+     "verification": [
+      "inspection"
+     ],
+     "result_metric": "MET. MARKETS.md § Real market inventory states the supply/inventory asymmetry and its mechanical reason — the hold decision reads the resolved price, which is computed from supply, so hiding held stock is a fixed point. Reasoning recorded in NR-261.",
+     "notes": "BL-422 design defaults to NOT visible. See the NEEDS_REVIEW entry filed with this work for why that default is not implementable without a fixed-point iteration: whether an order holds depends on the resolved price, which is computed FROM supply."
+    }
+   ]
+  },
+  {
+   "brief": "quadratic-build-score-honest",
+   "batch": "2026-08-17-bl417",
+   "title": "BL-417 step 1 — The build score says what it does: net^2/capex, written out, bias retained",
+   "status": "active",
+   "promoted_from": "backlog.json BL-417 AI_BUILD_SCORE_IS_QUADRATIC",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "ITEM-SPANNING (headless): the extraction build candidate's score is written as an explicit `net * net / capex`, with no intermediate `payback` variable, and carries a comment stating that the quadratic bias is retained deliberately because focus_weight/jitter/glut were tuned against this curve.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. src/world/corp_ai.cpp: `payback` is gone; the score reads `(net * net / capex) * focus_weight(...) * jitter * glut` under a comment naming the bias, why it is kept, and that step 2 (replace it) is a separate decision.",
+     "notes": "The old form `net / payback` with `payback = capex / net` read as capital efficiency and behaved as a margin bias — doubling margin quadruples the score, doubling cost only halves it. Nobody decided that; it was an artefact of the two-step spelling."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "BEHAVIOURAL NEUTRALITY, MEASURED NOT ASSUMED: the rewrite must be shown to move nothing. `net / (capex / net)` and `(net * net) / capex` are NOT the same computation in float, so this is a real risk to world evolution and to every blessed golden — it must be measured on the pinned toolchain before the change is called free.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET, and free. Pinned MSVC 14.44 build, A/B on this branch's base (BL-422 HEAD): ai_skill_harness output byte-identical across all 5 seeds (diff clean, ALL PASS 0 failures both sides); spectator_determinism byte-identical, hashes played=855E07DE529684EC and spectated=5AC90B4ACE717FCF unchanged on both sides. No golden re-bless was required.",
+     "notes": "Had this moved, the golden re-bless would have been part of BL-417 step 1 and reported as such, not smuggled in. Recorded in NR-268. Note also that the GCC numbers carried into the session differ from MSVC on every seed — the blessed bands are MSVC bands and a GCC run is not a valid comparator."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "NO SCOPE CREEP INTO STEP 2: the commit changes the spelling of the score and nothing about its value, weights, or gates. Deciding whether the quadratic bias is wanted stays open and stays Ben's.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. The diff to corp_ai.cpp is the score expression, the removal of the now-unused `payback`, and comments. No multiplier, threshold, gate or candidate set changed — which R2's byte-identity independently corroborates.",
+     "notes": "BL-417 step 2 is additionally re-scoped by NR-265: with no processing_facility build candidate in the scorer (BL-439), this curve only ever ranks extraction sites against each other, so retuning it cannot produce the processor preference BL-436 wanted from it."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "REGRESSION GATE: the full local CTest logic tier passes with the change in place — the gate the remote session could not run.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. Full local CTest logic tier, pinned MSVC 14.44: 78 of 79 passed, 4 skipped by their own gates (data_creep_harness, history_sim_harness, history_sweep, seed_sweep_probe), total 863 s. The one failure is tier_margin, and it is PRE-EXISTING and PROVEN so rather than assumed: tier_margin was built and run both with and without this change and its output is byte-identical. It fails BL-436's two open assertions - R2 (a processing facility out-earns an extraction site: measured -7.92/tick against +1659.18/tick) and R5 (every recipe input that has deposits is actually produced: 3 are not, resource ids 8/9/10). Both are the unresolved calibration BL-436 exists to measure, not a regression.",
+     "notes": "Run via the pinned-toolchain build + `ctest --output-on-failure` over build/. This is the first BL-417 run of the whole tier rather than a hand-picked subset, and it covers the 8 Lua-linked harnesses a remote session cannot reach - tier_margin, chain_depth, era_roster, recipe_switch_harness, interbody_pull_harness, pregame_balance_harness, player_seed_sweep, persona_counsel_harness. interbody_pull_harness (BL-406's guard) passes in 36 s."
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "requirement": "STEP 2 (Ben's call, deliberately NOT done here): decide whether the quadratic bias is wanted. Either keep it with the reasoning recorded, or replace it with an explicit linear metric and re-tune focus_weight/jitter/glut against the new curve, accepting the golden reshuffle that follows.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "PENDING — open. This is a design decision, not an implementation task, and the item states the two steps must not be one commit.",
+     "notes": "Re-scoped by NR-265 before it is taken: there is no processing_facility build candidate in the scorer (BL-439), so this curve only ranks extraction sites against each other and against the flat-scored military base. Retuning it cannot produce the processor preference BL-436 attributed to it. Landing BL-439 first would change what step 2 is choosing between."
+    }
+   ]
+  },
+  {
+   "brief": "ai-builds-processors",
+   "batch": "2026-08-17-bl439",
+   "title": "BL-439 — A rival corporation can build a processing facility, and does",
+   "status": "active",
+   "promoted_from": "backlog.json BL-439 AI_NEVER_BUILDS_PROCESSORS",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "ITEM-SPANNING (headless): over a representative ai_skill_harness run, at least one rival corporation constructs at least one processing_facility it was not generated with. This assertion fails by construction on the pre-BL-439 build and that must be demonstrated, not assumed.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET, and demonstrated in both directions. ai_skill_harness R5 counts rival-owned processing facilities at tick 0 and at the end, from the WORLD rather than the decision ring, so a generated processor never counts and a rejected build command never counts. Run against the PRE-change build first: processors_gained = 0 on all five seeds, the assertion red. Post-change: 12/15/16/16/10, 69 across the set.",
+     "notes": "Counted from the world deliberately — the ring records intent, and the claim under test is that a processor exists that did not before."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "Every processor the scorer commands names a recipe, and the built building runs that recipe. The command must never leave recipe = no_recipe (construct_building substitutes steel — the BL-388 trap), and corp_command must never reject the candidate as rejected_invalid.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. The candidate sets cmd.recipe to the chosen absolute id before emission; corp_command asserts the built processor kept it (BL-388). 69 processors built across the benchmark set with no rejected_invalid.",
+     "notes": null
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "The recipe is chosen from the BROWSE space for processing_facility and passed as an ABSOLUTE recipe id (NR-254 pinned this exact confusion at the build door). A candidate whose absolute id does not resolve via get_recipe is never emitted.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. The recipe loop walks reg.recipe_count/recipe_at (BROWSE, era-masked) and crosses to the ABSOLUTE id via reg.recipe_id(rc.name); a name that does not round-trip through get_recipe is skipped rather than emitted.",
+     "notes": null
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "INPUT ACCESS: a processor candidate is only emitted where the corp can actually source every input of its chosen recipe on that body — pool + local market inventory, measured against the same coverage threshold the production tick uses. A processor with no reachable input is an immediate loss-maker (BL-439 design (c)).",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. Per candidate recipe, every input is checked against (corp pool on this body + local market inventory) / (input x batches) >= reg.t_idle() — the same two sources and the same threshold economy_system uses to decide a processor bootstraps at all. Read const: scoring never authors a pool.",
+     "notes": null
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "requirement": "The candidate is subject to the SAME gates as the extraction candidate: the reserve floor, the should-have buffer, the solvency/reserve accounting, the glut forecast, and the never-build-into-an-expected-loss net gate. It carries capex like any Nice-to-Have build.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. Same score expression ((net*net/capex) x focus_weight x jitter x glut), same never-build-into-a-loss gate, same forecast_glut_multiplier veto, same c.spend/c.bucket accounting, so it passes through the reserve floor and should-have buffer exactly as the extraction candidate does.",
+     "notes": "Pricing differs deliberately: estimate_prospective_profit (BL-162) instead of the inline sum. A new candidate has no golden to protect, so it takes the model done properly. Tested both ways — same recipes, same counts, net worth moved only on seed 0."
+    },
+    {
+     "id": "R6",
+     "status": "failed",
+     "requirement": "GOLDEN RESHUFFLE PAID DELIBERATELY: every moved golden and ai_skill_harness band is re-blessed with the cause recorded in the file, confirmed reproducible across two runs, and never blessed before the cause is understood (Sprint 19 risk note). The ai_skill_harness bands re-blessed DOWNWARD on 2026-08-16 are expected to RISE; a bless that lowers them again needs an explicit written reason.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "NOT MET, DELIBERATELY. The bands moved and were LEFT RED rather than re-blessed. Sprint 19 wrote the criterion in advance: the bands re-blessed downward on 2026-08-16 should RISE when the processing defect is fixed, and a bless that does not raise them means the fix did not work. They fell — three of five seeds insolvent, seed 0 from 498k to -295k. Blessing that would record bankruptcy as the expected outcome. See NR-269; the call is Ben s.",
+     "notes": "This row is failed rather than pending on purpose: pending reads as unfinished work, and this is a finished decision not to bless."
+    },
+    {
+     "id": "R7",
+     "status": "complete",
+     "requirement": "AI_OPPONENT.md records that the build scorer enumerates processing facilities, how they are sited and how the recipe is chosen — the doc currently describes a scorer that only ranks extraction sites.",
+     "verification": [
+      "review"
+     ],
+     "result_metric": "MET. AI_OPPONENT.md s build-verb note is rewritten from \"ranges over two\" to \"ranges over three\", with the siting / recipe-choice / reachability / pricing rules stated, plus a block recording what the change immediately found and why the goldens are red.",
+     "notes": null
+    }
+   ]
+  },
+  {
+   "brief": "interbody-pull-counterpart",
+   "batch": "2026-08-17-bl406-bl404",
+   "title": "BL-406 / BL-404 — the inter-body pull reads a named counterpart market, and nets against a supply that exists",
+   "status": "complete",
+   "promoted_from": "backlog.json BL-406 HOME_MARKET_IS_AN_ARBITRARY_PICK, BL-404 INTERBODY_PULL_IS_UNNETTED",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "ITEM-SPANNING (headless): inject_interbody_demand no longer reads any market chosen by lowest id. For each (outpost market, resource) the pull reads a COUNTERPART market on the home body, selected by the greatest demand for that resource with the lowest market id as tiebreak, so the choice is a fact about the economy and is identical across standard-library container orders. interbody_pull_harness asserts the selection is order-independent by re-deriving it from a shuffled traversal and comparing.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "seed 0: home body carries 9 markets; the pull matched the counterpart on 3/3 distinguishable resources and the lowest-id market on 0/3 (pre-change: 0/3 and 3/3). Reverse-order re-derivation names the same market for all 37 resources.",
+     "notes": "Ben's ruling 2026-08-15 (BL-406 option c). The 'home body's demand' framing is retired: no single market stands for a body any more. Under today's model every home-body market sits at the same distance from a given outpost, so the relation collapses to many-to-one keyed on the RESOURCE; the outpost dimension is carried by the distance falloff alone."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "The netting is real (BL-404): the shortfall subtracts the counterpart market's supply as captured BEFORE clear_markets' reset loop (previous tick's end-of-tick supply), not the identically-zero supply at the injector's read point. On a warmed world the gate must be measurably narrower than the gross-demand gate — at least one resource that pulls under gross demand must be silenced by the netting, or the counterpart's supply for every pulled resource must be genuinely zero and asserted as such.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "seed 0: 1 of 3 pulled resources silenced by the netting (counterpart holds 260.7 supply against 5.5 demand); the other 2 net against a counterpart supply of genuinely 0.0 and pull at 2.8x their pre-change size. Both halves asserted.",
+     "notes": "BL-404 option (b), re-opened per its own 2026-08-15 ruling now that BL-406 defines what is being netted against. One tick of lag, no reordering of a pass whose ordering is already load-bearing, and no new persisted state — the snapshot is local to clear_markets."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "The guard is proven to bite: the new interbody_pull_harness assertions are run against the PRE-change build and observed to FAIL, and the failure recorded. A guard never seen to fail is not a guard.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "3 of 3 new assertions FAILED against pre-change behaviour, PASS after. Proven twice: once against the genuine pre-change source, and again after the assertions were sharpened, against a build with the old logic temporarily restored behind the new signature.",
+     "notes": "The harness's old 'the pull reads one market of many' assertion is obsolete by construction under R1 and is replaced, not deleted silently."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "Determinism holds: no RNG, no clock, and no dependence on unordered container traversal order in the new selection or netting. The snapshot is keyed by entity_id and read by lookup only.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "",
+     "notes": "The pre-change defect was NOT a determinism violation (same-seed reproducibility within a binary always held); it was a cross-toolchain instability in which market got read. R1's order-independence assertion is what closes that."
+    }
+   ]
+  },
+  {
+   "brief": "price-band-derived-ceiling",
+   "batch": "2026-08-17-bl442",
+   "title": "BL-442 step 2 - The scarcity ceiling is DERIVED from measured haulage, not authored as a round number",
+   "status": "complete",
+   "promoted_from": "backlog.json BL-442 PRICE_BAND_IS_CODE_NOT_DATA (step 2; step 1 landed 2026-08-17 as behaviour-identical plumbing and carried no requirement group)",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "ITEM-SPANNING (headless): the widened ceiling is DERIVED from the per-unit haulage the supply layer actually charges between adjacent markets in the real generated world, and the derivation is reproducible. A named tool must print the measured haulage, the base-price denominator, and the required ceil_mult that follows - so the number in scripts/economy.lua can be re-derived rather than trusted.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. haulage_measure over 5 seeds, 39 markets on 5 multi-market bodies: per-unit haulage market -> NEAREST market neighbour is p10 0.1160, median 0.6954, p90 1.6742, max 4.8347 credits (all same-body pairs: median 7.6843, max 12.6729). Cheapest good carrying a base_price is 0.600. Binding case = worst nearest-neighbour haul over cheapest good: ceil > 1 + 4.8347/0.600 = 9.06, rounded up to 10.0. The old 4.0 cleared the median pair (2.16) and only just the p90 (3.79), leaving the tail unservable at any scarcity. Independent agreement: within the ordinary raw tier (0.60 to 6.00 rare_earth_ore) the scarcity-outranks-abundance reading also demands ceil > 10 - the cross-tier reading demanding 233 was rejected and recorded as NR-291.",
+     "notes": "Home: tools/verify/haulage_measure.cpp, new this session. Measures logistics_cost(mode) x terrain-weighted A* cost between market centre tiles, exactly the cost dispatch_convoys charges."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "THE CHANGE IS DATA ONLY. scripts/economy.lua is the only behavioural file touched; no C++ is edited to make the widening work. Step 1 already routed both call sites through recipe_registry::price_band(), so if C++ needs editing here, step 1 was incomplete and that is the finding.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. The behavioural change is one literal: economy.price_band.ceil_mult 4.0 -> 10.0. No src/ file is touched at all - step 1's plumbing carried it end to end, and both consumers moved without being edited (price_band_harness P5 and P6 still pass, which is precisely the guard that fails if either site holds a private copy). Two NON-behavioural files did change and are named so the claim stays honest: tools/verify/price_band_harness.cpp P2, whose literal assertion states what the shipped Lua SAYS and therefore had to be updated 4.0 -> 10.0 (it got stronger, not weaker - the struct default is still 4.0, so an authored 10.0 now separates 'read from Lua' from 'fell through to defaults' on the ceiling too, and P1's defaults-are-0.25/4.0 row is untouched and green); and CMakeLists.txt, to declare the new measurement harness.",
+     "notes": "price_band_harness P5/P6 are the standing guard that both sites read the registry rather than a local constant; they must stay green across the value change."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "THE OUTCOME IS SHOWN, NOT ASSUMED. The claim 'inter-market trade now happens' is measured on the real generated world at BOTH bands and reported as a contrast. If the measurement contradicts the item's premise, the measurement wins and the contradiction is recorded rather than tuned away.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET AS A REQUIREMENT, AND IT REFUTED THE PREMISE - which is the outcome this row was written to allow. Measured over 5 seeds x 20 econ ticks. At the OLD band: 2146 convoys dispatched, 1677 of them intra-body market-to-market, 0 inter-body, 0 persistent trade_routes. At the NEW band: 2029 / 1576 / 0 / 0. Two findings, both recorded rather than tuned around. (a) Inter-market trade was NEVER ABSENT - 1677 market-to-market hauls at the old band. It looked absent because trade_routes is a body-level record (body_a/body_b) and is structurally blind to intra-body trade; the space lane it CAN see is zero at both bands because dispatch_convoys refuses it on the launchpad and propellant gates before consulting any price, so no ceiling can open it (NR-289). (b) Widening the ceiling REDUCED dispatch by ~5% - demand is price-elastic, a higher scarcity price cuts quantity demanded, the shortfall dispatch sizes from shrinks (NR-294). The landed ceiling stands on its haulage derivation; it is explicitly NOT recorded as having created inter-market trade.",
+     "notes": "haulage_measure's second section counts convoys split into intra-body market-to-market, inter-body space lane, and BL-088 persistent trade_routes."
+    },
+    {
+     "id": "R4",
+     "status": "partial",
+     "requirement": "STABILITY UNDER A WIDER BAND: a 2.5x wider ceiling must not destabilise clearing. Specifically - no price pegged at the ceiling for a whole run where it previously settled, and no oscillation introduced. econ_stability's assertions must hold; if a wider band breaks one, that is a finding to report, not a value to tune back.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "PARTIAL, and the shortfall is the most valuable thing this item found. NO OSCILLATION and no divergence: econ_stability is ALL PASS on both sides (R6 finiteness, sub-size^1.5 growth, no 4x doubling; exponent 0.96 after vs 1.04 before, worst rung 2.20x vs 2.55x - both inside tolerance and both timing noise on a loaded box). world_determinism, determinism_harness and order_book_harness (69/69) all green. BUT THE PEGGING TEST FAILS, and it failed BEFORE the change too, which is the finding: tier_margin R7 shows the entire refined/product tier already riding the OLD clamp at 3.35x-3.85x of base, and after the change riding the NEW one at 8.13x-9.55x (machinery 9.38x, alloys 9.37x, electronics 9.55x). Those prices are set by the clamp, not by supply and demand - widening moved the peg rather than releasing it. Consequence: processing input cost 14.86 -> 26.56 against revenue 12.55 -> 17.17, so processing net/tick fell -10.81 -> -17.68 while extraction was flat (8.09 -> 8.31, raws are not pegged). Recorded as NR-292, NOT tuned away: the fix is demand-side price discovery in the refined tier, not a different number in this field.",
+     "notes": "econ_stability is a labelled wall-clock bench as well; read its assertion rows, not its timings."
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "requirement": "REGRESSION GATE, REPORTED NOT BLESSED. The full ctest gate is run on both sides and every failure sorted into pre-existing / deliberate / NEW. NO golden and NO ai_skill_harness band is re-blessed - the benchmark is deliberately red (NR-269/271/272/278/280) and blessing is Ben's call. Every economy number that moved is reported with its attribution.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET, AND NOTHING BLESSED. Full ctest run on BOTH sides of the change from the same worktree. BEFORE: 82 tests, 3 failed - ai_skill_harness, spectator_determinism, tier_margin. AFTER: the same 3, plus 4 more that were each run down to a cause rather than accepted: history_ladder_harness (Timeout 60.03s), mediterranean_sweep (Timeout) and home_surface_bench (bench, worst preview 4286 ms vs its 3s ceiling, every CONTENT assertion green) were machine-load artefacts on a busy box - all three re-run standalone and PASS (26.45s / 97.15s / 13.76s); price_band_harness failed on the stale-build/scripts wiring defect and is green after the fix. NET NEW FAILURES: ZERO. Numbers that moved, all attributed: extraction net/tick 8.09 -> 8.31; processing net/tick -10.81 -> -17.68; processing input cost 14.86 -> 26.56; processing revenue 12.55 -> 17.17; refined/product prices 3.35x-3.85x -> 8.13x-9.55x of base (the pegging, NR-292); convoys 2146 -> 2029 and market-to-market 1677 -> 1576 (NR-294); starved share 45.4% -> 45.2%, extraction payback 12 ticks either side. ai_skill_harness is BYTE-IDENTICAL on both sides, all 20 bands still red and all five seeds' net_worth unchanged to the decimal - NOT because the change had no effect on the AI but because the harness hand-builds its registry and never reads economy.lua at all (NR-293). So the Sprint 19 question 'did the bands rise?' is still unanswered, and this item could not have answered it. Nothing re-blessed: not one golden, not one band, and tier_margin's 3 failures are the same 3 as before.",
+     "notes": "Named reads: tier_margin, ai_skill_harness, econ_stability, price_band_harness, spectator_determinism, order_book_harness - plus the full gate, because a per-item check is not a gate."
+    }
+   ]
+  },
+  {
+   "brief": "demand-register-records-wants",
+   "batch": "2026-08-17-bl441",
+   "title": "BL-441 - The market demand register records the WANT, not the FILL, so a starved input can price like a scarce one",
+   "status": "complete",
+   "promoted_from": "backlog.json BL-441 UNMET_DEMAND_IS_NEVER_REGISTERED",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "ITEM-SPANNING (headless): a consumer that could not get what it needed registers market demand equal to what it WANTED, not to what it managed to draw. Asserted on observable market state (market_component::demand) so the check compiles and runs against the PRE-CHANGE build and is seen to fail there - a guard never seen to fail is not a guard.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. order_book_harness R8.1: a processor with a full-run need of 8 iron ore and an EMPTY market shelf now registers demand of exactly 8.000. Shown to FAIL on the pre-change build first, printing \"R8 starved: demand=0.000 supply=0.000 price=5.000\" - the register was completely silent about the one input the body was short of. Post-change: \"demand=8.000 supply=0.000 price=12.500\". R8.4 covers the partial case (2 of 8 on the shelf): pre-change demand=2.000, post-change demand=8.000, which is the item summary verbatim at scale.",
+     "notes": "Home: tools/verify/order_book_harness.cpp, group R8. The defect: market_clearing.cpp registered demand[r] += bought[r] - the fill. A processor needing 16 of an input that could draw 2 registered demand of 2."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "THE PRICE SIGNAL ACTUALLY LIGHTS: a resource with real unmet demand and no supply resolves to the TOP of the price band rather than sitting at base. resolve_price already handles this correctly given real numbers (its own comment reads \"demand with no supply - top of the band\"); the assertion is that it is no longer being starved of input.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. order_book_harness R8.2: the starved resource price moved 5.000 -> 12.500 in one tick, exactly base + 0.5*(4*base - base) for base 5 under the 0.25x-4x band and 0.5 EMA smoothing. Pre-change it sat at 5.000, i.e. at base, because supply 0 and demand 0 took resolve_price no-signal branch. R8.2a asserts the fixture premise (nobody supplied the resource this tick) so the assertion cannot pass for the wrong reason.",
+     "notes": "order_book_harness R8. Pre-change this resolves to base exactly, because supply 0 and demand 0 take the no-signal branch."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "WANT AND FILL STAY SEPARATE, as SUPPLY and INVENTORY were separated by BL-422. Only the price-resolution input reads the want. The purchase record - auto_buys, the VWAP accumulator, and the money actually paid - must keep reading the FILL, and each site must say in a comment which of the two it wants. Paying for goods nobody delivered is BL-422 defect in the opposite direction.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. order_book_harness R8.3 captures report.purchases before clear_markets consumes it and asserts the fill is still 2.000 while demand reads 8.000 - the two registers demonstrably differ within the same tick. econ_harness passes unchanged (ALL PASS, 0 failures), including R4.2 \"market demand = auto-bought (iron 4)\": in that fixture the pool holds 4 against a need of 8, so the net want and the fill coincide at 4. Comments naming which of the two each site wants are at all four sites - run_processing want and fill, run_construction want and fill, and both loops in clear_markets.",
+     "notes": "econ_harness R4.2 asserts the fill (purchases) directly and must keep passing unchanged; that is the standing evidence the fill was not disturbed."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "DETERMINISM: the want is accumulated over a SORTED key set, never a hash order. This exact seam is where BL-422 found a latent unordered_map float-accumulation nondeterminism; it must not be reintroduced. spectator_determinism must still report its two hashes stably.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. economy_report::wants is a std::map keyed by (corp, body) - the same container and key type as purchases - so both accumulations run over a sorted key set, and no unordered_map was introduced. spectator_determinism reproducibility holds on both hashes: played=1C96F04629DFB584 twice and spectated=F9204FE9A8F063BE twice, from two independently built worlds. Its R2 byte-identity row against the pinned golden fails, but it ALREADY failed pre-change (NR-280 measured 6D546B281FFA4A68), and the control build on this branch reads played=944D0523A002B255 - so the change moved the world hash as expected, and that golden was already stale before it.",
+     "notes": "economy_report::purchases is already std::map; the new want register uses the identical key type and container for the same reason."
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "requirement": "REGRESSION GATE, REPORTED NOT BLESSED: the economy-wide reads are run and every number that moved is reported. The change is expected to move prices and margins. NO golden and NO ai_skill_harness band is re-blessed - the benchmark is deliberately red (NR-269/271/272/278) and tier_margin is red on its R4b rows by design. Blessing is Ben call.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET, and NOTHING BLESSED. tier_margin was built and run on BOTH sides of the change from the same worktree (the pre-change side via a stash of the three src files). Moved: extraction net/tick 7.27 -> 7.11; processing net/tick -9.52 -> -10.42; processing input cost 10.86 -> 11.59 (the intended effect - scarce inputs stopped being free); processing revenue 10.08 -> 9.64; processing samples 1758 -> 1701; produced-output ticks 777 (44.2%) -> 711 (41.8%); STARVED ticks 771 (43.9%) -> 772 (45.4%); extraction payback 13 -> 14 ticks. Prices left the floor on several resources: id 1 1.91 (0.95x base) -> 3.66 (1.83x), id 9 40.00 (1.00x) -> 51.05 (1.28x), id 3 1.48 -> 1.71, id 4 2.36 -> 2.83, id 5 5.27 -> 5.91, id 20 8.95 -> 9.94. The FAILING ASSERTION SET IS IDENTICAL on both sides - the same 3 failures (3 inputs unproduced, 6 inputs unsiteable, processing does not out-earn extraction). No new failure, and none masked.",
+     "notes": "tier_margin is the economy-wide read named by the item."
     }
    ]
   }

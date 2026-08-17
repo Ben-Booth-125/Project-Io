@@ -300,6 +300,14 @@ building_report run_processing(world& w, const recipe_registry& reg,
     market_component* mc = (market_id != null_entity) ? &w.markets.at(market_id) : nullptr;
 
     // Coverage of a full run = the scarcest input's (pool + market inventory) fraction.
+    //
+    // BL-441: this loop is also where the WANT becomes known, so it is where the
+    // want is recorded. `need` here is the FULL-RUN need — what the building set
+    // out to consume — computed before any coverage decision, so it is the same
+    // number whether the draw goes on to succeed, run short, or fail outright.
+    // Accumulated into a local first and merged below, so a building with no
+    // inputs never creates an empty row.
+    std::array<float, resource_count> wanted{};
     float coverage = std::numeric_limits<float>::infinity();
     bool  has_input = false;
     for (std::size_t r = 0; r < resource_count; ++r)
@@ -311,6 +319,15 @@ building_report run_processing(world& w, const recipe_registry& reg,
         const float need   = in * batches_full;
         const float avail  = pool.quantities[r] + (mc ? std::max(0.0f, mc->inventory[r]) : 0.0f);
         const float cov    = (need > 0.0f) ? avail / need : std::numeric_limits<float>::infinity();
+
+        // The want registered is the want OF THE MARKET: the full-run need less
+        // what the corp already holds in its own pool. mc.demand is compared
+        // against mc.supply, which is an OFFER to the market, so demand has to be
+        // the BID to the market for the comparison to mean anything — a corp
+        // feeding its smelter from its own mine is not bidding for the input and
+        // must not push its price. NR-281 records this reading of the item.
+        wanted[r] += std::max(0.0f, need - pool.quantities[r]);
+
         if (cov < coverage)
         {
             coverage              = cov;
@@ -318,6 +335,18 @@ building_report run_processing(world& w, const recipe_registry& reg,
             rep.has_limiting      = true;
         }
     }
+
+    // Registered BEFORE the run decision below, because the case this item exists
+    // for is the one that takes the early `rep.idle` return: a building too
+    // starved to run at all still wanted every unit of its input, and that is
+    // precisely when the market most needs to hear it.
+    if (has_input)
+    {
+        auto& want_row = out.wants[std::make_pair(corp, body)];
+        for (std::size_t r = 0; r < resource_count; ++r)
+            want_row[r] += wanted[r];
+    }
+
     if (!has_input)
         coverage = 1.0f; // degenerate no-input recipe runs full
 
@@ -346,8 +375,10 @@ building_report run_processing(world& w, const recipe_registry& reg,
     // Consume inputs pool-first; the remainder draws on the market's real
     // inventory (BL-130) — guaranteed sufficient at this `run` level by the
     // coverage-min construction above (every input's avail/need_full >= run).
-    // Recorded into `bought` for clear_markets' pricing pass, same as before —
-    // now billing a real draw rather than an unconditional one.
+    // Recorded into `bought` — the FILL, what actually arrived. Since BL-441 this
+    // is no longer what prices the resource (that is `out.wants`, above); it is
+    // strictly the receipt, and it is what the corp is billed for. The two must
+    // not be swapped: paying against the want would credit deliveries nobody made.
     auto& bought = out.purchases[std::make_pair(corp, body)];
     for (std::size_t r = 0; r < resource_count; ++r)
     {
@@ -396,12 +427,17 @@ building_report run_processing(world& w, const recipe_registry& reg,
 // result can hunt by ±one tier. A finer model + hysteresis is future work (BL-181).
 // Deterministic — reads last tick's market state only. Player corp only, opt-out via the
 // building's `workforce_auto` flag (io-standing-rules.md § the player-corp exception).
-constexpr float wf_price_floor_mult = 0.25f; // mirror market_clearing.cpp price band
-constexpr float wf_price_ceil_mult  = 4.0f;
+// BL-442: the band used to be two constexpr copies here, commented "mirror
+// market_clearing.cpp price band" — a hand-synchronised duplicate of the game's
+// most load-bearing economic tunable. It is now authored once in
+// scripts/economy.lua (economy.price_band) and reaches this file, exactly as it
+// reaches resolve_price, through recipe_registry::price_band(). Guarded by
+// tools/verify/price_band_harness.cpp, which fails if the two sites diverge.
 
 // The market's target (pre-smoothing) clearing price for one resource at a hypothetical
 // supply — the same formula resolve_price aims at, used here as a forward estimate.
-float wf_target_price(float base, float supply, float demand)
+float wf_target_price(float base, float supply, float demand,
+                      float wf_price_floor_mult, float wf_price_ceil_mult)
 {
     if (base <= 0.0f)
         return 0.0f;
@@ -442,7 +478,8 @@ int solve_workforce_target(const world& w, const recipe_registry& reg,
         if (mkt == nullptr)
             return 0.0f;
         const float supply = std::max(0.0f, mkt->supply[r] + supply_delta);
-        return wf_target_price(mkt->base_price[r], supply, mkt->demand[r]);
+        return wf_target_price(mkt->base_price[r], supply, mkt->demand[r],
+                               reg.price_band().floor_mult, reg.price_band().ceil_mult);
     };
 
     const auto tit = w.tiles.find(b.tile);
@@ -525,8 +562,8 @@ namespace {
 // supply of its materials, drawing + paying for them as it builds (pay-as-you-build).
 // Runs at the very top of the economy step, before production, so a building that
 // completes this tick is immediately eligible below. Visits buildings in ascending
-// id order (deterministic) because it mutates shared market demand (report.purchases)
-// and corp balances.
+// id order (deterministic) because it mutates the shared want/fill registers
+// (report.wants / report.purchases) and corp balances.
 void run_construction(world& w, const recipe_registry& reg, economy_report& report)
 {
     const float max_stretch = reg.construction().max_stretch;
@@ -566,16 +603,36 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
         rate = std::clamp(rate, 0.0f, 1.0f);
         if (rate < pause_below)
             rate = 0.0f; // paused: market can't supply even the max-stretched rate
+
+        const entity_id corp = owner_corp_of(w, bid);
+        const entity_id body = building_body(w, b);
+
+        // BL-441: register the WANT before the pause check, not after. A build
+        // site draws only from the market, so its want is this tick's full-rate
+        // material need — unreduced by `rate`, which is how much of that want the
+        // shelf could actually meet. Previously a site paused for want of steel
+        // registered NO demand for steel, which is the same defect as the starved
+        // processor's and arguably starker: the shortage silenced the one voice
+        // that would have priced it. NR-282 records why construction is in scope.
+        if (corp != null_entity && body != null_entity)
+        {
+            auto& want = report.wants[std::make_pair(corp, body)];
+            for (std::size_t r = 0; r < resource_count; ++r)
+            {
+                const float need = econ.resource_build_cost[r] / duration;
+                if (need > 0.0f)
+                    want[r] += need;
+            }
+        }
+
         if (rate <= 0.0f)
             continue;
 
         // Draw this tick's materials from the market's real inventory (BL-130) and
         // charge the flat build_cost portion incrementally to the owning corp.
-        // `bought` still records the drawn quantity as market demand for pricing
-        // (clear_markets), same as before — the transaction is now real, not just
-        // its billing.
-        const entity_id corp = owner_corp_of(w, bid);
-        const entity_id body = building_body(w, b);
+        // `bought` records the DRAWN quantity — the FILL, what the site actually
+        // received and is billed for. Since BL-441 the pricing signal comes from
+        // `report.wants` above instead; this is the receipt only.
         if (corp != null_entity && body != null_entity)
         {
             auto& bought = report.purchases[std::make_pair(corp, body)];

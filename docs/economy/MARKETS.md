@@ -51,23 +51,56 @@ history. A resource untradeable at home (`base_price` 0) stays untradeable at th
 **What clears there.** An outpost has real supply (whatever it produces) and essentially no local
 demand, so clearing only against local population would collapse its prices to the floor the
 instant it started producing — the failure mode BL-263's design flagged as most likely to read as
-broken. Instead, `inject_interbody_demand` pulls a distance-discounted slice of the **home body's
-own unmet demand** (its `demand - supply`, when positive) onto every outpost market's demand each
-tick, additive alongside `inject_population_demand` — "nobody builds a mine on a moon to sell to
-the moon." This is deliberately simpler than modelling every possible source/destination pair: the
-home body is the one market every outpost is presumed to ultimately feed, directly or through
-`dispatch_convoys`' own existing physical routing (which independently moves the corp's stockpiled
-surplus between bodies — this mechanism only shapes the outpost's local *price*, it moves no
-goods itself).
+broken. Instead, `inject_interbody_demand` pulls a distance-discounted slice of a **home-body
+counterparty's unmet demand** onto every outpost market's demand each tick, additive after
+`inject_population_demand` and `inject_background_demand` — "nobody builds a mine on a moon to
+sell to the moon." This only shapes the outpost's local *price*; it moves no goods. Physical
+movement is `dispatch_convoys`' independent job.
 
-> **The pull is live, and it pulls against *gross* demand (BL-404, found 2026-08-13).** The
-> code reads `demand − supply`, which states the intent — an outpost should be pulled by what
-> the home body *cannot* meet itself. But `clear_markets` zeroes every market's supply before
-> this injection runs, and the supply writes land after it, so `home.supply` is identically zero
-> at the read. The subtraction is a no-op: the shortfall is home gross demand, the gate opens for
-> every resource carrying any demand, and each outpost market receives `pull_fraction` of
-> Kepler's gross demand every tick, distance-discounted. BL-404 owns the fix; the wrong number
-> here is a live input to every outpost price, not a dormant branch.
+**Whose demand — the counterpart market.** Per resource, the outpost reads its **counterpart**:
+the home-body market carrying the **greatest demand for that resource**, with the lowest market id
+breaking ties. Not an aggregate over the body, and emphatically not "the home market" — the home
+body carries nine carved markets on seed 0 (BL-096), and *no single one of them stands for the
+body*.
+
+That is the correction BL-406 made, and it is worth stating what it replaced. The pull used to
+read `market_for_body(w, w.home_body)` — the **lowest-id** market on the body — and treat its
+demand as the body's. Measured, that market held **5% of the body's demand**; and because
+`world::markets` is unordered, a g++ build of the same seed selected a *different* market
+entirely. Same-seed reproducibility within a binary always held, so this was never a determinism
+violation — it was a price input decided by an implementation accident. The counterpart rule is a
+total order (strictly-greater demand, then smaller id), so every standard library names the same
+market. `interbody_pull_harness` asserts that by re-deriving the relation over a reversed
+traversal.
+
+Under today's model every home-body market sits at the same distance from a given outpost, so the
+relation is **many-to-one keyed on the resource**; the outpost dimension is carried entirely by the
+distance falloff. Per-(outpost, resource) counterparts would only start to mean something if
+markets acquired a per-market haul cost.
+
+**Against what — the netting.** `shortfall = counterpart.demand − counterpart.supply_last_tick`,
+and a non-positive shortfall pulls nothing: a counterparty already meeting its own appetite does
+not reach out for an outpost's goods. The subtrahend is the **previous tick's end-of-tick supply**,
+captured by `snapshot_market_supply` before the reset in step 1 below.
+
+The one-tick lag is deliberate (BL-404). Reading supply live is what made this a no-op for as long
+as it existed: the reset zeroes every market's supply immediately before this injection and the
+supply writes land after it, so the subtrahend was identically zero and every outpost was pulled by
+**gross** home demand. The alternative — moving the injection after the supply writes — was
+rejected because those writes are themselves demand-sensitive (auto-surplus yields to standing
+orders), which would make a pass whose ordering is already load-bearing into a two-pass dependency.
+The snapshot is local to `clear_markets`; nothing is persisted and the save format is untouched.
+
+**Ordering is now a requirement, not a convenience.** The injection must run *after* the population
+and background demand injections, because the counterpart is chosen by this tick's demand and those
+two are what deposit it.
+
+> **Magnitude moved, and was not re-tuned (2026-08-17).** Ben's ruling cleared outpost prices to
+> move. Measured on seed 0: two of three pulled resources now pull at **2.8×** their previous size
+> (the counterpart wants far more than the lowest-id market did) and one is **silenced outright**
+> by the now-real netting — its counterpart holds 260.7 supply against 5.5 demand.
+> `pull_fraction` is still its authored 0.50, a number chosen against a source that no longer
+> exists; re-tuning it is folded into BL-440's repricing pass (NR-277).
 
 ## What trades
 
@@ -82,7 +115,9 @@ minable-but-unsellable asymmetry of the BL-040 raws are catalogued in
 `clear_markets` runs once per economy tick, after production (`run_economy_step`). In order:
 
 1. **Reset** — every market's `supply` and `demand` arrays zero. There is no stored inventory;
-   both are per-tick flows.
+   both are per-tick flows. A snapshot of every market's supply is taken *immediately before* the
+   zeroing (`snapshot_market_supply`), because the inter-body pull needs a supply that this pass
+   has not yet computed — see § Spontaneous market emergence.
 2. **Background-firm production** (BL-365, 2026-08-11) — real corporations
    (`corporation_component.is_background = true`), generated at world-gen and running the same
    corp_ai scored-utility layer as rivals, produce, sell, and buy through the ORDINARY steps of
@@ -110,11 +145,13 @@ minable-but-unsellable asymmetry of the BL-040 raws are catalogued in
    `floor_price`. Multiple orders against one `(corp, body, resource)` share a **running
    remainder**: total listed quantity never exceeds the pool, each order's matched/auto-cleared
    quantity is tracked per order, and pool debits clamp at zero.
-6. **Auto-demand** — processor input shortfalls and construction material draws
-   (`report.purchases`) enter market demand. BL-130: this is billing, not a fresh grant — the
-   real transaction already happened, capped by real inventory, in the PRIOR phase of the same
-   tick (production and construction both run before `clear_markets`; see § Real market
-   inventory below). What lands here is exactly what was actually drawn.
+6. **Auto-demand** — two registers, read separately (BL-441; see § Want and fill below).
+   `report.wants` — what processors and construction sites set out to buy this tick, whether or
+   not they got it — enters **market demand**, and is the only thing that does.
+   `report.purchases` — what was actually drawn — enters the **billing** pass instead. BL-130:
+   that billing is not a fresh grant; the real transaction already happened, capped by real
+   inventory, in the PRIOR phase of the same tick (production and construction both run before
+   `clear_markets`; see § Real market inventory below).
 7. **Standing buy orders** — read from `world::buy_orders`, entered into demand and the
    explicit buy book (`max_price`, optional `preferred_seller`).
 8. **Reference prices** — computed once from the accumulated supply/demand (below), so every
@@ -179,6 +216,48 @@ individually on any surface that enumerates corporations.
 firms selling into a market that still conjured any buy-side shortfall would undercut the entire
 point of modelling real producers, which is why this item required BL-130 to land first.
 
+## Want and fill — the demand register records the bid (BL-441, 2026-08-17)
+
+**A want is a bid; a fill is a receipt.** This is the buy-side twin of the sell-side distinction
+BL-422 landed below: `supply` is an **offer** and `inventory` is a **delivery**. Demand needed the
+same split, and did not have it.
+
+`mc.demand` used to accrue from `report.purchases` — what a corp **actually bought**. But hunger is
+precisely the state in which no purchase completes, so the register was silent exactly when it
+mattered most. A processor that needed 16 units of an input and could draw only 2 told the market
+it wanted 2; one that could draw nothing told it nothing at all. The resource then read to
+`resolve_price` as one almost nobody wants, its price never rose, and scarcity was **invisible to
+the price signal**. `resolve_price` was never wrong about this — its own branch for zero supply
+against real demand takes the price to the top of the band — it was being starved of input.
+
+**Two registers, one of them priced.** `economy_report` now carries `wants` alongside `purchases`,
+both `std::map` keyed by `(corp, body)`:
+
+- **`wants`** — the full-run input need, computed **before** any coverage decision, so it is the
+  same number whether the draw then succeeds, runs short, or fails outright. Registered by
+  `run_processing` before its starved early return, and by `run_construction` **before** its
+  `rate <= 0` pause check, so a build stalled for want of steel finally says so. This is the sole
+  input to `mc.demand`.
+- **`purchases`** — what was actually delivered. Still feeds `auto_buys`, the VWAP accumulator, and
+  the expenditure a corp is charged. **Never pay against `wants`**: that would credit deliveries
+  nobody made, which is BL-422's defect pointed the other way.
+
+**The want is net of the corp's own pool** — the full-run need less what it already holds — because
+`mc.demand` is compared against `mc.supply`, an *offer to the market*, so demand must be the *bid to
+the market* for the ratio to mean anything. A corp feeding its smelter from its own mine is not
+bidding for the input and must not push its price. (Recorded as a delegated call: NR-281.)
+
+**Determinism.** Both registers are `std::map`, so accumulation runs over a **sorted** key set. This
+is the same seam where BL-422 found a latent `unordered_map` float-accumulation nondeterminism; the
+container choice here is that lesson, not an accident.
+
+**What it moved.** Scarce inputs stopped being free of price pressure, so they got dearer:
+measured over `tier_margin`'s 3-seed run, processing input cost rose 10.86 → 11.59/tick and
+processing net fell −9.52 → −10.42/tick, while extraction net eased 7.27 → 7.11. Several resources
+left the price floor for the first time (resource 1 at 0.95× base → 1.83×, resource 9 at 1.00× →
+1.28×). Refining paying worse than mining is BL-436's open calibration, not a regression this
+introduced — the failing assertion set is identical on both sides of the change.
+
 ## Real market inventory (BL-130, 2026-08-11)
 
 `market_component.inventory` is **real, persistent stock** — not reset each tick, unlike
@@ -190,8 +269,21 @@ end of the market's old role as an unconditional, infinite counterparty on the *
 **Fills from real corp sales only** — auto-surplus and standing sell orders, tallied separately
 from `mc.supply[r]`. This is a residual note from before BL-365 removed the old
 nation-substrate's abstract supply (a pricing fiction, never actually sold by anyone); today
-every seller filling `mc.inventory` is a real corp, background or not. Filled during
-`clear_markets`, after all sell-side listing completes.
+every seller filling `mc.inventory` is a real corp, background or not.
+
+**Credited where stock leaves a pool, not where it is listed (BL-422, 2026-08-16).** The fill
+used to happen at listing time, on every listed quantity, which was true while everything listed
+also sold. BL-386's reservation rule ended that: an order whose floor exceeds the resolved price
+**holds**, and its stock never leaves the seller. Crediting it anyway put goods on the shelf that
+no seller had parted with — and `inventory` is not a display figure, so a processor bought that
+phantom stock, decremented it, and no counterparty was ever paid. The credit now sits in the same
+statement as each of the three pool debits — auto-surplus clearing, matched explicit trades, and
+the auto-clear pass — so **inventory gains exactly what pools lose**, and the two cannot drift
+apart in a later edit. It is a conservation law, not a tally.
+
+A side effect worth naming: the old fill iterated the sell books in `unordered_map` order, so a
+float sum accumulated in an unspecified sequence. All three new sites are ordered (`std::map`
+pools; sorted market and resource keys), so the credit is deterministic as well as correct.
 
 **Drains during production and construction — both of which run BEFORE `clear_markets` in the
 same tick** — against whatever stock survived from **prior ticks'** sales:
@@ -213,12 +305,25 @@ is bounded by the coverage-min across every input, the total drawn from a market
 never exceed what was actually on hand — no double-spend, no negative inventory, no ordering
 dependence beyond the tick's own fixed pass order.
 
-**The sell side is unchanged** — auto-surplus and standing sell orders still clear in full
-unconditionally (§ Known limitations), so a seller never sees different behaviour. What changed
-is only whether a *buyer* (a processor, a build) can get what it wants when the market's real
-shelf is bare.
+**The sell side was unchanged by BL-130** — auto-surplus and standing sell orders cleared in full
+unconditionally, so a seller saw no difference; what BL-130 changed was only whether a *buyer* (a
+processor, a build) could get what it wanted when the market's real shelf was bare. **That is no
+longer true**: BL-386 made the floor a reservation price, so a standing order can now hold, and
+BL-422 above is what stops a held order stocking the shelf regardless.
 
-Verified by `tools/verify/market_inventory_harness.cpp`.
+**Held stock stays visible to the price signal — deliberately, and for a mechanical reason.**
+BL-422's design defaulted to hiding held quantity from `mc.supply[r]` as well, on the argument
+that stock which is explicitly not for sale below its floor is not supply. That default is not
+implementable as written: whether an order holds is decided by comparing its floor to the
+*resolved* price, and the resolved price is computed **from** `supply`. Removing held stock raises
+the price, which can un-hold the order that was removed — a fixed point, reached only by iterating,
+at a cost in complexity and determinism risk that a pricing nicety does not repay. So the two
+arrays are deliberately asymmetric: `supply` is the **offer** (listed stock is a real offer at a
+price, and the market may price against knowing it exists), `inventory` is the **delivery** (only
+what actually changed hands). Revisit only if a real defect is measured, not on the argument alone.
+
+Verified by `tools/verify/market_inventory_harness.cpp` and `order_book_harness` § R7 (BL-422's
+conservation rows).
 
 ## Where the order book lives
 
@@ -312,13 +417,98 @@ AI's command are one implementation.
 ```
 target = base_price × √(demand / supply)     — damped elasticity
          base_price                           when neither side has a signal
-         base_price × 4.0                     demand with zero supply
+         base_price × ceil_mult               demand with zero supply
 price  = prior + 0.5 × (target − prior)       — EMA smoothing
 ```
 
-Target and result are clamped to the band **[0.25×, 4×] of base**. Prices are therefore
-*anchored*: no scarcity can push a good past 4× its authored base, and no glut below a quarter
+Target and result are clamped to the band **[0.25×, 10×] of base**. Prices are therefore
+*anchored*: no scarcity can push a good past 10× its authored base, and no glut below a quarter
 of it. Untradeable resources (`base_price ≤ 0`) keep their prior price.
+
+### Where the band lives (BL-442, 2026-08-17)
+
+The band is **authored once, in data**: `scripts/economy.lua` → `economy.price_band`
+(`floor_mult` / `ceil_mult`), reaching C++ as `price_band_params` through
+`recipe_registry::price_band()` — the same route every other economy tunable takes.
+
+It is read by **two** call sites, and that is the point of naming it here:
+
+| Site | Function | What it clamps |
+|---|---|---|
+| `src/world/market_clearing.cpp` | `resolve_price` | Every market price, every tick — the real clearing band. |
+| `src/world/economy_system.cpp` | `wf_target_price` | The BL-181 workforce auto-solver's **forward** price estimate, so it prices a candidate target against the band the market will actually clear it in. |
+
+Until BL-442 those were two hand-synchronised `constexpr` copies, the second commented
+"mirror market_clearing.cpp price band" — with nothing enforcing the mirror. Editing one and
+not the other would have left the solver optimising against a band the market does not use: a
+silent divergence with no error and no visible symptom. `tools/verify/price_band_harness.cpp`
+is now the guard. Its rows are **differential** — each sets a non-default band and asserts the
+site *moves* — because a guard that only exercised one site would have passed before the change
+and would pass again the day someone reintroduces a local copy.
+
+The move was deliberately **behaviour-identical**: the authored values were the constants they
+replaced, and the struct defaults reproduce them exactly so a harness that hand-builds a
+registry is unchanged.
+
+### Where the ceiling comes from (BL-442 step 2, 2026-08-17)
+
+`ceil_mult` is **derived, not authored**. Ben's requirement (2026-08-17) is that scarcity must
+price high enough to **cross the margin for a nearby market**, so inter-market trading is a
+day-1 fact rather than a late-game unlock. That makes the ceiling a function of the haulage the
+supply layer already charges:
+
+```
+ceil_mult × base_price  >  base_price + haulage_per_unit
+ceil_mult               >  1 + haulage_per_unit / base_price
+```
+
+**The haulage is measured, not assumed.** `tools/verify/haulage_measure.cpp` walks every market
+in the real generated world, finds its nearest market neighbour by the terrain-weighted A* cost,
+and reports `logistics_cost(mode) × path.cost` — *exactly* the per-unit figure `dispatch_convoys`
+debits (`supply_system.cpp`). Over 5 seeds, 39 markets on 5 multi-market bodies:
+
+| Market → nearest market neighbour | credits per unit |
+|---|---|
+| p10 | 0.12 |
+| median | 0.70 |
+| p90 | 1.67 |
+| max | 4.83 |
+
+The denominator is the **cheapest good carrying a base price: 0.60**. The binding case is
+therefore the worst haul against the cheapest good:
+
+```
+ceil > 1 + 4.83 / 0.60 = 9.06   ->   10.0
+```
+
+**Why 4.0 was not enough.** It cleared the *median* neighbour pair (which needs 2.16) and only
+just cleared the p90 (3.79). The tail — the worst-connected market pair carrying the cheapest
+good — was permanently unservable at any scarcity. 10.0 covers **every** nearest-neighbour pair
+measured, for **every** priced good.
+
+**A second, independent reading agrees.** The requirement's other half is that a scarce cheap
+good must be able to outprice an abundant dear one. Read *within a tier* — which is the only
+coherent reading, since RESOURCES.md promises margin widens *between* tiers — the ordinary raw
+tier spans 0.60 to 6.00 (`rare_earth_ore`), demanding `ceil > 10`. The two derivations land on
+the same number, which is the reason to trust it. Read *across* tiers it would demand 233
+(0.60 against `spacecraft_components` at 140), which would delete the tier model; that reading
+was rejected and recorded (NR-291).
+
+**The floor is unchanged at 0.25×.** The requirement derives a ceiling and says nothing about a
+floor; lowering it would widen the arbitrage margin only by cutting what an abundant producer
+receives (NR-290).
+
+**Re-derive rather than trust.** Re-run `haulage_measure` whenever the logistics cost table
+(`logistics.base_cost_per_unit_distance`), the map scale (`body_km_per_tile`), or the
+`base_price` table changes — all three move the number this ceiling is computed from.
+
+**What the widening did NOT do.** It did not create inter-market trade. Measured at the *old*
+band, 1,677 of 2,146 dispatched convoys were already intra-body market-to-market hauls. What is
+zero — at both bands — is **inter-body** trade: 0 space-lane convoys and 0 persistent
+`trade_routes` across all five seeds, because that lane is refused by the launchpad and
+propellant gates in `dispatch_convoys` before any price is consulted. `trade_routes` is a
+body-level record, so BL-088's route store is structurally blind to the intra-body trade that
+*was* happening, which is very likely why it was believed to be absent (NR-289).
 
 ## Inter-body linkage
 
@@ -338,9 +528,12 @@ extracted there enter the economy only by convoy to a Kepler market.
 
 ## Known limitations (honest list)
 
-- **The SELL side still has no cap.** `market_component.supply` stays a derived per-tick flow for
-  pricing purposes, and the market still absorbs any listed sell quantity in full — BL-130 (below)
-  makes the BUY side real and finite; selling remains unconditional, same as before.
+- **The SELL side has no *volume* cap.** `market_component.supply` stays a derived per-tick flow
+  for pricing purposes, and the market absorbs any quantity a seller is willing to release at the
+  resolved price — BL-130 made the BUY side real and finite; sell volume remains unconditional.
+  What is no longer unconditional is the *price*: since BL-386 an order whose floor exceeds the
+  resolved price holds rather than selling (§ Real market inventory), so a listed quantity is a
+  ceiling on what may clear, not a guarantee that it will.
 - **Anchored prices.** The [0.25×, 4×] band caps every scarcity signal at 4× base. This is the
   band the BL-078 (product-market inertness) diagnosis found products pegged against — resolved
   in *shape* first by the elastic substrate and now by real background-firm supply (BL-365,

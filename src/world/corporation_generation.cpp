@@ -1789,3 +1789,13 @@ std::vector<entity_id> generate_background_firms(
 
     return firm_ids;
 }
+
+void assign_default_recipes(world& w, const recipe_registry& reg)
+{
+    // BL-429: era-aware, so an ancient campaign does not default every processor
+    // to an industrial recipe it could never run.
+    const uint16_t default_recipe = reg.default_recipe_id();
+    for (auto& [id, b] : w.buildings)
+        if (b.type == building_type::processing_facility && b.recipe == no_recipe)
+            b.recipe = default_recipe;
+}

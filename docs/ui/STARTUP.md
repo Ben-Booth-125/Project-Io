@@ -9,12 +9,16 @@ the opening view the flow hands over to.
 
 ## The screen state machine
 
-`app_screen` (`app.hpp`) has three states; `run()` opens on **`menu`**:
+`app_screen` (`app.hpp`) has five states; `run()` opens on **`menu`**:
 
 ```
-menu  →  generating  →  in_game
-(main menu)  (New World wizard)  (play)
+menu  →  generating  →  building  →  choosing_corp  →  in_game
+(main menu)  (New World wizard)  (the carve)  (pick your corp)  (play)
 ```
+
+`building` is the loading screen the world is carved on (CORPORATION_GENERATION.md
+§ Corporate seeding is watched). `choosing_corp` is the starting-corp selection
+stage added by BL-435 — see § Starting-corp selection below.
 
 **Only `in_game` simulates.** On the menu and wizard the loop just pumps events
 and draws — the world, economy, and sim clock are not built until the wizard's
@@ -109,3 +113,36 @@ The wizard's "Begin", and the one and only generation call:
 
 Play opens on the corporation's home planet — the Planetary rung, home body
 selected (CANVASES.md § Default state).
+
+## Starting-corp selection — `draw_corp_choice_screen` (BL-435, 2026-08-16)
+
+Which corporation the player runs used to be a lottery: the generator drew one and
+flagged it. Measured across 24 seeds, that handed the player a pure-extraction corp
+on 13 of them, so the chain-depth ladder and the Method page had nothing to stand
+on — while better openings sat unchosen in the same world. This stage converts the
+invisible draw into a stated choice.
+
+**It lives in exactly one frame, and both constraints are hard.** `poll_worldgen`
+opens it the moment generation returns, which is (1) **after** the corps exist,
+(2) **before** `start_new_game_prelude` runs `generate_background_firms`, so
+`m_world.corporations` still holds exactly the specialist set that is the pool,
+and (3) **before** the pre-game warm start, so the corp the player picks is the
+corp `corp_ai` excludes for all 80 warm ticks. No later frame satisfies all three.
+
+**What it shows:** name, industrial focus, home nation, and holdings as
+`N proc / N extr / N other`. **Balance is deliberately absent** — opening balances
+are seeded *by* the warm start, which has not run, so every corp reads 0.0 here.
+
+**What it must not claim.** A processor-bearing corp is the **deeper** opening, not
+the richer one: BL-436 measured a processing facility as currently earning *less*
+per tick than the extraction site it replaces. No copy on this screen ranks the
+openings, and none should until that is untrue.
+
+**"Surprise me"** takes the generator's own seeded pick, so it reproduces
+pre-BL-435 behaviour for that seed exactly. Selection **re-points**
+`is_player`/`player_entity` (`apply_corp_choice`) rather than replacing the draw,
+which is why every harness and golden that never opens this screen is
+bit-identical across the change. Both automated paths (`--autostart`, the verify
+harness) auto-take that fallback; a check reaches the screen through
+`verify.show_corp_choice` (`scripts/verify/corp_choice.lua`), and the headless
+properties it depends on are asserted by `player_seed_sweep --guard`.

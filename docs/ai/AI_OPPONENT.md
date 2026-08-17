@@ -257,6 +257,55 @@ construction**:
 richness), M small; recipes and dials enumerate per owned building; routes enumerate over
 known-body pairs. Bounded enumeration is what keeps the per-tick cost flat.
 
+> **`build` ranges over three types, and until 2026-08-17 it ranged over two (BL-439).** The table
+> above lists `build(type, tile, target, recipe)`, which reads as though the scorer picks a type.
+> For most of the project's life it did not: `corp_ai.cpp` emitted `corp_verb::build` from exactly
+> two sites, each setting the type to a literal — the `ranked_sites` loop (always
+> `extraction_site`) and one `military_base` candidate. **There was no `processing_facility`
+> candidate anywhere in the scorer**, so a rival owned only the processors it was generated with,
+> for the whole campaign. The *seam* was never the limit: `corp_command.cpp` builds a processor
+> with its recipe when a command asks for one (BL-388). The scorer simply never asked.
+>
+> Two claims rested on that not being true, and both are corrected: "the AI prefers mines" was
+> **structural**, not an artefact of the scoring curve (which is why BL-417 step 2 could never have
+> fixed it — NR-265), and BL-428's chain-depth gate, climbed by operating deeper processors, had
+> **no AI player** (NR-267).
+
+**The processing-facility candidate** (BL-439, landed 2026-08-17). It runs on the same score curve
+and the same solvency, glut and reserve-floor gates as the extraction candidate, and differs only
+where a processor genuinely differs from a mine:
+
+- **Siting.** No deposit ranks a processor, so `ranked_sites` offers it nothing. It is sited on the
+  **corp's own asset tiles** — the same body, so the same stockpile pool its extraction feeds; the
+  same tile, so the same market. Cheap (`O(assets)`, not another `O(tiles)` scan) and legible.
+  Nothing caps buildings per tile except the launchpad, so this is a real placement. One processor
+  per tile, or a corp would stack them on its best tile every evaluation.
+- **Recipe choice.** Walks the **browse** space (this era's roster) and crosses to the **absolute**
+  id through `recipe_id(name)` — the two id spaces `recipe_registry.hpp` keeps apart, and the exact
+  crossing NR-254 caught the build door getting wrong. The recipe travels **with** the command,
+  because `construct_building` substitutes steel for `no_recipe` (BL-388's trap).
+- **Reachability.** Two gates a mine never needs: BL-428's **chain depth** (asked here rather than
+  discovered as a seam rejection), and **input access** — pool + local market inventory measured
+  against the production tick's own coverage threshold, since a processor with no reachable input
+  is an immediate loss-maker.
+- **Pricing.** Unlike the extraction candidate, it is priced by `estimate_prospective_profit`
+  (BL-162) rather than the inline revenue-minus-wages sum. That inline model survives above **only**
+  because switching it would move every blessed golden for no player-visible gain; a new candidate
+  has no golden to protect and no reason to inherit the weaker model.
+
+> **What it immediately found, and why the goldens are red (NR-269).** Rivals now build 10–16
+> processors per seed (69 across the benchmark set, against 0 before) — and **three of five seeds
+> go insolvent**, seed 0 falling from 498k to −295k. The estimator was ruled out rather than
+> assumed innocent: scoring the candidate with the inline model and with
+> `estimate_prospective_profit` picks the same recipes and the same counts. The new per-building
+> read shows processors realising **−6 to −12 per tick against a predicted −0.4 to +0.1**, on the
+> same buildings, with extraction realising +22.8 where it sampled at all.
+>
+> Sprint 19 wrote its success criterion down in advance: these bands were re-blessed *downward* on
+> 2026-08-16 and should **rise** when BL-436 lands. They fell. Under that rule this is a finding,
+> not a bless, so `ai_skill_harness` is deliberately **left red** and the substrate defect
+> (BL-436) is where it gets fixed — not in the scorer that merely stopped hiding it.
+
 ### Scoring
 
 `score(action) = expected_net_per_tick / payback_ticks × strategy_weight`, terms computed from
@@ -267,6 +316,19 @@ CORPORATION_GENERATION.md), giving distinct-but-legible personalities for free. 
 gate** (cash − committed spend > reserve floor) vetoes any spend that breaks the floor; stage B
 replaces this crude floor with priority buckets + predictive spending (landed 2026-07-31, see
 § 2B below).
+
+> **What the build score actually is (BL-417 step 1, 2026-08-17).** The formula above is the
+> design intent; the shipped code spelled it `net / payback` with `payback = capex / net`, which
+> is **`net² / capex`**. It reads as capital efficiency and behaves as a **margin bias**: doubling
+> the margin quadruples the score, doubling the cost only halves it. Nobody chose that — it was an
+> artefact of the two-step spelling. `corp_ai.cpp` now writes it out as `net * net / capex`.
+>
+> **The bias is retained, deliberately.** `focus_weight`, `jitter` and the glut multiplier were all
+> tuned against this curve, and every blessed golden records a world evolved under it. Replacing it
+> with an explicit linear metric is a re-tune plus a golden reshuffle — BL-417 step 2, still open,
+> Ben's call. The rewrite itself was measured, not assumed, to be behaviour-preserving (float
+> rounding makes the two forms genuinely different): `ai_skill_harness` and `spectator_determinism`
+> are byte-identical across the change on the pinned MSVC build.
 
 ### 2B. Stage B — strategy, priority buckets, predictive spending (BL-203, landed 2026-07-31)
 

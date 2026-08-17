@@ -10,7 +10,159 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — the roster invariants land, and the roster shrinks (BL-432, NR-243, NR-257) (2026-08-16, latest)
+## Session — the score was never the reason (BL-417 step 1, BL-439) (2026-08-17, latest)
+
+Full mode. Continued Sprint 19 on its next item, BL-417 (AI build score is quadratic). The item
+landed as designed — its **step 1 only**, which is what it asks for. The session's actual result is
+the thing found while checking BL-417's premise, and it invalidates part of why BL-417 was filed.
+
+**The finding: the AI cannot build a processing facility.** `corp_ai.cpp` emits `corp_verb::build`
+from exactly two places — the `ranked_sites` loop, hard-coded to `building_type::extraction_site`,
+and one `military_base` candidate. There is no `processing_facility` candidate anywhere in the
+scorer. This is exhaustive, not a sample: both emission sites set `c.cmd.type` to a literal. The
+seam is not at fault — `corp_command.cpp` builds a processor, recipe and all, when a command asks
+for one (BL-388) — so a player or an MCP agent can build one and the deterministic scorer simply
+never asks. **A rival corp owns only the processors it was generated with, for the whole campaign.**
+Filed as **BL-439 (AI never builds processors)**, priority A.
+
+**It reassigns the blame BL-417 was filed to test (NR-265).** BL-436's design says the build scorer
+"is being asked to prefer processors on a payback curve that does not reward them." It is not being
+asked anything of the sort. No curve over a candidate set that excludes processors can prefer one.
+"The AI prefers mines" is **structural**, not a scoring artefact — so BL-417 step 2, "decide whether
+the quadratic bias is wanted", is a narrower question than it looked: how extraction sites rank
+against each other and against the flat-scored military base. Retuning it cannot make a rival build
+a processor. Step 2 stays open and stays Ben's, now with that correction attached.
+
+**And it breaks a shipped calibration narrative (NR-266).** BL-436's `calibration_sweep` explains
+the x4 collapse as corps "spending the extra income building processors that lose MORE per tick at
+higher scale". That mechanism is impossible here — the processor population does not respond to
+income, because nothing in the AI can add to it. Whatever the sweep measured, it measured generated
+and warm-start processors only. The conclusion may still hold; it is currently unsupported, and the
+standing instruction is to measure rather than tune, so it is recorded for re-derivation rather than
+patched. A third consequence, latent rather than live: BL-428's chain-depth gate is climbed by
+operating deeper processors, so **the growth ladder has no AI player** (NR-267). Ancient-only today,
+so it does not bite a 1960 campaign.
+
+**BL-417 step 1, and why it needed a local run.** The score now reads `(net * net / capex) * …`
+directly; `payback = capex / net` is gone, and a comment states that the quadratic bias is retained
+deliberately because `focus_weight`/`jitter`/`glut` were tuned against this curve. The item calls
+this "a no-op refactor, zero behavioural change" — **which was not established when it was written.**
+`net / (capex / net)` and `(net * net) / capex` round differently in float, so the rewrite could
+have moved every candidate score, hence world evolution, hence every blessed golden — making step 1
+exactly the thing the item says it is not. Measured, not assumed: A/B on the pinned MSVC 14.44
+build, `ai_skill_harness` **byte-identical** across all five seeds and `spectator_determinism`
+byte-identical with `played=855E07DE529684EC` / `spectated=5AC90B4ACE717FCF` unchanged. It is free
+on this toolchain — by rounding luck, not by algebra (NR-268). Had it moved, the re-bless would have
+been reported as part of step 1 rather than smuggled in.
+
+**The blessed bands are compiler-bound, and that is now demonstrated rather than suspected.** The
+GCC baseline numbers carried into this session differ from MSVC on *every* seed — seed 3 finals
+306437.4 (GCC) against 498537.6 (MSVC). The previous entry recorded `ai_skill_harness`'s "stale GCC
+bands" and `spectator_determinism`'s R2 failure as pre-existing; both pass cleanly here. They are
+not stale, they are **MSVC bands**, and a GCC run is not a valid comparator for them. Recorded in
+NR-268 with a suggestion that a non-MSVC run refuse the comparison rather than report a misleading
+failure.
+
+**Also corrected in passing.** The `military_base` candidate's comment claimed it must never out-bid
+"a genuine extraction/processing net-positive candidate" — prose asserting a candidate class that
+does not exist. Now says extraction, and points at BL-439.
+
+**Base correction.** The session opened on `main` (BL-435) rather than the branch the handoff named;
+`origin/claude/latest-sprint-4ivgg8` had BL-422 on top and was a strict fast-forward. Re-based onto
+it and **re-ran the whole A/B on that base** rather than trusting the earlier one — both baselines
+turned out identical, so BL-422 moves neither instrument, but the measurement that counts is the one
+taken against the base being committed to.
+
+**The gate the remote session could not run.** `cmake` configure works locally, so the full CTest
+logic tier ran rather than a hand-rolled subset: **78 of 79 pass**, 4 skipped by their own gates,
+863 s — including all eight Lua-linked harnesses a remote container cannot reach. The one red test
+is **`tier_margin`**, and it is pre-existing — *proven* rather than asserted, by building and running
+it both with and without the change and diffing: byte-identical. It fails BL-436's two open
+assertions, and since it is BL-436's own instrument, its numbers are now attached to NR-266 rather
+than left in a log: **extraction nets +1659.18 per building-tick against processing's −7.92**; a
+processor never pays back its 200 cr capex. The cause is mostly not price. R6 states it plainly —
+deposit richness (mean 53.34) multiplies a mine's `base_rate` of 20 to ~1067 against a processor's
+**flat** 8, a ~133:1 rate ratio *before* any price applies — and of 1590 processing building-ticks,
+30.9% starved on a missing input. Three recipe inputs (ids 8/9/10) have deposits, are usually the
+richest thing on their tile, and are produced by nothing at all, which reads as siting/reach rather
+than margin. All cost-side, therefore Ben's: measured here, not touched.
+
+`interbody_pull_harness` — BL-406's guard, and Lua-linked — passes in 36 s, which de-risks the item
+after next.
+
+**Runtime:** not summed (eighth consecutive entry — see the standing caution in SPRINTS.md).
+
+---
+
+## Session — the shelf stops carrying goods nobody sold (BL-422) (2026-08-16)
+
+Full mode. Continued Sprint 19 at its own sequencing: BL-436's remaining half is a calibration
+call that is Ben's, and the previous session stopped there deliberately, so this session took the
+sprint's other early item — the one its plan says to clear first *because* phantom supply distorts
+every price BL-436 is measured against.
+
+**The defect was larger than "a pricing nicety", and the reason is one line of `components.hpp`.**
+`market_clearing.cpp` credited a standing order's **listed** quantity to `market_component::inventory`
+before clearing ran. Harmless while everything listed also sold; BL-386 ended that by making the
+floor a reservation price. But `inventory` is not a display figure — `economy_system.cpp` draws
+processor inputs from it (lines 312/363/563) — so a held order's stock was bought by a processor,
+decremented, and **never paid for by anyone**. Goods from nothing on one side, money destroyed on
+the other. Same family as BL-351's over-listing, found the same way: by asking what a field is
+actually read by rather than what it is called.
+
+**The fix is a conservation law, not a tally.** The credit now sits in the same statement as each
+of the three pool debits — auto-surplus clearing, matched trades, the auto-clear pass. Inventory
+gains exactly what pools lose, and the two cannot drift apart in a later edit because separating
+them means deleting a line next to the one that pays for it.
+
+**A determinism bug fixed as a side effect, unnoticed until the sites were counted.** The old
+credit iterated the sell books in `unordered_map` order — a float sum accumulated in an
+unspecified sequence, inside the economy tick. All three new sites are ordered (`std::map` pools,
+sorted market and resource keys). Nothing was looking for this; it fell out of moving the credit
+to where the debits already were, which is the argument for that shape independent of BL-422.
+
+**Three of the twelve new guard rows were run against the pre-fix build first**, and fail there
+(R7.2, R7.3, R7.10). Sprint 18's retro recorded a check that ran green while pointed at a deleted
+tab; the cheap inoculation is to make the new rows fail once, on purpose, before accepting them.
+`order_book_harness` 64/64.
+
+**The measurement that is worth more than the fix.** `ai_skill_harness` is **byte-identical** on
+all five benchmark seeds before and after — same net worth, same solvency, same action counts. The
+AI places 9–10 standing sell orders per seed, so orders exist; none of them hold. That makes the
+change provably safe to land, but the useful half is the other reading: the AI benchmark has never
+measured the held-order regime at all, because `trade_floor_multiple` currently prices every AI
+order low enough to clear. BL-436's calibration moves resolved prices *down*, straight under those
+floors. Recorded as NR-263 against BL-436 rather than as a footnote here.
+
+**Scoped out deliberately, both recorded.** Held stock stays visible to the supply-side price
+signal, against BL-422's own stated default (NR-261) — hiding it is a fixed point, since a hold is
+decided by the resolved price and the resolved price is computed from `supply`. And an explicit
+matched trade still delivers to the shared market shelf rather than the buyer's stockpile
+(NR-262), which is dormant until BL-160 gives the buy side a verb. MARKETS.md now states the
+`supply` = offer / `inventory` = delivery asymmetry rather than leaving it to be rediscovered, and
+two stale claims in that doc — "the sell side is unchanged", "the SELL side still has no cap" —
+were corrected in passing; both predate BL-386.
+
+**A method finding, and it may be worth more than the item (NR-264).** NR-240 and NR-241 record
+work that shipped uncompiled from a remote session, on the belief that a remote container cannot
+build. It can. What is blocked is `cmake` *configure* — SDL3 and Lua arrive by FetchContent and the
+download is refused — not compilation. The 43 `src/world/*.cpp` sources need neither, and every
+harness in the CMake glob batch links that set alone: build the objects once (~14 s with `-P8`),
+`ar` them into a static lib, link each harness against it (~5 s). **63 of 77 harnesses build and
+run this way**, including every economy, determinism and generation check that does not read a Lua
+script. That is how this session verified its own work, and it is proposed as a saved tool rather
+than left as a note.
+
+Suite swept: the only failures anywhere are pre-existing and identical before and after —
+`ai_skill_harness`'s stale GCC bands (self-declared in its own output), `spectator_determinism`'s
+R2 byte-identity against the MSVC-blessed pre-BL-409 golden, and `history_sim_harness`'s five
+Era −1 rows. None are reachable from this change.
+
+**Runtime:** not summed (seventh consecutive entry — see the standing caution in SPRINTS.md).
+
+---
+
+## Session — the roster invariants land, and the roster shrinks (BL-432, NR-243, NR-257) (2026-08-16)
 
 Full mode. Opened on triage as asked. The queue's three named entries all moved, and two of them
 moved because a measurement contradicted the filed premise — the same pattern Sprint 18's retro

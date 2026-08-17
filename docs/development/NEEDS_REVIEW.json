@@ -437,6 +437,39 @@
       "resolution": null
     },
     {
+      "id": "NR-258",
+      "title": "NR-243's four dominated pairs were a grouping artefact - the no-dominance guard was asking the wrong question",
+      "raised": "2026-08-16",
+      "kind": "decision-taken",
+      "status": "open",
+      "source": "Ben's call on NR-243, 2026-08-16: option C first - settle the tier-vs-alternate axis before retuning any numbers.",
+      "what": "The axis did not need inventing: scripts/recipes.lua already states it twice in its own comments (ids 22 and 23) - distinct raws feeding a shared good is 'an ordinary multi-producer economy fact, NOT BL-430's alternate-METHOD feature (one building offering interchangeable recipes for the same output)'. Measured against that, three of NR-243's four pairs have DISJOINT input sets (steel {iron_ore,coal} vs {iron_nickel_ore}; charcoal {timber} vs {peat}; trade_goods {clay,timber} vs {sand}) and the fourth differs by a placement precondition rather than cost (propellant atmospheric vs electrolysis - the airless route is run because the cheap one is unavailable). So all four were false positives of grouping by (primary output, era), not balance defects. No recipe magnitude was changed. The guard moved to chain_depth.cpp's R2 row, regrouped: every sibling pair is bucketed as a supply route (disjoint raws), an explicitly-exempted precondition pair, or a genuine interchangeable method, and only the third is price-compared. recipe_switch_harness's duplicate R1 was deleted rather than left as a second answer to the same question - it now runs ALL PASS.",
+      "why_it_matters": "Today the roster contains ZERO genuine interchangeable methods - 4 sibling pairs, 3 supply routes, 1 precondition, 0 methods. That is a real finding about BL-430: the alternate-method FEATURE shipped, but no content yet uses it, and the four pairs that looked like alternates are multi-producer economics. The bucketing is what keeps R2 from being a vacuous green - a pair cannot escape by being unclassifiable, and the counts print on every run - but Ben should know the dominance half is currently guarding an empty set, and will only start biting when BL-430's own alternates are authored.",
+      "recommendation": "No action needed on the numbers. Worth deciding separately whether BL-430 should author at least one genuine same-inputs alternate pair, so the feature it built has content and R2's dominance half has something to guard.",
+      "files": [
+        "tools/verify/chain_depth.cpp",
+        "tools/verify/recipe_switch_harness.cpp",
+        "scripts/recipes.lua"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-259",
+      "title": "player_seed_sweep had never once passed under ctest — a 60s timeout on a 69s tool, silent because a Timeout looks like nothing",
+      "raised": "2026-08-16",
+      "kind": "observation",
+      "status": "open",
+      "source": "The full 78-test ctest run done to verify NR-257's resource_type removal.",
+      "what": "player_seed_sweep was added 2026-08-15/16 and registered in CMakeLists.txt's IO_TEST_SCRIPT_ROOTED_HARNESSES (so it gets the repo root as its working directory) but NOT in IO_TEST_LONG_HARNESSES, so it inherited the 60 s default timeout. It generates one full world per seed, 24 by default, and takes ~69 s on this box. It therefore timed out on every ctest run from the day it was added, while passing perfectly standalone - which is how it was used, and why nobody noticed. Fixed by adding it to IO_TEST_LONG_HARNESSES (240 s, ~3.5x headroom); it now passes at 71.8 s.",
+      "why_it_matters": "The failure mode is the point, and it is the mirror of the one Sprint 18's retro named. That retro found a check running GREEN while pointed at a deleted tab - coverage that was not coverage. This is the same defect from the other side: a check that had never run at all, reporting as a Timeout, which reads as infrastructure noise rather than as 'this harness has never verified anything'. Worth a standing habit: when a harness is added to the gate, run the GATE once, not just the exe. Two of the three ways a check can be worthless - green-but-blind, and never-executed - are both invisible from the harness's own output.",
+      "recommendation": "No further action on this instance; it is fixed and verified. Worth considering whether a new harness's first ctest run should be part of the checklist in the verifier-headless skill, since 'passes standalone' is what both the author and the skill's own Procedure section naturally check.",
+      "files": [
+        "CMakeLists.txt",
+        ".claude/skills/verifier-headless/SKILL.md"
+      ],
+      "resolution": null
+    },
+    {
       "id": "NR-260",
       "title": "A processing facility earns LESS than the extraction site it replaces — so BL-435's 'better opening' is deeper, not richer",
       "raised": "2026-08-16",
@@ -460,15 +493,63 @@
       "resolution": "Ben's call 2026-08-16: option B. The generation change STAYS - it does what it was asked to do and fixes a real code-vs-comment contradiction - and the income finding is filed as its own economy item, BL-436 (PROCESSING_UNDEREARNS_EXTRACTION, priority A, v0.1.18), carrying the full before/after measurement and four candidate causes to measure before tuning (input-cost-vs-output-price, wages/maintenance, market depth for inputs, throughput). ai_skill_harness re-blessed to the post-change numbers with the reason in the file, including the explicit note that these bands should RISE when BL-436 lands and that a bless which does not raise them means the fix did not work. BL-435 continues from task C."
     },
     {
-      "id": "NR-259",
-      "title": "player_seed_sweep had never once passed under ctest — a 60s timeout on a 69s tool, silent because a Timeout looks like nothing",
+      "id": "NR-261",
+      "title": "BL-422: held stock stays visible to the price signal, against the item's own stated default — the alternative is a fixed point",
+      "raised": "2026-08-16",
+      "kind": "decision-taken",
+      "status": "open",
+      "source": "BL-422 design: \"Decide whether the supply-side price signal should still see held stock (an argument exists both ways) — default to NOT visible, matching the reservation semantics BL-386 established.\"",
+      "what": "The default was NOT adopted, and the reason is mechanical rather than a preference. Whether an order holds is decided by comparing its floor to the RESOLVED price; the resolved price is computed FROM market_component::supply (resolve_price(price, base, supply, demand)). Removing held quantity from supply raises the resolved price, which can un-hold the very order that was removed, which puts its stock back into supply. Reaching a consistent answer means iterating to a fixed point inside clear_markets. So the two arrays are now deliberately asymmetric and MARKETS.md says so in as many words: supply is the OFFER (listed stock is a real offer at a price), inventory is the DELIVERY (only what actually changed hands). Only the inventory half of BL-422 was implemented.",
+      "why_it_matters": "The phantom-BUYING defect is fully fixed — no processor can draw stock a seller never released. What remains is a pricing nicety: a held order still depresses the resolved price by appearing as supply, which in a thin market can hold the price below the floor that caused the hold, so an order can hold itself down. That is a real (if second-order) feedback loop and Ben may judge it worth the iteration cost; it is not worth spending determinism risk on unmeasured.",
+      "recommendation": "Leave as implemented. If it is to be revisited, the cheap first step is a measurement rather than a fix: count how often a held order is the marginal supply that keeps the price below its own floor. File as a follow-on to BL-422 if that count is non-trivial.",
+      "files": [
+        "src/world/market_clearing.cpp",
+        "docs/economy/MARKETS.md"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-262",
+      "title": "An explicit matched trade pays the seller and delivers the goods to the shared market shelf, not to the buyer",
       "raised": "2026-08-16",
       "kind": "observation",
       "status": "open",
-      "source": "The full 78-test ctest run done to verify NR-257's resource_type removal.",
-      "what": "player_seed_sweep was added 2026-08-15/16 and registered in CMakeLists.txt's IO_TEST_SCRIPT_ROOTED_HARNESSES (so it gets the repo root as its working directory) but NOT in IO_TEST_LONG_HARNESSES, so it inherited the 60 s default timeout. It generates one full world per seed, 24 by default, and takes ~69 s on this box. It therefore timed out on every ctest run from the day it was added, while passing perfectly standalone - which is how it was used, and why nobody noticed. Fixed by adding it to IO_TEST_LONG_HARNESSES (240 s, ~3.5x headroom); it now passes at 71.8 s.",
-      "why_it_matters": "The failure mode is the point, and it is the mirror of the one Sprint 18's retro named. That retro found a check running GREEN while pointed at a deleted tab - coverage that was not coverage. This is the same defect from the other side: a check that had never run at all, reporting as a Timeout, which reads as infrastructure noise rather than as 'this harness has never verified anything'. Worth a standing habit: when a harness is added to the gate, run the GATE once, not just the exe. Two of the three ways a check can be worthless - green-but-blind, and never-executed - are both invisible from the harness's own output.",
-      "recommendation": "No further action on this instance; it is fixed and verified. Worth considering whether a new harness's first ctest run should be part of the checklist in the verifier-headless skill, since 'passes standalone' is what both the author and the skill's own Procedure section naturally check.",
+      "source": "Found while scoping BL-422's credit sites, 2026-08-16.",
+      "what": "In clear_markets, a matched explicit trade debits the seller pool and charges the buyer expenditure, but never credits the BUYER stockpile. The goods land in market_component::inventory (true before BL-422 via the listing-time credit, and still true after it via the matched-trade credit). Any corp on that body can then draw them through the ordinary processor path. So a buy order is closer to \"pay to put stock on the local shelf\" than to \"acquire these goods\".",
+      "why_it_matters": "It is currently invisible because nothing writes world::buy_orders in play — MARKETS.md § Known limitations records the buy-order book as engine-only, waiting on BL-160. The moment BL-160 derive_exchange_orders becomes the first live emitter, a player who wins a matched trade will pay for goods a competitor on the same body can consume. BL-422 deliberately did NOT change this: routing matched fills to the buyer pool is a behaviour change to the buy side, outside a fix scoped to phantom supply. order_book_harness R7.12 pins the current behaviour as conservation (pool loss == inventory gain), so a future correction will fail that row loudly rather than silently.",
+      "recommendation": "Fold into BL-160 (auto-exchange policy) rather than filing separately — that is the item that makes the buy side reachable, and the delivery question has to be answered there anyway.",
+      "files": [
+        "src/world/market_clearing.cpp",
+        "tools/verify/order_book_harness.cpp"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-263",
+      "title": "BL-422 moves nothing in the five AI benchmark seeds — the defect it fixes is unreached by the benchmark",
+      "raised": "2026-08-16",
+      "kind": "observation",
+      "status": "open",
+      "source": "Before/after measurement on ai_skill_harness and spectator_determinism, 2026-08-16.",
+      "what": "ai_skill_harness reports byte-identical net worth, solvency, survival and action counts on all five seeds before and after the fix (final = 499896.2 / -115203.9 / 183828.8 / 306437.4 / 396557.7 in both runs), and spectator_determinism is unchanged. The AI places standing sell orders in these worlds (action[place_sell_order] = 9-10 per seed), so orders exist; either none of them hold, or no processor ever drew the phantom stock they created. order_book_harness R7.2/R7.3/R7.10 DO fail against the pre-fix code, so the guard is real — it is the benchmark that does not reach the case.",
+      "why_it_matters": "Two things follow. First, the fix is safe to land: provably behaviour-neutral in the benchmark worlds while provably corrective in the case that produces the defect. Second, and more useful, the AI benchmark does not exercise a held order at all, which means corp_ai trade_floor_multiple currently prices its orders low enough to always clear. That is worth knowing before BL-436 calibration moves prices under it: a re-tune that pushes resolved prices down turns the AI standing orders into holds, and the benchmark has never measured that regime.",
+      "recommendation": "No action on BL-422. Worth carrying into BL-436: when the cost/income calibration is settled, re-check whether the AI standing orders still clear, since a held order is stock the corp neither sells nor consumes.",
+      "files": [
+        "tools/verify/ai_skill_harness.cpp",
+        "src/world/corp_ai.cpp"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-264",
+      "title": "A remote Linux session CAN build and run the headless suite — CMake configure is what is blocked, not compilation",
+      "raised": "2026-08-16",
+      "kind": "observation",
+      "status": "open",
+      "source": "This session, working around the NR-240 symptom (BL-429 slice 2 authored but never compiled because of the remote network policy).",
+      "what": "cmake configure fails outright in the remote container: SDL3 and Lua come in by FetchContent and the download is refused by the network policy, so no target is ever generated and every harness looks unbuildable. But the 43 src/world/*.cpp sources (the io_world_obj set, minus the four registry TUs) need neither, and every harness in the CMake glob batch links io_world_obj ALONE. Compiling them directly works: build the 43 objects once with xargs -P8 (~14 s), ar them into a static lib, then link each harness against it (~5 s each). 63 of the 77 harnesses build and run this way. The exceptions are the 8 Lua-linked ones (chain_depth, tier_margin, era_roster, player_seed_sweep, recipe_switch_harness, interbody_pull_harness, pregame_balance_harness, persona_counsel_harness), font_glyph_harness (ImGui), and the long sweeps.",
+      "why_it_matters": "NR-240 and NR-241 record work that shipped uncompiled and visually unverified because a remote session believed it could not build. It can — for two thirds of the gate, including every economy, determinism and generation harness that does not read a Lua script. That is the difference between a remote session that verifies its own work and one that hands Ben unverified changes.",
+      "recommendation": "Worth saving as a tool rather than a note (CLAUDE.md § Tool creation is skill creation): a tools/verify/build_linux.sh doing the lib-then-link build, named in the verifier-headless skill as the fallback when cmake configure fails. Creating or modifying a skill needs Ben permission, so it is proposed here rather than done. Vendoring Lua would close the remaining 8.",
       "files": [
         "CMakeLists.txt",
         ".claude/skills/verifier-headless/SKILL.md"
@@ -476,21 +557,597 @@
       "resolution": null
     },
     {
-      "id": "NR-258",
-      "title": "NR-243's four dominated pairs were a grouping artefact - the no-dominance guard was asking the wrong question",
-      "raised": "2026-08-16",
+      "id": "NR-265",
+      "title": "BL-436's design blames a scoring curve for something structural - the AI has no processing_facility build candidate at all",
+      "raised": "2026-08-17",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "Found while verifying BL-417 (AI build score is quadratic) before touching it, 2026-08-17.",
+      "what": "BL-436's design says corp_ai's build scorer \"is being asked to prefer processors on a payback curve that does not reward them\". Verified against the source: corp_ai.cpp emits corp_verb::build from exactly two sites - the ranked_sites loop hard-coded to building_type::extraction_site (~line 566), and one military_base candidate (~line 942). There is no processing_facility candidate anywhere in the scorer. The seam is not at fault: corp_command.cpp builds a processor, recipe and all, when a command asks for one (BL-388). The scorer simply never asks. I have filed this as BL-439 (AI never builds processors, priority A) rather than adjusting BL-436's premise silently.",
+      "why_it_matters": "It reassigns the blame BL-417 was filed to test. \"The AI prefers mines\" is structural - processors are not candidates - not an artefact of the net^2/capex curve. BL-417 step 1 (write the curve out honestly) is still worth doing and has landed; but BL-417 step 2, \"decide whether the quadratic bias is wanted\", is now a question about a curve that only ever ranks extraction sites against each other. Retuning that curve cannot make a rival build a processor.",
+      "recommendation": "Treat BL-439 as the item that actually addresses \"the AI prefers mines\", and re-scope BL-417 step 2 to what it really is: a choice about how extraction sites are ranked relative to one another and to the flat-scored military base. Do not tune the curve expecting a processor to appear.",
+      "files": [
+        "src/world/corp_ai.cpp",
+        "docs/development/backlog.json"
+      ],
+      "resolution": "Confirmed independently 2026-08-17 and acted on. corp_verb::build was emitted from exactly two sites in corp_ai.cpp — the ranked_sites loop (extraction_site) and one military_base — with no processing_facility candidate anywhere. BL-439 adds one: sited on the corp own asset tiles, recipe chosen from the browse space and crossed to the absolute id, gated on chain depth and on real input access (pool + local market inventory against the tick own coverage threshold), priced by estimate_prospective_profit, on the same score curve and the same solvency/glut/reserve gates as extraction. Guarded by ai_skill_harness R5, which was run against the PRE-change build first and failed by construction there (processors_gained = 0 on all five seeds). What the change then revealed is NR-269."
+    },
+    {
+      "id": "NR-266",
+      "title": "BL-436's calibration_sweep explains the x4 collapse by a mechanism that cannot happen - do not re-tune on that narrative",
+      "raised": "2026-08-17",
       "kind": "decision-taken",
       "status": "open",
-      "source": "Ben's call on NR-243, 2026-08-16: option C first - settle the tier-vs-alternate axis before retuning any numbers.",
-      "what": "The axis did not need inventing: scripts/recipes.lua already states it twice in its own comments (ids 22 and 23) - distinct raws feeding a shared good is 'an ordinary multi-producer economy fact, NOT BL-430's alternate-METHOD feature (one building offering interchangeable recipes for the same output)'. Measured against that, three of NR-243's four pairs have DISJOINT input sets (steel {iron_ore,coal} vs {iron_nickel_ore}; charcoal {timber} vs {peat}; trade_goods {clay,timber} vs {sand}) and the fourth differs by a placement precondition rather than cost (propellant atmospheric vs electrolysis - the airless route is run because the cheap one is unavailable). So all four were false positives of grouping by (primary output, era), not balance defects. No recipe magnitude was changed. The guard moved to chain_depth.cpp's R2 row, regrouped: every sibling pair is bucketed as a supply route (disjoint raws), an explicitly-exempted precondition pair, or a genuine interchangeable method, and only the third is price-compared. recipe_switch_harness's duplicate R1 was deleted rather than left as a second answer to the same question - it now runs ALL PASS.",
-      "why_it_matters": "Today the roster contains ZERO genuine interchangeable methods - 4 sibling pairs, 3 supply routes, 1 precondition, 0 methods. That is a real finding about BL-430: the alternate-method FEATURE shipped, but no content yet uses it, and the four pairs that looked like alternates are multi-producer economics. The bucketing is what keeps R2 from being a vacuous green - a pair cannot escape by being unclassifiable, and the counts print on every run - but Ben should know the dominance half is currently guarding an empty set, and will only start biting when BL-430's own alternates are authored.",
-      "recommendation": "No action needed on the numbers. Worth deciding separately whether BL-430 should author at least one genuine same-inputs alternate pair, so the feature it built has content and R2's dominance half has something to guard.",
+      "source": "Consequence of NR-265, found the same session, 2026-08-17.",
+      "what": "BL-436's calibration_sweep narrative attributes the x4 collapse to corps \"spending the extra income building processors that lose MORE per tick at higher scale\". Given NR-265 - the AI scorer has no processing_facility build candidate - no rival can spend income on a processor at any scale. Whatever the sweep measured, the processors involved were generated or warm-start ones only, and their count does not respond to income. The stated causal chain (more income -> more processors -> bigger per-tick loss) has no link in the middle.\n\nMEASURED THIS SESSION (2026-08-17), since tier_margin is Lua-linked and a local session can run it. Over 3 seeds x 20 ticks on the real generated world: extraction nets +1659.18 per building-tick, processing nets -7.92. A processor pays back its 200 cr capex NEVER; a mine pays back 100 cr in 0 ticks. The gap is not subtle and it is not mainly a price problem - R6 reports it directly: deposit richness (mean 53.34) multiplies a mine's base_rate of 20 to ~1067, against a processor's FLAT base_rate of 8, a ~133:1 rate ratio before any price is applied. Of 1590 processing building-ticks, 48.9% produced, 30.9% STARVED on a missing input, 9.1% had no recipe set. And R4/R5 name three recipe inputs (ids 8, 9, 10) that have deposits, are usually the richest thing on their tile, and are produced by NOTHING - a siting/reach failure, not a margin one.",
+      "why_it_matters": "The sweep's conclusion is currently the standing reason a cost-side lever was left alone. If the mechanism is wrong the conclusion may still be right, but it is unsupported, and any future calibration reasoning that leans on it inherits the error. Cost-side calibration is explicitly Ben's call, so I have measured and stopped rather than re-deriving it myself.\n\nThe measured picture makes the original narrative even less tenable: processors are not losing because corps overbuilt them at scale, they are losing because a processor's flat rate cannot compete with a richness-multiplied mine, and because a third of their ticks starve. Neither mechanism involves the AI building anything.",
+      "recommendation": "Re-derive the sweep before any cost-side number moves. tier_margin now runs locally and gives the numbers directly (it is currently the one red test in an otherwise green 79-test tier, failing its R2 and R5 exactly as designed). The three candidate levers it points at are distinct and should not be conflated: (a) the ~133:1 rate ratio from richness multiplying extraction but not processing, (b) the 30.9% input-starvation rate, (c) the 3 never-produced inputs, which read as siting/reach. All three are cost-side calibration and therefore Ben's - measured here, not touched.",
       "files": [
-        "tools/verify/chain_depth.cpp",
-        "tools/verify/recipe_switch_harness.cpp",
-        "scripts/recipes.lua"
+        "docs/development/backlog.json",
+        "tools/verify/tier_margin.cpp"
       ],
       "resolution": null
+    },
+    {
+      "id": "NR-267",
+      "title": "BL-428 chain depth has no AI player - a rival that cannot build a processor can never climb the ladder",
+      "raised": "2026-08-17",
+      "kind": "observation",
+      "status": "open",
+      "source": "Consequence of NR-265, found the same session, 2026-08-17.",
+      "what": "BL-428 gates recipes on a corp's reached chain depth. Depth is climbed by operating processors at successively deeper tiers. Since the AI scorer never builds a processing_facility (NR-265 / BL-439), a rival's depth is fixed at whatever its generated assets give it, for the whole campaign. The gate is single-player by construction.",
+      "why_it_matters": "It does not bite today: the depth-gated recipes are ancient-tier, so a 1960 campaign never reaches them. But the growth gate is being built as a shared mechanism, and it currently has exactly one participant. Worth knowing before more design leans on rivals climbing it.",
+      "recommendation": "No action needed now - recorded so it is not rediscovered later as a bug. It resolves as a side-effect of BL-439 (AI never builds processors); if BL-439 slips past the point where depth-gated recipes become reachable in a live era, this becomes urgent rather than latent.",
+      "files": [
+        "src/world/corp_ai.cpp"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-268",
+      "title": "BL-417 step 1 is genuinely free on MSVC - measured, not assumed; but the item's \"zero behavioural change\" claim was not established when written",
+      "raised": "2026-08-17",
+      "kind": "decision-taken",
+      "status": "open",
+      "source": "BL-417 step 1 landing, 2026-08-17.",
+      "what": "BL-417's design calls step 1 a \"no-op refactor, zero behavioural change\". In float that is not automatic: net/(capex/net) and (net*net)/capex round differently, so the rewrite could have moved every candidate score, hence world evolution, hence every blessed golden. Measured rather than assumed. Against the pinned MSVC build, before and after the rewrite: ai_skill_harness output byte-identical across all 5 seeds, and spectator_determinism byte-identical with hashes played=855E07DE529684EC / spectated=5AC90B4ACE717FCF unchanged. No golden re-bless was needed. Separately noted: the GCC baseline numbers carried into this session differ wholesale from MSVC on every seed (e.g. seed 3 final 306437.4 GCC vs 498537.6 MSVC), so the blessed bands are compiler-bound - they are MSVC bands, and a GCC run is not a valid comparator for them.",
+      "why_it_matters": "The claim happened to be true, but it was true by luck of rounding rather than by algebra, and the item asserted it as established. Worth recording because the same shape recurs: any \"algebraically equivalent\" rewrite inside the scorer is a golden-affecting change until measured. The compiler-bound goldens are the more useful finding - a harness result from a non-MSVC build cannot be compared against a blessed band.",
+      "recommendation": "Keep the measure-then-believe habit for scorer arithmetic. Consider whether the blessed bands should state their compiler in the harness output (ai_skill_harness already stamps \"(MSVC...)\" in its bless line, which is what made this catchable) and whether a GCC/WSL run should refuse to compare against them rather than reporting misleading failures.",
+      "files": [
+        "src/world/corp_ai.cpp",
+        "tools/verify/ai_skill_harness.cpp"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-269",
+      "title": "BL-439 landed and the AI immediately bankrupted itself on processors — the bands FELL where Sprint 19 predicted they would rise",
+      "raised": "2026-08-17",
+      "kind": "decision-taken",
+      "status": "open",
+      "source": "Landing BL-439 (the processing_facility build candidate), 2026-08-17.",
+      "what": "With a processor candidate in the scorer, rivals build 10-16 processors per seed across the benchmark set (69 total, against 0 before). Three of five seeds then go insolvent: seed 0 final net worth 498k -> -295k, seed 1 -> -89k, seed 4 -> -272k, each sitting below zero for 27-29 of 30 samples. Seeds 2 and 3 stay positive. ai_skill_harness is 18 rows red.\n\nThe estimator is NOT the culprit, and that was tested rather than assumed. The candidate was first scored with an inline revenue-minus-wages sum, then switched to estimate_prospective_profit (BL-162, the model done properly — habitability-scaled wages, real input cost, BL-193 stack decay). Same recipes chosen, same build counts, net worth moved only on seed 0 (-315k -> -295k). So the scorer is not mispricing the cost side; it is being promised a full run and handed a starved one.\n\nThe new per-building diagnostic reads: processor realised -6.24 to -11.70 per tick against a PREDICTED -0.38 to +0.08, on the same buildings, with extraction realised +22.80 where it sampled at all. Read the n: estimate_building_profit has no row for an idle or starved building, so the sample is biased toward the WORKING processors and the realised figure is the optimistic end.\n\nAMENDED 2026-08-17 after integration: the count above (18 red rows) was true when written and is now 23. Net-worth final/min and solvency are red on all five seeds, dial-action thrash ceilings on seeds 0/2/3/4, build-action on seed 3; survival still passes everywhere. The extra five rows come from BL-406/BL-404 moving outpost prices, not from further AI change — see NR-278. The finding and the decision not to bless are unchanged.",
+      "why_it_matters": "This is the measurement Sprint 19 was opened to get, with the AI actually exposed to the economy for the first time. Its success criterion was written down in advance: the ai_skill_harness bands re-blessed DOWNWARD on 2026-08-16 should RISE, and a bless that does not raise them means the fix did not work. They fell, hard. Under that rule these numbers are a finding, not a bless — so the goldens are deliberately LEFT RED rather than re-blessed, and BL-439 task C is not done.\n\nThe -295k figure is also bigger than processor losses can explain on their own: 12 processors x 300 ticks x ~11/tick is ~40k, not 800k. The likely amplifier is BL-073 debt interest compounding once a corp crosses zero, which would make insolvency self-deepening rather than self-correcting. Not measured, and named here so it is not assumed either way.",
+      "recommendation": "Ben owns the next call, because every lever here is cost-side calibration (the same boundary NR-266 stopped at). Three distinct options, which should not be conflated: (a) accept it as the honest finding, land BL-439 with the goldens red and a written reason, and let BL-436 fix the substrate — the bands re-bless once processing pays; (b) gate the candidate harder (a cash floor, a cap per corp) so rivals build processors without dying, which BUYS a green harness by hiding the defect the harness just found; (c) treat the debt-interest amplifier as its own item first, since a corp that cannot recover from one bad quarter makes every economy measurement noisier. My call taken in the meantime: do (a) and stop — nothing is tuned, nothing is blessed.",
+      "files": [
+        "src/world/corp_ai.cpp",
+        "tools/verify/ai_skill_harness.cpp",
+        "docs/development/backlog.json"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-270",
+      "title": "The AI can now build processors, so BL-436 can finally be measured against a rival that participates in it",
+      "raised": "2026-08-17",
+      "kind": "observation",
+      "status": "open",
+      "source": "Consequence of BL-439 landing, 2026-08-17.",
+      "what": "Every BL-436 measurement to date was taken on a world where the only processors were generated or warm-start ones, because the scorer could not build any (NR-265/NR-266). The benchmark set now carries 69 AI-built processors across five seeds, chosen by the AI on its own margin estimate.",
+      "why_it_matters": "It changes what the calibration sweep is measuring. NR-266 warned that the old narrative — corps spending income on processors that lose more at scale — described a mechanism that could not happen. It can happen now, so the sweep is worth re-running rather than re-derived on paper, and the three levers NR-266 named (the ~133:1 richness rate ratio, the 30.9% starvation rate, the three never-produced inputs) can each be measured with rivals responding to them.",
+      "recommendation": "Re-run BL-436 calibration_sweep and tier_margin after BL-439 lands, before any cost-side number moves. Also resolves NR-267: BL-428 chain depth now has an AI player in principle, though whether a rival actually climbs a rung is unmeasured and the depth-gated recipes remain ancient-only.",
+      "files": [
+        "tools/verify/tier_margin.cpp",
+        "docs/development/backlog.json"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-271",
+      "title": "richness_reference enabled at the MEDIAN, not the mean — and the cost side still cannot be rescaled into a fix, because processing gross margin is negative before any upkeep",
+      "raised": "2026-08-17",
+      "kind": "decision-taken",
+      "status": "open",
+      "source": "Ben's call to enable richness_reference and rescale the cost side, 2026-08-17.",
+      "what": "ENABLED, and corrected while enabling it. The authored intent is \"a typical deposit lands at ~1.0\", and the value that delivers that is the MEDIAN richness, not the mean. tier_margin now prints the distribution (new R6b): p10 10.58 / p25 15.76 / MEDIAN 24.92 / p75 45.09 / p90 98.34 / p99 360.91, mean 53.34, max 72,321. The mean sits at the 78th percentile, so referencing against it ran the median tile at 0.47 and clamped 18% of all deposits flat at the richness_min floor — halving raw supply across the whole map. Set to 24.9.\n\nThe ratio defect is FIXED. Extraction went from 1666.69 revenue / 1659.18 net per building-tick to 14.63 / 7.89, and its capex payback from 0 ticks (instant, i.e. meaningless) to 12. Processing revenue is now 12.66 against extraction 14.63 — comparable, where it was 16.60 against 1666.69.\n\nTHE COST SIDE IS NOT THE REMAINING BLOCKER, and that is measured rather than argued. Processing reads revenue 12.66, input$ 12.87, maintenance 7.73, wage 1.14, net -9.08. Gross margin is -0.21 BEFORE any upkeep, so cutting maintenance and wages to ZERO still leaves a loss-maker. No rescale of the cost side can fix a negative value-add.\n\nSeparately, the -3M net worth figures are almost entirely COMPOUNDING, not operations. k_debt_interest_per_quarter is 0.02 and the rollout is 300 ticks: 1.02^300 = 380x. Per-building extraction nets +5 to +11 across every seed, so a corp cannot lose millions by operating; it dips a few thousand negative on processor upkeep and the interest multiplies that by 380. This confirms the amplifier hypothesis raised in NR-269.",
+      "why_it_matters": "It relocates the lever, and it lands on the option Ben raised first. Before the ratio was fixed, repricing could not close a 100:1 gap and was correctly ruled out. With the ratio fixed, price IS the binding constraint — processing revenue must rise 1.72x to break even at current upkeep (12.87 input + 8.87 opex = 21.74 needed against 12.66 earned).\n\nIt also means the two levers now compose, where before neither worked alone: refined-good prices +40% AND processing upkeep halved gives 17.72 - 12.87 - 4.44 = +0.41, i.e. break-even. Matching extraction at +7.89 needs more than that.",
+      "recommendation": "Ben's call, three sized options, not mutually exclusive: (a) refined-good base prices +72% alone; (b) prices +40% with processing maintenance 10 -> 5 and base_wage 12 -> 8, which is the 'rescale the cost side' half actually doing work once it has a positive margin to protect; (c) cut recipe input quantities ~70%, which is a content change to recipes.lua rather than a price one. I have enabled the conversion at the median and stopped there — no price and no upkeep number has been touched, because tuning any of them against an unexplained -3M was the exact mistake NR-266 warns about, and the -3M is now explained.\n\nWorth noting for whichever is chosen: 30.0% of processing building-ticks STARVE and 20.3% run with NO RECIPE SET. Half of all processor ticks earn nothing while paying maintenance. That is a defect to fix before, not after, calibrating against these means — the no-recipe share in particular looks like a generation or default-recipe gap rather than an economic outcome.",
+      "files": [
+        "scripts/economy.lua",
+        "tools/verify/tier_margin.cpp",
+        "tools/verify/ai_skill_harness.cpp"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-272",
+      "title": "The no-recipe defect was real, was in the LIVE game, and fixing it uncovered the actual blocker: coal has 1,671 tiles and zero mines",
+      "raised": "2026-08-17",
+      "kind": "decision-taken",
+      "status": "open",
+      "source": "Ben's call to fix the no-recipe defect before calibrating, 2026-08-17.",
+      "what": "FIXED, and it was not a harness artefact. author_building cannot set a recipe (ids are indices into a registry that does not exist yet at world-gen time), so processors are authored with no_recipe and backfilled later. That backfill lived INLINE IN app::load_economy, which made a world-generation invariant depend on the UI startup sequence — every path building a world without app (headless harnesses, --serve, --verify) ran processors that could never produce.\n\nWorse, and this one hit the live game: load_economy runs the pass at app.cpp:955 and generate_background_firms authors MORE processors at :965. Every background firm processor kept no_recipe for the whole campaign, paying maintenance every tick, producing nothing, and reporting as ordinary idleness. tier_margin had already measured the shape of this in its own comment (26.5% recipe-less with no pass, 11.3% with the pre-firms pass only) and left the 11.3% standing as expected.\n\nThe loop is now world/s assign_default_recipes (corporation_generation.hpp). app calls it in BOTH positions; tier_margin retired its private copy for the shared one and calls it in both positions too; ai_skill_harness never ran it at all and now does. Measured: no-recipe ticks 20.3% -> 0.0%.\n\nIT DID NOT IMPROVE THE ECONOMICS, and that is the finding. Processing net went 9.08 -> -10.44 per building-tick, because the processors that were silently unconfigured are now visibly STARVING: starvation rose 30.0% -> 46.3%. The buildings were never going to pay; the defect was hiding the reason.",
+      "why_it_matters": "The starvation now names one culprit. Coal (resource id 1) is the binding input on 54.0% of all starved processor ticks. It has 1,671 tiles carrying deposits and ZERO extraction sites targeting it, supplying 6.1 units/tick from ambient sources alone.\n\nThe cause is siting, not price and not upkeep: an extraction site targets richest_extractable(tile), and coal is the richest extractable on only 1.1% of the tiles that carry it. It is always out-ranked, so no mine — generated or AI-built — ever targets it, while the steel chain needs it. This is the same failure mode as R5s three never-produced inputs (ids 8/9/10), which NR-266 flagged as siting/reach rather than margin.",
+      "recommendation": "Do NOT reprice yet. Repricing refined goods against a chain whose second input is unobtainable would tune around the shortage rather than fix it, and would have to be undone once coal is mined. The siting rule is the next item: an extraction site should be able to target a resource that is WANTED rather than merely richest — the demand signal already exists (the recipe input demand tier_margin R4 prints), and richest_extractable is a tile-local heuristic with no knowledge of it. Worth filing as its own backlog item; it is a corp_ai and generation change, not a calibration one.\n\nOnce coal is actually mined, re-run tier_margin and re-derive the price options in NR-271 (a/b/c) from the new numbers. The 1.72x revenue figure was measured on a starved chain and will move.",
+      "files": [
+        "src/world/corporation_generation.cpp",
+        "src/world/corporation_generation.hpp",
+        "src/core/app.cpp",
+        "tools/verify/tier_margin.cpp",
+        "tools/verify/ai_skill_harness.cpp"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-273",
+      "title": "The starting-corp pool was specialists-only by TIMING alone - now stated explicitly, and asserted",
+      "raised": "2026-08-17",
+      "kind": "decision-taken",
+      "status": "open",
+      "source": "BL-435 task E (the guard), while making the screen reachable to --verify.",
+      "what": "build_corp_choices was correct only because of WHEN it runs: the stage opens in the one frame before generate_background_firms, so m_world.corporations still held exactly the 8 specialists. That is a positional guarantee, one refactor away from silently becoming false - and it also blocked any verify hook, since a re-entered screen on a started world would have listed all 25-37 corps. Decision taken: skip is_background explicitly in build_corp_choices (a no-op on the live path, load-bearing everywhere else), and assert the split per seed in player_seed_sweep --guard G2 rather than trusting the ordering.",
+      "why_it_matters": "The pool being the specialist set is Ben’s own 2026-08-16 call and requirement R2. It was being upheld by an ordering nobody would notice breaking.",
+      "files": [
+        "src/core/app.cpp",
+        "tools/verify/player_seed_sweep.cpp"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-274",
+      "title": "Specialist processor coverage is now 6.92/8, not the 5.83/8 task B measured - something moved it further",
+      "raised": "2026-08-17",
+      "kind": "observation",
+      "status": "open",
+      "source": "player_seed_sweep --guard 24, run on resuming BL-435 at task E.",
+      "what": "BL-435 task B recorded specialists-with-a-processor at 2.96/8 before and 5.83/8 after its focus_asset_pattern fix. The same population measured today reads 6.92/8 over the same 24 seeds (166 of 192), with 0 seeds having none. Nothing in tasks E-F touches generation, so the extra ~1.1 came from work landed between - most plausibly BL-436's option-B extraction change or the dead-start trade holdings_range fix (2->3 draws reach the trade pattern's processing slot). Not investigated further: the guard's floor is 4.00/8 and the direction is the intended one.",
+      "why_it_matters": "The number quoted in BL-435’s own progress note is now stale, and coverage drifting upward without an item claiming it means the openings are being reshaped by side effects. Worth knowing which change owns it before anyone tunes against 5.83.",
+      "files": [
+        "tools/verify/player_seed_sweep.cpp",
+        "src/world/corporation_generation.cpp"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-275",
+      "title": "The corp-choice screen shipped with a clipped cell - caught by its first capture, which is the argument for capturing before blessing",
+      "raised": "2026-08-17",
+      "kind": "observation",
+      "status": "open",
+      "source": "BL-435 task E, scripts/verify/corp_choice.lua first successful run.",
+      "what": "The Holdings column rendered '2 proc / 0 extr / 1 other' clipped to '/ 1 otl' behind the Choose button - the table's column weights (0.42/0.16/0.24/0.18) gave the widest cell the narrowest stretch. Rebalanced to 0.36/0.14/0.22/0.28 off the measurement and re-captured clean. Also worth recording: the FIRST capture came back as a blank clear-colour frame, because the window is AlwaysAutoResize and ImGui sizes from the previous frame; the script now takes a warm-up capture as main_menu.lua does.",
+      "why_it_matters": "The screen was built and committed on 2026-08-16 without ever being photographed, and it carried a visible defect. Both failure modes here are cheap to hit again: a surface no automated path can reach, and a first-frame capture that looks like a working check but shows nothing.",
+      "files": [
+        "src/core/app.cpp",
+        "scripts/verify/corp_choice.lua"
+      ],
+      "resolution": null,
+      "recommendation": "EYEBALL OWED, and no golden until then. screenshots/corp_choice.png is committed-capture-only on purpose: blessing a golden now would pin a layout Ben has never seen. --autostart-play will NOT show the screen (it auto-picks Surprise me), so seeing it live means starting a game from the menu. Once he has looked, bless corp_choice as a golden - the check is already written and stable."
+    },
+    {
+      "id": "NR-276",
+      "title": "The shared dependency cache never seeds anything - BL-302's directory names do not match what it looks for",
+      "raised": "2026-08-17",
+      "kind": "observation",
+      "status": "resolved",
+      "source": "Hit while configuring a fresh sub-agent worktree for BL-406/BL-404. The configure tried to DOWNLOAD SDL3 and failed offline, in a repo that carries a 120 MB cache of exactly that.",
+      "what": "CMakeLists.txt's seeding loop tests for '${IO_DEPS_CACHE}/${dep_name}-src/${marker}' - sdl3-src, lua_src-src, sol2_src-src, imgui_src-src. The cache on disk holds 'sdl3', 'lua_src', 'sol2_src', 'imgui_src'. No name matches, so every dep is classified COLD in any build tree that is not already warm, and the 'Deps: seeded from ...' line never prints. The main repo's build/ tree hides this completely: it has been warm since before BL-302, so nobody has configured cold there.",
+      "why_it_matters": "It defeats BL-302's entire purpose, and it only bites the case that motivated it - a fresh worktree for a parallel sub-agent, which is now the standard way work is split here. Offline, or on a slow link, a sub-agent cannot configure at all. Worked around this session by passing FETCHCONTENT_SOURCE_DIR_* explicitly (see bl406_build.bat, deleted before commit), which is a one-off, not a fix.",
+      "recommendation": "One-line fix either way - point the loop at '${IO_DEPS_CACHE}/${dep_name}' or rename the four cache directories. Prefer changing the loop, since the cache directories are what the checkout actually carries. Worth a backlog item rather than a drive-by, because whichever way it goes wants a cold-configure check that would have caught it.",
+      "files": [
+        "CMakeLists.txt"
+      ],
+      "resolution": "Fixed 2026-08-17, one line: the seeding loop now tests IO_DEPS_CACHE/dep_name, without the -src suffix. That suffix is a FetchContent BUILD-TREE convention (_deps/<name>-src) and the IS_DIRECTORY test above it is right to keep using it; the shared CACHE is a plain checkout carrying sdl3, lua_src, sol2_src, imgui_src. Appending -src there matched nothing, so every dep classified COLD and the BL-302 seeding never fired once.\n\nPROVEN COLD rather than assumed, which is the whole point of this entry: configured a fresh build tree from scratch and it reported 'Deps: seeded from .../_deps_cache -> sdl3;lua_src;sol2_src;imgui_src', configuring in 25.9s with no download.\n\nThe integrator's report that the FETCHCONTENT_SOURCE_DIR_* variable NAMES were also wrong turned out to be mistaken - string(TOUPPER) already yields exactly SDL3, LUA_SRC, SOL2_SRC, IMGUI_SRC. Only the path was wrong, which is why its explicit-flag workaround succeeded and masked the real cause. Scratch tree removed after the check."
+    },
+    {
+      "id": "NR-277",
+      "title": "BL-406/BL-404 landed without re-tuning pull_fraction, though the ruling cleared it to move",
+      "raised": "2026-08-17",
+      "kind": "decision-taken",
+      "status": "open",
+      "source": "Ben's ruling 2026-08-15 on BL-406 said 'pull_fraction is re-tuned against whatever curve (c) produces' and cleared outpost prices to move. The session brief separately fenced off scripts/economy.lua repricing as Ben's open call, blocked behind BL-440.",
+      "what": "pull_fraction was left at its authored 0.50 and economy.lua was not touched. The two instructions point opposite ways, so the narrower one was taken. Measured effect of the change alone on seed 0: of three pulled resources on the test outpost, two pull at 2.8x their previous size (the counterpart wants far more than the lowest-id market did) and one is silenced outright by the now-real netting. Net direction is up, not down, so BL-263's price-floor support is not at risk - which was the specific failure mode the pre-change harness warned a naive netting would cause.",
+      "why_it_matters": "The mechanism is now correct and its magnitude is untuned. Nothing is broken by that - the pull got stronger, not weaker - but the 0.50 was chosen against a source that no longer exists, so it is a number with no remaining justification rather than a number known to be right.",
+      "recommendation": "Fold the pull_fraction tune into BL-440's repricing pass rather than doing it here. It is the same class of call (an authored economy constant), it wants the same before/after price evidence, and doing it separately means tuning twice.",
+      "files": [
+        "scripts/economy.lua",
+        "src/world/market_clearing.cpp"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-278",
+      "title": "Outpost prices move with BL-406/BL-404 - any golden or band that reads them will shift, and none was re-blessed",
+      "raised": "2026-08-17",
+      "kind": "observation",
+      "status": "open",
+      "source": "Landing BL-406/BL-404. Ben's ruling explicitly cleared outpost prices to move, so this is an intended consequence, recorded rather than hidden.",
+      "what": "Every off-home market's demand for a pulled resource changes size this tick and therefore its resolved price changes: two of three pulled resources at 2.8x, one silenced to zero, measured on seed 0. Any world hash, golden capture, or ai_skill_harness band downstream of an outpost price will read differently. Nothing was re-blessed - the benchmark is deliberately red already (NR-269/NR-271/NR-272) and re-blessing into a red benchmark would bake in an unexamined number.",
+      "why_it_matters": "A moved golden that nobody names looks identical to a regression when it is next noticed. This is the naming. It also means the first bless after BL-440's repricing must be taken against a build that carries this change, not before it.",
+      "recommendation": "Leave every golden and band red. Re-bless once, after BL-440 settles prices, rather than chasing each economy change through the capture set.",
+      "files": [
+        "src/world/market_clearing.cpp"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-279",
+      "title": "Two parallel agents both allocated NR-273/274/275 - the BL-406/BL-404 set was renumbered to NR-276/277/278, and its own commit message still quotes the old ids",
+      "raised": "2026-08-17",
+      "kind": "decision-taken",
+      "status": "open",
+      "source": "Integrating the three sprint19-bl417 sub-agent branches. Both the BL-435 worktree and the BL-406/BL-404 worktree branched from 5527984, where the highest id was NR-272, and each independently minted 273/274/275 for entirely different entries.",
+      "what": "Merge order decided it. BL-435 landed first and KEEPS NR-273 (specialists-only pool by timing), NR-274 (processor coverage 6.92/8) and NR-275 (clipped corp-choice cell). The BL-406/BL-404 set was renumbered: NR-273 -> NR-276 (the dep-cache seeding bug), NR-274 -> NR-277 (pull_fraction not re-tuned), NR-275 -> NR-278 (outpost prices move, nothing re-blessed). Cross-references were rewritten in backlog.json (BL-406 design), docs/economy/MARKETS.md and src/world/recipe_registry.hpp. THE ONE THING THAT COULD NOT BE FIXED is commit cab181b’s own message, which still reads \"pull_fraction is NOT re-tuned - NR-274\" and \"No golden or band re-blessed - NR-275\". Read against today’s file those point at two BL-435 entries. Substitute 277 and 278.",
+      "why_it_matters": "A naive merge would have silently dropped three entries - the exact failure the parallel-worktree notes warn about. It did not happen, but the near-miss is the point: id allocation off a stale local file is not safe once more than one worktree is open, and next_id.js only helps if it is actually run at authoring time rather than at landing time.",
+      "recommendation": "Nothing to undo. Worth considering whether NEEDS_REVIEW ids should be minted the way backlog ids are (next_id.js scanning all branches), or whether a verify check should simply assert no duplicate NR id - the latter is a five-line check and would have caught this before the merge rather than during it.",
+      "files": [
+        "docs/development/NEEDS_REVIEW.json",
+        "docs/development/backlog.json",
+        "docs/economy/MARKETS.md",
+        "src/world/recipe_registry.hpp"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-280",
+      "title": "BL-406/BL-404 moved outpost prices but did NOT move the spectator rollout hash - NR-278 over-predicted its own blast radius",
+      "raised": "2026-08-17",
+      "kind": "observation",
+      "status": "open",
+      "source": "Integration gate on sprint19-bl417 after merging all three sub-agent branches, plus a control build of spectator_determinism at the pre-merge commit 8cc2981.",
+      "what": "spectator_determinism fails one assertion - R2 byte-identity against the pinned golden 855E07DE529684EC. Measured on BOTH sides of the merge, the observed hash is the SAME value, 6D546B281FFA4A68, and the spectated hash is 8606FA466D259B09 on both. So the failure is entirely pre-existing (the golden was last blessed at 3b9ffd2, before BL-439/BL-436/BL-440 landed on this branch) and the market-clearing change contributed nothing to it. Every other assertion in that harness passes, including both reproducibility checks and the R2 prohibition check.",
+      "why_it_matters": "NR-278 states that any world hash downstream of an outpost price will read differently. On this rollout it does not, which is a fact worth having before anyone treats a moved hash as evidence the pull change reached something. The likely reason is that the seed-0 300-tick spectator rollout does not exercise an off-home market enough for the pull to register - if so, the harness is blind to exactly the change BL-406 made, and that is a coverage gap rather than a reassurance.",
+      "recommendation": "Do not bless. When the goldens are eventually re-blessed as one deliberate pass (NR-269 owns that call), re-blessing spectator_determinism’s R2 golden is a one-line change and should ride along. Separately worth checking whether the rollout reaches an off-home market at all.",
+      "files": [
+        "tools/verify/spectator_determinism.cpp",
+        "src/world/market_clearing.cpp"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-281",
+      "title": "BL-441: the want registered is NET of the corp's own pool, not the gross full-run need — a deliberate narrowing of the item's wording",
+      "raised": "2026-08-17",
+      "kind": "decision-taken",
+      "status": "open",
+      "source": "Implementing BL-441 in run_processing (economy_system.cpp), reading the item's design against what mc.demand means to resolve_price.",
+      "what": "BL-441's design says the demand to register is 'the full-run need per input'. Taken literally that is the GROSS need — 2 units per batch times the full batch count — regardless of how much of it the corp already holds in its own (corp, body) pool. I registered `max(0, need_full - pool_on_hand)` instead: the want the corp has OF THE MARKET. In the item's own worked example the two are identical, because a starved processor's pool is empty by construction, and the guard (order_book_harness R8) is written on an empty pool so it cannot tell them apart.",
+      "why_it_matters": "They differ for a corp that is NOT starved. mc.supply is an offer made to the market and mc.inventory is a delivery to it — BL-422's distinction. resolve_price compares supply against demand, so demand has to be the BID to the market for the comparison to be apples-to-apples. Under the gross reading, a vertically integrated corp that feeds its smelter entirely from its own mine would register full market demand for an input it never intends to buy, permanently inflating that input's price for everyone else. That is BL-422's defect in a third direction: crediting a transaction nobody made. Under the net reading, demand appears exactly when the buffer drains, which is when the corp actually competes for the good.",
+      "recommendation": "Keep the net reading; it is the one that makes demand the counterpart of supply. If Ben wants gross — a defensible alternative if mc.demand is meant to express total CONSUMPTION of a good rather than market pressure on it — it is a one-line change at the same site, but the two meanings should not be mixed and MARKETS.md should then say which it is.",
+      "files": [
+        "src/world/economy_system.cpp",
+        "docs/economy/MARKETS.md"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-282",
+      "title": "BL-441 necessarily pulled run_construction into scope — otherwise the fix would have silently ZEROED construction's market demand",
+      "raised": "2026-08-17",
+      "kind": "decision-taken",
+      "status": "open",
+      "source": "Tracing every writer of economy_report::purchases before splitting the demand read in market_clearing.cpp.",
+      "what": "BL-441's design names run_processing only. But run_construction (economy_system.cpp, BL-095 pay-as-you-build) is the OTHER writer of report.purchases, and market_clearing's single demand loop was reading both. Had I pointed demand at a new `wants` map fed only by processing, construction sites would have gone from registering their drawn materials as demand to registering NOTHING — a regression introduced by the fix. So run_construction now records its want too: the full-rate material need, registered BEFORE the `rate <= 0` continue, so a build paused for want of steel finally says so. This is the same defect in the same file, and arguably the starker case: a fully stalled build site previously registered zero demand for the exact material stalling it.",
+      "why_it_matters": "It widens the diff beyond the item's stated file scope while a parallel worktree (BL-442, price band as data) is editing the same two files. Worth Ben knowing it was forced by coherence rather than chosen, and worth knowing that construction demand is now a want and will read higher than before across the whole economy.",
+      "recommendation": "Accept as part of BL-441. If it should have been its own item, the split point is clean — the construction want is one added block in run_construction.",
+      "files": [
+        "src/world/economy_system.cpp"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-283",
+      "title": "NR-276's dependency-cache fix does not reach a git WORKTREE — the default cache path resolves inside the worktree, where there is no cache",
+      "raised": "2026-08-17",
+      "kind": "observation",
+      "status": "resolved",
+      "source": "Cold-configuring build/ in the BL-441 worktree at .claude/worktrees/agent-ae85f8b7ecd01345e.",
+      "what": "CMakeLists.txt defaults IO_DEPS_CACHE to ${CMAKE_CURRENT_SOURCE_DIR}/_deps_cache. In the main checkout that is C:/Users/benbo/Project-Io/_deps_cache and the fix works. In a worktree, CMAKE_CURRENT_SOURCE_DIR is the worktree root, which has no _deps_cache — so a cold configure there finds nothing to seed from and falls through to downloading. I got a zero-download configure only by exporting IO_DEPS_CACHE=C:/Users/benbo/Project-Io/_deps_cache by hand.",
+      "why_it_matters": "Worktrees are the project's primary sub-agent isolation mechanism (DELIVERY.md), so the case where the cache matters most — several agents each cold-configuring at once — is exactly the case the default misses. Each pays the ~120 MB download NR-276 exists to prevent.",
+      "recommendation": "Make the default cache path resolve against the main repository rather than the source dir — `git rev-parse --path-format=absolute --git-common-dir` gives the shared .git, whose parent is the main checkout, and it degrades to the current behaviour outside a worktree. Small change to CMakeLists.txt; not done here because it is outside BL-441 and touching the build config mid-flight would disturb the parallel worktrees.",
+      "files": [
+        "CMakeLists.txt"
+      ],
+      "resolution": "Already fixed on the integration branch before this entry merged in. Commit 10b0e5c (2026-08-17) took exactly the recommended route: when the default IO_DEPS_CACHE path does not exist, CMakeLists.txt asks git for --path-format=absolute --git-common-dir and uses the main checkout's _deps_cache. It is a no-op in a normal checkout. Verified in an actual worktree with a zero-download configure in 13.4s."
+    },
+    {
+      "id": "NR-284",
+      "title": "BL-442 step 1 ids allocated from 282 to dodge a parallel-worktree collision - renumber on merge",
+      "raised": "2026-08-17",
+      "kind": "observation",
+      "status": "resolved",
+      "source": "BL-442 step 1 (price band to data), run in a worktree in parallel with BL-441.",
+      "what": "This worktree's NEEDS_REVIEW.json ends at NR-258, but BL-441's agent is allocating from the same range at the same time. Rather than take 259-261 and guarantee a three-way clash, these three entries take 282-284, above the range the parent session named as free (around NR-281).",
+      "why_it_matters": "Purely mechanical, but the ids are not authoritative: whoever merges should renumber whichever side collides. Flagged so a duplicate id is read as an expected merge artifact, not as file corruption.",
+      "recommendation": "Renumber on merge; no other action.",
+      "files": [
+        "docs/development/NEEDS_REVIEW.json"
+      ],
+      "resolution": "Renumbered on merge, 2026-08-17, exactly as this entry asked. BL-441 merged first and kept its NR-281/282/283; BL-442 step 1's three entries moved as a contiguous block: NR-282 -> NR-284 (this entry), NR-283 -> NR-285, NR-284 -> NR-286. The block was moved whole rather than only the two colliding ids, because renumbering BL-442's NR-282 into NR-284 would otherwise have collided a second time with its own NR-284. No cross-reference outside NEEDS_REVIEW.json pointed at any of the three (checked by grep); the three surviving NR-282/NR-283 references in CMakeLists.txt, REFINED.md and economy_system.cpp all belong to BL-441 and are correct as they stand."
+    },
+    {
+      "id": "NR-285",
+      "title": "A processor's unmet input need registers ZERO market demand - only completed purchases reach mc.demand",
+      "raised": "2026-08-17",
+      "kind": "observation",
+      "status": "resolved",
+      "source": "Found while building tools/verify/price_band_harness.cpp for BL-442 step 1 - a fixture that should have driven the price to the ceiling produced no movement at all.",
+      "what": "To exercise resolve_price's ceiling branch the harness needs demand against zero supply. The obvious fixture - a processing facility consuming iron_ore with no extractor and no market inventory - generates EXACTLY ZERO demand. mc.demand accrues from what a corp actually BOUGHT (market_clearing.cpp's auto-buy pass, which credits report.purchases), and with nothing available to buy there is nothing to credit. Unmet industrial need is therefore invisible to price resolution: the hungrier the economy gets, the less demand it records, because hunger is precisely the state in which no purchase completes. The harness works around it with a standing buy order, which IS counted unconditionally.",
+      "why_it_matters": "This looks like the same structural-zero-demand shape BL-441 is being built to address, observed from a different direction - and if so it is worth checking that BL-441's fix reaches THIS path (purchase-credited demand) and not only the injection paths. It also explains why widening the price band ahead of BL-441 would amplify nothing: the ceiling branch is reachable in the shipped economy mainly through standing orders, not through industrial appetite.",
+      "recommendation": "Hand to whoever lands BL-441: confirm whether unmet input need is meant to register as demand, and if so whether the fix covers the auto-buy credit path. Not actioned here - BL-442 step 1 is explicitly behaviour-identical and must not change what demand means.",
+      "files": [
+        "src/world/market_clearing.cpp",
+        "tools/verify/price_band_harness.cpp"
+      ],
+      "resolution": "Answered by BL-441, which merged into this branch immediately before BL-442 step 1. This entry asked whether BL-441's fix reaches the purchase-credited demand path; it does, because that path is the one it replaced. mc.demand no longer reads report.purchases at all -- market_clearing.cpp now accumulates demand from report.wants, a new std::map over (corp, body) carrying what each consumer set out to buy whether or not the draw succeeded. report.purchases survives only as the money side (auto_buys / VWAP / expenditure), which is correct: billing the want would pay for deliveries nobody made. So the exact fixture described here -- a processing facility consuming iron_ore with no extractor and no market inventory -- now registers its full unmet need as demand, and the standing-buy-order workaround in price_band_harness.cpp is no longer the only route to the ceiling branch. The workaround is left in place: it is a valid unconditional-demand fixture and the harness is deliberately differential about the band, not about where demand comes from."
+    },
+    {
+      "id": "NR-286",
+      "title": "Decision taken: registered price_band_harness in the verifier-headless SKILL.md without asking first",
+      "raised": "2026-08-17",
+      "kind": "decision-taken",
+      "status": "open",
+      "source": "BL-442 step 1. CLAUDE.md: 'Creating or modifying a skill requires user permission'; this session is non-interactive.",
+      "what": "BL-442's guard is a new harness, tools/verify/price_band_harness.cpp. The documented way a headless check becomes a permanent asset is to name it in .claude/skills/verifier-headless/SKILL.md, but modifying a skill wants Ben's permission and there was no one to ask. Taken the call to add the entry, on the grounding that this is the additive case the skill's own text invites ('Authorising a new check = adding a tools/verify/*.cpp harness and naming it here') rather than a change to how the skill behaves. The alternative was an unregistered harness, which is exactly the 'loose tool is forgotten' outcome the standing rule warns against.",
+      "why_it_matters": "A delegated decision that is unrecorded is indistinguishable from one Ben made. If he would rather skill edits always wait for him, the entry is one paragraph to revert - but the harness should then be registered somewhere else, or it will rot.",
+      "recommendation": "Ratify the SKILL.md entry, or say that skill edits must always wait and name where new harnesses get registered instead.",
+      "files": [
+        ".claude/skills/verifier-headless/SKILL.md",
+        "tools/verify/price_band_harness.cpp"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-287",
+      "title": "BL-441 broke supply_advance R8 and neither agent saw it - the fixture drove demand through report.purchases",
+      "raised": "2026-08-17",
+      "kind": "observation",
+      "status": "resolved",
+      "source": "Full ctest gate on the integrated BL-441 + BL-442 tree. supply_advance failed with \"divergence: body B price above base (demand, no supply)  (got 1.0000, want 1.0000)\".",
+      "what": "Bisected across the two commits rather than guessed: the row PASSES at 10b0e5c (pre-BL-441) and FAILS at c5be73f (post-BL-441, pre-BL-442), so BL-441 caused it and BL-442 is innocent. The cause is exactly BL-441 working as designed. supply_advance hand-builds an economy_report and drives its standing iron_ore shortfall through report.purchases, which WAS the demand register. BL-441 moved the register to report.wants and left purchases as the money side, so the fixture went on charging a corp for goods and stopped bidding for them - body B recorded zero demand and its price parked on base exactly.",
+      "why_it_matters": "BL-441's own report says \"the failing assertion set is IDENTICAL on both sides - three pre-existing failures, none new, none masked\". That claim was true of tier_margin, which is what it ran; it was not true of the suite. A semantic change to a shared struct field needs every hand-built fixture of that struct re-read, not just the harness the item was written against. supply_advance was the only one, but nothing found it except the full gate.",
+      "recommendation": "Fixed here: the fixture now authors report.wants (the bid) alongside report.purchases (the fill), with a comment saying which is which. supply_advance is green. Worth Ben knowing the guard was EDITED as part of integration rather than left red - the edit teaches the fixture BL-441's new contract, it does not weaken the assertion, which still demands the price rise above base and still fails if demand goes missing again.",
+      "files": [
+        "tools/verify/supply_advance.cpp",
+        "src/world/market_clearing.cpp"
+      ],
+      "resolution": "Fixed 2026-08-17 at integration. Bisected to BL-441, fixture corrected, re-run green. No engine change."
+    },
+    {
+      "id": "NR-288",
+      "title": "price_band_harness P2 failed on the integration branch for want of a directory, not a defect",
+      "raised": "2026-08-17",
+      "kind": "observation",
+      "status": "resolved",
+      "source": "Full ctest gate on the integrated tree: price_band_harness reported \"could not write the probe script (is build_gen/verify present?)\".",
+      "what": "P2 writes a probe Lua script to build_gen/verify/ to prove the loader really reads the authored table rather than falling through to the struct defaults. It never creates that directory. It exists in a worktree that has run one of the cl recipes from tools/verify/README.md - which BL-442's worktree had - and does not exist in a checkout built only through CMake, which the integration branch is. So the harness passed for its author and failed for everyone else.",
+      "why_it_matters": "It reads as a red guard on a fresh clone and on CI, which is the case where a red guard is least likely to be investigated and most likely to be blessed away. Every BEHAVIOURAL row passed on the integrated tree, P5 included - the row that fails if economy_system.cpp reacquires a private copy of the band - so nothing about BL-442 was actually wrong.",
+      "recommendation": "Fixed here: the harness calls std::filesystem::create_directories on build_gen/verify before opening the probe. Green. Flagged because it is a general shape - any harness that writes into a build_gen path an ad-hoc cl recipe happens to create will pass locally and fail under CMake.",
+      "files": [
+        "tools/verify/price_band_harness.cpp"
+      ],
+      "resolution": "Fixed 2026-08-17 at integration: create_directories before the probe write. price_band_harness is green under ctest."
+    },
+    {
+      "id": "NR-289",
+      "title": "The premise of BL-442 step 2 is wrong in its most important particular: inter-market trade ALREADY happens on day 1",
+      "raised": "2026-08-17",
+      "kind": "observation",
+      "status": "open",
+      "source": "tools/verify/haulage_measure.cpp, new this session. 5 seeds of the real generated world, 20 econ ticks each, band unchanged at the old [0.25x, 4.0x].",
+      "what": "BL-442 step 2 is written on the premise that the narrow ceiling is why nothing moves between markets, and that inter-market trading is a late-game unlock rather than a day-1 fact. Measured at the OLD band: 2146 convoys dispatched, of which 1677 are intra-body market-to-market hauls. Inter-market trade was never absent. What IS absent - and was zero at the old band and stayed zero at the new one - is inter-BODY trade: 0 space-lane convoys and 0 persistent trade_routes across all five seeds. trade_routes is a body-level record (body_a/body_b in components.hpp), so BL-088's persistent route store cannot see intra-body trade at all, which is very likely why the thread believed there was none: the surface everyone reads was structurally blind to the trade that was happening.",
+      "why_it_matters": "The zero that matters is gated by the launchpad and the propellant burn in dispatch_convoys, not by the price band. No ceiling reachable by any sane number will open the space lane, because the lane is refused before any price is consulted. If the goal is 'inter-body trade from day 1', widening the band is the wrong lever and this item cannot deliver it. If the goal is the intra-body one, it was already met and the widening is a volume/reach change rather than an unlock.",
+      "recommendation": "Ben to say which trade he meant. If it is the space lane, that wants its own item against the launchpad/propellant gate in supply_system.cpp, not a price tunable. The widening landed here on its own honest merit - it extends the servable set from the median neighbour pair to every measured neighbour pair - but it should not be recorded as having created inter-market trade, because it did not.",
+      "files": [
+        "tools/verify/haulage_measure.cpp",
+        "src/world/supply_system.cpp",
+        "scripts/economy.lua"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-290",
+      "title": "Decision taken: the price band's FLOOR was left at 0.25 while the ceiling moved 4.0 -> 10.0",
+      "raised": "2026-08-17",
+      "kind": "decision-taken",
+      "status": "open",
+      "source": "BL-442 step 2. The item's summary calls the whole [0.25x, 4x] band 'far too narrow'; Ben's 2026-08-17 requirement derives only a ceiling.",
+      "what": "Widening symmetrically was the obvious reading of 'widen the band' and it was rejected. The derivation Ben gave - the ceiling must exceed base + haulage for a neighbouring market to be worth serving - constrains the ceiling and says nothing about the floor. A lower floor does widen the arbitrage margin, but it does so by cutting the price an abundant producer receives, which is the same direction Sprint 19's falling economy numbers already complain about, and it would have put an authored guess immediately beside a derived number.",
+      "why_it_matters": "It is a deliberate half-execution of the item as written, so it should not read later as an oversight. It also leaves the band asymmetric - [0.25x, 10.0x] - which is a legitimate shape for a scarcity model but is a change in character from the roughly log-symmetric [0.25x, 4x] it replaces.",
+      "recommendation": "If Ben wants the floor moved too, it should get its own derivation rather than a matching round number - most naturally from the carry cost of holding unsold stock, which the model does not currently charge at all.",
+      "files": [
+        "scripts/economy.lua",
+        "docs/economy/MARKETS.md"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-291",
+      "title": "The scarcity-outranks-abundance constraint was measured at 233x and deliberately NOT used",
+      "raised": "2026-08-17",
+      "kind": "decision-taken",
+      "status": "open",
+      "source": "haulage_measure's base-price report: min 0.60, max 140.00 (spacecraft_components), ratio 233.33.",
+      "what": "Ben's second sentence - 'a resource nobody can obtain is still cheaper than the one everybody has', with coal 2.0 -> 8.0 against iron ore 2.5 - reads as a constraint that a scarce good must be able to outprice an abundant one. Taken literally across the whole authored price table that demands ceil_mult > 233, because the table spans three tiers from a 0.60 raw to a 140.00 Tier 3 product. That was not used. RESOURCES.md promises margin WIDENS up the tiers and BL-340 priced spacecraft_components at 56x iron ore on purpose; a ceiling that lets the cheapest raw outprice the dearest product would delete the tier model the whole Trade pillar rests on.",
+      "why_it_matters": "The constraint is only coherent WITHIN a tier, and Ben's own worked example is two raws. Within the ordinary raw tier (0.60 to 6.00 rare_earth_ore) it demands ceil > 10, which the landed 10.0 satisfies exactly - so the two derivations agree, and that agreement is the reason to be comfortable with 10.0 rather than a number chosen only from haulage.",
+      "recommendation": "Ben to confirm the within-tier reading. If he meant it across tiers, the fix is not a bigger ceiling - it is that scarcity should scale a good's price against its OWN tier's neighbours, which is a different model and a different item.",
+      "files": [
+        "scripts/world_gen.lua",
+        "docs/economy/MARKETS.md"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-292",
+      "title": "The refined tier's price is CEILING-DETERMINED at any band - widening 4x -> 10x only moved the peg, and made processing lose more",
+      "raised": "2026-08-17",
+      "kind": "observation",
+      "status": "open",
+      "source": "tier_margin R7 (authored base_price vs live mean market price), run on both sides of the BL-442 step 2 widening.",
+      "what": "At the OLD 4.0x ceiling the whole refined/product tier already sat at 3.35x-3.85x of base - i.e. riding the clamp. At the NEW 10.0x ceiling the same resources sit at 8.13x-9.55x. They did not find a new equilibrium; they moved to the new clamp. ids 30/31/32 (machinery, alloys, electronics) read 9.38x, 9.37x, 9.55x. That is a price the band is setting, not one supply and demand are setting. Consequence, measured: processing input cost 14.86 -> 26.56 while processing revenue only 12.55 -> 17.17, so processing net/tick fell from -10.42/-10.81 to -17.68. Extraction barely moved (8.09 -> 8.31) because raws are NOT pegged.",
+      "why_it_matters": "It is the exact failure mode the item's own brief warned about ('a price pegged at the ceiling for a whole run is a finding worth more than a landed number'), and it says the ceiling is doing a job it should not be doing. A processor buys refined inputs from the rung below it, so when every refined price rides the clamp, widening the clamp raises a processor's COSTS as fast as its prices - faster, in fact, because a lower-rung processor sells one pegged good and buys several. Widening the band cannot fix processing margin; it makes it worse, monotonically. BL-436's open calibration questions (richness_reference, processing upkeep, recipe input quantities - NR-271) are where that fix lives, and they are deliberately untouched here.",
+      "recommendation": "Ben to decide whether 10.0 stands. It is correctly derived for the question it was asked (crossing inter-market haulage) and it is actively harmful to the question Sprint 19 actually cares about (does refining pay). Those are two different levers and this item was pointed at the first. If the pegging is the priority, the real finding is that the refined tier has no demand-side price discovery at all - it is clamp, EMA, clamp - which is a market-model item, not a tunable.",
+      "files": [
+        "scripts/economy.lua",
+        "src/world/market_clearing.cpp",
+        "tools/verify/tier_margin.cpp"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-293",
+      "title": "ai_skill_harness is STRUCTURALLY BLIND to scripts/economy.lua - its 20 red bands cannot move for any data-only economy change",
+      "raised": "2026-08-17",
+      "kind": "observation",
+      "status": "open",
+      "source": "BL-442 step 2. ai_skill_harness was run on both sides of a 2.5x price-ceiling widening and returned BYTE-IDENTICAL output: same 20 failures, and all five seeds' net_worth final/min identical to the decimal (-2220111.0, -3080723.2, -2914809.5, -3407154.2, -1947063.6).",
+      "what": "The harness hand-builds its recipe_registry (make_registry, ai_skill_harness.cpp line ~78) rather than loading the shipped Lua - its own comment says 'mirrors scripts/economy.lua'. The mirror covers building economics; it does not cover economy.price_band, so the harness runs on recipe_registry.hpp's struct defaults (0.25/4.0) whatever the shipped file says. It is not in CMakeLists' IO_TEST_SCRIPT_ROOTED_HARNESSES and links no Lua.",
+      "why_it_matters": "The thread has been asking all session whether the Sprint 19 bands RISE. For any change authored in economy.lua, that question is not merely unanswered by this harness - it is unanswerable, and the identical output reads exactly like 'the change had no effect on the AI' when the truth is 'the change never reached the AI'. A silent mirror that has fallen behind is worse than no mirror: it produces a confident null result. This is the same class of defect as BL-389 (--serve never loads world_gen.lua) and as tier_margin's own missing world_gen.lua load, both already recorded.",
+      "recommendation": "Either make the harness live-Lua like tier_margin and player_seed_sweep (it would then measure the shipped economy, at the cost of moving its bands once and deliberately), or add price_band to make_registry's mirror with a comment naming what else is NOT mirrored. Not done here: it would move all 20 bands in the same commit as a band change, making the two unattributable, and re-blessing is Ben's call. Filed rather than fixed.",
+      "files": [
+        "tools/verify/ai_skill_harness.cpp",
+        "CMakeLists.txt"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-294",
+      "title": "Widening the ceiling REDUCED convoy dispatch - higher scarcity prices suppress the demand that dispatch reads",
+      "raised": "2026-08-17",
+      "kind": "observation",
+      "status": "open",
+      "source": "tools/verify/haulage_measure.cpp second section, 5 seeds x 20 econ ticks, both bands.",
+      "what": "Convoys dispatched fell 2146 -> 2029, and the intra-body market-to-market subset fell 1677 -> 1576, when the ceiling went 4.0 -> 10.0. The mechanism is legible and is not a bug: dispatch_convoys sizes every haul from a market's shortfall (demand - supply), and demand is price-elastic (economy.demand.demand_elasticity, exponent on base_price/price). A higher ceiling lets a scarce good's price rise further, elasticity then cuts the quantity demanded, the shortfall shrinks, and fewer/smaller convoys are dispatched to fill it.",
+      "why_it_matters": "It is the direct opposite of the item's stated goal. The premise was that a higher ceiling makes distant supply worth hauling; measured, the price and the quantity move in opposite directions and the quantity effect wins at this scale. A margin that is wide enough but on a demand that has shrunk is not more trade. Anyone reading the landed ceiling as 'more goods now move' would be wrong by 5%.",
+      "recommendation": "Read together with NR-289 (inter-market trade was never absent) this says the band was not the constraint on trade in either direction. Ben to weigh whether 10.0 still earns its place on the haulage derivation alone. The number is honestly derived; the outcome it was expected to produce did not occur, and that is reported rather than tuned around.",
+      "files": [
+        "tools/verify/haulage_measure.cpp",
+        "src/world/supply_system.cpp",
+        "scripts/economy.lua"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-295",
+      "title": "build/scripts/ goes STALE on any Lua-only edit, and two live-Lua harnesses were reading it under ctest",
+      "raised": "2026-08-17",
+      "kind": "observation",
+      "status": "resolved",
+      "source": "BL-442 step 2's full gate. tier_margin reported extraction 8.09 / processing -10.81 under ctest - the PRE-change numbers - while the same binary standalone from the repo root reported 8.31 / -17.68. price_band_harness failed under ctest on an assertion that passes standalone.",
+      "what": "Two compounding causes. (1) CMakeLists copies scripts/ to the output dir in a POST_BUILD on the ProjectIo TARGET. A Lua-only edit is not a build dependency of anything, so nothing relinks, the POST_BUILD never fires, and build/scripts/ silently keeps the previous contents - measured here still holding the original ceil_mult 4.0 after two full 'nmake all' runs against a repo tree saying 10.0. (2) price_band_harness and tier_margin were never listed in IO_TEST_SCRIPT_ROOTED_HARNESSES despite both loading scripts/*.lua by relative path and both SAYING SO in their own headers (price_band_harness's README entry: 'Run it from the repo root'; tier_margin's CMake block explains it must load scripts/world_gen.lua). So under ctest they ran from build/ and read the stale copy.",
+      "why_it_matters": "It is the vacuity trap CMakeLists already warns about two comments further down ('without this they run from the build dir, load nothing, and pass vacuously'), found twice more - and this time it did not merely pass vacuously, it produced a confident WRONG number. tier_margin under ctest reported an economy that no longer exists, and it would have gone on doing so for every future Lua-only tuning change. The general hazard is worse than these two harnesses: any harness added to the script-rooted list still reads the repo tree, but ProjectIo --verify runs and anything else with cwd=build read a copy that only refreshes when C++ changes.",
+      "recommendation": "Fixed here for the two harnesses: both added to IO_TEST_SCRIPT_ROOTED_HARNESSES with the reasoning recorded at the list. The DEEPER fix is left for Ben: the POST_BUILD copy should hang off the scripts themselves (a custom target with the .lua files as DEPENDS) rather than off ProjectIo relinking, so build/scripts/ cannot lag the repo. Worth a backlog item - it is a trap that will keep firing on every data-only economy change, which is exactly the shape of change BL-442 step 1 was built to encourage.",
+      "files": [
+        "CMakeLists.txt",
+        "tools/verify/price_band_harness.cpp",
+        "tools/verify/tier_margin.cpp"
+      ],
+      "resolution": "Harness wiring fixed 2026-08-17: price_band_harness and tier_margin are now script-rooted under ctest and read the repo's scripts/, so both report the shipped economy. The stale-copy mechanism itself is NOT fixed and remains open for Ben."
+    },
+    {
+      "id": "NR-296",
+      "title": "Measured (BL-443): interest is 98.8% of every benchmark corp's deficit on all five seeds, so ai_skill_harness's net-worth band measures WHEN a corp first dipped, not how it played",
+      "raised": "2026-08-17",
+      "kind": "observation",
+      "status": "open",
+      "source": "BL-443 (debt compounds with no floor) measurement phase. New instrument tools/verify/debt_decomposition.cpp: the ai_skill_harness rollout (same registry, same seeds, same 300 ticks, same run_tick order) with apply_budget's existing optional `breakdown` sink accumulated per corp. No economic behaviour was changed and nothing was re-blessed.",
+      "what": "FIRST, the existing check. tools/verify/econ_bankruptcy.cpp does NOT pin the debt spiral as expected behaviour, so BL-443 is not a disagreement with a guard. It asserts nothing at all: it prints PASS unconditionally on the last line, and its header says in as many words that 'the prototype carries no insolvency mechanic'. It is a calibration REPORT wearing a harness's clothes. Its one notion of insolvency is a local calibration trigger, balance <= -5x starting_capital, and that threshold is inert on the real generator - see the last paragraph.\n\nSECOND, the decomposition. The '-3M is almost entirely compounding' claim was arithmetic inference from 1.02^300; it is now an observation, and it is stronger than the claim. Aggregate over the seven non-player corps, per seed: seed 0 final -2,220,111 of which operating -24,942 and interest -2,193,302; seed 1 final -3,080,723 (operating -34,452, interest -3,044,605); seed 2 final -2,914,810 (operating -31,869, interest -2,880,475); seed 3 final -3,407,154 (operating -37,752, interest -3,366,534); seed 4 final -1,947,064 (operating -23,421, interest -1,921,775). Interest is 98.7-98.8% of the deficit on ALL FIVE seeds. Operating flows are 79x to 88x smaller than the interest charged on them. The invariance of that 98.8% across five different generated worlds is itself the finding: the final number is a near-pure function of the interest rule, and is close to blind to what happened in the world.\n\nTHIRD, when. Corps do not dip late and they do not dip deep. Every rival crosses zero between tick 9 and tick 27 on four of five seeds, and it crosses by a rounding error: observed first-crossing balances include -1.0, -3.7, -3.8, -4.6, -7.4 and -12.9 credits. Seed 0 corp 46797 went one credit into the red at tick 19 and finished at -248,761, against a 300-tick operating loss of -2,717. That is a 92x amplification of a loss the corp could have covered out of a single tick's income.\n\nThe reason there is no buffer: every generated corp opens at balance 0. corporation_params::base_capital defaults to 0.0f and corporation_generation.cpp sets both background firms (line 1760) and the seeded roster to it, on the premise that 'capital is earned through the pre-game warm start'. The benchmark runs no_prehistory(), so no warm start runs. A corp with zero cash and a 2%/qtr charge on any negative balance has no first bad quarter it can survive.",
+      "why_it_matters": "It puts the net-worth band out of commission as a SKILL signal, which is the metric Sprint 19 has been reading all week. Final net worth decomposes as (small operating loss) x (1.02 ^ ticks since first crossing), so the dominant term is the EXPONENT - the tick a corp first crossed zero - not the base. The spread that exponent contributes is roughly 50x between an early and a late crosser, and the measurement contains a clean natural experiment for it. Seed 1, two corps in the same world: corp 46831 crossed at tick 18 and finished at -855,092; corp 46828 crossed at tick 156 and finished at -5,057. Their actual operating performance differs by 13x (-11,306 against -868). Their headline net worth differs by 169x. The band ranks them as if one were catastrophically worse than the other; it is measuring a 138-tick head start on the compounding clock.\n\nThis also explains why the band has needed re-blessing after almost every economy change while the survival fraction stayed green throughout Sprint 19. Any change that moves the first-crossing tick by a handful of ticks moves final net worth by a multiple, so the band has been tracking a lever that is arithmetically hypersensitive and substantively uninformative.\n\nOn survival as the replacement: it is UNCORRUPTED but LOW-RESOLUTION. It reads the world (corps holding at least one non-decommissioned building) rather than the balance, so compounding cannot touch it - that is genuinely why it held. But with no insolvency mechanic nothing forces a decommission from debt, so it only moves when the BL-079 reflex tier idles or sheds something, and it therefore cannot distinguish a corp trading well from a corp merely still standing. It is the sounder of the two today, and it is not yet a skill metric. It becomes one the moment insolvency has a consequence, which is the same change BL-443 is about.",
+      "recommendation": "MEASUREMENT ONLY was done; no lever pulled, no constant touched, no golden or band re-blessed. The three BL-443 candidates against the numbers above:\n\n(a) DEBT CEILING - argue against. The measurement says the damage is the amplification factor, not the magnitude. A ceiling replaces '-3.4M' with '-C' for every insolvent corp, which makes them all read IDENTICAL and censors the variable rather than restoring its meaning. It also leaves the corp in the same undefined state it is in now. It silences the number BL-443 named and fixes nothing under it.\n\n(b) FORCED LIQUIDATION - right shape, wrong instrument to reach for first, and the measurement supplies a concrete objection. Any threshold expressed as a multiple of starting capital degenerates to zero here, because starting_capital IS zero on every generated corp - econ_bankruptcy's own -5x rule triggers at -0.0. And a threshold in absolute credits would fire on essentially the whole field, since every rival is a few credits underwater by tick 27. Liquidation designed against these numbers today liquidates everyone by tick 30.\n\n(c) RESTRUCTURING - RECOMMENDED, and the measurement argues for it much more strongly than the abstract case did. The operating losses are tiny: roughly -10 credits per tick against corps booking thousands in income. A corp needs to shed a handful of credits per tick to be solvent, and the machinery that sheds them already exists - BL-079's reflex tier idles persistently loss-making buildings, it is simply not gated on the corp's own solvency. So (c) is the smallest real change, it composes with the reflex tier and the BL-202 scorer instead of sitting beside them, and it attacks the term that actually dominates (it shortens the compounding window rather than capping its output). It also makes the survival fraction load-bearing, since a corp that cannot restructure back to solvency is then the one that goes.\n\nTwo things for Ben that are NOT levers and should be decided before one is chosen. First: is a corp opening at balance 0 intended in a session where no pre-game warm start runs? The interest rule is defensible at ~8%/yr; charging it against a corp given no capital at all is what makes the first bad quarter unrecoverable by construction. Second: what should be done with econ_bankruptcy.cpp, which reports green forever by printing an unconditional PASS - it should either grow BL-443's bounded-terminal-state assertion or be renamed to say it is a report.",
+      "files": [
+        "tools/verify/debt_decomposition.cpp",
+        "tools/verify/econ_bankruptcy.cpp",
+        "tools/verify/ai_skill_harness.cpp",
+        "src/world/budget_system.cpp",
+        "src/world/corporation_generation.cpp"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-297",
+      "title": "Decision taken: added tools/verify/debt_decomposition.cpp as a measurement instrument and did NOT register it in the verifier-headless skill",
+      "raised": "2026-08-17",
+      "kind": "decision-taken",
+      "status": "open",
+      "source": "BL-443 measurement phase, non-interactive session. CLAUDE.md: 'Creating or modifying a skill requires user permission'.",
+      "what": "The BL-443 numbers needed a rollout instrumented through apply_budget's `breakdown` sink, which no existing harness does. Built it as tools/verify/debt_decomposition.cpp. Deliberately did NOT add it to .claude/skills/verifier-headless/SKILL.md, unlike NR-286's call on price_band_harness, for a reason specific to this file: it asserts nothing and has no PASS/FAIL. It prints a table and exits 0. Registering a non-asserting instrument in the harness skill would put a permanently-green entry in the gate, which is the same failure mode the entry above criticises econ_bankruptcy for. The CMake glob at CMakeLists.txt:687 picks it up automatically, so it builds and is discoverable without the skill edit.",
+      "why_it_matters": "It leaves a useful tool slightly less discoverable than the standing rule would like ('the loose one is forgotten'). The honest fix is not a skill entry but a decision about whether tools/verify/ should hold instruments at all, or whether measurement harnesses want their own home and their own ctest exclusion.",
+      "recommendation": "Either keep it unregistered as an instrument (and say instruments live in tools/verify/ unregistered), or have it grow BL-443's real assertion - a corp driven insolvent reaches a bounded terminal or recovered state - at which point it becomes a genuine guard and should be registered. Note also that NR-296/NR-297 were allocated from this worktree's file, where NR-288 was the max; sibling worktree agents were active, so check for an id collision at integration.",
+      "files": [
+        "tools/verify/debt_decomposition.cpp",
+        ".claude/skills/verifier-headless/SKILL.md"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-298",
+      "title": "There is no hostility model anywhere in the codebase, and every military plan assumes one",
+      "raised": "2026-08-17",
+      "kind": "question",
+      "status": "open",
+      "source": "Sprint 21 scoping audit (docs only). Source read: corp_command.{hpp,cpp}, campaign_battle.{hpp,cpp}, combat.{hpp,cpp}, corp_ai.cpp, world.hpp.",
+      "what": "Nothing in src/ expresses that one corporation may fight another. There is no standing, no war state, no allegiance, no target-legality predicate. Sprint 16, Sprint 18 and Sprint 20's candidate B all describe fighting and none of them names this. BL-315 (armed house conflict spine) settled that army, mercenary and pirate are three derived readings of one company - that is a NAMING rule and it answers nothing about who may be attacked.",
+      "why_it_matters": "It blocks three things at once and is filed as none of them: an attack verb has no legal precondition, an engagement trigger has no condition to test, and the corp_ai scorer cannot price an engagement it has no rule to bound. It is the load-bearing unknown of the whole military theme, and it is a design call rather than an implementation - so no agent should take it. Left open it serialises a sprint the decomposition otherwise parallelises four ways.",
+      "recommendation": "Answer before Sprint 21 opens, and file it as a backlog item so it has an id. The narrow version is probably enough for a first cut: a deterministic may_engage(w, attacker_corp, defender_corp) over minimal state, defined tightly enough that it does not quietly grow into the diplomacy system BL-297 owns. Decomposition and consequences: REFINED.md Sprint 21 slice F2.",
+      "files": [
+        "docs/development/REFINED.md",
+        "docs/development/SPRINTS.md"
+      ]
+    },
+    {
+      "id": "NR-299",
+      "title": "Sprint 18's block says BL-315 has nothing built against it - the campaign battle resolver is fully built and has zero callers",
+      "raised": "2026-08-17",
+      "kind": "observation",
+      "status": "open",
+      "source": "Sprint 21 scoping audit. src/world/campaign_battle.{hpp,cpp} (~190 line header, full params block), tools/verify/campaign_battle_harness.cpp, commits f8dc6eb / 841759a / 825ca46.",
+      "what": "Sprint 18's planned block and Sprint 20's candidate B both describe BL-315 (armed house conflict spine) as designed with nothing built against it, and name it as the sprint's largest unknown. In fact resolve_campaign_battle is written, compiled into the shipping binary (CMake globs src/world/*.cpp), harnessed, and its swing parameter was measured and retuned over 1000 seeds. It has no caller outside its own harness - and neither does combat.cpp's resolve_battle, whose only live caller is the Era -1 sim.",
+      "why_it_matters": "It changes what the military sprint IS. The estimate of four to six sessions was priced against building a resolver that already exists; what is actually absent is everything that would call one - a unit verb, a hostility rule, a contact trigger, a battle store, a unit-to-stack adapter, and a screen. That is a different and more parallelisable shape, and it is why the Sprint 21 block was rewritten around reach rather than around combat.",
+      "recommendation": "No action beyond reading the corrected block. Recorded because the stale premise survived two sprint plans, which is the failure mode NR-265 and NR-266 both hit this week: a plan describing a world the code did not match.",
+      "files": [
+        "docs/development/SPRINTS.md",
+        "src/world/campaign_battle.hpp"
+      ]
+    },
+    {
+      "id": "NR-300",
+      "title": "Nothing converts a unit_component into an army_stack_entry, so NR-247's strength ambiguity is now blocking rather than cosmetic",
+      "raised": "2026-08-17",
+      "kind": "observation",
+      "status": "open",
+      "source": "Sprint 21 scoping audit. components.hpp unit_component, combat.hpp army_stack_entry, campaign_battle.hpp, NR-247.",
+      "what": "Both resolvers take fully-resolved army_stack_entry values and deliberately never look a roster up. No adapter exists anywhere that turns the live w.units store into those values. When one is written it must decide what unit_component::strength means - and NR-247 already recorded that the field is documented as a fixed-point scalar while all three of its writers (corp_command hire_unit, corporation_generation, hard_coded_world) set it equal to raw manpower, with both readers printing it raw.",
+      "why_it_matters": "NR-247's own recommendation was to reconcile this whenever combat starts consuming strength values. That is exactly the moment the Sprint 21 decomposition reaches, in slice S1. Deferring it a fourth time means the adapter silently picks one reading and the doc comment stays wrong.",
+      "recommendation": "Settle it inside S1 rather than as separate work: either drop the fixed-point doc comment and treat strength as raw manpower, or introduce a divisor and update components.hpp, entity_summary.cpp and selection_panel.cpp together. Resolve NR-247 with whichever is chosen.",
+      "files": [
+        "src/world/components.hpp",
+        "docs/development/REFINED.md"
+      ]
+    },
+    {
+      "id": "NR-301",
+      "title": "BL-325's out-of-supply decay cut from the Sprint 21 proposal on the economy seam, not on scope",
+      "raised": "2026-08-17",
+      "kind": "decision-taken",
+      "status": "open",
+      "source": "Sprint 21 scoping audit, deciding what the proposed sprint carries.",
+      "what": "BL-325 (military bases and supply) slice S3, deterministic out-of-supply strength decay, is the last leg of that item and reads naturally as part of a military sprint. It needs economy_system.cpp and scripts/economy.lua. Three agents are live in the market_clearing / economy_system / budget_system / economy.lua seam right now, and the Sprint 21 decomposition is otherwise entirely clear of it - no proposed slice writes any of those four files.",
+      "why_it_matters": "Including it would put the one sequencing hazard into an otherwise four-way-parallel sprint, for a slice whose own item already sequences it behind the conflict spine (NR-177). The call was taken rather than escalated because it is a sequencing decision, not a design one - but it is a deliberate narrowing of a theme already deferred three times, so it is recorded rather than left in the prose.",
+      "recommendation": "Pick it up in the sprint after, once the conflict layer gives units something to be out of supply FROM and the economy seam has quiesced. If Ben would rather it rode along, sequence it last and alone - never concurrent with the other slices.",
+      "files": [
+        "docs/development/REFINED.md",
+        "docs/development/SPRINTS.md"
+      ]
     }
   ]
 }

@@ -14,15 +14,19 @@ namespace {
 // supply/demand ratio. A damped (sqrt) elasticity keeps swings readable; the
 // move is clamped to a band around base and eased across ticks so a single tick's
 // imbalance cannot snap the price.
-constexpr float price_floor_mult = 0.25f; ///< Lowest a price may fall: 0.25× base.
-constexpr float price_ceil_mult  = 4.0f;  ///< Highest a price may rise: 4× base.
+/// The band multipliers are NO LONGER constants here (BL-442): they are authored
+/// once in scripts/economy.lua under `economy.price_band` and reach both this
+/// function and economy_system.cpp's `wf_target_price` through
+/// `recipe_registry::price_band()`. They arrive as parameters below.
 constexpr float price_smoothing  = 0.5f;  ///< EMA factor toward the tick's target price.
 
 /// Resolve one resource's price for a market this tick. The target is
 /// `base × sqrt(demand/supply)` (damped elasticity), clamped to the band and
 /// reached by an exponential moving average from the prior price. Untraded
-/// resources (`base <= 0`) keep their prior price.
-float resolve_price(float prior, float base, float supply, float demand)
+/// resources (`base <= 0`) keep their prior price. The band multipliers come from
+/// the registry (`price_band()`), not from a local constant — BL-442.
+float resolve_price(float prior, float base, float supply, float demand,
+                    float price_floor_mult, float price_ceil_mult)
 {
     if (base <= 0.0f)
         return prior; // never traded here — leave it (stays 0)
@@ -395,15 +399,78 @@ entity_id maybe_spawn_market(world& w, const recipe_registry& reg, entity_id bod
     return mid;
 }
 
-void inject_interbody_demand(world& w, const recipe_registry& reg)
+market_supply_snapshot snapshot_market_supply(const world& w)
+{
+    market_supply_snapshot snap;
+    snap.reserve(w.markets.size());
+    for (const auto& [mid, mc] : w.markets)
+        snap[mid] = mc.supply;
+    return snap;
+}
+
+namespace {
+
+/// The COUNTERPART home-body market for resource @p r: the home-body market
+/// carrying the greatest demand for that resource, with the lowest market id
+/// breaking ties (BL-406, Ben's ruling 2026-08-15, option c).
+///
+/// This replaces `market_for_body(w, w.home_body)` as the pull's source, and the
+/// difference is the whole point of BL-406. That call returned the LOWEST-ID
+/// market of the many BL-096 carves onto the home body and treated its demand as
+/// the body's — a market holding 5% of the body's demand on the MSVC build and a
+/// different market entirely on a g++ build of the same seed, because `w.markets`
+/// is unordered and the lowest id is not a portable choice. Same-seed
+/// reproducibility WITHIN a binary always held, so that was never a determinism
+/// violation; it was a price input decided by an implementation accident.
+///
+/// The relation dissolves the defect rather than repairing it: no single market
+/// is asked to stand for a body any more. An outpost selling resource r is pulled
+/// by the home-body market that actually wants r most — a counterparty, not an
+/// aggregate. Under today's model every home-body market sits at the same
+/// distance from a given outpost, so the relation is many-to-one keyed on the
+/// RESOURCE; the outpost dimension is carried entirely by the distance falloff.
+/// If markets ever acquire a per-market haul cost, this is where a per-(outpost,
+/// resource) counterpart would go.
+///
+/// Order-independent by construction — strictly-greater demand wins, and an exact
+/// tie is broken by the smaller id — so every standard library's traversal of
+/// `w.markets` names the same market. That property is asserted, not assumed:
+/// `interbody_pull_harness` re-derives it over a reversed traversal.
+entity_id counterpart_home_market(const world& w, std::size_t r)
+{
+    entity_id best        = null_entity;
+    float     best_demand = 0.0f;
+    for (const auto& [mid, mc] : w.markets)
+    {
+        if (mc.body != w.home_body)
+            continue;
+        const float d = mc.demand[r];
+        if (best == null_entity || d > best_demand || (d == best_demand && mid < best))
+        {
+            best        = mid;
+            best_demand = d;
+        }
+    }
+    return best;
+}
+
+} // namespace
+
+void inject_interbody_demand(world& w,
+                             const recipe_registry& reg,
+                             const market_supply_snapshot& prior_supply)
 {
     if (w.home_body == null_entity)
         return;
-    const entity_id home_market_id = market_for_body(w, w.home_body);
-    if (home_market_id == null_entity)
-        return;
-    const market_component& home = w.markets.at(home_market_id);
     const market_emergence_params& mp = reg.market_emergence();
+
+    // The counterpart per resource, resolved once — it is a property of the home
+    // body this tick, not of the outpost being filled, so resolving it inside the
+    // market loop would recompute the same answer for every outpost.
+    std::array<entity_id, resource_count> counterpart{};
+    counterpart.fill(null_entity);
+    for (std::size_t r = 0; r < resource_count; ++r)
+        counterpart[r] = counterpart_home_market(w, r);
 
     for (auto& [mid, mc] : w.markets)
     {
@@ -415,23 +482,31 @@ void inject_interbody_demand(world& w, const recipe_registry& reg)
 
         for (std::size_t r = 0; r < resource_count; ++r)
         {
-            // THE SUBTRACTION IS A NO-OP HERE, AND THE PULL IS LIVE (BL-404).
-            // `clear_markets` zeroes every market's supply immediately above
-            // (mc.supply.fill) and the supply writes come later in the same
-            // pass, so home.supply is identically 0.0f at this read: the
-            // shortfall is home *gross* demand, not unmet demand, and the gate
-            // opens for every resource carrying any demand at all. Outposts
-            // therefore receive pull_fraction of Kepler's gross demand every
-            // tick. Written as `demand - supply` because that is the intent;
-            // making the intent true means reading a supply this pass has not
-            // computed yet. BL-404 owns the fix — do not "simplify" the
-            // subtraction away, it is the record of what this should net.
-            const float home_shortfall = home.demand[r] - home.supply[r];
-            if (home_shortfall <= 0.0f)
-                continue;
+            const entity_id src = counterpart[r];
+            if (src == null_entity)
+                continue; // No market on the home body at all.
+            const market_component& cm = w.markets.at(src);
+
+            // THE SUBTRACTION IS REAL NOW (BL-404, option b). It was a no-op for
+            // as long as it read `cm.supply` directly: `clear_markets` zeroes
+            // every market's supply immediately above this call and the supply
+            // writes land after it, so the subtrahend was identically 0.0f and
+            // every outpost received pull_fraction of GROSS home demand. The fix
+            // is not to reorder a pass whose ordering is already load-bearing
+            // (the supply writes are themselves demand-sensitive) but to net
+            // against the counterpart's END-OF-TICK supply from the PREVIOUS
+            // tick, captured by snapshot_market_supply before the reset loop.
+            // One tick of lag, deterministic, and honest about what it is.
+            const auto it = prior_supply.find(src);
+            const float supply_last_tick =
+                (it != prior_supply.end()) ? it->second[r] : 0.0f;
+
+            const float shortfall = cm.demand[r] - supply_last_tick;
+            if (shortfall <= 0.0f)
+                continue; // The counterpart already meets its own appetite.
             if (mc.base_price[r] <= 0.0f)
                 continue; // Untradeable here regardless of what's wanted at home.
-            mc.demand[r] += home_shortfall * mp.pull_fraction / falloff;
+            mc.demand[r] += shortfall * mp.pull_fraction / falloff;
         }
     }
 }
@@ -452,6 +527,13 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     const std::vector<sell_order>& standing_sells = w.sell_orders;
     const std::vector<buy_order>&  standing_buys  = w.buy_orders;
 
+    // Captured BEFORE the reset below, so it carries the PREVIOUS tick's
+    // end-of-tick supply — the only honest subtrahend available to
+    // inject_interbody_demand, which runs before this tick's supply is written
+    // (BL-404). Local to this pass: nothing is persisted and the save format is
+    // untouched.
+    const market_supply_snapshot prior_supply = snapshot_market_supply(w);
+
     for (auto& [mid, mc] : w.markets)
     {
         mc.supply.fill(0.0f);
@@ -469,8 +551,11 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // BL-263: the home body's own unmet demand pulls a discounted slice onto
     // every outpost market, additive after the resets above — without this an
     // outpost with real supply and no local population collapses to the price
-    // floor the instant it starts producing.
-    inject_interbody_demand(w, reg);
+    // floor the instant it starts producing. Runs AFTER the two demand
+    // injections above, because BL-406's counterpart selection reads the demand
+    // they deposit: the counterpart for a resource is whichever home-body market
+    // wants it most, and that is not knowable until this tick's demand is in.
+    inject_interbody_demand(w, reg, prior_supply);
 
     // A (corp, body, resource) with a standing sell order against it is under
     // manual control: the auto-surplus path yields so the floor-priced order
@@ -568,20 +653,52 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         sell_books[mid][r].push_back({order.corp, available, order.floor_price, available});
     }
 
-    // BL-130: fill real inventory from this tick's REAL corp-sourced sales only —
-    // auto-surplus (auto_sells) and the standing sell orders just listed above
-    // (sell_books). Deliberately NOT read off mc.supply[r] as a whole: that array
-    // also carries inject_population_demand's/inject_background_demand's pure
-    // demand-side pulls and any residual pricing-only signal, which must not
-    // inflate real stock.
-    for (const auto_sell_entry& se : auto_sells)
-        w.markets.at(se.market).inventory[se.r] += se.qty;
-    for (const auto& [mid, sell_by_r] : sell_books)
-        for (const auto& [r, entries] : sell_by_r)
-            for (const ob_sell_entry& e : entries)
-                w.markets.at(mid).inventory[r] += e.qty;
+    // BL-130 fills real inventory from this tick's REAL corp-sourced sales only —
+    // never read off mc.supply[r] as a whole, which also carries
+    // inject_population_demand's/inject_background_demand's pure demand-side pulls
+    // and any residual pricing-only signal.
+    //
+    // BL-422: the credit used to happen HERE, at listing time, on every listed
+    // quantity. That was true while everything listed also sold; under BL-386's
+    // reservation rule an order whose floor exceeds the resolved price holds its
+    // stock, and inventory is not a display field — economy_system draws processor
+    // inputs from it — so a held order's listed quantity became stock a buyer paid
+    // for that no seller ever parted with. The credit now happens at each of the
+    // three points a pool is actually debited (auto-surplus clearing, matched
+    // trades, auto-clear), so inventory gains exactly what pools lose. Keeping the
+    // two in the same statement is the whole point: they cannot drift apart.
 
-    // Auto-demand: processor input shortfalls from the economy report.
+    // BL-441 — the demand register reads the WANT, and only the want.
+    //
+    // This line used to read `report.purchases`, the FILL, so a processor that
+    // needed 16 units of an input and could draw 2 told the market it wanted 2.
+    // The resource then read to resolve_price as one almost nobody wants, its
+    // price never rose, and scarcity was invisible — resolve_price was never
+    // broken, it was being starved of input. `report.wants` carries what each
+    // consumer set out to buy whether or not the draw succeeded, which is the
+    // number a price is supposed to answer. Nothing is PAID against this loop.
+    //
+    // std::map, so accumulation is over a sorted key set — the ordering BL-422's
+    // latent unordered_map float-accumulation nondeterminism was found in.
+    for (const auto& [key, wanted] : report.wants)
+    {
+        const entity_id corp = key.first;
+        const entity_id body = key.second;
+
+        const entity_id mid = market_for_corp_on_body(w, by_body, corp, body);
+        if (mid == null_entity)
+            continue;
+
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (wanted[r] > 0.0f)
+                w.markets.at(mid).demand[r] += wanted[r];
+    }
+
+    // The FILL, kept strictly separate: goods actually delivered to a consumer
+    // this tick. This is the money side — auto_buys feeds the VWAP accumulator
+    // and the expenditure a corp is actually charged — so it must go on reading
+    // `purchases`. Billing the want instead would pay for deliveries nobody made,
+    // which is BL-422's defect in the opposite direction. Also a std::map.
     for (const auto& [key, bought] : report.purchases)
     {
         const entity_id corp = key.first;
@@ -596,7 +713,6 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
             const float qty = bought[r];
             if (qty <= 0.0f)
                 continue;
-            w.markets.at(mid).demand[r] += qty;
             auto_buys.push_back({corp, mid, r, qty});
         }
     }
@@ -623,7 +739,9 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         ref_price[mid] = {};
         for (std::size_t r = 0; r < resource_count; ++r)
             ref_price[mid][r] = resolve_price(mc.price[r], mc.base_price[r],
-                                              mc.supply[r], mc.demand[r]);
+                                              mc.supply[r], mc.demand[r],
+                                              reg.price_band().floor_mult,
+                                              reg.price_band().ceil_mult);
     }
 
     // --- Auto-surplus clearing: income at ref_price, pool debited immediately ---
@@ -634,7 +752,9 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         if (pkit != w.corp_body_pools.end())
         {
             float& q = pkit->second.quantities[se.r];
-            q = std::max(0.0f, q - se.qty); // defensive: a pool never goes negative
+            const float left = std::min(q, se.qty); // defensive: a pool never goes negative
+            q -= left;
+            w.markets.at(se.market).inventory[se.r] += left; // BL-422: credit what left
         }
         flows[se.corp].income += se.qty * ref_price[se.market][se.r];
     }
@@ -764,7 +884,9 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         if (pkit != w.corp_body_pools.end())
         {
             float& q = pkit->second.quantities[t.r];
-            q = std::max(0.0f, q - t.qty); // defensive: a pool never goes negative
+            const float left = std::min(q, t.qty); // defensive: a pool never goes negative
+            q -= left;
+            w.markets.at(t.market).inventory[t.r] += left; // BL-422: credit what left
         }
         flows[t.seller].income     += t.qty * t.price;
         flows[t.buyer].expenditure += t.qty * t.price;
@@ -802,7 +924,9 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
                     // over-selling (BL-351; BL-293 fixed the same fault by drawing
                     // a matched total down, which `rem` expresses directly).
                     float& q = pkit->second.quantities[r];
-                    q = std::max(0.0f, q - se.rem); // defensive: a pool never goes negative
+                    const float left = std::min(q, se.rem); // defensive: never negative
+                    q -= left;
+                    w.markets.at(mid).inventory[r] += left; // BL-422: credit what left
                 }
                 flows[se.corp].income += se.rem * rp;
             }

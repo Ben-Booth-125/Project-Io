@@ -50,6 +50,19 @@
 //       exceeds its cleared quantity × that price. The floor is a reservation
 //       price, not a self-declared payout.
 //
+//   R8  DEMAND IS THE WANT, NOT THE FILL (BL-441). The demand register was
+//       `demand[r] += bought[r]` — what a corp ACTUALLY BOUGHT — so a processor
+//       that needed 16 of an input and could draw 2 registered demand of 2, and
+//       the resource read to resolve_price as one almost nobody wants. These
+//       assertions are written against observable market state
+//       (market_component::demand / ::price) rather than against any new field,
+//       specifically so they compile and run on the PRE-CHANGE build and are
+//       seen to fail there. A guard never seen to fail is not a guard.
+//
+//       R8 also pins the half that must NOT change: the fill. SUPPLY is an offer
+//       and INVENTORY is a delivery (BL-422); demand needs the same split, and
+//       `purchases` stays the record of goods actually received and paid for.
+//
 // The process exits non-zero if any assertion FAILs.
 
 #include "world/budget_system.hpp"
@@ -589,6 +602,240 @@ int main()
                   "R6.6 ...and is paid the RESOLVED price exactly (not the floor, not above)");
             check(flows.count(s.corp) && flows.at(s.corp).income <= cleared * rp + 0.01f,
                   "R6.7 INVARIANT: clearing income never exceeds cleared quantity x resolved price");
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // R7 — market inventory is credited with what LEFT a pool, never with what
+    //      was merely listed (BL-422)
+    // -----------------------------------------------------------------------
+    // R6 above establishes that a held order earns nothing and keeps its stock.
+    // That left half the reservation rule unenforced: clear_markets credited the
+    // LISTED quantity to market_component::inventory before clearing ran, so a
+    // held order still put stock on the shelf. inventory is not a display field —
+    // economy_system draws processor inputs from it — so the phantom was bought,
+    // decremented, and never paid for by anyone.
+    //
+    // The assertions are stated as an EQUALITY between inventory gain and pool
+    // loss, so an under-credit fails them as loudly as an over-credit.
+    {
+        const std::size_t r_steel = ri(resource_type::steel);
+        auto inventory_steel = [&](const scenario& s) {
+            return s.w.markets.at(s.market).inventory[r_steel];
+        };
+
+        // HOLD: floor 6.0 against a resolved price of 5.0 (the R6.1 fixture).
+        {
+            scenario s = make_scenario(100.0f);
+            apply_corp_command(s.w, reg, place_cmd(s, 40.0f, 6.0f));
+            economy_report empty;
+            clear_markets(s.w, reg, empty);
+            check(s.w.markets.at(s.market).price[r_steel] < 6.0f,
+                  "R7.1 fixture: the resolved price sits below the order's floor");
+            check(inventory_steel(s) == 0.0f,
+                  "R7.2 HOLD: a held order puts NO stock into the market's real inventory");
+            check(pool_steel(s) == 100.0f && inventory_steel(s) == 0.0f,
+                  "R7.3 HOLD: nothing left the pool, so nothing arrived on the shelf");
+        }
+
+        // CLEARS: floor 3.0, below the resolved price — the mirror case.
+        {
+            scenario s = make_scenario(100.0f);
+            apply_corp_command(s.w, reg, place_cmd(s, 40.0f, 3.0f));
+            economy_report empty;
+            clear_markets(s.w, reg, empty);
+            const float pool_loss = 100.0f - pool_steel(s);
+            check(pool_loss > 39.99f && pool_loss < 40.01f,
+                  "R7.4 fixture: the clearing order emptied its listed quantity from the pool");
+            check(std::fabs(inventory_steel(s) - pool_loss) < 0.01f,
+                  "R7.5 CONSERVATION: inventory gains exactly what left the pool");
+        }
+
+        // AUTO-SURPLUS: no order at all, so the greedy path sells the whole pool.
+        // The third credit site, and the one that was already correct — asserted
+        // so a later tidy of the three cannot quietly drop it.
+        {
+            scenario s = make_scenario(100.0f);
+            economy_report empty;
+            clear_markets(s.w, reg, empty);
+            const float pool_loss = 100.0f - pool_steel(s);
+            check(pool_loss > 0.0f,
+                  "R7.6 fixture: with no standing order the auto-surplus path sells");
+            check(std::fabs(inventory_steel(s) - pool_loss) < 0.01f,
+                  "R7.7 CONSERVATION: the auto-surplus path credits exactly what it sold");
+        }
+
+        // MIXED TICK: a held order and a clearing order against the same
+        // (market, resource). The single-order cases both pass if the credit is
+        // computed per-resource rather than per-order; this one does not.
+        {
+            scenario s = make_scenario(100.0f);
+            apply_corp_command(s.w, reg, place_cmd(s, 40.0f, 6.0f));  // holds
+            apply_corp_command(s.w, reg, place_cmd(s, 30.0f, 1.0f));  // clears
+            economy_report empty;
+            clear_markets(s.w, reg, empty);
+            const float rp = s.w.markets.at(s.market).price[r_steel];
+            check(rp > 1.0f && rp < 6.0f,
+                  "R7.8 fixture: the resolved price separates the two orders");
+            const float pool_loss = 100.0f - pool_steel(s);
+            check(pool_loss > 29.99f && pool_loss < 30.01f,
+                  "R7.9 MIXED: only the clearing order's 30 units leave the pool");
+            check(std::fabs(inventory_steel(s) - 30.0f) < 0.01f,
+                  "R7.10 MIXED: the held order is not rescued by its clearing neighbour");
+        }
+
+        // MATCHED TRADE: the second credit site. No press authors a buy order yet
+        // (components.hpp), so the buy side is pushed directly — the same
+        // hand-built-world licence the rest of this harness runs on.
+        {
+            scenario s = make_scenario(100.0f);
+            apply_corp_command(s.w, reg, place_cmd(s, 40.0f, 3.0f));
+
+            const entity_id buyer = s.w.create_entity();
+            corporation_component bc;
+            bc.balance = 1000.0f;
+            s.w.corporations[buyer] = bc;
+
+            buy_order bo;
+            bo.corp      = buyer;
+            bo.body      = s.body;
+            bo.resource  = resource_type::steel;
+            bo.quantity  = 25.0f;
+            bo.max_price = 999.0f;
+            s.w.buy_orders.push_back(bo);
+
+            economy_report empty;
+            const auto flows = clear_markets(s.w, reg, empty);
+            check(flows.count(buyer) && flows.at(buyer).expenditure > 0.0f,
+                  "R7.11 fixture: the buy order matched and the buyer paid");
+            const float pool_loss = 100.0f - pool_steel(s);
+            check(std::fabs(inventory_steel(s) - pool_loss) < 0.01f,
+                  "R7.12 CONSERVATION: matched fills and the auto-cleared remainder both credit once");
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // R8 — the demand register records the WANT, not the FILL (BL-441)
+    // -----------------------------------------------------------------------
+    {
+        const std::size_t r_iron = ri(resource_type::iron_ore);
+
+        // A processor whose only input is iron ore, on a body whose market
+        // prices iron ore, with a stated quantity of iron ore actually on the
+        // shelf. Everything below is arithmetic off make_registry():
+        //
+        //   batches_full = base_rate(8) * workforce_assigned(0.5) * wt(1.0) = 4
+        //   full-run need of iron ore = 2 per batch * 4 = 8
+        //
+        // so "wanted 8" is the number under test, and how much of it the
+        // processor can actually get is the dial each case turns.
+        struct proc_scenario
+        {
+            world     w;
+            entity_id body   = null_entity;
+            entity_id market = null_entity;
+            entity_id corp   = null_entity;
+        };
+
+        auto make_processor = [&](float shelf_iron) {
+            proc_scenario s;
+
+            s.body = s.w.create_entity();
+            body_component bc{};
+            bc.name              = "Forge";
+            bc.type              = body_type::planet;
+            bc.orbital_radius_au = 1.0f;
+            bc.grid_width = bc.grid_height = 4;
+            s.w.bodies[s.body] = bc;
+
+            s.market = s.w.create_entity();
+            market_component mc{};
+            mc.body = s.body;
+            mc.base_price[r_iron]                   = 5.0f;
+            mc.base_price[ri(resource_type::steel)] = 8.0f;
+            mc.price = mc.base_price;
+            mc.inventory[r_iron] = shelf_iron; // the only iron in the world
+            s.w.markets[s.market] = mc;
+
+            const entity_id tile = s.w.create_entity();
+            tile_component tc{};
+            tc.body        = s.body;
+            tc.composition = terrain_composition::grassland;
+            s.w.tiles[tile] = tc;
+
+            const entity_id bld = s.w.create_entity();
+            building_component b{};
+            b.tile               = tile;
+            b.type               = building_type::processing_facility;
+            b.workforce_assigned = 0.5f;
+            b.workforce_target   = 100;
+            b.workforce_auto     = false; // pin the dial: BL-181's solver would move it
+            b.recipe             = 0;     // make_registry's only recipe (steel)
+            s.w.buildings[bld] = b;
+
+            s.corp = s.w.create_entity();
+            corporation_component cc;
+            cc.name             = "Smelter Co";
+            cc.starting_capital = 1000.0f;
+            cc.balance          = 1000.0f;
+            cc.assets.push_back(bld);
+            cc.is_player = true; // exclude from the BL-202 strategic tier, as econ_harness does
+            s.w.corporations[s.corp] = cc;
+
+            // Pool empty, so every unit of the want is a want ON THE MARKET and
+            // the two readings of "the want" (gross, and net of own stock) agree.
+            s.w.pool_for(s.corp, s.body).quantities[r_iron] = 0.0f;
+            return s;
+        };
+
+        // --- STARVED: nothing on the shelf at all. -------------------------
+        // coverage 0/8 = 0 < t_idle(0.2) -> the building idles and buys nothing.
+        // Pre-change the register therefore reads ZERO demand for the one input
+        // the whole body is short of, which is the defect in its purest form.
+        {
+            proc_scenario s = make_processor(0.0f);
+            economy_report rep = run_economy_step(s.w, reg);
+            clear_markets(s.w, reg, rep);
+
+            const market_component& mc = s.w.markets.at(s.market);
+            std::printf("       R8 starved: demand=%.3f supply=%.3f price=%.3f (base 5)\n",
+                        mc.demand[r_iron], mc.supply[r_iron], mc.price[r_iron]);
+
+            check(mc.demand[r_iron] > 7.99f && mc.demand[r_iron] < 8.01f,
+                  "R8.1 STARVED: demand = the full-run NEED (8), not the quantity drawn (0)");
+
+            // resolve_price already handles this correctly given real numbers —
+            // its own comment reads "demand with no supply — top of the band".
+            // It was being starved of input, not broken. Band is 0.25x-4x base
+            // with 0.5 EMA smoothing, so one tick from base 5 reaches 12.5.
+            check(mc.supply[r_iron] <= 0.0f,
+                  "R8.2a fixture: nobody supplied iron ore this tick");
+            check(mc.price[r_iron] > 10.0f,
+                  "R8.2 PRICE: real demand with no supply resolves toward the TOP of the band, not base");
+        }
+
+        // --- PARTIAL DRAW: 2 units on the shelf against a want of 8. -------
+        // The item's own example, scaled: coverage 2/8 = 0.25, which sits
+        // between t_idle(0.2) and t_full(1.0), so the run scales to 0.25, the
+        // processor draws exactly 2 — and pre-change registered demand of 2.
+        {
+            proc_scenario s = make_processor(2.0f);
+            economy_report rep = run_economy_step(s.w, reg);
+
+            // The FILL, captured before clear_markets consumes the report. This
+            // is the half that must NOT move: `purchases` is goods actually
+            // received and actually paid for.
+            const float fill = rep.purchases.count({s.corp, s.body})
+                             ? rep.purchases.at({s.corp, s.body})[r_iron] : 0.0f;
+
+            clear_markets(s.w, reg, rep);
+            const market_component& mc = s.w.markets.at(s.market);
+            std::printf("       R8 partial: fill=%.3f demand=%.3f\n", fill, mc.demand[r_iron]);
+
+            check(fill > 1.99f && fill < 2.01f,
+                  "R8.3 FILL UNMOVED: the purchase record still says 2 — what was actually delivered");
+            check(mc.demand[r_iron] > 7.99f && mc.demand[r_iron] < 8.01f,
+                  "R8.4 WANT: demand = 8 even though only 2 arrived — want and fill are separate");
         }
     }
 

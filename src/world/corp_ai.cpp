@@ -12,6 +12,7 @@
 #include "world.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdio>
 #include <limits>
@@ -191,6 +192,19 @@ float recipe_margin(const world& w, const recipe_registry& reg,
         if (rc->inputs[r]  > 0.0f) m -= rc->inputs[r]  * local_price(w, tile, r);
     }
     return m;
+}
+
+/// The resource a recipe mostly makes — its largest output. Names what a
+/// processor is FOR, which is the argument the glut forecast and the placement
+/// rules both want (BL-439). Ties resolve to the lowest resource index, so the
+/// answer is a function of the recipe rather than of iteration order.
+resource_type primary_output(const recipe& rc)
+{
+    std::size_t best = 0;
+    float       q    = 0.0f;
+    for (std::size_t r = 0; r < resource_count; ++r)
+        if (rc.outputs[r] > q) { q = rc.outputs[r]; best = r; }
+    return static_cast<resource_type>(best);
 }
 
 /// Whether `tile` is revealed under its body's survey state (geographic fog).
@@ -397,7 +411,53 @@ struct extraction_site
 /// for every corp evaluating this tick; only the later can_place_in_world
 /// filter (tech gate, logistics reach) and scoring are genuinely per-corp,
 /// and both run over this already-truncated top-M list, not the full tile set.
-std::vector<extraction_site> rank_extraction_sites(const world& w, int top_m)
+/// Per-resource siting pull from unmet recipe demand (BL-440).
+///
+/// `wanted` counts the loaded recipes naming the resource as an input — a static
+/// property of the recipe graph, so it is identical for every corp and every
+/// tick. `sites` counts the extraction sites in the world already NAMED for it,
+/// which is what makes the pull self-limiting: the first mine for a starved good
+/// halves the bonus, the third quarters it, and a well-supplied resource gets
+/// essentially nothing.
+///
+/// Deliberately keyed on sites-named-for-it rather than on units produced. Since
+/// BL-437 a site works every deposit on its tile, so a starved good trickles in
+/// as a BY-PRODUCT of mines placed for something richer — which is exactly how
+/// coal reached 6.1 units/tick against demand that starved half the economy while
+/// looking, to a production-keyed measure, like it was being supplied.
+std::array<float, resource_count> input_demand_weights(const world& w,
+                                                       const recipe_registry& reg,
+                                                       const corp_ai_params& p)
+{
+    std::array<float, resource_count> weight;
+    weight.fill(1.0f);
+    if (p.input_demand_pull <= 0.0f)
+        return weight; // conversion disabled: pre-BL-440 behaviour
+
+    std::array<int, resource_count> wanted{};
+    const int n = reg.recipe_count(building_type::processing_facility);
+    for (int i = 0; i < n; ++i)
+    {
+        const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (rc.inputs[r] > 0.0f)
+                ++wanted[r];
+    }
+
+    std::array<int, resource_count> sites{};
+    for (const auto& [bid, b] : w.buildings)
+        if (b.type == building_type::extraction_site)
+            ++sites[static_cast<std::size_t>(b.target_resource)];
+
+    for (std::size_t r = 0; r < resource_count; ++r)
+        if (wanted[r] > 0)
+            weight[r] = 1.0f + p.input_demand_pull * static_cast<float>(wanted[r])
+                                                   / static_cast<float>(1 + sites[r]);
+    return weight;
+}
+
+std::vector<extraction_site> rank_extraction_sites(const world& w, int top_m,
+                                                   const std::array<float, resource_count>& demand_weight)
 {
     std::vector<extraction_site> sites;
     sites.reserve(w.tiles.size() / 2); // most land tiles carry some deposit
@@ -424,20 +484,33 @@ std::vector<extraction_site> rank_extraction_sites(const world& w, int top_m)
             !survey_tile_visible(memo_bc->survey, memo_bc->grid_width, memo_bc->grid_height,
                                  tc.grid_x, tc.grid_y))
             continue; // geographic fog: unsurveyed tiles are not candidates
-        bool any = false;
-        const resource_type best = placement_rules::richest_extractable(tc, any);
-        if (!any)
-            continue;
-        const float rich = tc.resource_deposit[static_cast<std::size_t>(best)];
-        if (rich <= 0.0f)
-            continue;
-        // Terrain affinity × deposit richness: mountains/canyons expose
-        // minerals (TILES.md), read here as a mild suitability bonus.
+        // Terrain affinity: mountains/canyons expose minerals (TILES.md), read
+        // here as a mild suitability bonus. Tile-wide, so it is hoisted out of
+        // the per-target loop below.
         float affinity = 1.0f;
         if (tc.landform == terrain_landform::mountain ||
             tc.landform == terrain_landform::canyon)
             affinity = 1.15f;
-        sites.push_back({tid, rich * affinity, best});
+
+        // EVERY extractable deposit on this tile is a candidate, not just the
+        // richest (BL-440). This used to call richest_extractable and emit one
+        // site per tile, which meant a resource that is common but rarely
+        // dominant was never offered to the scorer AT ALL — it lost every
+        // richness comparison it was entered into, so no amount of demand could
+        // reach it. Seven wanted recipe inputs sat on 200+ tiles apiece with
+        // zero sites named for them; one of them on 16,361 tiles.
+        //
+        // Pre-selecting the richest was a TILE-LOCAL heuristic answering a
+        // WORLD-level question. Enumerating is what lets the demand weight (and
+        // the existing net/glut/solvency scoring downstream) decide instead.
+        for (const resource_type rt : placement_rules::k_extractable)
+        {
+            const std::size_t ri   = static_cast<std::size_t>(rt);
+            const float       rich = tc.resource_deposit[ri];
+            if (rich <= 0.0f)
+                continue;
+            sites.push_back({tid, rich * affinity * demand_weight[ri], rt});
+        }
     }
     // PARTIAL SORT, not a full one (2026-08-12). Only the top M survive the
     // resize below, so sorting all ~18,000 qualifying sites to discard all but
@@ -506,7 +579,12 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
     // per-corp one — compute it once for the whole tick rather than once per
     // due corp. Cheap to build unconditionally even on ticks with no due
     // corp (rare, and still O(tiles) once rather than O(tiles) per corp).
-    const std::vector<extraction_site> ranked_sites = rank_extraction_sites(w, p.top_m_sites);
+    // BL-440: the demand weights are a world fact too (recipe graph + the sites
+    // standing in the world), so they are computed once per tick alongside the
+    // site ranking they feed, not once per due corp — the same BL-253 hoist.
+    const std::array<float, resource_count> demand_weight = input_demand_weights(w, reg, p);
+    const std::vector<extraction_site> ranked_sites =
+        rank_extraction_sites(w, p.top_m_sites, demand_weight);
 
     for (std::size_t index = 0; index < corp_ids.size(); ++index)
     {
@@ -587,7 +665,6 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 if (net <= 0.0f)
                     continue; // never build into an expected loss
                 const float capex = std::max(1.0f, ex.build_cost);
-                const float payback = capex / net;
 
                 // Predictive spending (BL-203): forecast this build's added
                 // supply against the local market's PUBLIC demand over its
@@ -608,7 +685,217 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 c.cmd.tile   = s.tile;
                 c.cmd.type   = building_type::extraction_site;
                 c.cmd.target = s.target;
-                c.score  = (net / payback) * focus_weight(cc.focus, corp_verb::build) * jitter * glut;
+                // BL-417 step 1: this used to read `net / payback` with
+                // `payback = capex / net` — which is `net^2 / capex`. It looked
+                // like capital efficiency and behaved like a margin bias:
+                // doubling the margin quadruples the score, doubling the cost
+                // only halves it. Written out here so the code stops lying to
+                // the next reader.
+                //
+                // The bias is RETAINED, deliberately. focus_weight, jitter and
+                // the glut multiplier were all tuned against this curve, and
+                // every blessed golden records a world evolved under it —
+                // replacing it with an explicit linear metric is a re-tune plus
+                // a golden reshuffle, which is BL-417 step 2 and Ben's call.
+                //
+                // NOT algebraically free in float: `net / (capex / net)` and
+                // `net * net / capex` round differently. Measured against the
+                // MSVC build (ai_skill_harness 5 seeds, spectator_determinism
+                // state_hash) before landing; byte-identical both sides. See
+                // BL-417 `step_1_landed` and requirements group
+                // quadratic-build-score-honest.
+                c.score  = (net * net / capex) * focus_weight(cc.focus, corp_verb::build) * jitter * glut;
+                c.spend  = capex;
+                c.reason = corp_decision_reason::best_build;
+                c.bucket = bucket_for_reason(c.reason);
+                cands.push_back(c);
+            }
+        }
+
+        // ---- Build candidates: a processing facility on the corp's own ground -
+        //
+        // BL-439. Until 2026-08-17 this scorer emitted `corp_verb::build` from
+        // exactly two places — the extraction loop above and the muster base
+        // below — so a rival owned only the processors it was GENERATED with,
+        // for the whole campaign. Three shipped claims rested on that not being
+        // true (NR-265/266/267): "the AI prefers mines" read as a scoring-curve
+        // artefact when it was structural; BL-436's calibration narrative
+        // explained a collapse by corps building processors, which they cannot
+        // do; and BL-428's chain-depth ladder had exactly one climber.
+        //
+        // The seam was never the problem: corp_command/construct_building build
+        // a processor, recipe and all, when a command asks for one (BL-388). The
+        // scorer simply never asked.
+        {
+            const building_economics& pe = reg.economics(building_type::processing_facility);
+
+            // SITING. A processor is not sited by a deposit, so `ranked_sites`
+            // offers it nothing — it needs its own rule, and the corp's OWN
+            // asset tiles are the legible one: same body, so the same stockpile
+            // pool its extraction feeds; same tile, so the same market; and
+            // O(assets) rather than another O(tiles) scan. Nothing stops two
+            // buildings sharing a tile (only the launchpad is capped), so this
+            // is a real placement, not a workaround.
+            //
+            // One processor per tile, deliberately: without it a corp would
+            // stack processors on its best tile every evaluation. Collected in
+            // the same single walk that finds the tiles.
+            std::vector<entity_id> own_tiles;
+            std::vector<entity_id> tiles_with_processor;
+            own_tiles.reserve(cc.assets.size());
+            for (const entity_id bid : cc.assets)
+            {
+                const auto bit = w.buildings.find(bid);
+                if (bit == w.buildings.end())
+                    continue;
+                own_tiles.push_back(bit->second.tile);
+                if (bit->second.type == building_type::processing_facility)
+                    tiles_with_processor.push_back(bit->second.tile);
+            }
+            // Sorted + deduped so the candidate order is a function of the world,
+            // not of insertion history — the same determinism contract
+            // rank_extraction_sites keeps for the extraction half.
+            std::sort(own_tiles.begin(), own_tiles.end());
+            own_tiles.erase(std::unique(own_tiles.begin(), own_tiles.end()), own_tiles.end());
+            std::sort(tiles_with_processor.begin(), tiles_with_processor.end());
+
+            const int   n_recipes = reg.recipe_count(building_type::processing_facility);
+            const int   depth     = corp_reached_depth(cc, reg);
+            const float wf        = 0.5f; // construct_building staffs at 0.5, as above
+            const float batches   = pe.base_rate * wf;
+
+            for (const entity_id tile : own_tiles)
+            {
+                if (std::binary_search(tiles_with_processor.begin(),
+                                       tiles_with_processor.end(), tile))
+                    continue;
+                const auto tit = w.tiles.find(tile);
+                if (tit == w.tiles.end())
+                    continue;
+                const entity_id body = tit->second.body;
+
+                // The corp's own stock on this body, plus what the local market
+                // actually holds — the SAME two sources the production tick
+                // draws inputs from (economy_system.cpp § run_processing, the
+                // BL-130 pool + inventory coverage). Read const: a candidate
+                // that is only being scored must not author a pool.
+                const auto pit = w.corp_body_pools.find(std::make_pair(corp, body));
+                const stockpile_component* pool =
+                    (pit != w.corp_body_pools.end()) ? &pit->second : nullptr;
+                const entity_id mid = market_for_tile(w, tile);
+                const auto      mit = (mid != null_entity) ? w.markets.find(mid) : w.markets.end();
+                const market_component* mkt = (mit != w.markets.end()) ? &mit->second : nullptr;
+
+                // RECIPE CHOICE. Walk the BROWSE space (this era's roster) and
+                // cross to the ABSOLUTE id through recipe_id(name) — the two id
+                // spaces recipe_registry.hpp keeps apart, and the exact crossing
+                // NR-254 caught the build door getting wrong.
+                //
+                // Each surviving recipe is priced by `estimate_prospective_profit`
+                // (BL-162) rather than by the inline revenue-minus-wages sum the
+                // extraction candidate above uses. That inline model is kept
+                // there ONLY because switching it would move every blessed
+                // golden for no player-visible gain (the BL-162 note). This
+                // candidate is new, so it has no golden to protect and no reason
+                // to inherit the weaker model: the proper one takes opex through
+                // compute_building_opex, so it carries habitability-scaled wages,
+                // real input cost at local prices, and BL-193 stack decay.
+                //
+                // What it still does NOT model is input STARVATION — it prices a
+                // full run. Measured at 30.9% of processing building-ticks
+                // (NR-266), so this remains an over-estimate; the `reachable`
+                // gate below is the coarse guard against the worst of it.
+                uint16_t best_recipe = no_recipe;
+                float    best_net    = 0.0f;
+                for (int i = 0; i < n_recipes; ++i)
+                {
+                    const recipe&  rc  = reg.recipe_at(building_type::processing_facility, i);
+                    const uint16_t rid = reg.recipe_id(rc.name);
+                    const recipe*  abs = reg.get_recipe(rid);
+                    if (abs == nullptr)
+                        continue; // the name did not round-trip; never emit it
+
+                    // BL-428's growth gate, asked here rather than discovered at
+                    // the seam: construct_building rejects a recipe deeper than
+                    // the corp has reached, and a candidate that can only ever be
+                    // refused costs a build slot to learn nothing.
+                    const int required = reg.recipe_required_depth(rid);
+                    if (required < 0 || required > depth)
+                        continue;
+
+                    // INPUT ACCESS. A processor with no reachable input is an
+                    // immediate loss-maker, so this asks the production tick's
+                    // own question: does pool + market inventory cover a full
+                    // run at the idle threshold? Below it the building would not
+                    // even bootstrap on the tick it completed.
+                    bool  reachable = true;
+                    for (std::size_t r = 0; r < resource_count && reachable; ++r)
+                    {
+                        const float in = abs->inputs[r];
+                        if (in <= 0.0f)
+                            continue;
+                        const float need  = in * batches;
+                        const float avail = (pool ? pool->quantities[r] : 0.0f)
+                                          + (mkt ? std::max(0.0f, mkt->inventory[r]) : 0.0f);
+                        if (need > 0.0f && avail / need < reg.t_idle())
+                            reachable = false;
+                    }
+                    if (!reachable)
+                        continue;
+
+                    const resource_type    rt = primary_output(*abs);
+                    const building_profit  bp = estimate_prospective_profit(
+                        w, reg, tile, building_type::processing_facility, rt, rid);
+                    if (!bp.has_data)
+                        continue;
+                    const float n = bp.net();
+                    if (n > best_net || (n == best_net && best_recipe != no_recipe && rid < best_recipe))
+                    {
+                        best_net    = n;
+                        best_recipe = rid;
+                    }
+                }
+                if (best_recipe == no_recipe)
+                    continue; // nothing this corp can reach, run and profit from
+
+                const recipe* rc = reg.get_recipe(best_recipe);
+                // The target names the primary output. It is what the glut
+                // forecast is run against, and it is the argument placement_rules
+                // reads for the Hydroponics Bay rule (BL-166).
+                const resource_type target    = primary_output(*rc);
+                const float         primary_q = rc->outputs[static_cast<std::size_t>(target)];
+
+                if (!placement_rules::can_place_in_world(w, tile, building_type::processing_facility, target))
+                    continue;
+
+                const float net = best_net;
+                if (net <= 0.0f)
+                    continue; // never build into an expected loss, same as above
+
+                const float capex      = std::max(1.0f, pe.build_cost);
+                const float added_rate = primary_q * batches;
+                const int   horizon    = static_cast<int>(pe.build_duration_ticks) + p.forecast_clearing_ticks;
+                const float glut       = forecast_glut_multiplier(w, tile, target, added_rate, horizon, p);
+                if (glut <= 0.0f)
+                    continue; // forecast hard glut — veto, as the extraction half does
+
+                candidate c;
+                c.cmd.tick   = tick;
+                c.cmd.corp   = corp;
+                c.cmd.verb   = corp_verb::build;
+                c.cmd.tile   = tile;
+                c.cmd.type   = building_type::processing_facility;
+                c.cmd.target = target;
+                // The recipe MUST travel with the command. construct_building
+                // substitutes steel for `no_recipe` — right for a caller with no
+                // opinion, wrong for one that chose — and BL-388 closed exactly
+                // that trap by making corp_command assert the built processor
+                // kept the recipe it was given.
+                c.cmd.recipe = best_recipe;
+                // Same curve as the extraction candidate, deliberately: BL-417
+                // step 2 is the decision about whether net^2/capex is the right
+                // shape, and it should be taken ONCE for both, not forked here.
+                c.score  = (net * net / capex) * focus_weight(cc.focus, corp_verb::build) * jitter * glut;
                 c.spend  = capex;
                 c.reason = corp_decision_reason::best_build;
                 c.bucket = bucket_for_reason(c.reason);
@@ -943,9 +1230,14 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     c.cmd.tile   = best_tile;
                     c.cmd.type   = building_type::military_base;
                     // Flat, modest score: real enough to win an otherwise-quiet
-                    // eval, never enough to out-bid a genuine extraction/processing
-                    // net-positive candidate (those score net/payback, typically
+                    // eval, never enough to out-bid a genuine extraction
+                    // net-positive candidate (those score net^2/capex, typically
                     // well above 1.0 for a viable site).
+                    //
+                    // Said "extraction/processing" until BL-439: there is no
+                    // processing_facility build candidate anywhere in this
+                    // scorer, so the comparison could only ever be against an
+                    // extraction site. See BL-439 (AI never builds processors).
                     c.score  = 0.35f * jitter;
                     c.spend  = std::max(1.0f, mex.build_cost);
                     c.reason = corp_decision_reason::best_build;
