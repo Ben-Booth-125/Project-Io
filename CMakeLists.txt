@@ -78,6 +78,37 @@ if(NOT IO_DEPS_CACHE)
     set(IO_DEPS_CACHE "${CMAKE_CURRENT_SOURCE_DIR}/_deps_cache")
 endif()
 
+# A WORKTREE HAS NO CACHE OF ITS OWN (NR-283, 2026-08-17). The default above
+# resolves inside the source tree, and a sub-agent worktree at
+# .claude/worktrees/agent-<id> carries no `_deps_cache` — so the seeding fell
+# straight through to COLD and every parallel agent re-downloaded ~120 MB. The
+# env-var comment above documented the manual export as the answer, which meant
+# the fix only worked for whoever remembered to type it; the case the cache
+# exists FOR is precisely the one that missed it.
+#
+# Ask git where the real checkout is rather than guessing a `../../..` depth,
+# which would silently break if the worktree location ever moves.
+# `--git-common-dir` resolves to the MAIN repo's .git for a linked worktree and
+# to our own for a normal checkout, so this is a no-op in the normal case.
+if(NOT EXISTS "${IO_DEPS_CACHE}")
+    find_package(Git QUIET)
+    if(GIT_EXECUTABLE)
+        execute_process(
+            COMMAND "${GIT_EXECUTABLE}" rev-parse --path-format=absolute --git-common-dir
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            OUTPUT_VARIABLE IO_GIT_COMMON_DIR
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET)
+        if(IO_GIT_COMMON_DIR)
+            get_filename_component(IO_MAIN_CHECKOUT "${IO_GIT_COMMON_DIR}" DIRECTORY)
+            if(EXISTS "${IO_MAIN_CHECKOUT}/_deps_cache")
+                set(IO_DEPS_CACHE "${IO_MAIN_CHECKOUT}/_deps_cache")
+                message(STATUS "Deps: worktree — using the main checkout's cache at ${IO_DEPS_CACHE}")
+            endif()
+        endif()
+    endif()
+endif()
+
 # Where THIS build tree keeps its own populated deps. FETCHCONTENT_BASE_DIR is
 # not defaulted until include(FetchContent) below, so mirror its default here.
 if(FETCHCONTENT_BASE_DIR)
