@@ -739,7 +739,7 @@
       "title": "The shared dependency cache never seeds anything - BL-302's directory names do not match what it looks for",
       "raised": "2026-08-17",
       "kind": "observation",
-      "status": "open",
+      "status": "resolved",
       "source": "Hit while configuring a fresh sub-agent worktree for BL-406/BL-404. The configure tried to DOWNLOAD SDL3 and failed offline, in a repo that carries a 120 MB cache of exactly that.",
       "what": "CMakeLists.txt's seeding loop tests for '${IO_DEPS_CACHE}/${dep_name}-src/${marker}' - sdl3-src, lua_src-src, sol2_src-src, imgui_src-src. The cache on disk holds 'sdl3', 'lua_src', 'sol2_src', 'imgui_src'. No name matches, so every dep is classified COLD in any build tree that is not already warm, and the 'Deps: seeded from ...' line never prints. The main repo's build/ tree hides this completely: it has been warm since before BL-302, so nobody has configured cold there.",
       "why_it_matters": "It defeats BL-302's entire purpose, and it only bites the case that motivated it - a fresh worktree for a parallel sub-agent, which is now the standard way work is split here. Offline, or on a slow link, a sub-agent cannot configure at all. Worked around this session by passing FETCHCONTENT_SOURCE_DIR_* explicitly (see bl406_build.bat, deleted before commit), which is a one-off, not a fix.",
@@ -747,7 +747,7 @@
       "files": [
         "CMakeLists.txt"
       ],
-      "resolution": null
+      "resolution": "Fixed 2026-08-17, one line: the seeding loop now tests IO_DEPS_CACHE/dep_name, without the -src suffix. That suffix is a FetchContent BUILD-TREE convention (_deps/<name>-src) and the IS_DIRECTORY test above it is right to keep using it; the shared CACHE is a plain checkout carrying sdl3, lua_src, sol2_src, imgui_src. Appending -src there matched nothing, so every dep classified COLD and the BL-302 seeding never fired once.\n\nPROVEN COLD rather than assumed, which is the whole point of this entry: configured a fresh build tree from scratch and it reported 'Deps: seeded from .../_deps_cache -> sdl3;lua_src;sol2_src;imgui_src', configuring in 25.9s with no download.\n\nThe integrator's report that the FETCHCONTENT_SOURCE_DIR_* variable NAMES were also wrong turned out to be mistaken - string(TOUPPER) already yields exactly SDL3, LUA_SRC, SOL2_SRC, IMGUI_SRC. Only the path was wrong, which is why its explicit-flag workaround succeeded and masked the real cause. Scratch tree removed after the check."
     },
     {
       "id": "NR-277",

@@ -101,7 +101,18 @@ foreach(dep_spec IN ITEMS
 
     string(TOUPPER "${dep_name}" dep_upper)
     set(dep_var "FETCHCONTENT_SOURCE_DIR_${dep_upper}")
-    set(dep_cached_src "${IO_DEPS_CACHE}/${dep_name}-src")
+    # NO `-src` SUFFIX HERE (NR-276, fixed 2026-08-17). The suffix is a
+    # FetchContent BUILD-TREE convention — `_deps/<name>-src` — and the
+    # IS_DIRECTORY test below is right to use it. The shared CACHE is a plain
+    # checkout that carries `sdl3`, `lua_src`, `sol2_src`, `imgui_src`, so
+    # appending `-src` here matched nothing, every dep classified COLD, and the
+    # BL-302 seeding this loop exists to perform never fired once.
+    #
+    # It went unseen because the main repo's build/ tree has been warm since
+    # before BL-302, so the IS_DIRECTORY branch above answered first every time
+    # and no one configured cold. It surfaced only when sub-agent worktrees
+    # started each trying to download ~120 MB.
+    set(dep_cached_src "${IO_DEPS_CACHE}/${dep_name}")
 
     if(NOT "${${dep_var}}" STREQUAL "")
         # Explicitly pointed somewhere by the caller — never second-guess it.

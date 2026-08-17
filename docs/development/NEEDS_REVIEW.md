@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*45 entries — 38 open, 7 resolved.*
+*45 entries — 37 open, 8 resolved.*
 
 ---
 
@@ -439,17 +439,6 @@ The Holdings column rendered '2 proc / 0 extr / 1 other' clipped to '/ 1 otl' be
 
 *Files: `src/core/app.cpp`, `scripts/verify/corp_choice.lua`*
 
-### NR-276 — The shared dependency cache never seeds anything - BL-302's directory names do not match what it looks for
-*observation · raised 2026-08-17 · from Hit while configuring a fresh sub-agent worktree for BL-406/BL-404. The configure tried to DOWNLOAD SDL3 and failed offline, in a repo that carries a 120 MB cache of exactly that.*
-
-CMakeLists.txt's seeding loop tests for '${IO_DEPS_CACHE}/${dep_name}-src/${marker}' - sdl3-src, lua_src-src, sol2_src-src, imgui_src-src. The cache on disk holds 'sdl3', 'lua_src', 'sol2_src', 'imgui_src'. No name matches, so every dep is classified COLD in any build tree that is not already warm, and the 'Deps: seeded from ...' line never prints. The main repo's build/ tree hides this completely: it has been warm since before BL-302, so nobody has configured cold there.
-
-**Why it matters.** It defeats BL-302's entire purpose, and it only bites the case that motivated it - a fresh worktree for a parallel sub-agent, which is now the standard way work is split here. Offline, or on a slow link, a sub-agent cannot configure at all. Worked around this session by passing FETCHCONTENT_SOURCE_DIR_* explicitly (see bl406_build.bat, deleted before commit), which is a one-off, not a fix.
-
-> **Recommendation:** One-line fix either way - point the loop at '${IO_DEPS_CACHE}/${dep_name}' or rename the four cache directories. Prefer changing the loop, since the cache directories are what the checkout actually carries. Worth a backlog item rather than a drive-by, because whichever way it goes wants a cold-configure check that would have caught it.
-
-*Files: `CMakeLists.txt`*
-
 ### NR-277 — BL-406/BL-404 landed without re-tuning pull_fraction, though the ruling cleared it to move
 *decision taken on your behalf · raised 2026-08-17 · from Ben's ruling 2026-08-15 on BL-406 said 'pull_fraction is re-tuned against whatever curve (c) produces' and cleared outpost prices to move. The session brief separately fenced off scripts/economy.lua repricing as Ben's open call, blocked behind BL-440.*
 
@@ -600,4 +589,21 @@ BL-436's design says corp_ai's build scorer "is being asked to prefer processors
 > **RESOLVED.** Confirmed independently 2026-08-17 and acted on. corp_verb::build was emitted from exactly two sites in corp_ai.cpp — the ranked_sites loop (extraction_site) and one military_base — with no processing_facility candidate anywhere. BL-439 adds one: sited on the corp own asset tiles, recipe chosen from the browse space and crossed to the absolute id, gated on chain depth and on real input access (pool + local market inventory against the tick own coverage threshold), priced by estimate_prospective_profit, on the same score curve and the same solvency/glut/reserve gates as extraction. Guarded by ai_skill_harness R5, which was run against the PRE-change build first and failed by construction there (processors_gained = 0 on all five seeds). What the change then revealed is NR-269.
 
 *Files: `src/world/corp_ai.cpp`, `docs/development/backlog.json`*
+
+### NR-276 — The shared dependency cache never seeds anything - BL-302's directory names do not match what it looks for
+*observation · raised 2026-08-17 · from Hit while configuring a fresh sub-agent worktree for BL-406/BL-404. The configure tried to DOWNLOAD SDL3 and failed offline, in a repo that carries a 120 MB cache of exactly that.*
+
+CMakeLists.txt's seeding loop tests for '${IO_DEPS_CACHE}/${dep_name}-src/${marker}' - sdl3-src, lua_src-src, sol2_src-src, imgui_src-src. The cache on disk holds 'sdl3', 'lua_src', 'sol2_src', 'imgui_src'. No name matches, so every dep is classified COLD in any build tree that is not already warm, and the 'Deps: seeded from ...' line never prints. The main repo's build/ tree hides this completely: it has been warm since before BL-302, so nobody has configured cold there.
+
+**Why it matters.** It defeats BL-302's entire purpose, and it only bites the case that motivated it - a fresh worktree for a parallel sub-agent, which is now the standard way work is split here. Offline, or on a slow link, a sub-agent cannot configure at all. Worked around this session by passing FETCHCONTENT_SOURCE_DIR_* explicitly (see bl406_build.bat, deleted before commit), which is a one-off, not a fix.
+
+> **Recommendation:** One-line fix either way - point the loop at '${IO_DEPS_CACHE}/${dep_name}' or rename the four cache directories. Prefer changing the loop, since the cache directories are what the checkout actually carries. Worth a backlog item rather than a drive-by, because whichever way it goes wants a cold-configure check that would have caught it.
+
+> **RESOLVED.** Fixed 2026-08-17, one line: the seeding loop now tests IO_DEPS_CACHE/dep_name, without the -src suffix. That suffix is a FetchContent BUILD-TREE convention (_deps/<name>-src) and the IS_DIRECTORY test above it is right to keep using it; the shared CACHE is a plain checkout carrying sdl3, lua_src, sol2_src, imgui_src. Appending -src there matched nothing, so every dep classified COLD and the BL-302 seeding never fired once.
+
+PROVEN COLD rather than assumed, which is the whole point of this entry: configured a fresh build tree from scratch and it reported 'Deps: seeded from .../_deps_cache -> sdl3;lua_src;sol2_src;imgui_src', configuring in 25.9s with no download.
+
+The integrator's report that the FETCHCONTENT_SOURCE_DIR_* variable NAMES were also wrong turned out to be mistaken - string(TOUPPER) already yields exactly SDL3, LUA_SRC, SOL2_SRC, IMGUI_SRC. Only the path was wrong, which is why its explicit-flag workaround succeeded and masked the real cause. Scratch tree removed after the check.
+
+*Files: `CMakeLists.txt`*
 
