@@ -3733,6 +3733,85 @@
      "notes": "Re-scoped by NR-265 before it is taken: there is no processing_facility build candidate in the scorer (BL-439), so this curve only ranks extraction sites against each other and against the flat-scored military base. Retuning it cannot produce the processor preference BL-436 attributed to it. Landing BL-439 first would change what step 2 is choosing between."
     }
    ]
+  },
+  {
+   "brief": "ai-builds-processors",
+   "batch": "2026-08-17-bl439",
+   "title": "BL-439 — A rival corporation can build a processing facility, and does",
+   "status": "active",
+   "promoted_from": "backlog.json BL-439 AI_NEVER_BUILDS_PROCESSORS",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "ITEM-SPANNING (headless): over a representative ai_skill_harness run, at least one rival corporation constructs at least one processing_facility it was not generated with. This assertion fails by construction on the pre-BL-439 build and that must be demonstrated, not assumed.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET, and demonstrated in both directions. ai_skill_harness R5 counts rival-owned processing facilities at tick 0 and at the end, from the WORLD rather than the decision ring, so a generated processor never counts and a rejected build command never counts. Run against the PRE-change build first: processors_gained = 0 on all five seeds, the assertion red. Post-change: 12/15/16/16/10, 69 across the set.",
+     "notes": "Counted from the world deliberately — the ring records intent, and the claim under test is that a processor exists that did not before."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "Every processor the scorer commands names a recipe, and the built building runs that recipe. The command must never leave recipe = no_recipe (construct_building substitutes steel — the BL-388 trap), and corp_command must never reject the candidate as rejected_invalid.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. The candidate sets cmd.recipe to the chosen absolute id before emission; corp_command asserts the built processor kept it (BL-388). 69 processors built across the benchmark set with no rejected_invalid.",
+     "notes": null
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "The recipe is chosen from the BROWSE space for processing_facility and passed as an ABSOLUTE recipe id (NR-254 pinned this exact confusion at the build door). A candidate whose absolute id does not resolve via get_recipe is never emitted.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. The recipe loop walks reg.recipe_count/recipe_at (BROWSE, era-masked) and crosses to the ABSOLUTE id via reg.recipe_id(rc.name); a name that does not round-trip through get_recipe is skipped rather than emitted.",
+     "notes": null
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "INPUT ACCESS: a processor candidate is only emitted where the corp can actually source every input of its chosen recipe on that body — pool + local market inventory, measured against the same coverage threshold the production tick uses. A processor with no reachable input is an immediate loss-maker (BL-439 design (c)).",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. Per candidate recipe, every input is checked against (corp pool on this body + local market inventory) / (input x batches) >= reg.t_idle() — the same two sources and the same threshold economy_system uses to decide a processor bootstraps at all. Read const: scoring never authors a pool.",
+     "notes": null
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "requirement": "The candidate is subject to the SAME gates as the extraction candidate: the reserve floor, the should-have buffer, the solvency/reserve accounting, the glut forecast, and the never-build-into-an-expected-loss net gate. It carries capex like any Nice-to-Have build.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. Same score expression ((net*net/capex) x focus_weight x jitter x glut), same never-build-into-a-loss gate, same forecast_glut_multiplier veto, same c.spend/c.bucket accounting, so it passes through the reserve floor and should-have buffer exactly as the extraction candidate does.",
+     "notes": "Pricing differs deliberately: estimate_prospective_profit (BL-162) instead of the inline sum. A new candidate has no golden to protect, so it takes the model done properly. Tested both ways — same recipes, same counts, net worth moved only on seed 0."
+    },
+    {
+     "id": "R6",
+     "status": "failed",
+     "requirement": "GOLDEN RESHUFFLE PAID DELIBERATELY: every moved golden and ai_skill_harness band is re-blessed with the cause recorded in the file, confirmed reproducible across two runs, and never blessed before the cause is understood (Sprint 19 risk note). The ai_skill_harness bands re-blessed DOWNWARD on 2026-08-16 are expected to RISE; a bless that lowers them again needs an explicit written reason.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "NOT MET, DELIBERATELY. The bands moved and were LEFT RED rather than re-blessed. Sprint 19 wrote the criterion in advance: the bands re-blessed downward on 2026-08-16 should RISE when the processing defect is fixed, and a bless that does not raise them means the fix did not work. They fell — three of five seeds insolvent, seed 0 from 498k to -295k. Blessing that would record bankruptcy as the expected outcome. See NR-269; the call is Ben s.",
+     "notes": "This row is failed rather than pending on purpose: pending reads as unfinished work, and this is a finished decision not to bless."
+    },
+    {
+     "id": "R7",
+     "status": "complete",
+     "requirement": "AI_OPPONENT.md records that the build scorer enumerates processing facilities, how they are sited and how the recipe is chosen — the doc currently describes a scorer that only ranks extraction sites.",
+     "verification": [
+      "review"
+     ],
+     "result_metric": "MET. AI_OPPONENT.md s build-verb note is rewritten from \"ranges over two\" to \"ranges over three\", with the siting / recipe-choice / reachability / pricing rules stated, plus a block recording what the change immediately found and why the goldens are red.",
+     "notes": null
+    }
+   ]
   }
  ]
 }

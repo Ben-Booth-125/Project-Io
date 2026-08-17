@@ -1,5 +1,57 @@
 # Project Io — REFINED (active worklist)
 
+## AI never builds processors (promoted from BL-439) — **3/4, C HELD FOR BEN** (2026-08-17)
+
+Requirements: requirements.json § ai-builds-processors (R1–R7)
+
+The structural finding behind Sprint 19's keystone. `corp_ai.cpp` emits `corp_verb::build` from
+exactly two sites — the `ranked_sites` loop hard-coded to `extraction_site` (line 606) and one
+`military_base` (line 960). A rival therefore owns only the processors it was *generated* with,
+for the whole campaign. "The AI prefers mines" is not a scoring-curve artefact (NR-265); BL-428's
+growth ladder has no AI player (NR-267); and BL-436's calibration narrative describes a mechanism
+that cannot happen (NR-266).
+
+- **[3] A — The processor build candidate.** Add a `processing_facility` candidate to
+  `run_corp_strategic_step`'s enumeration, on the same score curve and the same solvency / glut /
+  reserve gates as the extraction candidate. Three things extraction does not have to solve:
+  **siting** (no deposit ranks a processor — site it on the corp's own asset tiles, which is
+  literally "next to its own input supply", shares the body pool and the market, and costs
+  O(assets) not O(tiles)); **recipe choice** (`recipe_margin` scores it; the id must cross from
+  the BROWSE space to the ABSOLUTE one — NR-254's exact trap); **input access** (pool + local
+  market inventory against the tick's own coverage threshold). Files: `src/world/corp_ai.cpp`.
+  Deps: foundation. Satisfies: R2, R3, R4, R5.
+- **[2] B — Guard: a rival actually builds one.** Extend `ai_skill_harness` with the assertion
+  that at least one rival constructs at least one processing facility over the run — and run it
+  against the **pre-change** build first, where it must fail by construction. Files:
+  `tools/verify/ai_skill_harness.cpp`. Deps: A. Satisfies: R1.
+- **[2] C — Pay the golden reshuffle deliberately.** Every evolved world changes, so goldens and
+  bands move. Re-bless with the cause recorded, confirmed across two runs. The bands lowered on
+  2026-08-16 are expected to **rise**; if they do not, that is a finding about the item, not a
+  number to bless. Deps: A, B. Satisfies: R6.
+- **[1] D — Propagate to AI_OPPONENT.md.** The doc describes a scorer that only ranks extraction
+  sites. Files: `docs/ai/AI_OPPONENT.md`. Deps: A. Satisfies: R7.
+
+**Parallelisation.** Strictly A → {B, D} → C. One logic file with `corp_ai.cpp` as the hotspot —
+main session, no fan-out.
+
+**Status 2026-08-17. A, B and D complete; C is held, not skipped.** The guard was written and run
+against the pre-change build *first*, where it failed by construction (`processors_gained = 0` on
+all five seeds); after the change it reads 12/15/16/16/10, 69 across the set. So the structural
+defect is closed and demonstrated in both directions.
+
+What it then found is why C stops here. Three of five seeds go insolvent — seed 0 from 498k to
+−295k — and `ai_skill_harness` is 18 rows red. The estimator was **ruled out rather than assumed
+innocent**: scored with the inline model and with `estimate_prospective_profit`, the candidate picks
+the same recipes and builds the same counts, and net worth moves only on seed 0. The new
+per-building read shows processors realising **−6 to −12 per tick against a predicted −0.4 to
++0.1**, on the same buildings.
+
+Sprint 19's success criterion was written before the work started: these bands should **rise**, and
+a bless that does not raise them means the fix did not work. They fell. Blessing here would record
+bankruptcy as the expected outcome, so the goldens are **left red** and the call is Ben's —
+NR-269 lays out the three options and states the one taken in the meantime (change nothing, bless
+nothing).
+
 ## Held-order phantom inventory (promoted from BL-422) — **COMPLETE** (3/3, 2026-08-16)
 
 Requirements: requirements.json § held-order-phantom-inventory (R1–R4)

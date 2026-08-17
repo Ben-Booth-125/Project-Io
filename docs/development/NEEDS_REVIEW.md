@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*33 entries — 27 open, 6 resolved.*
+*35 entries — 28 open, 7 resolved.*
 
 ---
 
@@ -301,17 +301,6 @@ cmake configure fails outright in the remote container: SDL3 and Lua come in by 
 
 *Files: `CMakeLists.txt`, `.claude/skills/verifier-headless/SKILL.md`*
 
-### NR-265 — BL-436's design blames a scoring curve for something structural - the AI has no processing_facility build candidate at all
-*decision taken on your behalf · raised 2026-08-17 · from Found while verifying BL-417 (AI build score is quadratic) before touching it, 2026-08-17.*
-
-BL-436's design says corp_ai's build scorer "is being asked to prefer processors on a payback curve that does not reward them". Verified against the source: corp_ai.cpp emits corp_verb::build from exactly two sites - the ranked_sites loop hard-coded to building_type::extraction_site (~line 566), and one military_base candidate (~line 942). There is no processing_facility candidate anywhere in the scorer. The seam is not at fault: corp_command.cpp builds a processor, recipe and all, when a command asks for one (BL-388). The scorer simply never asks. I have filed this as BL-439 (AI never builds processors, priority A) rather than adjusting BL-436's premise silently.
-
-**Why it matters.** It reassigns the blame BL-417 was filed to test. "The AI prefers mines" is structural - processors are not candidates - not an artefact of the net^2/capex curve. BL-417 step 1 (write the curve out honestly) is still worth doing and has landed; but BL-417 step 2, "decide whether the quadratic bias is wanted", is now a question about a curve that only ever ranks extraction sites against each other. Retuning that curve cannot make a rival build a processor.
-
-> **Recommendation:** Treat BL-439 as the item that actually addresses "the AI prefers mines", and re-scope BL-417 step 2 to what it really is: a choice about how extraction sites are ranked relative to one another and to the flat-scored military base. Do not tune the curve expecting a processor to appear.
-
-*Files: `src/world/corp_ai.cpp`, `docs/development/backlog.json`*
-
 ### NR-266 — BL-436's calibration_sweep explains the x4 collapse by a mechanism that cannot happen - do not re-tune on that narrative
 *decision taken on your behalf · raised 2026-08-17 · from Consequence of NR-265, found the same session, 2026-08-17.*
 
@@ -348,6 +337,34 @@ BL-417's design calls step 1 a "no-op refactor, zero behavioural change". In flo
 > **Recommendation:** Keep the measure-then-believe habit for scorer arithmetic. Consider whether the blessed bands should state their compiler in the harness output (ai_skill_harness already stamps "(MSVC...)" in its bless line, which is what made this catchable) and whether a GCC/WSL run should refuse to compare against them rather than reporting misleading failures.
 
 *Files: `src/world/corp_ai.cpp`, `tools/verify/ai_skill_harness.cpp`*
+
+### NR-269 — BL-439 landed and the AI immediately bankrupted itself on processors — the bands FELL where Sprint 19 predicted they would rise
+*decision taken on your behalf · raised 2026-08-17 · from Landing BL-439 (the processing_facility build candidate), 2026-08-17.*
+
+With a processor candidate in the scorer, rivals build 10-16 processors per seed across the benchmark set (69 total, against 0 before). Three of five seeds then go insolvent: seed 0 final net worth 498k -> -295k, seed 1 -> -89k, seed 4 -> -272k, each sitting below zero for 27-29 of 30 samples. Seeds 2 and 3 stay positive. ai_skill_harness is 18 rows red.
+
+The estimator is NOT the culprit, and that was tested rather than assumed. The candidate was first scored with an inline revenue-minus-wages sum, then switched to estimate_prospective_profit (BL-162, the model done properly — habitability-scaled wages, real input cost, BL-193 stack decay). Same recipes chosen, same build counts, net worth moved only on seed 0 (-315k -> -295k). So the scorer is not mispricing the cost side; it is being promised a full run and handed a starved one.
+
+The new per-building diagnostic reads: processor realised -6.24 to -11.70 per tick against a PREDICTED -0.38 to +0.08, on the same buildings, with extraction realised +22.80 where it sampled at all. Read the n: estimate_building_profit has no row for an idle or starved building, so the sample is biased toward the WORKING processors and the realised figure is the optimistic end.
+
+**Why it matters.** This is the measurement Sprint 19 was opened to get, with the AI actually exposed to the economy for the first time. Its success criterion was written down in advance: the ai_skill_harness bands re-blessed DOWNWARD on 2026-08-16 should RISE, and a bless that does not raise them means the fix did not work. They fell, hard. Under that rule these numbers are a finding, not a bless — so the goldens are deliberately LEFT RED rather than re-blessed, and BL-439 task C is not done.
+
+The -295k figure is also bigger than processor losses can explain on their own: 12 processors x 300 ticks x ~11/tick is ~40k, not 800k. The likely amplifier is BL-073 debt interest compounding once a corp crosses zero, which would make insolvency self-deepening rather than self-correcting. Not measured, and named here so it is not assumed either way.
+
+> **Recommendation:** Ben owns the next call, because every lever here is cost-side calibration (the same boundary NR-266 stopped at). Three distinct options, which should not be conflated: (a) accept it as the honest finding, land BL-439 with the goldens red and a written reason, and let BL-436 fix the substrate — the bands re-bless once processing pays; (b) gate the candidate harder (a cash floor, a cap per corp) so rivals build processors without dying, which BUYS a green harness by hiding the defect the harness just found; (c) treat the debt-interest amplifier as its own item first, since a corp that cannot recover from one bad quarter makes every economy measurement noisier. My call taken in the meantime: do (a) and stop — nothing is tuned, nothing is blessed.
+
+*Files: `src/world/corp_ai.cpp`, `tools/verify/ai_skill_harness.cpp`, `docs/development/backlog.json`*
+
+### NR-270 — The AI can now build processors, so BL-436 can finally be measured against a rival that participates in it
+*observation · raised 2026-08-17 · from Consequence of BL-439 landing, 2026-08-17.*
+
+Every BL-436 measurement to date was taken on a world where the only processors were generated or warm-start ones, because the scorer could not build any (NR-265/NR-266). The benchmark set now carries 69 AI-built processors across five seeds, chosen by the AI on its own margin estimate.
+
+**Why it matters.** It changes what the calibration sweep is measuring. NR-266 warned that the old narrative — corps spending income on processors that lose more at scale — described a mechanism that could not happen. It can happen now, so the sweep is worth re-running rather than re-derived on paper, and the three levers NR-266 named (the ~133:1 richness rate ratio, the 30.9% starvation rate, the three never-produced inputs) can each be measured with rivals responding to them.
+
+> **Recommendation:** Re-run BL-436 calibration_sweep and tier_margin after BL-439 lands, before any cost-side number moves. Also resolves NR-267: BL-428 chain depth now has an AI player in principle, though whether a rival actually climbs a rung is unmeasured and the depth-gated recipes remain ancient-only.
+
+*Files: `tools/verify/tier_margin.cpp`, `docs/development/backlog.json`*
 
 ---
 
@@ -442,4 +459,17 @@ Ben's call was to raise how many of the 8 selectable specialists open with a pro
 > **RESOLVED.** Ben's call 2026-08-16: option B. The generation change STAYS - it does what it was asked to do and fixes a real code-vs-comment contradiction - and the income finding is filed as its own economy item, BL-436 (PROCESSING_UNDEREARNS_EXTRACTION, priority A, v0.1.18), carrying the full before/after measurement and four candidate causes to measure before tuning (input-cost-vs-output-price, wages/maintenance, market depth for inputs, throughput). ai_skill_harness re-blessed to the post-change numbers with the reason in the file, including the explicit note that these bands should RISE when BL-436 lands and that a bless which does not raise them means the fix did not work. BL-435 continues from task C.
 
 *Files: `src/world/corporation_generation.cpp`, `tools/verify/ai_skill_harness.cpp`, `tools/verify/player_seed_sweep.cpp`*
+
+### NR-265 — BL-436's design blames a scoring curve for something structural - the AI has no processing_facility build candidate at all
+*decision taken on your behalf · raised 2026-08-17 · from Found while verifying BL-417 (AI build score is quadratic) before touching it, 2026-08-17.*
+
+BL-436's design says corp_ai's build scorer "is being asked to prefer processors on a payback curve that does not reward them". Verified against the source: corp_ai.cpp emits corp_verb::build from exactly two sites - the ranked_sites loop hard-coded to building_type::extraction_site (~line 566), and one military_base candidate (~line 942). There is no processing_facility candidate anywhere in the scorer. The seam is not at fault: corp_command.cpp builds a processor, recipe and all, when a command asks for one (BL-388). The scorer simply never asks. I have filed this as BL-439 (AI never builds processors, priority A) rather than adjusting BL-436's premise silently.
+
+**Why it matters.** It reassigns the blame BL-417 was filed to test. "The AI prefers mines" is structural - processors are not candidates - not an artefact of the net^2/capex curve. BL-417 step 1 (write the curve out honestly) is still worth doing and has landed; but BL-417 step 2, "decide whether the quadratic bias is wanted", is now a question about a curve that only ever ranks extraction sites against each other. Retuning that curve cannot make a rival build a processor.
+
+> **Recommendation:** Treat BL-439 as the item that actually addresses "the AI prefers mines", and re-scope BL-417 step 2 to what it really is: a choice about how extraction sites are ranked relative to one another and to the flat-scored military base. Do not tune the curve expecting a processor to appear.
+
+> **RESOLVED.** Confirmed independently 2026-08-17 and acted on. corp_verb::build was emitted from exactly two sites in corp_ai.cpp — the ranked_sites loop (extraction_site) and one military_base — with no processing_facility candidate anywhere. BL-439 adds one: sited on the corp own asset tiles, recipe chosen from the browse space and crossed to the absolute id, gated on chain depth and on real input access (pool + local market inventory against the tick own coverage threshold), priced by estimate_prospective_profit, on the same score curve and the same solvency/glut/reserve gates as extraction. Guarded by ai_skill_harness R5, which was run against the PRE-change build first and failed by construction there (processors_gained = 0 on all five seeds). What the change then revealed is NR-269.
+
+*Files: `src/world/corp_ai.cpp`, `docs/development/backlog.json`*
 
