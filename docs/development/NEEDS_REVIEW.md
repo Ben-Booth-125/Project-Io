@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*77 entries — 61 open, 16 resolved.*
+*77 entries — 49 open, 28 resolved.*
 
 ---
 
@@ -123,17 +123,6 @@ Three new Selection-panel surfaces landed (src/ui/selection_panel.cpp: draw_prod
 > **Recommendation:** A — the surfaces are dense (three toggles stacked in an already-tight Facts column) and are exactly the case Rule 0b calls out as needing real numbers, not a guess.
 
 *Files: `src/ui/selection_panel.cpp`, `docs/development/req/requirements.json`, `docs/ui/SELECTION.md`*
-
-### NR-247 — Unit Strength page prints unit_component::strength raw, despite its "fixed-point" doc comment
-*decision taken on your behalf · raised 2026-08-15 · from New Soldier (unit) Selection card, Strength page (src/ui/selection_panel.cpp draw_unit_strength_page).*
-
-components.hpp documents unit_component::strength as a "Fixed-point combat strength scalar (BL-157)", implying a display divisor is needed to show a real-world number. But every current writer (corp_command.cpp hire_unit, corporation_generation.cpp, hard_coded_world.cpp) sets it equal to the raw manpower count (e.g. 50) with no scale applied, and the existing hover-card reader (entity_summary.cpp draw_unit_summary) already prints it raw with ImGui::Text("Strength: %d", u.strength). The new card prints the raw value too, matching that existing reader, rather than inventing a divisor with no basis in the actual writers.
-
-**Why it matters.** If a future combat pass (BL-157/BL-272 follow-on) starts writing a genuinely fixed-point strength, both this new page and the older hover-card reader will silently disagree with the doc comment until someone reconciles them - worth a look whenever combat resolution actually starts consuming strength values.
-
-> **Recommendation:** When BL-157/combat lands real fixed-point strength writes, update both entity_summary.cpp::draw_unit_summary and selection_panel.cpp::draw_unit_strength_page together (and fix or drop the stale doc comment).
-
-*Files: `src/ui/selection_panel.cpp`, `src/ui/entity_summary.cpp`, `src/world/components.hpp`*
 
 ### NR-248 — Profitability chart's Revenue/Expenses split is as fine as building_profit.hpp gets — no revenue sub-breakdown exists
 *observation · raised 2026-08-15 · from Playtest-driven building-card rework (2026-08-15): Ben asked for a Revenue-vs-Expenses bar chart on the Profitability page.*
@@ -622,39 +611,6 @@ The BL-443 numbers needed a rollout instrumented through apply_budget's `breakdo
 
 *Files: `tools/verify/debt_decomposition.cpp`, `.claude/skills/verifier-headless/SKILL.md`*
 
-### NR-298 — There is no hostility model anywhere in the codebase, and every military plan assumes one
-*question · raised 2026-08-17 · from Sprint 21 scoping audit (docs only). Source read: corp_command.{hpp,cpp}, campaign_battle.{hpp,cpp}, combat.{hpp,cpp}, corp_ai.cpp, world.hpp.*
-
-Nothing in src/ expresses that one corporation may fight another. There is no standing, no war state, no allegiance, no target-legality predicate. Sprint 16, Sprint 18 and Sprint 20's candidate B all describe fighting and none of them names this. BL-315 (armed house conflict spine) settled that army, mercenary and pirate are three derived readings of one company - that is a NAMING rule and it answers nothing about who may be attacked.
-
-**Why it matters.** It blocks three things at once and is filed as none of them: an attack verb has no legal precondition, an engagement trigger has no condition to test, and the corp_ai scorer cannot price an engagement it has no rule to bound. It is the load-bearing unknown of the whole military theme, and it is a design call rather than an implementation - so no agent should take it. Left open it serialises a sprint the decomposition otherwise parallelises four ways.
-
-> **Recommendation:** Answer before Sprint 21 opens, and file it as a backlog item so it has an id. The narrow version is probably enough for a first cut: a deterministic may_engage(w, attacker_corp, defender_corp) over minimal state, defined tightly enough that it does not quietly grow into the diplomacy system BL-297 owns. Decomposition and consequences: REFINED.md Sprint 21 slice F2.
-
-*Files: `docs/development/REFINED.md`, `docs/development/SPRINTS.md`*
-
-### NR-299 — Sprint 18's block says BL-315 has nothing built against it - the campaign battle resolver is fully built and has zero callers
-*observation · raised 2026-08-17 · from Sprint 21 scoping audit. src/world/campaign_battle.{hpp,cpp} (~190 line header, full params block), tools/verify/campaign_battle_harness.cpp, commits f8dc6eb / 841759a / 825ca46.*
-
-Sprint 18's planned block and Sprint 20's candidate B both describe BL-315 (armed house conflict spine) as designed with nothing built against it, and name it as the sprint's largest unknown. In fact resolve_campaign_battle is written, compiled into the shipping binary (CMake globs src/world/*.cpp), harnessed, and its swing parameter was measured and retuned over 1000 seeds. It has no caller outside its own harness - and neither does combat.cpp's resolve_battle, whose only live caller is the Era -1 sim.
-
-**Why it matters.** It changes what the military sprint IS. The estimate of four to six sessions was priced against building a resolver that already exists; what is actually absent is everything that would call one - a unit verb, a hostility rule, a contact trigger, a battle store, a unit-to-stack adapter, and a screen. That is a different and more parallelisable shape, and it is why the Sprint 21 block was rewritten around reach rather than around combat.
-
-> **Recommendation:** No action beyond reading the corrected block. Recorded because the stale premise survived two sprint plans, which is the failure mode NR-265 and NR-266 both hit this week: a plan describing a world the code did not match.
-
-*Files: `docs/development/SPRINTS.md`, `src/world/campaign_battle.hpp`*
-
-### NR-300 — Nothing converts a unit_component into an army_stack_entry, so NR-247's strength ambiguity is now blocking rather than cosmetic
-*observation · raised 2026-08-17 · from Sprint 21 scoping audit. components.hpp unit_component, combat.hpp army_stack_entry, campaign_battle.hpp, NR-247.*
-
-Both resolvers take fully-resolved army_stack_entry values and deliberately never look a roster up. No adapter exists anywhere that turns the live w.units store into those values. When one is written it must decide what unit_component::strength means - and NR-247 already recorded that the field is documented as a fixed-point scalar while all three of its writers (corp_command hire_unit, corporation_generation, hard_coded_world) set it equal to raw manpower, with both readers printing it raw.
-
-**Why it matters.** NR-247's own recommendation was to reconcile this whenever combat starts consuming strength values. That is exactly the moment the Sprint 21 decomposition reaches, in slice S1. Deferring it a fourth time means the adapter silently picks one reading and the doc comment stays wrong.
-
-> **Recommendation:** Settle it inside S1 rather than as separate work: either drop the fixed-point doc comment and treat strength as raw manpower, or introduce a divisor and update components.hpp, entity_summary.cpp and selection_panel.cpp together. Resolve NR-247 with whichever is chosen.
-
-*Files: `src/world/components.hpp`, `docs/development/REFINED.md`*
-
 ### NR-301 — BL-325's out-of-supply decay cut from the Sprint 21 proposal on the economy seam, not on scope
 *decision taken on your behalf · raised 2026-08-17 · from Sprint 21 scoping audit, deciding what the proposed sprint carries.*
 
@@ -666,74 +622,12 @@ BL-325 (military bases and supply) slice S3, deterministic out-of-supply strengt
 
 *Files: `docs/development/REFINED.md`, `docs/development/SPRINTS.md`*
 
-### NR-302 — Is corp stance directed (asymmetric hostility) or symmetric? It changes the data model, not the logic
-*question · raised 2026-08-17 · from Sprints 22-24 proposal, designing BL-448 (friend/neutral/hostile stance) on your 2026-08-17 ruling.*
-
-Your ruling was that hostility is a declared war state corps opt into deliberately, with a friend state alongside it. That admits two readings and they differ in STORAGE, so it cannot be deferred into implementation. Reading A, asymmetric hostility with mutual friendship: war is done TO you, friendship is agreed WITH you. declare_hostile applies unilaterally; offer_friendship creates a pending offer that accept_friendship converts. Storage is a directed (actor, target) pair. Reading B, symmetric throughout: both modes belong to the pair, declaring drags the target in, storage is a canonicalised (min id, max id) key with one row per relationship.
-
-**Why it matters.** Under A the world holds one-sided wars, so every consumer - the engagement trigger, the AI scorer, the UI - must ask 'is A hostile to B', never 'are A and B at war'. Under B that question does not exist and cannot be asked. Retrofitting A onto B later means touching every consumer, and B onto A means deciding what to do with the one-sided rows already saved. It is also the difference between an ambush being expressible and not.
-
-- A - directed. Matches the words you chose ('declared', 'opt into' are one-sided). Costs a second row per relationship. Note world::corp_reputation is ALREADY a directed std::map<std::pair<entity_id,entity_id>, float>, serialised and deterministic, so the directed shape is proven affordable here.
-- B - symmetric. Simpler at every consumer, half the state, no possibility of an inconsistent pair. Cannot express a declaration the target has not yet noticed.
-- Hybrid - hostility directed, friendship symmetric. Honest to the fiction and the most code: two tables with two different key rules.
-
-> **Recommendation:** A, weakly. It matches the ruling's own verbs and the reputation table already pays the directed cost. Recorded as a recommendation, not taken - it is a data-model call and yours.
-
-### NR-303 — Measured: 7 of 15 corp_verbs are unreachable by the AI, 3 unreachable by any human
-*observation · raised 2026-08-17 · from Sprints 22-24 proposal, three-way coverage audit over corp_command.hpp, ACTIONS.json and corp_ai.cpp.*
-
-The seam has 15 verbs. The dictionary covers all 15 (complete, no gap). A UI press covers 12 - request_quote, accept_quote and cancel_contract have none, and ACTIONS.json says so itself in the words 'No UI. SEAM-ONLY'. The rival scorer emits 8: corp_ai.cpp assigns cmd.verb at exactly ten sites, covering build, resume, idle, set_workforce, set_recipe, survey, hire_unit, place_sell_order. Absent from the scorer: demolish, place_road, remove_sell_order, set_workforce_auto, and the three procurement verbs.
-
-**Why it matters.** Two of these are documentation defects rather than merely gaps. First, .claude/rules/io-standing-rules.md states the BL-202/BL-203 exception as rivals scoring 'build, demolish, survey and road decisions each tick' - demolish and place_road are described and not emitted, so a standing rule is asserting a behaviour that does not exist. Second, BL-350 (procurement seam) landed complete world state, serialisation and a harness with no player surface at all, meaning an external agent can contract for goods and a human cannot.
-
 ### NR-304 — Called it 'stance', not 'standing' - the latter is taken by BL-262's power bands
 *decision taken on your behalf · raised 2026-08-17 · from Sprints 22-24 proposal, naming the friend/neutral/hostile model.*
 
 The brief called the friend/neutral/hostile model 'the standing model'. src/world/standing.{hpp,cpp} already exists and means something unrelated: the BL-262 coarse public POWER read - negligible/minor/notable/major/dominant over reach, capital and market share. I named the new concept corp_stance in src/world/stance.{hpp,cpp} instead of overloading the word.
 
 **Why it matters.** Overloaded, every future sentence about 'a corp's standing' is ambiguous between how strong it is and how it feels about you - in prose, in the glossary, and in symbol names two headers apart. Cheap to fix now and expensive later. Also note BL-262's own header warns against unifying its bands with the AI scorer (a Goodhart trap); a stance model that shares its name invites exactly that confusion.
-
-### NR-305 — The spectate-proves-reachability thesis is half right, and the missing half is a check
-*observation · raised 2026-08-17 · from Sprints 22-24 proposal, testing the brief's stated thesis against corp_ai.cpp and spectator_determinism.cpp.*
-
-The thesis was that spectator mode (BL-409) is the forcing function making seam reachability observable, since with no human seat every corp must reach its goals through one seam. The first half holds exactly: under corp_ai_params::spectating the prohibition is unsubscribed, world::player_entity evaluates like any rival, so a spectated session genuinely does drive every corp through apply_corp_command. But spectate makes the gap CONSEQUENTIAL without making it OBSERVABLE. A UI-only verb simply never fires and nothing reports that it did not. A seam-only verb is not exercised either, since the scorer does not emit it. Spectate is silent on both.
-
-**Why it matters.** tools/verify/spectator_determinism.cpp confirms this concretely: it buckets 15 verbs into 4 families, so place_sell_order alone satisfies the whole 'trade' family and hides the four unemitted trade verbs behind it, while hire_unit alone satisfies 'other' and hides demolish and place_road. The harness built to prove spectate exercises the seam does so at a granularity too coarse to see that 7 of 15 verbs never fire. So spectate is the right forcing function only once paired with an instrument - which is why the reachability sprint leads with the instrument rather than the fixes.
-
-### NR-307 — Two write-only accumulators: military_points and science are credited every tick and read by nothing
-*observation · raised 2026-08-17 · from Sprint 25 audit, grepping BL-332 military_points across src/.*
-
-corporation_component::military_points and ::science each have exactly three sites in src/: the declaration in components.hpp, the Lua param load in recipe_registry.cpp, and the write in economy_system.cpp's per-tick pass. No gate reads them, no UI surface shows them, the corp_ai scorer does not score them, and export_corp_blackboard does not export them. military_capability_harness verifies the accumulation faithfully - symmetry across player and non-player corps, no credit while under construction - which makes it a green check over a number nothing reads.
-
-**Why it matters.** This is NR-257's orphan-resource shape with the arrow reversed: produced by something, consumed by nothing. That precedent resolved by DELETING five resource_type values rather than by finding uses for them, and the roster got healthier. The same test should be applied rather than assumed away. science plausibly has a home (tech_gate.cpp exists, BL-344 landed one earned tech) and may just be unwired. military_points is the harder case and delete may be the honest answer - under BL-325 the economy-to-military interface is the base tile plus the reach field, and under BL-454 the recurring cost is credits and goods, so a third abstract military currency either gates something unnamed or duplicates those.
-
-### NR-308 — Sprint 22 counted verbs against surfaces; it could not see a subsystem that owns no verb
-*observation · raised 2026-08-17 · from Sprint 25 audit, re-reading the Sprint 22 reachability table against src/world/corp_command.hpp.*
-
-Sprint 22's audit joined four artefacts - the seam, the dictionary, each entry's surface field, and the scorer's emission sites - and found seven of fifteen verbs unreachable from one direction or another. Every one of the fifteen is reachable from at least one. The question it did not ask is the complementary one: which SUBSYSTEMS own no verb at all. The convoy layer owns none. corp_verb's fifteen values name eight buildings, three orders, two contracts, one body and one tile; not one names a convoy. That is ~340 lines of supply_system.cpp plus the whole of logistics.cpp plus four rendering paths, entirely automatic.
-
-**Why it matters.** A join over the verbs that exist can only find gaps in verbs that exist. It is structurally blind to the absent verb, and the absent verb is the larger gap here - SUPPLY.md's own Build status has carried the line 'Player-directed dispatch has no UI or code path yet' since the layer landed, and its Dispatch trigger section describes player-direction as a shipped exception that was never built. If BL-444's coverage tool is written as designed it will inherit the same blind spot, and a green coverage report will read as 'everything is reachable' over a game with an untouchable logistics layer.
-
-### NR-310 — Interdiction: is intercepted cargo captured or destroyed?
-*question · raised 2026-08-17 · from Sprint 25 rescope, filing BL-458 (supply lines cannot be cut).*
-
-Cargo leaves the source pool at dispatch (SUPPLY.md § Convoy entity), so the goods are already committed and both answers conserve correctly. DESTROY erases the convoy and the cargo - simple, symmetric, pure denial, and it pays the interceptor nothing. CAPTURE credits the cargo to the interceptor's (corp, body) pool at the interception body - it pays for itself, creates a raiding economy, and needs one guard (an interceptor with no market access holds goods it cannot sell, which is a fine outcome and should not be special-cased away).
-
-**Why it matters.** It decides whether interdiction is a mechanic a rival will ever CHOOSE. The corp AI is a deterministic scored-utility layer: it prices candidates by payoff. Destroy-only gives an interception a payoff of zero to the interceptor and a cost in exposure, so BL-450's stance scorer would correctly never rank it - interdiction would exist and never fire outside player use, which is the same unreachable-capability defect this whole sprint is about. It also decides whether BL-315's third derived reading is earned: 'pirate' is a company that TAKES cargo. A company that only burns it is reading closer to a saboteur.
-
-### NR-311 — BL-325's design prose still cites BL-287 for grain/fodder draws that no longer exist
-*observation · raised 2026-08-17 · from Sprint 25 rescope, writing BL-454 against BL-325 and checking the citation.*
-
-BL-325's design says out-of-supply decay 'gives BL-287's future grain/fodder draws a place to land'. Three things are wrong with that sentence now. BL-287 is a verify-harness item ('Verify tier rebuilds the world layer once per harness'); the logistics-goods item is BL-286. Grain and fodder were REMOVED from resource_type by Ben's call on NR-257 (2026-08-16) as produced-by-nothing and consumed-by-nothing. And BL-295 - complete, v0.1.1 - was filed for exactly this stale citation and fixed it in components.hpp, but did not reach the backlog copy.
-
-**Why it matters.** It propagated. BL-454's first draft repeated the sentence almost verbatim, because BL-325 is the correct doc to read when writing an upkeep item and the citation looked authoritative. A stale cross-reference in a design field is read as settled design by the next session, and this one pointed at two goods that no longer exist - which under Ben's reading (c) is precisely the question being answered. Caught here only because the enum was audited rather than trusted.
-
-### NR-312 — The rescope costs Sprint 25 its independence - half of it now waits on two unopened sprints
-*decision taken on your behalf · raised 2026-08-17 · from Sprint 25 rescope, sequencing BL-458 against BL-315 and BL-448.*
-
-As first proposed, Sprint 25 shared no dependency with Sprints 21-24 and could have run next. Rescoped to carry interdiction it cannot: BL-458 requires BL-315 (units must be commandable), BL-448 (stance is the interception predicate) and BL-452. Rather than propose a sprint that stalls - the exact failure Sprint 23's block warns about, and that BL-440's open fork caused in Sprint 19 - the block is split into 25a (the draw: BL-457, BL-454, BL-452, BL-453, BL-455, BL-456 - independent, runnable now) and 25b (the cut: BL-458 - gated). The split is the decision taken.
-
-**Why it matters.** It changes what 'run Sprint 25 next' means, and it should not be discovered at promotion time. 25a is a full sprint on its own and lands the substrate 25b needs; 25b is one item that cannot start until two other proposals have landed. The honest sequence is now 21 -> 23 -> 25b, with 25a insertable anywhere before it. Ben should know that accepting the rescope moved the payoff item behind two things he has not yet opened.
 
 ---
 
@@ -781,6 +675,19 @@ scripts/verify/building_management_shell.lua calls verify.show_panel('constructi
 > **RESOLVED.** Resolved 2026-08-16 with BL-428 slice 2. building_management_shell.lua rewritten: it now selects a player PROCESSING building (falling back to any player building) and walks the Selection card's pager, capturing all three pages separately. It also needed a new verify verb — verify.building_page(n) — because fold('building_metric', k) sets the drill KEY, not the page, so the first rewrite still captured page 1 three times. Confirmed by capture: the Method page now shows 'Method (2/3)' with both alternates and the Switch control. That first honest photograph immediately surfaced a real layout defect, filed as NR-255.
 
 *Files: `scripts/verify/building_management_shell.lua`, `src/ui/selection_panel.cpp`*
+
+### NR-247 — Unit Strength page prints unit_component::strength raw, despite its "fixed-point" doc comment
+*decision taken on your behalf · raised 2026-08-15 · from New Soldier (unit) Selection card, Strength page (src/ui/selection_panel.cpp draw_unit_strength_page).*
+
+components.hpp documents unit_component::strength as a "Fixed-point combat strength scalar (BL-157)", implying a display divisor is needed to show a real-world number. But every current writer (corp_command.cpp hire_unit, corporation_generation.cpp, hard_coded_world.cpp) sets it equal to the raw manpower count (e.g. 50) with no scale applied, and the existing hover-card reader (entity_summary.cpp draw_unit_summary) already prints it raw with ImGui::Text("Strength: %d", u.strength). The new card prints the raw value too, matching that existing reader, rather than inventing a divisor with no basis in the actual writers.
+
+**Why it matters.** If a future combat pass (BL-157/BL-272 follow-on) starts writing a genuinely fixed-point strength, both this new page and the older hover-card reader will silently disagree with the doc comment until someone reconciles them - worth a look whenever combat resolution actually starts consuming strength values.
+
+> **Recommendation:** When BL-157/combat lands real fixed-point strength writes, update both entity_summary.cpp::draw_unit_summary and selection_panel.cpp::draw_unit_strength_page together (and fix or drop the stale doc comment).
+
+> **RESOLVED.** ANSWERED 2026-08-17 (Ben), together with NR-300 - see BL-459. The field is made genuinely fixed-point rather than having its doc comment corrected. A sharper reading was found while putting the question: strength is not ambiguously scaled, it is a literal DUPLICATE of count - corp_command.cpp:472-474 and corporation_generation.cpp:1606-1608 both set the two fields to the same value. Resolution: the stored strength field is DROPPED, and strength becomes derived on read as count x roster_type_quality x supply_factor at x100 scale. Deriving rather than storing is the part that prevents the duplicate returning.
+
+*Files: `src/ui/selection_panel.cpp`, `src/ui/entity_summary.cpp`, `src/world/components.hpp`*
 
 ### NR-251 — cross_group_multiplier (6.0x) is a first-cut number, needs playtest
 *decision taken on your behalf · raised 2026-08-15 · from BL-434 sub-facility groups: tiered recipe-switch cost.*
@@ -937,6 +844,78 @@ Two compounding causes. (1) CMakeLists copies scripts/ to the output dir in a PO
 
 *Files: `CMakeLists.txt`, `tools/verify/price_band_harness.cpp`, `tools/verify/tier_margin.cpp`*
 
+### NR-298 — There is no hostility model anywhere in the codebase, and every military plan assumes one
+*question · raised 2026-08-17 · from Sprint 21 scoping audit (docs only). Source read: corp_command.{hpp,cpp}, campaign_battle.{hpp,cpp}, combat.{hpp,cpp}, corp_ai.cpp, world.hpp.*
+
+Nothing in src/ expresses that one corporation may fight another. There is no standing, no war state, no allegiance, no target-legality predicate. Sprint 16, Sprint 18 and Sprint 20's candidate B all describe fighting and none of them names this. BL-315 (armed house conflict spine) settled that army, mercenary and pirate are three derived readings of one company - that is a NAMING rule and it answers nothing about who may be attacked.
+
+**Why it matters.** It blocks three things at once and is filed as none of them: an attack verb has no legal precondition, an engagement trigger has no condition to test, and the corp_ai scorer cannot price an engagement it has no rule to bound. It is the load-bearing unknown of the whole military theme, and it is a design call rather than an implementation - so no agent should take it. Left open it serialises a sprint the decomposition otherwise parallelises four ways.
+
+> **Recommendation:** Answer before Sprint 21 opens, and file it as a backlog item so it has an id. The narrow version is probably enough for a first cut: a deterministic may_engage(w, attacker_corp, defender_corp) over minimal state, defined tightly enough that it does not quietly grow into the diplomacy system BL-297 owns. Decomposition and consequences: REFINED.md Sprint 21 slice F2.
+
+> **RESOLVED.** CLOSED 2026-08-17 - superseded by events. The hostility model this entry said existed nowhere was settled by Ben on 2026-08-17 (a declared war state corps opt into, with a friend state alongside) and is filed as BL-448 (friend/neutral/hostile stance) with its surface as BL-449. The one substantive question it left open - symmetry - was NR-302, now also answered (hybrid: hostility directed, friendship symmetric). Nothing remains in this entry that is not carried by BL-448.
+
+*Files: `docs/development/REFINED.md`, `docs/development/SPRINTS.md`*
+
+### NR-299 — Sprint 18's block says BL-315 has nothing built against it - the campaign battle resolver is fully built and has zero callers
+*observation · raised 2026-08-17 · from Sprint 21 scoping audit. src/world/campaign_battle.{hpp,cpp} (~190 line header, full params block), tools/verify/campaign_battle_harness.cpp, commits f8dc6eb / 841759a / 825ca46.*
+
+Sprint 18's planned block and Sprint 20's candidate B both describe BL-315 (armed house conflict spine) as designed with nothing built against it, and name it as the sprint's largest unknown. In fact resolve_campaign_battle is written, compiled into the shipping binary (CMake globs src/world/*.cpp), harnessed, and its swing parameter was measured and retuned over 1000 seeds. It has no caller outside its own harness - and neither does combat.cpp's resolve_battle, whose only live caller is the Era -1 sim.
+
+**Why it matters.** It changes what the military sprint IS. The estimate of four to six sessions was priced against building a resolver that already exists; what is actually absent is everything that would call one - a unit verb, a hostility rule, a contact trigger, a battle store, a unit-to-stack adapter, and a screen. That is a different and more parallelisable shape, and it is why the Sprint 21 block was rewritten around reach rather than around combat.
+
+> **Recommendation:** No action beyond reading the corrected block. Recorded because the stale premise survived two sprint plans, which is the failure mode NR-265 and NR-266 both hit this week: a plan describing a world the code did not match.
+
+> **RESOLVED.** CLOSED 2026-08-17 - acted on. The correction this entry recorded is now written into the Sprint 21 proposal's audit table, which states that campaign_battle.cpp is built, compiled into the shipping binary and covered by campaign_battle_harness with zero callers outside it, and re-scopes BL-315 to what is actually missing. The durable version of this finding is owed to BL-456 (military authority doc), whose whole argument is that this cost was paid because no doc owned the subject.
+
+*Files: `docs/development/SPRINTS.md`, `src/world/campaign_battle.hpp`*
+
+### NR-300 — Nothing converts a unit_component into an army_stack_entry, so NR-247's strength ambiguity is now blocking rather than cosmetic
+*observation · raised 2026-08-17 · from Sprint 21 scoping audit. components.hpp unit_component, combat.hpp army_stack_entry, campaign_battle.hpp, NR-247.*
+
+Both resolvers take fully-resolved army_stack_entry values and deliberately never look a roster up. No adapter exists anywhere that turns the live w.units store into those values. When one is written it must decide what unit_component::strength means - and NR-247 already recorded that the field is documented as a fixed-point scalar while all three of its writers (corp_command hire_unit, corporation_generation, hard_coded_world) set it equal to raw manpower, with both readers printing it raw.
+
+**Why it matters.** NR-247's own recommendation was to reconcile this whenever combat starts consuming strength values. That is exactly the moment the Sprint 21 decomposition reaches, in slice S1. Deferring it a fourth time means the adapter silently picks one reading and the doc comment stays wrong.
+
+> **Recommendation:** Settle it inside S1 rather than as separate work: either drop the fixed-point doc comment and treat strength as raw manpower, or introduce a divisor and update components.hpp, entity_summary.cpp and selection_panel.cpp together. Resolve NR-247 with whichever is chosen.
+
+> **RESOLVED.** ANSWERED 2026-08-17 (Ben) - filed as BL-459 (unit strength is a duplicate of count), which carries both the strength model and the missing unit -> army_stack_entry adapter. This entry's warning was that deferring a fourth time means the adapter silently picks a reading; it is answered by writing the adapter in its own item rather than inside BL-315, so the choice is made deliberately rather than under implementation pressure. The supply_factor term is the load-bearing half: an unpaid ordnance/rations draw reduces strength, so BL-454's upkeep, BL-325 S3's decay and this factor are one mechanism seen from three places.
+
+*Files: `src/world/components.hpp`, `docs/development/REFINED.md`*
+
+### NR-302 — Is corp stance directed (asymmetric hostility) or symmetric? It changes the data model, not the logic
+*question · raised 2026-08-17 · from Sprints 22-24 proposal, designing BL-448 (friend/neutral/hostile stance) on your 2026-08-17 ruling.*
+
+Your ruling was that hostility is a declared war state corps opt into deliberately, with a friend state alongside it. That admits two readings and they differ in STORAGE, so it cannot be deferred into implementation. Reading A, asymmetric hostility with mutual friendship: war is done TO you, friendship is agreed WITH you. declare_hostile applies unilaterally; offer_friendship creates a pending offer that accept_friendship converts. Storage is a directed (actor, target) pair. Reading B, symmetric throughout: both modes belong to the pair, declaring drags the target in, storage is a canonicalised (min id, max id) key with one row per relationship.
+
+**Why it matters.** Under A the world holds one-sided wars, so every consumer - the engagement trigger, the AI scorer, the UI - must ask 'is A hostile to B', never 'are A and B at war'. Under B that question does not exist and cannot be asked. Retrofitting A onto B later means touching every consumer, and B onto A means deciding what to do with the one-sided rows already saved. It is also the difference between an ambush being expressible and not.
+
+- A - directed. Matches the words you chose ('declared', 'opt into' are one-sided). Costs a second row per relationship. Note world::corp_reputation is ALREADY a directed std::map<std::pair<entity_id,entity_id>, float>, serialised and deterministic, so the directed shape is proven affordable here.
+- B - symmetric. Simpler at every consumer, half the state, no possibility of an inconsistent pair. Cannot express a declaration the target has not yet noticed.
+- Hybrid - hostility directed, friendship symmetric. Honest to the fiction and the most code: two tables with two different key rules.
+
+> **Recommendation:** A, weakly. It matches the ruling's own verbs and the reputation table already pays the directed cost. Recorded as a recommendation, not taken - it is a data-model call and yours.
+
+> **RESOLVED.** ANSWERED 2026-08-17 (Ben): the HYBRID - hostility stored directed, friendship stored symmetric. This overrules the recommendation on file (A, directed throughout), deliberately: the hybrid is the only reading honest to both halves at once - you can be attacked without agreeing, you cannot be befriended without agreeing. BL-448 rewritten and raised d4 -> d5, with three non-optional invariants written in: a pending offer lives in its own store and is not a stance; declaring hostility dissolves any friendship row atomically in the same command rather than leaving a contradictory pair; and consumers must not collapse is_hostile(a,b) and are_friends(a,b) behind one stance_between() accessor, which is the most likely way this flattens back to symmetric by accident.
+
+### NR-303 — Measured: 7 of 15 corp_verbs are unreachable by the AI, 3 unreachable by any human
+*observation · raised 2026-08-17 · from Sprints 22-24 proposal, three-way coverage audit over corp_command.hpp, ACTIONS.json and corp_ai.cpp.*
+
+The seam has 15 verbs. The dictionary covers all 15 (complete, no gap). A UI press covers 12 - request_quote, accept_quote and cancel_contract have none, and ACTIONS.json says so itself in the words 'No UI. SEAM-ONLY'. The rival scorer emits 8: corp_ai.cpp assigns cmd.verb at exactly ten sites, covering build, resume, idle, set_workforce, set_recipe, survey, hire_unit, place_sell_order. Absent from the scorer: demolish, place_road, remove_sell_order, set_workforce_auto, and the three procurement verbs.
+
+**Why it matters.** Two of these are documentation defects rather than merely gaps. First, .claude/rules/io-standing-rules.md states the BL-202/BL-203 exception as rivals scoring 'build, demolish, survey and road decisions each tick' - demolish and place_road are described and not emitted, so a standing rule is asserting a behaviour that does not exist. Second, BL-350 (procurement seam) landed complete world state, serialisation and a harness with no player surface at all, meaning an external agent can contract for goods and a human cannot.
+
+> **RESOLVED.** CLOSED 2026-08-17 - acted on. The measured gap is filed: BL-445 (procurement has no UI) for the three seam-only verbs, BL-446 (scorer cannot procure), BL-447 (scorer never demolishes or roads, plus the standing-rules correction), and BL-444 (the coverage tool that makes the measurement repeatable, now widened by NR-308). The standing-rules defect this entry named - the BL-202/BL-203 exception describing rivals scoring demolish and place_road, neither of which is emitted - is carried by BL-447 and should be corrected in .claude/rules/io-standing-rules.md as part of it.
+
+### NR-305 — The spectate-proves-reachability thesis is half right, and the missing half is a check
+*observation · raised 2026-08-17 · from Sprints 22-24 proposal, testing the brief's stated thesis against corp_ai.cpp and spectator_determinism.cpp.*
+
+The thesis was that spectator mode (BL-409) is the forcing function making seam reachability observable, since with no human seat every corp must reach its goals through one seam. The first half holds exactly: under corp_ai_params::spectating the prohibition is unsubscribed, world::player_entity evaluates like any rival, so a spectated session genuinely does drive every corp through apply_corp_command. But spectate makes the gap CONSEQUENTIAL without making it OBSERVABLE. A UI-only verb simply never fires and nothing reports that it did not. A seam-only verb is not exercised either, since the scorer does not emit it. Spectate is silent on both.
+
+**Why it matters.** tools/verify/spectator_determinism.cpp confirms this concretely: it buckets 15 verbs into 4 families, so place_sell_order alone satisfies the whole 'trade' family and hides the four unemitted trade verbs behind it, while hire_unit alone satisfies 'other' and hides demolish and place_road. The harness built to prove spectate exercises the seam does so at a granularity too coarse to see that 7 of 15 verbs never fire. So spectate is the right forcing function only once paired with an instrument - which is why the reachability sprint leads with the instrument rather than the fixes.
+
+> **RESOLVED.** CLOSED 2026-08-17 - acted on. Filed as BL-451 (spectate asserts families, not verbs): the family assertion stays, a per-verb histogram is added beside it, printed always and asserted never. The thesis correction this entry recorded - that spectate makes an unreachable verb consequential but not observable - is written into the Sprints 22-24 proposal block and is why Sprint 22 leads with the instrument rather than with fixes. NR-308 later found the complementary blind spot on the subsystem axis.
+
 ### NR-306 — What does a unit consume - credits, goods, or both? The data model differs by answer
 *question · raised 2026-08-17 · from Sprint 25 logistics/military audit, filing BL-454 (units cost nothing to keep).*
 
@@ -946,6 +925,24 @@ w.units appears in no economic flow at all - verified by grep across economy_sys
 
 > **RESOLVED.** ANSWERED 2026-08-17 (Ben): reading (c) - BOTH credits and military goods (supplies, rations, weapons). BL-454 rewritten to (c) and its difficulty raised 3 -> 4. Three consequences taken as part of the answer rather than deferred: the per-tick cost is a VECTOR resolved from the roster (not a float with extras bolted on later); an empty pool creates a partial-supply case, whose shortfall rule is ONE decay rule with two triggers shared with BL-325 S3 rather than a second parallel rule; and the goods must exist, which they do not - weapons are absent from the 37-value enum entirely, so BL-457 (no military terminal good) is filed and BL-454 now requires it.
 
+### NR-307 — Two write-only accumulators: military_points and science are credited every tick and read by nothing
+*observation · raised 2026-08-17 · from Sprint 25 audit, grepping BL-332 military_points across src/.*
+
+corporation_component::military_points and ::science each have exactly three sites in src/: the declaration in components.hpp, the Lua param load in recipe_registry.cpp, and the write in economy_system.cpp's per-tick pass. No gate reads them, no UI surface shows them, the corp_ai scorer does not score them, and export_corp_blackboard does not export them. military_capability_harness verifies the accumulation faithfully - symmetry across player and non-player corps, no credit while under construction - which makes it a green check over a number nothing reads.
+
+**Why it matters.** This is NR-257's orphan-resource shape with the arrow reversed: produced by something, consumed by nothing. That precedent resolved by DELETING five resource_type values rather than by finding uses for them, and the roster got healthier. The same test should be applied rather than assumed away. science plausibly has a home (tech_gate.cpp exists, BL-344 landed one earned tech) and may just be unwired. military_points is the harder case and delete may be the honest answer - under BL-325 the economy-to-military interface is the base tile plus the reach field, and under BL-454 the recurring cost is credits and goods, so a third abstract military currency either gates something unnamed or duplicates those.
+
+> **RESOLVED.** ANSWERED 2026-08-17 (Ben), split per accumulator: DELETE military_points, WIRE science. BL-455 updated and retitled. military_points has no nameable consumer - the economy-to-military interface is already the base tile plus the reach field (BL-325) and the recurring cost of force is already credits and ordnance (BL-454) - so a third abstract currency duplicates or gates nothing; if BL-094 later wants one it is an append with its behaviour filed in the same change. science has a consumer already written and waiting in tech_gate.cpp, so it is a wiring job. The split is the point: the NR-257 precedent tests for a consumer, and the two fields fail that test differently.
+
+### NR-308 — Sprint 22 counted verbs against surfaces; it could not see a subsystem that owns no verb
+*observation · raised 2026-08-17 · from Sprint 25 audit, re-reading the Sprint 22 reachability table against src/world/corp_command.hpp.*
+
+Sprint 22's audit joined four artefacts - the seam, the dictionary, each entry's surface field, and the scorer's emission sites - and found seven of fifteen verbs unreachable from one direction or another. Every one of the fifteen is reachable from at least one. The question it did not ask is the complementary one: which SUBSYSTEMS own no verb at all. The convoy layer owns none. corp_verb's fifteen values name eight buildings, three orders, two contracts, one body and one tile; not one names a convoy. That is ~340 lines of supply_system.cpp plus the whole of logistics.cpp plus four rendering paths, entirely automatic.
+
+**Why it matters.** A join over the verbs that exist can only find gaps in verbs that exist. It is structurally blind to the absent verb, and the absent verb is the larger gap here - SUPPLY.md's own Build status has carried the line 'Player-directed dispatch has no UI or code path yet' since the layer landed, and its Dispatch trigger section describes player-direction as a shipped exception that was never built. If BL-444's coverage tool is written as designed it will inherit the same blind spot, and a green coverage report will read as 'everything is reachable' over a game with an untouchable logistics layer.
+
+> **RESOLVED.** ANSWERED 2026-08-17 (Ben): widen BL-444 with a subsystem column before it is built. The list is AUTHORED, not derived from filenames - a derived list would grow a meaningless row per new file. Reported, never failed, since a subsystem legitimately owning no verb is a real design state (market_clearing should take no player commands); the row exists so the absence is visible and deliberate rather than inferred. Same reasoning BL-451 uses for its unasserted per-verb histogram. BL-444 difficulty 2 -> 3.
+
 ### NR-309 — Sprint 25 proposed as the seam between military and logistics, not as more of either
 *decision taken on your behalf · raised 2026-08-17 · from Sprint 25 proposal, answering the brief to pad out the military and logistics systems.*
 
@@ -954,4 +951,31 @@ The brief asked what to build to pad out both systems. The obvious readings are 
 **Why it matters.** It is a scoping call made on Ben's behalf and it excludes things he may have meant. Specifically excluded and named in the sprint block: convoy interdiction and escort (deferred behind BL-315 conflict spine and BL-448 stance - a convoy cannot be escorted until something can threaten it), per-node throughput capacity (SUPPLY.md puts it out of prototype scope), air mode and the airfield building, and any second reach field (BL-325's ruling 3 forbids it).
 
 > **RESOLVED.** ANSWERED 2026-08-17 (Ben): 'Rescope' - read as accepting the interdiction option this entry offered ('say so and it becomes the sprint that follows 23'). Sprint 25 rewritten as 'Supply lines are a military object' in two phases: 25a the draw (upkeep + the ordnance good + dispatch + ledger, runnable now) and 25b the cut (BL-458 interdiction, gated on Sprints 21 and 23). Interdiction filed as BL-458 with capture-vs-destroy raised as NR-310. The cost of the rescope is stated in the sprint block and in NR-312: the sprint is no longer runnable end-to-end next, because half of it now depends on two unopened proposals. If 'Rescope' meant only 'rescope BL-454 for answer (c)' and NOT interdiction, BL-458 should be unfiled and the block reverts to one phase - say so and it is a five-minute reversal.
+
+### NR-310 — Interdiction: is intercepted cargo captured or destroyed?
+*question · raised 2026-08-17 · from Sprint 25 rescope, filing BL-458 (supply lines cannot be cut).*
+
+Cargo leaves the source pool at dispatch (SUPPLY.md § Convoy entity), so the goods are already committed and both answers conserve correctly. DESTROY erases the convoy and the cargo - simple, symmetric, pure denial, and it pays the interceptor nothing. CAPTURE credits the cargo to the interceptor's (corp, body) pool at the interception body - it pays for itself, creates a raiding economy, and needs one guard (an interceptor with no market access holds goods it cannot sell, which is a fine outcome and should not be special-cased away).
+
+**Why it matters.** It decides whether interdiction is a mechanic a rival will ever CHOOSE. The corp AI is a deterministic scored-utility layer: it prices candidates by payoff. Destroy-only gives an interception a payoff of zero to the interceptor and a cost in exposure, so BL-450's stance scorer would correctly never rank it - interdiction would exist and never fire outside player use, which is the same unreachable-capability defect this whole sprint is about. It also decides whether BL-315's third derived reading is earned: 'pirate' is a company that TAKES cargo. A company that only burns it is reading closer to a saboteur.
+
+> **RESOLVED.** ANSWERED 2026-08-17 (Ben): CAPTURE, with destruction as the fallback when the cargo cannot be credited. BL-458 updated. The reasoning that decided it: destroy-only gives an interception a payoff of zero, so BL-450's deterministic scored-utility stance layer would correctly never rank it, and interdiction would ship as a capability only the player ever uses - the same unreachable-capability defect Sprint 25 exists to fix. Capture also earns BL-315's third derived reading, since a company that takes cargo reads as a pirate and one that only burns it reads as a saboteur.
+
+### NR-311 — BL-325's design prose still cites BL-287 for grain/fodder draws that no longer exist
+*observation · raised 2026-08-17 · from Sprint 25 rescope, writing BL-454 against BL-325 and checking the citation.*
+
+BL-325's design says out-of-supply decay 'gives BL-287's future grain/fodder draws a place to land'. Three things are wrong with that sentence now. BL-287 is a verify-harness item ('Verify tier rebuilds the world layer once per harness'); the logistics-goods item is BL-286. Grain and fodder were REMOVED from resource_type by Ben's call on NR-257 (2026-08-16) as produced-by-nothing and consumed-by-nothing. And BL-295 - complete, v0.1.1 - was filed for exactly this stale citation and fixed it in components.hpp, but did not reach the backlog copy.
+
+**Why it matters.** It propagated. BL-454's first draft repeated the sentence almost verbatim, because BL-325 is the correct doc to read when writing an upkeep item and the citation looked authoritative. A stale cross-reference in a design field is read as settled design by the next session, and this one pointed at two goods that no longer exist - which under Ben's reading (c) is precisely the question being answered. Caught here only because the enum was audited rather than trusted.
+
+> **RESOLVED.** FIXED 2026-08-17. BL-325's design prose corrected in place: the sentence no longer cites BL-287 or grain/fodder, and now names BL-454's upkeep vector against BL-457's ordnance as where the draw lands, with S3's decay converging with BL-454's shortfall rule as one rule with two triggers. Correcting an open item's design field is a real edit rather than a typo fix, so the change is marked inline with its date and this entry's id. BL-454's own inherited copy of the stale sentence was corrected when it was rewritten for reading (c).
+
+### NR-312 — The rescope costs Sprint 25 its independence - half of it now waits on two unopened sprints
+*decision taken on your behalf · raised 2026-08-17 · from Sprint 25 rescope, sequencing BL-458 against BL-315 and BL-448.*
+
+As first proposed, Sprint 25 shared no dependency with Sprints 21-24 and could have run next. Rescoped to carry interdiction it cannot: BL-458 requires BL-315 (units must be commandable), BL-448 (stance is the interception predicate) and BL-452. Rather than propose a sprint that stalls - the exact failure Sprint 23's block warns about, and that BL-440's open fork caused in Sprint 19 - the block is split into 25a (the draw: BL-457, BL-454, BL-452, BL-453, BL-455, BL-456 - independent, runnable now) and 25b (the cut: BL-458 - gated). The split is the decision taken.
+
+**Why it matters.** It changes what 'run Sprint 25 next' means, and it should not be discovered at promotion time. 25a is a full sprint on its own and lands the substrate 25b needs; 25b is one item that cannot start until two other proposals have landed. The honest sequence is now 21 -> 23 -> 25b, with 25a insertable anywhere before it. Ben should know that accepting the rescope moved the payoff item behind two things he has not yet opened.
+
+> **RESOLVED.** ANSWERED 2026-08-17 (Ben): run 25a next - BL-457 (ordnance), BL-454 (upkeep), BL-452/BL-453 (dispatch + ledger), BL-455, BL-456, plus BL-459 (unit strength + adapter) which the same session's rulings added to the phase. Sequence is 25a -> 21 -> 23 -> 25b. The split stands as the decision taken; this entry closes with the sequence confirmed rather than overturned.
 
