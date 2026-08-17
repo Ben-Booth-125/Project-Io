@@ -5,6 +5,7 @@
 #include "economy_system.hpp" // BL-430: try_switch_recipe, the shared recipe-switch gate
 #include "logistics.hpp" // invalidate_logistics_caches (idle/resume flips the anchor set)
 #include "recipe_registry.hpp"
+#include "supply_system.hpp" // BL-452: the shared dispatch (price_convoy_leg / commit_convoy)
 #include "survey_system.hpp"
 #include "unit_roster.hpp"
 #include "world.hpp"
@@ -663,6 +664,98 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             // nothing left to pace.
             w.corp_reputation[{it->buyer, it->supplier}] += reg.procurement().reputation_on_cancel;
             w.procurement_contracts.erase(it);
+            return corp_command_result::applied;
+        }
+
+        // --- BL-452: the logistics layer ------------------------------------
+        // Layer 5 had no player verb at all: supply_system, logistics, four
+        // rendering paths and the only coupling between two markets' prices,
+        // entirely automatic. These two verbs are the seam onto it.
+        //
+        // dispatch_convoy is deliberately NOT a second implementation of a
+        // dispatch. It is the auto-dispatcher's own body with the shortfall
+        // scan removed — price_convoy_leg + commit_convoy (supply_system.hpp),
+        // the same two calls dispatch_convoys makes with the same arguments.
+        // Anything the player's convoy does differently from a rival's would be
+        // a divergence, not a feature.
+
+        case corp_verb::dispatch_convoy:
+        {
+            // UNTRUSTED INPUT BOUNDARY (io-standing-rules.md, 2026-08-14). Every
+            // field is validated as the value that lands in the destination,
+            // before anything is read from it, and the whole command is refused
+            // on violation — never clamped, truncated or wrapped. Nothing below
+            // mutates until the single commit at the end.
+            const auto src_it = w.markets.find(cmd.subject);
+            if (src_it == w.markets.end())
+                return corp_command_result::rejected_invalid; // subject is not a market
+            const auto dest_it = w.markets.find(cmd.counterparty);
+            if (dest_it == w.markets.end())
+                return corp_command_result::rejected_invalid; // counterparty is not a market
+
+            const std::size_t r = static_cast<std::size_t>(cmd.target);
+            if (r >= resource_count)
+                return corp_command_result::rejected_invalid;
+
+            // Finiteness FIRST: an infinity or a NaN passes `> 0.0f` (or fails
+            // it) without meaning anything, and would reach the cost product
+            // and the pool debit as a value no later comparison can catch.
+            if (!std::isfinite(cmd.quantity) || !(cmd.quantity > 0.0f))
+                return corp_command_result::rejected_invalid;
+
+            // The corp must actually HOLD the cargo. The source pool is keyed
+            // by (corp, body), so reading the acting corp's own pool is the
+            // ownership check — there is no way to name someone else's stock.
+            const entity_id src_body = src_it->second.body;
+            const auto      pit      = w.corp_body_pools.find({cmd.corp, src_body});
+            const float     stock    =
+                (pit != w.corp_body_pools.end()) ? pit->second.quantities[r] : 0.0f;
+            if (cmd.quantity > stock)
+                return corp_command_result::rejected_state; // the goods are not there
+
+            // Price the leg through the shared path. `viable == false` is the
+            // lane refusing the haul: no production anchor, no reachable route,
+            // no launchpad on the source body, no propellant to launch with, or
+            // a cost that is not a finite number.
+            const logistics_nodes nodes = collect_logistics_nodes(w);
+            const convoy_leg      leg   = price_convoy_leg(
+                w, reg, nodes, cmd.corp, src_body, cmd.counterparty, r, cmd.quantity,
+                reg.logistics_cost(convoy_mode::space));
+            if (!leg.viable)
+                return corp_command_result::rejected_placement;
+
+            // The solvency gate lives inside commit_convoy, in one place for
+            // both callers; a refusal there mutates nothing.
+            if (!commit_convoy(w, cmd.corp, src_body, cmd.counterparty, r, cmd.quantity, leg))
+                return corp_command_result::rejected_funds;
+            return corp_command_result::applied;
+        }
+
+        case corp_verb::hold_convoy:
+        {
+            // NOT a cancel, and there is no verb that is one. Cargo left the
+            // source pool at dispatch (SUPPLY.md § Convoy entity: "goods in
+            // transit are committed"), so a cancel would have to invent a
+            // return leg or mint the goods back at the source — neither is in
+            // scope. A held convoy stops advancing (advance_convoys skips it)
+            // and pays nothing further, because the haul was paid once at
+            // dispatch. Issuing the verb again releases it: the toggle rule.
+            if (cmd.order == 0)
+                return corp_command_result::rejected_invalid;
+
+            const auto it = std::find_if(w.convoys.begin(), w.convoys.end(),
+                                         [&](const convoy_component& c) { return c.id == cmd.order; });
+            // A convoy that does not exist and one belonging to another corp
+            // answer identically, for BL-397's reason: convoy ids are one
+            // global monotonic sequence, so a distinguishable rejection would
+            // let an id sweep map every rival's cargo in flight — precisely the
+            // intelligence the BL-068 visibility rule keeps private.
+            if (it == w.convoys.end() || it->corp != cmd.corp)
+                return corp_command_result::rejected_invalid;
+            if (it->arrived)
+                return corp_command_result::rejected_state; // already landed; nothing to hold
+
+            it->held = !it->held;
             return corp_command_result::applied;
         }
     }

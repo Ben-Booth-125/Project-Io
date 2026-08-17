@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <numbers>
 #include <string>
 #include <unordered_map>
@@ -16,7 +17,10 @@ void advance_convoys(world& w)
 {
     for (auto& convoy : w.convoys)
     {
-        if (convoy.arrived)
+        // BL-452: a HELD convoy stops advancing and waits on its lane. It is
+        // skipped rather than slowed — hold is a stop, not a throttle — and it
+        // costs nothing further, since the haul was paid once at dispatch.
+        if (convoy.arrived || convoy.held)
             continue;
         convoy.progress += convoy.speed;
         if (convoy.progress >= 1.0f)
@@ -244,37 +248,6 @@ entity_id market_for_body(const world& w, entity_id body)
     return best;
 }
 
-/// BL-148/149 logistics-node lookups, built once per dispatch pass. `pop_tile_scale`
-/// maps a population-centre's tile to its scale (tier 1–5, BL-148 — cities are free hubs);
-/// `hub_tiles` holds every completed inland_logistics_hub's tile (BL-149 — the player
-/// extends the land network). A convoy's intra-body haul is discounted for each such node
-/// its A* path crosses.
-struct logistics_nodes
-{
-    std::unordered_map<entity_id, int> pop_tile_scale;
-    std::unordered_set<entity_id>      hub_tiles;
-};
-
-logistics_nodes collect_logistics_nodes(const world& w)
-{
-    logistics_nodes nodes;
-    for (const auto& [centre_id, tile_id] : w.population_centre_tile)
-    {
-        const auto pit = w.population_centres.find(centre_id);
-        const int  scale = (pit != w.population_centres.end()) ? pit->second.scale : 1;
-        nodes.pop_tile_scale[tile_id] = scale;
-    }
-    for (const auto& [bid, bc] : w.buildings)
-    {
-        // A hub confers its discount only while it is built AND active — a decommissioned
-        // hub is inert, matching how the production loop treats it (economy_system.cpp).
-        if (bc.type == building_type::inland_logistics_hub && bc.ticks_remaining <= 0
-            && !bc.decommissioned)
-            nodes.hub_tiles.insert(bc.tile);
-    }
-    return nodes;
-}
-
 /// Fraction in [0, cap] to discount an intra-body haul cost by — summed over the
 /// population-centre (scale-weighted) and hub (flat) tiles the path crosses, capped.
 /// Deterministic: a pure function of the path tiles and the node sets.
@@ -297,6 +270,168 @@ float node_discount_fraction(const logistics_path& path, const logistics_nodes& 
 
 } // namespace
 
+// ---------------------------------------------------------------------------
+// The shared dispatch (BL-452) — see supply_system.hpp for why it is shared.
+// ---------------------------------------------------------------------------
+
+logistics_nodes collect_logistics_nodes(const world& w)
+{
+    logistics_nodes nodes;
+    for (const auto& [centre_id, tile_id] : w.population_centre_tile)
+    {
+        const auto pit = w.population_centres.find(centre_id);
+        const int  scale = (pit != w.population_centres.end()) ? pit->second.scale : 1;
+        nodes.pop_tile_scale[tile_id] = scale;
+    }
+    for (const auto& [bid, bc] : w.buildings)
+    {
+        // A hub confers its discount only while it is built AND active — a decommissioned
+        // hub is inert, matching how the production loop treats it (economy_system.cpp).
+        if (bc.type == building_type::inland_logistics_hub && bc.ticks_remaining <= 0
+            && !bc.decommissioned)
+            nodes.hub_tiles.insert(bc.tile);
+    }
+    return nodes;
+}
+
+convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
+                            const logistics_nodes& nodes, entity_id corp_id,
+                            entity_id src_body, entity_id dest_market_id,
+                            std::size_t ri, float qty, float logistics_cost_space)
+{
+    convoy_leg leg;
+
+    const auto cit = w.corporations.find(corp_id);
+    if (cit == w.corporations.end())
+        return leg;
+    const auto mit = w.markets.find(dest_market_id);
+    if (mit == w.markets.end())
+        return leg;
+    if (ri >= resource_count)
+        return leg;
+    // A non-finite quantity would make every comparison below meaningless and
+    // the cost NaN; refuse it here so both callers refuse it identically.
+    if (!std::isfinite(qty) || !(qty > 0.0f))
+        return leg;
+
+    const corporation_component& corp        = cit->second;
+    const market_component&      dest_market = mit->second;
+    const entity_id              dest_body   = dest_market.body;
+    const logistics_node_params& node_params = reg.logistics_nodes();
+
+    convoy_mode mode;
+    float       dist;
+    float       unit_cost;
+    int         travel_ticks  = 1;
+    float       node_discount = 0.0f; // BL-148/149: intra-body city/hub discount.
+    if (src_body == dest_body)
+    {
+        // Intra-body (BL-077): haul the corp's on-body stockpile from its
+        // representative tile to the short market's centre, terrain-weighted
+        // over the tile grid (land, or sea when the path must cross water).
+        const entity_id origin      = corp_representative_tile(w, corp, src_body);
+        const entity_id dest_centre = dest_market.centre_tile;
+        if (origin == null_entity || dest_centre == null_entity)
+            return leg; // no production anchor / unanchored market: cannot route
+        const logistics_path& path = intra_body_path(w, src_body, origin, dest_centre);
+        if (!path.reachable)
+            return leg;
+        mode      = path.crosses_ocean ? convoy_mode::sea : convoy_mode::land;
+        dist      = path.cost;
+        unit_cost = reg.logistics_cost(mode);
+        // Distance now costs TIME as well as money (Ben, 2026-08-12). Computed
+        // here because `path` is a reference into the A* cache and must be read
+        // before anything can invalidate it.
+        travel_ticks = convoy_travel_ticks(w, src_body, path);
+        // BL-148/149: discount the haul for the cities + hubs its path crosses.
+        node_discount = node_discount_fraction(path, nodes, node_params);
+    }
+    else
+    {
+        // Inter-body: straight-line space lane, launchpad-gated.
+        if (!corp_has_launchpad_on(w, corp, src_body))
+            return leg;
+        // BL-308: the pad also has to be FUELLED. A launch burns
+        // propellant_per_launch from the corp's stockpile on the source body;
+        // without it the lane is shut exactly as if no pad existed.
+        // Deterministic — a pure read of the pool.
+        if (launch_propellant_available(w, corp_id, src_body, ri, qty) < propellant_per_launch)
+            return leg;
+        mode      = convoy_mode::space;
+        // BL-354: evaluated at the tick-pure angle, so sourcing, pricing and
+        // convoy speed are a pure function of tick, never of frame rate.
+        dist      = body_distance_au(w, src_body, dest_body, w.current_day_tick);
+        unit_cost = logistics_cost_space;
+        // The space lane keeps its own calibration — roughly one econ tick per
+        // AU. Unchanged deliberately: it is the only leg the AU model was ever
+        // right for, and it is parked with the space arc anyway (era/space).
+        travel_ticks = (dist > 1.0f) ? static_cast<int>(dist + 0.999f) : 1;
+    }
+
+    const float cost = unit_cost * dist * qty * (1.0f - node_discount);
+    // A cost that is not a finite, non-negative number is not a price. Reached
+    // by an absurd (but finite) quantity overflowing the product; refused here
+    // rather than debited, since `balance -= inf` is unrecoverable.
+    if (!std::isfinite(cost) || cost < 0.0f)
+        return leg;
+
+    leg.viable       = true;
+    leg.mode         = mode;
+    leg.cost         = cost;
+    leg.travel_ticks = travel_ticks < 1 ? 1 : travel_ticks;
+    return leg;
+}
+
+bool commit_convoy(world& w, entity_id corp_id, entity_id src_body,
+                   entity_id dest_market_id, std::size_t ri, float qty,
+                   const convoy_leg& leg)
+{
+    if (!leg.viable || ri >= resource_count)
+        return false;
+    const auto cit = w.corporations.find(corp_id);
+    if (cit == w.corporations.end())
+        return false;
+    corporation_component& corp = cit->second;
+    if (corp.balance < leg.cost)
+        return false; // the solvency gate, in ONE place for both callers
+
+    // Debit cost and source pool; create the convoy.
+    corp.balance -= leg.cost;
+    w.pool_for(corp_id, src_body).quantities[ri] -= qty;
+
+    // BL-308: burn the launch's propellant. Charged once per launch (not per
+    // unit, not per AU) and only on the space lane; price_convoy_leg's
+    // availability gate already ran against this same pool, so this cannot
+    // drive it negative.
+    if (leg.mode == convoy_mode::space)
+        w.pool_for(corp_id, src_body).quantities[
+            static_cast<std::size_t>(resource_type::propellant)] -= propellant_per_launch;
+
+    convoy_component c;
+    c.id             = w.allocate_convoy_id();
+    c.source_market  = market_for_body(w, src_body);
+    c.dest_market    = dest_market_id;
+    c.mode           = leg.mode;
+    c.cargo_resource = static_cast<resource_type>(ri);
+    c.cargo_qty      = qty;
+    c.progress       = 0.0f;
+    // Speed is progress-per-tick, so a leg taking N ticks advances 1/N each
+    // tick (Ben, 2026-08-12).
+    //
+    // WAS: `1 / distance_in_AU`, an interplanetary calibration.
+    // `body_distance_au` returns 0 for two markets on the same body, so it
+    // clamped to 1.0 and EVERY intra-body convoy arrived in a single econ tick
+    // regardless of how far it went — distance cost money and never cost time.
+    // `leg.travel_ticks` carries the terrain-weighted, physically-scaled figure.
+    c.speed          = 1.0f / static_cast<float>(leg.travel_ticks);
+    c.corp           = corp_id;
+    c.arrived        = false;
+    c.held           = false;
+    c.cost_paid      = leg.cost;
+    w.convoys.push_back(c);
+    return true;
+}
+
 void dispatch_convoys(world& w, const recipe_registry& reg,
                       float logistics_cost_land, float logistics_cost_space)
 {
@@ -306,13 +441,12 @@ void dispatch_convoys(world& w, const recipe_registry& reg,
 
     // BL-148/149: build the logistics-node lookups once — cities (population centres) and the
     // player's inland logistics hubs discount any intra-body haul whose A* path crosses them.
-    const logistics_nodes  nodes = collect_logistics_nodes(w);
-    const logistics_node_params& node_params = reg.logistics_nodes();
+    const logistics_nodes nodes = collect_logistics_nodes(w);
 
-    // BL-354: inter-body distances are evaluated at this day tick via the tick-pure
-    // angle, so sourcing, pricing and convoy speed are a pure function of tick.
-    // current_day_tick is set by every tick path (app + main) before dispatch runs.
-    const int day_tick = w.current_day_tick;
+    // BL-354 note: inter-body distances are evaluated inside price_convoy_leg at
+    // w.current_day_tick via the tick-pure angle, so sourcing, pricing and convoy
+    // speed are a pure function of tick. current_day_tick is set by every tick
+    // path (app + main) before dispatch runs.
 
     // Sorted id walks (the standing.hpp convention): corporations and markets are
     // unordered_maps, and convoy insertion order — hence trade-route creation order
@@ -332,14 +466,11 @@ void dispatch_convoys(world& w, const recipe_registry& reg,
 
     for (const entity_id corp_id : corp_ids)
     {
-        corporation_component& corp = w.corporations.at(corp_id);
-
         // Iterate markets (not corp pools) so we catch shortfalls even on bodies
         // where the corp has no existing pool entry.
         for (const entity_id dest_market_id : market_ids)
         {
             const market_component& dest_market = w.markets.at(dest_market_id);
-            const entity_id dest_body = dest_market.body;
 
             for (std::size_t ri = 0; ri < resource_count; ++ri)
             {
@@ -347,17 +478,15 @@ void dispatch_convoys(world& w, const recipe_registry& reg,
                 if (shortfall <= 0.0f)
                     continue;
 
-                // Find cheapest reachable source.
-                entity_id best_src_body    = null_entity;
-                entity_id best_src_market  = null_entity;
-                float     best_cost        = std::numeric_limits<float>::max();
-                float     best_qty         = 0.0f;
-                convoy_mode best_mode      = convoy_mode::land;
-                /// Econ ticks the winning leg takes (Ben, 2026-08-12). Carried
-                /// out of the source loop because the intra-body branch is the
-                /// only place the terrain-weighted path is in scope, and the
-                /// reference it returns must not outlive a cache invalidation.
-                int       best_travel_ticks = 1;
+                // Find the cheapest reachable source. The SHORTFALL SCAN is
+                // this function's own contribution (BL-452): everything below
+                // the winner — pricing the leg and committing the cargo — is
+                // the shared dispatch the player's `dispatch_convoy` verb calls
+                // with this scan removed, so the two cannot drift apart.
+                entity_id  best_src_body = null_entity;
+                float      best_qty      = 0.0f;
+                convoy_leg best_leg;
+                best_leg.cost = std::numeric_limits<float>::max();
 
                 for (auto& [src_key, src_pool] : w.corp_body_pools)
                 {
@@ -370,107 +499,27 @@ void dispatch_convoys(world& w, const recipe_registry& reg,
                         continue;
                     const float qty = std::min(surplus, shortfall);
 
-                    convoy_mode mode;
-                    float       dist;
-                    float       unit_cost;
-                    int         travel_ticks = 1;
-                    float       node_discount = 0.0f; // BL-148/149: intra-body city/hub discount.
-                    if (src_body == dest_body)
+                    const convoy_leg leg = price_convoy_leg(
+                        w, reg, nodes, corp_id, src_body, dest_market_id, ri, qty,
+                        logistics_cost_space);
+                    if (!leg.viable)
+                        continue; // unroutable / unpadded / unfuelled lane
+                    if (leg.cost < best_leg.cost)
                     {
-                        // Intra-body (BL-077): haul the corp's on-body stockpile from its
-                        // representative tile to the short market's centre, terrain-weighted
-                        // over the tile grid (land, or sea when the path must cross water).
-                        const entity_id origin      = corp_representative_tile(w, corp, src_body);
-                        const entity_id dest_centre = dest_market.centre_tile;
-                        if (origin == null_entity || dest_centre == null_entity)
-                            continue; // no production anchor / unanchored market: cannot route
-                        const logistics_path& path = intra_body_path(w, src_body, origin, dest_centre);
-                        if (!path.reachable)
-                            continue;
-                        mode      = path.crosses_ocean ? convoy_mode::sea : convoy_mode::land;
-                        dist      = path.cost;
-                        unit_cost = reg.logistics_cost(mode);
-                        // Distance now costs TIME as well as money (Ben,
-                        // 2026-08-12). Computed here because `path` is a
-                        // reference into the A* cache and must be read before
-                        // anything can invalidate it.
-                        travel_ticks = convoy_travel_ticks(w, src_body, path);
-                        // BL-148/149: discount the haul for the cities + hubs its path crosses.
-                        node_discount = node_discount_fraction(path, nodes, node_params);
-                    }
-                    else
-                    {
-                        // Inter-body: straight-line space lane, launchpad-gated.
-                        if (!corp_has_launchpad_on(w, corp, src_body))
-                            continue;
-                        // BL-308: the pad also has to be FUELLED. A launch burns
-                        // propellant_per_launch from the corp's stockpile on the
-                        // source body; without it the lane is shut exactly as if
-                        // no pad existed. Deterministic — a pure read of the pool.
-                        if (launch_propellant_available(w, corp_id, src_body, ri, qty)
-                            < propellant_per_launch)
-                            continue;
-                        mode      = convoy_mode::space;
-                        dist      = body_distance_au(w, src_body, dest_body, day_tick);
-                        unit_cost = logistics_cost_space;
-                        // The space lane keeps its own calibration — roughly one
-                        // econ tick per AU. Unchanged deliberately: it is the
-                        // only leg the AU model was ever right for, and it is
-                        // parked with the space arc anyway (era/space).
-                        travel_ticks = (dist > 1.0f) ? static_cast<int>(dist + 0.999f) : 1;
-                    }
-
-                    const float cost = unit_cost * dist * qty * (1.0f - node_discount);
-                    if (cost < best_cost)
-                    {
-                        best_src_body   = src_body;
-                        best_src_market = market_for_body(w, src_body);
-                        best_cost       = cost;
-                        best_qty        = qty;
-                        best_mode       = mode;
-                        best_travel_ticks = travel_ticks;
+                        best_src_body = src_body;
+                        best_qty      = qty;
+                        best_leg      = leg;
                     }
                 }
 
                 if (best_src_body == null_entity)
                     continue;
-                if (corp.balance < best_cost)
-                    continue;
 
-                // Debit cost and source pool; create the convoy.
-                corp.balance -= best_cost;
-                w.pool_for(corp_id, best_src_body).quantities[ri] -= best_qty;
-
-                // BL-308: burn the launch's propellant. Charged once per launch
-                // (not per unit, not per AU) and only on the space lane; the
-                // availability gate above already ran against this same pool, so
-                // this cannot drive it negative.
-                if (best_mode == convoy_mode::space)
-                    w.pool_for(corp_id, best_src_body).quantities[
-                        static_cast<std::size_t>(resource_type::propellant)] -= propellant_per_launch;
-
-                // Speed is progress-per-tick, so a leg taking N ticks advances
-                // 1/N each tick (Ben, 2026-08-12).
-                //
-                // WAS: `1 / distance_in_AU`, an interplanetary calibration.
-                // `body_distance_au` returns 0 for two markets on the same body,
-                // so it clamped to 1.0 and EVERY intra-body convoy arrived in a
-                // single econ tick regardless of how far it went — distance cost
-                // money and never cost time. `best_travel_ticks` now carries the
-                // terrain-weighted, physically-scaled figure for the winning leg.
-                const float speed = 1.0f / static_cast<float>(best_travel_ticks);
-
-                convoy_component c;
-                c.source_market  = best_src_market;
-                c.dest_market    = dest_market_id;
-                c.mode           = best_mode;
-                c.cargo_resource = static_cast<resource_type>(ri);
-                c.cargo_qty      = best_qty;
-                c.progress       = 0.0f;
-                c.speed          = speed;
-                c.corp           = corp_id;
-                c.arrived        = false;
-                w.convoys.push_back(c);
+                // Commit through the shared path: the solvency gate, the pool
+                // debit, the propellant burn and the convoy itself all live
+                // there, so a rival's convoy and the player's are the same
+                // object built by the same code.
+                commit_convoy(w, corp_id, best_src_body, dest_market_id, ri, best_qty, best_leg);
             }
         }
     }

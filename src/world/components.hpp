@@ -605,6 +605,28 @@ struct convoy_component
     float       speed          = 0.0f; ///< Progress increment per Tick (1/distance in ticks).
     entity_id   corp           = null_entity; ///< Dispatching corporation.
     bool        arrived        = false; ///< Set true when progress >= 1.0; retirement pending.
+
+    // --- BL-452: the layer becomes reachable by command (2026-08-17) ---
+
+    /// Stable handle, allocated at dispatch from `world::allocate_convoy_id`.
+    /// A convoy is a **transient** subject — it exists for a handful of ticks
+    /// and is then erased — but `hold_convoy` has to name one, and naming it by
+    /// vector index would let one convoy's arrival re-point a command already
+    /// composed against another. Same "stable across erase, never reused"
+    /// contract as `sell_order::id` (world.hpp § next_order_id), and carried in
+    /// `corp_command::order` for the same reason: it is a handle, not an entity.
+    uint32_t    id             = 0;
+    /// True while the convoy is **held** — `advance_convoys` skips it, so it
+    /// stops making progress and simply waits on its lane. Deliberately NOT a
+    /// cancel: the cargo left the source pool at dispatch, so a cancel would
+    /// have to invent a return leg or mint the goods back. Toggled by the
+    /// `hold_convoy` verb; a held convoy costs nothing further (the haul is paid
+    /// once, at dispatch) and resumes exactly where it stopped.
+    bool        held           = false;
+    /// Credits the dispatch actually charged for this haul — recorded so the
+    /// Convoys tab can report what the cargo in flight has already cost, which
+    /// is otherwise unrecoverable once the balance has moved on.
+    float       cost_paid      = 0.0f;
 };
 
 // ---------------------------------------------------------------------------

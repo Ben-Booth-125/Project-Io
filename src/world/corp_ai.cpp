@@ -101,6 +101,12 @@ const char* corp_verb_label(corp_verb v)
         case corp_verb::request_quote:      return "quote request";
         case corp_verb::accept_quote:       return "quote acceptance";
         case corp_verb::cancel_contract:    return "contract cancellation";
+        // BL-452's convoy pair. The scorer does not emit either verb (the
+        // auto-dispatcher still runs the AI's logistics), but an agent on the
+        // MCP seam can, and this label is what the world history log narrates
+        // whatever the seam applied.
+        case corp_verb::dispatch_convoy:    return "convoy dispatch";
+        case corp_verb::hold_convoy:        return "convoy hold";
     }
     return "action";
 }
@@ -1628,6 +1634,13 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 case corp_verb::request_quote:
                 case corp_verb::accept_quote:
                 case corp_verb::cancel_contract:
+                // BL-452's convoy pair joins them for the same reason: the chat
+                // feed has no vocabulary for a convoy, and kind 0 is
+                // `recipe_switch`, so falling out of the switch would narrate a
+                // dispatch as a recipe change — a wrong statement rather than a
+                // missing one.
+                case corp_verb::dispatch_convoy:
+                case corp_verb::hold_convoy:
                     ev.corp = null_entity; // sentinel: "no feed event for this verb"
                     break;
             }
