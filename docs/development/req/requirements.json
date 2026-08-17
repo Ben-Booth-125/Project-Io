@@ -3674,6 +3674,65 @@
      "notes": "BL-422 design defaults to NOT visible. See the NEEDS_REVIEW entry filed with this work for why that default is not implementable without a fixed-point iteration: whether an order holds depends on the resolved price, which is computed FROM supply."
     }
    ]
+  },
+  {
+   "brief": "quadratic-build-score-honest",
+   "batch": "2026-08-17-bl417",
+   "title": "BL-417 step 1 — The build score says what it does: net^2/capex, written out, bias retained",
+   "status": "active",
+   "promoted_from": "backlog.json BL-417 AI_BUILD_SCORE_IS_QUADRATIC",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "ITEM-SPANNING (headless): the extraction build candidate's score is written as an explicit `net * net / capex`, with no intermediate `payback` variable, and carries a comment stating that the quadratic bias is retained deliberately because focus_weight/jitter/glut were tuned against this curve.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. src/world/corp_ai.cpp: `payback` is gone; the score reads `(net * net / capex) * focus_weight(...) * jitter * glut` under a comment naming the bias, why it is kept, and that step 2 (replace it) is a separate decision.",
+     "notes": "The old form `net / payback` with `payback = capex / net` read as capital efficiency and behaved as a margin bias — doubling margin quadruples the score, doubling cost only halves it. Nobody decided that; it was an artefact of the two-step spelling."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "BEHAVIOURAL NEUTRALITY, MEASURED NOT ASSUMED: the rewrite must be shown to move nothing. `net / (capex / net)` and `(net * net) / capex` are NOT the same computation in float, so this is a real risk to world evolution and to every blessed golden — it must be measured on the pinned toolchain before the change is called free.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET, and free. Pinned MSVC 14.44 build, A/B on this branch's base (BL-422 HEAD): ai_skill_harness output byte-identical across all 5 seeds (diff clean, ALL PASS 0 failures both sides); spectator_determinism byte-identical, hashes played=855E07DE529684EC and spectated=5AC90B4ACE717FCF unchanged on both sides. No golden re-bless was required.",
+     "notes": "Had this moved, the golden re-bless would have been part of BL-417 step 1 and reported as such, not smuggled in. Recorded in NR-268. Note also that the GCC numbers carried into the session differ from MSVC on every seed — the blessed bands are MSVC bands and a GCC run is not a valid comparator."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "NO SCOPE CREEP INTO STEP 2: the commit changes the spelling of the score and nothing about its value, weights, or gates. Deciding whether the quadratic bias is wanted stays open and stays Ben's.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. The diff to corp_ai.cpp is the score expression, the removal of the now-unused `payback`, and comments. No multiplier, threshold, gate or candidate set changed — which R2's byte-identity independently corroborates.",
+     "notes": "BL-417 step 2 is additionally re-scoped by NR-265: with no processing_facility build candidate in the scorer (BL-439), this curve only ever ranks extraction sites against each other, so retuning it cannot produce the processor preference BL-436 wanted from it."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "REGRESSION GATE: the full local CTest logic tier passes with the change in place — the gate the remote session could not run.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. Full local CTest logic tier, pinned MSVC 14.44: 78 of 79 passed, 4 skipped by their own gates (data_creep_harness, history_sim_harness, history_sweep, seed_sweep_probe), total 863 s. The one failure is tier_margin, and it is PRE-EXISTING and PROVEN so rather than assumed: tier_margin was built and run both with and without this change and its output is byte-identical. It fails BL-436's two open assertions - R2 (a processing facility out-earns an extraction site: measured -7.92/tick against +1659.18/tick) and R5 (every recipe input that has deposits is actually produced: 3 are not, resource ids 8/9/10). Both are the unresolved calibration BL-436 exists to measure, not a regression.",
+     "notes": "Run via the pinned-toolchain build + `ctest --output-on-failure` over build/. This is the first BL-417 run of the whole tier rather than a hand-picked subset, and it covers the 8 Lua-linked harnesses a remote session cannot reach - tier_margin, chain_depth, era_roster, recipe_switch_harness, interbody_pull_harness, pregame_balance_harness, player_seed_sweep, persona_counsel_harness. interbody_pull_harness (BL-406's guard) passes in 36 s."
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "requirement": "STEP 2 (Ben's call, deliberately NOT done here): decide whether the quadratic bias is wanted. Either keep it with the reasoning recorded, or replace it with an explicit linear metric and re-tune focus_weight/jitter/glut against the new curve, accepting the golden reshuffle that follows.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "PENDING — open. This is a design decision, not an implementation task, and the item states the two steps must not be one commit.",
+     "notes": "Re-scoped by NR-265 before it is taken: there is no processing_facility build candidate in the scorer (BL-439), so this curve only ranks extraction sites against each other and against the flat-scored military base. Retuning it cannot produce the processor preference BL-436 attributed to it. Landing BL-439 first would change what step 2 is choosing between."
+    }
+   ]
   }
  ]
 }

@@ -3,13 +3,14 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 167 entries across 2 volume(s).
+One line per session, newest first — 168 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
+| 2026-08-17 | [the score was never the reason (BL-417 step 1, BL-439)](DEVLOG.md) | BL-388 BL-406 BL-417 BL-422 BL-428 BL-435 BL-436 BL-439 | DEVLOG.md |
 | 2026-08-16 | [the shelf stops carrying goods nobody sold (BL-422)](DEVLOG.md) | BL-160 BL-351 BL-386 BL-409 BL-422 BL-436 | DEVLOG.md |
 | 2026-08-16 | [the roster invariants land, and the roster shrinks (BL-432, NR-243, NR-257)](DEVLOG.md) | BL-409 BL-428 BL-430 BL-432 | DEVLOG.md |
 | 2026-08-16 | [chain depth becomes the growth gate (BL-428 slice 2), Method-page fix, seed sweep](DEVLOG.md) | BL-215 BL-428 BL-429 BL-431 BL-432 BL-435 | DEVLOG.md |

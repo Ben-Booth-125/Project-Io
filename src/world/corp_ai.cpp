@@ -587,7 +587,6 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 if (net <= 0.0f)
                     continue; // never build into an expected loss
                 const float capex = std::max(1.0f, ex.build_cost);
-                const float payback = capex / net;
 
                 // Predictive spending (BL-203): forecast this build's added
                 // supply against the local market's PUBLIC demand over its
@@ -608,7 +607,26 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 c.cmd.tile   = s.tile;
                 c.cmd.type   = building_type::extraction_site;
                 c.cmd.target = s.target;
-                c.score  = (net / payback) * focus_weight(cc.focus, corp_verb::build) * jitter * glut;
+                // BL-417 step 1: this used to read `net / payback` with
+                // `payback = capex / net` — which is `net^2 / capex`. It looked
+                // like capital efficiency and behaved like a margin bias:
+                // doubling the margin quadruples the score, doubling the cost
+                // only halves it. Written out here so the code stops lying to
+                // the next reader.
+                //
+                // The bias is RETAINED, deliberately. focus_weight, jitter and
+                // the glut multiplier were all tuned against this curve, and
+                // every blessed golden records a world evolved under it —
+                // replacing it with an explicit linear metric is a re-tune plus
+                // a golden reshuffle, which is BL-417 step 2 and Ben's call.
+                //
+                // NOT algebraically free in float: `net / (capex / net)` and
+                // `net * net / capex` round differently. Measured against the
+                // MSVC build (ai_skill_harness 5 seeds, spectator_determinism
+                // state_hash) before landing; byte-identical both sides. See
+                // BL-417 `step_1_landed` and requirements group
+                // quadratic-build-score-honest.
+                c.score  = (net * net / capex) * focus_weight(cc.focus, corp_verb::build) * jitter * glut;
                 c.spend  = capex;
                 c.reason = corp_decision_reason::best_build;
                 c.bucket = bucket_for_reason(c.reason);
@@ -943,9 +961,14 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     c.cmd.tile   = best_tile;
                     c.cmd.type   = building_type::military_base;
                     // Flat, modest score: real enough to win an otherwise-quiet
-                    // eval, never enough to out-bid a genuine extraction/processing
-                    // net-positive candidate (those score net/payback, typically
+                    // eval, never enough to out-bid a genuine extraction
+                    // net-positive candidate (those score net^2/capex, typically
                     // well above 1.0 for a viable site).
+                    //
+                    // Said "extraction/processing" until BL-439: there is no
+                    // processing_facility build candidate anywhere in this
+                    // scorer, so the comparison could only ever be against an
+                    // extraction site. See BL-439 (AI never builds processors).
                     c.score  = 0.35f * jitter;
                     c.spend  = std::max(1.0f, mex.build_cost);
                     c.reason = corp_decision_reason::best_build;

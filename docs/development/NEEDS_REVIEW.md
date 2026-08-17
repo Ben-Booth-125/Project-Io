@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*29 entries — 23 open, 6 resolved.*
+*33 entries — 27 open, 6 resolved.*
 
 ---
 
@@ -300,6 +300,54 @@ cmake configure fails outright in the remote container: SDL3 and Lua come in by 
 > **Recommendation:** Worth saving as a tool rather than a note (CLAUDE.md § Tool creation is skill creation): a tools/verify/build_linux.sh doing the lib-then-link build, named in the verifier-headless skill as the fallback when cmake configure fails. Creating or modifying a skill needs Ben permission, so it is proposed here rather than done. Vendoring Lua would close the remaining 8.
 
 *Files: `CMakeLists.txt`, `.claude/skills/verifier-headless/SKILL.md`*
+
+### NR-265 — BL-436's design blames a scoring curve for something structural - the AI has no processing_facility build candidate at all
+*decision taken on your behalf · raised 2026-08-17 · from Found while verifying BL-417 (AI build score is quadratic) before touching it, 2026-08-17.*
+
+BL-436's design says corp_ai's build scorer "is being asked to prefer processors on a payback curve that does not reward them". Verified against the source: corp_ai.cpp emits corp_verb::build from exactly two sites - the ranked_sites loop hard-coded to building_type::extraction_site (~line 566), and one military_base candidate (~line 942). There is no processing_facility candidate anywhere in the scorer. The seam is not at fault: corp_command.cpp builds a processor, recipe and all, when a command asks for one (BL-388). The scorer simply never asks. I have filed this as BL-439 (AI never builds processors, priority A) rather than adjusting BL-436's premise silently.
+
+**Why it matters.** It reassigns the blame BL-417 was filed to test. "The AI prefers mines" is structural - processors are not candidates - not an artefact of the net^2/capex curve. BL-417 step 1 (write the curve out honestly) is still worth doing and has landed; but BL-417 step 2, "decide whether the quadratic bias is wanted", is now a question about a curve that only ever ranks extraction sites against each other. Retuning that curve cannot make a rival build a processor.
+
+> **Recommendation:** Treat BL-439 as the item that actually addresses "the AI prefers mines", and re-scope BL-417 step 2 to what it really is: a choice about how extraction sites are ranked relative to one another and to the flat-scored military base. Do not tune the curve expecting a processor to appear.
+
+*Files: `src/world/corp_ai.cpp`, `docs/development/backlog.json`*
+
+### NR-266 — BL-436's calibration_sweep explains the x4 collapse by a mechanism that cannot happen - do not re-tune on that narrative
+*decision taken on your behalf · raised 2026-08-17 · from Consequence of NR-265, found the same session, 2026-08-17.*
+
+BL-436's calibration_sweep narrative attributes the x4 collapse to corps "spending the extra income building processors that lose MORE per tick at higher scale". Given NR-265 - the AI scorer has no processing_facility build candidate - no rival can spend income on a processor at any scale. Whatever the sweep measured, the processors involved were generated or warm-start ones only, and their count does not respond to income. The stated causal chain (more income -> more processors -> bigger per-tick loss) has no link in the middle.
+
+MEASURED THIS SESSION (2026-08-17), since tier_margin is Lua-linked and a local session can run it. Over 3 seeds x 20 ticks on the real generated world: extraction nets +1659.18 per building-tick, processing nets -7.92. A processor pays back its 200 cr capex NEVER; a mine pays back 100 cr in 0 ticks. The gap is not subtle and it is not mainly a price problem - R6 reports it directly: deposit richness (mean 53.34) multiplies a mine's base_rate of 20 to ~1067, against a processor's FLAT base_rate of 8, a ~133:1 rate ratio before any price is applied. Of 1590 processing building-ticks, 48.9% produced, 30.9% STARVED on a missing input, 9.1% had no recipe set. And R4/R5 name three recipe inputs (ids 8, 9, 10) that have deposits, are usually the richest thing on their tile, and are produced by NOTHING - a siting/reach failure, not a margin one.
+
+**Why it matters.** The sweep's conclusion is currently the standing reason a cost-side lever was left alone. If the mechanism is wrong the conclusion may still be right, but it is unsupported, and any future calibration reasoning that leans on it inherits the error. Cost-side calibration is explicitly Ben's call, so I have measured and stopped rather than re-deriving it myself.
+
+The measured picture makes the original narrative even less tenable: processors are not losing because corps overbuilt them at scale, they are losing because a processor's flat rate cannot compete with a richness-multiplied mine, and because a third of their ticks starve. Neither mechanism involves the AI building anything.
+
+> **Recommendation:** Re-derive the sweep before any cost-side number moves. tier_margin now runs locally and gives the numbers directly (it is currently the one red test in an otherwise green 79-test tier, failing its R2 and R5 exactly as designed). The three candidate levers it points at are distinct and should not be conflated: (a) the ~133:1 rate ratio from richness multiplying extraction but not processing, (b) the 30.9% input-starvation rate, (c) the 3 never-produced inputs, which read as siting/reach. All three are cost-side calibration and therefore Ben's - measured here, not touched.
+
+*Files: `docs/development/backlog.json`, `tools/verify/tier_margin.cpp`*
+
+### NR-267 — BL-428 chain depth has no AI player - a rival that cannot build a processor can never climb the ladder
+*observation · raised 2026-08-17 · from Consequence of NR-265, found the same session, 2026-08-17.*
+
+BL-428 gates recipes on a corp's reached chain depth. Depth is climbed by operating processors at successively deeper tiers. Since the AI scorer never builds a processing_facility (NR-265 / BL-439), a rival's depth is fixed at whatever its generated assets give it, for the whole campaign. The gate is single-player by construction.
+
+**Why it matters.** It does not bite today: the depth-gated recipes are ancient-tier, so a 1960 campaign never reaches them. But the growth gate is being built as a shared mechanism, and it currently has exactly one participant. Worth knowing before more design leans on rivals climbing it.
+
+> **Recommendation:** No action needed now - recorded so it is not rediscovered later as a bug. It resolves as a side-effect of BL-439 (AI never builds processors); if BL-439 slips past the point where depth-gated recipes become reachable in a live era, this becomes urgent rather than latent.
+
+*Files: `src/world/corp_ai.cpp`*
+
+### NR-268 — BL-417 step 1 is genuinely free on MSVC - measured, not assumed; but the item's "zero behavioural change" claim was not established when written
+*decision taken on your behalf · raised 2026-08-17 · from BL-417 step 1 landing, 2026-08-17.*
+
+BL-417's design calls step 1 a "no-op refactor, zero behavioural change". In float that is not automatic: net/(capex/net) and (net*net)/capex round differently, so the rewrite could have moved every candidate score, hence world evolution, hence every blessed golden. Measured rather than assumed. Against the pinned MSVC build, before and after the rewrite: ai_skill_harness output byte-identical across all 5 seeds, and spectator_determinism byte-identical with hashes played=855E07DE529684EC / spectated=5AC90B4ACE717FCF unchanged. No golden re-bless was needed. Separately noted: the GCC baseline numbers carried into this session differ wholesale from MSVC on every seed (e.g. seed 3 final 306437.4 GCC vs 498537.6 MSVC), so the blessed bands are compiler-bound - they are MSVC bands, and a GCC run is not a valid comparator for them.
+
+**Why it matters.** The claim happened to be true, but it was true by luck of rounding rather than by algebra, and the item asserted it as established. Worth recording because the same shape recurs: any "algebraically equivalent" rewrite inside the scorer is a golden-affecting change until measured. The compiler-bound goldens are the more useful finding - a harness result from a non-MSVC build cannot be compared against a blessed band.
+
+> **Recommendation:** Keep the measure-then-believe habit for scorer arithmetic. Consider whether the blessed bands should state their compiler in the harness output (ai_skill_harness already stamps "(MSVC...)" in its bless line, which is what made this catchable) and whether a GCC/WSL run should refuse to compare against them rather than reporting misleading failures.
+
+*Files: `src/world/corp_ai.cpp`, `tools/verify/ai_skill_harness.cpp`*
 
 ---
 

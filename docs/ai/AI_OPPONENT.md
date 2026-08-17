@@ -257,6 +257,20 @@ construction**:
 richness), M small; recipes and dials enumerate per owned building; routes enumerate over
 known-body pairs. Bounded enumeration is what keeps the per-tick cost flat.
 
+> **`build` does NOT range over building types — it ranges over two (BL-439, found 2026-08-17).**
+> The table above lists `build(type, tile, target, recipe)`, which reads as though the scorer picks
+> a type. It does not. `corp_ai.cpp` emits `corp_verb::build` from exactly two sites, each setting
+> the type to a literal: the `ranked_sites` loop (always `extraction_site`) and one `military_base`
+> candidate. **There is no `processing_facility` build candidate anywhere in the scorer**, so no
+> rival ever builds a processor — it owns only the ones it was generated with, for the whole
+> campaign. The *seam* is not the limit: `corp_command.cpp` builds a processor with its recipe when
+> a command asks for one (BL-388), so a player or an MCP agent can. The scorer simply never asks.
+>
+> Two consequences worth carrying: "the AI prefers mines" is **structural**, not an artefact of the
+> scoring curve (which is why BL-417 step 2 cannot fix it — NR-265); and BL-428's chain-depth gate,
+> climbed by operating deeper processors, currently **has no AI player** (NR-267). BL-439 is the
+> item that closes this, and it deliberately accepts a golden reshuffle as its cost.
+
 ### Scoring
 
 `score(action) = expected_net_per_tick / payback_ticks × strategy_weight`, terms computed from
@@ -267,6 +281,19 @@ CORPORATION_GENERATION.md), giving distinct-but-legible personalities for free. 
 gate** (cash − committed spend > reserve floor) vetoes any spend that breaks the floor; stage B
 replaces this crude floor with priority buckets + predictive spending (landed 2026-07-31, see
 § 2B below).
+
+> **What the build score actually is (BL-417 step 1, 2026-08-17).** The formula above is the
+> design intent; the shipped code spelled it `net / payback` with `payback = capex / net`, which
+> is **`net² / capex`**. It reads as capital efficiency and behaves as a **margin bias**: doubling
+> the margin quadruples the score, doubling the cost only halves it. Nobody chose that — it was an
+> artefact of the two-step spelling. `corp_ai.cpp` now writes it out as `net * net / capex`.
+>
+> **The bias is retained, deliberately.** `focus_weight`, `jitter` and the glut multiplier were all
+> tuned against this curve, and every blessed golden records a world evolved under it. Replacing it
+> with an explicit linear metric is a re-tune plus a golden reshuffle — BL-417 step 2, still open,
+> Ben's call. The rewrite itself was measured, not assumed, to be behaviour-preserving (float
+> rounding makes the two forms genuinely different): `ai_skill_harness` and `spectator_determinism`
+> are byte-identical across the change on the pinned MSVC build.
 
 ### 2B. Stage B — strategy, priority buckets, predictive spending (BL-203, landed 2026-07-31)
 
