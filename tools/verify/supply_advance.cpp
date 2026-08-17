@@ -330,9 +330,21 @@ static void test_price_convergence()
     }
 
     // Standing iron_ore shortfall on body B drives demand each tick.
+    //
+    // BL-441 moved the demand register from `purchases` to `wants`: `purchases`
+    // is now the FILL (the money side — what a consumer was actually delivered
+    // and billed for) and `wants` is the BID (what it set out to buy, whether or
+    // not the draw succeeded). This fixture is the bid — a standing shortfall on
+    // a body with NO supply, which is by construction a want that is never
+    // filled — so it has to be authored on `wants`. Left on `purchases` alone it
+    // registered zero demand and body B's price sat exactly on base, which is
+    // what this row caught at integration. `purchases` is kept alongside because
+    // the corp is still the party being charged; the two carrying the same number
+    // here is a property of the fixture, not of the engine.
     economy_report report;
     std::array<float, resource_count> shortfall{};
     shortfall[ri(resource_type::iron_ore)] = 50.0f;
+    report.wants[{corp, body_b}]     = shortfall;
     report.purchases[{corp, body_b}] = shortfall;
 
     // --- Phase 1: diverge without convoys (3 ticks to settle EMA) ---

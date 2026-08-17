@@ -65,6 +65,7 @@
 
 #include <cmath>
 #include <cstdio>
+#include <filesystem>
 #include <fstream>
 #include <string>
 
@@ -126,6 +127,15 @@ void run_lua_reaches_cpp()
         // ignored the table would be caught here rather than flattered by the
         // fact that the authored numbers happen to equal the defaults.
         const char* probe_path = "build_gen/verify/price_band_probe.lua";
+        // Create the directory rather than assume it. It exists in a worktree
+        // that has run a `cl` recipe from tools/verify/README.md, and does NOT
+        // exist in a checkout built only through CMake — so this row failed on
+        // the integration branch while every behavioural row passed, which is an
+        // environment defect masquerading as a real one.
+        {
+            std::error_code ec;
+            std::filesystem::create_directories("build_gen/verify", ec);
+        }
         {
             std::ofstream probe(probe_path);
             if (!probe)

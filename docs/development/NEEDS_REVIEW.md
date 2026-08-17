@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*51 entries — 40 open, 11 resolved.*
+*53 entries — 40 open, 13 resolved.*
 
 ---
 
@@ -678,4 +678,30 @@ To exercise resolve_price's ceiling branch the harness needs demand against zero
 > **RESOLVED.** Answered by BL-441, which merged into this branch immediately before BL-442 step 1. This entry asked whether BL-441's fix reaches the purchase-credited demand path; it does, because that path is the one it replaced. mc.demand no longer reads report.purchases at all -- market_clearing.cpp now accumulates demand from report.wants, a new std::map over (corp, body) carrying what each consumer set out to buy whether or not the draw succeeded. report.purchases survives only as the money side (auto_buys / VWAP / expenditure), which is correct: billing the want would pay for deliveries nobody made. So the exact fixture described here -- a processing facility consuming iron_ore with no extractor and no market inventory -- now registers its full unmet need as demand, and the standing-buy-order workaround in price_band_harness.cpp is no longer the only route to the ceiling branch. The workaround is left in place: it is a valid unconditional-demand fixture and the harness is deliberately differential about the band, not about where demand comes from.
 
 *Files: `src/world/market_clearing.cpp`, `tools/verify/price_band_harness.cpp`*
+
+### NR-287 — BL-441 broke supply_advance R8 and neither agent saw it - the fixture drove demand through report.purchases
+*observation · raised 2026-08-17 · from Full ctest gate on the integrated BL-441 + BL-442 tree. supply_advance failed with "divergence: body B price above base (demand, no supply)  (got 1.0000, want 1.0000)".*
+
+Bisected across the two commits rather than guessed: the row PASSES at 10b0e5c (pre-BL-441) and FAILS at c5be73f (post-BL-441, pre-BL-442), so BL-441 caused it and BL-442 is innocent. The cause is exactly BL-441 working as designed. supply_advance hand-builds an economy_report and drives its standing iron_ore shortfall through report.purchases, which WAS the demand register. BL-441 moved the register to report.wants and left purchases as the money side, so the fixture went on charging a corp for goods and stopped bidding for them - body B recorded zero demand and its price parked on base exactly.
+
+**Why it matters.** BL-441's own report says "the failing assertion set is IDENTICAL on both sides - three pre-existing failures, none new, none masked". That claim was true of tier_margin, which is what it ran; it was not true of the suite. A semantic change to a shared struct field needs every hand-built fixture of that struct re-read, not just the harness the item was written against. supply_advance was the only one, but nothing found it except the full gate.
+
+> **Recommendation:** Fixed here: the fixture now authors report.wants (the bid) alongside report.purchases (the fill), with a comment saying which is which. supply_advance is green. Worth Ben knowing the guard was EDITED as part of integration rather than left red - the edit teaches the fixture BL-441's new contract, it does not weaken the assertion, which still demands the price rise above base and still fails if demand goes missing again.
+
+> **RESOLVED.** Fixed 2026-08-17 at integration. Bisected to BL-441, fixture corrected, re-run green. No engine change.
+
+*Files: `tools/verify/supply_advance.cpp`, `src/world/market_clearing.cpp`*
+
+### NR-288 — price_band_harness P2 failed on the integration branch for want of a directory, not a defect
+*observation · raised 2026-08-17 · from Full ctest gate on the integrated tree: price_band_harness reported "could not write the probe script (is build_gen/verify present?)".*
+
+P2 writes a probe Lua script to build_gen/verify/ to prove the loader really reads the authored table rather than falling through to the struct defaults. It never creates that directory. It exists in a worktree that has run one of the cl recipes from tools/verify/README.md - which BL-442's worktree had - and does not exist in a checkout built only through CMake, which the integration branch is. So the harness passed for its author and failed for everyone else.
+
+**Why it matters.** It reads as a red guard on a fresh clone and on CI, which is the case where a red guard is least likely to be investigated and most likely to be blessed away. Every BEHAVIOURAL row passed on the integrated tree, P5 included - the row that fails if economy_system.cpp reacquires a private copy of the band - so nothing about BL-442 was actually wrong.
+
+> **Recommendation:** Fixed here: the harness calls std::filesystem::create_directories on build_gen/verify before opening the probe. Green. Flagged because it is a general shape - any harness that writes into a build_gen path an ad-hoc cl recipe happens to create will pass locally and fail under CMake.
+
+> **RESOLVED.** Fixed 2026-08-17 at integration: create_directories before the probe write. price_band_harness is green under ctest.
+
+*Files: `tools/verify/price_band_harness.cpp`*
 
