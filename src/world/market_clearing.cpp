@@ -395,15 +395,78 @@ entity_id maybe_spawn_market(world& w, const recipe_registry& reg, entity_id bod
     return mid;
 }
 
-void inject_interbody_demand(world& w, const recipe_registry& reg)
+market_supply_snapshot snapshot_market_supply(const world& w)
+{
+    market_supply_snapshot snap;
+    snap.reserve(w.markets.size());
+    for (const auto& [mid, mc] : w.markets)
+        snap[mid] = mc.supply;
+    return snap;
+}
+
+namespace {
+
+/// The COUNTERPART home-body market for resource @p r: the home-body market
+/// carrying the greatest demand for that resource, with the lowest market id
+/// breaking ties (BL-406, Ben's ruling 2026-08-15, option c).
+///
+/// This replaces `market_for_body(w, w.home_body)` as the pull's source, and the
+/// difference is the whole point of BL-406. That call returned the LOWEST-ID
+/// market of the many BL-096 carves onto the home body and treated its demand as
+/// the body's — a market holding 5% of the body's demand on the MSVC build and a
+/// different market entirely on a g++ build of the same seed, because `w.markets`
+/// is unordered and the lowest id is not a portable choice. Same-seed
+/// reproducibility WITHIN a binary always held, so that was never a determinism
+/// violation; it was a price input decided by an implementation accident.
+///
+/// The relation dissolves the defect rather than repairing it: no single market
+/// is asked to stand for a body any more. An outpost selling resource r is pulled
+/// by the home-body market that actually wants r most — a counterparty, not an
+/// aggregate. Under today's model every home-body market sits at the same
+/// distance from a given outpost, so the relation is many-to-one keyed on the
+/// RESOURCE; the outpost dimension is carried entirely by the distance falloff.
+/// If markets ever acquire a per-market haul cost, this is where a per-(outpost,
+/// resource) counterpart would go.
+///
+/// Order-independent by construction — strictly-greater demand wins, and an exact
+/// tie is broken by the smaller id — so every standard library's traversal of
+/// `w.markets` names the same market. That property is asserted, not assumed:
+/// `interbody_pull_harness` re-derives it over a reversed traversal.
+entity_id counterpart_home_market(const world& w, std::size_t r)
+{
+    entity_id best        = null_entity;
+    float     best_demand = 0.0f;
+    for (const auto& [mid, mc] : w.markets)
+    {
+        if (mc.body != w.home_body)
+            continue;
+        const float d = mc.demand[r];
+        if (best == null_entity || d > best_demand || (d == best_demand && mid < best))
+        {
+            best        = mid;
+            best_demand = d;
+        }
+    }
+    return best;
+}
+
+} // namespace
+
+void inject_interbody_demand(world& w,
+                             const recipe_registry& reg,
+                             const market_supply_snapshot& prior_supply)
 {
     if (w.home_body == null_entity)
         return;
-    const entity_id home_market_id = market_for_body(w, w.home_body);
-    if (home_market_id == null_entity)
-        return;
-    const market_component& home = w.markets.at(home_market_id);
     const market_emergence_params& mp = reg.market_emergence();
+
+    // The counterpart per resource, resolved once — it is a property of the home
+    // body this tick, not of the outpost being filled, so resolving it inside the
+    // market loop would recompute the same answer for every outpost.
+    std::array<entity_id, resource_count> counterpart{};
+    counterpart.fill(null_entity);
+    for (std::size_t r = 0; r < resource_count; ++r)
+        counterpart[r] = counterpart_home_market(w, r);
 
     for (auto& [mid, mc] : w.markets)
     {
@@ -415,23 +478,31 @@ void inject_interbody_demand(world& w, const recipe_registry& reg)
 
         for (std::size_t r = 0; r < resource_count; ++r)
         {
-            // THE SUBTRACTION IS A NO-OP HERE, AND THE PULL IS LIVE (BL-404).
-            // `clear_markets` zeroes every market's supply immediately above
-            // (mc.supply.fill) and the supply writes come later in the same
-            // pass, so home.supply is identically 0.0f at this read: the
-            // shortfall is home *gross* demand, not unmet demand, and the gate
-            // opens for every resource carrying any demand at all. Outposts
-            // therefore receive pull_fraction of Kepler's gross demand every
-            // tick. Written as `demand - supply` because that is the intent;
-            // making the intent true means reading a supply this pass has not
-            // computed yet. BL-404 owns the fix — do not "simplify" the
-            // subtraction away, it is the record of what this should net.
-            const float home_shortfall = home.demand[r] - home.supply[r];
-            if (home_shortfall <= 0.0f)
-                continue;
+            const entity_id src = counterpart[r];
+            if (src == null_entity)
+                continue; // No market on the home body at all.
+            const market_component& cm = w.markets.at(src);
+
+            // THE SUBTRACTION IS REAL NOW (BL-404, option b). It was a no-op for
+            // as long as it read `cm.supply` directly: `clear_markets` zeroes
+            // every market's supply immediately above this call and the supply
+            // writes land after it, so the subtrahend was identically 0.0f and
+            // every outpost received pull_fraction of GROSS home demand. The fix
+            // is not to reorder a pass whose ordering is already load-bearing
+            // (the supply writes are themselves demand-sensitive) but to net
+            // against the counterpart's END-OF-TICK supply from the PREVIOUS
+            // tick, captured by snapshot_market_supply before the reset loop.
+            // One tick of lag, deterministic, and honest about what it is.
+            const auto it = prior_supply.find(src);
+            const float supply_last_tick =
+                (it != prior_supply.end()) ? it->second[r] : 0.0f;
+
+            const float shortfall = cm.demand[r] - supply_last_tick;
+            if (shortfall <= 0.0f)
+                continue; // The counterpart already meets its own appetite.
             if (mc.base_price[r] <= 0.0f)
                 continue; // Untradeable here regardless of what's wanted at home.
-            mc.demand[r] += home_shortfall * mp.pull_fraction / falloff;
+            mc.demand[r] += shortfall * mp.pull_fraction / falloff;
         }
     }
 }
@@ -452,6 +523,13 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     const std::vector<sell_order>& standing_sells = w.sell_orders;
     const std::vector<buy_order>&  standing_buys  = w.buy_orders;
 
+    // Captured BEFORE the reset below, so it carries the PREVIOUS tick's
+    // end-of-tick supply — the only honest subtrahend available to
+    // inject_interbody_demand, which runs before this tick's supply is written
+    // (BL-404). Local to this pass: nothing is persisted and the save format is
+    // untouched.
+    const market_supply_snapshot prior_supply = snapshot_market_supply(w);
+
     for (auto& [mid, mc] : w.markets)
     {
         mc.supply.fill(0.0f);
@@ -469,8 +547,11 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // BL-263: the home body's own unmet demand pulls a discounted slice onto
     // every outpost market, additive after the resets above — without this an
     // outpost with real supply and no local population collapses to the price
-    // floor the instant it starts producing.
-    inject_interbody_demand(w, reg);
+    // floor the instant it starts producing. Runs AFTER the two demand
+    // injections above, because BL-406's counterpart selection reads the demand
+    // they deposit: the counterpart for a resource is whichever home-body market
+    // wants it most, and that is not knowable until this tick's demand is in.
+    inject_interbody_demand(w, reg, prior_supply);
 
     // A (corp, body, resource) with a standing sell order against it is under
     // manual control: the auto-surplus path yields so the floor-priced order

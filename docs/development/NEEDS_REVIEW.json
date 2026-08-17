@@ -733,6 +733,52 @@
       ],
       "resolution": null,
       "recommendation": "EYEBALL OWED, and no golden until then. screenshots/corp_choice.png is committed-capture-only on purpose: blessing a golden now would pin a layout Ben has never seen. --autostart-play will NOT show the screen (it auto-picks Surprise me), so seeing it live means starting a game from the menu. Once he has looked, bless corp_choice as a golden - the check is already written and stable."
+    },
+    {
+      "id": "NR-276",
+      "title": "The shared dependency cache never seeds anything - BL-302's directory names do not match what it looks for",
+      "raised": "2026-08-17",
+      "kind": "observation",
+      "status": "open",
+      "source": "Hit while configuring a fresh sub-agent worktree for BL-406/BL-404. The configure tried to DOWNLOAD SDL3 and failed offline, in a repo that carries a 120 MB cache of exactly that.",
+      "what": "CMakeLists.txt's seeding loop tests for '${IO_DEPS_CACHE}/${dep_name}-src/${marker}' - sdl3-src, lua_src-src, sol2_src-src, imgui_src-src. The cache on disk holds 'sdl3', 'lua_src', 'sol2_src', 'imgui_src'. No name matches, so every dep is classified COLD in any build tree that is not already warm, and the 'Deps: seeded from ...' line never prints. The main repo's build/ tree hides this completely: it has been warm since before BL-302, so nobody has configured cold there.",
+      "why_it_matters": "It defeats BL-302's entire purpose, and it only bites the case that motivated it - a fresh worktree for a parallel sub-agent, which is now the standard way work is split here. Offline, or on a slow link, a sub-agent cannot configure at all. Worked around this session by passing FETCHCONTENT_SOURCE_DIR_* explicitly (see bl406_build.bat, deleted before commit), which is a one-off, not a fix.",
+      "recommendation": "One-line fix either way - point the loop at '${IO_DEPS_CACHE}/${dep_name}' or rename the four cache directories. Prefer changing the loop, since the cache directories are what the checkout actually carries. Worth a backlog item rather than a drive-by, because whichever way it goes wants a cold-configure check that would have caught it.",
+      "files": [
+        "CMakeLists.txt"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-277",
+      "title": "BL-406/BL-404 landed without re-tuning pull_fraction, though the ruling cleared it to move",
+      "raised": "2026-08-17",
+      "kind": "decision-taken",
+      "status": "open",
+      "source": "Ben's ruling 2026-08-15 on BL-406 said 'pull_fraction is re-tuned against whatever curve (c) produces' and cleared outpost prices to move. The session brief separately fenced off scripts/economy.lua repricing as Ben's open call, blocked behind BL-440.",
+      "what": "pull_fraction was left at its authored 0.50 and economy.lua was not touched. The two instructions point opposite ways, so the narrower one was taken. Measured effect of the change alone on seed 0: of three pulled resources on the test outpost, two pull at 2.8x their previous size (the counterpart wants far more than the lowest-id market did) and one is silenced outright by the now-real netting. Net direction is up, not down, so BL-263's price-floor support is not at risk - which was the specific failure mode the pre-change harness warned a naive netting would cause.",
+      "why_it_matters": "The mechanism is now correct and its magnitude is untuned. Nothing is broken by that - the pull got stronger, not weaker - but the 0.50 was chosen against a source that no longer exists, so it is a number with no remaining justification rather than a number known to be right.",
+      "recommendation": "Fold the pull_fraction tune into BL-440's repricing pass rather than doing it here. It is the same class of call (an authored economy constant), it wants the same before/after price evidence, and doing it separately means tuning twice.",
+      "files": [
+        "scripts/economy.lua",
+        "src/world/market_clearing.cpp"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-278",
+      "title": "Outpost prices move with BL-406/BL-404 - any golden or band that reads them will shift, and none was re-blessed",
+      "raised": "2026-08-17",
+      "kind": "observation",
+      "status": "open",
+      "source": "Landing BL-406/BL-404. Ben's ruling explicitly cleared outpost prices to move, so this is an intended consequence, recorded rather than hidden.",
+      "what": "Every off-home market's demand for a pulled resource changes size this tick and therefore its resolved price changes: two of three pulled resources at 2.8x, one silenced to zero, measured on seed 0. Any world hash, golden capture, or ai_skill_harness band downstream of an outpost price will read differently. Nothing was re-blessed - the benchmark is deliberately red already (NR-269/NR-271/NR-272) and re-blessing into a red benchmark would bake in an unexamined number.",
+      "why_it_matters": "A moved golden that nobody names looks identical to a regression when it is next noticed. This is the naming. It also means the first bless after BL-440's repricing must be taken against a build that carries this change, not before it.",
+      "recommendation": "Leave every golden and band red. Re-bless once, after BL-440 settles prices, rather than chasing each economy change through the capture set.",
+      "files": [
+        "src/world/market_clearing.cpp"
+      ],
+      "resolution": null
     }
   ]
 }

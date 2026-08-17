@@ -3833,6 +3833,55 @@
      "notes": null
     }
    ]
+  },
+  {
+   "brief": "interbody-pull-counterpart",
+   "batch": "2026-08-17-bl406-bl404",
+   "title": "BL-406 / BL-404 — the inter-body pull reads a named counterpart market, and nets against a supply that exists",
+   "status": "complete",
+   "promoted_from": "backlog.json BL-406 HOME_MARKET_IS_AN_ARBITRARY_PICK, BL-404 INTERBODY_PULL_IS_UNNETTED",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "ITEM-SPANNING (headless): inject_interbody_demand no longer reads any market chosen by lowest id. For each (outpost market, resource) the pull reads a COUNTERPART market on the home body, selected by the greatest demand for that resource with the lowest market id as tiebreak, so the choice is a fact about the economy and is identical across standard-library container orders. interbody_pull_harness asserts the selection is order-independent by re-deriving it from a shuffled traversal and comparing.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "seed 0: home body carries 9 markets; the pull matched the counterpart on 3/3 distinguishable resources and the lowest-id market on 0/3 (pre-change: 0/3 and 3/3). Reverse-order re-derivation names the same market for all 37 resources.",
+     "notes": "Ben's ruling 2026-08-15 (BL-406 option c). The 'home body's demand' framing is retired: no single market stands for a body any more. Under today's model every home-body market sits at the same distance from a given outpost, so the relation collapses to many-to-one keyed on the RESOURCE; the outpost dimension is carried by the distance falloff alone."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "The netting is real (BL-404): the shortfall subtracts the counterpart market's supply as captured BEFORE clear_markets' reset loop (previous tick's end-of-tick supply), not the identically-zero supply at the injector's read point. On a warmed world the gate must be measurably narrower than the gross-demand gate — at least one resource that pulls under gross demand must be silenced by the netting, or the counterpart's supply for every pulled resource must be genuinely zero and asserted as such.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "seed 0: 1 of 3 pulled resources silenced by the netting (counterpart holds 260.7 supply against 5.5 demand); the other 2 net against a counterpart supply of genuinely 0.0 and pull at 2.8x their pre-change size. Both halves asserted.",
+     "notes": "BL-404 option (b), re-opened per its own 2026-08-15 ruling now that BL-406 defines what is being netted against. One tick of lag, no reordering of a pass whose ordering is already load-bearing, and no new persisted state — the snapshot is local to clear_markets."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "The guard is proven to bite: the new interbody_pull_harness assertions are run against the PRE-change build and observed to FAIL, and the failure recorded. A guard never seen to fail is not a guard.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "3 of 3 new assertions FAILED against pre-change behaviour, PASS after. Proven twice: once against the genuine pre-change source, and again after the assertions were sharpened, against a build with the old logic temporarily restored behind the new signature.",
+     "notes": "The harness's old 'the pull reads one market of many' assertion is obsolete by construction under R1 and is replaced, not deleted silently."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "Determinism holds: no RNG, no clock, and no dependence on unordered container traversal order in the new selection or netting. The snapshot is keyed by entity_id and read by lookup only.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "",
+     "notes": "The pre-change defect was NOT a determinism violation (same-seed reproducibility within a binary always held); it was a cross-toolchain instability in which market got read. R1's order-independence assertion is what closes that."
+    }
+   ]
   }
  ]
 }

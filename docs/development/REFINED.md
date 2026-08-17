@@ -764,3 +764,41 @@ wave. Verify retroactively — do not assume an agent's self-reported success.
 
 ---
 
+## The inter-body pull reads a counterpart market (promoted from BL-406, then BL-404) — 2026-08-17
+
+Requirements: requirements.json § interbody-pull-counterpart (R1–R4)
+
+Two items, strictly in order: **BL-406 (home market is an arbitrary pick)** first, because it
+defines *what* is being netted against; **BL-404 (inter-body pull is unnetted)** second.
+
+Ben's ruling 2026-08-15 took **BL-406 option (c)** — a per-counterpart-market pull — and deferred
+BL-404's own a/b/c to the same pass. Outpost prices are cleared to move.
+
+> **Closed 2026-08-17, all five tasks complete, in ONE commit rather than the usual one-per-item.**
+> The two items rewrite the same twenty lines, and BL-404's own ruling put its decision inside the
+> pass that lands BL-406. Splitting them would mean committing an intermediate whose own guard
+> (C3) fails by design — a red commit for the sake of a boundary the ruling had already dissolved.
+
+**Baseline, measured before any change** (`interbody_pull_harness`, seed 0, 60 ticks, MSVC): the
+home body carries **9** markets holding 3861.3 supply and 34.0 demand; the market
+`market_for_body` hands the pull holds **0.0 supply and 1.81 demand — 5% of the body's**.
+
+### Tasks
+
+- **A — define the counterpart relation** (`src/world/market_clearing.cpp`). A per-resource
+  `counterpart_home_market(w, r)`: the home-body market with the greatest demand for `r`,
+  lowest market id as tiebreak. Order-independent by construction, so it is stable across
+  standard-library container orders. — **complete**
+- **B — the pull reads it** (`src/world/market_clearing.{hpp,cpp}`). Retire the single
+  `market_for_body(w.home_body)` read; select per resource inside the loop. — **complete**
+- **C — the netting becomes real** (BL-404; `market_clearing.{hpp,cpp}`). Snapshot every market's
+  supply **before** `clear_markets`' reset loop and net the counterpart's snapshot supply. This is
+  BL-404 option **(b)**, one tick of lag, no reordering, no new persisted state. — **complete**
+- **D — the guard** (`tools/verify/interbody_pull_harness.cpp`, `market_emergence_harness.cpp`).
+  Behavioural assertions on `inject_interbody_demand`'s observable output, run against the
+  **pre-change** build first and observed to fail — **3 of 3 did**. — **complete**
+- **E — propagate** (`docs/economy/MARKETS.md`). Authority time-slice: the settled design moves
+  out of the two items and into the market doc as part of landing. — **complete**
+
+---
+
