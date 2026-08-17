@@ -320,6 +320,33 @@ Target and result are clamped to the band **[0.25×, 4×] of base**. Prices are 
 *anchored*: no scarcity can push a good past 4× its authored base, and no glut below a quarter
 of it. Untradeable resources (`base_price ≤ 0`) keep their prior price.
 
+### Where the band lives (BL-442, 2026-08-17)
+
+The band is **authored once, in data**: `scripts/economy.lua` → `economy.price_band`
+(`floor_mult` / `ceil_mult`), reaching C++ as `price_band_params` through
+`recipe_registry::price_band()` — the same route every other economy tunable takes.
+
+It is read by **two** call sites, and that is the point of naming it here:
+
+| Site | Function | What it clamps |
+|---|---|---|
+| `src/world/market_clearing.cpp` | `resolve_price` | Every market price, every tick — the real clearing band. |
+| `src/world/economy_system.cpp` | `wf_target_price` | The BL-181 workforce auto-solver's **forward** price estimate, so it prices a candidate target against the band the market will actually clear it in. |
+
+Until BL-442 those were two hand-synchronised `constexpr` copies, the second commented
+"mirror market_clearing.cpp price band" — with nothing enforcing the mirror. Editing one and
+not the other would have left the solver optimising against a band the market does not use: a
+silent divergence with no error and no visible symptom. `tools/verify/price_band_harness.cpp`
+is now the guard. Its rows are **differential** — each sets a non-default band and asserts the
+site *moves* — because a guard that only exercised one site would have passed before the change
+and would pass again the day someone reintroduces a local copy.
+
+The move was deliberately **behaviour-identical**: the authored values are the constants they
+replaced, and the struct defaults reproduce them exactly so a harness that hand-builds a
+registry is unchanged. **Widening** the band is a separate, later call (BL-442 step 2), held
+until BL-441 makes the demand input non-zero — widening a band whose input signal is
+structurally zero amplifies nothing.
+
 ## Inter-body linkage
 
 There is no abstract price coupling between bodies — **the convoy is the coupling**

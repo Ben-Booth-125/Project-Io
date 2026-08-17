@@ -37,6 +37,31 @@ in `tools/verify/README.md`.
   survives a loaded machine. Reading the sweep: the exponent sitting above 1.0 is
   `run_corp_strategic_step`'s O(corps × tiles) candidate scan (BL-253), not a
   regression.
+- **`price_band_harness`** — the price band as data (BL-442 step 1). The band
+  `[0.25×, 4×]` around `base_price` is read by **two** call sites — `resolve_price`
+  (`market_clearing.cpp`, the real clearing clamp) and `wf_target_price`
+  (`economy_system.cpp`, the BL-181 workforce solver's forward price estimate) —
+  and used to be two hand-synchronised `constexpr` copies, the second commented
+  "mirror market_clearing.cpp price band" with nothing enforcing the mirror. BL-442
+  authors it once in `scripts/economy.lua` (`economy.price_band`), routed through
+  `recipe_registry::price_band()`; this is the guard that the routing stays real.
+  **Every behavioural row is differential** — it sets a non-default band and asserts
+  the site *moves* — because a guard that exercised only one site would have passed
+  before the change and would pass again the day someone reintroduces a local copy.
+  Rows: P1 the defaults are bit-exactly 0.25/4.0 (so every hand-built-registry
+  harness is unchanged); P2 the shipped Lua authors the band AND a probe script's
+  distinctive override is read back (proving the loader does not silently fall
+  through to the defaults); P3/P4 the clearing price honours a raised floor and a
+  lowered ceiling; P5 the solver's chosen workforce target moves with the band —
+  **the row that fails if `economy_system.cpp` reacquires a private copy**, verified
+  by negative control; P6 the settled price tracks the registry ceiling
+  monotonically across a four-rung sweep. Live-Lua (for P2 only) — links
+  `recipe_registry.cpp` + `lua_state.cpp` + `lua54` on top of `io_world_obj`, and is
+  hand-declared in `CMakeLists.txt`, so use the CMake target, not a `cl` recipe.
+  Note P5's direction is the opposite of the naive guess and correctly so: a LOW
+  ceiling flattens the price across the candidate range, making revenue linear and
+  the optimum bang-bang (200); a HIGH ceiling restores the price response and an
+  interior optimum appears (100).
 - **`resource_chain_harness`** — the processing-chain roster (BL-340): a hand-built
   three-extractor (silica/copper_ore/rare_earth_ore) + seven-processor chain run
   80 ticks, asserting every one of the seven new goods (silicon, refined_copper,

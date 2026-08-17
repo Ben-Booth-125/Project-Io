@@ -396,12 +396,17 @@ building_report run_processing(world& w, const recipe_registry& reg,
 // result can hunt by ±one tier. A finer model + hysteresis is future work (BL-181).
 // Deterministic — reads last tick's market state only. Player corp only, opt-out via the
 // building's `workforce_auto` flag (io-standing-rules.md § the player-corp exception).
-constexpr float wf_price_floor_mult = 0.25f; // mirror market_clearing.cpp price band
-constexpr float wf_price_ceil_mult  = 4.0f;
+// BL-442: the band used to be two constexpr copies here, commented "mirror
+// market_clearing.cpp price band" — a hand-synchronised duplicate of the game's
+// most load-bearing economic tunable. It is now authored once in
+// scripts/economy.lua (economy.price_band) and reaches this file, exactly as it
+// reaches resolve_price, through recipe_registry::price_band(). Guarded by
+// tools/verify/price_band_harness.cpp, which fails if the two sites diverge.
 
 // The market's target (pre-smoothing) clearing price for one resource at a hypothetical
 // supply — the same formula resolve_price aims at, used here as a forward estimate.
-float wf_target_price(float base, float supply, float demand)
+float wf_target_price(float base, float supply, float demand,
+                      float wf_price_floor_mult, float wf_price_ceil_mult)
 {
     if (base <= 0.0f)
         return 0.0f;
@@ -442,7 +447,8 @@ int solve_workforce_target(const world& w, const recipe_registry& reg,
         if (mkt == nullptr)
             return 0.0f;
         const float supply = std::max(0.0f, mkt->supply[r] + supply_delta);
-        return wf_target_price(mkt->base_price[r], supply, mkt->demand[r]);
+        return wf_target_price(mkt->base_price[r], supply, mkt->demand[r],
+                               reg.price_band().floor_mult, reg.price_band().ceil_mult);
     };
 
     const auto tit = w.tiles.find(b.tile);

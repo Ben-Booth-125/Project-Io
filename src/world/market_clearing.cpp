@@ -14,15 +14,19 @@ namespace {
 // supply/demand ratio. A damped (sqrt) elasticity keeps swings readable; the
 // move is clamped to a band around base and eased across ticks so a single tick's
 // imbalance cannot snap the price.
-constexpr float price_floor_mult = 0.25f; ///< Lowest a price may fall: 0.25× base.
-constexpr float price_ceil_mult  = 4.0f;  ///< Highest a price may rise: 4× base.
+/// The band multipliers are NO LONGER constants here (BL-442): they are authored
+/// once in scripts/economy.lua under `economy.price_band` and reach both this
+/// function and economy_system.cpp's `wf_target_price` through
+/// `recipe_registry::price_band()`. They arrive as parameters below.
 constexpr float price_smoothing  = 0.5f;  ///< EMA factor toward the tick's target price.
 
 /// Resolve one resource's price for a market this tick. The target is
 /// `base × sqrt(demand/supply)` (damped elasticity), clamped to the band and
 /// reached by an exponential moving average from the prior price. Untraded
-/// resources (`base <= 0`) keep their prior price.
-float resolve_price(float prior, float base, float supply, float demand)
+/// resources (`base <= 0`) keep their prior price. The band multipliers come from
+/// the registry (`price_band()`), not from a local constant — BL-442.
+float resolve_price(float prior, float base, float supply, float demand,
+                    float price_floor_mult, float price_ceil_mult)
 {
     if (base <= 0.0f)
         return prior; // never traded here — leave it (stays 0)
@@ -623,7 +627,9 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         ref_price[mid] = {};
         for (std::size_t r = 0; r < resource_count; ++r)
             ref_price[mid][r] = resolve_price(mc.price[r], mc.base_price[r],
-                                              mc.supply[r], mc.demand[r]);
+                                              mc.supply[r], mc.demand[r],
+                                              reg.price_band().floor_mult,
+                                              reg.price_band().ceil_mult);
     }
 
     // --- Auto-surplus clearing: income at ref_price, pool debited immediately ---
