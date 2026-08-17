@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*43 entries — 36 open, 7 resolved.*
+*45 entries — 38 open, 7 resolved.*
 
 ---
 
@@ -469,6 +469,28 @@ Every off-home market's demand for a pulled resource changes size this tick and 
 > **Recommendation:** Leave every golden and band red. Re-bless once, after BL-440 settles prices, rather than chasing each economy change through the capture set.
 
 *Files: `src/world/market_clearing.cpp`*
+
+### NR-279 — Two parallel agents both allocated NR-273/274/275 - the BL-406/BL-404 set was renumbered to NR-276/277/278, and its own commit message still quotes the old ids
+*decision taken on your behalf · raised 2026-08-17 · from Integrating the three sprint19-bl417 sub-agent branches. Both the BL-435 worktree and the BL-406/BL-404 worktree branched from 5527984, where the highest id was NR-272, and each independently minted 273/274/275 for entirely different entries.*
+
+Merge order decided it. BL-435 landed first and KEEPS NR-273 (specialists-only pool by timing), NR-274 (processor coverage 6.92/8) and NR-275 (clipped corp-choice cell). The BL-406/BL-404 set was renumbered: NR-273 -> NR-276 (the dep-cache seeding bug), NR-274 -> NR-277 (pull_fraction not re-tuned), NR-275 -> NR-278 (outpost prices move, nothing re-blessed). Cross-references were rewritten in backlog.json (BL-406 design), docs/economy/MARKETS.md and src/world/recipe_registry.hpp. THE ONE THING THAT COULD NOT BE FIXED is commit cab181b’s own message, which still reads "pull_fraction is NOT re-tuned - NR-274" and "No golden or band re-blessed - NR-275". Read against today’s file those point at two BL-435 entries. Substitute 277 and 278.
+
+**Why it matters.** A naive merge would have silently dropped three entries - the exact failure the parallel-worktree notes warn about. It did not happen, but the near-miss is the point: id allocation off a stale local file is not safe once more than one worktree is open, and next_id.js only helps if it is actually run at authoring time rather than at landing time.
+
+> **Recommendation:** Nothing to undo. Worth considering whether NEEDS_REVIEW ids should be minted the way backlog ids are (next_id.js scanning all branches), or whether a verify check should simply assert no duplicate NR id - the latter is a five-line check and would have caught this before the merge rather than during it.
+
+*Files: `docs/development/NEEDS_REVIEW.json`, `docs/development/backlog.json`, `docs/economy/MARKETS.md`, `src/world/recipe_registry.hpp`*
+
+### NR-280 — BL-406/BL-404 moved outpost prices but did NOT move the spectator rollout hash - NR-278 over-predicted its own blast radius
+*observation · raised 2026-08-17 · from Integration gate on sprint19-bl417 after merging all three sub-agent branches, plus a control build of spectator_determinism at the pre-merge commit 8cc2981.*
+
+spectator_determinism fails one assertion - R2 byte-identity against the pinned golden 855E07DE529684EC. Measured on BOTH sides of the merge, the observed hash is the SAME value, 6D546B281FFA4A68, and the spectated hash is 8606FA466D259B09 on both. So the failure is entirely pre-existing (the golden was last blessed at 3b9ffd2, before BL-439/BL-436/BL-440 landed on this branch) and the market-clearing change contributed nothing to it. Every other assertion in that harness passes, including both reproducibility checks and the R2 prohibition check.
+
+**Why it matters.** NR-278 states that any world hash downstream of an outpost price will read differently. On this rollout it does not, which is a fact worth having before anyone treats a moved hash as evidence the pull change reached something. The likely reason is that the seed-0 300-tick spectator rollout does not exercise an off-home market enough for the pull to register - if so, the harness is blind to exactly the change BL-406 made, and that is a coverage gap rather than a reassurance.
+
+> **Recommendation:** Do not bless. When the goldens are eventually re-blessed as one deliberate pass (NR-269 owns that call), re-blessing spectator_determinism’s R2 golden is a one-line change and should ride along. Separately worth checking whether the rollout reaches an off-home market at all.
+
+*Files: `tools/verify/spectator_determinism.cpp`, `src/world/market_clearing.cpp`*
 
 ---
 
