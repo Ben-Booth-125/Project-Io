@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*66 entries — 52 open, 14 resolved.*
+*70 entries — 56 open, 14 resolved.*
 
 ---
 
@@ -665,6 +665,40 @@ BL-325 (military bases and supply) slice S3, deterministic out-of-supply strengt
 > **Recommendation:** Pick it up in the sprint after, once the conflict layer gives units something to be out of supply FROM and the economy seam has quiesced. If Ben would rather it rode along, sequence it last and alone - never concurrent with the other slices.
 
 *Files: `docs/development/REFINED.md`, `docs/development/SPRINTS.md`*
+
+### NR-302 — Is corp stance directed (asymmetric hostility) or symmetric? It changes the data model, not the logic
+*question · raised 2026-08-17 · from Sprints 22-24 proposal, designing BL-448 (friend/neutral/hostile stance) on your 2026-08-17 ruling.*
+
+Your ruling was that hostility is a declared war state corps opt into deliberately, with a friend state alongside it. That admits two readings and they differ in STORAGE, so it cannot be deferred into implementation. Reading A, asymmetric hostility with mutual friendship: war is done TO you, friendship is agreed WITH you. declare_hostile applies unilaterally; offer_friendship creates a pending offer that accept_friendship converts. Storage is a directed (actor, target) pair. Reading B, symmetric throughout: both modes belong to the pair, declaring drags the target in, storage is a canonicalised (min id, max id) key with one row per relationship.
+
+**Why it matters.** Under A the world holds one-sided wars, so every consumer - the engagement trigger, the AI scorer, the UI - must ask 'is A hostile to B', never 'are A and B at war'. Under B that question does not exist and cannot be asked. Retrofitting A onto B later means touching every consumer, and B onto A means deciding what to do with the one-sided rows already saved. It is also the difference between an ambush being expressible and not.
+
+- A - directed. Matches the words you chose ('declared', 'opt into' are one-sided). Costs a second row per relationship. Note world::corp_reputation is ALREADY a directed std::map<std::pair<entity_id,entity_id>, float>, serialised and deterministic, so the directed shape is proven affordable here.
+- B - symmetric. Simpler at every consumer, half the state, no possibility of an inconsistent pair. Cannot express a declaration the target has not yet noticed.
+- Hybrid - hostility directed, friendship symmetric. Honest to the fiction and the most code: two tables with two different key rules.
+
+> **Recommendation:** A, weakly. It matches the ruling's own verbs and the reputation table already pays the directed cost. Recorded as a recommendation, not taken - it is a data-model call and yours.
+
+### NR-303 — Measured: 7 of 15 corp_verbs are unreachable by the AI, 3 unreachable by any human
+*observation · raised 2026-08-17 · from Sprints 22-24 proposal, three-way coverage audit over corp_command.hpp, ACTIONS.json and corp_ai.cpp.*
+
+The seam has 15 verbs. The dictionary covers all 15 (complete, no gap). A UI press covers 12 - request_quote, accept_quote and cancel_contract have none, and ACTIONS.json says so itself in the words 'No UI. SEAM-ONLY'. The rival scorer emits 8: corp_ai.cpp assigns cmd.verb at exactly ten sites, covering build, resume, idle, set_workforce, set_recipe, survey, hire_unit, place_sell_order. Absent from the scorer: demolish, place_road, remove_sell_order, set_workforce_auto, and the three procurement verbs.
+
+**Why it matters.** Two of these are documentation defects rather than merely gaps. First, .claude/rules/io-standing-rules.md states the BL-202/BL-203 exception as rivals scoring 'build, demolish, survey and road decisions each tick' - demolish and place_road are described and not emitted, so a standing rule is asserting a behaviour that does not exist. Second, BL-350 (procurement seam) landed complete world state, serialisation and a harness with no player surface at all, meaning an external agent can contract for goods and a human cannot.
+
+### NR-304 — Called it 'stance', not 'standing' - the latter is taken by BL-262's power bands
+*decision taken on your behalf · raised 2026-08-17 · from Sprints 22-24 proposal, naming the friend/neutral/hostile model.*
+
+The brief called the friend/neutral/hostile model 'the standing model'. src/world/standing.{hpp,cpp} already exists and means something unrelated: the BL-262 coarse public POWER read - negligible/minor/notable/major/dominant over reach, capital and market share. I named the new concept corp_stance in src/world/stance.{hpp,cpp} instead of overloading the word.
+
+**Why it matters.** Overloaded, every future sentence about 'a corp's standing' is ambiguous between how strong it is and how it feels about you - in prose, in the glossary, and in symbol names two headers apart. Cheap to fix now and expensive later. Also note BL-262's own header warns against unifying its bands with the AI scorer (a Goodhart trap); a stance model that shares its name invites exactly that confusion.
+
+### NR-305 — The spectate-proves-reachability thesis is half right, and the missing half is a check
+*observation · raised 2026-08-17 · from Sprints 22-24 proposal, testing the brief's stated thesis against corp_ai.cpp and spectator_determinism.cpp.*
+
+The thesis was that spectator mode (BL-409) is the forcing function making seam reachability observable, since with no human seat every corp must reach its goals through one seam. The first half holds exactly: under corp_ai_params::spectating the prohibition is unsubscribed, world::player_entity evaluates like any rival, so a spectated session genuinely does drive every corp through apply_corp_command. But spectate makes the gap CONSEQUENTIAL without making it OBSERVABLE. A UI-only verb simply never fires and nothing reports that it did not. A seam-only verb is not exercised either, since the scorer does not emit it. Spectate is silent on both.
+
+**Why it matters.** tools/verify/spectator_determinism.cpp confirms this concretely: it buckets 15 verbs into 4 families, so place_sell_order alone satisfies the whole 'trade' family and hides the four unemitted trade verbs behind it, while hire_unit alone satisfies 'other' and hides demolish and place_road. The harness built to prove spectate exercises the seam does so at a granularity too coarse to see that 7 of 15 verbs never fire. So spectate is the right forcing function only once paired with an instrument - which is why the reachability sprint leads with the instrument rather than the fixes.
 
 ---
 

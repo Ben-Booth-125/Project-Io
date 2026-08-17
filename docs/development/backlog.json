@@ -10247,6 +10247,203 @@
    "summary": "Found 2026-08-17 while reading ai_skill_harness's -2M to -3.4M net worths (NR-269). k_debt_interest_per_quarter is 0.02 and the benchmark rollout is 300 ticks: 1.02^300 = 380x. Per-building extraction nets +5 to +11 on every seed, so a corp cannot lose millions by operating. It dips a few thousand negative on processor upkeep and compounding does the rest. The rate itself is defensible (~8%/yr); what is missing is any floor, recovery path or terminal state. An insolvent corp is not resolved, it just accelerates away from zero.",
    "design": "MEASURE BEFORE CHANGING ANYTHING, and the measurement is the first deliverable: decompose a benchmark corp's final balance into operating flows versus accrued interest. The claim that the -3M is 'almost entirely compounding' is arithmetic inference from 1.02^300, not an observation, and it should be confirmed or overturned before a lever is chosen.\n\nNote tools/verify/econ_bankruptcy.cpp ALREADY EXISTS and budget_system.hpp names it as a reader of the interest constant, yet budget_system.cpp contains no bankruptcy handling at all. Read that harness first: it may already pin the spiral as expected behaviour, in which case this item is partly a disagreement with an existing check rather than a new defect, and that has to be settled openly rather than by editing the check.\n\nThe design question is what insolvency MEANS, and it is a game-design call, not an arithmetic one. Candidates, deliberately not chosen here: (a) a debt ceiling past which no further interest accrues, cheapest and least meaningful; (b) forced liquidation - assets sold to clear debt, which gives 'survival' a real definition and makes the survival metric mean something it currently does not; (c) restructuring, where a corp idles or sheds buildings to return to solvency, which is the version that composes with the existing BL-079 reflex tier and the BL-202 scorer rather than sitting beside them.\n\n(b) and (c) are the ones that feed Conflict and Trade; (a) only silences a number. Prefer whichever the measurement supports, and state the reason.\n\nGUARD: a corp driven insolvent reaches a defined terminal or recovered state within a bounded number of ticks, rather than diverging. Must be shown to fail pre-change - today it diverges by construction.",
    "consequences_for_shipped_claims": "It puts a question mark over ai_skill_harness's net-worth bands as a SKILL signal at all. If final net worth is dominated by compounding on an early dip, the metric is measuring how early a corp first went negative, not how well it played - and the bands have been blessed and re-blessed against that number repeatedly. The survival fraction may be the sounder signal; it is currently the one metric that has stayed green throughout Sprint 19."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-17",
+   "created": "2026-08-17",
+   "id": "BL-444",
+   "short_name": "VERB_REACHABILITY_COVERAGE_TOOL",
+   "category": "Documentation",
+   "difficulty": 2,
+   "priority": "A",
+   "version_goal": "v0.1.16",
+   "requires": [],
+   "title": "No check asserts that a corp_verb is reachable from all three directions",
+   "files": [
+    "tools/session/verb_coverage.js",
+    "docs/ai/ACTIONS.json",
+    "src/world/corp_command.hpp"
+   ],
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "summary": "Filed 2026-08-17 from the Sprint 22 audit. The seam has 15 verbs. The dictionary covers 15, a UI press covers 12, the rival scorer emits 8. Nothing measures that, so the gap was found by hand and will go stale by hand.",
+   "design": "## What the audit measured\n\nThree artefacts already carry the answer, and no tool joins them.\n\n- `src/world/corp_command.hpp` is the authoritative verb list (15, append-only).\n- `docs/ai/ACTIONS.json` gameplay family transcribes it (15 entries, complete today).\n- Each dictionary entry carries a `surface` field naming its UI press, or saying SEAM-ONLY.\n- `src/world/corp_ai.cpp` assigns `cmd.verb` at exactly ten sites, covering eight distinct verbs.\n\nThe join is mechanical and cheap. It is not written.\n\n## Shape\n\nA node tool, `tools/session/verb_coverage.js`, emitting one row per verb with four columns:\nseam / dictionary / UI press / AI candidate. Sources, in order of authority:\n\n1. Parse the `corp_verb` enum out of `corp_command.hpp` — the seam wins over everything.\n2. Read `ACTIONS.json` gameplay entries; a missing verb is a dictionary defect, and per\n   BL-270 the dictionary is the wrong one when they disagree.\n3. Read each entry `surface` field; a `SEAM-ONLY` marker means no human press. This is the\n   one axis read from prose rather than code, and it is deliberate — the prose is the\n   maintained record, and a grep of `src/ui` for a verb name finds nothing useful because\n   the UI calls seam functions, not verbs.\n4. Grep `corp_ai.cpp` for `cmd.verb = corp_verb::X` assignments.\n\nExit non-zero on a **dictionary** gap only. UI and AI gaps are reported, not failed — they\nare legitimate design states (`set_workforce_auto` may well be correctly AI-absent), and a\ntool that fails on them would be muted within a week.\n\n## Why it is priority A for its size\n\nIt is the instrument the reachability argument rests on. Sprint 22 proposes closing gaps;\nwithout this the closing is unverified and the reopening is unnoticed. Per CLAUDE.md\n§ Tool creation is skill creation, it should be wrapped or invoked from an existing skill\nrather than left loose."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-17",
+   "created": "2026-08-17",
+   "id": "BL-445",
+   "short_name": "PROCUREMENT_HAS_NO_UI",
+   "category": "UI",
+   "difficulty": 3,
+   "priority": "A",
+   "version_goal": "v0.1.16",
+   "requires": [],
+   "title": "Three procurement verbs are reachable by an agent and by no human",
+   "files": [
+    "src/ui/market_ledger.cpp",
+    "docs/ui/question_log.json",
+    "docs/ai/ACTIONS.json"
+   ],
+   "authority_doc": "docs/ui/LAYOUT.md",
+   "summary": "Filed 2026-08-17 from the Sprint 22 audit. request_quote, accept_quote and cancel_contract landed with world state, serialisation and a harness, and no press. The dictionary already records all three as SEAM-ONLY in as many words.",
+   "design": "## The gap, in the dictionary own words\n\nAll three entries open identically: *No UI. SEAM-ONLY: this verb has NO player-facing\npress.* BL-350 (procurement seam) landed the state, the serialisation and the harness and\nstopped short of the surface. So an external agent can contract for goods and a human\ncannot — the exact asymmetry the reachability argument exists to catch, and the largest\none on the board.\n\n## Shape\n\nA **Contracts** tab on the Market Ledger, beside Sell Orders, scoped to the ledger\nselected body the way Sell Orders already is. Three regions:\n\n- **Request** — supplier combo, resource combo, quantity, a Request button. The four\n  decline results (`rejected_no_capacity`, `no_input_access`, `embargo`, `reputation`)\n  are already distinguishable at the seam, so each gets its own message rather than a\n  generic failure. That distinguishability was designed in and is currently unread by\n  anything.\n- **Live quotes** — one row per quote with price, lead time, deposit, and Accept.\n- **Contracts in flight** — progress, remaining, and Cancel behind a confirm popup\n  (irreversible and forfeits the deposit, so it follows the demolish precedent).\n\n## What it must not do\n\nIt must not add a fourth code path. The presses issue `corp_command` records through\n`apply_corp_command`, exactly as the Sell Orders tab does since BL-293, so the human and\nthe agent share one seam and one validation.\n\n## Owed alongside\n\nA `question_log.json` entry per region (the pair is required on every surface), and the\nthree `ACTIONS.json` entries rewritten — their `surface` and `press` fields currently\nassert there is no UI, which is precisely the kind of stale entry BL-270 warns misleads\nthe AI player."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-17",
+   "created": "2026-08-17",
+   "id": "BL-446",
+   "short_name": "SCORER_CANNOT_PROCURE",
+   "category": "AI",
+   "difficulty": 3,
+   "priority": "B",
+   "version_goal": "v0.1.16",
+   "requires": [
+    "BL-445"
+   ],
+   "title": "The rival scorer enumerates no procurement candidate",
+   "files": [
+    "src/world/corp_ai.cpp",
+    "src/world/corp_ai.hpp"
+   ],
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "summary": "Filed 2026-08-17 from the Sprint 22 audit. corp_ai.cpp assigns cmd.verb at ten sites and none of them is request_quote, accept_quote or cancel_contract. BL-350 gave rivals a procurement seam they never use.",
+   "design": "## The gap\n\nBL-293 (order book on the seam) gave rivals the sell side. The buy side arrived with\nBL-350 (procurement seam) and no scorer touched it. A rival whose local market cannot\nsupply a recipe input has exactly one remedy today — build differently — when the seam\noffers a second.\n\n## Shape, respecting the standing rules\n\nOne more candidate family on the existing deterministic scored-utility layer. No planner,\nno new code path, legal verbs only:\n\n- **Request.** For each completed building whose recipe is input-starved at its local\n  market, score a `request_quote` against the highest-reputation supplier holding capacity.\n  The supplier walk must be over a **sorted** corp id list — `w.corporations` is an\n  unordered_map and iterating it directly is the nondeterminism BL-422 already caught once.\n- **Accept.** Score each live quote against the counterfactual of buying the same goods on\n  the open market over the lead time. Accept when the contract is cheaper *and* the\n  deposit clears the solvency floor — the deposit is a spend and is subject to the reserve\n  gate like every other, per the standing-rules ruling on NR-218.\n- **Cancel.** Score only when the contracted good has become cheaper than the contract by\n  more than the forfeited deposit. Deliberately conservative: cancellation moves\n  reputation, and a scorer that churns contracts makes the reputation axis meaningless.\n\n## Cap\n\nOne procurement command per evaluation, as `hire_unit` is capped. Contracts are durative\nand a rival that opens six in a tick has committed cash it cannot see."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-17",
+   "created": "2026-08-17",
+   "id": "BL-447",
+   "short_name": "SCORER_NEVER_DEMOLISHES_OR_ROADS",
+   "category": "AI",
+   "difficulty": 3,
+   "priority": "B",
+   "version_goal": "v0.1.16",
+   "requires": [],
+   "title": "Three verbs the docs say the scorer uses, it does not emit",
+   "files": [
+    "src/world/corp_ai.cpp",
+    "docs/ai/AI_OPPONENT.md",
+    ".claude/rules/io-standing-rules.md"
+   ],
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "summary": "Filed 2026-08-17 from the Sprint 22 audit. The standing rules describe rivals scoring \"build, demolish, survey and road decisions each tick\". The scorer emits build, survey, the four dials and place_sell_order. Demolish, place_road and remove_sell_order have no candidate site.",
+   "design": "## The discrepancy\n\n`.claude/rules/io-standing-rules.md` states the BL-202/BL-203 exception as *\"build,\ndemolish, survey and road decisions scored each tick\"*. Grepping `cmd.verb = corp_verb::`\nin `corp_ai.cpp` returns ten sites covering eight verbs: build (x3), resume, idle,\nset_workforce, set_recipe, survey, hire_unit, place_sell_order.\n\n**Demolish and place_road are described and absent.** This is the backlog-prose-goes-stale\npattern applied to a standing rule, which is worse, because the rule is read as an\ninvariant rather than as a plan.\n\n## Three separate calls, not one\n\n1. **`demolish`** — a real gap. A rival with a persistently loss-making asset can idle it\n   (and does) but never reclaims the tile. Idle is free and reversible, so the honest\n   trigger is not \"loss-making\" but \"the tile is worth more under a different building\n   than this one is worth idled\". That is a comparison against the build enumeration that\n   already runs, so the candidate is cheap to site and easy to get wrong.\n2. **`place_road`** — a real gap, and the one with a measurable payoff, since haulage is\n   now instrumented (`haulage_measure`). Score a tier against the freight it would\n   actually carry rather than against adjacency.\n3. **`remove_sell_order`** — a real gap and the smallest. BL-293 gave rivals order\n   placement and no withdrawal, so a floor priced for last quarter stands forever, and\n   `max_sell_orders_per_corp` becomes a ceiling a long game will reach.\n\n**`set_workforce_auto` is NOT in scope and is judged correctly absent.** It hands a dial\nto an auto-solver; a scorer that already sets the dial has no use for it. Recorded so the\nnext audit does not re-file it.\n\n## The doc half\n\nWhichever of the three land, the standing-rules sentence and AI_OPPONENT.md are corrected\nto the verbs actually emitted — and if one is deliberately not built, it is named as\ndeliberate rather than left reading as shipped."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-17",
+   "created": "2026-08-17",
+   "id": "BL-448",
+   "short_name": "CORP_STANCE_FRIEND_NEUTRAL_HOSTILE",
+   "category": "AI",
+   "difficulty": 4,
+   "priority": "A",
+   "version_goal": "v0.1.16",
+   "requires": [],
+   "title": "No corp may be at war with, or allied to, another",
+   "files": [
+    "src/world/stance.hpp",
+    "src/world/stance.cpp",
+    "src/world/corp_command.hpp",
+    "src/world/world.hpp",
+    "src/world/serialization.cpp"
+   ],
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "summary": "Filed 2026-08-17 on Ben's ruling the same date: hostility is a declared war state corps opt into deliberately, with a friend state alongside it - three modes (friend / neutral / hostile) as the substrate for naive diplomacy. Answers the risk Sprint 21 named and left unfiled.",
+   "design": "## Why now\n\nThe Sprint 21 proposal audit found that *\"the capability everyone assumes exists and does\nnot is a hostility model\"*, and flagged it as a design call filed as work nowhere. Ben\nsettled the design on 2026-08-17. This is that call, written as an item.\n\nWithout it there is no legal predicate on an attack verb, no engagement trigger condition,\nand no way for the scorer to price an engagement. It blocks BL-315 (armed house conflict\nspine) F2 entirely.\n\n## Naming — do not call it standing\n\n`src/world/standing.{hpp,cpp}` already exists and means something else: the BL-262 coarse\n**power** read (negligible / minor / notable / major / dominant) over reach, capital and\nmarket share. Overloading the word would make every future sentence about \"a corp\nstanding\" ambiguous between how strong it is and how it feels about you.\n\nProposed term: **stance**. `corp_stance { friendly, neutral, hostile }`, in\n`src/world/stance.{hpp,cpp}`. GLOSSARY.md gets both terms with the distinction stated.\n\n## The substrate that already exists\n\n`world::corp_reputation` is a `std::map<std::pair<entity_id, entity_id>, float>` — already\ndirected, already serialised, already sorted-key deterministic. A stance table is the same\nshape with an enum payload, so the data-model cost is near zero **if stance is directed**.\nSee the symmetry question below, which is exactly the question of whether it may be.\n\n`condition_set` and `rejected_embargo` also already exist: `request_quote` declines when a\nsupplier condition set evaluates false against the buyer. So there is already a\nrelationship-shaped gate in the economy, and stance should feed it rather than sit beside it.\n\n## THE OPEN QUESTION - symmetry. Ben call, not to be decided in implementation\n\nBen ruling says hostility is *opted into deliberately* and friendship sits *alongside* it.\nTwo readings, and they differ in the **data model**, not merely the logic:\n\n**Reading A — asymmetric hostility, mutual friendship.** War is done *to* you; friendship\nis agreed *with* you. `declare_hostile` takes effect unilaterally and immediately.\n`offer_friendship` creates a pending offer that `accept_friendship` converts. Storage is a\ndirected pair, matching `corp_reputation` exactly. Consequence: A may be hostile to B while\nB is neutral to A, so the world holds one-sided wars and every consumer must ask *\"is A\nhostile to B\"*, never *\"are A and B at war\"*.\n\n**Reading B — symmetric throughout.** Both modes are properties of the pair. Declaring\nhostility drags the target into it. Storage is a canonicalised pair (min id, max id). One\nrow per relationship, and no consumer can ask a one-sided question because none exists.\n\nA models the fiction better and doubles the state. B is simpler everywhere and cannot\nexpress an ambush. **Recommendation, stated as a recommendation:** A, because it matches\nthe verb Ben chose — \"declared\" and \"opt into\" are one-sided words — and because the\nreputation table proves the directed shape is already affordable. But it is his call and\nis not to be resolved by whoever implements first.\n\n## Scope\n\nWorld state, the three verbs (`declare_hostile`, `offer_friendship`, `accept_friendship`,\nplus a return-to-neutral), serialisation, and a determinism harness. **No consequence** —\nstance gates nothing in this item. What hostility permits is BL-315 (armed house conflict\nspine); what friendship permits is a later call. Landing the substrate inert is deliberate:\nit lets the model be argued about against a real save rather than against prose."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-17",
+   "created": "2026-08-17",
+   "id": "BL-449",
+   "short_name": "STANCE_NEEDS_A_SURFACE",
+   "category": "UI",
+   "difficulty": 3,
+   "priority": "A",
+   "version_goal": "v0.1.16",
+   "requires": [
+    "BL-448"
+   ],
+   "title": "A declared war a player cannot see or declare",
+   "files": [
+    "src/ui/corporation_panel.cpp",
+    "docs/ui/question_log.json",
+    "docs/ai/ACTIONS.json"
+   ],
+   "authority_doc": "docs/ui/SELECTION.md",
+   "summary": "Filed 2026-08-17. The companion surface to BL-448 (friend/neutral/hostile stance), filed separately so the model can land without the UI blocking it - and so the UI cannot be quietly dropped the way BL-350 procurement surface was.",
+   "design": "## Why a separate item\n\nBL-350 (procurement seam) landed a complete seam with no press, and nobody noticed for\nweeks. The lesson is that the surface half must be its own tracked item, not a task inside\nthe model item where it is the first thing cut under pressure.\n\n## Shape\n\nThe Corporation panel gains a stance column and the three presses, gated on visibility.\nA stance toward a corp the player has not discovered is not shown — the BL-068\ncompetitor-visibility rule applies, and *whether someone has declared war on you* is not\nobviously public information. **That is a second question for Ben** and is smaller than the\nsymmetry one: does a declaration announce itself, or is it discovered on contact? It rides\nnaturally on the comms dock if it announces.\n\nPresses issue `corp_command` records. Declaring hostility takes a confirm popup on the\ndemolish precedent — it is not literally irreversible, but under Reading A it is not\nunilaterally reversible either, which is close enough to warrant the friction.\n\n## Owed alongside\n\nA `question_log.json` entry, and `ACTIONS.json` entries for the new verbs — transcribed\nfrom the seam after it exists, never authored ahead of it (BL-270 discipline)."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-17",
+   "created": "2026-08-17",
+   "id": "BL-450",
+   "short_name": "RIVALS_CANNOT_REASON_ABOUT_STANCE",
+   "category": "AI",
+   "difficulty": 4,
+   "priority": "A",
+   "version_goal": "v0.1.16",
+   "requires": [
+    "BL-448"
+   ],
+   "title": "Rivals need to score a stance change as an ordinary candidate",
+   "files": [
+    "src/world/corp_ai.cpp",
+    "src/world/corp_ai.hpp",
+    "docs/ai/AI_OPPONENT.md"
+   ],
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "summary": "Filed 2026-08-17. The reasoning half of the friend/neutral/hostile model - rivals choosing stance on the existing deterministic scored-utility layer, with no new planner and no nation behaviour.",
+   "design": "## The constraint first\n\nThis is a widening of the BL-202/BL-203 exception in exactly the way BL-324 (rival hiring)\nwas: one more legal verb family on the same deterministic scored-utility layer. It is\n**not** a diplomacy planner, has no negotiation state machine, and adds no nation\nbehaviour — nation actors stay deferred, and stance is corp-to-corp only.\n\nEvery term below must be pure, seeded and replayable, computed from world state a rival\ncan legitimately see under BL-068.\n\n## The scoring terms\n\n**Toward hostile.** Score rises with contested overlap — shared bodies, shared market\nbodies, competition for the same scarce resource — and with the relative-strength read\n`compute_corp_standings` already produces. It falls with the target military capacity and\nwith the fraction of the scorer own income that flows through markets the target also\nsells into. A corp does not open a war it is losing, and does not burn a market it eats from.\n\n**Toward friendly.** Score rises with complementarity: the target sells what this corp\nbuys, and their build focuses do not collide. This is where BL-446 (scorer procurement)\ncomposes — a supplier you have completed contracts with is the natural friend, and\n`corp_reputation` is already the scalar that says so.\n\n**Toward neutral.** The de-escalation term, and the one most likely to be forgotten.\nWithout it stances ratchet and every long game ends with everyone hostile to everyone.\n\n## Hysteresis is required, not optional\n\nStance changes must carry a margin the way the workforce and recipe dials do. A stance\nthat flips on a marginal score is worse than no stance model, because it makes the\nDecision Feed unreadable and makes any downstream military trigger fire on noise. One\nstance command per corp per evaluation, and a cooldown before the same pair may move again.\n\n## Legibility\n\nNew `corp_decision_reason` values so the Decision Feed reads *why* a rival declared. This\nis the item main payoff under spectate: a spectated war whose cause is invisible is a\nfight, not a story."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-17",
+   "created": "2026-08-17",
+   "id": "BL-451",
+   "short_name": "SPECTATE_ASSERTS_FAMILIES_NOT_VERBS",
+   "category": "AI",
+   "difficulty": 2,
+   "priority": "B",
+   "version_goal": "v0.1.16",
+   "requires": [],
+   "title": "The spectator harness cannot see a verb the scorer never emits",
+   "files": [
+    "tools/verify/spectator_determinism.cpp"
+   ],
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "summary": "Filed 2026-08-17 from the Sprint 22 audit. spectator_determinism buckets the 15 verbs into four families (build / dial / survey / trade / other), so seven verbs no scorer emits are absorbed silently by families their siblings satisfy.",
+   "design": "## The blind spot\n\n`family_of()` maps `place_sell_order`, `remove_sell_order`, `request_quote`,\n`accept_quote` and `cancel_contract` all to `verb_family::trade`. A rollout in which\nrivals place sell orders and do nothing else satisfies the trade family completely, and\nthe four unemitted verbs beside it are invisible. The same absorption hides `demolish` and\n`place_road` inside `other`, which `hire_unit` satisfies on its own.\n\nSo the harness that exists to prove spectate exercises the seam proves it at a granularity\ntoo coarse to notice that seven of fifteen verbs never fire.\n\n## Shape\n\nKeep the family assertion — it is doing a different job (BL-409 R1, that no single corp\nneeds all four families over a short run). **Add** a per-verb histogram over the rollout,\nprinted always and asserted never. A printed count is the right instrument here: asserting\na floor per verb would fail legitimately whenever a verb is correctly rare, and a harness\nthat fails legitimately is a harness that gets muted.\n\nThe histogram is then the behavioural half of BL-444 (verb coverage tool) static read —\none says the path exists, the other says it was walked.\n\n## Cheap and independent\n\nOne file, no world change, no golden movement. It should run first in any reachability\nwork, because it is the measurement everything else is judged against."
   }
  ]
 }
