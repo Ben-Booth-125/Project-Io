@@ -734,17 +734,38 @@ struct corporation_component
     entity_id hq_building     = null_entity;
     float     influence_range = 0.0f;
 
-    /// Capability-point accumulators (BL-332). Stockpiled, market-invisible,
-    /// never decaying — closer to "research points" than a resource_type
-    /// good (no market slot, no price, not held in a (corp, body) pool).
-    /// military_points is produced passively by every completed military_base
-    /// the corp owns (Ben, 2026-08-08: "produced by bases"); science by every
-    /// completed research_institute. Symmetric across every corp — player,
-    /// rival, background — matching the same-clock extension BL-324 gave
-    /// hire_unit. No spend mechanism reads either yet: BL-087's constellation
-    /// (band progress) is the intended sink, not built by this item.
-    float military_points = 0.0f;
-    float science          = 0.0f;
+    /// Research accumulator (BL-332). Stockpiled, market-invisible, never
+    /// decaying — closer to "research points" than a resource_type good (no
+    /// market slot, no price, not held in a (corp, body) pool). Produced
+    /// passively by every completed research_institute the corp owns, symmetric
+    /// across player, rival and background alike.
+    ///
+    /// READ BY `condition_subject::science` (BL-455, 2026-08-17), so a tech gate
+    /// or a law can require a research level. It is REACHED, not SPENT: a
+    /// condition_set is a predicate over corp state and nothing in the gate
+    /// system debits anything. See condition_set.hpp for why spending would be a
+    /// different mechanism rather than a tuning choice.
+    ///
+    /// **`military_points` was REMOVED here on 2026-08-17 (BL-455, Ben's call on
+    /// NR-307).** It sat beside `science` and was credited per tick by every
+    /// completed military_base — and read by nothing at all: no gate, no
+    /// surface, no scorer, not the blackboard. Three sites in all of `src/`
+    /// (this declaration, the Lua param load, the write) and no fourth.
+    ///
+    /// It was deleted rather than wired because no consumer could be named for
+    /// it. The economy→military interface is already the base tile plus the
+    /// reach field (BL-325's ruling 3), and the recurring cost of force is
+    /// already credits and ordnance (BL-454's upkeep) — a third abstract
+    /// military currency beside those either duplicates them or gates something
+    /// nobody has specified. `science` survived the same test because its
+    /// consumer already existed and was merely unconnected.
+    ///
+    /// This is NR-257's orphan-resource rule applied to a component field:
+    /// a value earns its place by having a consumer, and the honest response to
+    /// "there is no consumer" is deletion, not a placeholder. If the
+    /// governing-body pivot (BL-094) later wants a military capacity scalar, it
+    /// is an append with its behaviour filed in the same change.
+    float science = 0.0f;
 
     /// BL-428 growth spine: every good this corporation has EVER produced, set the
     /// tick a building of its actually makes some (economy_system.cpp's

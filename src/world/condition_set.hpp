@@ -57,6 +57,23 @@ enum class condition_subject : uint8_t
     // --- the military instances (BL-094's test, applied at the foundation) --
     military_units,    ///< Total unit count the subject corp fields.
     military_strength, ///< Summed combat strength of the units the subject corp fields.
+
+    // --- research (BL-455, 2026-08-17) --------------------------------------
+    // corporation_component::science accumulates per tick from every completed
+    // research_institute (BL-332) and, until this value existed, was read by
+    // NOTHING — no gate, no surface, no scorer, not the blackboard. Three sites
+    // in all of src/: the declaration, the Lua param load, and the write.
+    //
+    // Appended last: condition_subject is a uint8_t inside a SERIALISED
+    // condition_set, so a value may be appended but never inserted.
+    //
+    // REACHED, NOT SPENT — and this matches BL-344 rather than inventing a
+    // second model. A tech_gate is a PREDICATE over corp state: it asks whether
+    // a condition holds, and holds again next tick. Nothing in the gate system
+    // debits anything. So science is a threshold a corp passes ("at_least N"),
+    // not a currency it pays down. Making it spendable would need an entirely
+    // different mechanism and would be a design change, not a wiring job.
+    science,           ///< The subject corp's accumulated research points.
 };
 
 /// How a measured value is compared against `condition::operand`.

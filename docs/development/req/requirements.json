@@ -4054,6 +4054,69 @@
      "result_metric": "NOT VERIFIED IN THIS SESSION and deliberately left pending rather than claimed. No Lua interpreter is available and the Lua-linked harnesses cannot be built (NR-313). Static checks only: brace balance clean on both files, both edits follow their neighbours' shape exactly, and resource_table_check.js confirms \"ordnance\" resolves in both name maps - which is the specific failure mode (Unknown resource) that crashed startup in 2026-08-12. Run chain_depth and any live-Lua harness on a machine with the deps before cutting."
     }
    ]
+  },
+  {
+   "brief": "military-points-deleted-science-wired",
+   "batch": "2026-08-17-sprint25a",
+   "title": "BL-455 - military_points is deleted and science is wired to the tech gate",
+   "status": "complete",
+   "promoted_from": "backlog.json BL-455 MILITARY_POINTS_AND_SCIENCE_ARE_WRITE_ONLY",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "ITEM-SPANNING (headless): neither accumulator is write-only any more. military_points does not exist; science is measurable by a predicate, so a tech gate or law can require a research level.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. military_capability_harness rebuilt: R4 asserts a gate at 5 research is met by the corp that earned 5 and NOT by a corp with none, and not met one step above what was earned. 8/8 PASS. condition_set_harness still 40 passed, 0 failed."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "military_points is removed at every site, not merely unread - field, Lua param, param struct member, the per-tick write, and every assertion about it.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. grep for military_points across src/, scripts/ and tools/ returns only explanatory comments recording the removal - zero live references. Sites removed: components.hpp field, economy_system.cpp write branch, recipe_registry.{hpp,cpp} param, economy.lua row, and six harness assertions."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "science is REACHED, not SPENT, matching BL-344's landed predicate model rather than inventing a second one.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET by reading BL-344 before choosing. tech_gate is a condition_set predicate over corp state and nothing in the gate system debits anything, so science became condition_subject::science (a threshold), not a currency. Recorded in the enum comment so the next reader does not re-open it."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "science compares as a continuous quantity, not rounded to a count - the classification switch is hand-maintained and a wrong entry is invisible from behaviour.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. R5 rows assert a gate at 4.5 passes for a corp holding 5.0, and that condition_subject_is_integral(science) is false."
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "requirement": "The world layer still compiles and the neighbouring harnesses are unaffected.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. 43 of 47 world TUs compile (4 need Lua - NR-313). condition_set_harness 40/40, military_capability_harness 8/8."
+    },
+    {
+     "id": "R6",
+     "status": "complete",
+     "requirement": "The serialisation seam survives the removed field.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET, VACUOUSLY, and checked rather than assumed. There is NO serialisation layer in the tree at all - no src/world/serialization.cpp exists (BL-107, save magic + version header, has not landed), and nothing writes corporation_component to disk. So removing a field from it cannot invalidate a save, because there are no saves. Worth re-reading when BL-107 lands: at that point this deletion WOULD have been a format break, and the same is true of BL-457 appending to resource_type."
+    }
+   ]
   }
  ]
 }

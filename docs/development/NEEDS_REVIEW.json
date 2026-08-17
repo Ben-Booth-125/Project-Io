@@ -1311,6 +1311,28 @@
       "what": "resource_table is a positional constexpr array declared [resource_count]. It carried 34 initialisers for 37 values, so clean_water, consumer_goods and medical_supplies (BL-368, landed 2026-08-11) were value-initialised to nulls and rendered as '(unnamed resource)' - a population centre's own demand basket, nameless, for six days. Adding ordnance at index 37 is impossible without filling 34-36, so BL-457 authored all four rows. Names, abbreviations and colours were chosen for the three habitability goods in the palette's existing idiom (cooler and paler than the industrial tier, matching the argument that priced them modestly).",
       "why_it_matters": "It is scope BL-457 did not ask for, landed on Ben's behalf, and it touches a UI file this session cannot photograph (NR-313) - so four new colour choices ship unseen. The defect itself is real but minor: presentation_of()'s fallback handled it without crashing, which is exactly why it survived. Worth noting the compiler is structurally unable to catch this - a short initialiser list for a sized array is legal C++ and silently zero-fills.",
       "next_step": "Two things. (1) Eyeball the four new resource rows on a stockpile strip when the app next runs - especially ordnance's oxblood against iron ore's vermillion rust, which are the closest pair. (2) tools/session/resource_table_check.js was added to detect this class of drift and PUSHING IT TO A SKILL NEEDS BEN'S PERMISSION (CLAUDE.md: tool creation is skill creation). It is currently a loose script, which the standing rule says is the forgotten kind. BL-414 still owns the real fix - consolidating the four transcriptions so the desync cannot be authored - and this guard should be deleted the day that lands."
+    },
+    {
+      "id": "NR-315",
+      "raised": "2026-08-17",
+      "kind": "decision-taken",
+      "status": "open",
+      "title": "BL-455 wired science as a condition SUBJECT, which is 'reached' not 'spent' - and that was read off BL-344, not chosen",
+      "source": "Sprint 25a, implementing BL-455 after Ben ruled delete military_points / wire science.",
+      "what": "The item's design flagged one thing to settle while wiring: whether a tech's cost is SPENT (a balance that decrements on unlock) or REACHED (a threshold the total must pass), and said to read BL-344's landed shape and match it rather than choosing freshly. Read: tech_gate is a condition_set PREDICATE over corp state, evaluated fresh each time, and nothing anywhere in the gate system debits anything. So science became condition_subject::science - a threshold, appended last to the serialised uint8_t enum - and is classified CONTINUOUS rather than integral, since a corp genuinely sits at 12.5 points.",
+      "why_it_matters": "It forecloses a design option quietly. A spend model is not reachable by extending this: it would need a debit mechanism, an unlock transaction, and a decision about what happens when two gates want the same points - none of which condition_set can express, because a predicate that changes the state it measures is not a predicate. If research is ever meant to be a CURRENCY rather than a LEVEL, that is a new mechanism and this wiring is the wrong foundation for it. Recorded so the choice is visible rather than inherited.",
+      "next_step": "No action needed if research is a level. If Ben wants research spent rather than reached, say so and it becomes its own item - the wiring here is ten lines and cheap to replace, but the mechanism around it is not."
+    },
+    {
+      "id": "NR-316",
+      "raised": "2026-08-17",
+      "kind": "observation",
+      "status": "open",
+      "title": "All three Sprint 25a worktree agents branched from the SESSION-START commit, not the current branch head - the v0.1.9 failure, repeated",
+      "source": "Sprint 25a fan-out; caught when the docs agent reported BL-454/455/459 missing from its backlog.json.",
+      "what": "Three sub-agents were launched with isolation: worktree AFTER three commits had landed on the working branch (the sprint rescope, the seven rulings, and BL-457 ordnance). All three worktrees were created at 7f0fac6 - the commit that was HEAD when the SESSION started - not at 44166a4, the branch head at launch time. The docs agent surfaced it by noticing its backlog.json still recorded BL-448's symmetry as an open question and had no BL-454/455/459 at all. The severe case was the upkeep agent: resource_type::ordnance did not exist in its tree, and its entire item is 'units draw ordnance', so it was one step from inventing a duplicate append to a serialised enum.",
+      "why_it_matters": "This is verbatim the v0.1.9 batch failure the Sprint 17 retro recorded - 'three of five agents branched from a base that had already moved, and worktrees isolate WRITES, not HISTORY' - and the mitigation recorded then (integration reads every hunk) is a cure, not a prevention. The prevention is to state the base explicitly at launch or to have agents merge the working branch as their first act. Neither happened here because the worktree base is chosen by the harness, not by the brief, and nothing in the launch surface reports which commit it picked. Two agents were mid-flight when it was caught; both were told to merge the working branch before continuing.",
+      "next_step": "Cheap standing habit worth adopting: make 'git merge <working-branch>' the FIRST instruction in every worktree agent brief, unconditionally, rather than assuming the worktree is current. Costs one command when it is a no-op. Worth considering as a line in DELIVERY.md's sub-agent section, since this is the second recorded instance of the same failure."
     }
   ]
 }

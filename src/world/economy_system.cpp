@@ -762,10 +762,10 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         if (b.recipe_switch_cooldown > 0)
             --b.recipe_switch_cooldown;
 
-    // BL-332 capability points: a flat per-tick credit to the owning corp's
-    // military_points / science for every COMPLETED military_base /
-    // research_institute it holds — passive, no workforce dependency (both
-    // types staff at zero), symmetric across every corp. Runs after
+    // BL-332 research points: a flat per-tick credit to the owning corp's
+    // science for every COMPLETED research_institute it holds — passive, no
+    // workforce dependency (the type staffs at zero), symmetric across every
+    // corp. Read by condition_subject::science (BL-455). Runs after
     // run_construction so a base finishing this tick already counts, mirroring
     // the rest of this function's build-then-produce ordering. Iterates each
     // corp's own `assets` vector (not w.buildings), so per-corp determinism
@@ -783,9 +783,11 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                 const building_component& b = bit->second;
                 if (b.ticks_remaining > 0 || b.decommissioned)
                     continue; // still under construction, or torn down
-                if (b.type == building_type::military_base)
-                    cc.military_points += mp.military_points_per_base_tick;
-                else if (b.type == building_type::research_institute)
+                // BL-455 (2026-08-17): the military_base branch that credited
+                // cc.military_points was removed with the field. It had no
+                // reader anywhere in src/ — see components.hpp for why deletion
+                // beat inventing a consumer.
+                if (b.type == building_type::research_institute)
                     cc.science += mp.science_per_research_institute_tick;
             }
         }
