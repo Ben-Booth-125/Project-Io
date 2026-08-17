@@ -645,6 +645,26 @@ target_link_libraries(tier_margin PRIVATE io_world_obj lua54)
 target_compile_features(tier_margin PRIVATE cxx_std_20)
 target_compile_options(tier_margin PRIVATE ${IO_WARNING_FLAGS})
 
+# haulage_measure (BL-442 step 2, 2026-08-17) — live-Lua for the same reason as
+# tier_margin: it measures the per-unit haulage the supply layer ACTUALLY charges
+# between adjacent markets, which is the authored logistics cost table times the
+# terrain-weighted A* cost in the real generated world. It exists so the widened
+# price ceiling is a derived number rather than a guess, and so it can be
+# re-derived later rather than trusted.
+add_executable(haulage_measure
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/haulage_measure.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
+)
+target_include_directories(haulage_measure PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(haulage_measure PRIVATE io_world_obj lua54)
+target_compile_features(haulage_measure PRIVATE cxx_std_20)
+target_compile_options(haulage_measure PRIVATE ${IO_WARNING_FLAGS})
+
 # font_glyph_harness (BL-234) is the one harness that links ImGui rather than
 # ${IO_WORLD_SOURCES}: the defect it guards is the ImFontConfig handed to
 # AddFontFromFileTTF, which lives in src/ui/fonts.cpp, not in world/*. It still
@@ -827,11 +847,25 @@ set(IO_TEST_BENCH_HARNESSES
 set(IO_TEST_SCRIPT_ROOTED_HARNESSES
     chain_depth
     era_roster
+    haulage_measure
     player_seed_sweep
     interbody_pull_harness
     pregame_balance_harness
     persona_counsel_harness
     recipe_switch_harness
+    # ADDED 2026-08-17 (BL-442 step 2). Both load scripts/*.lua by relative path
+    # and both say so in their own headers — price_band_harness's README entry
+    # reads "Run it from the repo root", tier_margin's CMake block says it loads
+    # scripts/world_gen.lua — but neither was ever listed here, so under ctest
+    # they ran from build/ and read build/scripts/, which the POST_BUILD copy only
+    # refreshes when the ProjectIo TARGET relinks. A Lua-only edit does not relink
+    # anything, so that copy goes stale silently and these two measured the OLD
+    # economy while the repo held the new one. That is how BL-442 step 2's ceiling
+    # change reached tier_margin standalone (net/tick -17.68) and NOT under ctest
+    # (-10.81, the pre-change number) in the same session. Exactly the vacuity trap
+    # the comment at the foreach below already warns about, found twice more.
+    price_band_harness
+    tier_margin
 )
 
 foreach(harness_src ${IO_VERIFY_HARNESSES})

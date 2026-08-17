@@ -37,6 +37,23 @@ in `tools/verify/README.md`.
   survives a loaded machine. Reading the sweep: the exponent sitting above 1.0 is
   `run_corp_strategic_step`'s O(corps × tiles) candidate scan (BL-253), not a
   regression.
+- **`haulage_measure`** — what it COSTS to serve a neighbouring market, and whether
+  anyone does (BL-442 step 2). The companion to `price_band_harness`: that one guards
+  that the band is read from one place, this one says what its **ceiling should be**.
+  Ben's requirement makes the ceiling derived — scarcity must clear `base + haulage`
+  for a nearby market — so this measures the per-unit haulage `dispatch_convoys`
+  actually debits (`logistics_cost(mode) × terrain-weighted A* cost` between market
+  centre tiles) over the real generated world, reports its distribution against the
+  authored `base_price` table, and prints the `ceil_mult > 1 + haul/base` that
+  follows. **Report-only by design**: its one assertion is a vacuity guard that it
+  measured a world with markets in it, because a pass/fail bar on a number the
+  harness exists to *discover* would be a guess wearing a test's clothes. Its second
+  section runs the real tick loop and counts convoys split into intra-body
+  market-to-market / inter-body space lane / BL-088 persistent `trade_routes` — the
+  check that a band change actually moved trade rather than only moving prices.
+  **Re-run it whenever the logistics cost table, the map scale, or `base_price`
+  changes**, and re-derive the ceiling in `scripts/economy.lua` from what it prints.
+  Live-Lua, hand-declared in `CMakeLists.txt`, runs from the repo root.
 - **`price_band_harness`** — the price band as data (BL-442 step 1). The band
   `[0.25×, 4×]` around `base_price` is read by **two** call sites — `resolve_price`
   (`market_clearing.cpp`, the real clearing clamp) and `wf_target_price`

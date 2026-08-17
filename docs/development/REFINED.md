@@ -1,5 +1,33 @@
 # Project Io — REFINED (active worklist)
 
+## Widen the price band (promoted from BL-442 step 2) — **5/5 DONE** (2026-08-17)
+
+Requirements: requirements.json § price-band-derived-ceiling (R1–R5)
+
+Step 1 made the band data (`economy.price_band`, read by `resolve_price` and `wf_target_price`
+through `recipe_registry::price_band()`) and deliberately left the values alone. Step 2 changes
+the values, and only the values — Ben's requirement makes the ceiling **derived**: scarcity must
+price high enough to cross the margin for a nearby market.
+
+- **[3] A — Measure the haulage first.** A ceiling picked before the number is known is a guess
+  wearing a derivation's clothes. New harness walks every market in the real generated world,
+  finds its nearest market neighbour by the terrain-weighted A* cost, and reports
+  `logistics_cost(mode) x path.cost` — exactly what `dispatch_convoys` charges. **DONE.**
+  Measured: median **0.70**, p90 **1.67**, max **4.83** credits per unit; cheapest priced good
+  **0.60**. Files: `tools/verify/haulage_measure.cpp`, `CMakeLists.txt`. Satisfies: R1.
+- **[1] B — Change the value, data only.** `ceil_mult` 4.0 → **10.0**, from
+  `1 + 4.83/0.60 = 9.06` rounded up. Floor left at 0.25 (NR-290). No C++ touched. **DONE.**
+  Files: `scripts/economy.lua`. Deps: A. Satisfies: R2.
+- **[3] C — Prove the outcome instead of assuming it.** Count convoys at both bands, split
+  intra-body market-to-market / inter-body / BL-088 trade routes. **DONE, and it contradicted the
+  premise** — intra-body inter-market trade was already happening at the old band, and the space
+  lane is zero at both because it is launchpad-gated, not price-gated (NR-289). Files:
+  `tools/verify/haulage_measure.cpp`. Deps: A. Satisfies: R3.
+- **[2] D — Run the full gate, report every number that moved, bless nothing.** **DONE.**
+  Deps: B. Satisfies: R4, R5.
+- **[1] E — Propagate the derivation to MARKETS.md** so the number can be re-derived rather than
+  trusted. **DONE.** Files: `docs/economy/MARKETS.md`. Deps: B.
+
 ## Unmet demand is never registered (promoted from BL-441) — **5/5 DONE** (2026-08-17)
 
 Requirements: requirements.json § demand-register-records-wants (R1–R5)

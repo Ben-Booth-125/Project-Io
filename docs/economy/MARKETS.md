@@ -417,12 +417,12 @@ AI's command are one implementation.
 ```
 target = base_price × √(demand / supply)     — damped elasticity
          base_price                           when neither side has a signal
-         base_price × 4.0                     demand with zero supply
+         base_price × ceil_mult               demand with zero supply
 price  = prior + 0.5 × (target − prior)       — EMA smoothing
 ```
 
-Target and result are clamped to the band **[0.25×, 4×] of base**. Prices are therefore
-*anchored*: no scarcity can push a good past 4× its authored base, and no glut below a quarter
+Target and result are clamped to the band **[0.25×, 10×] of base**. Prices are therefore
+*anchored*: no scarcity can push a good past 10× its authored base, and no glut below a quarter
 of it. Untradeable resources (`base_price ≤ 0`) keep their prior price.
 
 ### Where the band lives (BL-442, 2026-08-17)
@@ -446,11 +446,69 @@ is now the guard. Its rows are **differential** — each sets a non-default band
 site *moves* — because a guard that only exercised one site would have passed before the change
 and would pass again the day someone reintroduces a local copy.
 
-The move was deliberately **behaviour-identical**: the authored values are the constants they
+The move was deliberately **behaviour-identical**: the authored values were the constants they
 replaced, and the struct defaults reproduce them exactly so a harness that hand-builds a
-registry is unchanged. **Widening** the band is a separate, later call (BL-442 step 2), held
-until BL-441 makes the demand input non-zero — widening a band whose input signal is
-structurally zero amplifies nothing.
+registry is unchanged.
+
+### Where the ceiling comes from (BL-442 step 2, 2026-08-17)
+
+`ceil_mult` is **derived, not authored**. Ben's requirement (2026-08-17) is that scarcity must
+price high enough to **cross the margin for a nearby market**, so inter-market trading is a
+day-1 fact rather than a late-game unlock. That makes the ceiling a function of the haulage the
+supply layer already charges:
+
+```
+ceil_mult × base_price  >  base_price + haulage_per_unit
+ceil_mult               >  1 + haulage_per_unit / base_price
+```
+
+**The haulage is measured, not assumed.** `tools/verify/haulage_measure.cpp` walks every market
+in the real generated world, finds its nearest market neighbour by the terrain-weighted A* cost,
+and reports `logistics_cost(mode) × path.cost` — *exactly* the per-unit figure `dispatch_convoys`
+debits (`supply_system.cpp`). Over 5 seeds, 39 markets on 5 multi-market bodies:
+
+| Market → nearest market neighbour | credits per unit |
+|---|---|
+| p10 | 0.12 |
+| median | 0.70 |
+| p90 | 1.67 |
+| max | 4.83 |
+
+The denominator is the **cheapest good carrying a base price: 0.60**. The binding case is
+therefore the worst haul against the cheapest good:
+
+```
+ceil > 1 + 4.83 / 0.60 = 9.06   ->   10.0
+```
+
+**Why 4.0 was not enough.** It cleared the *median* neighbour pair (which needs 2.16) and only
+just cleared the p90 (3.79). The tail — the worst-connected market pair carrying the cheapest
+good — was permanently unservable at any scarcity. 10.0 covers **every** nearest-neighbour pair
+measured, for **every** priced good.
+
+**A second, independent reading agrees.** The requirement's other half is that a scarce cheap
+good must be able to outprice an abundant dear one. Read *within a tier* — which is the only
+coherent reading, since RESOURCES.md promises margin widens *between* tiers — the ordinary raw
+tier spans 0.60 to 6.00 (`rare_earth_ore`), demanding `ceil > 10`. The two derivations land on
+the same number, which is the reason to trust it. Read *across* tiers it would demand 233
+(0.60 against `spacecraft_components` at 140), which would delete the tier model; that reading
+was rejected and recorded (NR-291).
+
+**The floor is unchanged at 0.25×.** The requirement derives a ceiling and says nothing about a
+floor; lowering it would widen the arbitrage margin only by cutting what an abundant producer
+receives (NR-290).
+
+**Re-derive rather than trust.** Re-run `haulage_measure` whenever the logistics cost table
+(`logistics.base_cost_per_unit_distance`), the map scale (`body_km_per_tile`), or the
+`base_price` table changes — all three move the number this ceiling is computed from.
+
+**What the widening did NOT do.** It did not create inter-market trade. Measured at the *old*
+band, 1,677 of 2,146 dispatched convoys were already intra-body market-to-market hauls. What is
+zero — at both bands — is **inter-body** trade: 0 space-lane convoys and 0 persistent
+`trade_routes` across all five seeds, because that lane is refused by the launchpad and
+propellant gates in `dispatch_convoys` before any price is consulted. `trade_routes` is a
+body-level record, so BL-088's route store is structurally blind to the intra-body trade that
+*was* happening, which is very likely why it was believed to be absent (NR-289).
 
 ## Inter-body linkage
 

@@ -115,10 +115,19 @@ void run_lua_reaches_cpp()
         // `price_band` table from economy.lua, the defaults would still make an
         // equality-with-defaults check pass, and the authoring would have silently
         // stopped being the authority.
+        //
+        // UPDATED for BL-442 step 2 (2026-08-17): the ceiling moved 4.0 -> 10.0,
+        // DERIVED from measured inter-market haulage (tools/verify/haulage_measure.cpp;
+        // docs/economy/MARKETS.md § Where the ceiling comes from). This row is not
+        // a golden and updating it is not a blessing: it asserts what the shipped
+        // file SAYS, and the shipped file deliberately says something new. The row
+        // in fact got STRONGER — the struct default is still 4.0 (P1 asserts that,
+        // unchanged), so an authored 10.0 now separates "read from Lua" from "fell
+        // through to the defaults" on the ceiling as well as the floor.
         check(reg.price_band().floor_mult == 0.25f,
               "shipped economy.lua authors floor_mult 0.25");
-        check(reg.price_band().ceil_mult == 4.0f,
-              "shipped economy.lua authors ceil_mult 4.0");
+        check(reg.price_band().ceil_mult == 10.0f,
+              "shipped economy.lua authors ceil_mult 10.0 (BL-442 step 2, derived)");
     }
 
     {
