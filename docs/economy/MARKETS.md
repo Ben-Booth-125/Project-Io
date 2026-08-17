@@ -145,11 +145,13 @@ minable-but-unsellable asymmetry of the BL-040 raws are catalogued in
    `floor_price`. Multiple orders against one `(corp, body, resource)` share a **running
    remainder**: total listed quantity never exceeds the pool, each order's matched/auto-cleared
    quantity is tracked per order, and pool debits clamp at zero.
-6. **Auto-demand** — processor input shortfalls and construction material draws
-   (`report.purchases`) enter market demand. BL-130: this is billing, not a fresh grant — the
-   real transaction already happened, capped by real inventory, in the PRIOR phase of the same
-   tick (production and construction both run before `clear_markets`; see § Real market
-   inventory below). What lands here is exactly what was actually drawn.
+6. **Auto-demand** — two registers, read separately (BL-441; see § Want and fill below).
+   `report.wants` — what processors and construction sites set out to buy this tick, whether or
+   not they got it — enters **market demand**, and is the only thing that does.
+   `report.purchases` — what was actually drawn — enters the **billing** pass instead. BL-130:
+   that billing is not a fresh grant; the real transaction already happened, capped by real
+   inventory, in the PRIOR phase of the same tick (production and construction both run before
+   `clear_markets`; see § Real market inventory below).
 7. **Standing buy orders** — read from `world::buy_orders`, entered into demand and the
    explicit buy book (`max_price`, optional `preferred_seller`).
 8. **Reference prices** — computed once from the accumulated supply/demand (below), so every
@@ -213,6 +215,48 @@ individually on any surface that enumerates corporations.
 **BL-130 (real market inventory, below) is a hard prerequisite, not a neighbour.** Real background
 firms selling into a market that still conjured any buy-side shortfall would undercut the entire
 point of modelling real producers, which is why this item required BL-130 to land first.
+
+## Want and fill — the demand register records the bid (BL-441, 2026-08-17)
+
+**A want is a bid; a fill is a receipt.** This is the buy-side twin of the sell-side distinction
+BL-422 landed below: `supply` is an **offer** and `inventory` is a **delivery**. Demand needed the
+same split, and did not have it.
+
+`mc.demand` used to accrue from `report.purchases` — what a corp **actually bought**. But hunger is
+precisely the state in which no purchase completes, so the register was silent exactly when it
+mattered most. A processor that needed 16 units of an input and could draw only 2 told the market
+it wanted 2; one that could draw nothing told it nothing at all. The resource then read to
+`resolve_price` as one almost nobody wants, its price never rose, and scarcity was **invisible to
+the price signal**. `resolve_price` was never wrong about this — its own branch for zero supply
+against real demand takes the price to the top of the band — it was being starved of input.
+
+**Two registers, one of them priced.** `economy_report` now carries `wants` alongside `purchases`,
+both `std::map` keyed by `(corp, body)`:
+
+- **`wants`** — the full-run input need, computed **before** any coverage decision, so it is the
+  same number whether the draw then succeeds, runs short, or fails outright. Registered by
+  `run_processing` before its starved early return, and by `run_construction` **before** its
+  `rate <= 0` pause check, so a build stalled for want of steel finally says so. This is the sole
+  input to `mc.demand`.
+- **`purchases`** — what was actually delivered. Still feeds `auto_buys`, the VWAP accumulator, and
+  the expenditure a corp is charged. **Never pay against `wants`**: that would credit deliveries
+  nobody made, which is BL-422's defect pointed the other way.
+
+**The want is net of the corp's own pool** — the full-run need less what it already holds — because
+`mc.demand` is compared against `mc.supply`, an *offer to the market*, so demand must be the *bid to
+the market* for the ratio to mean anything. A corp feeding its smelter from its own mine is not
+bidding for the input and must not push its price. (Recorded as a delegated call: NR-281.)
+
+**Determinism.** Both registers are `std::map`, so accumulation runs over a **sorted** key set. This
+is the same seam where BL-422 found a latent `unordered_map` float-accumulation nondeterminism; the
+container choice here is that lesson, not an accident.
+
+**What it moved.** Scarce inputs stopped being free of price pressure, so they got dearer:
+measured over `tier_margin`'s 3-seed run, processing input cost rose 10.86 → 11.59/tick and
+processing net fell −9.52 → −10.42/tick, while extraction net eased 7.27 → 7.11. Several resources
+left the price floor for the first time (resource 1 at 0.95× base → 1.83×, resource 9 at 1.00× →
+1.28×). Refining paying worse than mining is BL-436's open calibration, not a regression this
+introduced — the failing assertion set is identical on both sides of the change.
 
 ## Real market inventory (BL-130, 2026-08-11)
 

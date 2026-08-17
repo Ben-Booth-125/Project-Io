@@ -664,7 +664,37 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // trades, auto-clear), so inventory gains exactly what pools lose. Keeping the
     // two in the same statement is the whole point: they cannot drift apart.
 
-    // Auto-demand: processor input shortfalls from the economy report.
+    // BL-441 — the demand register reads the WANT, and only the want.
+    //
+    // This line used to read `report.purchases`, the FILL, so a processor that
+    // needed 16 units of an input and could draw 2 told the market it wanted 2.
+    // The resource then read to resolve_price as one almost nobody wants, its
+    // price never rose, and scarcity was invisible — resolve_price was never
+    // broken, it was being starved of input. `report.wants` carries what each
+    // consumer set out to buy whether or not the draw succeeded, which is the
+    // number a price is supposed to answer. Nothing is PAID against this loop.
+    //
+    // std::map, so accumulation is over a sorted key set — the ordering BL-422's
+    // latent unordered_map float-accumulation nondeterminism was found in.
+    for (const auto& [key, wanted] : report.wants)
+    {
+        const entity_id corp = key.first;
+        const entity_id body = key.second;
+
+        const entity_id mid = market_for_corp_on_body(w, by_body, corp, body);
+        if (mid == null_entity)
+            continue;
+
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (wanted[r] > 0.0f)
+                w.markets.at(mid).demand[r] += wanted[r];
+    }
+
+    // The FILL, kept strictly separate: goods actually delivered to a consumer
+    // this tick. This is the money side — auto_buys feeds the VWAP accumulator
+    // and the expenditure a corp is actually charged — so it must go on reading
+    // `purchases`. Billing the want instead would pay for deliveries nobody made,
+    // which is BL-422's defect in the opposite direction. Also a std::map.
     for (const auto& [key, bought] : report.purchases)
     {
         const entity_id corp = key.first;
@@ -679,7 +709,6 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
             const float qty = bought[r];
             if (qty <= 0.0f)
                 continue;
-            w.markets.at(mid).demand[r] += qty;
             auto_buys.push_back({corp, mid, r, qty});
         }
     }

@@ -1,5 +1,53 @@
 # Project Io — REFINED (active worklist)
 
+## Unmet demand is never registered (promoted from BL-441) — **5/5 DONE** (2026-08-17)
+
+Requirements: requirements.json § demand-register-records-wants (R1–R5)
+
+`market_clearing.cpp` registers `demand[r] += bought[r]` — what a corp **actually bought**. A
+processor that needed 16 units of an input and could draw only 2 registers demand of 2, so the
+resource reads to `resolve_price` as one almost nobody wants and scarcity is invisible. The fix is
+to register the **want** alongside the **fill**: `run_processing` already computes the full-run need
+per input *before* deciding coverage, and that figure is the demand.
+
+The distinction is the one BL-422 landed for the sell side — SUPPLY is an offer, INVENTORY is a
+delivery. Demand needs the same split: what was **wanted** versus what was **bought**. Only the
+price-resolution input changes; the purchase record (`auto_buys`, the VWAP accumulator, the money
+actually paid) keeps reading the fill.
+
+- **[2] A — Guard first, run against the pre-change build.** Two assertions on observable market
+  state, so they compile and run *before* the fix and are seen to fail there: a starved processor
+  registers demand equal to its full-run NEED, not the quantity it drew; and a resource with real
+  demand and no supply resolves to the TOP of the price band, not to base. Files:
+  `tools/verify/order_book_harness.cpp`. Deps: foundation. Satisfies: R1, R2.
+- **[2] B — The want register.** A `wants` map on `economy_report`, keyed and containered exactly
+  as `purchases` (`std::map` over `(corp, body)` — a **sorted** key set; this is the seam where
+  BL-422 found a latent `unordered_map` float-accumulation nondeterminism). Files:
+  `src/world/economy_system.hpp`. Deps: foundation. Satisfies: R4.
+- **[3] C — Record the want at both consumer sites.** `run_processing`: the full-run need net of
+  the corp's own pool, recorded in the coverage loop so it survives the early return that a starved
+  building takes. `run_construction`: the full-rate material need, recorded **before** the
+  `rate <= 0` continue, so a paused build still says what it wanted. C is not optional scope — once
+  demand reads `wants`, a construction site with no want row would register zero demand where it
+  previously registered its draw. Files: `src/world/economy_system.cpp`. Deps: B. Satisfies: R1, R3.
+- **[2] D — Split the read in the clearing pass.** `mc.demand` reads `report.wants`; `auto_buys`,
+  the VWAP accumulator and the money paid keep reading `report.purchases`. Both loops iterate a
+  `std::map`. Each site states in a comment which of the two it wants. Files:
+  `src/world/market_clearing.cpp`. Deps: B, C. Satisfies: R3, R4.
+- **[2] E — Measure the economy, report it, bless nothing.** Run `tier_margin` and the determinism
+  reads; report every number that moved. Propagate the settled design into `docs/economy/MARKETS.md`
+  as part of landing. Files: `docs/economy/MARKETS.md`. Deps: D. Satisfies: R5. **DONE.**
+
+**All five tasks complete.** The guard was run against the pre-change build first and failed there
+on all three new assertions — `demand=0.000 price=5.000` starved, `fill=2 demand=2` partial.
+`tier_margin` was measured on **both** sides from the same worktree: processing input cost
+10.86 → 11.59, processing net −9.52 → −10.42, extraction net 7.27 → 7.11, and several resources left
+the price floor for the first time. The failing assertion set is **identical** on both sides — three
+pre-existing failures, none new, none masked. **Nothing was blessed**; that stays Ben's call
+(NR-269). Two delegated calls are logged: NR-281 (the want is net of the corp's own pool) and
+NR-282 (`run_construction` was pulled into scope, because leaving it out would have zeroed
+construction's market demand).
+
 ## Mines only target the richest (promoted from BL-440) — **2/4, C SUPERSEDED BY BL-441/442** (2026-08-17)
 
 Requirements: none written yet — the item is mid-flight and (c) is a design call, not an
