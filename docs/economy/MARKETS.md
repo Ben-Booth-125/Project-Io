@@ -51,23 +51,56 @@ history. A resource untradeable at home (`base_price` 0) stays untradeable at th
 **What clears there.** An outpost has real supply (whatever it produces) and essentially no local
 demand, so clearing only against local population would collapse its prices to the floor the
 instant it started producing — the failure mode BL-263's design flagged as most likely to read as
-broken. Instead, `inject_interbody_demand` pulls a distance-discounted slice of the **home body's
-own unmet demand** (its `demand - supply`, when positive) onto every outpost market's demand each
-tick, additive alongside `inject_population_demand` — "nobody builds a mine on a moon to sell to
-the moon." This is deliberately simpler than modelling every possible source/destination pair: the
-home body is the one market every outpost is presumed to ultimately feed, directly or through
-`dispatch_convoys`' own existing physical routing (which independently moves the corp's stockpiled
-surplus between bodies — this mechanism only shapes the outpost's local *price*, it moves no
-goods itself).
+broken. Instead, `inject_interbody_demand` pulls a distance-discounted slice of a **home-body
+counterparty's unmet demand** onto every outpost market's demand each tick, additive after
+`inject_population_demand` and `inject_background_demand` — "nobody builds a mine on a moon to
+sell to the moon." This only shapes the outpost's local *price*; it moves no goods. Physical
+movement is `dispatch_convoys`' independent job.
 
-> **The pull is live, and it pulls against *gross* demand (BL-404, found 2026-08-13).** The
-> code reads `demand − supply`, which states the intent — an outpost should be pulled by what
-> the home body *cannot* meet itself. But `clear_markets` zeroes every market's supply before
-> this injection runs, and the supply writes land after it, so `home.supply` is identically zero
-> at the read. The subtraction is a no-op: the shortfall is home gross demand, the gate opens for
-> every resource carrying any demand, and each outpost market receives `pull_fraction` of
-> Kepler's gross demand every tick, distance-discounted. BL-404 owns the fix; the wrong number
-> here is a live input to every outpost price, not a dormant branch.
+**Whose demand — the counterpart market.** Per resource, the outpost reads its **counterpart**:
+the home-body market carrying the **greatest demand for that resource**, with the lowest market id
+breaking ties. Not an aggregate over the body, and emphatically not "the home market" — the home
+body carries nine carved markets on seed 0 (BL-096), and *no single one of them stands for the
+body*.
+
+That is the correction BL-406 made, and it is worth stating what it replaced. The pull used to
+read `market_for_body(w, w.home_body)` — the **lowest-id** market on the body — and treat its
+demand as the body's. Measured, that market held **5% of the body's demand**; and because
+`world::markets` is unordered, a g++ build of the same seed selected a *different* market
+entirely. Same-seed reproducibility within a binary always held, so this was never a determinism
+violation — it was a price input decided by an implementation accident. The counterpart rule is a
+total order (strictly-greater demand, then smaller id), so every standard library names the same
+market. `interbody_pull_harness` asserts that by re-deriving the relation over a reversed
+traversal.
+
+Under today's model every home-body market sits at the same distance from a given outpost, so the
+relation is **many-to-one keyed on the resource**; the outpost dimension is carried entirely by the
+distance falloff. Per-(outpost, resource) counterparts would only start to mean something if
+markets acquired a per-market haul cost.
+
+**Against what — the netting.** `shortfall = counterpart.demand − counterpart.supply_last_tick`,
+and a non-positive shortfall pulls nothing: a counterparty already meeting its own appetite does
+not reach out for an outpost's goods. The subtrahend is the **previous tick's end-of-tick supply**,
+captured by `snapshot_market_supply` before the reset in step 1 below.
+
+The one-tick lag is deliberate (BL-404). Reading supply live is what made this a no-op for as long
+as it existed: the reset zeroes every market's supply immediately before this injection and the
+supply writes land after it, so the subtrahend was identically zero and every outpost was pulled by
+**gross** home demand. The alternative — moving the injection after the supply writes — was
+rejected because those writes are themselves demand-sensitive (auto-surplus yields to standing
+orders), which would make a pass whose ordering is already load-bearing into a two-pass dependency.
+The snapshot is local to `clear_markets`; nothing is persisted and the save format is untouched.
+
+**Ordering is now a requirement, not a convenience.** The injection must run *after* the population
+and background demand injections, because the counterpart is chosen by this tick's demand and those
+two are what deposit it.
+
+> **Magnitude moved, and was not re-tuned (2026-08-17).** Ben's ruling cleared outpost prices to
+> move. Measured on seed 0: two of three pulled resources now pull at **2.8×** their previous size
+> (the counterpart wants far more than the lowest-id market did) and one is **silenced outright**
+> by the now-real netting — its counterpart holds 260.7 supply against 5.5 demand.
+> `pull_fraction` is still its authored 0.50, a number chosen against a source that no longer
+> exists; re-tuning it is folded into BL-440's repricing pass (NR-274).
 
 ## What trades
 
@@ -82,7 +115,9 @@ minable-but-unsellable asymmetry of the BL-040 raws are catalogued in
 `clear_markets` runs once per economy tick, after production (`run_economy_step`). In order:
 
 1. **Reset** — every market's `supply` and `demand` arrays zero. There is no stored inventory;
-   both are per-tick flows.
+   both are per-tick flows. A snapshot of every market's supply is taken *immediately before* the
+   zeroing (`snapshot_market_supply`), because the inter-body pull needs a supply that this pass
+   has not yet computed — see § Spontaneous market emergence.
 2. **Background-firm production** (BL-365, 2026-08-11) — real corporations
    (`corporation_component.is_background = true`), generated at world-gen and running the same
    corp_ai scored-utility layer as rivals, produce, sell, and buy through the ORDINARY steps of

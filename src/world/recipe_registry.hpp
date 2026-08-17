@@ -183,9 +183,9 @@ struct growth_params
 /// under `economy.market_emergence`. Two independent uses, both keyed off distance
 /// from the home body (world::home_body), the only body with a market at world
 /// generation: seeding a newly-spawned outpost market's opening prices
-/// (maybe_spawn_market), and pulling a discounted slice of the home body's own
-/// unmet demand onto every outpost market each tick so an outpost with supply and
-/// no local population does not collapse to the price floor
+/// (maybe_spawn_market), and pulling a discounted slice of a home-body
+/// COUNTERPARTY's unmet demand onto every outpost market each tick so an outpost
+/// with supply and no local population does not collapse to the price floor
 /// (inject_interbody_demand). See docs/economy/MARKETS.md § Spontaneous market
 /// emergence.
 struct market_emergence_params
@@ -196,11 +196,17 @@ struct market_emergence_params
     /// mirroring BL-191's endemic-good distance pricing but keyed to a real
     /// per-resource base price rather than a flat source price.
     float price_distance_gain = 0.08f;
-    /// Fraction of the home body's own unmet demand (demand - supply, when
-    /// positive) pulled onto each outpost market per tick, before the distance
-    /// falloff below.
+    /// Fraction of the counterpart home-body market's unmet demand (its demand
+    /// less its PREVIOUS tick's supply, when positive) pulled onto each outpost
+    /// market per tick, before the distance falloff below. The counterpart is
+    /// chosen per resource — the home-body market wanting that resource most
+    /// (BL-406); it is not "the home market" and not a body-level aggregate.
+    ///
+    /// NOT re-tuned when BL-406/BL-404 landed (2026-08-17), though the ruling
+    /// cleared it to be: on seed 0 the corrected pull is 2.8x its old size where
+    /// it fires at all. Folded into BL-440's repricing pass — NR-274.
     float pull_fraction = 0.50f;
-    /// Falloff denominator per AU: pulled_demand = home_shortfall * pull_fraction
+    /// Falloff denominator per AU: pulled_demand = shortfall * pull_fraction
     /// / (1 + distance_falloff * distance_au). Further outposts feel less of the
     /// home body's pull — plausible if a haul is expensive, and it keeps a distant
     /// outpost's price from being yanked to Kepler's exactly.
