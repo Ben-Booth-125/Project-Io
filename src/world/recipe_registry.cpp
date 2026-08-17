@@ -233,6 +233,17 @@ void recipe_registry::load_from_lua(lua_state& lua)
         m_background_demand = bd;
     }
 
+    // BL-442 price band (economy.price_band) — authored once here, read by BOTH
+    // resolve_price (market_clearing.cpp) and wf_target_price (economy_system.cpp).
+    sol::optional<sol::table> price_band = (*econ)["price_band"];
+    if (price_band)
+    {
+        price_band_params pb;
+        pb.floor_mult = price_band->get_or("floor_mult", pb.floor_mult);
+        pb.ceil_mult  = price_band->get_or("ceil_mult",  pb.ceil_mult);
+        m_price_band = pb;
+    }
+
     // BL-263 spontaneous-market-emergence tunables (economy.market_emergence).
     sol::optional<sol::table> market_emergence = (*econ)["market_emergence"];
     if (market_emergence)

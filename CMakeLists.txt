@@ -667,6 +667,23 @@ target_link_libraries(font_glyph_harness PRIVATE imgui)
 target_compile_features(font_glyph_harness PRIVATE cxx_std_20)
 target_compile_options(font_glyph_harness PRIVATE ${IO_WARNING_FLAGS})
 
+# price_band_harness (BL-442) is live-Lua for one row only, P2: it asserts that
+# the band the SHIPPED scripts/economy.lua authors is the band that reaches
+# recipe_registry, which a hand-built fixture cannot answer without becoming the
+# thing under test. Its remaining rows are hand-built fixtures.
+add_executable(price_band_harness
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/price_band_harness.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(price_band_harness PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(price_band_harness PRIVATE io_world_obj lua54)
+target_compile_features(price_band_harness PRIVATE cxx_std_20)
+target_compile_options(price_band_harness PRIVATE ${IO_WARNING_FLAGS})
+
 file(GLOB IO_VERIFY_HARNESSES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/*.cpp")
 
 # ---------------------------------------------------------------------------

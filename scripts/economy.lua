@@ -331,6 +331,24 @@ economy = {
         demand_scale      = 1.00,
     },
 
+    -- BL-442 (2026-08-17): THE price band. A market price is anchored to its
+    -- rarity-derived base_price and pushed by the tick's supply/demand ratio
+    -- (damped sqrt elasticity), then clamped to this band and eased toward it by
+    -- an EMA. Read by resolve_price (market_clearing.cpp) AND by the BL-181
+    -- workforce auto-solver's forward price estimate (wf_target_price,
+    -- economy_system.cpp) — until BL-442 those were two hand-synchronised
+    -- constexpr copies of the same two numbers.
+    --
+    -- The values below are UNCHANGED from the constants they replace: this move
+    -- is behaviour-identical by construction, so any golden that shifts is a bug,
+    -- not a re-tune. Widening the band is a separate, later call (BL-442 step 2),
+    -- deliberately held until BL-441 makes the demand input non-zero — widening a
+    -- band whose input signal is structurally zero amplifies nothing.
+    price_band = {
+        floor_mult = 0.25, -- lowest a price may fall, x base_price
+        ceil_mult  = 4.0,  -- highest a price may rise, x base_price
+    },
+
     -- BL-263 (2026-08-11): spontaneous market emergence — a market appears the
     -- tick the first building completes on a body that has none, seeded from the
     -- home body's own prices/demand rather than from nothing. See

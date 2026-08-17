@@ -21,6 +21,12 @@ cmake --build build --target <harness_name>
 .\build\<harness_name>.exe
 ```
 
+`price_band_harness` (BL-442) is CMake-only for a second reason: it is a **live-Lua** harness
+(it links `recipe_registry.cpp` + `lua_state.cpp` + `lua54` on top of `io_world_obj`, and is
+hand-declared in `CMakeLists.txt`), because its P2 row asks what the shipped
+`scripts/economy.lua` actually delivers. Run it from the repo root — P2 writes a probe script
+to `build_gen/verify/`, and the Lua loads are relative paths.
+
 Use that route for anything linking the world superset — `world_audit`, `ai_skill_harness`,
 `history_ladder_harness`, **`settlement_harness`**, `data_creep_harness`, `corp_terrain_matrix`,
 `trade_routes_harness` — and for `font_glyph_harness`, which links ImGui and is hand-declared in
