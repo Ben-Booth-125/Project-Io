@@ -272,6 +272,19 @@ in `tools/verify/README.md`.
   seeds, **11 playable, 13 pure-extraction**, and **solvency was not the discriminator at all** —
   every seed ended positive (1.3k–55k cr) and not one dipped. Reach for it whenever a change could
   plausibly move what the opening position looks like.
+
+  **`--guard [seed_count]` is the one ASSERTING mode** (BL-435 task E, 2026-08-16), and the split
+  from the reporting default is deliberate: the sweep answers an arguable design question, the
+  guard asserts the four properties the starting-corp selection screen needs to hold in *every*
+  world, exiting non-zero when one breaks. **G1** every seed offers a choice (≥ 2 specialists);
+  **G2** the specialist/background split holds (≤ 12 specialists, none mis-flagged `is_background`);
+  **G3** no specialist that cannot produce at all (neither extraction nor processing — Ben's
+  dead-start call); **G4** every seed has ≥ 1 specialist with a processor and mean coverage stays
+  above the 4.00/8 floor (pre-BL-435 was 2.96/8; measured 6.92/8 over 24 seeds on 2026-08-16).
+  Registered as its own ctest, `player_seed_sweep_guard`, at 12 seeds. **G4 is depth, never
+  wealth** — BL-436 measured a processing facility as currently earning *less* per tick than the
+  extraction site it replaces, so this floor must never be re-read as a profitability gate.
+  `player_seed_sweep.exe --guard 24`, or `--roster <seed>` for every corp's opening on one seed.
 - **`era_roster`** — The era gate over the authored economy data (BL-433). The **fourth live-Lua
   harness**: it asks what the *authored* `era` tags do, so it loads the real `scripts/economy.lua`
   + `recipes.lua` rather than hand-building a registry — a hand-built fixture could only confirm

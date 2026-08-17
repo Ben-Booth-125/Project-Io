@@ -753,6 +753,15 @@ void app::build_corp_choices()
 
     for (const auto& [id, cc] : m_world.corporations)
     {
+        // The pool is the SPECIALIST set (R2). In the real flow this filter never
+        // fires — the stage opens in the one frame before generate_background_firms
+        // runs, so nothing here is a background firm yet. It is stated anyway
+        // because the pool being specialists-only is currently a property of WHEN
+        // this is called, and a positional guarantee is one refactor from silently
+        // becoming false. It is also what lets verify.show_corp_choice render the
+        // real pool from an already-started world.
+        if (cc.is_background)
+            continue;
         corp_choice ch;
         ch.id   = id;
         ch.name = cc.name;
@@ -844,10 +853,13 @@ void app::draw_corp_choice_screen()
                           ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerH |
                           ImGuiTableFlags_SizingStretchProp))
     {
-        ImGui::TableSetupColumn("Corporation", ImGuiTableColumnFlags_WidthStretch, 0.42f);
-        ImGui::TableSetupColumn("Focus",       ImGuiTableColumnFlags_WidthStretch, 0.16f);
-        ImGui::TableSetupColumn("Nation",      ImGuiTableColumnFlags_WidthStretch, 0.24f);
-        ImGui::TableSetupColumn("Holdings",    ImGuiTableColumnFlags_WidthStretch, 0.18f);
+        // Holdings carries the widest cell — "2 proc / 0 extr / 1 other" — and the
+        // first capture (2026-08-16) caught it clipped to "/ 1 otl" against the
+        // Choose column. Weights rebalanced off that measurement, not by eye.
+        ImGui::TableSetupColumn("Corporation", ImGuiTableColumnFlags_WidthStretch, 0.36f);
+        ImGui::TableSetupColumn("Focus",       ImGuiTableColumnFlags_WidthStretch, 0.14f);
+        ImGui::TableSetupColumn("Nation",      ImGuiTableColumnFlags_WidthStretch, 0.22f);
+        ImGui::TableSetupColumn("Holdings",    ImGuiTableColumnFlags_WidthStretch, 0.28f);
         ImGui::TableSetupColumn("",            ImGuiTableColumnFlags_WidthFixed,   72.0f);
         ImGui::TableHeadersRow();
 

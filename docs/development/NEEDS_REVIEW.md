@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*37 entries — 30 open, 7 resolved.*
+*40 entries — 33 open, 7 resolved.*
 
 ---
 
@@ -407,6 +407,35 @@ The cause is siting, not price and not upkeep: an extraction site targets riches
 Once coal is actually mined, re-run tier_margin and re-derive the price options in NR-271 (a/b/c) from the new numbers. The 1.72x revenue figure was measured on a starved chain and will move.
 
 *Files: `src/world/corporation_generation.cpp`, `src/world/corporation_generation.hpp`, `src/core/app.cpp`, `tools/verify/tier_margin.cpp`, `tools/verify/ai_skill_harness.cpp`*
+
+### NR-273 — The starting-corp pool was specialists-only by TIMING alone - now stated explicitly, and asserted
+*decision taken on your behalf · raised 2026-08-17 · from BL-435 task E (the guard), while making the screen reachable to --verify.*
+
+build_corp_choices was correct only because of WHEN it runs: the stage opens in the one frame before generate_background_firms, so m_world.corporations still held exactly the 8 specialists. That is a positional guarantee, one refactor away from silently becoming false - and it also blocked any verify hook, since a re-entered screen on a started world would have listed all 25-37 corps. Decision taken: skip is_background explicitly in build_corp_choices (a no-op on the live path, load-bearing everywhere else), and assert the split per seed in player_seed_sweep --guard G2 rather than trusting the ordering.
+
+**Why it matters.** The pool being the specialist set is Ben’s own 2026-08-16 call and requirement R2. It was being upheld by an ordering nobody would notice breaking.
+
+*Files: `src/core/app.cpp`, `tools/verify/player_seed_sweep.cpp`*
+
+### NR-274 — Specialist processor coverage is now 6.92/8, not the 5.83/8 task B measured - something moved it further
+*observation · raised 2026-08-17 · from player_seed_sweep --guard 24, run on resuming BL-435 at task E.*
+
+BL-435 task B recorded specialists-with-a-processor at 2.96/8 before and 5.83/8 after its focus_asset_pattern fix. The same population measured today reads 6.92/8 over the same 24 seeds (166 of 192), with 0 seeds having none. Nothing in tasks E-F touches generation, so the extra ~1.1 came from work landed between - most plausibly BL-436's option-B extraction change or the dead-start trade holdings_range fix (2->3 draws reach the trade pattern's processing slot). Not investigated further: the guard's floor is 4.00/8 and the direction is the intended one.
+
+**Why it matters.** The number quoted in BL-435’s own progress note is now stale, and coverage drifting upward without an item claiming it means the openings are being reshaped by side effects. Worth knowing which change owns it before anyone tunes against 5.83.
+
+*Files: `tools/verify/player_seed_sweep.cpp`, `src/world/corporation_generation.cpp`*
+
+### NR-275 — The corp-choice screen shipped with a clipped cell - caught by its first capture, which is the argument for capturing before blessing
+*observation · raised 2026-08-17 · from BL-435 task E, scripts/verify/corp_choice.lua first successful run.*
+
+The Holdings column rendered '2 proc / 0 extr / 1 other' clipped to '/ 1 otl' behind the Choose button - the table's column weights (0.42/0.16/0.24/0.18) gave the widest cell the narrowest stretch. Rebalanced to 0.36/0.14/0.22/0.28 off the measurement and re-captured clean. Also worth recording: the FIRST capture came back as a blank clear-colour frame, because the window is AlwaysAutoResize and ImGui sizes from the previous frame; the script now takes a warm-up capture as main_menu.lua does.
+
+**Why it matters.** The screen was built and committed on 2026-08-16 without ever being photographed, and it carried a visible defect. Both failure modes here are cheap to hit again: a surface no automated path can reach, and a first-frame capture that looks like a working check but shows nothing.
+
+> **Recommendation:** EYEBALL OWED, and no golden until then. screenshots/corp_choice.png is committed-capture-only on purpose: blessing a golden now would pin a layout Ben has never seen. --autostart-play will NOT show the screen (it auto-picks Surprise me), so seeing it live means starting a game from the menu. Once he has looked, bless corp_choice as a golden - the check is already written and stable.
+
+*Files: `src/core/app.cpp`, `scripts/verify/corp_choice.lua`*
 
 ---
 

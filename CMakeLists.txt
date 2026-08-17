@@ -819,3 +819,20 @@ foreach(harness_src ${IO_VERIFY_HARNESSES})
             WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
     endif()
 endforeach()
+
+# BL-435 task E — the same exe, its ASSERTING mode, as its own test. The default
+# player_seed_sweep run reports a design question and exits 0 whatever it finds;
+# `--guard` asserts the four properties the starting-corp selection screen needs
+# to hold in EVERY world (a choice exists, the specialist/background split holds,
+# no specialist that cannot produce, processor coverage above the pre-BL-435
+# floor) and exits non-zero when one breaks. Registering it separately is what
+# makes it a gate rather than a thing someone remembers to run.
+#
+# 12 seeds, not the sweep's 24: each seed is a full world generation, and the
+# properties are per-seed invariants rather than a distribution needing a large
+# sample. Script-rooted for the same reason the sweep is — it loads the real
+# recipes.lua/economy.lua and would otherwise measure an empty registry.
+add_test(NAME player_seed_sweep_guard COMMAND player_seed_sweep --guard 12)
+set_tests_properties(player_seed_sweep_guard PROPERTIES
+    TIMEOUT ${IO_TEST_TIMEOUT_LONG}
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
