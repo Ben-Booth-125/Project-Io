@@ -423,6 +423,35 @@ recipes = {
         inputs       = { regolith = 12.0 },
         outputs      = { steel = 1.0 },
     },
+
+    -- id 27 — Fabricator: steel + machinery -> ordnance (BL-457). The MILITARY
+    -- terminal good, and the roster's first one: until this recipe the chain
+    -- terminated only in spacecraft_components, so the "trade coloured by
+    -- military use" half of the 2026-08-10 refocus had no object to trade.
+    --
+    -- Sits at the same depth as alloys (id 11) and electronics (id 12) — one
+    -- step below the Assembly Plant — deliberately, so BL-428's chain-depth gate
+    -- treats it as a real growth-track object rather than something a starting
+    -- corp can make on tick one. It draws machinery, which gives that good a
+    -- second consumer beside id 24's heavy spacecraft route.
+    --
+    -- PRICE IS DERIVED, NOT PICKED. The processing roster prices an output at a
+    -- strikingly tight markup over its input basket: machinery 1.419, alloys
+    -- 1.417, electronics 1.415, spacecraft_components 1.443. Inputs here cost
+    -- steel 8.0 + machinery 22.0 = 30.0, so base_price 43.0 (world_gen.lua) is
+    -- a ratio of 1.433 — inside the observed band rather than beside it. Change
+    -- either input quantity and re-derive rather than leaving the price to drift.
+    --
+    -- NO ANCIENT ROUTE HERE. An iron_blooms + charcoal path is a real idea and
+    -- belongs with BL-429's ancient roster, not smuggled in beside an
+    -- industrial-era recipe.
+    {
+        name    = "ordnance",
+        era     = "industrial", -- BL-433
+        group   = "Advanced Fabrication", -- BL-434, with machinery and alloys
+        inputs  = { steel = 1.0, machinery = 1.0 },
+        outputs = { ordnance = 1.0 },
+    },
 }
 
 print(string.format("[Lua] recipes.lua loaded  recipe_count=%d", #recipes))

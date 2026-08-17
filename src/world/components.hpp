@@ -119,7 +119,30 @@ enum class resource_type : uint8_t
     clean_water            = 34, ///< Water Treatment Plant, from water. Reduces habitability if undersupplied.
     consumer_goods         = 35, ///< Consumer Goods Factory, from food_rations + steel. Reduces workforce efficiency if undersupplied.
     medical_supplies       = 36, ///< Pharmaceutical Lab, from water + agricultural_produce. Reduces habitability if undersupplied.
-    count                  = 37
+    // --- The military terminal good (BL-457, 2026-08-17) ---
+    //
+    // The 2026-08-10 refocus (NR-120) put the player as a militia whose trade is
+    // "coloured directly with military use, and space equipment". The space half
+    // landed with BL-340 — the chain terminates in spacecraft_components, which
+    // BL-350's procurement contracts buy. The military half had NO OBJECT AT ALL
+    // until this value: no ordnance, no munitions, no small arms anywhere in the
+    // roster. It went unnoticed because nothing consumed one.
+    //
+    // Admission rule (PRODUCTION.md / BL-340) satisfied on both ends, which is
+    // what makes it admissible now and not before: PRODUCED by an authored
+    // Fabricator recipe (steel + machinery, recipes.lua), and CONSUMED by
+    // BL-454's per-tick unit upkeep draw — a named actor, carried in
+    // chain_depth's R1 exemption table beside propellant and the habitability
+    // goods rather than assumed.
+    //
+    // ONE value, not the three Ben's words named ("supplies, rations, weapons"):
+    // food_rations already covers rations and is already produced, and a
+    // "supplies" value with no distinct consumer is exactly the
+    // produced-by-nothing shape NR-257 deleted five of. A distinct field ration
+    // or medical draw later is an APPEND with its behaviour filed in the same
+    // change — never a re-insertion here, which would repoint every id after it.
+    ordnance               = 37, ///< Fabricator, from steel + machinery. Terminal military good; drawn per-tick by unit upkeep (BL-454).
+    count                  = 38
 };
 
 static constexpr std::size_t resource_count = static_cast<std::size_t>(resource_type::count);

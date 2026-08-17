@@ -1289,6 +1289,28 @@
       "why_it_matters": "It changes what 'run Sprint 25 next' means, and it should not be discovered at promotion time. 25a is a full sprint on its own and lands the substrate 25b needs; 25b is one item that cannot start until two other proposals have landed. The honest sequence is now 21 -> 23 -> 25b, with 25a insertable anywhere before it. Ben should know that accepting the rescope moved the payoff item behind two things he has not yet opened.",
       "next_step": "No action needed if the sequence is acceptable. If the intent was for the interdiction work to be runnable SOON, the shorter path is to open Sprint 23 (stance) first - it is substrate-only and deliberately inert, and it is the harder of BL-458's two blockers to work around.",
       "resolution": "ANSWERED 2026-08-17 (Ben): run 25a next - BL-457 (ordnance), BL-454 (upkeep), BL-452/BL-453 (dispatch + ledger), BL-455, BL-456, plus BL-459 (unit strength + adapter) which the same session's rulings added to the phase. Sequence is 25a -> 21 -> 23 -> 25b. The split stands as the decision taken; this entry closes with the sequence confirmed rather than overturned."
+    },
+    {
+      "id": "NR-313",
+      "raised": "2026-08-17",
+      "kind": "observation",
+      "status": "open",
+      "title": "This session cannot run live-Lua or any visual verification - the dependency host is blocked by egress policy",
+      "source": "Sprint 25a implementation, configuring CMake before starting BL-457.",
+      "what": "CMake fetches SDL3, Lua, sol2 and ImGui from codeload.github.com at configure time. That host returns 403 through this session's egress proxy, which the proxy documentation classifies as an organization policy denial and explicitly says not to route around. Consequence: the GUI cannot be built at all, and neither can any harness that links Lua - which is chain_depth (BL-457's own named guard), price_band_harness and haulage_measure. What DOES work: 43 of the 47 world TUs are Lua-free and compile with plain g++, so every non-Lua harness runs. Verified end to end by building and running econ_harness (ALL PASS).",
+      "why_it_matters": "It changes what 'verified' means for everything in Sprint 25a and it must not be discovered at cut time. Three concrete gaps: (1) no visual/--verify capture, so BL-453's Convoys tab ships unphotographed; (2) no chain_depth run, so the R1 orphan row is argued by inspection rather than executed; (3) no Lua load test, so a syntax or name error in recipes.lua / economy.lua / world_gen.lua would not surface here - the exact class of defect that crashed startup in 2026-08-12 and that NR-237 caught eleven days late. Requirement rows that could not be executed are marked pending rather than complete, per the project's own rule that a guard never seen to fail is not a guard.",
+      "next_step": "Run the full gate on the Windows machine before cutting anything from this batch - specifically chain_depth, price_band_harness, and an app launch that loads all three Lua files. Worth considering whether the deps should be vendored or a cache seeded (BL-302 chose the seeded-cache posture and its cache directory does not exist in a fresh cloud clone), since this is the second environment where a from-cold configure has blocked work."
+    },
+    {
+      "id": "NR-314",
+      "raised": "2026-08-17",
+      "kind": "decision-taken",
+      "status": "open",
+      "title": "BL-457 authored three presentation rows outside its scope, because a positional array left no choice",
+      "source": "Sprint 25a, appending ordnance to src/ui/presentation.cpp resource_table.",
+      "what": "resource_table is a positional constexpr array declared [resource_count]. It carried 34 initialisers for 37 values, so clean_water, consumer_goods and medical_supplies (BL-368, landed 2026-08-11) were value-initialised to nulls and rendered as '(unnamed resource)' - a population centre's own demand basket, nameless, for six days. Adding ordnance at index 37 is impossible without filling 34-36, so BL-457 authored all four rows. Names, abbreviations and colours were chosen for the three habitability goods in the palette's existing idiom (cooler and paler than the industrial tier, matching the argument that priced them modestly).",
+      "why_it_matters": "It is scope BL-457 did not ask for, landed on Ben's behalf, and it touches a UI file this session cannot photograph (NR-313) - so four new colour choices ship unseen. The defect itself is real but minor: presentation_of()'s fallback handled it without crashing, which is exactly why it survived. Worth noting the compiler is structurally unable to catch this - a short initialiser list for a sized array is legal C++ and silently zero-fills.",
+      "next_step": "Two things. (1) Eyeball the four new resource rows on a stockpile strip when the app next runs - especially ordnance's oxblood against iron ore's vermillion rust, which are the closest pair. (2) tools/session/resource_table_check.js was added to detect this class of drift and PUSHING IT TO A SKILL NEEDS BEN'S PERMISSION (CLAUDE.md: tool creation is skill creation). It is currently a loose script, which the standing rule says is the forgotten kind. BL-414 still owns the real fix - consolidating the four transcriptions so the desync cannot be authored - and this guard should be deleted the day that lands."
     }
   ]
 }

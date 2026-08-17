@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*77 entries — 49 open, 28 resolved.*
+*79 entries — 51 open, 28 resolved.*
 
 ---
 
@@ -628,6 +628,20 @@ BL-325 (military bases and supply) slice S3, deterministic out-of-supply strengt
 The brief called the friend/neutral/hostile model 'the standing model'. src/world/standing.{hpp,cpp} already exists and means something unrelated: the BL-262 coarse public POWER read - negligible/minor/notable/major/dominant over reach, capital and market share. I named the new concept corp_stance in src/world/stance.{hpp,cpp} instead of overloading the word.
 
 **Why it matters.** Overloaded, every future sentence about 'a corp's standing' is ambiguous between how strong it is and how it feels about you - in prose, in the glossary, and in symbol names two headers apart. Cheap to fix now and expensive later. Also note BL-262's own header warns against unifying its bands with the AI scorer (a Goodhart trap); a stance model that shares its name invites exactly that confusion.
+
+### NR-313 — This session cannot run live-Lua or any visual verification - the dependency host is blocked by egress policy
+*observation · raised 2026-08-17 · from Sprint 25a implementation, configuring CMake before starting BL-457.*
+
+CMake fetches SDL3, Lua, sol2 and ImGui from codeload.github.com at configure time. That host returns 403 through this session's egress proxy, which the proxy documentation classifies as an organization policy denial and explicitly says not to route around. Consequence: the GUI cannot be built at all, and neither can any harness that links Lua - which is chain_depth (BL-457's own named guard), price_band_harness and haulage_measure. What DOES work: 43 of the 47 world TUs are Lua-free and compile with plain g++, so every non-Lua harness runs. Verified end to end by building and running econ_harness (ALL PASS).
+
+**Why it matters.** It changes what 'verified' means for everything in Sprint 25a and it must not be discovered at cut time. Three concrete gaps: (1) no visual/--verify capture, so BL-453's Convoys tab ships unphotographed; (2) no chain_depth run, so the R1 orphan row is argued by inspection rather than executed; (3) no Lua load test, so a syntax or name error in recipes.lua / economy.lua / world_gen.lua would not surface here - the exact class of defect that crashed startup in 2026-08-12 and that NR-237 caught eleven days late. Requirement rows that could not be executed are marked pending rather than complete, per the project's own rule that a guard never seen to fail is not a guard.
+
+### NR-314 — BL-457 authored three presentation rows outside its scope, because a positional array left no choice
+*decision taken on your behalf · raised 2026-08-17 · from Sprint 25a, appending ordnance to src/ui/presentation.cpp resource_table.*
+
+resource_table is a positional constexpr array declared [resource_count]. It carried 34 initialisers for 37 values, so clean_water, consumer_goods and medical_supplies (BL-368, landed 2026-08-11) were value-initialised to nulls and rendered as '(unnamed resource)' - a population centre's own demand basket, nameless, for six days. Adding ordnance at index 37 is impossible without filling 34-36, so BL-457 authored all four rows. Names, abbreviations and colours were chosen for the three habitability goods in the palette's existing idiom (cooler and paler than the industrial tier, matching the argument that priced them modestly).
+
+**Why it matters.** It is scope BL-457 did not ask for, landed on Ben's behalf, and it touches a UI file this session cannot photograph (NR-313) - so four new colour choices ship unseen. The defect itself is real but minor: presentation_of()'s fallback handled it without crashing, which is exactly why it survived. Worth noting the compiler is structurally unable to catch this - a short initialiser list for a sized array is legal C++ and silently zero-fills.
 
 ---
 

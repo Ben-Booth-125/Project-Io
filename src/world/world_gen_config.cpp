@@ -52,6 +52,10 @@ resource_type resource_from_name(const std::string& name, bool& ok)
         { "alloys",                resource_type::alloys },
         { "electronics",           resource_type::electronics },
         { "spacecraft_components", resource_type::spacecraft_components },
+        // BL-457 (2026-08-17): the military terminal good. Priced in world_gen.lua
+        // from the day it landed, so it must be here or the load throws the same
+        // "Unknown resource" the habitability tranche threw in 2026-08-12.
+        { "ordnance",              resource_type::ordnance },
         // BL-368 (2026-08-11): the habitability tranche. Priced in world_gen.lua
         // from the day it landed; missing here until 2026-08-12, which is the
         // crash described above.
