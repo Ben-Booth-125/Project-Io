@@ -1,11 +1,19 @@
-// Headless harness for BL-332 (military points + research building): a
-// COMPLETED military_base credits its owning corp's military_points every
-// tick, a COMPLETED research_institute credits science, both are symmetric
-// across player and non-player corps, and neither accumulates while the
-// building is still under construction or decommissioned.
+// Headless harness for BL-332 (research building) and BL-455 (its reader): a
+// COMPLETED research_institute credits its owning corp's science every tick,
+// symmetrically across player and non-player corps, and accumulates nothing
+// while under construction or decommissioned — and that accumulator is now
+// MEASURABLE by condition_subject::science, so a tech gate or law can require
+// a research level.
+//
+// BL-455 (2026-08-17) deleted corporation_component::military_points and every
+// assertion about it. It was credited per tick by a completed military_base and
+// read by nothing in src/. The rows are gone rather than commented out: a
+// harness asserting a deleted field's behaviour is the "green check over a
+// number nothing reads" this item existed to remove.
 // Kept outside src/ so the CMake glob does not pull it into the real build.
 
 #include "world/budget_system.hpp"
+#include "world/condition_set.hpp"
 #include "world/components.hpp"
 #include "world/economy_system.hpp"
 #include "world/market_clearing.hpp"
@@ -84,20 +92,47 @@ int main()
 
     std::printf("Military-capability harness (BL-332), %d ticks\n", k_ticks);
 
-    check(near(w.corporations[corp_a].military_points, 5.0f),
-          "R1 a completed military_base credits military_points at the authored per-tick rate");
+    // BL-455 (2026-08-17): every military_points row is GONE with the field.
+    // R1's surviving half is the one that still says something — a corp holding
+    // only a military_base accumulates NOTHING, which after the deletion is a
+    // statement about the base rather than about a second accumulator.
     check(near(w.corporations[corp_a].science, 0.0f),
-          "R1 that corp's science stays at zero (no research_institute)");
+          "R1 a corp with only a military_base accumulates no science");
 
     check(near(w.corporations[corp_b].science, 5.0f),
           "R2 a completed research_institute credits science, on a NON-PLAYER corp (Q4 symmetry)");
-    check(near(w.corporations[corp_b].military_points, 0.0f),
-          "R2 that corp's military_points stays at zero (no military_base)");
 
-    check(near(w.corporations[corp_c].military_points, 0.0f),
-          "R3 a base still under construction (ticks_remaining > 0) accumulates nothing");
     check(near(w.corporations[corp_c].science, 0.0f),
           "R3 a decommissioned research_institute accumulates nothing");
+
+    // --- BL-455: science now has a READER, which is the whole point of keeping
+    // it. condition_subject::science measures the accumulator, so a tech gate or
+    // a law can require a research level. Without these rows the deletion half
+    // of this item would be verified and the wiring half would not.
+    {
+        condition c;
+        c.subject    = condition_subject::science;
+        c.comparator = condition_comparator::at_least;
+
+        c.operand = 5.0f;
+        check(evaluate_condition(c, w, corp_b),
+              "R4 a gate requiring 5 research is MET by the corp that earned 5");
+        check(!evaluate_condition(c, w, corp_a),
+              "R4 the same gate is NOT met by a corp with no research institute");
+
+        c.operand = 5.5f;
+        check(!evaluate_condition(c, w, corp_b),
+              "R4 the gate is not met one step above what was earned");
+
+        // Continuous, not integral: 5 units of research is 5.0, and a gate at
+        // 4.5 must pass rather than round. Asserted because the classification
+        // is a hand-maintained switch and getting it wrong is invisible.
+        c.operand = 4.5f;
+        check(evaluate_condition(c, w, corp_b),
+              "R5 science compares as a float, not rounded to a count");
+        check(!condition_subject_is_integral(condition_subject::science),
+              "R5 science is classified continuous");
+    }
 
     if (g_failures == 0) std::printf("\nALL PASS  (0 failures)\n");
     else                 std::printf("\nFAILURES (%d failures)\n", g_failures);

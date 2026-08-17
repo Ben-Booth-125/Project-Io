@@ -57,6 +57,7 @@ resource_type resource_from_name(const std::string& name, bool& ok)
         { "clean_water",           resource_type::clean_water },
         { "consumer_goods",        resource_type::consumer_goods },
         { "medical_supplies",      resource_type::medical_supplies },
+        { "ordnance",              resource_type::ordnance }, // BL-457
     };
 
     const auto it = table.find(name);
@@ -307,12 +308,13 @@ void recipe_registry::load_from_lua(lua_state& lua)
         }
     }
 
-    // BL-332 capability-point accumulation rates (economy.military).
+    // BL-332 research accumulation rate (economy.military). BL-455 removed
+    // military_points_per_base_tick; an economy.lua still carrying the key is
+    // simply ignored, which is the same tolerance every other get_or here has.
     sol::optional<sol::table> military = (*econ)["military"];
     if (military)
     {
         military_capability_params mp;
-        mp.military_points_per_base_tick       = military->get_or("military_points_per_base_tick",       mp.military_points_per_base_tick);
         mp.science_per_research_institute_tick = military->get_or("science_per_research_institute_tick", mp.science_per_research_institute_tick);
         // BL-394: hire_unit's credit cost (floor + power-scaled component).
         mp.hire_base_cost      = military->get_or("hire_base_cost",      mp.hire_base_cost);

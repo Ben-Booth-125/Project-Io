@@ -68,6 +68,29 @@ constexpr resource_presentation resource_table[resource_count] = {
     { "Alloys",             "Aly", IM_COL32(190, 160, 200, 255) }, // steel-violet blend
     { "Electronics",        "Elc", IM_COL32(130, 200, 210, 255) }, // circuit teal
     { "Spacecraft Components","S/C",IM_COL32(235, 210, 100, 255) }, // high-value gold
+    // --- Habitability tranche (BL-368, 2026-08-11) — authored 2026-08-17 by
+    // BL-457. These three shipped in August with no presentation row: the array
+    // is declared [resource_count] but only 34 of its 37 initialisers were
+    // given, so C++ value-initialised the rest to nulls and presentation_of()
+    // returned "(unnamed resource)" for all three. Not a crash — the fallback
+    // did its job — but a population centre's own demand basket rendered
+    // nameless. Found while appending ordnance, because a positional array
+    // cannot gain index 37 without filling 34-36 first.
+    //
+    // Cooler and paler than the industrial tier: welfare goods, not
+    // high-margin products, which is the same argument that priced them
+    // modestly above their inputs in world_gen.lua.
+    { "Clean Water",        "H2O+",IM_COL32(165, 215, 240, 255) }, // treated, paler than raw water
+    { "Consumer Goods",     "Cns", IM_COL32(205, 172, 162, 255) }, // soft domestic rose-tan
+    { "Medical Supplies",   "Med", IM_COL32(212, 232, 220, 255) }, // clinical pale green-white
+    // --- The military terminal good (BL-457, 2026-08-17). Oxblood: the one
+    // saturated red-crimson in the table, deliberately NOT reusing the
+    // orange-browns the raws occupy (iron ore, spices, copper) so a strip
+    // carrying ordnance reads as carrying something else entirely. It is a
+    // terminal good like spacecraft components, and the pair should be
+    // distinguishable at a glance — gold for the space road, oxblood for the
+    // military one.
+    { "Ordnance",           "Ord", IM_COL32(178,  66,  78, 255) }, // oxblood — terminal military good
 };
 
 // Reserved corporation identity colours. Slot 0 is the player's corporation; the

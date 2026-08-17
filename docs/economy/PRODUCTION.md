@@ -198,6 +198,23 @@ On a body with an atmosphere, liquid oxygen is produced in Era 0 by cryogenic ai
 |--------|--------|-----|
 | Steel + refined copper | Machinery | 0 |
 | Steel + REE alloy | Alloys | 0 |
+| Steel + machinery | **Ordnance** | 0 |
+
+The ordnance route (BL-457, 2026-08-17) is the roster's **military terminal good** — see
+`RESOURCES.md` § The two terminal goods for why the tier now ends in two places. Three notes that
+belong here rather than there:
+
+- It sits at the **same depth as alloys**, one step below the Assembly Plant, deliberately. Under
+  BL-428's chain-depth gate that makes it a real growth-track object rather than something a
+  starting corp can produce on tick one.
+- It is `machinery`'s **second** consumer, after the heavy spacecraft route below. That good spent
+  its first days orphaned, and a single consumer is one revert away from orphaning it again.
+- Its `base_price` (43.0) is **derived** from this tier's own markup ratio, not authored — the
+  derivation and the numbers are in RESOURCES.md, and it should be re-derived rather than
+  re-guessed if either input's price moves.
+
+There is deliberately **no ancient route**. An `iron_blooms + charcoal` path is a real idea and
+belongs with BL-429's ancient roster, not smuggled in beside an industrial-era recipe.
 
 #### Assembly Plant
 
@@ -654,7 +671,7 @@ sibling — nothing was left in the `"General"` catch-all:
 | Food Processing | `food_rations` (any), `hydroponics_bay` (industrial), `food_rations_milled` "Miller" (ancient) | Feeding the population, whether growing the produce (Hydroponics Bay) or milling it into rations (Food Processor, Miller). |
 | Chemical Works | `propellant_atmospheric` (industrial), `propellant_electrolysis` (industrial) | The Chemical Plant's two propellant routes (BL-308). |
 | Electronics | `silicon` (industrial), `ree_alloy` (industrial), `electronics` (industrial), `electronics_contact_grade` "Contact-Grade Electronics Lab" (industrial, NR-257) | The silicon/REE/electronics chain — named explicitly by this item's own design brief. |
-| Advanced Fabrication | `machinery` (industrial), `alloys` (industrial), `spacecraft_components` (industrial), `spacecraft_components_heavy` "Heavy Assembly Plant" (industrial, NR-257) | Fabricator + Assembly Plant: goods assembled from refined inputs rather than smelted from ore. |
+| Advanced Fabrication | `machinery` (industrial), `alloys` (industrial), `ordnance` (industrial, BL-457), `spacecraft_components` (industrial), `spacecraft_components_heavy` "Heavy Assembly Plant" (industrial, NR-257) | Fabricator + Assembly Plant: goods assembled from refined inputs rather than smelted from ore. |
 | Welfare Goods | `clean_water` (industrial), `consumer_goods` (industrial), `medical_supplies` (industrial) | The BL-368 habitability tranche — Water Treatment Plant, Consumer Goods Factory, Pharmaceutical Lab. |
 | Fuel Production | `charcoal` "Charcoal Burner" (ancient), `peat_charcoal` "Peat Kiln" (ancient) | Two independent producers of the same fuel good (`charcoal`) — an ordinary multi-producer economy fact (see the Alternate production methods section above), not itself an alternate-method pair since they're already grouped. |
 | Artisan Goods | `trade_goods` "Potter & Weaver" (ancient), `glass` "Glassworks" (ancient) | Two independent producers of `trade_goods_misc`, same shape as Fuel Production above. |

@@ -38,6 +38,10 @@ bool condition_subject_is_integral(condition_subject s)
         case condition_subject::market:
         case condition_subject::surplus:
         case condition_subject::military_strength:
+        // BL-455: science accrues as a float per tick, so a corp genuinely sits
+        // at 12.5 research points. Rounding it to compare would be the same lie
+        // the comment above rejects for a 3.5-unit stockpile.
+        case condition_subject::science:
             return false;
     }
     return false;
@@ -95,6 +99,14 @@ float measure_condition(const condition& c, const world& w, entity_id subject_co
 
         case condition_subject::surplus:
             return cc.balance;
+
+        // BL-455: the first reader corporation_component::science has ever had.
+        // Accumulated by the BL-332 per-tick pass from every completed
+        // research_institute; a gate asks whether the corp has REACHED a level,
+        // and nothing debits it (see the enum comment for why spending would be
+        // a different mechanism, not a wiring choice).
+        case condition_subject::science:
+            return cc.science;
 
         case condition_subject::era:
         {
@@ -192,6 +204,7 @@ std::string condition_text(const condition& c,
         case condition_subject::era:               subject = "Era";               break;
         case condition_subject::military_units:    subject = "Units";             break;
         case condition_subject::military_strength: subject = "Military strength"; break;
+        case condition_subject::science:           subject = "Research";          break;
     }
 
     const char* cmp = "";

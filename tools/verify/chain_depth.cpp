@@ -397,6 +397,12 @@ int main()
             { resource_type::coffee,                "mercantile demand, endemic good (BL-191)" },
             { resource_type::furs,                  "mercantile demand, endemic good (BL-191)" },
             { resource_type::trade_goods_misc,      "mercantile demand, endemic-luxury placeholder" },
+            // BL-457/BL-454. Named rather than assumed, per this table's own
+            // rule: ordnance is drawn per-tick, per unit, by the upkeep pass in
+            // economy_system.cpp. If BL-454 is ever reverted, this line becomes
+            // a lie and the row is supposed to catch it — delete the exemption
+            // with the consumer, not after someone notices the good is dead.
+            { resource_type::ordnance,              "BL-454 unit upkeep draw (per-tick, per unit)" },
         };
         auto exempt_consumer = [&](std::size_t r) -> const char* {
             for (const exemption& e : k_actor_consumed)

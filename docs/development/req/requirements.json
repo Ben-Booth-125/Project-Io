@@ -4000,6 +4000,123 @@
      "notes": "tier_margin is the economy-wide read named by the item."
     }
    ]
+  },
+  {
+   "brief": "ordnance-military-terminal-good",
+   "batch": "2026-08-17-sprint25a",
+   "title": "BL-457 - The militia has no military good to buy: ordnance does not exist in the roster",
+   "status": "complete",
+   "promoted_from": "backlog.json BL-457 NO_MILITARY_TERMINAL_GOOD",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "ITEM-SPANNING (headless): resource_type carries a military terminal good that is PRODUCED by an authored recipe and WANTED by a named consumer, so chain_depth's R1 orphan row stays green in both directions rather than gaining a new orphan.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET BY INSPECTION, NOT BY EXECUTION - see the environment note below. ordnance = 37 appended (components.hpp, count 37 -> 38); produced by recipes.lua id 27 (Fabricator, steel 1.0 + machinery 1.0); wanted via chain_depth's k_actor_consumed exemption naming 'BL-454 unit upkeep draw (per-tick, per unit)', which is the table's own mechanism for a non-recipe consumer (propellant and the habitability goods sit in it already). chain_depth itself COULD NOT BE RUN: it is a live-Lua harness and this session cannot build Lua/sol2 (NR-313)."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "Every hand-maintained transcription of resource_type accepts the new value: both name maps (recipe_registry.cpp for recipes/economy, world_gen_config.cpp for world_gen) and the positional UI presentation array. A missing name-map row is a hard startup crash (the 2026-08-12 medical_supplies precedent); a missing presentation row is a silent \"(unnamed resource)\".",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET and MECHANISED. tools/session/resource_table_check.js added - a static join over all four transcriptions. Reports OK for 38 values. Run against the pre-change tree in a detached worktree it FAILS with \"presentation.cpp: 34 rows for 37 enum values - indices 34..36 are value-initialised\", i.e. it was seen to fail on a real defect before being trusted."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "The base price is DERIVED from the processing roster's own convention rather than picked, and the derivation is written down where it can be re-derived.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. The roster marks an output up over its input basket at 1.415-1.443 (machinery 1.419, alloys 1.417, electronics 1.415, spacecraft_components 1.443 - computed from world_gen.lua base prices). Ordnance inputs = steel 8.0 + machinery 22.0 = 30.0; base_price 43.0 gives 1.433, inside the band. Derivation recorded in world_gen.lua, recipes.lua id 27, and RESOURCES.md."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "The whole world layer still compiles with the widened enum, and no per-resource array or switch silently mis-sizes.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. 43 of 47 world TUs compiled with g++ -std=c++20 -O2 -Wall (the other 4 need Lua/sol2 - NR-313). econ_harness links and runs ALL PASS, 0 failures. -Wswitch produced no resource_type diagnostic, and tile_generation.cpp's arrays widened to std::array<float, 38> as expected."
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "requirement": "The Lua roster actually loads: recipes.lua id 27 and world_gen.lua base_price parse and resolve against the name maps at runtime.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "NOT VERIFIED IN THIS SESSION and deliberately left pending rather than claimed. No Lua interpreter is available and the Lua-linked harnesses cannot be built (NR-313). Static checks only: brace balance clean on both files, both edits follow their neighbours' shape exactly, and resource_table_check.js confirms \"ordnance\" resolves in both name maps - which is the specific failure mode (Unknown resource) that crashed startup in 2026-08-12. Run chain_depth and any live-Lua harness on a machine with the deps before cutting."
+    }
+   ]
+  },
+  {
+   "brief": "military-points-deleted-science-wired",
+   "batch": "2026-08-17-sprint25a",
+   "title": "BL-455 - military_points is deleted and science is wired to the tech gate",
+   "status": "complete",
+   "promoted_from": "backlog.json BL-455 MILITARY_POINTS_AND_SCIENCE_ARE_WRITE_ONLY",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "ITEM-SPANNING (headless): neither accumulator is write-only any more. military_points does not exist; science is measurable by a predicate, so a tech gate or law can require a research level.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. military_capability_harness rebuilt: R4 asserts a gate at 5 research is met by the corp that earned 5 and NOT by a corp with none, and not met one step above what was earned. 8/8 PASS. condition_set_harness still 40 passed, 0 failed."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "military_points is removed at every site, not merely unread - field, Lua param, param struct member, the per-tick write, and every assertion about it.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. grep for military_points across src/, scripts/ and tools/ returns only explanatory comments recording the removal - zero live references. Sites removed: components.hpp field, economy_system.cpp write branch, recipe_registry.{hpp,cpp} param, economy.lua row, and six harness assertions."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "science is REACHED, not SPENT, matching BL-344's landed predicate model rather than inventing a second one.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET by reading BL-344 before choosing. tech_gate is a condition_set predicate over corp state and nothing in the gate system debits anything, so science became condition_subject::science (a threshold), not a currency. Recorded in the enum comment so the next reader does not re-open it."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "science compares as a continuous quantity, not rounded to a count - the classification switch is hand-maintained and a wrong entry is invisible from behaviour.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. R5 rows assert a gate at 4.5 passes for a corp holding 5.0, and that condition_subject_is_integral(science) is false."
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "requirement": "The world layer still compiles and the neighbouring harnesses are unaffected.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. 43 of 47 world TUs compile (4 need Lua - NR-313). condition_set_harness 40/40, military_capability_harness 8/8."
+    },
+    {
+     "id": "R6",
+     "status": "complete",
+     "requirement": "The serialisation seam survives the removed field.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET, VACUOUSLY, and checked rather than assumed. There is NO serialisation layer in the tree at all - no src/world/serialization.cpp exists (BL-107, save magic + version header, has not landed), and nothing writes corporation_component to disk. So removing a field from it cannot invalidate a save, because there are no saves. Worth re-reading when BL-107 lands: at that point this deletion WOULD have been a format break, and the same is true of BL-457 appending to resource_type."
+    }
+   ]
   }
  ]
 }

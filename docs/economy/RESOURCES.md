@@ -284,8 +284,36 @@ Products are the highest-value goods and the primary driver of market price dive
 | Propellant | Refined fuel + liquid oxygen | Chemical Plant |
 | Alloys | Steel + REE alloy | Fabricator |
 | Spacecraft components | Alloys + electronics | Assembly Plant |
+| **Ordnance** | **Steel + machinery** | **Fabricator** |
 
 Propellant and spacecraft components are the key outputs enabling space access. Propellant is the operating cost of any launch; spacecraft components are consumed by infrastructure construction in orbit and on remote bodies.
+
+### The two terminal goods (BL-457, 2026-08-17)
+
+The tier now ends in **two** places rather than one, and the pair is the point.
+
+**Spacecraft components** is the *space* terminal — the object BL-350's procurement contracts buy,
+with deliberately no background demand so the militia is its only buyer. **Ordnance** is the
+*military* terminal, drawn per tick by unit upkeep (BL-454) rather than bought as a lump.
+
+Until BL-457 only the space road existed. The 2026-08-10 refocus (NR-120) put the player as a
+militia whose trade is *"coloured directly with military use, and space equipment"*, and the
+military half of that sentence had **no object in the roster at all** — no ordnance, no munitions,
+no small arms. It went unnoticed for a week because nothing consumed one, which is precisely the
+admission rule working in reverse: a good with no consumer does not get in, so the good that
+*should* have existed never announced its absence.
+
+**One value, not three.** Ben's words were "supplies, rations, weapons". `food_rations` already
+covers rations; `medical_supplies` exists but is a habitability good a population centre competes
+for, so borrowing it would put an army and a city on one price. A distinct field ration or medical
+draw later is an **append with its behaviour filed in the same change** — never a re-insertion,
+which would repoint every id after it.
+
+**Its price is derived, not picked.** The processing roster marks an output up over its input
+basket by a strikingly tight ratio — machinery 1.419, alloys 1.417, electronics 1.415, spacecraft
+components 1.443. Ordnance draws steel 8.0 + machinery 22.0 = 30.0, so its `base_price` of **43.0**
+is a ratio of **1.433**, inside that band rather than beside it. Re-derive if either input's price
+or the recipe quantities move.
 
 ---
 

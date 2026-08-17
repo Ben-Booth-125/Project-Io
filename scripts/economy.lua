@@ -186,14 +186,17 @@ economy = {
         },
     },
 
-    -- BL-332: capability-point accumulation rates. Flat per-tick credit to the
-    -- owning corp's corporation_component.military_points / .science for every
-    -- COMPLETED military_base / research_institute it owns — passive, no
-    -- workforce dependency (both buildings staff at zero). First-cut authored
-    -- constants; retune by playtest. No spend mechanism reads either yet
-    -- (BL-087's constellation is the intended future sink).
+    -- BL-332: research accumulation rate. Flat per-tick credit to the owning
+    -- corp's corporation_component.science for every COMPLETED
+    -- research_institute it owns — passive, no workforce dependency (the
+    -- building staffs at zero). First-cut authored constant; retune by playtest.
+    --
+    -- BL-455 (2026-08-17) removed `military_points_per_base_tick` from here with
+    -- the field it fed: it credited an accumulator that nothing in src/ ever
+    -- read. `science` kept its rate because it now HAS a reader —
+    -- condition_subject::science, so a tech gate or a law can require a research
+    -- level (reached, not spent; see condition_set.hpp).
     military = {
-        military_points_per_base_tick       = 1.0,
         science_per_research_institute_tick = 1.0,
 
         -- BL-394: hire_unit's credit cost, debited from the corp's balance by
