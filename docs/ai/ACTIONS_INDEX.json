@@ -62,6 +62,14 @@
    "The Survey section of the Selection band when an unsurveyed body is selected (the hero action for that selection kind; the star carries no survey)."
   ],
   [
+   "gameplay.dispatch_convoy",
+   "A corp_verb with no dedicated in-app form yet (BL-452, 2026-08-17). Issued against the corp-command seam, or over --serve, which needed no new wire key: it reuses subject / counterparty / target / quantity. The Market Ledger's Convoys tab (BL-453) shows the RESULT and carries the Hold press, but composes no dispatch."
+  ],
+  [
+   "gameplay.hold_convoy",
+   "The 'Hold' / 'Release' button on each row of the Market Ledger's Convoys tab (BL-453); also a corp_verb, issuable directly against the seam."
+  ],
+  [
    "canvas.ascend_key",
    "Keyboard."
   ],

@@ -49,6 +49,13 @@ enum class corp_verb : uint8_t
     request_quote,   ///< Ask `counterparty` for a price + lead time on `target`/`quantity` at `subject` (body).
     accept_quote,     ///< Convert the live quote `order` into a contract; debits the deposit.
     cancel_contract,  ///< Terminate contract `order` in flight; forfeits the deposit, moves reputation.
+    // --- BL-452: the logistics layer joins the seam (2026-08-17) ---
+    // Appended AFTER cancel_contract, same append-only rule. Layer 5 — the only
+    // coupling between two markets' prices — was entirely automatic until this
+    // pair: fifteen verbs named a building, an order, a contract, a body or a
+    // tile, and not one named a convoy.
+    dispatch_convoy,  ///< Put a convoy on a lane: `subject` = source market, `counterparty` = destination market, `target` = cargo, `quantity` = units.
+    hold_convoy,      ///< Toggle convoy `order` between held and moving. NOT a cancel — see the verb's comment in corp_command.cpp.
 };
 
 /// One past the highest verb — the wire parser's range gate (BL-396: run_serve
@@ -58,7 +65,7 @@ enum class corp_verb : uint8_t
 /// appending a verb means moving this with it — and only this, since existing
 /// values never renumber.
 inline constexpr uint8_t corp_verb_count =
-    static_cast<uint8_t>(corp_verb::cancel_contract) + 1;
+    static_cast<uint8_t>(corp_verb::hold_convoy) + 1;
 
 /// Ceiling on one corporation's outstanding sell orders. The book is now
 /// reachable by command, so it is reachable by a scorer with a bug in it — this
@@ -101,6 +108,12 @@ struct corp_command
     /// request_quote: the supplier corp being asked. `subject` names the body
     /// the contract fulfils at; `target` (resource_type, reused from `build`)
     /// names the resource; `quantity` names the amount.
+    ///
+    /// BL-452 reuses this field for `dispatch_convoy`'s DESTINATION MARKET —
+    /// the field is "the other end of the transaction" in both readings, and a
+    /// fifth entity_id arg for one verb would grow the record every command
+    /// pays for. `subject` is the source market, `target` the cargo,
+    /// `quantity` the units; `order` names the convoy for `hold_convoy`.
     entity_id counterparty = null_entity;
 };
 

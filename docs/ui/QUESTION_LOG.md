@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**22 surfaces** — 3 settled, 19 awaiting Ben's wording.
+**23 surfaces** — 3 settled, 20 awaiting Ben's wording.
 
 ---
 
@@ -107,6 +107,14 @@ alphabetical order.
 **Because:** Markets are the public intelligence channel under the BL-068 visibility rule -- a rival's production and stockpiles are private, so price and the order book are the only honest read the player has on a competitor. Without this surface the discovery model has no channel to reason through.
 
 *Demanded by BL-122, BL-159 · `src/ui/market_ledger.cpp` · id `market_ledger`*
+
+### Market Ledger - Convoys tab
+
+**Answers:** What is on its way to me, and when does it land?
+
+**Because:** Convoys are drawn on three canvases -- a moving beam on the Planetary canvas, lines on the Solar canvas, a lens glyph, an aggregated route graph -- and were LISTED nowhere, so the one number the player needs from them had no home. Travel time became load-bearing on 2026-08-12: a long haul now takes several quarters where it used to take one, and stock committed to a convoy is out of the pool for the whole of it. Without ticks-to-arrival on a surface, a player cannot tell a delivery that is late from one that was always going to be slow, and cannot plan a build against stock already in transit. The tab also gives BL-452's Hold press a per-convoy row to sit on.
+
+*Demanded by BL-452, BL-453 · `src/ui/market_ledger.cpp` · id `market_ledger_convoys`*
 
 ### Nav rail
 

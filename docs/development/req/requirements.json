@@ -4117,6 +4117,78 @@
      "result_metric": "MET, VACUOUSLY, and checked rather than assumed. There is NO serialisation layer in the tree at all - no src/world/serialization.cpp exists (BL-107, save magic + version header, has not landed), and nothing writes corporation_component to disk. So removing a field from it cannot invalidate a save, because there are no saves. Worth re-reading when BL-107 lands: at that point this deletion WOULD have been a format break, and the same is true of BL-457 appending to resource_type."
     }
    ]
+  },
+  {
+   "brief": "convoy-dispatch-seam-and-ledger",
+   "batch": "2026-08-17-sprint25a",
+   "title": "BL-452 / BL-453 - the logistics layer joins the command seam, and gains a ledger",
+   "status": "partial",
+   "promoted_from": "backlog.json BL-452 LOGISTICS_HAS_NO_VERB + BL-453 CONVOYS_HAVE_NO_LEDGER",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "ITEM-SPANNING (headless): a player can dispatch a named cargo down a chosen lane and hold it in flight, through apply_corp_command, with no second dispatch code path.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. convoy_command harness, 50/50 PASS, rebuilt and re-run independently on the merged tree by the main session rather than taken from the agent report. R4 is the no-second-path row: a player convoy and an auto convoy on the same lane are asserted identical in cost, speed, mode and cargo, and both corps debited equally."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "The seam is an untrusted input boundary: every rejection mutates NOTHING, and out-of-domain values are refused rather than clamped.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET, and asserted against a FULL WORLD FINGERPRINT rather than a spot check - all balances, every pool quantity, every convoy field, next_convoy_id, and every market supply/demand/price/inventory, compared before and after. Eleven rejection paths (R1.1-R1.13) plus NaN, +inf, -inf and an absurd finite quantity (R2.1-R2.4), each refused, none clamped."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "Holding is conservative: cargo is neither duplicated nor lost, and a released convoy resumes rather than restarting.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. R3.5-R3.12: a held convoy does not advance over five ticks, hold toggles, a released convoy resumes from where it stopped, and the delivered cargo lands in the destination pool in full."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "Determinism: two runs of one script produce identical convoy sets, and the auto-dispatcher is behaviourally unchanged.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. R5.2 compares the convoy set at every tick across two runs and R5.3 guards against vacuity. Auto behaviour unchanged, confirmed by econ_harness, logistics_harness, order_book_harness (69/69), corp_ai_harness, procurement_harness and commercial_fog_harness all green on the merged tree."
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "requirement": "The dictionary is transcribed from the seam, not authored ahead of it, and the mirrors are regenerated rather than hand-edited.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. Two gameplay entries added to ACTIONS.json after the verbs existed; ACTIONS.md and ACTIONS_INDEX.json regenerated via render_actions.js. question_log.json gained the Convoys-tab entry (marked drafted, wording is Ben’s) with QUESTION_LOG.md regenerated. SUPPLY.md’s stale “no UI or code path yet” line replaced."
+    },
+    {
+     "id": "R6",
+     "status": "pending",
+     "requirement": "BL-453: the Convoys tab renders, lists in-flight convoys with ticks-to-arrival, and its Hold press issues the verb.",
+     "verification": [
+      "visual"
+     ],
+     "result_metric": "NOT VERIFIED - NOT COMPILED, NOT RUN, NOT PHOTOGRAPHED. The UI half is written by inspection only. This session cannot build ImGui/SDL/Lua (NR-313). Needs an integrating build plus a verifier-visual pass before anything is cut. The dispatch press on the market Selection card was CANCELLED (scope returned), recorded in SUPPLY.md Outstanding."
+    },
+    {
+     "id": "R7",
+     "status": "failed",
+     "requirement": "The existing gate stays green.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "FAILED, PRE-EXISTING, and isolated rather than assumed - see NR-319. spectator_determinism R2 byte-identity is red. Measured at three commits under g++: it was ALREADY red before this batch (4f3c4d8, observed 9744431472DE5755), the ordnance append moved it (44166a4, CCF93A83903B6B45), and the military_points deletion moved it not at all. The golden is MSVC-derived and cannot pass under g++ at any commit. Owed: a Windows re-bless citing resource_count 37->38."
+    }
+   ]
   }
  ]
 }

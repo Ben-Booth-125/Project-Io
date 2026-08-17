@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*81 entries — 53 open, 28 resolved.*
+*85 entries — 57 open, 28 resolved.*
 
 ---
 
@@ -656,6 +656,34 @@ The item's design flagged one thing to settle while wiring: whether a tech's cos
 Three sub-agents were launched with isolation: worktree AFTER three commits had landed on the working branch (the sprint rescope, the seven rulings, and BL-457 ordnance). All three worktrees were created at 7f0fac6 - the commit that was HEAD when the SESSION started - not at 44166a4, the branch head at launch time. The docs agent surfaced it by noticing its backlog.json still recorded BL-448's symmetry as an open question and had no BL-454/455/459 at all. The severe case was the upkeep agent: resource_type::ordnance did not exist in its tree, and its entire item is 'units draw ordnance', so it was one step from inventing a duplicate append to a serialised enum.
 
 **Why it matters.** This is verbatim the v0.1.9 batch failure the Sprint 17 retro recorded - 'three of five agents branched from a base that had already moved, and worktrees isolate WRITES, not HISTORY' - and the mitigation recorded then (integration reads every hunk) is a cure, not a prevention. The prevention is to state the base explicitly at launch or to have agents merge the working branch as their first act. Neither happened here because the worktree base is chosen by the harness, not by the brief, and nothing in the launch surface reports which commit it picked. Two agents were mid-flight when it was caught; both were told to merge the working branch before continuing.
+
+### NR-317 — A held convoy is free forever - cargo can be parked outside the economy indefinitely
+*question · raised 2026-08-17 · from Sprint 25a, BL-452 (logistics has no verb). Raised by the implementing agent, which could not file it itself.*
+
+hold_convoy stops a convoy advancing and it then costs nothing. Nothing charges upkeep on held cargo, nothing forces resolution, and nothing expires the hold. The goods are in neither a corp pool nor on a market shelf, so they are invisible to the price signal while held. A player can therefore withdraw stock from the market indefinitely at zero cost - and so, once BL-446 lands, can a rival scorer.
+
+**Why it matters.** It is exploit-shaped rather than a bug: every individual behaviour is correct, and the gap is that holding has no price. It also interacts with BL-422 (held sell orders stay visible to the price signal) which settled the OPPOSITE convention for the order book - held stock there remains visible deliberately, so scarcity is not gameable. A held convoy is the same question answered the other way, by omission rather than by decision.
+
+### NR-318 — hold_convoy names its convoy through cmd.order, not cmd.subject - convoys are not entities
+*decision taken on your behalf · raised 2026-08-17 · from Sprint 25a, BL-452. The brief said subject; the agent deviated and said so.*
+
+The brief specified subject = the convoy. The agent found that convoys are not entities at all - w.convoys is a plain vector, not an entity map - so an entity_id subject had nothing real to name. It instead gave convoy_component a monotonic id from a new allocate_convoy_id() (mirroring next_order_id) and carried it in cmd.order, the field every other non-entity handle already uses: sell_order::id, quote and contract ids. Two related calls ride with it: the named SOURCE MARKET only selects the source body, with the intra-body route still running from the corp's production anchor exactly as the auto-dispatcher does (a second routing rule for the player was refused); and a foreign convoy id returns the same rejected_invalid as a nonexistent one, following BL-397's oracle rule so the seam does not leak which ids exist.
+
+**Why it matters.** It is a deviation from an explicit instruction, taken for a good reason, and it sets the idiom for every future verb naming a transient object. Minting a real entity for something that lives about two ticks and appears in no map would have been worse, but it is a call Ben should see rather than inherit. The oracle-rule choice in particular is a deliberate usability cost paid for an information-leak guarantee.
+
+### NR-319 — spectator_determinism's golden: two independent causes, now separated by measurement
+*observation · raised 2026-08-17 · from Sprint 25a integration, isolating the one red check across three commits.*
+
+The R2 byte-identity row fails on the merged branch. The implementing agent reported two candidate causes together - the ordnance resource append, and the golden being MSVC-derived. Building the harness at three points under g++ separates them. At 4f3c4d8 (before any of this work): observed 9744431472DE5755, already FAILING against golden 855E07DE529684EC. At 44166a4 (ordnance only): observed CCF93A83903B6B45. At 9644eaa (ordnance + the military_points deletion): observed CCF93A83903B6B45, UNCHANGED.
+
+**Why it matters.** Three separate facts fall out, and the conflated version supports none of them. (1) The golden cannot pass under g++ at any commit - it is toolchain-specific, so this row is permanently red in any Linux/cloud session and its redness carries no signal there. (2) The ordnance append DID move the hash, so a Windows re-bless is genuinely owed and is not merely a toolchain artefact. (3) Deleting corporation_component::military_points moved it NOT AT ALL, which says state_hash does not walk that field but does walk the per-resource arrays. Without the three-point measurement, (3) would have been assumed either way.
+
+### NR-320 — Two new headless harnesses and one new tool are not discoverable - the skills need your permission
+*question · raised 2026-08-17 · from Sprint 25a. CLAUDE.md: tool creation is skill creation, and modifying a skill requires the user.*
+
+Sprint 25a added three checks that are currently loose. tools/verify/convoy_command.cpp (50 assertions over the dispatch/hold seam, including a full-world-fingerprint rejection check) and, pending the upkeep agent, tools/verify/unit_upkeep.cpp - neither is named in the verifier-headless skill, so neither is discoverable by a future session even though CMake's glob already picks them up as CTest tests. And tools/session/resource_table_check.js, the static join across the four hand-maintained transcriptions of resource_type, is wrapped in no skill at all.
+
+**Why it matters.** The standing rule is explicit that a loose tool is the forgotten kind, and this is three of them in one batch. resource_table_check.js is the one that matters most: it caught a real defect the compiler is structurally unable to see (a short initialiser list for a sized array silently zero-fills), and that defect had already survived six days unnoticed.
 
 ---
 

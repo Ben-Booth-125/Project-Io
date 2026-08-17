@@ -21,6 +21,14 @@ namespace ui {
 /// and, since the book is world state, ADDS/REMOVES by enqueuing a `corp_command`
 /// onto `s.pending_order_commands` — the const `world&` here cannot be mutated
 /// directly, so `app::render` applies the request through `apply_corp_command`.
+///
+/// The Convoys tab (BL-453) does the same for `world::convoys`: one row per
+/// in-flight convoy of the player's corp — cargo, endpoints, mode, progress,
+/// TICKS TO ARRIVAL and the haul cost already paid — with a Hold press that
+/// enqueues `hold_convoy`. It is the only surface that reports arrival time;
+/// the three canvases draw convoys but list none of this. Unlike Sell Orders it
+/// is NOT scoped to the selected market: "what is on its way to me" spans the
+/// whole corp.
 void draw_market_ledger(const world& w,
                         ui_state& s,
                         const market_plot_history& history,

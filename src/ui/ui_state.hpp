@@ -266,7 +266,9 @@ struct ui_state
     int  economy_view = 0; ///< Economy panel: 0=Corps, 1=Holdings, 2=Markets (BL-117).
 
     /// Market Ledger: 0=Prices, 1=Sell Orders (BL-159 — sell-order management
-    /// relocated here from the Construction/Building panel).
+    /// relocated here from the Construction/Building panel), 2=Convoys (BL-453 —
+    /// the player's cargo in flight, with its ticks-to-arrival; drawn on three
+    /// canvases before this and listed on none).
     int  market_ledger_view = 0;
 
     /// History ledger: 0=Story (the body's biography), 1=Chain (the generation
