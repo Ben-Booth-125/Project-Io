@@ -17,6 +17,9 @@ A convoy is a world ECS component. Each active convoy carries:
 | `cargo_qty` | quantity | Units in transit |
 | `progress` | `0.0–1.0` | Fraction of route completed |
 | `speed` | progress/Tick | Fixed linear advance per economy Tick |
+| `id` | uint32 | Stable handle from `world::allocate_convoy_id`; what `hold_convoy` names. Never reused. A **transient** id — valid only while the convoy is in flight (BL-452) |
+| `held` | bool | While true `advance_convoys` skips the convoy: stopped, not slowed (BL-452) |
+| `cost_paid` | credits | What the haul was charged at dispatch; read by the Convoys tab (BL-453) |
 
 The coupling is **market-to-market**, not body-to-body. A convoy is created when goods are dispatched toward a destination shortfall. It advances `progress` by `speed` each Tick (linear; no orbital mechanics in the prototype). On arrival (`progress >= 1.0`) it credits the destination `(corp, body)` pool, then is retired; the cargo reaches the destination market's supply through the ordinary auto-surplus path at the next clear (BL-382, the dead market writes, removed a direct supply write the clearing pass zeroed before pricing ever read it).
 
@@ -86,7 +89,20 @@ The cost is charged in full at dispatch (`dispatch_convoys` debits `corp.balance
 
 **Auto-dispatch is the default.** On each economy Tick the system scans for destination shortfalls (demand exceeds local supply) and dispatches convoys from the cheapest reachable source to fill them. The loop runs without player intervention.
 
-**Player-direction is the exception.** A player can direct a specific convoy — for example, fulfilling a standing sell order whose counterparty is on another body. This covers targeted arbitrage and order-book matching across bodies.
+**Player-direction is the exception — and since 2026-08-17 (BL-452) it is built.** A player (or an
+agent) directs a specific convoy through the `dispatch_convoy` corp_verb: subject = source market,
+`counterparty` = destination market, `target` = cargo, `quantity` = units. It is the auto-dispatch
+body above **with the shortfall scan removed** — `price_convoy_leg` + `commit_convoy`
+(`supply_system.hpp`) are shared by both callers, so a player's convoy and a rival's of the same
+shape cost the same, travel at the same speed and pick the same mode. There is deliberately no
+fourth code path, and `tools/verify/convoy_command.cpp` asserts the two agree rather than trusting
+that they do.
+
+**`hold_convoy` stops a convoy; nothing cancels one.** Cargo leaves the source pool at dispatch, so
+a cancel would have to invent a return leg or mint the goods back at the source. `hold_convoy`
+instead flips a `held` flag that `advance_convoys` skips: the convoy stops dead on its lane, pays
+nothing further (the haul was paid once), and resumes from the same progress when the verb is issued
+again. A toggle, not a one-way door.
 
 **Space launches auto-dispatch too (corrected 2026-07-31 — the "always player-directed" rule
 written here was never built).** `dispatch_convoys` auto-dispatches inter-body convoys exactly
@@ -146,6 +162,8 @@ still read "designed but not yet built"). `src/world/supply_system.cpp` (~340 li
 shipped layer.
 
 **Landed:**
+- Player-directed dispatch + hold on the corp-command seam (BL-452, 2026-08-17) — the shared
+  `price_convoy_leg` / `commit_convoy` pair, and the Market Ledger's Convoys tab (BL-453)
 - Convoy component, per-Tick advance, destination pool crediting (the on-arrival market supply injection was removed by BL-382 — it was zeroed before pricing read it)
 - Terrain-weighted A* intra-body routing with roads and the node discount (BL-077 planetary logistics; BL-146–149; BL-172 road tiers)
 - River generation + logistics discount, stacking multiplicatively with the road ladder (BL-170)
@@ -156,4 +174,11 @@ shipped layer.
 - Per-node throughput capacity (out of prototype scope, § Infrastructure gates)
 - Air mode (never dispatched; no airfield building)
 - Port gating for sea mode (BL-188, coastal ports — design-owed)
-- Player-directed dispatch (the § Dispatch trigger "exception" has no UI or code path yet)
+- A dispatch FORM in the app. `dispatch_convoy` is reachable from the corp-command seam and over
+  `--serve` (BL-452), and the Market Ledger's Convoys tab lists the result and carries the Hold
+  press (BL-453) — but no in-app control composes a dispatch. It belongs on the market Selection
+  card (a dispatch starts from a source you are looking at), which is a resource + quantity +
+  destination-market form, not a press
+- Convoys are not in `world::state_hash`. They were not before BL-452 either, and the determinism
+  check for them is `convoy_command.cpp` R5 (identical convoy sets across two runs) rather than the
+  hash. Folding them in would move the byte-identity baseline `spectator_determinism.cpp` pins

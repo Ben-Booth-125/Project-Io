@@ -117,6 +117,15 @@ convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
 /// viable or the corp cannot afford `leg.cost`. The propellant availability
 /// gate lives in `price_convoy_leg`, so a viable space leg cannot drive the
 /// propellant pool negative here.
+///
+/// @param src_body   The body the cargo leaves; the pool debited is (corp, src_body).
+/// @param src_market Recorded as the convoy's `source_market`, purely as the lane's
+///                   display endpoint. Passed rather than re-derived so the player's
+///                   NAMED source market is the one recorded: the auto-dispatcher
+///                   selects by body and passes the body's lowest-id market (which may
+///                   be `null_entity` on a body carrying none), while the player's verb
+///                   passes the market they actually dispatched from. The cargo and the
+///                   cost are a function of `src_body` either way.
 bool commit_convoy(world& w, entity_id corp_id, entity_id src_body,
-                   entity_id dest_market_id, std::size_t ri, float qty,
-                   const convoy_leg& leg);
+                   entity_id src_market, entity_id dest_market_id,
+                   std::size_t ri, float qty, const convoy_leg& leg);

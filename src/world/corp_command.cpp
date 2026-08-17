@@ -726,7 +726,8 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
 
             // The solvency gate lives inside commit_convoy, in one place for
             // both callers; a refusal there mutates nothing.
-            if (!commit_convoy(w, cmd.corp, src_body, cmd.counterparty, r, cmd.quantity, leg))
+            if (!commit_convoy(w, cmd.corp, src_body, cmd.subject, cmd.counterparty,
+                               r, cmd.quantity, leg))
                 return corp_command_result::rejected_funds;
             return corp_command_result::applied;
         }

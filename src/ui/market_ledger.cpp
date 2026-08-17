@@ -7,6 +7,8 @@
 #include <imgui.h>
 
 #include <algorithm>
+#include <cmath>   // std::ceil — the convoy tab's ticks-to-arrival
+#include <cstdio>  // std::snprintf — the progress-bar overlay
 #include <string>
 #include <vector>
 
@@ -160,6 +162,123 @@ void draw_sell_orders_tab(const world& w, ui_state& state, entity_id body,
     ImGui::EndDisabled();
 }
 
+// --- Convoys (player, in flight) --------------------------------------------
+// BL-453. Convoys render on three canvases — a moving beam on the Planetary
+// canvas, lines on the Solar canvas, a lens glyph, an aggregated route graph —
+// and were LISTED nowhere: what is in flight, carrying what, from where to
+// where, arriving when, at what cost had no surface at all.
+//
+// The number that earns the tab is TICKS TO ARRIVAL. The travel-time model
+// landed 2026-08-12 and is load-bearing — a long haul now takes several
+// quarters where it used to take one, always — and no surface reported it.
+//
+// Deliberately NOT scoped to the ledger's selected market, unlike the Sell
+// Orders tab beside it: the question is "what is on its way to me", and a
+// convoy inbound to a market the player is not currently looking at is exactly
+// the one they would otherwise miss. The body/market combos above are
+// cross-cutting selectors (the toggle rule exempts them), so leaving them
+// unread here is consistent rather than a lapse.
+//
+// The presses enqueue a corp_command, like the Sell Orders tab: the const
+// `world&` cannot be mutated here, and routing through apply_corp_command is
+// what keeps the player's Hold and an agent's `hold_convoy` the same act.
+
+const char* convoy_mode_name(convoy_mode m)
+{
+    switch (m)
+    {
+        case convoy_mode::land:  return "Land";
+        case convoy_mode::sea:   return "Sea";
+        case convoy_mode::air:   return "Air";   // never dispatched in the prototype
+        case convoy_mode::space: return "Space";
+    }
+    return "-";
+}
+
+/// Econ ticks until this convoy lands, rounded up — the figure the whole tab
+/// exists for. A held convoy has no arrival time at all: it is not slowed, it
+/// is stopped, so reporting a number would be a lie (hence the caller's "held").
+int ticks_to_arrival(const convoy_component& c)
+{
+    if (c.arrived || c.progress >= 1.0f)
+        return 0;
+    if (!(c.speed > 0.0f))
+        return -1; // unknown: a zero speed never arrives
+    const float remaining = 1.0f - c.progress;
+    return static_cast<int>(std::ceil(remaining / c.speed));
+}
+
+void draw_convoys_tab(const world& w, ui_state& state)
+{
+    const entity_id corp = w.player_entity;
+
+    // Sorted by soonest arrival, then by id — "what lands next" is the reading
+    // order the question implies, and the id tiebreak keeps it stable frame to
+    // frame (world::convoys is dispatch-ordered, which is neither).
+    std::vector<const convoy_component*> rows;
+    for (const convoy_component& c : w.convoys)
+        if (c.corp == corp && !c.arrived)
+            rows.push_back(&c);
+    std::sort(rows.begin(), rows.end(),
+              [](const convoy_component* a, const convoy_component* b) {
+                  const int ta = ticks_to_arrival(*a);
+                  const int tb = ticks_to_arrival(*b);
+                  if (ta != tb) return ta < tb;
+                  return a->id < b->id;
+              });
+
+    if (rows.empty())
+    {
+        ImGui::TextDisabled("Nothing in flight.");
+        return;
+    }
+
+    for (const convoy_component* cp : rows)
+    {
+        const convoy_component& c = *cp;
+        // PushID on the CONVOY ID, not the loop index: the id is what the hold
+        // command names, and it is stable across the erase an arrival causes.
+        ImGui::PushID(static_cast<int>(c.id));
+
+        const resource_presentation& rp = presentation_of(c.cargo_resource);
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(rp.colour), "%s", rp.name);
+        ImGui::SameLine();
+        ImGui::Text("x%.0f", c.cargo_qty);
+        ImGui::SameLine();
+        ImGui::TextDisabled("%s -> %s  (%s)",
+                            market_city_name(w, c.source_market).c_str(),
+                            market_city_name(w, c.dest_market).c_str(),
+                            convoy_mode_name(c.mode));
+
+        const int eta = ticks_to_arrival(c);
+        char overlay[48];
+        if (c.held)
+            std::snprintf(overlay, sizeof overlay, "held");
+        else if (eta < 0)
+            std::snprintf(overlay, sizeof overlay, "%.0f%%  (stalled)", c.progress * 100.0f);
+        else
+            std::snprintf(overlay, sizeof overlay, "%.0f%%  %d qtr%s",
+                          c.progress * 100.0f, eta, eta == 1 ? "" : "s");
+        ImGui::ProgressBar(c.progress, ImVec2{-1.0f, 0.0f}, overlay);
+
+        ImGui::TextDisabled("Haul cost paid: %.2f", static_cast<double>(c.cost_paid));
+        ImGui::SameLine();
+        // The toggle rule: the press reads as the state it would move to, and
+        // issuing it again undoes it — one verb, `hold_convoy`, both ways.
+        if (ImGui::SmallButton(c.held ? "Release" : "Hold"))
+        {
+            corp_command cmd;
+            cmd.corp  = corp;
+            cmd.verb  = corp_verb::hold_convoy;
+            cmd.order = c.id;
+            state.pending_order_commands.push_back(cmd);
+        }
+
+        ImGui::Separator();
+        ImGui::PopID();
+    }
+}
+
 } // namespace
 
 void draw_market_ledger(const world& w, ui_state& s,
@@ -278,15 +397,27 @@ void draw_market_ledger(const world& w, ui_state& s,
     // --- View tabs (BL-159): Prices (the original view) / Sell Orders (relocated
     // from the Construction/Building panel — a market question belongs on the
     // market surface). Same button-strip idiom as the other split ledgers.
+    // BL-453 adds Convoys: the same chrome, the same toggle rule, no new
+    // nav-rail slot — "what is on its way to me" is a market question, so it
+    // belongs beside the other two rather than in a ledger of its own.
     ui::nav_button("Prices",      0, s.market_ledger_view, &open);
     ImGui::SameLine();
     ui::nav_button("Sell Orders", 1, s.market_ledger_view, &open);
+    ImGui::SameLine();
+    ui::nav_button("Convoys",     2, s.market_ledger_view, &open);
     ImGui::Separator();
     ImGui::Spacing();
 
     if (s.market_ledger_view == 1)
     {
         draw_sell_orders_tab(w, s, selected_body, &mc);
+        ui::foldout_end();
+        return;
+    }
+
+    if (s.market_ledger_view == 2)
+    {
+        draw_convoys_tab(w, s);
         ui::foldout_end();
         return;
     }

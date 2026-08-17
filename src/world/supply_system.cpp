@@ -383,8 +383,8 @@ convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
 }
 
 bool commit_convoy(world& w, entity_id corp_id, entity_id src_body,
-                   entity_id dest_market_id, std::size_t ri, float qty,
-                   const convoy_leg& leg)
+                   entity_id src_market, entity_id dest_market_id,
+                   std::size_t ri, float qty, const convoy_leg& leg)
 {
     if (!leg.viable || ri >= resource_count)
         return false;
@@ -409,7 +409,7 @@ bool commit_convoy(world& w, entity_id corp_id, entity_id src_body,
 
     convoy_component c;
     c.id             = w.allocate_convoy_id();
-    c.source_market  = market_for_body(w, src_body);
+    c.source_market  = src_market;
     c.dest_market    = dest_market_id;
     c.mode           = leg.mode;
     c.cargo_resource = static_cast<resource_type>(ri);
@@ -519,7 +519,8 @@ void dispatch_convoys(world& w, const recipe_registry& reg,
                 // debit, the propellant burn and the convoy itself all live
                 // there, so a rival's convoy and the player's are the same
                 // object built by the same code.
-                commit_convoy(w, corp_id, best_src_body, dest_market_id, ri, best_qty, best_leg);
+                commit_convoy(w, corp_id, best_src_body, market_for_body(w, best_src_body),
+                              dest_market_id, ri, best_qty, best_leg);
             }
         }
     }

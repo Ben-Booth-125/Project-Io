@@ -229,6 +229,13 @@ const char* corp_command_result_name(corp_command_result r)
 // in step with `corp_verb` — the last three verb families were added to the enum
 // without their arguments ever reaching this parser, which made them applicable
 // in the dictionary and inapplicable on the wire.
+//
+// BL-452's convoy pair (2026-08-17) needed NO new key: `dispatch_convoy` reads
+// subject / counterparty / target / quantity and `hold_convoy` reads order, all
+// of which this parser already range-checks. Worth stating rather than leaving
+// to be rediscovered — the precedent above is a parser that silently lagged the
+// enum, and the reason it does not lag here is that these verbs reuse fields,
+// not that anyone remembered to extend it.
 // Responses are one line each except BLACKBOARD, which is N JSONL lines + END.
 int run_serve(int ticks, long long as_corp, bool as_any)
 {

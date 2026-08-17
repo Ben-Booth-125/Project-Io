@@ -343,6 +343,19 @@
         "scripts/verify/corp_choice.lua"
       ],
       "status": "drafted"
+    },
+    "market_ledger_convoys": {
+      "surface": "Market Ledger - Convoys tab",
+      "answers": "What is on its way to me, and when does it land?",
+      "because": "Convoys are drawn on three canvases -- a moving beam on the Planetary canvas, lines on the Solar canvas, a lens glyph, an aggregated route graph -- and were LISTED nowhere, so the one number the player needs from them had no home. Travel time became load-bearing on 2026-08-12: a long haul now takes several quarters where it used to take one, and stock committed to a convoy is out of the pool for the whole of it. Without ticks-to-arrival on a surface, a player cannot tell a delivery that is late from one that was always going to be slow, and cannot plan a build against stock already in transit. The tab also gives BL-452's Hold press a per-convoy row to sit on.",
+      "backlog_item": [
+        "BL-452",
+        "BL-453"
+      ],
+      "files": [
+        "src/ui/market_ledger.cpp"
+      ],
+      "status": "drafted"
     }
   }
 }
