@@ -85,18 +85,32 @@ economy = {
             -- (resource_remaining, seeded at generation), so a rich tile is still
             -- worth far more over its life — it simply cannot also run a thousand
             -- times faster. Set richness_reference = 0 to restore raw behaviour.
-            -- DISABLED PENDING CALIBRATION (BL-436, 2026-08-16). Set this to 53.3
-            -- to enable the conversion; 0 keeps the raw pre-BL-436 behaviour.
+            -- ENABLED 2026-08-17 (BL-436, Ben's call), after sitting at 0 since
+            -- 2026-08-16.
             --
-            -- The conversion itself is correct and lands a 133:1 structural gap at
-            -- 2.5:1. It is off because the COST side of the economy was tuned
-            -- against the old inflated income and every AI corp goes bankrupt with
-            -- it on. A scale sweep (x1/x4/x10 on both producer base_rates, ratio
-            -- held) showed scale is NOT the lever: raising extraction income makes
-            -- the collapse WORSE, because corps spend it on processors that lose
-            -- more per tick at higher scale (-19.95 at x1, -61.86 at x4). The real
-            -- blocker is processing profitability, which is BL-436's open half.
-            richness_reference = 0.0,
+            -- 24.9 is the measured MEDIAN deposit richness, not the mean. The
+            -- promise above — "a typical tile lands at ~1.0" — is what this value
+            -- has to deliver, and the mean does not deliver it: the distribution
+            -- runs to 72,321, so its mean (53.34) sits at the 78th percentile.
+            -- Referenced against the mean, the median tile ran at 0.47 and 18% of
+            -- deposits clamped flat at the richness_min floor, halving raw supply
+            -- across the whole map. Measured: tier_margin R6b prints the
+            -- percentiles (p10 10.58 / p25 15.76 / MEDIAN 24.92 / p75 45.09 /
+            -- p90 98.34 / p99 360.91) so this number can be re-derived rather
+            -- than trusted.
+            --
+            -- The reason it was off is recorded rather than deleted, because the
+            -- reason turned out to be wrong. The old note read: "every AI corp goes
+            -- bankrupt with it on ... a scale sweep showed raising extraction income
+            -- makes the collapse WORSE, because corps spend it on processors that
+            -- lose more per tick at higher scale". That mechanism could not happen.
+            -- The AI had no processing_facility build candidate at all until BL-439
+            -- (2026-08-17), so no corp could spend income on a processor at any
+            -- scale, and the sweep's causal chain had no link in the middle
+            -- (NR-265/NR-266). Whatever it measured, it was not that.
+            --
+            -- Set to 0 to restore raw pre-BL-436 behaviour.
+            richness_reference = 24.9,
             richness_min       = 0.25,
             richness_max       = 2.0,
         },

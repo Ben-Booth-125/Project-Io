@@ -651,6 +651,42 @@
         "docs/development/backlog.json"
       ],
       "resolution": null
+    },
+    {
+      "id": "NR-271",
+      "title": "richness_reference enabled at the MEDIAN, not the mean — and the cost side still cannot be rescaled into a fix, because processing gross margin is negative before any upkeep",
+      "raised": "2026-08-17",
+      "kind": "decision-taken",
+      "status": "open",
+      "source": "Ben's call to enable richness_reference and rescale the cost side, 2026-08-17.",
+      "what": "ENABLED, and corrected while enabling it. The authored intent is \"a typical deposit lands at ~1.0\", and the value that delivers that is the MEDIAN richness, not the mean. tier_margin now prints the distribution (new R6b): p10 10.58 / p25 15.76 / MEDIAN 24.92 / p75 45.09 / p90 98.34 / p99 360.91, mean 53.34, max 72,321. The mean sits at the 78th percentile, so referencing against it ran the median tile at 0.47 and clamped 18% of all deposits flat at the richness_min floor — halving raw supply across the whole map. Set to 24.9.\n\nThe ratio defect is FIXED. Extraction went from 1666.69 revenue / 1659.18 net per building-tick to 14.63 / 7.89, and its capex payback from 0 ticks (instant, i.e. meaningless) to 12. Processing revenue is now 12.66 against extraction 14.63 — comparable, where it was 16.60 against 1666.69.\n\nTHE COST SIDE IS NOT THE REMAINING BLOCKER, and that is measured rather than argued. Processing reads revenue 12.66, input$ 12.87, maintenance 7.73, wage 1.14, net -9.08. Gross margin is -0.21 BEFORE any upkeep, so cutting maintenance and wages to ZERO still leaves a loss-maker. No rescale of the cost side can fix a negative value-add.\n\nSeparately, the -3M net worth figures are almost entirely COMPOUNDING, not operations. k_debt_interest_per_quarter is 0.02 and the rollout is 300 ticks: 1.02^300 = 380x. Per-building extraction nets +5 to +11 across every seed, so a corp cannot lose millions by operating; it dips a few thousand negative on processor upkeep and the interest multiplies that by 380. This confirms the amplifier hypothesis raised in NR-269.",
+      "why_it_matters": "It relocates the lever, and it lands on the option Ben raised first. Before the ratio was fixed, repricing could not close a 100:1 gap and was correctly ruled out. With the ratio fixed, price IS the binding constraint — processing revenue must rise 1.72x to break even at current upkeep (12.87 input + 8.87 opex = 21.74 needed against 12.66 earned).\n\nIt also means the two levers now compose, where before neither worked alone: refined-good prices +40% AND processing upkeep halved gives 17.72 - 12.87 - 4.44 = +0.41, i.e. break-even. Matching extraction at +7.89 needs more than that.",
+      "recommendation": "Ben's call, three sized options, not mutually exclusive: (a) refined-good base prices +72% alone; (b) prices +40% with processing maintenance 10 -> 5 and base_wage 12 -> 8, which is the 'rescale the cost side' half actually doing work once it has a positive margin to protect; (c) cut recipe input quantities ~70%, which is a content change to recipes.lua rather than a price one. I have enabled the conversion at the median and stopped there — no price and no upkeep number has been touched, because tuning any of them against an unexplained -3M was the exact mistake NR-266 warns about, and the -3M is now explained.\n\nWorth noting for whichever is chosen: 30.0% of processing building-ticks STARVE and 20.3% run with NO RECIPE SET. Half of all processor ticks earn nothing while paying maintenance. That is a defect to fix before, not after, calibrating against these means — the no-recipe share in particular looks like a generation or default-recipe gap rather than an economic outcome.",
+      "files": [
+        "scripts/economy.lua",
+        "tools/verify/tier_margin.cpp",
+        "tools/verify/ai_skill_harness.cpp"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-272",
+      "title": "The no-recipe defect was real, was in the LIVE game, and fixing it uncovered the actual blocker: coal has 1,671 tiles and zero mines",
+      "raised": "2026-08-17",
+      "kind": "decision-taken",
+      "status": "open",
+      "source": "Ben's call to fix the no-recipe defect before calibrating, 2026-08-17.",
+      "what": "FIXED, and it was not a harness artefact. author_building cannot set a recipe (ids are indices into a registry that does not exist yet at world-gen time), so processors are authored with no_recipe and backfilled later. That backfill lived INLINE IN app::load_economy, which made a world-generation invariant depend on the UI startup sequence — every path building a world without app (headless harnesses, --serve, --verify) ran processors that could never produce.\n\nWorse, and this one hit the live game: load_economy runs the pass at app.cpp:955 and generate_background_firms authors MORE processors at :965. Every background firm processor kept no_recipe for the whole campaign, paying maintenance every tick, producing nothing, and reporting as ordinary idleness. tier_margin had already measured the shape of this in its own comment (26.5% recipe-less with no pass, 11.3% with the pre-firms pass only) and left the 11.3% standing as expected.\n\nThe loop is now world/s assign_default_recipes (corporation_generation.hpp). app calls it in BOTH positions; tier_margin retired its private copy for the shared one and calls it in both positions too; ai_skill_harness never ran it at all and now does. Measured: no-recipe ticks 20.3% -> 0.0%.\n\nIT DID NOT IMPROVE THE ECONOMICS, and that is the finding. Processing net went 9.08 -> -10.44 per building-tick, because the processors that were silently unconfigured are now visibly STARVING: starvation rose 30.0% -> 46.3%. The buildings were never going to pay; the defect was hiding the reason.",
+      "why_it_matters": "The starvation now names one culprit. Coal (resource id 1) is the binding input on 54.0% of all starved processor ticks. It has 1,671 tiles carrying deposits and ZERO extraction sites targeting it, supplying 6.1 units/tick from ambient sources alone.\n\nThe cause is siting, not price and not upkeep: an extraction site targets richest_extractable(tile), and coal is the richest extractable on only 1.1% of the tiles that carry it. It is always out-ranked, so no mine — generated or AI-built — ever targets it, while the steel chain needs it. This is the same failure mode as R5s three never-produced inputs (ids 8/9/10), which NR-266 flagged as siting/reach rather than margin.",
+      "recommendation": "Do NOT reprice yet. Repricing refined goods against a chain whose second input is unobtainable would tune around the shortage rather than fix it, and would have to be undone once coal is mined. The siting rule is the next item: an extraction site should be able to target a resource that is WANTED rather than merely richest — the demand signal already exists (the recipe input demand tier_margin R4 prints), and richest_extractable is a tile-local heuristic with no knowledge of it. Worth filing as its own backlog item; it is a corp_ai and generation change, not a calibration one.\n\nOnce coal is actually mined, re-run tier_margin and re-derive the price options in NR-271 (a/b/c) from the new numbers. The 1.72x revenue figure was measured on a starved chain and will move.",
+      "files": [
+        "src/world/corporation_generation.cpp",
+        "src/world/corporation_generation.hpp",
+        "src/core/app.cpp",
+        "tools/verify/tier_margin.cpp",
+        "tools/verify/ai_skill_harness.cpp"
+      ],
+      "resolution": null
     }
   ]
 }

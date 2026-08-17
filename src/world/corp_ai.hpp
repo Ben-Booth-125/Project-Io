@@ -28,6 +28,25 @@ struct corp_ai_params
 {
     int   cadence_k       = 4;     ///< Corp c evaluates when tick % k == index(c) % k.
     int   top_m_sites     = 8;     ///< Build-site pre-filter width (bounded enumeration).
+    /// BL-440: how hard an UNMET RECIPE INPUT pulls a site's suitability up.
+    ///
+    /// A tile offers every extractable deposit it carries as a candidate target,
+    /// not just its richest, and this weights those candidates by what the economy
+    /// cannot currently get. Without it, a resource that is common but rarely
+    /// dominant is structurally unmineable: it loses every richness comparison it
+    /// is ever entered into, so no scorer ever picks it, however badly a recipe
+    /// wants it. Measured 2026-08-17: SEVEN wanted inputs sat on 200+ tiles apiece
+    /// with zero sites named for them, one of them on 16,361 tiles.
+    ///
+    /// Deliberately NOT routed through the price signal, which cannot work here:
+    /// a processor must be RUNNING to bid a scarce input's price up, and it cannot
+    /// run without that input. The deadlock is the defect, so the pull is taken
+    /// from the recipe graph, which is a static, deterministic world fact.
+    ///
+    /// Self-limiting by construction — the bonus divides by the sites already
+    /// targeting the resource, so it decays as the shortage is answered rather
+    /// than driving the whole map onto one good. 0 restores pre-BL-440 behaviour.
+    float input_demand_pull = 4.0f;
     float theta           = 0.15f; ///< Hysteresis: beat do-nothing/incumbent by this relative margin.
     int   cooldown_evals  = 4;     ///< Evals a touched building holds before re-dialling.
     int   max_builds      = 1;     ///< Constructions per corp per evaluation.

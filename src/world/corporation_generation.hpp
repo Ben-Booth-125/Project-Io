@@ -139,3 +139,26 @@ std::vector<entity_id> generate_background_firms(
     world& w,
     const recipe_registry& reg,
     uint32_t seed);
+
+/// Give every processing facility that still carries `no_recipe` the registry's
+/// era-aware default. Idempotent, and a no-op on a world where every processor
+/// is already configured.
+///
+/// **Why this is a function and not three lines in the caller.** `author_building`
+/// cannot set a recipe: a recipe id is an index into a registry that does not
+/// exist yet when `make_hard_coded_world` runs (the Lua economy layer loads
+/// after world generation — see app::setup_world / app::load_economy ordering).
+/// So the field is left `no_recipe` and backfilled once the registry exists.
+///
+/// That backfill used to live inline in `app::load_economy`, which made a
+/// **world-generation invariant depend on the UI's startup sequence**. Every path
+/// that builds a world without going through `app` — every headless harness,
+/// `--serve`, `--verify` — got generated processors that could never produce, and
+/// nothing said so: they report as idle with `no_recipe`, which reads as an
+/// economic outcome rather than a missing initialisation. Measured at **20.3% of
+/// all processing building-ticks** in `tier_margin` before this moved (2026-08-17),
+/// silently dragging down every mean the BL-436 calibration was being read off.
+///
+/// Call it after the registry is loaded and after every generation pass that can
+/// author a processor (`generate_corporations`, `generate_background_firms`).
+void assign_default_recipes(world& w, const recipe_registry& reg);

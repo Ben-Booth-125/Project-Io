@@ -12,6 +12,7 @@
 #include "world.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdio>
 #include <limits>
@@ -410,7 +411,53 @@ struct extraction_site
 /// for every corp evaluating this tick; only the later can_place_in_world
 /// filter (tech gate, logistics reach) and scoring are genuinely per-corp,
 /// and both run over this already-truncated top-M list, not the full tile set.
-std::vector<extraction_site> rank_extraction_sites(const world& w, int top_m)
+/// Per-resource siting pull from unmet recipe demand (BL-440).
+///
+/// `wanted` counts the loaded recipes naming the resource as an input — a static
+/// property of the recipe graph, so it is identical for every corp and every
+/// tick. `sites` counts the extraction sites in the world already NAMED for it,
+/// which is what makes the pull self-limiting: the first mine for a starved good
+/// halves the bonus, the third quarters it, and a well-supplied resource gets
+/// essentially nothing.
+///
+/// Deliberately keyed on sites-named-for-it rather than on units produced. Since
+/// BL-437 a site works every deposit on its tile, so a starved good trickles in
+/// as a BY-PRODUCT of mines placed for something richer — which is exactly how
+/// coal reached 6.1 units/tick against demand that starved half the economy while
+/// looking, to a production-keyed measure, like it was being supplied.
+std::array<float, resource_count> input_demand_weights(const world& w,
+                                                       const recipe_registry& reg,
+                                                       const corp_ai_params& p)
+{
+    std::array<float, resource_count> weight;
+    weight.fill(1.0f);
+    if (p.input_demand_pull <= 0.0f)
+        return weight; // conversion disabled: pre-BL-440 behaviour
+
+    std::array<int, resource_count> wanted{};
+    const int n = reg.recipe_count(building_type::processing_facility);
+    for (int i = 0; i < n; ++i)
+    {
+        const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (rc.inputs[r] > 0.0f)
+                ++wanted[r];
+    }
+
+    std::array<int, resource_count> sites{};
+    for (const auto& [bid, b] : w.buildings)
+        if (b.type == building_type::extraction_site)
+            ++sites[static_cast<std::size_t>(b.target_resource)];
+
+    for (std::size_t r = 0; r < resource_count; ++r)
+        if (wanted[r] > 0)
+            weight[r] = 1.0f + p.input_demand_pull * static_cast<float>(wanted[r])
+                                                   / static_cast<float>(1 + sites[r]);
+    return weight;
+}
+
+std::vector<extraction_site> rank_extraction_sites(const world& w, int top_m,
+                                                   const std::array<float, resource_count>& demand_weight)
 {
     std::vector<extraction_site> sites;
     sites.reserve(w.tiles.size() / 2); // most land tiles carry some deposit
@@ -437,20 +484,33 @@ std::vector<extraction_site> rank_extraction_sites(const world& w, int top_m)
             !survey_tile_visible(memo_bc->survey, memo_bc->grid_width, memo_bc->grid_height,
                                  tc.grid_x, tc.grid_y))
             continue; // geographic fog: unsurveyed tiles are not candidates
-        bool any = false;
-        const resource_type best = placement_rules::richest_extractable(tc, any);
-        if (!any)
-            continue;
-        const float rich = tc.resource_deposit[static_cast<std::size_t>(best)];
-        if (rich <= 0.0f)
-            continue;
-        // Terrain affinity × deposit richness: mountains/canyons expose
-        // minerals (TILES.md), read here as a mild suitability bonus.
+        // Terrain affinity: mountains/canyons expose minerals (TILES.md), read
+        // here as a mild suitability bonus. Tile-wide, so it is hoisted out of
+        // the per-target loop below.
         float affinity = 1.0f;
         if (tc.landform == terrain_landform::mountain ||
             tc.landform == terrain_landform::canyon)
             affinity = 1.15f;
-        sites.push_back({tid, rich * affinity, best});
+
+        // EVERY extractable deposit on this tile is a candidate, not just the
+        // richest (BL-440). This used to call richest_extractable and emit one
+        // site per tile, which meant a resource that is common but rarely
+        // dominant was never offered to the scorer AT ALL — it lost every
+        // richness comparison it was entered into, so no amount of demand could
+        // reach it. Seven wanted recipe inputs sat on 200+ tiles apiece with
+        // zero sites named for them; one of them on 16,361 tiles.
+        //
+        // Pre-selecting the richest was a TILE-LOCAL heuristic answering a
+        // WORLD-level question. Enumerating is what lets the demand weight (and
+        // the existing net/glut/solvency scoring downstream) decide instead.
+        for (const resource_type rt : placement_rules::k_extractable)
+        {
+            const std::size_t ri   = static_cast<std::size_t>(rt);
+            const float       rich = tc.resource_deposit[ri];
+            if (rich <= 0.0f)
+                continue;
+            sites.push_back({tid, rich * affinity * demand_weight[ri], rt});
+        }
     }
     // PARTIAL SORT, not a full one (2026-08-12). Only the top M survive the
     // resize below, so sorting all ~18,000 qualifying sites to discard all but
@@ -519,7 +579,12 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
     // per-corp one — compute it once for the whole tick rather than once per
     // due corp. Cheap to build unconditionally even on ticks with no due
     // corp (rare, and still O(tiles) once rather than O(tiles) per corp).
-    const std::vector<extraction_site> ranked_sites = rank_extraction_sites(w, p.top_m_sites);
+    // BL-440: the demand weights are a world fact too (recipe graph + the sites
+    // standing in the world), so they are computed once per tick alongside the
+    // site ranking they feed, not once per due corp — the same BL-253 hoist.
+    const std::array<float, resource_count> demand_weight = input_demand_weights(w, reg, p);
+    const std::vector<extraction_site> ranked_sites =
+        rank_extraction_sites(w, p.top_m_sites, demand_weight);
 
     for (std::size_t index = 0; index < corp_ids.size(); ++index)
     {

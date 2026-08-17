@@ -1,5 +1,35 @@
 # Project Io — REFINED (active worklist)
 
+## Mines only target the richest (promoted from BL-440) — **2/4, HELD ON A DESIGN FORK** (2026-08-17)
+
+Requirements: none written yet — the item is mid-flight and (c) is a design call, not an
+implementation detail. Write them with (c)'s shape, so decomposition is shaped by it.
+
+`richest_extractable` gives a site the single richest deposit on its tile, so a resource that is
+common but rarely dominant is structurally unmineable — it loses every richness comparison it is
+entered into, so no scorer is ever offered it.
+
+- **[3] A — Guard first: tier_margin R4b.** Assert no wanted recipe input sits on 200+ tiles with
+  zero sites naming it. **DONE**, and run against the pre-change build where it fails by
+  construction on **seven** resources, one of them on 16,361 tiles. Files: `tools/verify/tier_margin.cpp`.
+- **[3] B — Enumerate, and weight by unmet demand.** `rank_extraction_sites` emits a candidate per
+  extractable deposit rather than one for the richest, weighted by `input_demand_weights()`
+  (recipes-wanting-it over sites-already-named-for-it, self-limiting). `input_demand_pull` in
+  `corp_ai_params` makes it a data change. **DONE.** Files: `src/world/corp_ai.{hpp,cpp}`.
+- **[3] C — Generation sites by the same broken rule.** **HELD — Ben's call between (i) a
+  post-registry retarget pass and (ii) a static demand hint at world-gen time.** See BL-440's
+  design § PROGRESS. Files: `src/world/corporation_generation.cpp`.
+- **[1] D — Propagate to PRODUCTION.md.** Not started. Deps: C.
+
+**The measurement that says C is the load-bearing half.** tier_margin is **byte-identical** across
+A+B — extraction 14.53/7.82, processing 12.37/−10.44, samples 2993/1916, all seven R4b rows still
+red. A 3-seed 20-tick run is dominated by generated assets, and generation still calls
+`richest_extractable`. The AI-side fix cannot show until generation stops digging the hole.
+
+The blocker on C is the same ordering constraint that produced the no-recipe defect:
+`generate_corporations` runs inside `make_hard_coded_world`, before the Lua economy layer loads, so
+it can see neither recipe ids nor recipe demand.
+
 ## AI never builds processors (promoted from BL-439) — **3/4, C HELD FOR BEN** (2026-08-17)
 
 Requirements: requirements.json § ai-builds-processors (R1–R7)

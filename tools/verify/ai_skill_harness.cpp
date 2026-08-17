@@ -39,6 +39,7 @@
 #include "world/building_profit.hpp" // BL-439: the predicted-vs-realised processor read
 #include "world/components.hpp"
 #include "world/corp_ai.hpp"
+#include "world/corporation_generation.hpp" // assign_default_recipes
 #include "world/corp_command.hpp"
 #include "world/economy_system.hpp"
 #include "world/hard_coded_world.hpp"
@@ -89,7 +90,7 @@ recipe_registry make_registry()
     // measures the PRE-BL-436 rate model while reporting green — which is exactly
     // what happened on the run that landed BL-436, and why its goldens were
     // vacuous with respect to the change they were supposed to be guarding.
-    extraction.richness_reference = 0.0f; // mirrors economy.lua: DISABLED pending BL-436 calibration
+    extraction.richness_reference = 24.9f; // mirrors economy.lua: ENABLED 2026-08-17 (BL-436)
     extraction.richness_min       = 0.25f;
     extraction.richness_max       = 2.0f;
     reg.set_economics(building_type::extraction_site, extraction);
@@ -257,6 +258,13 @@ rollout_metrics run_rollout(uint32_t seed, int ticks)
     params.seed = seed;
     world w = make_hard_coded_world(no_prehistory(params));
     const recipe_registry reg = make_registry();
+    // The default-recipe pass (2026-08-17). This harness never ran it, so every
+    // GENERATED processor in the benchmark carried no_recipe for all 300 ticks —
+    // paying maintenance, never producing, and reporting as ordinary idleness.
+    // The AI's own processors were unaffected (BL-439 names a recipe on the
+    // command), which is why the two read so differently. app::load_economy does
+    // this; a harness that skips it measures a startup the game never performs.
+    assign_default_recipes(w, reg);
 
     rollout_metrics m;
     const int processors_at_start = rival_processor_count(w);
