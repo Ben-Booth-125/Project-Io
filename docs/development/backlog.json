@@ -10222,6 +10222,31 @@
    ],
    "summary": "The [0.25x, 4x] price band lives as constexpr floats in market_clearing.cpp AND again in economy_system.cpp:399-400, the second carrying the comment \"mirror market_clearing.cpp price band\" — a duplication kept in step by hand. It is not in economy.lua, so the single most load-bearing economic tunable in the game is a code change rather than a data one, in two files that can silently diverge.",
    "design": "TWO STEPS, and the first must land BEHAVIOUR-IDENTICAL. (1) Move the band to scripts/economy.lua as ONE authored pair, read through recipe_registry like every other tunable, with both call sites reading the same value. Verify byte-identical output across the move before touching the numbers — a refactor and a re-tune in one commit is how a golden move becomes unattributable. Add a guard that the two sites cannot diverge again.\n\n(2) WIDEN, but only against measurement, and only after BL-441 lands. Ben s target (2026-08-17) is that scarcity must price high enough to CROSS THE MARGIN FOR NEARBY MARKETS, so inter-market trading exists from day 1 rather than as a late-game unlock. That makes the ceiling a function of the transport cost between adjacent markets, not a round number: the widened ceiling has to exceed base + haulage for a neighbouring market to be worth serving. Derive it from the logistics cost the supply layer already charges, and state the derivation in MARKETS.md.\n\nToday s ceiling is why nothing moves: coal s base is 2.0, so its scarcity ceiling is 8.0 against iron ore s 10.0 — a resource nobody can obtain is still cheaper than the one everybody has.\n\nBLOCKED ON BL-441 for step 2 only. Widening a band whose demand input is structurally zero amplifies nothing; step 1 can run immediately."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-17",
+   "created": "2026-08-17",
+   "id": "BL-443",
+   "short_name": "DEBT_COMPOUNDS_WITH_NO_FLOOR",
+   "category": "Economy",
+   "difficulty": 3,
+   "priority": "A",
+   "version_goal": "v0.1.16",
+   "requires": [],
+   "title": "A corp that dips one quarter into the red compounds at 2%/tick forever, so a few thousand of operating loss reads as millions and every economy measurement downstream becomes unreadable",
+   "authority_doc": "docs/economy/FINANCE.md",
+   "files": [
+    "src/world/budget_system.cpp",
+    "src/world/budget_system.hpp",
+    "tools/verify/econ_bankruptcy.cpp"
+   ],
+   "summary": "Found 2026-08-17 while reading ai_skill_harness's -2M to -3.4M net worths (NR-269). k_debt_interest_per_quarter is 0.02 and the benchmark rollout is 300 ticks: 1.02^300 = 380x. Per-building extraction nets +5 to +11 on every seed, so a corp cannot lose millions by operating. It dips a few thousand negative on processor upkeep and compounding does the rest. The rate itself is defensible (~8%/yr); what is missing is any floor, recovery path or terminal state. An insolvent corp is not resolved, it just accelerates away from zero.",
+   "design": "MEASURE BEFORE CHANGING ANYTHING, and the measurement is the first deliverable: decompose a benchmark corp's final balance into operating flows versus accrued interest. The claim that the -3M is 'almost entirely compounding' is arithmetic inference from 1.02^300, not an observation, and it should be confirmed or overturned before a lever is chosen.\n\nNote tools/verify/econ_bankruptcy.cpp ALREADY EXISTS and budget_system.hpp names it as a reader of the interest constant, yet budget_system.cpp contains no bankruptcy handling at all. Read that harness first: it may already pin the spiral as expected behaviour, in which case this item is partly a disagreement with an existing check rather than a new defect, and that has to be settled openly rather than by editing the check.\n\nThe design question is what insolvency MEANS, and it is a game-design call, not an arithmetic one. Candidates, deliberately not chosen here: (a) a debt ceiling past which no further interest accrues, cheapest and least meaningful; (b) forced liquidation - assets sold to clear debt, which gives 'survival' a real definition and makes the survival metric mean something it currently does not; (c) restructuring, where a corp idles or sheds buildings to return to solvency, which is the version that composes with the existing BL-079 reflex tier and the BL-202 scorer rather than sitting beside them.\n\n(b) and (c) are the ones that feed Conflict and Trade; (a) only silences a number. Prefer whichever the measurement supports, and state the reason.\n\nGUARD: a corp driven insolvent reaches a defined terminal or recovered state within a bounded number of ticks, rather than diverging. Must be shown to fail pre-change - today it diverges by construction.",
+   "consequences_for_shipped_claims": "It puts a question mark over ai_skill_harness's net-worth bands as a SKILL signal at all. If final net worth is dominated by compounding on an early dip, the metric is measuring how early a corp first went negative, not how well it played - and the bands have been blessed and re-blessed against that number repeatedly. The survival fraction may be the sounder signal; it is currently the one metric that has stayed green throughout Sprint 19."
   }
  ]
 }
