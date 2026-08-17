@@ -347,6 +347,8 @@ The estimator is NOT the culprit, and that was tested rather than assumed. The c
 
 The new per-building diagnostic reads: processor realised -6.24 to -11.70 per tick against a PREDICTED -0.38 to +0.08, on the same buildings, with extraction realised +22.80 where it sampled at all. Read the n: estimate_building_profit has no row for an idle or starved building, so the sample is biased toward the WORKING processors and the realised figure is the optimistic end.
 
+AMENDED 2026-08-17 after integration: the count above (18 red rows) was true when written and is now 23. Net-worth final/min and solvency are red on all five seeds, dial-action thrash ceilings on seeds 0/2/3/4, build-action on seed 3; survival still passes everywhere. The extra five rows come from BL-406/BL-404 moving outpost prices, not from further AI change — see NR-278. The finding and the decision not to bless are unchanged.
+
 **Why it matters.** This is the measurement Sprint 19 was opened to get, with the AI actually exposed to the economy for the first time. Its success criterion was written down in advance: the ai_skill_harness bands re-blessed DOWNWARD on 2026-08-16 should RISE, and a bless that does not raise them means the fix did not work. They fell, hard. Under that rule these numbers are a finding, not a bless — so the goldens are deliberately LEFT RED rather than re-blessed, and BL-439 task C is not done.
 
 The -295k figure is also bigger than processor losses can explain on their own: 12 processors x 300 ticks x ~11/tick is ~40k, not 800k. The likely amplifier is BL-073 debt interest compounding once a corp crosses zero, which would make insolvency self-deepening rather than self-correcting. Not measured, and named here so it is not assumed either way.

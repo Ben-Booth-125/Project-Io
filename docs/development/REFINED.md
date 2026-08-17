@@ -1,6 +1,6 @@
 # Project Io — REFINED (active worklist)
 
-## Mines only target the richest (promoted from BL-440) — **2/4, HELD ON A DESIGN FORK** (2026-08-17)
+## Mines only target the richest (promoted from BL-440) — **2/4, C SUPERSEDED BY BL-441/442** (2026-08-17)
 
 Requirements: none written yet — the item is mid-flight and (c) is a design call, not an
 implementation detail. Write them with (c)'s shape, so decomposition is shaped by it.
@@ -16,9 +16,12 @@ entered into, so no scorer is ever offered it.
   extractable deposit rather than one for the richest, weighted by `input_demand_weights()`
   (recipes-wanting-it over sites-already-named-for-it, self-limiting). `input_demand_pull` in
   `corp_ai_params` makes it a data change. **DONE.** Files: `src/world/corp_ai.{hpp,cpp}`.
-- **[3] C — Generation sites by the same broken rule.** **HELD — Ben's call between (i) a
-  post-registry retarget pass and (ii) a static demand hint at world-gen time.** See BL-440's
-  design § PROGRESS. Files: `src/world/corporation_generation.cpp`.
+- **[3] C — Generation sites by the same broken rule.** **SUPERSEDED 2026-08-17, do not build.**
+  Ben chose the static demand hint, then redirected past it the same session on a better reading:
+  the price signal was never structurally unable to do this job. It was starved, because the demand
+  register records FILLS rather than WANTS. Fix that and price sites the mine by itself, with task
+  B's per-deposit enumeration as the thing that lets the scorer act on it. Now BL-441 (unmet demand
+  is never registered) and BL-442 (price band is code, not data).
 - **[1] D — Propagate to PRODUCTION.md.** Not started. Deps: C.
 
 **The measurement that says C is the load-bearing half.** tier_margin is **byte-identical** across
