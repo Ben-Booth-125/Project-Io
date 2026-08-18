@@ -1371,12 +1371,13 @@
    "id": "NR-320",
    "raised": "2026-08-17",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "title": "Two new headless harnesses and one new tool are not discoverable - the skills need your permission",
    "source": "Sprint 25a. CLAUDE.md: tool creation is skill creation, and modifying a skill requires the user.",
    "what": "Sprint 25a added three checks that are currently loose. tools/verify/convoy_command.cpp (50 assertions over the dispatch/hold seam, including a full-world-fingerprint rejection check) and, pending the upkeep agent, tools/verify/unit_upkeep.cpp - neither is named in the verifier-headless skill, so neither is discoverable by a future session even though CMake's glob already picks them up as CTest tests. And tools/session/resource_table_check.js, the static join across the four hand-maintained transcriptions of resource_type, is wrapped in no skill at all.",
    "why_it_matters": "The standing rule is explicit that a loose tool is the forgotten kind, and this is three of them in one batch. resource_table_check.js is the one that matters most: it caught a real defect the compiler is structurally unable to see (a short initialiser list for a sized array silently zero-fills), and that defect had already survived six days unnoticed.",
-   "next_step": "Ben's permission to (a) add convoy_command and unit_upkeep paragraphs to .claude/skills/verifier-headless/SKILL.md, and (b) decide whether resource_table_check.js gets its own small skill or a line inside verifier-headless. If skill creation is declined, the fallback per CLAUDE.md is to note in the requirement that the method was run ad hoc."
+   "next_step": "Ben's permission to (a) add convoy_command and unit_upkeep paragraphs to .claude/skills/verifier-headless/SKILL.md, and (b) decide whether resource_table_check.js gets its own small skill or a line inside verifier-headless. If skill creation is declined, the fallback per CLAUDE.md is to note in the requirement that the method was run ad hoc.",
+   "outcome": "RESOLVED 2026-08-18 (Ben): permission granted. substrate_census and the other new harnesses are registered in the verifier-headless skill."
   },
   {
    "id": "NR-321",
@@ -1523,7 +1524,7 @@
    "id": "NR-332",
    "raised": "2026-08-18",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "title": "Ordnance has no ancient route — does the 0 CE arc get one, or a different military good?",
    "source": "Sprint 26b doc truth pass, 2026-08-18; confirmed against scripts/recipes.lua:450 and recipe_registry.hpp:36-38.",
    "what": "The only military terminal good in the game is tagged era = industrial, and a 0 CE campaign resolves to era_band::ancient, so ordnance cannot be produced in the shipped product. The recipe author deferred an ancient route to BL-429 (ancient building roster) in a source comment and no item was filed, so the deferral went invisible. Filed as BL-460 (ordnance unproducible at 0 CE), priority A.",
@@ -1539,7 +1540,8 @@
     "BL-429",
     "BL-433",
     "NR-321"
-   ]
+   ],
+   "outcome": "RESOLVED 2026-08-18 (Ben): ordnance stays industrial. The ancient arc gets a DIFFERENT military terminal good, filed as the follow-on to BL-460. The iron_blooms + charcoal route is NOT taken."
   },
   {
    "id": "NR-333",
@@ -1561,7 +1563,7 @@
    "id": "NR-334",
    "raised": "2026-08-18",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "title": "Ruling 8 has a second half — does the HARNESS follow production to 400 years, or production follow the struct to 4000?",
    "source": "Sprint 27 (BL-384 assertion agent) and Sprint 26b (doc truth pass) reported contradictory spans on 2026-08-18. Both were right; the configurations differ.",
    "what": "history_sim_params defaults to 4000 BCE -> 0 CE on a six-band clock (136 decision rounds). make_hard_coded_world overrides it to 400 BCE -> 0 CE on one 4-year band (100 rounds). Every harness and the Ages view use the struct default; only generation uses the override. Filed as BL-462 (harnesses measure a different sim than ships), priority A.",
@@ -1578,7 +1580,8 @@
     "BL-317",
     "NR-331",
     "NR-177"
-   ]
+   ],
+   "outcome": "RESOLVED 2026-08-18 (Ben): the harness follows production - 400 years, one 4-year band. Sprint 27's B384 findings are re-measured on the shipped config; the six-band ladder becomes dead default and is deleted. Work is BL-462."
   },
   {
    "id": "NR-335",
@@ -1647,7 +1650,7 @@
    "id": "NR-339",
    "raised": "2026-08-18",
    "kind": "observation",
-   "status": "open",
+   "status": "resolved",
    "title": "Two generation features are authored and never produced — valley landform and Highway roads",
    "source": "Sprint B1 substrate census, 2026-08-18, three seeds.",
    "what": "The landform valley reports 0.0% on the home body on all three seeds. Road tier 3 (Highway) is never generated — seed 0 produced Track 195 / Road 269 / Highway 0. Both are authored values with rendering and, in the road case, a distinct logistics cost.",
@@ -1655,6 +1658,30 @@
    "refs": [
     "BL-463",
     "NR-257"
+   ],
+   "outcome": "RESOLVED 2026-08-18 (Ben): make them generate. valley landform and Highway roads get real generation rather than deletion - which also feeds the roads-converge hub reading of BL-463."
+  },
+  {
+   "id": "NR-340",
+   "raised": "2026-08-18",
+   "kind": "decision-taken",
+   "status": "resolved",
+   "title": "Eight delivery rulings, and the Logistic Points instruction",
+   "source": "Ben, 2026-08-18, second elicitation form of the session.",
+   "what": "(1) NR-334 - the HARNESS follows production: 400 years, one band. Sprint 27's findings get re-measured on the shipped config and the six-band ladder becomes dead default. (2) NR-332 - ordnance stays industrial; the ancient arc gets a DIFFERENT military terminal good. (3) NR-321 - upkeep rates go live AFTER that good is producible, then measure pool and golden movement. (4) BL-463 - settlements are BOTH too few and too evenly spread; raise the target AND cluster. (5) The hub reads as ROADS CONVERGING, not a marker or a bigger settlement. (6) NR-339 - make valley landform and Highway roads actually generate. (7) NR-320 - permission granted to register the new harnesses in the verifier-headless skill. (8) Next delivery is Lane C1 (stance). Plus: begin codifying Logistic Points this sprint.",
+   "why": "Ruling 1 unblocks Sprints 28 and 30, which were measuring a configuration that does not ship. Ruling 5 is the most informative answer in the set: it says the hub problem is a NETWORK problem, not a marker problem, which redirects BL-463 and Lane B2 away from adding a capital glyph and toward road generation - and means polity::capital may not be needed for the hub at all.",
+   "outcome": "BL-464 (Logistic Points) filed design-owed and promoted into Lane C1. NR-332, NR-334, NR-320, NR-339 resolved. NR-321 stays open, now sequenced behind the ancient military good. BL-463 gains the both-axes ruling. Lane B2's hub approach re-pointed at roads.",
+   "refs": [
+    "BL-464",
+    "BL-463",
+    "BL-462",
+    "BL-460",
+    "BL-448",
+    "NR-332",
+    "NR-334",
+    "NR-339",
+    "NR-320",
+    "NR-321"
    ]
   }
  ]

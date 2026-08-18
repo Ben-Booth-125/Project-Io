@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*104 entries — 72 open, 32 resolved.*
+*105 entries — 68 open, 37 resolved.*
 
 ---
 
@@ -678,13 +678,6 @@ The R2 byte-identity row fails on the merged branch. The implementing agent repo
 
 **Why it matters.** Three separate facts fall out, and the conflated version supports none of them. (1) The golden cannot pass under g++ at any commit - it is toolchain-specific, so this row is permanently red in any Linux/cloud session and its redness carries no signal there. (2) The ordnance append DID move the hash, so a Windows re-bless is genuinely owed and is not merely a toolchain artefact. (3) Deleting corporation_component::military_points moved it NOT AT ALL, which says state_hash does not walk that field but does walk the per-resource arrays. Without the three-point measurement, (3) would have been assumed either way.
 
-### NR-320 — Two new headless harnesses and one new tool are not discoverable - the skills need your permission
-*question · raised 2026-08-17 · from Sprint 25a. CLAUDE.md: tool creation is skill creation, and modifying a skill requires the user.*
-
-Sprint 25a added three checks that are currently loose. tools/verify/convoy_command.cpp (50 assertions over the dispatch/hold seam, including a full-world-fingerprint rejection check) and, pending the upkeep agent, tools/verify/unit_upkeep.cpp - neither is named in the verifier-headless skill, so neither is discoverable by a future session even though CMake's glob already picks them up as CTest tests. And tools/session/resource_table_check.js, the static join across the four hand-maintained transcriptions of resource_type, is wrapped in no skill at all.
-
-**Why it matters.** The standing rule is explicit that a loose tool is the forgotten kind, and this is three of them in one batch. resource_table_check.js is the one that matters most: it caught a real defect the compiler is structurally unable to see (a short initialiser list for a sized array silently zero-fills), and that defect had already survived six days unnoticed.
-
 ### NR-321 — Ordnance's upkeep rate ships at 0.0, so nothing consumes it at runtime and BL-457's admission argument is not yet true in play
 *question · raised 2026-08-18 · from Sprint 25a, integrating BL-454. The implementing agent flagged the tension rather than resolving it silently.*
 
@@ -734,27 +727,10 @@ tier_margin reports: 3 recipe inputs that have deposits are never produced; 7 wa
 
 **Why it matters.** Not merge damage — tier_margin links only world/*, and nothing merged today touches world logic. It is either inherited from Sprint 25a (which added ordnance and a Fabricator recipe consuming steel + machinery, plausibly moving the sited/produced sets) or older still. Worth knowing which, because the second row — a wanted input on 200+ tiles that nothing sites for — is the shape of a good the economy asks for and cannot get.
 
-### NR-332 — Ordnance has no ancient route — does the 0 CE arc get one, or a different military good?
-*question · raised 2026-08-18 · from Sprint 26b doc truth pass, 2026-08-18; confirmed against scripts/recipes.lua:450 and recipe_registry.hpp:36-38.*
-
-The only military terminal good in the game is tagged era = industrial, and a 0 CE campaign resolves to era_band::ancient, so ordnance cannot be produced in the shipped product. The recipe author deferred an ancient route to BL-429 (ancient building roster) in a source comment and no item was filed, so the deferral went invisible. Filed as BL-460 (ordnance unproducible at 0 CE), priority A.
-
-- (a) Give ordnance an iron_blooms + charcoal ancient route now — small, and it unblocks the rate rollout.
-- (b) Give the ancient arc a DIFFERENT military terminal good, and leave ordnance industrial for the parked space arc.
-
 ### NR-333 — Two independent notions of era have drifted apart, and each stranded something
 *observation · raised 2026-08-18 · from Sprint 26b doc truth pass, 2026-08-18.*
 
 The recipe registry has era_band_for_epoch (recipe_registry.hpp:36-38), derived from epoch_year. The unit roster has campaign_roster_band (unit_roster.hpp:61), a hard constant set to industrial with a comment still reading 1960s. Neither consults the other. BL-460 is the recipe side stranding ordnance; BL-461 is the roster side offering industrial units in a 0 CE campaign.
-
-### NR-334 — Ruling 8 has a second half — does the HARNESS follow production to 400 years, or production follow the struct to 4000?
-*question · raised 2026-08-18 · from Sprint 27 (BL-384 assertion agent) and Sprint 26b (doc truth pass) reported contradictory spans on 2026-08-18. Both were right; the configurations differ.*
-
-history_sim_params defaults to 4000 BCE -> 0 CE on a six-band clock (136 decision rounds). make_hard_coded_world overrides it to 400 BCE -> 0 CE on one 4-year band (100 rounds). Every harness and the Ages view use the struct default; only generation uses the override. Filed as BL-462 (harnesses measure a different sim than ships), priority A.
-
-- (a) Harness follows production — 400 years, one band. Sprint 27's findings get re-measured; the six-band ladder becomes dead default and should be deleted.
-- (b) Production follows the struct — restore 4000 years and six bands in generation. Contradicts ruling 8 and needs BL-320's perf work first.
-- (c) Both are deliberate — a long sandbox config and a short shipped one. Then every harness row must name which config it measured, and the docs must describe both.
 
 ### NR-335 — BL-384's filed premise does not reproduce — 267 battles / 0 conquests is stale
 *observation · raised 2026-08-18 · from Sprint 27 assertion agent, 2026-08-18, over seeds 0-7 with real terrain; independently confirmed against an unmodified history_sweep run.*
@@ -775,11 +751,6 @@ world_determinism's existing digest is world_metrics, a tile-and-count digest. T
 *observation · raised 2026-08-18 · from Sprint B1 substrate census agent, 2026-08-18. Verified, not assumed: seed_sweep_probe prints firms=0.*
 
 CMakeLists' generic glob target for tools/verify/*.cpp links io_world_obj only, which excludes the sol2 translation units. generate_background_firms sizes itself against economy.lua's population_demand and background_demand baskets, and those are all-zero on a default registry with no Lua loaded — so it places zero firms. A census built on the generic target would have described a world nobody plays. The agent added an explicit live-Lua target for substrate_census, mirroring chain_depth, tier_margin and haulage_measure.
-
-### NR-339 — Two generation features are authored and never produced — valley landform and Highway roads
-*observation · raised 2026-08-18 · from Sprint B1 substrate census, 2026-08-18, three seeds.*
-
-The landform valley reports 0.0% on the home body on all three seeds. Road tier 3 (Highway) is never generated — seed 0 produced Track 195 / Road 269 / Highway 0. Both are authored values with rendering and, in the road case, a distinct logistics cost.
 
 ---
 
@@ -1131,6 +1102,13 @@ As first proposed, Sprint 25 shared no dependency with Sprints 21-24 and could h
 
 > **RESOLVED.** ANSWERED 2026-08-17 (Ben): run 25a next - BL-457 (ordnance), BL-454 (upkeep), BL-452/BL-453 (dispatch + ledger), BL-455, BL-456, plus BL-459 (unit strength + adapter) which the same session's rulings added to the phase. Sequence is 25a -> 21 -> 23 -> 25b. The split stands as the decision taken; this entry closes with the sequence confirmed rather than overturned.
 
+### NR-320 — Two new headless harnesses and one new tool are not discoverable - the skills need your permission
+*question · raised 2026-08-17 · from Sprint 25a. CLAUDE.md: tool creation is skill creation, and modifying a skill requires the user.*
+
+Sprint 25a added three checks that are currently loose. tools/verify/convoy_command.cpp (50 assertions over the dispatch/hold seam, including a full-world-fingerprint rejection check) and, pending the upkeep agent, tools/verify/unit_upkeep.cpp - neither is named in the verifier-headless skill, so neither is discoverable by a future session even though CMake's glob already picks them up as CTest tests. And tools/session/resource_table_check.js, the static join across the four hand-maintained transcriptions of resource_type, is wrapped in no skill at all.
+
+**Why it matters.** The standing rule is explicit that a loose tool is the forgotten kind, and this is three of them in one batch. resource_table_check.js is the one that matters most: it caught a real defect the compiler is structurally unable to see (a short initialiser list for a sized array silently zero-fills), and that defect had already survived six days unnoticed.
+
 ### NR-324 — verify_api's resource-slug mapper is a FIFTH transcription of resource_type, and it is 20 of 37 stale
 *observation · raised 2026-08-18 · from Post-merge run of the Sprint 25a work on a machine that can build SDL/ImGui (2026-08-18).*
 
@@ -1162,4 +1140,31 @@ Neither golden was blessed. NR-328 originally said the hash move should be expla
 *decision taken on your behalf · raised 2026-08-18 · from Ben, 2026-08-18, elicitation form. Brief: plan a series of sprints to the inevitable Era −1 outcome — empire collapse for one of two hegemons, played out in real time in the 0 CE sandbox, as part of generation.*
 
 Put to Ben before any sprint was written, because each ruling changes which sprint opens first and three amend a standing authority. All eight answered same session. (1) REAL TIME = watched replay — no steppable sim, no agent seat, no determinism amendment. (2) HANDOFF = borders plus character — the collapse writes posture, creed and grudges onto surviving nations, which forces the Era −1 record to cross from generation_report into world as a save-format payload (file against BL-107). (3) SURVIVOR = dominant but not hegemonic — share threshold pinned by measurement; HISTORY.md claim 2 survives, only Stage 2 narrows; BL-224 stays a reported tuning target. (4) NATION BEHAVIOUR = granted for Era −1 AND campaign nations — a dated exception to BL-054 in the BL-202/BL-203 shape (pure, seeded, replayable, legal verbs, no planner), to be written into .claude/rules/io-standing-rules.md in Sprint 26 before Lane D builds on it. (5) UN-PARK v0.1.11 whole — BL-155, BL-156, BL-186, BL-280 move to the ancient arc; ROADMAP edit. (6) RESEARCH = spent, not reached — overturns what shipped 2026-08-17 by default rather than by choice (NR-315); needs a debit mechanism. (7) STANCE FIRST — confirms Lane C order and resolves the standing contradiction where NR-312 settled 25a→21→23 while Sprint 23 own block says it must precede 21. (8) PREHISTORY SPAN = keep 400 — the code is right, HISTORY.md and ERAS.md are wrong and get corrected.
+
+### NR-332 — Ordnance has no ancient route — does the 0 CE arc get one, or a different military good?
+*question · raised 2026-08-18 · from Sprint 26b doc truth pass, 2026-08-18; confirmed against scripts/recipes.lua:450 and recipe_registry.hpp:36-38.*
+
+The only military terminal good in the game is tagged era = industrial, and a 0 CE campaign resolves to era_band::ancient, so ordnance cannot be produced in the shipped product. The recipe author deferred an ancient route to BL-429 (ancient building roster) in a source comment and no item was filed, so the deferral went invisible. Filed as BL-460 (ordnance unproducible at 0 CE), priority A.
+
+- (a) Give ordnance an iron_blooms + charcoal ancient route now — small, and it unblocks the rate rollout.
+- (b) Give the ancient arc a DIFFERENT military terminal good, and leave ordnance industrial for the parked space arc.
+
+### NR-334 — Ruling 8 has a second half — does the HARNESS follow production to 400 years, or production follow the struct to 4000?
+*question · raised 2026-08-18 · from Sprint 27 (BL-384 assertion agent) and Sprint 26b (doc truth pass) reported contradictory spans on 2026-08-18. Both were right; the configurations differ.*
+
+history_sim_params defaults to 4000 BCE -> 0 CE on a six-band clock (136 decision rounds). make_hard_coded_world overrides it to 400 BCE -> 0 CE on one 4-year band (100 rounds). Every harness and the Ages view use the struct default; only generation uses the override. Filed as BL-462 (harnesses measure a different sim than ships), priority A.
+
+- (a) Harness follows production — 400 years, one band. Sprint 27's findings get re-measured; the six-band ladder becomes dead default and should be deleted.
+- (b) Production follows the struct — restore 4000 years and six bands in generation. Contradicts ruling 8 and needs BL-320's perf work first.
+- (c) Both are deliberate — a long sandbox config and a short shipped one. Then every harness row must name which config it measured, and the docs must describe both.
+
+### NR-339 — Two generation features are authored and never produced — valley landform and Highway roads
+*observation · raised 2026-08-18 · from Sprint B1 substrate census, 2026-08-18, three seeds.*
+
+The landform valley reports 0.0% on the home body on all three seeds. Road tier 3 (Highway) is never generated — seed 0 produced Track 195 / Road 269 / Highway 0. Both are authored values with rendering and, in the road case, a distinct logistics cost.
+
+### NR-340 — Eight delivery rulings, and the Logistic Points instruction
+*decision taken on your behalf · raised 2026-08-18 · from Ben, 2026-08-18, second elicitation form of the session.*
+
+(1) NR-334 - the HARNESS follows production: 400 years, one band. Sprint 27's findings get re-measured on the shipped config and the six-band ladder becomes dead default. (2) NR-332 - ordnance stays industrial; the ancient arc gets a DIFFERENT military terminal good. (3) NR-321 - upkeep rates go live AFTER that good is producible, then measure pool and golden movement. (4) BL-463 - settlements are BOTH too few and too evenly spread; raise the target AND cluster. (5) The hub reads as ROADS CONVERGING, not a marker or a bigger settlement. (6) NR-339 - make valley landform and Highway roads actually generate. (7) NR-320 - permission granted to register the new harnesses in the verifier-headless skill. (8) Next delivery is Lane C1 (stance). Plus: begin codifying Logistic Points this sprint.
 

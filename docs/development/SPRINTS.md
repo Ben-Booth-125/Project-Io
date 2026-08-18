@@ -57,6 +57,7 @@ and/or a version goal (v0.1.1 etc.).
 | 26b | Close-out and the doc truth pass | **Open 2026-08-18** — 6 items closed on evidence; doc pass in flight |
 | 27 | The run is retained, and its failure falsifiable | **Open 2026-08-18** — Lane A; BL-384 assertion half only, expected RED |
 | B1 | The substrate becomes a number | **Open 2026-08-18** — Lane B; substrate census harness in flight |
+| C1 | Stance, and the first cut of Logistic Points | **Open 2026-08-18** — BL-448+449+461 build, BL-464 design-only |
 
 **Next up (2026-08-10).** Sprint 5 is closed on Ben's call — *"I am happy with the generation
 progress we made"* — and the board went momentarily to zero goaled sprints. The plan for
@@ -67,6 +68,69 @@ tail is *for* — military and space-hardware trade stop being a later layer and
 the remaining minors are supposed to carry. **NR-102 (sequencing decoupling)** is the standing
 structural item this plan is the first answer to: every open item names a minor, but until now
 nothing said in what order to build them.
+
+---
+
+# Sprint C1 — Stance, and the first cut of Logistic Points (opened 2026-08-18)
+
+**Goal.** Land the predicate every military capability waits on — who may fight whom — and begin
+codifying **Logistic Points**, the throughput layer Ben named this date. Cuts toward v0.1.16.
+
+**Chosen over the Era −1 spine deliberately.** Lane A's next two sprints were measuring a
+configuration that does not ship (BL-462), and ruling 1 of NR-340 has just re-pointed them at the
+production config. Tuning a scorer before that re-measurement lands is how Sprint 19 lost its goal.
+Lane C1 has no such dependency.
+
+**Planned.**
+- **BL-448 — corp stance (friend / neutral / hostile)** (`designed`, A, d5): `src/world/stance.*`,
+  a directed hostility map and a canonicalised friendship map, the four verbs. **Determinism
+  harness written FIRST, landed inert.** Assert on in-memory replay, **never** a save round-trip —
+  no serialiser exists, a point all three judges independently confirmed.
+- **BL-449 — stance needs a surface** (`designed`, A): the Corporation panel's stance column and
+  its four presses, gated on BL-068 visibility, with a confirm on `declare_hostile`. **Ships in the
+  same sprint as BL-448, not the next one** — BL-350 landed a complete seam with no press and
+  nobody noticed for weeks.
+- **BL-461 — campaign roster band is industrial** (`designed`, A, d2): the rider. Derive from
+  `era_band_for_epoch` rather than adding a second era concept. Small, and it stops a 0 CE company
+  fielding industrial units.
+- **BL-464 — Logistic Points** (`design-owed`, A, d5): **design only this sprint.** Four readings,
+  materially different, and the shape is owed to Ben before any code. See its own block below.
+
+**Not in this sprint, and why.** BL-450 (rivals score stance) is now *legal* — its grant landed
+today — but it reads `corp_reputation`, which no player press can move (BL-446), so its
+toward-friendly branch would be dead arithmetic on the day it shipped. That is the defect Judge 2
+caught in a candidate plan, and it applies here unchanged.
+
+**Done when** two corporations can hold a stance, a player can see and set it, a rejection mutates
+nothing, the determinism harness is green on in-memory replay, no roster row above the epoch's band
+is offered — and BL-464 has a settled shape with its consumer named.
+
+**Risk.** BL-448 is d5 and BL-464 is a new subsystem. The mitigation is that **BL-464 is scoped to
+design in this sprint**: no accrual-only code lands, because that is precisely the `military_points`
+defect deleted on 2026-08-17.
+
+## BL-464 — what "begin codifying" means here
+
+**It overturns a settled scope line, and that is recorded rather than hidden.** SUPPLY.md
+§ Infrastructure gates lists per-node throughput capacity as *out of prototype scope*, and Sprint
+25 re-affirmed it. Ben's instruction supersedes both under newest-dated-wins; SUPPLY.md is
+corrected as part of landing the work, not ahead of it.
+
+**Why the concept is right regardless of its shape.** BL-325's ruling 3 — *one reach field,
+economic reach IS military reach* — is currently only topological: the network answers *can this be
+reached*. Logistic Points make it **quantitative**: how much can move, and what else that displaces.
+Same network, goods and force alike, which is the ruling made real rather than a second system.
+
+It also hands four shipped systems a consumer they lack — road tiers only discount cost today,
+ports carry no throughput meaning, the Reach lens is a binary field, and convoys never contend.
+
+**The one non-negotiable.** LP lands **with its consumer, in the same batch**. `military_points`
+was deleted for being write-only on 2026-08-17 and NR-257 deleted five resources for it the day
+before. An accrual-only first cut is that defect with a new name.
+
+**Determinism.** Allocation under contention must be **order-independent** — a deterministic
+priority rule over a sorted set, never first-come by iteration order. Guarded by
+`world::state_hash` and `convoy_command.cpp` R5.
 
 ---
 

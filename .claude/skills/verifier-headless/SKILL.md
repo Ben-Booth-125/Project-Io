@@ -370,6 +370,30 @@ in `tools/verify/README.md`.
   harness that loads data by relative path and does not check the load can only ever report
   that it found nothing wrong.
 
+
+- **`substrate_census`** — How civilised is the generated world? (NEW-10, Sprint B1, 2026-08-18.)
+  Reports over N seeds (default 3), measured **after** `generate_background_firms` and at the
+  shipped 400-year prehistory: tiles by composition and landform, population centres and centres
+  per nation, corporations and their focus split, buildings by type and per nation, road tiles by
+  tier plus how many nations have **no** network, markets plus how many nations contain none, and
+  the share of land within N tiles of any building, settlement or road.
+
+  **A report, not a gate** — per BL-224's discipline it measures across seeds and asserts no
+  per-world density threshold. S1–S3 pass. A fourth row, *every nation holds at least one
+  population centre*, was written, measured and **fails at 64%**; it is deliberately non-gating and
+  is the acceptance test for BL-463 (settlement count is seed-invariant).
+
+  **Live-Lua, and this is the same trap `haulage_measure` documents above.** On the generic glob
+  target it links `io_world_obj` only, no sol2 — so `economy.lua`'s demand baskets read all-zero,
+  `generate_background_firms` places **zero firms**, and the census describes a world nobody plays.
+  Declared explicitly in `CMakeLists.txt` with the script-rooted and sweep lists. That this is now
+  the *second* harness to hit it is recorded as NR-338, with the open question of which other
+  generic-target harnesses touch firms.
+
+  Registered as a **`sweep`** (needs `IO_RUN_SWEEPS=1`): ~1.0 s/world at `/O2` but ~62 s/world in
+  Debug, so the three-seed default is ~186 s in a Debug tree — inside 25% of the long tier, the
+  flaky-by-luck margin BL-288 re-tiered the suite to remove. `substrate_census.exe [seeds]`.
+
 ## Running the whole suite (CTest — BL-104)
 
 As of BL-104 every `tools/verify/*.cpp` is a registered CTest test, so the whole logic tier runs
