@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*92 entries — 63 open, 29 resolved.*
+*94 entries — 65 open, 29 resolved.*
 
 ---
 
@@ -726,6 +726,20 @@ All three branched from a base predating the verify-API carve-out, so each still
 First, route labels are clipped mid-word — rows read "Huhaidar -> Kai Sa..." and "Huhaidar -> Huhai..." with the destination cut off, which is the one field distinguishing otherwise identical rows. Second, two of five rows show a quantity of x0 ("Agricultural Produce x0"), each with a live progress bar, an ETA and a non-zero haul cost paid.
 
 **Why it matters.** The clipping defeats the tab's purpose: with several Agricultural Produce convoys in flight, the destination is what tells them apart, and it is the part being truncated. The x0 rows are either a real defect (a convoy dispatched with nothing aboard, still paying haulage) or a legitimate empty return leg that the tab does not distinguish from a laden one — from the surface alone a player cannot tell which, and neither could I.
+
+### NR-328 — Sprint 25a's economy change moved two blessed golden bands, and one of them is the BL-409 byte-identity invariant
+*observation · raised 2026-08-18 · from First full ctest run of the merged tree on a machine that can build everything (2026-08-18). 82 of 85 pass.*
+
+ai_skill_harness and spectator_determinism both fail, and in both the DETERMINISM rows pass — what fails is the comparison against a golden blessed before the sprint. ai_skill_harness: all four BL-204 R0 rows pass (identical state_hash across same-seed runs, identical net-worth curve, identical verb tallies, differing across seeds), but the per-seed net-worth / solvency / dial-thrash bands blessed 2026-08-16 no longer hold. spectator_determinism: R2 reproducibility and R3 spectated-determinism both pass, and the unspectated hash is stable at 1611F1A8F609D3FC across two independently built worlds — but the standing rule's byte-identity row fails, because that rule cites 3CBAD1D44EE71EDE as the pre-BL-409 golden.
+
+**Why it matters.** BL-454/BL-459 gave units a per-tick credit wage and goods draw, and made strength derived. That legitimately changes the simulation, so both goldens SHOULD move — but the spectator one is quoted verbatim in .claude/rules/io-standing-rules.md as the evidence that spectate defaults false and an ordinary session is byte-identical. Leaving a standing rule citing a hash the tree no longer produces makes the rule unfalsifiable: the next reader cannot tell whether it was re-blessed deliberately or quietly broken. That needs your call, not mine, since re-blessing a determinism golden is exactly the move the golden exists to make expensive.
+
+### NR-329 — tier_margin fails three rows, one of them the processing-out-earns-extraction premise
+*observation · raised 2026-08-18 · from Full ctest run of the merged tree (2026-08-18).*
+
+tier_margin reports: 3 recipe inputs that have deposits are never produced; 7 wanted recipe inputs sit on 200+ tiles with no site naming them; and a processing facility does not out-earn an extraction site per tick. The third is already known — the verifier-headless notes on player_seed_sweep record BL-436 measuring exactly that, and warn its G4 depth floor must never be re-read as a profitability gate. The first two rows I have not traced.
+
+**Why it matters.** Not merge damage — tier_margin links only world/*, and nothing merged today touches world logic. It is either inherited from Sprint 25a (which added ordnance and a Fabricator recipe consuming steel + machinery, plausibly moving the sited/produced sets) or older still. Worth knowing which, because the second row — a wanted input on 200+ tiles that nothing sites for — is the shape of a good the economy asks for and cannot get.
 
 ---
 
