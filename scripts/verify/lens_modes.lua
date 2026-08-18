@@ -25,6 +25,14 @@ verify.capture("lens_market")
 verify.set_overlay("supply")
 verify.capture("lens_supply")
 
+-- Off-strip lenses (BL-011/BL-014) — selectable by name since the lens-cycle
+-- count fix; both read the player's trade_routes for the active body.
+verify.set_overlay("reach")
+verify.capture("lens_reach")
+
+verify.set_overlay("supply_routes")
+verify.capture("lens_supply_routes")
+
 verify.set_overlay("resource")
 verify.set_lens_resource("iron_ore")
 verify.capture("lens_resource_iron_ore")
