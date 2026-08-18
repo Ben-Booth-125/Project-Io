@@ -757,6 +757,13 @@ set(IO_TEST_TIMEOUT_LONG 240)
 # RE-TIERED AGAIN 2026-08-13. Wiring the Era -1 year-tick sim into generation
 # added ~23 s to every generated world. Harnesses that do not test the era now
 # say so (tools/verify/harness_params.hpp, `no_prehistory()`) and pay nothing.
+#
+# CORRECTION 2026-08-18: that ~23 s is a **Debug** number, and it is quoted as
+# an unqualified cost here, in hard_coded_world.hpp and in harness_params.hpp.
+# Measured at /O2 /DNDEBUG the same pass is **1.2-1.8 s per world** — roughly
+# 15x cheaper. `no_prehistory()`'s argument still holds for the Debug gate,
+# which is what `build/` is configured as, but any Release-cost reasoning built
+# on ~23 s is wrong by an order of magnitude. See NR-336.
 # era_world_harness cannot: testing the 0 CE world IS its subject, and it builds
 # two of them for its determinism check. It is structurally long-running now,
 # not slow by accident, so it moves tier rather than having the check thinned.
@@ -775,6 +782,20 @@ set(IO_TEST_LONG_HARNESSES
     # suite run, not by the harness reporting anything: a Timeout is a silent
     # failure mode, since the tool prints its findings and exits 0 either way.
     player_seed_sweep
+    # world_determinism moved 2026-08-18, PRE-EMPTIVELY, when BL-462's R3 group
+    # gave it the first prehistory-ON cases it has ever had. Every earlier case
+    # passed `prehistory_years = 0`, so the project's determinism guarantee
+    # excluded the era sim entirely; R3 builds five worlds at the real shipping
+    # default (epoch 0, 400 years) and takes **128 s in Debug** against 10.3 s
+    # at /O2. `build/` is configured Debug, so the 60 s tier would have timed it
+    # out on its very first gate run — the player_seed_sweep failure above,
+    # repeated one day later on the harness that guards determinism itself.
+    # Moved before it ever ran red rather than after, which is the whole point
+    # of writing that story down.
+    # HEADROOM IS THIN: 128 s against this tier's 240 s is ~1.9x, well under the
+    # "3x-6000x" this block claims above. If R3 grows a sixth world, re-tier or
+    # label it `sweep` rather than letting the margin quietly close.
+    world_determinism
 )
 
 # EXCLUDED FROM THE ROUTINE GATE - labelled `sweep`. TWO REASONS live here, and

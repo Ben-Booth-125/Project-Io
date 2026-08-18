@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*100 entries — 68 open, 32 resolved.*
+*102 entries — 70 open, 32 resolved.*
 
 ---
 
@@ -760,6 +760,16 @@ history_sim_params defaults to 4000 BCE -> 0 CE on a six-band clock (136 decisio
 *observation · raised 2026-08-18 · from Sprint 27 assertion agent, 2026-08-18, over seeds 0-7 with real terrain; independently confirmed against an unmodified history_sweep run.*
 
 Where a world fights at all it converts nearly every battle into ground taken (137/144, 272/272, 272/272, 27/27). The transfer branch at history_sim.cpp:996-1027 is NOT the bottleneck, which is what BL-384 was filed against. The real shape is bimodal: 4 of 8 worlds fight nothing whatsoever across the whole run. The 267/0 figure appears descended from the pre-fix w_cult era recorded in the scorer's own comment.
+
+### NR-336 — The era pass costs 1.2-1.8 s in Release, not ~23 s — BL-320's urgency drops by an order of magnitude
+*decision taken on your behalf · raised 2026-08-18 · from Sprint 26a determinism agent, 2026-08-18, MSVC 14.44 pinned, both configurations measured.*
+
+The ~23 s per-world cost of the Era -1 pass is quoted unqualified in CMakeLists.txt, hard_coded_world.hpp and harness_params.hpp, and it is a DEBUG number. At /O2 /DNDEBUG the same pass costs 1.2-1.8 s per world; the whole world_determinism harness runs 10.3 s Release against 128 s Debug. Cost also tracks the province table rather than combat — seed B ran 3x longer with FEWER battles (193 vs 365) and more foundings (994 vs 765).
+
+### NR-337 — The determinism digest would have passed while comparing nothing — the agent caught it, no check would have
+*observation · raised 2026-08-18 · from Sprint 26a determinism agent, 2026-08-18.*
+
+world_determinism's existing digest is world_metrics, a tile-and-count digest. The Era -1 sim touches no tile: it moves provinces between owners and reaches the world only through the nation carve, derived character, names and charter placement. A prehistory-ON case compared on world_metrics alone would have gone green while asserting nothing about the pass it exists to cover. The agent built a deep_digest instead — world::state_hash folded with the political layer that state_hash deliberately omits (nations, tile_to_nation, population centres, corporations, history_log), because state_hash is a tick-boundary instrument and borders do not move on a tick.
 
 ---
 

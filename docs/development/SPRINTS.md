@@ -413,7 +413,14 @@ than a border that quietly changed.
 run completes **identically** whether watched or skipped — the determinism constraint BL-317
 already carries and which ruling 1 keeps intact.
 
-**Risk.** The era pass is already ~23 s of ~25 s of generation. Perf leads for a reason.
+**Risk — RESTATED 2026-08-18, because the number this sprint was ordered around is wrong.**
+It read *"the era pass is already ~23 s of ~25 s of generation, so perf leads"*. Sprint 26a's
+determinism agent measured it: **~23 s is a Debug figure. At `/O2 /DNDEBUG` the pass costs
+1.2–1.8 s per world** — roughly 15× cheaper, and the cost tracks the **province table, not the
+fighting** (a seed with *fewer* battles ran 3× longer). So **BL-320 (Era −1 sim perf) is not the
+gate on watchability it was scoped as**, and this sprint should lead with BL-317's re-basing
+instead. Re-measure before spending a sprint on perf; the honest risk is now the Debug gate's
+runtime, not the player's.
 
 **Explicitly out, per ruling 1:** splitting `run_history_sim` into init / `step_year` / finish, and
 any agent seat on a polity. If that becomes wanted later it is its own item, and it is the one
