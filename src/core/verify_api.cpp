@@ -4,6 +4,7 @@
 /// names are unchanged (scripts/verify/*.lua call them by name).
 
 #include <cstdio>
+#include <iterator>
 #include <chrono>
 #include <thread>
 #include "app.hpp"
@@ -77,34 +78,71 @@ overlay_mode overlay_from_name(const std::string& s)
     return overlay_mode::none;
 }
 
+/// Every `resource_type` as its enum slug, INDEXED BY THE ENUM VALUE — so this is a
+/// positional transcription, not a lookup table that can quietly disagree. The
+/// static_assert below is the tripwire: adding a resource to `resource_type` fails
+/// this translation unit until the slug is appended here.
+///
+/// This table went stale once already (20 of 38 values, 2026-08-18), and the failure
+/// was silent because `resource_from_name` fell back to `iron_ore`: a verify script
+/// naming `ordnance` seeded an IRON ORE convoy and still passed. That is worse than
+/// an error, because the check certifies the wrong good. Hence both the assert and
+/// the warning on the fallback path.
+constexpr const char* k_resource_slugs[] = {
+    "iron_ore",                // 0
+    "coal",                    // 1
+    "petroleum",               // 2
+    "silica",                  // 3
+    "copper_ore",              // 4
+    "rare_earth_ore",          // 5
+    "agricultural_produce",    // 6
+    "water",                   // 7
+    "iron_nickel_ore",         // 8
+    "platinum_group_metals",   // 9
+    "regolith",                // 10
+    "stone",                   // 11
+    "timber",                  // 12
+    "sand",                    // 13
+    "clay",                    // 14
+    "peat",                    // 15
+    "tobacco",                 // 16
+    "spices",                  // 17
+    "coffee",                  // 18
+    "furs",                    // 19
+    "steel",                   // 20
+    "refined_fuel",            // 21
+    "food_rations",            // 22
+    "charcoal",                // 23
+    "iron_blooms",             // 24
+    "trade_goods_misc",        // 25
+    "propellant",              // 26
+    "silicon",                 // 27
+    "refined_copper",          // 28
+    "ree_alloy",               // 29
+    "machinery",               // 30
+    "alloys",                  // 31
+    "electronics",             // 32
+    "spacecraft_components",   // 33
+    "clean_water",             // 34
+    "consumer_goods",          // 35
+    "medical_supplies",        // 36
+    "ordnance",                // 37
+};
+static_assert(std::size(k_resource_slugs) == static_cast<std::size_t>(resource_type::count),
+              "resource_type grew - append its slug to k_resource_slugs (and keep the order)");
+
 /// Map a resource enum-slug to its `resource_type`, for the verify lens hooks. The
-/// full prototype set so a check can name any good; unknown names fall back to iron_ore.
+/// full roster, so a check can name any good. An unknown name still falls back to
+/// iron_ore (a script naming a good that does not exist should not abort a capture
+/// run) but SAYS SO, because a silent fallback reads as a passing check.
 resource_type resource_from_name(const std::string& s)
 {
-    static const std::unordered_map<std::string, resource_type> m = {
-        {"iron_ore", resource_type::iron_ore},
-        {"coal", resource_type::coal},
-        {"petroleum", resource_type::petroleum},
-        {"silica", resource_type::silica},
-        {"copper_ore", resource_type::copper_ore},
-        {"rare_earth_ore", resource_type::rare_earth_ore},
-        {"agricultural_produce", resource_type::agricultural_produce},
-        {"water", resource_type::water},
-        {"iron_nickel_ore", resource_type::iron_nickel_ore},
-        {"platinum_group_metals", resource_type::platinum_group_metals},
-        {"regolith", resource_type::regolith},
-        {"stone", resource_type::stone},
-        {"timber", resource_type::timber},
-        {"sand", resource_type::sand},
-        {"clay", resource_type::clay},
-        {"peat", resource_type::peat},
-        {"steel", resource_type::steel},
-        {"refined_fuel", resource_type::refined_fuel},
-        {"food_rations", resource_type::food_rations},
-        {"propellant", resource_type::propellant},
-    };
-    const auto it = m.find(s);
-    return it != m.end() ? it->second : resource_type::iron_ore;
+    for (std::size_t i = 0; i < std::size(k_resource_slugs); ++i)
+        if (s == k_resource_slugs[i])
+            return static_cast<resource_type>(i);
+
+    SDL_Log("verify: unknown resource '%s' - falling back to iron_ore", s.c_str());
+    return resource_type::iron_ore;
 }
 
 /// Find a body by ROLE, or failing that by case-insensitive name. Returns

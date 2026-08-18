@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*91 entries — 63 open, 28 resolved.*
+*92 entries — 63 open, 29 resolved.*
 
 ---
 
@@ -706,13 +706,6 @@ The unit Selection card's Strength page now shows a derived figure with its coun
 
 **Why it matters.** BL-260's rule is that every information surface declares the question it answers, and the enforcement is authorship rather than machinery - so a missed entry is missed permanently and silently. This is exactly the gap the question log exists to expose: a surface that changed with no recorded justification. The merge-hazard reasoning was correct at the time and the debt is now mine, not the agent's.
 
-### NR-324 — verify_api's resource-slug mapper is a FIFTH transcription of resource_type, and it is 20 of 37 stale
-*observation · raised 2026-08-18 · from Post-merge run of the Sprint 25a work on a machine that can build SDL/ImGui (2026-08-18).*
-
-resource_from_name in src/core/verify_api.cpp maps only 20 of the 37 resource_type values, and falls back to iron_ore for anything it does not know. A verify script naming ordnance therefore seeds an IRON ORE convoy and the capture reads 'Iron Ore x8' — silently, with no error. Confirmed live: verify.seed_convoy(...,'ordnance',...) rendered as Iron Ore in the BL-453 Convoys tab. tools/session/resource_table_check.js passes (38 values agree) because it joins components.hpp, recipe_registry.cpp, world_gen_config.cpp and presentation.cpp — it does not know about this fifth table.
-
-**Why it matters.** BL-457's own guard was written precisely to stop a resource roster drifting across hand-maintained copies, and it reports OK while a fifth copy is missing 17 goods including the sprint's headline one. The silent iron_ore fallback is the bad part: a visual check that MEANT to exercise ordnance exercises iron ore and still passes, so the check certifies the wrong thing. This is the same class of defect as the '(unnamed resource)' bug that guard was built to catch.
-
 ### NR-325 — Two fold-out ledgers open at once overlap in the same column slot rather than one replacing the other
 *observation · raised 2026-08-18 · from Post-merge visual run, BL-453 Convoys tab capture (2026-08-18).*
 
@@ -726,6 +719,13 @@ With the Corporations dashboard already open, verify.show_panel('market', true) 
 All three branched from a base predating the verify-API carve-out, so each still had run_verify and its helpers inside src/core/app.cpp, which main has since split into src/core/verify_api.cpp. Merging their app.cpp hunks would have re-created deleted code. Resolution taken: app.cpp took HEAD wholesale in both conflicts, and the intent was re-ported by hand — the lens branch needed nothing (main's verify_api.cpp already maps reach and supply_routes), and elated-mclean's verify.scroll_panel binding was moved into verify_api.cpp beside panel_view, with the SKILL.md pointer corrected from app.cpp to verify_api.cpp. Also: every golden PNG the three branches carried was DROPPED rather than merged, since main's curated set is the two icon_silhouettes files after the 2026-08-15 demotion. For the lens-cycle conflict, the branch's overlay_mode::count sentinel was taken over main's last-enumerator + static_assert, because the enum now carries the sentinel and it needs no hand maintenance.
 
 **Why it matters.** This is the stale-base failure mode again — worktrees isolate writes, not history — and it is the third recorded instance. A clean textual merge here would have compiled and silently reverted a refactor. Recording it so the re-port is visible as a decision rather than looking like the branches merged cleanly.
+
+### NR-327 — Two presentation issues visible in the BL-453 Convoys tab on its first real render
+*observation · raised 2026-08-18 · from Post-merge visual pass, first time the Convoys tab has been rendered on a machine that can build ImGui (2026-08-18).*
+
+First, route labels are clipped mid-word — rows read "Huhaidar -> Kai Sa..." and "Huhaidar -> Huhai..." with the destination cut off, which is the one field distinguishing otherwise identical rows. Second, two of five rows show a quantity of x0 ("Agricultural Produce x0"), each with a live progress bar, an ETA and a non-zero haul cost paid.
+
+**Why it matters.** The clipping defeats the tab's purpose: with several Agricultural Produce convoys in flight, the destination is what tells them apart, and it is the part being truncated. The x0 rows are either a real defect (a convoy dispatched with nothing aboard, still paying haulage) or a legitimate empty return leg that the tab does not distinguish from a laden one — from the surface alone a player cannot tell which, and neither could I.
 
 ---
 
@@ -1076,4 +1076,13 @@ As first proposed, Sprint 25 shared no dependency with Sprints 21-24 and could h
 **Why it matters.** It changes what 'run Sprint 25 next' means, and it should not be discovered at promotion time. 25a is a full sprint on its own and lands the substrate 25b needs; 25b is one item that cannot start until two other proposals have landed. The honest sequence is now 21 -> 23 -> 25b, with 25a insertable anywhere before it. Ben should know that accepting the rescope moved the payoff item behind two things he has not yet opened.
 
 > **RESOLVED.** ANSWERED 2026-08-17 (Ben): run 25a next - BL-457 (ordnance), BL-454 (upkeep), BL-452/BL-453 (dispatch + ledger), BL-455, BL-456, plus BL-459 (unit strength + adapter) which the same session's rulings added to the phase. Sequence is 25a -> 21 -> 23 -> 25b. The split stands as the decision taken; this entry closes with the sequence confirmed rather than overturned.
+
+### NR-324 — verify_api's resource-slug mapper is a FIFTH transcription of resource_type, and it is 20 of 37 stale
+*observation · raised 2026-08-18 · from Post-merge run of the Sprint 25a work on a machine that can build SDL/ImGui (2026-08-18).*
+
+resource_from_name in src/core/verify_api.cpp maps only 20 of the 37 resource_type values, and falls back to iron_ore for anything it does not know. A verify script naming ordnance therefore seeds an IRON ORE convoy and the capture reads 'Iron Ore x8' — silently, with no error. Confirmed live: verify.seed_convoy(...,'ordnance',...) rendered as Iron Ore in the BL-453 Convoys tab. tools/session/resource_table_check.js passes (38 values agree) because it joins components.hpp, recipe_registry.cpp, world_gen_config.cpp and presentation.cpp — it does not know about this fifth table.
+
+**Why it matters.** BL-457's own guard was written precisely to stop a resource roster drifting across hand-maintained copies, and it reports OK while a fifth copy is missing 17 goods including the sprint's headline one. The silent iron_ore fallback is the bad part: a visual check that MEANT to exercise ordnance exercises iron ore and still passes, so the check certifies the wrong thing. This is the same class of defect as the '(unnamed resource)' bug that guard was built to catch.
+
+> **RESOLVED.** Fixed 2026-08-18. resource_from_name now resolves against k_resource_slugs, a POSITIONAL array indexed by the enum value, carrying all 38 slugs; a static_assert on its length fails the translation unit if resource_type grows. The iron_ore fallback is kept (a script naming a non-existent good should not abort a capture run) but now SDL_Logs the name, so the silence that made this dangerous is gone. resource_table_check.js gained verify_api.cpp as a fifth table and checks slug ORDER, which the static_assert cannot. Both failure modes negative-tested: a dropped slug and a shifted one each fail the guard. Verified live — the same seeded convoy that rendered "Iron Ore x8" now renders "Ordnance x8" in its own identity colour, and a bogus name prints the warning.
 

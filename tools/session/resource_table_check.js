@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 // resource_table_check.js — the static join BL-414 is missing, in the cheap form.
 //
-// resource_type is transcribed by hand into FOUR places and no two of them are
+// resource_type is transcribed by hand into FIVE places and no two of them are
 // checked against each other:
 //
 //   1. src/world/components.hpp          the enum — the authority
 //   2. src/world/recipe_registry.cpp     name -> enum, for recipes.lua / economy.lua
 //   3. src/world/world_gen_config.cpp    name -> enum, for world_gen.lua
 //   4. src/ui/presentation.cpp           a POSITIONAL array of display rows
+//   5. src/core/verify_api.cpp           a POSITIONAL array of enum slugs, for
+//                                        the verify hooks that take a good by name
 //
 // Every one of those has already failed in a way nobody caught at review:
 //   * BL-286 added eleven values the Lua loader could not parse — eleven days
@@ -19,6 +21,10 @@
 //     rendered as "(unnamed resource)" from 2026-08-11 until BL-457 found it
 //     on 2026-08-17 — a positional array silently value-initialises its tail,
 //     so the compiler never says a word.
+//   * verify_api.cpp's slug table sat at 20 of 38 values and fell back to
+//     iron_ore for the rest, so a check naming 'ordnance' seeded an IRON ORE
+//     convoy and passed (NR-324, 2026-08-18). This guard reported OK throughout,
+//     because it only knew about the other four.
 //
 // This is not BL-414's fix. BL-414 consolidates the tables so the desync cannot
 // be authored; this only *detects* it, and should be deleted the day that lands.
@@ -38,6 +44,7 @@ const MAPS = [
   ['world_gen_config', 'src/world/world_gen_config.cpp'],
 ];
 const PRESENTATION = 'src/ui/presentation.cpp';
+const VERIFY_SLUGS = 'src/core/verify_api.cpp';
 
 const quiet = process.argv.includes('--quiet');
 const read = f => fs.readFileSync(f, 'utf8');
@@ -76,8 +83,20 @@ function readPresentation() {
   return [...block.matchAll(/^\s*\{\s*(?:"([^"]*)"|nullptr)/gm)].map(m => m[1] ?? null);
 }
 
+// --- 5. the positional slug array the verify hooks resolve names through -----
+// Same failure shape as presentation.cpp, and the same reason a compiler cannot
+// see it: the entries are plain strings, so a short or reordered table is legal.
+// verify_api.cpp carries its own static_assert on the LENGTH; this checks the
+// ORDER, which the assert cannot.
+function readVerifySlugs() {
+  const tbl = read(VERIFY_SLUGS).split('k_resource_slugs[] = {')[1];
+  if (!tbl) throw new Error('k_resource_slugs not found in ' + VERIFY_SLUGS);
+  return [...tbl.split('\n};')[0].matchAll(/"([a-z_][a-z0-9_]*)"/g)].map(m => m[1]);
+}
+
 const { values, count } = readEnum();
 const present = readPresentation();
+const slugs = readVerifySlugs();
 const maps = MAPS.map(([label, file]) => [label, file, readNameMap(file)]);
 
 const problems = [];
@@ -113,14 +132,29 @@ for (let i = 0; i < Math.min(present.length, values.length); ++i) {
   }
 }
 
+// The slug array is positional AND its entries are the enum names verbatim, so a
+// mismatch at index i is unambiguous — no fuzzy display-name comparison needed.
+if (slugs.length !== values.length) {
+  problems.push(
+    `verify_api.cpp: ${slugs.length} slugs for ${values.length} enum values — ` +
+    `a verify script naming any of the missing goods silently gets iron_ore instead`
+  );
+}
+for (let i = 0; i < Math.min(slugs.length, values.length); ++i) {
+  if (slugs[i] !== values[i].name) {
+    problems.push(`verify_api.cpp: index ${i} is '${values[i].name}' but the slug reads '${slugs[i]}' — the array has shifted`);
+  }
+}
+
 if (problems.length) {
   console.error(`resource_table_check: ${problems.length} problem(s)\n`);
   for (const p of problems) console.error('  FAIL  ' + p);
-  console.error(`\n${values.length} enum values checked against 3 transcriptions.`);
+  console.error(`\n${values.length} enum values checked against 4 transcriptions.`);
   process.exit(1);
 }
 
 if (!quiet) {
   console.log(`resource_table_check: OK — ${values.length} resource_type values agree across`);
-  console.log('  components.hpp, recipe_registry.cpp, world_gen_config.cpp, presentation.cpp');
+  console.log('  components.hpp, recipe_registry.cpp, world_gen_config.cpp, presentation.cpp,');
+  console.log('  verify_api.cpp');
 }
