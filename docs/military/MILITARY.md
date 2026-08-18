@@ -1,9 +1,9 @@
 # Project Io — Military
 
 The military layer is **parts, not a system**. Two battle resolvers, a unit roster, a muster
-building, a hire verb and a terrain model all ship compiled in the binary. What does not ship is
-anything that makes them meet: no hostility, no engagement trigger, no unit verbs, and no code
-that turns a `unit_component` into an army.
+building, a hire verb, a terrain model, a per-tick upkeep pass and a roster→combat adapter all
+ship compiled in the binary. What does not ship is anything that makes them meet: no hostility, no
+engagement trigger, no unit verbs, and nothing in production that calls the adapter.
 
 This document is the authority for what is built, written 2026-08-17 against the source. It exists
 because the absence of one cost real work: three sprint proposals in a row described the campaign
@@ -12,6 +12,17 @@ Nobody had a doc to check.
 
 Read § Build status first if you only want the landed/outstanding split. Read § What is absent
 before assuming any capability here is reachable in play.
+
+> **CORRECTED 2026-08-18 against the source.** This document was written at commit `6153278` and
+> the commit that landed Sprint 25a's military work — `0936400`, BL-454 (unit upkeep) and BL-459
+> (unit strength is a duplicate of count) — **did not touch it**. It updated `FINANCE.md` instead.
+> Three sections were stale within a day of being written: the unit model's field table, the
+> upkeep and decay entries in § What is absent, and § Build status.
+>
+> **THE ONE THING TO TAKE FROM THIS PASS: upkeep ships at RATE ZERO.** An army costs nothing to
+> keep today. The pass runs, the plumbing is real, and every authored rate in `scripts/economy.lua`
+> § `economy.military.unit_upkeep` is literally `0.0`. Do not read anything below as saying force
+> has a running cost — see § Upkeep, at rate zero.
 
 ---
 
@@ -208,7 +219,8 @@ for the old barrier bool, and **neither resolver reads it** — its consumers ar
 ## The unit model
 
 A unit is a **group token**, not a stat block. `unit_component` in `src/world/components.hpp`
-carries five fields:
+carries six fields (**table corrected 2026-08-18** — BL-459 removed `strength`, BL-454 added the
+last two):
 
 | Field | Type | Notes |
 |---|---|---|
@@ -216,7 +228,13 @@ carries five fields:
 | `owner` | `entity_id` | Corporation or faction entity that controls it. |
 | `count` | `int` | Number of units in the group. |
 | `type` | `uint16_t` | Opaque index into the roster table. |
-| `strength` | `int32_t` | Documented as a fixed-point combat scalar — see § Two live inconsistencies. |
+| `supply_factor_permille` | `int32_t` | How well supplied, 1000 = full. Moved only by the upkeep pass's one decay rule (BL-454, unit upkeep). |
+| `muster_base` | `entity_id` | The `military_base` this unit was raised at, or `null_entity`. The **orphan key** — see § Upkeep, at rate zero. |
+
+**There is no stored `strength`.** BL-459 (unit strength is a duplicate of count) removed the
+field and made strength derived — `unit_strength(w, u)` in `src/world/unit_roster.hpp` returns
+`count × roster_type_quality × supply_factor` at ×100 fixed point. It returns an **integer** on
+purpose, so a sum over the unordered `w.units` stays order-independent.
 
 **Position is tile-canonical.** BL-157 (military datamodel stub) ruled tile position canonical over
 body/province on 2026-08-07; the struct shipped with a `body` field ahead of that ruling, and
@@ -228,19 +246,28 @@ the container's iteration order off the determinism seam.
 
 **Three writers exist**, and no other code creates a unit:
 
-- `src/world/hard_coded_world.cpp` — the Kepler player stub, count 50, type left at 0.
-- `src/world/corporation_generation.cpp` — the player corp's starting unit beside its starting base (BL-331, starting military presence), count 50, roster row 0.
-- `src/world/corp_command.cpp` — the `hire_unit` verb, count `hire_batch_manpower` = 50.
+- `src/world/hard_coded_world.cpp` — the Kepler player stub, count 50, type left at 0. **No `muster_base`** (that world has none), so it is deliberately never orphaned.
+- `src/world/corporation_generation.cpp` — the player corp's starting unit beside its starting base (BL-331, starting military presence), count 50, roster row 0. Records that base as its `muster_base`.
+- `src/world/corp_command.cpp` — the `hire_unit` verb, count `hire_batch_manpower` = 50. Records the tile's qualifying base, lowest entity id first.
 
-**No code turns a `unit_component` into an `army_stack_entry`.** `roster_stack` composes a stack
-from *province manpower*, and its only caller is the Era −1 sim. The campaign has units and it has
-resolvers, and there is no bridge between them.
+**The bridge now exists — and nothing in production crosses it (corrected 2026-08-18).** This
+section used to say no code turns a `unit_component` into an `army_stack_entry`. BL-459 added
+`unit_to_stack_entry(w, u)` (`src/world/unit_roster.hpp`), the adapter that resolves a live unit
+into the value both resolvers accept: supply is carried in the entry's `count`, quality in its
+`type_power_mod` — deliberately not both in one place, since doubling quality into count would
+square it against `unit_strength`.
+
+**Its only caller is `tools/verify/unit_upkeep.cpp` (check U7).** So the accurate statement is now
+narrower and worse: the campaign has units, resolvers *and* a bridge, and still nothing decides
+that a fight happens. `roster_stack` — the other composition path, from *province manpower* — is
+still Era −1's alone.
 
 **What reads a unit today.** Two condition subjects — `military_units` (summed counts) and
-`military_strength` (summed strengths) — in `src/world/condition_set.cpp`, available to laws, techs
-and quests. The Selection element's read-only unit card (Strength / Roster pages) and the hover
-summary in `src/ui/entity_summary.cpp`. The corp AI, counting its own units against a soft cap of
-three. That is the whole list.
+`military_strength` (summed derived strengths) — in `src/world/condition_set.cpp`, available to
+laws, techs and quests. The Selection element's read-only unit card (Strength / Roster pages) and
+the hover summary in `src/ui/entity_summary.cpp`, both of which now print the derived strength plus
+its `count × quality × supply` derivation. The corp AI, counting its own units against a soft cap
+of three. The upkeep pass and the budget's `upkeep` term. That is the whole list.
 
 **A unit is not drawn on the canvas.** The old stroke-only unit chevron was deleted uncalled
 (BL-294) and no marker replaced it. A unit is reached by clicking its tile: the Planetary canvas
@@ -289,10 +316,14 @@ the resource leg alone tested and spent nothing, and the cheapest rows were free
 any seam caller. Both legs are checked before either is debited, so a refusal leaves the corp
 wholly uncharged.
 
-On success: a new unit entity at the muster tile, `count` and `strength` both
-`hire_batch_manpower`, returned through `apply_corp_command`'s out-param. The player's press then
-selects the new unit; the rival scorer's path additionally reports an `agency_event::kind::hired`
-for the decision feed and session history.
+On success: a new unit entity at the muster tile with `count = hire_batch_manpower`, returned
+through `apply_corp_command`'s out-param. *(Corrected 2026-08-18: this line also said `strength`
+was set — BL-459 removed that field.)* The verb records the base it was raised at as the unit's
+`muster_base`; where the tile carries more than one qualifying base, the **lowest entity id**
+wins, so the choice is deterministic.
+
+The player's press then selects the new unit; the rival scorer's path additionally reports an
+`agency_event::kind::hired` for the decision feed and session history.
 
 **Rivals hire through the same verb** (BL-324's widening of the AI-agency exception, standing
 rules § Determinism & data model). `src/world/corp_ai.cpp` scores hiring alongside build, demolish,
@@ -306,9 +337,11 @@ becoming an unconditional extra action every evaluation.
 tree: availability is derived from ground and era band, with no research, no player choice and no
 unlock events.
 
-Eighteen rows across four cumulative bands — `classical`, `medieval`, `gunpowder`, `industrial`.
-Bands are cumulative because nothing un-invents a spear: an industrial polity still fields levies
-where its ground cannot pay for better.
+**Nineteen** rows across four cumulative bands — `classical` 7, `medieval` 4, `gunpowder` 4,
+`industrial` 4. (Counted from `g_table` in `src/world/unit_roster.cpp` on 2026-08-18; this
+document said "eighteen", which was wrong on the day it was written.) Bands are cumulative because
+nothing un-invents a spear: an industrial polity still fields levies where its ground cannot pay
+for better.
 
 Each row carries `{name, band, cls, gate, power_mod, weight}`. The `roster_gate` is four thresholds
 on 0..1000 endowment axes: `ore_q`, `farm_q`, `port_q`, `energy_q`.
@@ -337,14 +370,96 @@ graduated dial; quantity-scaled readiness is a follow-on.
 | `energy_q` | Holds any coal, refined fuel or petroleum |
 
 `campaign_roster_band` is fixed at `industrial`. It is **not** derived from a military-capacity
-score — that is the Era −1 settlement model. The campaign is simply industrial-era throughout, and
-because bands are cumulative, every earlier row the corp's ground supports is still exposed.
+score — that is the Era −1 settlement model — and because bands are cumulative, every earlier row
+the corp's ground supports is still exposed.
+
+> **This is now a defect, not a design (recorded 2026-08-18; not fixed here).**
+> `inline constexpr roster_band campaign_roster_band = roster_band::industrial;`
+> (`src/world/unit_roster.hpp:61`) still carries its original comment, *"The 1960s campaign's fixed
+> roster band"*. The default campaign epoch moved to **0 CE** on 2026-08-12
+> (`world_params::epoch_year = 0`, `src/world/hard_coded_world.hpp:51`) and this constant did not
+> move with it.
+>
+> It is a compile-time constant read by three call sites — the hire panel
+> (`src/ui/selection_panel.cpp:2656`), the rival scorer (`src/world/corp_ai.cpp:1303`) and the
+> `hire_unit` verb (`src/world/corp_command.cpp:421`). Nothing derives it from `epoch_year`, and
+> nothing consults `era_band` (`src/world/recipe_registry.hpp`), which *does* switch on the epoch
+> and masks the industrial building/recipe roster out of an ancient campaign.
+>
+> So an ancient-era campaign offers Rifle Regiments and Mechanised Columns, filtered only by the
+> stockpile gate. Filed here in § What is absent; the fix is a separate change.
 
 `roster_stack(manpower, province, band, readiness)` composes an army stack from province manpower.
 Later bands crowd out earlier ones — a row's weight decays ×0.35 per band it sits below the
 polity's own, so a rifle-era army is not half levy spears. Readiness folds into each entry's
 `type_power_mod` as `(readiness − 1000) / 10`, which is the same channel cohesion and defensive
 works use.
+
+---
+
+## Upkeep, at rate zero
+
+Added 2026-08-18, describing BL-454 (unit upkeep) as it landed at commit `0936400`.
+
+**Read this first: an army costs nothing to keep.** The pass is wired, harnessed and running every
+economy tick, and **every authored rate is `0.0`** — `scripts/economy.lua`
+§ `economy.military.unit_upkeep`. Nothing is charged, no pool is drawn, no draw can go unmet, and
+no unit's supply factor ever moves. The item shipped **inert on purpose**, so no economy golden
+moved on landing and the pricing can be tuned by playtest against a measured baseline.
+
+The authored table, in full, as it ships:
+
+| Rate | Value | What it would do |
+|---|---|---|
+| `credits_per_head` | `0.0` | Flat wage per head per tick |
+| `credits_per_head_per_power` | `0.0` | Wage scaled by the roster row's `power_mod` |
+| `goods_per_head.ordnance` | `0.0` | The **ordnance** draw (BL-457, ordnance) |
+| `goods_per_head.food_rations` | `0.0` | The sanctioned second line |
+| `supply_decay_permille` | `0` | The one decay subtraction |
+| `supply_recovery_permille` | `0` | Regained per tick while supplied |
+| `out_of_supply_reach` | `0.0` | Reach cost past which a unit is out of supply; ≤ 0 **disables the trigger** |
+
+**Two halves, two homes.** The credit half is its own term in `apply_budget`
+(`src/world/budget_system.cpp:173`, surfacing as `corp_budget::upkeep`). The goods half is a pool
+debit in `run_unit_upkeep` (`src/world/economy_system.cpp:1468`), drawn from the unit's
+`(owner, body)` stockpile.
+
+**Ordnance is the good, and it is authored as data.** BL-457 (ordnance) added
+`resource_type::ordnance` as the roster's first terminal military good precisely so this draw had
+something to consume. Naming a good here is a one-line `economy.lua` change, never a code change.
+
+> **The ordnance draw could not be met at the shipped epoch anyway (noted 2026-08-18).** The
+> Fabricator recipe that makes ordnance is tagged `era = "industrial"` (`scripts/recipes.lua`
+> id 27), and the default 0 CE campaign resolves to `era_band::ancient`
+> (`era_band_for_epoch`, `src/world/recipe_registry.hpp:36`), which masks it out of the allowed
+> roster. So even at a non-zero rate, an ancient campaign has no way to produce the good its
+> upkeep would draw. The same epoch mismatch as `campaign_roster_band`, one layer down.
+
+**One decay rule, two triggers.** A unit is unsupplied if it sits beyond the reach field *or* its
+goods draw went unmet. Both fire the **same** subtraction on `supply_factor_permille`, because both
+mean the same thing — an army that is not being supplied gets weaker. It is deliberately not two
+rules.
+
+The reach trigger is **opt-in**: a non-positive `out_of_supply_reach` disables it *and* the
+Dijkstra behind it, so the default rates cost no time as well as no credits.
+
+**Determinism.** The pass visits units in **ascending entity id**, sorted out of the unordered
+`w.units`, because two units of one corp on one body draw from a shared pool — the visit order
+decides which one goes short. That is load-bearing, not cosmetic.
+
+**Orphan cleanup — the demolish gap, closed.** `demolish_building` erases the building, the corp
+asset and the stockpile but never touches `w.units`, so demolishing a muster base used to leave its
+units standing on a tile whose base was gone. The upkeep pass disbands a unit whose `owner`, tile,
+or `muster_base` has been erased. It runs **last** in the economy step, so a base torn down this
+tick orphans its units in the same tick rather than leaving them live for one.
+
+`muster_base == null_entity` means "no base recorded" — the hard-coded world's stub unit — and is
+never orphaned.
+
+**Supply is measurably real in the resolver, not merely expensive.** `unit_strength` and
+`unit_to_stack_entry` both read `supply_factor_permille`, so an unsupplied army is weaker where it
+counts. At rate zero no unit ever becomes unsupplied, so this path is untravelled in play and
+exercised only by the harness.
 
 ---
 
@@ -370,29 +485,43 @@ building one changes nothing in the reach field.
 The ruling's reason is legibility over local cleverness. A second field would mean two answers to
 "how far can I operate", diverging quietly, and a player learning the road network twice.
 
-Its consequence — units beyond the envelope losing strength each tick — is BL-325's slice S3 and is
-**not built**. That slice is sequenced behind BL-315 (armed house conflict spine), per NR-177: do
-not land a decay rule for units that nothing yet commands.
+Its consequence — units beyond the envelope losing strength each tick — is BL-325's slice S3.
+
+> **S3 is now BUILT, and OFF (corrected 2026-08-18).** This paragraph said "not built" and was
+> written the day before BL-454 (unit upkeep) landed it. `run_unit_upkeep` calls `body_reach_field`
+> and `tile_reach_cost`, and a unit whose tile cost exceeds `out_of_supply_reach` — or which is
+> unreachable outright — takes the decay subtraction. `!(rc <= limit)` rather than `rc > limit`, so
+> infinity and NaN both read as out of supply.
+>
+> **The authored limit is `0.0`, which disables the trigger entirely** (§ Upkeep, at rate zero), so
+> no unit has ever gone out of supply in a shipped campaign. The rule exists; the number does not.
+> The sequencing worry NR-177 recorded — do not land a decay rule for units nothing commands —
+> was answered by landing it inert rather than by deferring it.
 
 ---
 
-## Two live inconsistencies
+## Two inconsistencies — both now RESOLVED
 
-Both are recorded here as **in-flight**, not settled. Do not write code against the intended shape;
-write it against what the source does today.
+Retitled 2026-08-18: this section was headed "Two live inconsistencies". Neither is live.
 
-**1. `unit_component::strength` duplicates `count`.** It is documented as a fixed-point combat
-strength scalar (BL-157, military datamodel stub), but all three writers set it equal to the raw
-manpower count with no scale factor. Both UI readers — the Selection strength page and the hover
-summary — print it raw, rather than guessing a divisor that would disagree with each other.
+**1. `unit_component::strength` duplicated `count` — RESOLVED 2026-08-17, by derivation.** All
+three writers used to set the stored field equal to raw manpower, so it carried no information
+`count` did not, and both UI readers printed it raw.
 
-BL-459 (unit strength is a duplicate of count) is in flight and changes this to a **derived** value:
-`count × roster_type_quality × supply_factor` at ×100 fixed point, with the stored field dropped so
-the duplicate cannot return. Until it lands, `strength` carries no information `count` does not.
+BL-459 (unit strength is a duplicate of count) landed at commit `0936400`. The stored field is
+**dropped** — so the duplicate cannot return — and strength is computed on read:
+`count × roster_type_quality × supply_factor`, ×100 fixed point, integral throughout
+(`unit_strength`, `src/world/unit_roster.hpp`). Scale anchor: at quality 1.0 and full supply,
+`strength == count * 100` exactly.
 
-Note the third reader, which is not UI: `condition_subject::military_strength`
-(`src/world/condition_set.cpp`) sums `uc.strength` across a corp's units, so laws and tech gates
-read it too.
+Quality is **derived from the row's `power_mod`** rather than authored as a second number, so there
+is one per-type quality figure and it cannot drift from the one combat already reads. Levy Spear
+(power_mod 0) is 1000; Rifle Regiment (380) is 1380.
+
+All three readers moved with it: the Selection strength page and the hover card now show the
+derivation, and `condition_subject::military_strength` (`src/world/condition_set.cpp:138`) sums
+`unit_strength` — an **integer** sum, which is what keeps the walk over the unordered `w.units`
+order-independent.
 
 **2. `corporation_component::military_points` — RESOLVED 2026-08-17, by deletion.** Every completed
 `military_base` used to credit it a flat rate each economy tick, and nothing in `src/` ever read it.
@@ -400,7 +529,8 @@ read it too.
 BL-455 (military points and science are write-only) removed the field, its Lua rate, its parameter,
 its write branch and every assertion about it. No consumer could be named: the economy→military
 interface is already the base tile plus the reach field (§ One reach field), and the recurring cost
-of force is already credits and ordnance (BL-454, unit upkeep).
+of force is already credits and ordnance (BL-454, unit upkeep — *shape* only; both rates are zero,
+§ Upkeep, at rate zero).
 
 **A military base now accumulates nothing.** It gates hiring and it occupies a tile; it does not
 produce a currency. If the governing-body pivot (BL-094) later wants a military-capacity scalar,
@@ -415,21 +545,23 @@ below is a real gap with a named owner.
 
 - **No hostility model.** No corp may be at war with, or allied to, another. BL-448 (friend/neutral/hostile corp stance) is the item; the settled shape is hostility **directed** (declared unilaterally) and friendship **symmetric** (offered and accepted). It is not built, and until it is there is no legal predicate on an attack verb and no condition for an engagement trigger.
 - **No unit-subject verbs.** Every command verb names a tile, a building, a body or an order; none names a unit. So a unit cannot be moved, merged, disbanded, garrisoned or ordered — it is created at its muster tile and stays there for the campaign. BL-393 (units are write-only and inert) and BL-314 (unit verb family) own this.
-- **No engagement trigger.** Nothing in the world decides that two forces are fighting. `resolve_campaign_battle` has no caller but its harness, and no code composes an `army_stack_entry` from a `unit_component`, so the resolver could not be called even if something wanted to.
+- **No engagement trigger.** Nothing in the world decides that two forces are fighting. `resolve_campaign_battle` has no caller but its harness. *(Amended 2026-08-18: the second half of this bullet — "no code composes an `army_stack_entry` from a `unit_component`" — is no longer true. `unit_to_stack_entry` exists (BL-459) and only the harness calls it. The resolver **could** now be called; nothing wants to.)*
 - **No battle state in the world.** `campaign_battle_state` is a value a caller holds, not a world component. Nothing serialises a fight in progress, and nothing steps one across ticks.
-- **No upkeep.** A standing force costs credits once, at hire, and nothing thereafter. `scripts/economy.lua` records the absence explicitly. BL-454 (unit upkeep) owns it.
-- **No out-of-supply decay.** BL-325 slice S3, above. Units outside the reach envelope suffer nothing.
+- **No upkeep *rate*.** *(Rewritten 2026-08-18 — the old bullet said "No upkeep", which BL-454 falsified.)* The upkeep **pass** ships and runs every economy tick, both halves wired: credits through `apply_budget`, goods through `run_unit_upkeep`. What is absent is a **number** — every authored rate is `0.0`, so a standing force still costs credits once, at hire, and nothing thereafter. Turning it on is an `economy.lua` edit, not a code change. See § Upkeep, at rate zero.
+- **No out-of-supply decay *in effect*.** *(Rewritten 2026-08-18 — the old bullet said the rule was unbuilt; BL-325 S3 landed with BL-454.)* The trigger, the reach lookup and the decay subtraction all ship. `out_of_supply_reach` is authored at `0.0`, which disables the trigger outright, so units outside the reach envelope still suffer nothing.
+- **The campaign roster band is hard-coded to the wrong era.** `campaign_roster_band = roster_band::industrial` (`src/world/unit_roster.hpp:61`) is a compile-time constant with a comment still describing "the 1960s campaign", while the default epoch is **0 CE**. Nothing derives it from `epoch_year` or from `era_band`, so an ancient campaign offers industrial rows. A known defect with no owning item as of 2026-08-18 — see § The roster.
 - **No fortification.** Siege is uniformly weak in the open field precisely because there is no held position to reduce; `siege_stance` is declared and unread.
 - **No tactical naval.** Naval rows exist in the roster and naval entries are accepted by `resolve_battle`, contributing zero power and zero weight. Naval presence is strategic tagging only.
 - **No unit marker on the canvas.** Units are selectable through the tile click-cycle and have no glyph of their own.
-- **No blackboard export of units.** An agent can raise a unit and cannot read back that it exists (BL-393, units are write-only and inert).
-- **No demolish interaction.** Demolishing a muster base leaves its units standing on a tile whose base is gone; nothing cleans them up and nothing reports it (BL-393 again).
+- **No blackboard export of units.** An agent can raise a unit and cannot read back that it exists. Re-checked 2026-08-18: `export_corp_blackboard` (`src/world/corp_ai.cpp`) emits no unit-subject fact. (BL-393, units are write-only and inert.)
+- ~~**No demolish interaction.**~~ — *resolved 2026-08-18 by BL-454 (unit upkeep). The upkeep pass disbands a unit whose owner, tile or `muster_base` has been erased, and runs last in the economy step so the cleanup happens in the same tick as the demolition. It reports the count as `unit_upkeep_tick::disbanded`.*
 
 ---
 
 ## Verification
 
-Three headless harnesses cover this layer. Run them with the `verifier-headless` skill.
+**Four** headless harnesses cover this layer (a fourth landed with BL-454/BL-459 on 2026-08-17;
+this section said three). Run them with the `verifier-headless` skill.
 
 **`tools/verify/combat_harness.cpp`** — `resolve_battle`. R1: a unit carries a type and armies are
 `(type, count)` stacks. R2: determinism on identical inputs, a hand-picked matchup landing on the
@@ -453,6 +585,19 @@ completed research institute
 credits `science` on a *non-player* corp (the symmetry check), and neither a base under
 construction nor a decommissioned institute accumulates anything.
 
+**`tools/verify/unit_upkeep.cpp`** — the upkeep pass and derived strength (BL-454, unit upkeep;
+BL-459, unit strength is a duplicate of count). U1: the credit charge is exactly N × the type's
+rate and nothing else in the budget moves; the goods debit is exactly N × each authored good. U2:
+an empty pool decays at the authored scalar and stock never goes negative. U3: demolishing the
+muster base leaves no orphan unit. U4: replay determinism across balances, pools and strengths.
+**U5: at the shipped (zero) rates nothing moves at all — no balance, no pool, no supply factor, no
+pool even created.** U6: strength derivation, including `strength == count * 100` at quality 1.0
+and full supply. U7: the combat adapter round-trips a live unit into an `army_stack_entry` the
+resolver accepts.
+
+U5 is the load-bearing row. It is what lets the economy goldens be re-blessed honestly, because it
+asserts the item is inert until someone authors a rate.
+
 Adjacent coverage: `buildings_rework_harness` R6/R7 for `military_base` placement, zero staffing
 and the not-an-anchor property.
 
@@ -460,26 +605,34 @@ and the not-an-anchor property.
 
 ## Build status
 
+Re-verified against the source 2026-08-18.
+
 **Landed:**
 
 - `resolve_battle` — the nation-scale resolver, consumed by the Era −1 history sim (BL-272, unit/doctrine combat model)
 - `resolve_campaign_battle` and its begin/step/withdraw state machine — compiled, harnessed, **no production caller** (BL-315, armed house conflict spine)
 - Terrain defence / attrition / resistance (BL-233, terrain combat modifiers)
 - `unit_component` with tile-canonical position (BL-157, military datamodel stub; BL-324, unit hire surface)
-- The 18-row era-keyed roster and both gate paths (BL-274, era-keyed unit rosters; BL-352, hire gate live store)
+- The **19**-row era-keyed roster and both gate paths (BL-274, era-keyed unit rosters; BL-352, hire gate live store)
 - `military_base` as a building, tech-gated behind `E0-ML-01` (BL-325 S1; BL-344)
 - `hire_unit` gated on a completed owned base at the tile, with a credit cost and a resource draw (BL-325 S2; BL-394, hire is free on the seam)
 - Rival hiring through the same verb (BL-324's exception; BL-293's seam widening)
 - The player corp's starting base and unit (BL-331, starting military presence)
+- **Unit upkeep — the pass, both halves, at rate zero** (BL-454, unit upkeep). Credits via `apply_budget`, goods via `run_unit_upkeep`. **Moved from Outstanding 2026-08-18**; landed at commit `0936400` on 2026-08-17. Every authored rate is `0.0` — see § Upkeep, at rate zero
+- **Out-of-supply decay — the rule, with the trigger disabled** (BL-325 S3). **Moved from Outstanding 2026-08-18**; `out_of_supply_reach` is authored at `0.0`
+- **Orphan cleanup** — demolishing a muster base disbands its units in the same tick (BL-454)
+- **Derived unit strength** — `count × roster quality × supply factor`, the stored field removed (BL-459, unit strength is a duplicate of count)
+- **`unit_to_stack_entry`** — the roster→combat adapter (BL-459). Harness-only caller
+- **`resource_type::ordnance`** — the roster's first terminal military good, named as upkeep's draw (BL-457, ordnance)
 - ~~Passive `military_points` accumulation (BL-332)~~ — **removed 2026-08-17** by BL-455 (military points and science are write-only); a base accumulates nothing
 
 **Outstanding:**
 
 - Corp stance / hostility (BL-448, friend/neutral/hostile corp stance) — designed, unbuilt
 - Unit verbs and the unit-command seam (BL-314, unit verb family; BL-393, units are write-only and inert)
-- Anything that calls the campaign resolver: an engagement trigger, a `unit_component` → `army_stack_entry` bridge, battle state in the world (BL-315)
-- Unit upkeep (BL-454, unit upkeep)
-- Out-of-supply decay (BL-325 S3, sequenced behind BL-315)
+- Anything that **calls** the campaign resolver: an engagement trigger, battle state in the world (BL-315). *The `unit_component` → `army_stack_entry` bridge this line used to list is built — see Landed*
+- **Authoring the upkeep numbers.** The pass is inert until someone sets a rate; that tuning has no owning item as of 2026-08-18
+- **Deriving `campaign_roster_band` from the epoch.** Hard-coded to `industrial` against a 0 CE default — a known defect, no owning item (§ The roster)
 - Hire price on screen (BL-405, hire has no price on screen)
 - The Era −1 sim's conquest failure — 267 battles, zero province transfers (BL-384, Era −1 sim conquers nothing)
 - Fortification, tactical naval, and a unit canvas marker — no owning item yet

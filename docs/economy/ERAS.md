@@ -42,16 +42,28 @@ Only Era 0 and Era 1 are designed for the prototype. Later eras are stubbed.
 
 > **THE CAMPAIGN EPOCH MOVED TO 0 CE (Ben, 2026-08-12).** Every "1960" below is superseded.
 > The project refocused to the ancient era (NR-177): the player is a mercenary company, the
-> space arc is parked on `era/space`, and generation now runs a stepped prehistory from
-> **4000 BCE to 0 CE** (`history_sim_params`, `src/world/history_sim.hpp`) rather than 0 CE to
-> 1960. This is a dated note rather than a rewrite — the Era *structure* below (a gear shift
-> that changes what the game is about, each Era necessitating the one before) is unaffected and
-> still the target. What changed is where the ladder starts, and that Era 1+ is DLC scope.
+> space arc is parked on `era/space`, and generation now runs a pre-epoch history sim rather
+> than opening cold at 1960. This is a dated note rather than a rewrite — the Era *structure*
+> below (a gear shift that changes what the game is about, each Era necessitating the one
+> before) is unaffected and still the target. What changed is where the ladder starts, and that
+> Era 1+ is DLC scope.
 >
-> The 4000-year prehistory is a **generator**, not a play layer: it produces the 0 CE world the
-> campaign opens on. Its clock steps 100 → 50 → 20 → 10 → 5 → 1 years so resolution concentrates
-> near the epoch, and a settle-dominated deep prehistory is the intended shape, not a defect
-> (NR-205, ruled 2026-08-12).
+> The prehistory is a **generator**, not a play layer: it produces the 0 CE world the campaign
+> opens on. A settle-dominated run is the intended shape, not a defect (NR-205, ruled
+> 2026-08-12).
+>
+> **CORRECTED 2026-08-18 — THE PREHISTORY IS 400 YEARS IN ONE BAND, NOT 4000 IN SIX.** This note
+> used to claim a **4000 BCE → 0 CE** run stepping **100 → 50 → 20 → 10 → 5 → 1** years. The
+> shipped code runs **400 BCE → 0 CE at 4 years a tick — one band, 100 decision rounds**
+> (`world_params::prehistory_years = 400`, `src/world/hard_coded_world.hpp:65`; the flattening is
+> `hp.tick_bands[0] = {epoch_year, 4}; hp.tick_band_count = 1;` at
+> `src/world/hard_coded_world.cpp:532-536`). Ben's ruling that day: the code is right, the doc
+> was wrong.
+>
+> The six-band ladder is still *authored* — but only as the `history_sim_params` **struct
+> default** (`src/world/history_sim.hpp:119-140`), which generation overrides on every world.
+> Its live readers are the tile inspector and the harnesses, not the campaign. Authority for
+> the prehistory run is `docs/lore/HISTORY.md`.
 
 ## Era 0 — Terrestrial
 
