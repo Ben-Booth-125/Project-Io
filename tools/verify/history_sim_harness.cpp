@@ -12,6 +12,15 @@
 //   S3a/S3b  the burden of breadth is live and points the right way
 //   B318a-c  no verb has swallowed the run
 //
+// AND (BL-384) the full-run OUTCOME group B384a-d, which is a different kind of
+// claim from everything above and is deliberately last. Every check before it
+// asks whether a mechanism is live; B384 asks whether the run these mechanisms
+// compose into ever reaches a conclusion — whether a province ever changes
+// hands by war across a spread of generated worlds. That question had no
+// assertion behind it, which is how "267 battles, zero conquests" survived: the
+// conquest count was compared between two runs for determinism (`same_run`,
+// `differs`) but never compared against zero over more than one world.
+//
 // THE PATTERN THESE USE, and the reason they are shaped this way: each runs the
 // SAME world twice with one variable changed, and asserts the DIRECTION of the
 // difference. An absolute count would be a calibration target, and calibration
@@ -24,10 +33,12 @@
 
 #include "world/hard_coded_world.hpp"
 #include "world/history_sim.hpp"
+#include "world/sim_terrain_build.hpp"
 #include "world/unit_roster.hpp"
 #include "world/settlement.hpp"
 #include "world/world.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdio>
 #include <string>
@@ -141,6 +152,80 @@ bool differs(const history_sim_state& a, const history_sim_state& b)
             return true;
     return false;
 }
+
+// ---------------------------------------------------------------------------
+// BL-384 — the outcome instruments
+// ---------------------------------------------------------------------------
+//
+// ONE DEFINITION OF DOMINANCE, NOT TWO. `history_sweep.cpp` already fixed what
+// "a power dominates this world" means — half of all owned provinces, held as a
+// per-mille REPORTING threshold that gates nothing — and the shape it reads it
+// through is `slice_shape` over a materialised owner slice. Both are reproduced
+// here rather than re-invented, because a second definition of the same word
+// would let the sweep and the harness disagree about whether a given world had
+// a hegemon while both looked right in isolation.
+//
+// The sweep's own note is inherited with it: 0.5 is the plainest reading of
+// "one power dominates the world", and it is REPORTED. B384 asserts nothing
+// against it — see the group's comment for why the dominance column stays a
+// column.
+constexpr int hegemony_threshold_q = 500; // history_sweep.cpp § hegemony_threshold_q
+
+/// Distinct owners and the largest owner's share (per-mille of OWNED provinces)
+/// in one materialised year slice. `owner_none` cells are provinces that do not
+/// exist yet at that year, and are excluded from the denominator — a share of
+/// "all provinces including ones nobody has founded" would fall as the Settle
+/// verb ran and read as de-concentration that never happened.
+void slice_shape(const std::vector<uint16_t>& slice, int& powers, int& top_share_q)
+{
+    std::vector<uint16_t> ids;
+    std::vector<int>      counts;
+    int live = 0;
+    for (uint16_t o : slice)
+    {
+        if (o == owner_none) continue;
+        ++live;
+        auto it = std::find(ids.begin(), ids.end(), o);
+        if (it == ids.end()) { ids.push_back(o); counts.push_back(1); }
+        else                 { ++counts[static_cast<std::size_t>(it - ids.begin())]; }
+    }
+    powers = static_cast<int>(ids.size());
+    int top = 0;
+    for (int c : counts) top = c > top ? c : top;
+    top_share_q = live > 0 ? (top * 1000) / live : 0;
+}
+
+/// One world's outcome row. Every field answers "did the run CONCLUDE", which
+/// is the axis the counters the sim already carries cannot reach on their own.
+struct outcome_row
+{
+    uint32_t seed = 0;
+
+    int64_t battles   = 0;
+    int64_t conquests = 0;
+    int64_t foundings = 0;
+    int64_t stalled   = 0;
+
+    /// Polities the run left holding nothing (`polity::alive == false`), out of
+    /// the ones that HELD GROUND at the start.
+    ///
+    /// Counted against the start slice rather than against `polities.size()`
+    /// deliberately: the sim seeds one polity per culture, and a culture that
+    /// never held a province would otherwise be counted as somebody the run had
+    /// killed. That would report a positive elimination rate for a run in which
+    /// nothing whatsoever happened, which is the exact failure this row exists
+    /// to detect.
+    int polities_at_start = 0;
+    int polities_at_end   = 0;
+    int eliminated        = 0;
+
+    /// The largest polity's share of owned provinces at the epoch, per-mille,
+    /// and whether that crossed `hegemony_threshold_q`.
+    int  top_share_q   = 0;
+    bool hegemon       = false;
+
+    int64_t ms = 0;
+};
 
 } // namespace
 
@@ -594,6 +679,191 @@ int main()
               "B299b the majors carry OPPOSED creeds, not the same one twice");
         check(static_cast<int>(a.polities.size()) > 2,
               "B299c the periphery survives as actors, not terrain");
+    }
+
+    // --- BL-384  the full run must reach a CONCLUSION ----------------------
+    //
+    // WHAT THIS GROUP ASSERTS THAT NOTHING ABOVE DOES. Every check before it is
+    // a MECHANISM check: terrain is live, supply decays, the burden bites, the
+    // verbs share a currency. Each is a claim about one moving part, and the
+    // whole file's stated pattern — run the same world twice with one variable
+    // changed and assert the DIRECTION — is the right shape for those.
+    //
+    // It is the wrong shape for this one. "Does the generator ever finish a
+    // war" is not a direction, it is an OUTCOME, and an outcome has no sibling
+    // run to be compared against. The gap that left is exactly how BL-384 was
+    // filed: `same_run` and `differs` both read `conquests`, so two runs were
+    // required to AGREE about the count without anything ever asking what the
+    // count was. A sim that conquers nothing is perfectly deterministic.
+    //
+    // WHY A SEED SET AND NOT ONE WORLD. B318c already asserts conquests > 0,
+    // on one seed, and one seed cannot tell "this sim never conquers" from
+    // "this world happened to be peaceful". Measured below, that distinction is
+    // the entire finding: the outcome is BIMODAL across worlds, and no
+    // single-seed check can see a bimodal distribution at all.
+    //
+    // COST. Each row generates a whole world (with its pre-epoch pass — this
+    // harness may not use `no_prehistory`, see tools/verify/harness_params.hpp)
+    // and then runs the full 4000 BCE -> 0 CE sim over it. That is the reason
+    // this group is last and the reason the count is small; the harness carries
+    // the `sweep` label already (CMakeLists § IO_TEST_SWEEP_HARNESSES).
+    {
+        // SEEDS 0..N-1, WHICH IS history_sweep's OWN SEED CONVENTION
+        // (`wp.seed = i`). Deliberate, so a row here and a row there describe
+        // the same world and can be read against each other. Fixed in the
+        // source rather than taken from argv: a red assertion whose seed set is
+        // an argument is a red assertion that can be argued away.
+        constexpr int outcome_seeds = 8;
+
+        // REAL TERRAIN AND THE REAL GRID, because the claim is about the run
+        // the GAME does. The Kepler checks above pass `no_terrain` — correct
+        // for them, since they isolate one mechanism — but a peaceful-world
+        // finding measured on ground that does not exist would be unactionable.
+        //
+        // No works registry, which is this harness's standing convention (the
+        // real table is Lua and every check here is Lua-free). The sweep's
+        // hand-built fixture is deliberately not duplicated — see its own note
+        // on why that fixture is not a second authoring path.
+        std::vector<outcome_row> rows;
+        rows.reserve(static_cast<std::size_t>(outcome_seeds));
+
+        for (int i = 0; i < outcome_seeds; ++i)
+        {
+            const auto t0 = std::chrono::steady_clock::now();
+
+            world_params owp;
+            owp.seed = static_cast<uint32_t>(i);
+            generation_report rep;
+            const world w = make_hard_coded_world(owp, &rep);
+
+            const generation_report::body_entry* k = kepler_of(rep);
+            if (k == nullptr) continue;
+
+            settlement_state ss = k->settlement;
+            const sim_terrain_arrays terr =
+                build_sim_terrain(w, k->id, kgw, kgh); // the entry names its own entity (BL-257)
+
+            history_sim_params op; // the real epoch and the real tuning, untouched
+            const history_sim_state a =
+                run_history_sim(ss, nullptr, terr.view(), kgw, kgh, op, owp.seed);
+
+            outcome_row row;
+            row.seed      = owp.seed;
+            row.battles   = a.battles;
+            row.conquests = a.conquests;
+            row.foundings = a.foundings;
+            row.stalled   = a.stalled_campaigns;
+
+            const std::vector<uint16_t> first = owner_slice_at(a, op.start_year);
+            const std::vector<uint16_t> last  = owner_slice_at(a, op.stop_year);
+
+            int dummy = 0;
+            slice_shape(first, row.polities_at_start, dummy);
+            slice_shape(last,  row.polities_at_end,   row.top_share_q);
+            row.hegemon = row.top_share_q >= hegemony_threshold_q;
+
+            for (const polity& q : a.polities)
+            {
+                if (q.alive) continue;
+                bool held_at_start = false;
+                for (uint16_t o : first)
+                    if (o == static_cast<uint16_t>(q.id)) { held_at_start = true; break; }
+                if (held_at_start) ++row.eliminated;
+            }
+
+            const auto t1 = std::chrono::steady_clock::now();
+            row.ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+
+            rows.push_back(row);
+        }
+
+        std::printf("\n      --- BL-384 full-run outcome, %d worlds, real terrain ---\n",
+                    static_cast<int>(rows.size()));
+        std::printf("      seed  battles  conquests  stalled  foundings  "
+                    "powers(0>epoch)  elim  top%%   ms\n");
+        int64_t total_ms = 0;
+        int worlds_with_conquest = 0, worlds_that_fought = 0;
+        int worlds_fought_took_nothing = 0, total_eliminated = 0, hegemonies = 0;
+        for (const outcome_row& r : rows)
+        {
+            std::printf("      %4u  %7lld  %9lld  %7lld  %9lld  %6d > %6d  %4d  %3d%%  %5lld\n",
+                        r.seed,
+                        static_cast<long long>(r.battles),
+                        static_cast<long long>(r.conquests),
+                        static_cast<long long>(r.stalled),
+                        static_cast<long long>(r.foundings),
+                        r.polities_at_start, r.polities_at_end,
+                        r.eliminated, r.top_share_q / 10,
+                        static_cast<long long>(r.ms));
+            total_ms += r.ms;
+            if (r.conquests > 0) ++worlds_with_conquest;
+            if (r.battles > 0)   ++worlds_that_fought;
+            if (r.battles > 0 && r.conquests == 0) ++worlds_fought_took_nothing;
+            total_eliminated += r.eliminated;
+            if (r.hegemon) ++hegemonies;
+        }
+        const int n = static_cast<int>(rows.size());
+        std::printf("      %d/%d worlds fought, %d/%d took ground, %d polities eliminated, "
+                    "%d hegemonies, %lld ms total\n",
+                    worlds_that_fought, n, worlds_with_conquest, n,
+                    total_eliminated, hegemonies, static_cast<long long>(total_ms));
+
+        check(n == outcome_seeds, "B384  every seed in the set produced a world and ran");
+
+        // THE SHARE IS ALL OF THEM, AND THAT IS NOT A DIAL.
+        //
+        // Any share below 1.0 would make this a calibration target, and the
+        // header of this file says why calibration targets do not belong here:
+        // they get tuned toward instead of measured. What is claimed is
+        // REACHABILITY — the same claim B318c makes on one seed — and a verb
+        // that is unreachable in a given world is unreachable in it however
+        // many other worlds it works in.
+        //
+        // The claim also has a plain design reading. The pre-epoch sim exists
+        // to hand the campaign a world with a past (hard_coded_world.cpp: "the
+        // campaign opened onto a world that had been settled and then stood
+        // perfectly still: no wars, no borders that had ever moved, nothing to
+        // inherit"). A world that runs four thousand years without one province
+        // changing hands is that world again — the pass ran and produced the
+        // state it was written to prevent.
+        //
+        // The achieved share is printed above regardless, so a later decision
+        // to accept some peaceful worlds has the number to argue from.
+        check(worlds_with_conquest == n,
+              "B384a every world sees at least one province change hands by war");
+
+        // THE DEFECT EXACTLY AS FILED: 267 battles, zero conquests. A world
+        // that campaigns for an era and takes nothing means the transfer branch
+        // (history_sim.cpp § "TERRITORY MOVES AT PROVINCE GRANULARITY") is
+        // unreachable behind a decisiveness bar no victory clears.
+        //
+        // Kept separate from B384a on purpose, because the two fail for
+        // opposite reasons and a single row could not tell them apart: B384a
+        // fails when the scorer never picks Campaign, B384b when it picks it
+        // constantly and the transfer never fires. Reading which one is red is
+        // the diagnosis.
+        check(worlds_fought_took_nothing == 0,
+              "B384b no world fights a whole era and takes nothing (the transfer branch fires)");
+
+        // THE ARC'S SECOND RUNG. BL-308 added polity cohesion precisely because
+        // "the first sweep produced elimination in 0 of 12 worlds" — losing
+        // ground cost a polity nothing that made the next defeat more likely,
+        // so no defeat ever led to another (history_sim.hpp § cohesion_q).
+        //
+        // That is the project's own statement that a zero here is a defect and
+        // not a preference, which is what makes it assertable at all. It is
+        // stated across the WHOLE set rather than per world: one polity losing
+        // its last province somewhere in N worlds is the weakest form of "the
+        // death spiral terminates", and anything weaker is not a claim.
+        check(total_eliminated > 0,
+              "B384c a polity somewhere in the set loses its last province (BL-308's spiral ends)");
+
+        // DOMINANCE IS REPORTED AND GATES NOTHING — history_sweep.cpp's ruling,
+        // inherited with its threshold. BL-224's non-hegemony is a tuning
+        // target read off the spread, not a construction guarantee, so the
+        // `top%` column and the hegemony count above are instruments. Asserting
+        // a bound on them here would be writing the calibration this arc has
+        // not chosen yet, and would hide the spread it needs to see.
     }
 
     std::printf("\n%s (%d failure%s)\n",
