@@ -51,6 +51,8 @@ and/or a version goal (v0.1.1 etc.).
 | 18b | Roster invariants (retro-recorded) | **Closed 2026-08-16** — BL-432 landed; BL-435 paused 4/6; BL-436 filed |
 | 19 | The economy tells the truth | **Closed 2026-08-17 — goal NOT met.** The blame moved three times and landed on supply; goldens left red and unblessed |
 | 20 | Not yet chosen | **Proposed 2026-08-17** — three candidates laid out below; Ben's call |
+| 25a | The draw (upkeep, ordnance, convoy seam) | **Closed 2026-08-18** — 6/6; goldens left red and attributed |
+| 26–33 | **The Fall** — the arc to the Era −1 collapse | **Proposed 2026-08-18** — eight rulings settled; Sprint 26 is the gate. Supersedes 21, 23, 25b |
 
 **Next up (2026-08-10).** Sprint 5 is closed on Ben's call — *"I am happy with the generation
 progress we made"* — and the board went momentarily to zero goaled sprints. The plan for
@@ -61,6 +63,376 @@ tail is *for* — military and space-hardware trade stop being a later layer and
 the remaining minors are supposed to carry. **NR-102 (sequencing decoupling)** is the standing
 structural item this plan is the first answer to: every open item names a minor, but until now
 nothing said in what order to build them.
+
+---
+
+# Sprints 26–33 — The Fall: the arc to the Era −1 collapse (proposed 2026-08-18, NOT opened — Ben picks)
+
+**This is a proposal, not a decision.** Ben's brief this date asks for a series of sprints ending
+at *"the inevitable Era −1 outcome — empire collapse for one of the two main hegemons, played out
+in real time, using the 0 AD sandbox, as part of generation"*, on robust military, trade,
+international logistics and diplomacy, with tech meta and law/policy started, and a substrate that
+reads as physically civilised.
+
+**The brief is a resumption, not a pivot.** BL-299 (great-power seed) was filed **2026-08-04 at
+Ben's own request** and already says it: two majors with opposed creeds in a multipolar antiquity,
+*"while the focus is on how these empires change and crumble"*. What is missing is the crumble.
+
+**And it does not contradict the non-hegemony invariant.** BL-224 (non-hegemony asserted) is
+`parked: true` at v0.4.0, was never built, and asserts no **world-conquering** nation as a
+cross-seed tuning target. BL-299 already reconciles them in writing: *"neither major absorbs the
+world early; the periphery stays alive as actors, not terrain."*
+
+## The audit — ten read-only slices, 2026-08-18
+
+Run as a ten-agent fan-out over `src/` and the doc corpus. Evidence is file:line, not doc claim,
+because this repo has been burned three times by docs describing unbuilt code and by compiled code
+described as unbuilt.
+
+### The five findings that reshape the plan
+
+| # | Finding | Evidence |
+|---|---|---|
+| 1 | **The sim's political result is discarded before the campaign starts.** `generate_nations` seeds one nation per province *anchor*, with no reference to polity ownership. A perfect rise-and-fall leaves **no trace** at 0 CE | `hard_coded_world.cpp:56`, `settlement.cpp:498-505` |
+| 2 | **There is no collapse mechanic of any kind.** No secession, succession crisis, revolt, civil war or dissolution. Territory moves only by conquest; `owner_none` is never emitted; `alive=false` is silent | `history_sim.cpp:466`, `:1198` |
+| 3 | **The two hegemons exist in code and are switched off.** `seed_great_powers` defaults false; `polity::major` is written and read **nowhere** in `src/` | `history_sim.hpp:371`, `history_sim.cpp:290-291` |
+| 4 | **Zero trade routes exist, structurally.** `trade_route` is keyed on a body *pair* and `supply_system.cpp:65` skips lanes where source and destination bodies match — always true on a one-planet arc | `components.hpp`, `supply_system.cpp:58-65` |
+| 5 | **A tech cannot express a buff.** The whole effect vocabulary is one field, `building_type unlocks_structure`. The *condition* side has 9 subjects and 5 comparators — a 9:1 asymmetry | `tech_gate.hpp:53`, `condition_set.hpp:47-77` |
+
+### The capability table
+
+| Capability | State | Evidence |
+|---|---|---|
+| Era −1 sim: settle / campaign / invest / consolidate / build_work, 400 yr | **BUILT** | `history_sim.cpp:419` |
+| Two-great-power seeding | **BUILT, OFF** | `history_sim.hpp:371` default false |
+| Conquest actually transferring a province | **DEFECT** | BL-384: 267 battles, **0** conquests |
+| Collapse / secession / fragmentation | **ABSENT** | no verb, no `owner_none` emission |
+| Hegemony measure inside the engine | **ABSENT** | only a reporting threshold in `history_sweep.cpp` |
+| Sim steppable / pausable / injectable | **ABSENT** | `run_history_sim` is one blocking call |
+| Per-year decision trace | **ABSENT** | `sim_verb` is a loop local, applied and discarded |
+| Polity-pair state (war, peace, enmity, tribute) | **ABSENT** | `polity` has no pair-keyed field |
+| Nation-grain read seam (blackboard) | **ABSENT** | no `export_nation_blackboard` anywhere |
+| Ages view with play/pause/restart | **BUILT** | `tile_inspector.cpp:226-360` — *shows the wrong history* |
+| Campaign hostility / stance model | **ABSENT** | `src/world/stance.*` does not exist |
+| A verb naming a live unit | **ABSENT** | 17 `corp_verb`s, none takes a unit subject |
+| Unit upkeep, ordnance draw, supply decay | **BUILT, RATE ZERO** | `scripts/economy.lua:232` all `0.0` |
+| Corp-to-corp trade | **ABSENT** | every clearing path is corp-to-market, no payer |
+| Order-book matching + preferred-seller routing | **DEAD CODE** | nothing authors a buy order |
+| Nation treasury / tariff / customs | **ABSENT** | levy *destroys* money (`budget_system.cpp:210-212`) |
+| Law with an author or an applicability scope | **ABSENT** | `struct law` has no nation field |
+| Law enactment | **DEFECT** | a corporation flips world law via a debug checkbox |
+| Wage as a lever | **ABSENT** | per-building-type constant, `scripts/economy.lua` |
+| Tech effect kinds | **PARTIAL** | exactly one; 1 of 132 techs earnable |
+| Roads crossing water; cross-water adjacency | **ABSENT** | `road_generation.cpp:65`, `:195` |
+| Roads for a nation with < 2 centres | **ABSENT** | `road_generation.cpp:90` returns early |
+| A drawn surface trade lane | **ABSENT** | the beam only writes `beam_intensity` |
+| Nation capital carried to the campaign | **DEFECT** | `polity::capital` exists and is discarded |
+| Corporation KIND axis | **ABSENT** | `industrial_focus` is a chain position, not identity |
+| Developed-tile representation | **ABSENT** | `land_use_component` is attached to nothing |
+| World build density | **0.2–0.5%** | ~55–150 buildings, 31 centres, 31,581 tiles |
+
+**Two corrections the audit forces on other blocks.** *"0 AD" is the YEAR*, settled twice in writing
+(NR-060, 2026-08-04) — the RTS was installed and retired the same day; the arena is Io's own sandbox.
+And **the backlog's `status` cannot be trusted**: ~15 items whose code is in `src/` still read
+`designed`, BL-452 (logistics verb) and BL-453 (convoy ledger) among them.
+
+## The shape — one serial spine, three parallel lanes
+
+The collapse is a **generation** outcome, so its spine is serial: nothing can collapse before
+conquest works, nothing can inherit a border before the map is inherited, and nothing can be
+watched before it is retained. Everything else Ben named is genuinely independent and runs
+alongside — the audits show the file sets barely touch.
+
+| Lane | Owns | Principal files |
+|---|---|---|
+| **A — the spine** | conquest, inheritance, hegemony, collapse, the watch | `history_sim.*`, `combat.cpp`, `settlement.cpp`, `hard_coded_world.cpp` |
+| **B — the civilised world** | capitals, roads, ports, land/sea lanes, density, corp kind | `road_generation.*`, `population_generation.*`, `supply_system.*`, `logistics.*`, `corporation_generation.*` |
+| **C — force and stance** | stance, the unit verb, the engagement trigger, live upkeep | `stance.*` (new), `corp_command.*`, `campaign_battle.*`, `economy.lua` |
+| **D — tech meta, law, and the nation as an actor** | the effect union, the modifier vocabulary, author/scope, treasury, tax, wages, tariffs | `tech_gate.*`, `law.*`, `budget_system.*`, `condition_set.*`, `components.hpp` |
+
+**The two collisions, named rather than discovered.** Lane A's inheritance sprint and Lane B's
+settlement-density work both touch `settlement.cpp`. Lanes C and D both append to
+`condition_subject` in `condition_set.hpp` — an append-only serialised enum, so the rule is one
+appender per batch. Worktree isolation covers the writes; the sequencing note is what stops a
+semantic conflict.
+
+---
+
+## Sprint 26 — Re-baseline (the gate; nothing else may open first)
+
+**Goal.** Make the board readable before eight sprints are planned onto it. This is method debt,
+and it is cheap.
+
+**Planned.**
+- **Close-out** — flip the ~15 landed-but-open items terminal (BL-417 build score, BL-429 ancient
+  roster, BL-437 one-resource economy, BL-439 AI processors, BL-440 mine targeting, BL-441 unmet
+  demand, BL-442 price band, BL-443 debt floor, BL-452 logistics verb, BL-453 convoy ledger,
+  BL-454 unit upkeep, BL-455 accumulators, BL-456 military doc, BL-457 ordnance, BL-459 unit
+  strength). A plan built from `--status designed` schedules work that already shipped.
+- **Split v0.1.16** — 37 open items in an admitted holding pen, with no internal order. Name the
+  minors this arc needs; add v0.1.18 to ROADMAP.md, which currently has no theme for it.
+- **NEW-1 — prehistory-on determinism case.** `world_determinism.cpp` sets `prehistory_years = 0`
+  on *every* case, so the project's determinism guarantee **excludes the exact pass this whole arc
+  changes**. Add the case first, while the sim still behaves.
+- **Doc truth pass** — MILITARY.md is stale in three places; TECH_FOUNDATIONS.md still says combat
+  is out of scope; HISTORY.md and ERAS.md describe a 4000-year six-band ladder generation does not
+  run. These assert things landed work already falsified, so the time-slice does not protect them.
+  **Per ruling 8 the code is right and the docs are wrong**: correct both to the shipped 400 years
+  in one 4-year band, rather than restoring a span nothing has ever run.
+- **NEW-12 — the nation-behaviour grant, written into the standing rules.** Ruling 4 widens BL-054
+  in the BL-202/BL-203 shape: pure, seeded, replayable, legal verbs only, no planner. It must be a
+  dated paragraph in `.claude/rules/io-standing-rules.md` **before** Lane D builds against it,
+  because every other exception there is dated and scoped and this one carries the most reach.
+- **Un-park v0.1.11** — ruling 5. BL-155 (law/policy surface), BL-156 (tech system early design),
+  BL-186 (laws ledger) and BL-280 (negotiated tax) move into the ancient arc with a new theme.
+  ROADMAP.md currently says *"do not build against them while parked"*, so this is the edit that
+  makes Lane D legal.
+
+**Done when** `backlog_query.js --status designed` returns only genuinely unbuilt work,
+`world_determinism` has a green prehistory-on case, and the nation-behaviour exception is in the
+standing rules with its date and its scope.
+
+**Risk.** None material. The risk is skipping it and planning against a false board.
+
+---
+
+## Lane A — the spine
+
+### Sprint 27 — The run is retained, and its failure is falsifiable
+
+**Goal.** Stop throwing the history away, and make "the sim conquers nothing" a red assertion
+rather than an observation.
+
+**Planned.** BL-384 (Era −1 sim conquers nothing) **in its own prescribed order**: the conquest-count
+assertion in the full-run harness **first**, then the cause. Plus NEW-2, retaining
+`history_sim_state` (owner changes, polities, final ownership) from `hard_coded_world.cpp:561`
+rather than discarding it; and NEW-3, persisting the `sim_verb` decision already computed at
+`history_sim.cpp:571-899` as a per-year trace.
+
+**Done when** `history_sim_harness` fails on conquest count against today's build, and a full run
+returns a retained ownership record two runs of one seed agree on byte-for-byte.
+
+**Risk.** BL-384's cause is unmeasured. The audit's best candidate is that `p_win` is optimistic and
+decisiveness never clears the contest-relieved threshold — but measure before tuning.
+
+### Sprint 28 — Conquest works, and growth stops extinguishing war
+
+**Goal.** A province changes hands, and a large polity keeps campaigning.
+
+**Planned.** The scorer/resolver disagreement (both measured optimisms together, since either alone
+moves battles without moving conquests). Then the argmax fix: **Invest and Consolidate score on a
+sum over holdings while Campaign and Settle score a single province** (`history_sim.cpp:786-795`,
+`:810-820`) — so growth mathematically extinguishes the Campaign verb, which is precisely why no
+hegemon can form.
+
+**Done when** the conquest assertion from Sprint 27 goes green, and a sweep shows province transfers
+scaling with polity size rather than collapsing.
+
+**Risk.** This is the sprint most likely to reveal that "inevitable" needs an accumulator that does
+not exist. Sprint 30 is where that lands; do not pre-build it here.
+
+### Sprint 29 — The map inherits the war, and the majors mean something
+
+**Goal.** What the sim decided becomes what the player sees at 0 CE.
+
+**Planned.** NEW-4: retire one-seed-per-province Voronoi for the ancient branch — surviving polities
+become the nations. NEW-5: carry `polity::capital` through into `nation_component`, which is a
+value that already exists and is thrown away. BL-299 (great-power seed) turned **on**, with
+`polity::major` given behavioural meaning rather than being written and never read.
+
+**NEW-13 — the character half, which ruling 2 makes non-optional.** Ben chose *borders **plus
+character***: the collapse writes posture, creed and grudges onto the surviving nations, replacing
+the current independent RNG assignment. That forces a second decision the audit flagged — the Era −1
+record must **cross into `world`**, not stay presentation data in `generation_report`, which is
+explicitly off the serialisation seam. Carry a **minimal summary** — final ownership, capital,
+creed lean, a per-nation-pair grudge scalar, and the collapse record — not the full delta stream.
+
+**Done when** the campaign nation map is derived from sim ownership, every nation has a capital tile
+and a creed inherited from its sim history, a surviving nation carries a grudge naming the polity
+that broke, and a sweep reports how often a major actually dominates.
+
+**Risk.** Nation counts and shapes will move, and every generation golden with them. Re-pin the
+bands by measurement, per BL-224's own reported-not-asserted discipline. The `world` crossing is a
+save-format payload — file it against BL-107 (save format version) rather than inventing a second
+format.
+
+**Collision.** Touches `settlement.cpp` — coordinate with Lane B's density sprint.
+
+### Sprint 30 — Collapse
+
+**Goal.** The brief's central mechanic, which does not exist in any form.
+
+**Planned.** NEW-6: an accumulating pressure that can break — overextension against cohesion, the
+one thing the sim *does* carry (`cohesion_q`) but which only ratchets. NEW-7: the collapse verb
+itself — fragmentation into successor polities, `owner_none` emission, an eliminated-polity event
+where `alive=false` is currently silent. NEW-8: the hegemony measure, promoted out of the sweep
+harness into the engine so something can name, gate and narrate a great power.
+
+**Done when** a seeded run produces a major that rises, overextends and fragments, and the harness
+asserts it happens at a rate inside a stated band across N seeds — reported, never clamped.
+
+**Risk.** The largest unknown in the arc, and the one item with nothing filed. It is also the point
+where "inevitable" gets defined; hold it to a deterministic consequence of upstream scalars rather
+than a die roll.
+
+### Sprint 31 — Watch it fall
+
+**Goal.** The "played out in real time" half. **Ruling 1: watched replay** — the sim runs to
+completion and is played back. No steppable sim, no agent seat, and therefore **no determinism
+amendment**, which is the cheapest of the three readings by a wide margin.
+
+**Planned.** BL-320 (Era −1 sim perf) first: the O(provinces) occupancy scan and the per-round
+holdings rebuild, because a watchable run must be a cheap one. Then BL-317 (prehistory timelapse)
+S2/S3 re-based onto the **generation** run, so the Ages view stops showing a second, unrelated
+history — it already has play/pause/restart and currently points at the wrong history entirely.
+Rider: the collapse gets a narrated line in the history log, so the fall reads as an event rather
+than a border that quietly changed.
+
+**Done when** the generating screen plays the real run back, the collapse is legible in it, and the
+run completes **identically** whether watched or skipped — the determinism constraint BL-317
+already carries and which ruling 1 keeps intact.
+
+**Risk.** The era pass is already ~23 s of ~25 s of generation. Perf leads for a reason.
+
+**Explicitly out, per ruling 1:** splitting `run_history_sim` into init / `step_year` / finish, and
+any agent seat on a polity. If that becomes wanted later it is its own item, and it is the one
+piece of this arc that would need the determinism rule reopened.
+
+---
+
+## Lane B — the world reads as civilised
+
+Runs from day one. Shares no file with Lane A except `settlement.cpp`.
+
+### Sprint B1 — Census, capitals and the lane that can be drawn
+NEW-10 `substrate_census.cpp`: a harness that states how civilised the world is, over N seeds,
+so the complaint becomes a number. Then the trade-route record widened from a body pair to a
+**market pair carrying its tile path** — the structural fix for zero routes. Then
+`convoy_tile_at()` lifted out of the renderer, owning the lo→hi canonicalisation the canvas
+currently reverses conditionally.
+
+### Sprint B2 — Roads that reach, ports that mean something
+The three structural cuts in `road_generation.cpp`: nations with fewer than two centres, water
+crossing, and cross-water adjacency. Then BL-188 (coastal ports) un-parked — sea is currently
+priced **backwards against its own settled design**, and one ocean tile prices the whole route.
+
+### Sprint B3 — Density, and corporations stop all being the same thing
+The population-centre clamp is still `clamp(tiles/1000, 20, 40)` from the 180×84 era, against a
+312×145 map. Then BL-374 (corp density target) unblocked by replacing the per-*body* firm cap with
+a per-*nation* bound. Then NEW-11: a corporation **kind** axis orthogonal to `industrial_focus` —
+Ben's *"not every corporation is a militia"*, which is currently inverted in code, since every
+rival converges on a military base and only the player is seeded with one.
+
+---
+
+## Lane C — force and stance
+
+### Sprint C1 — Stance (supersedes Sprint 23)
+BL-448 (friend/neutral/hostile) + BL-449 (stance surface) **in the same sprint, not the next one**.
+Determinism harness written first, landed inert. Plus the reachability fix for `corp_reputation`,
+the only pairwise relationship in the codebase and one no player press can move.
+
+### Sprint C2 — A verb that names a unit (supersedes Sprint 21)
+BL-393 (units are write-only and inert): the `unit_command` seam, run alone because it is a data-model
+change to a serialised record. Then BL-314 (unit verb family), transcribed once the seam exists.
+
+### Sprint C3 — The engagement trigger, and the fight you can watch
+BL-315 (armed house conflict spine)'s actual remainder — a world-side battle store, the trigger,
+and losses applied to `unit_component`. Both resolvers currently return results **nothing reads**.
+Rider: turn the upkeep rates off zero and measure the movement, which is what BL-458 (supply lines
+cannot be cut) has been waiting on.
+
+---
+
+## Lane D — tech meta, law, and the nation as an actor
+
+**Unblocked by rulings 4 and 5**, both taken 2026-08-18. Before them this lane was illegal twice
+over: every item was `parked: true` under a ROADMAP line saying *"do not build against them while
+parked"*, and nations were forbidden actors under BL-054. Sprint 26 clears both.
+
+### Sprint D1 — A tech can express a buff
+Widen `tech_gate`'s one-field effect into a closed tagged union: `unlock_structure` (existing) plus
+`modify_scalar`. Then author the closed **modifier-subject vocabulary** — every scalar a tech *or a
+law* may move. This is the shared object both halves of the brief need, and it is why tech and law
+belong in one lane. It is also the direct answer to Ben's *"how each tech maps to a direct unlock or
+existing system buff"*: today the unlock is the only expressible half.
+
+### Sprint D2 — Research becomes a currency, and the ladder becomes a path
+**Ruling 6: spent, not reached.** What shipped on 2026-08-17 is a *level* — `condition_subject::science`,
+a threshold subject picked by reading BL-344's shape rather than by choice (NR-315). Spending needs a
+debit mechanism the level model never had, so this sprint files and builds it: an accrual, a cost per
+node, and a debit at the moment a node is taken. Then load `docs/research/ancient_tech_ladder.json`
+(92 objects, already linted) and author the T1–T2 gates with **enforced prerequisites**, turning
+`earnable = false` into something reachable. Prereqs are authored data nothing currently enforces,
+and without enforcement there is no ordering — so no "path", which is the word Ben used.
+
+**Paths for differently-scoped players** land here as the pay-off: a corp's chain depth (BL-428)
+and its starting loadout (BL-435) already differ, so a cheap-but-narrow path and an expensive-but-broad
+path become expressible the moment cost and prereqs both exist.
+
+### Sprint D3 — A law has an author, and a tax is a transfer
+Add an enacting-nation id and applicability scope to `struct law` — BL-155 (law/policy surface)
+names this as non-deferrable, *"a law with no author is not migratable later"*. Give
+`nation_component` a treasury so the levy stops **destroying** money. Then wages as a lever above a
+legal floor, and enactment moved off the player's ledger — replacing a debug checkbox that currently
+lets a corporation flip world law, which is the exact inversion of the settled ruling that the
+player is a law *subject*.
+
+### Sprint D4 — The border costs something (the international half)
+The clause of Ben's brief nothing else owns. `market_component.centre_tile` already resolves through
+`w.tile_to_nation` to a nation, so the hook exists and is unused. Give a market a nation, give a
+nation a tariff rate set by its own law, and make a cross-border sale debit the buyer and **credit
+the enacting nation's treasury**. This is the first flow in the game where money moves between two
+named actors rather than appearing or vanishing — and it is what makes "international trade" a
+mechanic rather than a description.
+
+Depends on D3 for the treasury and on Lane B's route work for the lane a good crosses.
+
+---
+
+## Sequencing, and what it supersedes
+
+**Sprints 21, 23 and 25b are superseded by Lane C**, explicitly and not silently: Sprint 23 becomes
+C1, Sprint 21 becomes C2+C3, and 25b (BL-458 interdiction) sits after C1 and C3 exactly as its own
+gate says. **This also resolves the unreconciled ordering contradiction** — NR-312 settled
+25a → 21 → 23 → 25b, while Sprint 23's own block says in writing that it must precede 21. Lane C
+runs stance first, which is the order both the audit and Sprint 23's block support.
+
+**Sprint 22 (reachability)** survives untouched and is good filler for any lane that finishes short.
+
+## What this arc deliberately does not carry
+
+**Escort, blockade and ambient banditry** stay out, per Sprint 25's own boundary. **A second reach
+field** is forbidden by BL-325 ruling 3. **The space arc stays parked.** **A cloud model playing a
+polity is excluded** by the shipped no-cloud invariant — any seat is the local model over the MCP
+socket. And **no proper noun from Earth history enters generation**: hegemon, collapse and
+overextension are mechanism references, exactly as HISTORY.md's ladder already is.
+
+## The eight rulings — SETTLED 2026-08-18 (Ben, elicitation form; recorded as NR-331)
+
+Put to Ben before any sprint was written, because each changes which sprint opens first and three
+change a standing authority. All eight came back the same session.
+
+| # | Question | Ruling | What it costs |
+|---|---|---|---|
+| 1 | What is "real time"? | **Watched replay** | Cheapest of three. No steppable sim, no agent seat, **no determinism amendment**. Sprint 31 shrinks to perf + BL-317 re-based |
+| 2 | What does the collapse hand the campaign? | **Borders plus character** | The largest structural cost. The Era −1 record must cross into `world` — a save-format payload, filed against BL-107. Adds NEW-13 to Sprint 29 |
+| 3 | Does a hegemon stand at 0 CE? | **Dominant, not hegemonic** | A share threshold pinned **by measurement**, not chosen. HISTORY.md claim 2 survives; only Stage 2's absolute sentence is narrowed. BL-224 stays a reported tuning target |
+| 4 | Grant nation-grain behaviour? | **Era −1 *and* campaign** | A dated exception to BL-054 in the BL-202/BL-203 shape — pure, seeded, replayable, legal verbs, no planner. Must land in the standing rules in Sprint 26, before Lane D builds on it |
+| 5 | Un-park v0.1.11? | **The whole minor** | BL-155, BL-156, BL-186, BL-280 move to the ancient arc. A ROADMAP edit, and the thing that makes Lane D legal at all |
+| 6 | Research reached or spent? | **Spent** | Overturns what shipped 2026-08-17 by default rather than by choice (NR-315). Needs a debit mechanism the level model never had |
+| 7 | Stance before military reach? | **Stance first** | Confirms Lane C's order and **resolves the standing contradiction** — NR-312 settled 25a → 21 → 23, while Sprint 23's own block says it must precede 21 |
+| 8 | Prehistory span? | **Keep 400** | The code is right and the docs are wrong. HISTORY.md and ERAS.md get corrected in Sprint 26's doc pass, rather than a span nothing has run being restored |
+
+**Three of these are authority edits, not preferences**, and they are why Sprint 26 is a hard gate:
+ruling 4 amends `.claude/rules/io-standing-rules.md`, ruling 5 amends ROADMAP.md, and ruling 8
+corrects two design docs that currently assert something the build already falsified.
+
+**Ruling 2 is the one to watch.** *Borders plus character* is the answer that makes the collapse
+matter at 0 CE — a nation the player trades with carries the posture and the grudge its history
+gave it — and it is also the answer that drags the serialisation seam into an arc that would
+otherwise have stayed inside generation. That cost is worth naming now rather than discovering it
+in Sprint 29.
 
 ---
 

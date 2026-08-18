@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*95 entries — 64 open, 31 resolved.*
+*96 entries — 64 open, 32 resolved.*
 
 ---
 
@@ -1110,4 +1110,9 @@ Neither golden was blessed. NR-328 originally said the hash move should be expla
 **Why it matters.** This is a reversal of an explicit instruction, so it needs to be visible rather than buried. The instruction was sound given what NR-328 claimed; the claim was mine and it was wrong. Blessing on a false premise would have converted a live defect into a permanent green.
 
 > **RESOLVED.** Hold vindicated by the bisect. The two commits that caused the red both refused the same bless explicitly and for the same stated reason, so blessing would have overridden a deliberate hand-off, not corrected a stale golden. No bless was made; the standing rule was left alone. Its stale hash (3CBAD1D44EE71EDE vs the constant 855E07DE529684EC) remains worth fixing on its own, and is the only part of the original instruction still actionable.
+
+### NR-331 — Eight rulings settling the Era −1 collapse arc (Sprints 26–33, The Fall)
+*decision taken on your behalf · raised 2026-08-18 · from Ben, 2026-08-18, elicitation form. Brief: plan a series of sprints to the inevitable Era −1 outcome — empire collapse for one of two hegemons, played out in real time in the 0 CE sandbox, as part of generation.*
+
+Put to Ben before any sprint was written, because each ruling changes which sprint opens first and three amend a standing authority. All eight answered same session. (1) REAL TIME = watched replay — no steppable sim, no agent seat, no determinism amendment. (2) HANDOFF = borders plus character — the collapse writes posture, creed and grudges onto surviving nations, which forces the Era −1 record to cross from generation_report into world as a save-format payload (file against BL-107). (3) SURVIVOR = dominant but not hegemonic — share threshold pinned by measurement; HISTORY.md claim 2 survives, only Stage 2 narrows; BL-224 stays a reported tuning target. (4) NATION BEHAVIOUR = granted for Era −1 AND campaign nations — a dated exception to BL-054 in the BL-202/BL-203 shape (pure, seeded, replayable, legal verbs, no planner), to be written into .claude/rules/io-standing-rules.md in Sprint 26 before Lane D builds on it. (5) UN-PARK v0.1.11 whole — BL-155, BL-156, BL-186, BL-280 move to the ancient arc; ROADMAP edit. (6) RESEARCH = spent, not reached — overturns what shipped 2026-08-17 by default rather than by choice (NR-315); needs a debit mechanism. (7) STANCE FIRST — confirms Lane C order and resolves the standing contradiction where NR-312 settled 25a→21→23 while Sprint 23 own block says it must precede 21. (8) PREHISTORY SPAN = keep 400 — the code is right, HISTORY.md and ERAS.md are wrong and get corrected.
 
