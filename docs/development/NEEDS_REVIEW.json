@@ -1626,6 +1626,36 @@
     "NR-259",
     "NR-246"
    ]
+  },
+  {
+   "id": "NR-338",
+   "raised": "2026-08-18",
+   "kind": "observation",
+   "status": "open",
+   "title": "The generic harness target links no sol2, so any harness measuring background firms sees a world with ZERO firms",
+   "source": "Sprint B1 substrate census agent, 2026-08-18. Verified, not assumed: seed_sweep_probe prints firms=0.",
+   "what": "CMakeLists' generic glob target for tools/verify/*.cpp links io_world_obj only, which excludes the sol2 translation units. generate_background_firms sizes itself against economy.lua's population_demand and background_demand baskets, and those are all-zero on a default registry with no Lua loaded — so it places zero firms. A census built on the generic target would have described a world nobody plays. The agent added an explicit live-Lua target for substrate_census, mirroring chain_depth, tier_margin and haulage_measure.",
+   "why": "Fifth instance this month of a check measuring the wrong thing, and the first at the BUILD TARGET layer rather than in the check's own logic. The open question is scope: which OTHER harnesses on the generic glob target touch background firms, corporation counts or demand baskets, and have therefore been measuring a firm-less world? That is worth a sweep, because unlike the previous four this one is invisible from the harness source — the code looks right and the link line is what is wrong.",
+   "refs": [
+    "BL-462",
+    "BL-463",
+    "BL-365",
+    "NR-337"
+   ]
+  },
+  {
+   "id": "NR-339",
+   "raised": "2026-08-18",
+   "kind": "observation",
+   "status": "open",
+   "title": "Two generation features are authored and never produced — valley landform and Highway roads",
+   "source": "Sprint B1 substrate census, 2026-08-18, three seeds.",
+   "what": "The landform valley reports 0.0% on the home body on all three seeds. Road tier 3 (Highway) is never generated — seed 0 produced Track 195 / Road 269 / Highway 0. Both are authored values with rendering and, in the road case, a distinct logistics cost.",
+   "why": "Same shape as the orphan resources NR-257 deleted five of: a value that exists in the enum, is presented in the UI, and is produced by nothing. Each needs the same three-way call — produce it, delete it, or record why it is deliberately unreachable. Reported rather than acted on because the census was scoped as a measurement.",
+   "refs": [
+    "BL-463",
+    "NR-257"
+   ]
   }
  ]
 }

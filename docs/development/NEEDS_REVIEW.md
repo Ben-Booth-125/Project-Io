@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*102 entries — 70 open, 32 resolved.*
+*104 entries — 72 open, 32 resolved.*
 
 ---
 
@@ -770,6 +770,16 @@ The ~23 s per-world cost of the Era -1 pass is quoted unqualified in CMakeLists.
 *observation · raised 2026-08-18 · from Sprint 26a determinism agent, 2026-08-18.*
 
 world_determinism's existing digest is world_metrics, a tile-and-count digest. The Era -1 sim touches no tile: it moves provinces between owners and reaches the world only through the nation carve, derived character, names and charter placement. A prehistory-ON case compared on world_metrics alone would have gone green while asserting nothing about the pass it exists to cover. The agent built a deep_digest instead — world::state_hash folded with the political layer that state_hash deliberately omits (nations, tile_to_nation, population centres, corporations, history_log), because state_hash is a tick-boundary instrument and borders do not move on a tick.
+
+### NR-338 — The generic harness target links no sol2, so any harness measuring background firms sees a world with ZERO firms
+*observation · raised 2026-08-18 · from Sprint B1 substrate census agent, 2026-08-18. Verified, not assumed: seed_sweep_probe prints firms=0.*
+
+CMakeLists' generic glob target for tools/verify/*.cpp links io_world_obj only, which excludes the sol2 translation units. generate_background_firms sizes itself against economy.lua's population_demand and background_demand baskets, and those are all-zero on a default registry with no Lua loaded — so it places zero firms. A census built on the generic target would have described a world nobody plays. The agent added an explicit live-Lua target for substrate_census, mirroring chain_depth, tier_margin and haulage_measure.
+
+### NR-339 — Two generation features are authored and never produced — valley landform and Highway roads
+*observation · raised 2026-08-18 · from Sprint B1 substrate census, 2026-08-18, three seeds.*
+
+The landform valley reports 0.0% on the home body on all three seeds. Road tier 3 (Highway) is never generated — seed 0 produced Track 195 / Road 269 / Highway 0. Both are authored values with rendering and, in the road case, a distinct logistics cost.
 
 ---
 

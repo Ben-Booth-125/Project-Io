@@ -444,3 +444,35 @@ cmake --build build --target spectator_determinism    # from a vcvars shell
 build_app.bat spectator_determinism                   # or via the pinned script
 ctest --test-dir build -R spectator_determinism
 ```
+
+## substrate_census (NEW-10, Sprint B1)
+
+How civilised the generated world actually is, over N seeds (default 3), measured
+**after** `generate_background_firms` and at the shipped 400-year prehistory. Reports
+tiles by composition and landform; population centres and centres per nation;
+corporations and their focus split; buildings by type and per nation; road tiles by
+tier and how many nations have **no** network; markets and how many nations contain
+none; and the share of land within N tiles of any building, settlement or road.
+
+**A report, not a gate** — per BL-224's discipline, it measures across seeds and
+asserts no per-world density threshold. Its structural rows (S1–S3) pass. A fourth
+row, *every nation holds at least one population centre*, was written, measured and
+**fails at 64%** (109 of 169 nations); it is deliberately non-gating and is the
+acceptance test for BL-463 (settlement count is seed-invariant).
+
+**Needs an explicit live-Lua target, and this is not a convenience.** The generic
+glob target links `io_world_obj` only, which excludes the sol2 TUs, and
+`generate_background_firms` sizes itself against `economy.lua`'s demand baskets —
+all-zero on a default registry. Built on the generic target it places **zero firms**
+and the census describes a world nobody plays (NR-338).
+
+Registered as a **`sweep`** (skipped unless `IO_RUN_SWEEPS` is set): ~1.0 s/world at
+`/O2` but ~62 s/world in Debug, so the three-seed default is ~186 s in a Debug tree —
+inside 25% of the long tier, which is the flaky-by-luck margin BL-288 re-tiered the
+suite to remove (NR-259).
+
+```
+cmake --build build --target substrate_census    # from a vcvars shell
+build_app.bat substrate_census                   # or via the pinned script
+IO_RUN_SWEEPS=1 ctest --test-dir build -R substrate_census
+```
