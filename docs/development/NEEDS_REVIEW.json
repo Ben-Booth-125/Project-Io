@@ -1556,6 +1556,45 @@
     "BL-274",
     "NR-177"
    ]
+  },
+  {
+   "id": "NR-334",
+   "raised": "2026-08-18",
+   "kind": "question",
+   "status": "open",
+   "title": "Ruling 8 has a second half — does the HARNESS follow production to 400 years, or production follow the struct to 4000?",
+   "source": "Sprint 27 (BL-384 assertion agent) and Sprint 26b (doc truth pass) reported contradictory spans on 2026-08-18. Both were right; the configurations differ.",
+   "what": "history_sim_params defaults to 4000 BCE -> 0 CE on a six-band clock (136 decision rounds). make_hard_coded_world overrides it to 400 BCE -> 0 CE on one 4-year band (100 rounds). Every harness and the Ages view use the struct default; only generation uses the override. Filed as BL-462 (harnesses measure a different sim than ships), priority A.",
+   "why": "Ruling 8 said the code is right and the docs are wrong — keep 400. That was taken against the production number, before this divergence was known, and the doc pass has now written 400 into HISTORY.md and ERAS.md. But the struct comment attributes the six-band 4000-year ladder to Ben on 2026-08-12, so it reads as a second live intent rather than a stale default. Until this is settled, every Era -1 measurement the arc depends on is taken on a configuration that does not ship.",
+   "options": [
+    "(a) Harness follows production — 400 years, one band. Sprint 27's findings get re-measured; the six-band ladder becomes dead default and should be deleted.",
+    "(b) Production follows the struct — restore 4000 years and six bands in generation. Contradicts ruling 8 and needs BL-320's perf work first.",
+    "(c) Both are deliberate — a long sandbox config and a short shipped one. Then every harness row must name which config it measured, and the docs must describe both."
+   ],
+   "refs": [
+    "BL-462",
+    "BL-384",
+    "BL-320",
+    "BL-317",
+    "NR-331",
+    "NR-177"
+   ]
+  },
+  {
+   "id": "NR-335",
+   "raised": "2026-08-18",
+   "kind": "observation",
+   "status": "open",
+   "title": "BL-384's filed premise does not reproduce — 267 battles / 0 conquests is stale",
+   "source": "Sprint 27 assertion agent, 2026-08-18, over seeds 0-7 with real terrain; independently confirmed against an unmodified history_sweep run.",
+   "what": "Where a world fights at all it converts nearly every battle into ground taken (137/144, 272/272, 272/272, 27/27). The transfer branch at history_sim.cpp:996-1027 is NOT the bottleneck, which is what BL-384 was filed against. The real shape is bimodal: 4 of 8 worlds fight nothing whatsoever across the whole run. The 267/0 figure appears descended from the pre-fix w_cult era recorded in the scorer's own comment.",
+   "why": "Sprint 28 was scoped to fix the scorer/resolver disagreement on the assumption that battles do not convert. They do. The item should be re-cut around the two hypotheses the measurement actually supports: H1, that Campaign is priced at roughly half of Settle for the same ground in BL-318's shared currency and only wins the argmax when Settle's gate closes; and H2, that elimination is arithmetically unreachable because one verb per polity per round caps whole-era conquest below a single power's holdings. H2 matters most for the arc — no amount of cohesion tuning reaches collapse if the action budget is the binding constraint, which would re-scope Sprint 30 before it opens.",
+   "refs": [
+    "BL-384",
+    "BL-462",
+    "BL-318",
+    "BL-308"
+   ]
   }
  ]
 }

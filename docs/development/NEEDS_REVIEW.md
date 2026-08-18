@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*98 entries — 66 open, 32 resolved.*
+*100 entries — 68 open, 32 resolved.*
 
 ---
 
@@ -746,6 +746,20 @@ The only military terminal good in the game is tagged era = industrial, and a 0 
 *observation · raised 2026-08-18 · from Sprint 26b doc truth pass, 2026-08-18.*
 
 The recipe registry has era_band_for_epoch (recipe_registry.hpp:36-38), derived from epoch_year. The unit roster has campaign_roster_band (unit_roster.hpp:61), a hard constant set to industrial with a comment still reading 1960s. Neither consults the other. BL-460 is the recipe side stranding ordnance; BL-461 is the roster side offering industrial units in a 0 CE campaign.
+
+### NR-334 — Ruling 8 has a second half — does the HARNESS follow production to 400 years, or production follow the struct to 4000?
+*question · raised 2026-08-18 · from Sprint 27 (BL-384 assertion agent) and Sprint 26b (doc truth pass) reported contradictory spans on 2026-08-18. Both were right; the configurations differ.*
+
+history_sim_params defaults to 4000 BCE -> 0 CE on a six-band clock (136 decision rounds). make_hard_coded_world overrides it to 400 BCE -> 0 CE on one 4-year band (100 rounds). Every harness and the Ages view use the struct default; only generation uses the override. Filed as BL-462 (harnesses measure a different sim than ships), priority A.
+
+- (a) Harness follows production — 400 years, one band. Sprint 27's findings get re-measured; the six-band ladder becomes dead default and should be deleted.
+- (b) Production follows the struct — restore 4000 years and six bands in generation. Contradicts ruling 8 and needs BL-320's perf work first.
+- (c) Both are deliberate — a long sandbox config and a short shipped one. Then every harness row must name which config it measured, and the docs must describe both.
+
+### NR-335 — BL-384's filed premise does not reproduce — 267 battles / 0 conquests is stale
+*observation · raised 2026-08-18 · from Sprint 27 assertion agent, 2026-08-18, over seeds 0-7 with real terrain; independently confirmed against an unmodified history_sweep run.*
+
+Where a world fights at all it converts nearly every battle into ground taken (137/144, 272/272, 272/272, 27/27). The transfer branch at history_sim.cpp:996-1027 is NOT the bottleneck, which is what BL-384 was filed against. The real shape is bimodal: 4 of 8 worlds fight nothing whatsoever across the whole run. The 267/0 figure appears descended from the pre-fix w_cult era recorded in the scorer's own comment.
 
 ---
 
