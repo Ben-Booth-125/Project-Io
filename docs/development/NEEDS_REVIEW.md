@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*88 entries — 60 open, 28 resolved.*
+*91 entries — 63 open, 28 resolved.*
 
 ---
 
@@ -705,6 +705,27 @@ BL-459's formula is strength = count x roster_type_quality x supply_factor. Rath
 The unit Selection card's Strength page now shows a derived figure with its count x quality x supply derivation, an unsupplied callout and an upkeep block; the Corporation dashboard gains a seventh Finance bar (Force) and a force line beneath the net. Both are material content changes to existing surfaces. The agent did not touch docs/ui/question_log.json or docs/ai/ACTIONS.json because both were live merge hazards against concurrent work, and said so rather than editing them.
 
 **Why it matters.** BL-260's rule is that every information surface declares the question it answers, and the enforcement is authorship rather than machinery - so a missed entry is missed permanently and silently. This is exactly the gap the question log exists to expose: a surface that changed with no recorded justification. The merge-hazard reasoning was correct at the time and the debt is now mine, not the agent's.
+
+### NR-324 — verify_api's resource-slug mapper is a FIFTH transcription of resource_type, and it is 20 of 37 stale
+*observation · raised 2026-08-18 · from Post-merge run of the Sprint 25a work on a machine that can build SDL/ImGui (2026-08-18).*
+
+resource_from_name in src/core/verify_api.cpp maps only 20 of the 37 resource_type values, and falls back to iron_ore for anything it does not know. A verify script naming ordnance therefore seeds an IRON ORE convoy and the capture reads 'Iron Ore x8' — silently, with no error. Confirmed live: verify.seed_convoy(...,'ordnance',...) rendered as Iron Ore in the BL-453 Convoys tab. tools/session/resource_table_check.js passes (38 values agree) because it joins components.hpp, recipe_registry.cpp, world_gen_config.cpp and presentation.cpp — it does not know about this fifth table.
+
+**Why it matters.** BL-457's own guard was written precisely to stop a resource roster drifting across hand-maintained copies, and it reports OK while a fifth copy is missing 17 goods including the sprint's headline one. The silent iron_ore fallback is the bad part: a visual check that MEANT to exercise ordnance exercises iron ore and still passes, so the check certifies the wrong thing. This is the same class of defect as the '(unnamed resource)' bug that guard was built to catch.
+
+### NR-325 — Two fold-out ledgers open at once overlap in the same column slot rather than one replacing the other
+*observation · raised 2026-08-18 · from Post-merge visual run, BL-453 Convoys tab capture (2026-08-18).*
+
+With the Corporations dashboard already open, verify.show_panel('market', true) drew the Market Ledger INTO THE SAME shell fold-out column, both windows compositing on top of each other — the Corps/Holdings/Markets strip legible over the ghosted Prices/Sell Orders/Convoys strip. Closing the other panels first produced a clean Convoys capture. Knock-on: verify.scroll_panel targets an ImGui WINDOW name, so with two panels stacked it scrolls the invisible one and the capture silently shows an unscrolled panel.
+
+**Why it matters.** The fold-out column hosts one ledger at a time by design (LAYOUT.md / the toggle rule), so this is either a missing mutual-exclusion in the panel open flags or an accepted state nobody has looked at. Either way it makes verify captures order-dependent in a way no script declares, which is a quiet source of misleading goldens.
+
+### NR-326 — Three stale cloud branches merged to main; their app.cpp changes were re-ported, not merged
+*decision taken on your behalf · raised 2026-08-18 · from Merge of claude/ui-documentation-json-1566f7, claude/ecstatic-hofstadter-80f1d6 and claude/elated-mclean-7dd61c into main (2026-08-18).*
+
+All three branched from a base predating the verify-API carve-out, so each still had run_verify and its helpers inside src/core/app.cpp, which main has since split into src/core/verify_api.cpp. Merging their app.cpp hunks would have re-created deleted code. Resolution taken: app.cpp took HEAD wholesale in both conflicts, and the intent was re-ported by hand — the lens branch needed nothing (main's verify_api.cpp already maps reach and supply_routes), and elated-mclean's verify.scroll_panel binding was moved into verify_api.cpp beside panel_view, with the SKILL.md pointer corrected from app.cpp to verify_api.cpp. Also: every golden PNG the three branches carried was DROPPED rather than merged, since main's curated set is the two icon_silhouettes files after the 2026-08-15 demotion. For the lens-cycle conflict, the branch's overlay_mode::count sentinel was taken over main's last-enumerator + static_assert, because the enum now carries the sentinel and it needs no hand maintenance.
+
+**Why it matters.** This is the stale-base failure mode again — worktrees isolate writes, not history — and it is the third recorded instance. A clean textual merge here would have compiled and silently reverted a refactor. Recording it so the re-port is visible as a decision rather than looking like the branches merged cleanly.
 
 ---
 
