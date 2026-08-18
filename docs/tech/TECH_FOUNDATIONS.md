@@ -21,15 +21,46 @@ The prototype validates the **economy loop only**. It covers resource extraction
 >
 > The earlier note, still accurate on terrain: `terrain_combat.{hpp,cpp}` provides `terrain_defence` / `terrain_attrition` / `terrain_resistance` (0–1000, pure functions of composition × landform — no stored field, nothing on the serialisation seam). No consumer is wired yet: the history ladder still prices conquest through its own `is_barrier` bool, and swapping it onto the graded scalars — plus any gameplay use — is BL-233 (terrain combat modifiers), open. When combat lands it reads these same functions rather than inventing a second answer to "how does ground resist an army".
 
+> **Re-based 2026-08-18 — "campaign play" is no longer the clean line either.** The note above
+> drew the boundary at *codebase vs campaign play*. That boundary has since moved twice, and this
+> document was not updated with it. What ships now:
+>
+> - **A second, campaign-scale resolver.** `src/world/campaign_battle.{hpp,cpp}` (BL-315, armed
+>   house conflict spine) — seeded rounds, priced withdrawal, a begin/step/withdraw state machine.
+>   Compiled and harnessed (`tools/verify/campaign_battle_harness.cpp`), with **no production
+>   caller**. Designed-and-built-but-unreachable, not designed-and-unbuilt.
+> - **A recurring cost of force.** `run_unit_upkeep` (`src/world/economy_system.cpp`) draws goods
+>   per unit per tick and `apply_budget` charges the credit half (`src/world/budget_system.cpp:173`)
+>   — BL-454 (unit upkeep). **Every authored rate is 0.0** (`scripts/economy.lua`
+>   § `economy.military.unit_upkeep`), so the plumbing ships inert and an army costs nothing today.
+> - **A military good.** `resource_type::ordnance` (BL-457, ordnance) — the roster's first terminal
+>   military good, produced by the Fabricator recipe and named as unit upkeep's draw.
+> - **A muster building.** `building_type::military_base` (BL-325, military bases and supply).
+>
+> The honest statement of scope is therefore: **combat resolution and the economy that would feed
+> it are built; campaign combat is not *reachable*.** Nothing composes an army from live units in
+> production, nothing decides two forces are fighting, and no verb names a unit. The absent list
+> is enumerated in `docs/military/MILITARY.md` § What is absent — that doc, not this one, is the
+> authority for the military layer's landed/outstanding split.
+
 ### Units
 Units exist in the **data model** as minimal entities. They are defined enough that they will not need to be retrofitted when combat is added, but no combat rules are implemented. The following are explicitly excluded from the prototype:
 
-- ~~Combat resolution of any kind~~ — *superseded 2026-08-02; `resolve_battle` ships (BL-272), consumed by the Era −1 sim only. Campaign-side combat is still excluded.*
+- ~~Combat resolution of any kind~~ — *superseded 2026-08-02 and again 2026-08-18; **both** resolvers ship. `resolve_battle` (BL-272) is called by the Era −1 sim; `resolve_campaign_battle` (BL-315, armed house conflict spine) is compiled and harnessed with no production caller.*
 - ~~Opponent or AI factions~~ — *superseded; see § Factions below (2026-07-31)*
-- Unit transport infrastructure (troop carriers, shuttles, transit buildings) — *still holds*
-- Weaponry or equipment systems — *still holds*
+- Unit transport infrastructure (troop carriers, shuttles, transit buildings) — *still holds (checked against source 2026-08-18: no such building type exists)*
+- ~~Weaponry or equipment systems~~ — *narrowed 2026-08-18. **Weaponry as a traded good ships**: `resource_type::ordnance` (BL-457, ordnance) is produced by the Fabricator and drawn per-head per-tick by unit upkeep (BL-454, unit upkeep), at an authored rate of 0.0. What still does not exist is an **equipment system** — nothing equips, upgrades or re-arms a unit; a roster row's `power_mod` is its whole materiel model.*
+
+Also no longer accurate as written: "no combat rules are implemented". Both resolvers implement
+rules; what is missing is anything that *invokes* them on live units.
 
 The design goal is that adding combat later extends the existing model rather than replaces it.
+
+> **Where the unit data model actually stands (2026-08-18).** `unit_component` carries
+> `{position, owner, count, type, supply_factor_permille, muster_base}`. The `strength` field this
+> section's "minimal entities" framing assumed was **removed** by BL-459 (unit strength is a
+> duplicate of count) — strength is now derived, not stored. Detail in
+> `docs/military/MILITARY.md` § The unit model.
 
 ### Procedural generation
 
@@ -37,6 +68,20 @@ The design goal is that adding combat later extends the existing model rather th
 
 ### Buildings and infrastructure
 Economy-supporting infrastructure (extraction sites, processing facilities, ports) is in scope only to the degree needed to demonstrate the trade loop. Buildings whose primary purpose is unit production, transport, or military logistics are excluded.
+
+> **Superseded on the military clause (2026-08-18).** A **unit-production building ships**:
+> `building_type::military_base` (BL-325, military bases and supply). It is the single
+> economy → military interface and the only place units come from — `hire_unit` requires the
+> acting corp's own completed base on the named tile. Priced in `scripts/economy.lua` at build
+> cost 300, 35 steel, 4 ticks, maintenance 15; tech-gated behind `E0-ML-01`.
+>
+> **Military *logistics* was not excluded so much as declined a separate existence.** BL-325's
+> ruling 3 (Ben, 2026-08-08) is that economic reach **is** military reach: there is one
+> `body_reach_field` and armies pay it. A `military_base` is deliberately not a supply anchor and
+> extends nothing. So the correct statement is not "military logistics is out of scope" but
+> "there is no second logistics network, by decision".
+>
+> The transport clause **still holds** — no troop carrier, shuttle or transit building exists.
 
 ### Factions
 
@@ -200,7 +245,8 @@ This means ImGui panel code should be written clearly, not cleverly. It is refer
 | Lua binding | sol2 (v3) |
 | Tick architecture | Three-layer calendar clock (`sim_loop`: 12 sim ticks/day → day tick → 90-day quarter econ tick); tick-boundary snapshots for saves (planned) |
 | Generation | In scope, deterministic (seeded) — planetology → continents → tiles → history ladder → nations/population/roads/corporations (superseded the out-of-scope call, 2026-07-31) |
-| Factions | Generated nations + rival corps with scoped AI (BL-079 reflexes, BL-202 corp AI, BL-203 predictive spending); campaign-side combat still excluded, though `resolve_battle` ships for the Era −1 sim (BL-272) |
+| Factions | Generated nations + rival corps with scoped AI (BL-079 reflexes, BL-202 corp AI, BL-203 predictive spending) |
+| Military (2026-08-18) | Both resolvers ship — `resolve_battle` for the Era −1 sim (BL-272), `resolve_campaign_battle` compiled + harnessed with no production caller (BL-315). Muster building (BL-325), hire verb, ordnance good (BL-457) and unit upkeep (BL-454, **rates 0.0**) all landed. Campaign combat is **unreachable**, not unbuilt. Authority: `docs/military/MILITARY.md` |
 | Tile memory | All tiles resident; flat binary structs; no per-tile Lua |
 | UI (prototype) | Dear ImGui |
 | UI (production) | Lua-driven retained layer — deferred to UI document |

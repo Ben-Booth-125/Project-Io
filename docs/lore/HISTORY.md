@@ -11,15 +11,30 @@ generation stack can hang dated history lines off. Companion to `../generation/P
 >
 > **What this costs the ladder, stated plainly.** Stages 1–4 (agrarian surplus, the enforceable
 > promise, fragmentation-with-connectivity, capital disciplines the sovereign) are pre-industrial
-> and land inside a 4000 BCE → 0 CE run intact. **Stages 5 and 6 — the energy transition and
+> and land inside the pre-epoch run intact. **Stages 5 and 6 — the energy transition and
 > saturation — are past the new epoch entirely** and are no longer campaign backstory; they
 > become DLC-era material alongside the parked space arc. They were already flagged superseded
 > by BL-223, so this narrows a doc that was already known to be wrong there rather than
 > overturning settled prose.
 >
-> The one-shot pass this document describes is now driven by the stepped year-tick sim
-> (`src/world/history_sim.{hpp,cpp}`), 4000 BCE → 0 CE, stepping 100 → 50 → 20 → 10 → 5 → 1
-> years. A settle-dominated deep prehistory is the intended shape (NR-205, ruled 2026-08-12).
+> **THE RUN IS 400 YEARS IN ONE BAND, NOT 4000 IN SIX (verified against source 2026-08-18).**
+> Ben's ruling that day: the code is right, this doc was wrong. Generation simulates
+> **400 BCE → 0 CE at 4 years a tick — one band, 100 decision rounds.** The span comes from
+> `world_params::prehistory_years = 400` (`src/world/hard_coded_world.hpp:65`) and the band is
+> flattened at the call site: `hp.tick_bands[0] = {epoch_year, 4}; hp.tick_band_count = 1;`
+> (`src/world/hard_coded_world.cpp:532-536`).
+>
+> The 4000-year, 100 → 50 → 20 → 10 → 5 → 1 ladder survives only as the **struct default** in
+> `history_sim_params` (`src/world/history_sim.hpp:119-140`). Generation overrides it on every
+> world it builds; only the tile inspector and the harnesses run the default. Do not read the
+> default as the shipped run.
+>
+> `prehistory_years` is a **scope knob, not a tuning dial** — set it to 0 and the pass is skipped
+> entirely, which is how the harnesses that do not test the era avoid paying for it.
+>
+> The one-shot pass this document describes is driven by that stepped year-tick sim
+> (`src/world/history_sim.{hpp,cpp}`). A settle-dominated run is the intended shape (NR-205,
+> ruled 2026-08-12) — that ruling was made of the long span and still holds of the short one.
 
 ## Purpose
 
@@ -402,9 +417,19 @@ province's own endowment, reach against the polity's **mean** holding. Scoring r
 
 **Bounded by construction**, like the other four verbs. Two candidate provinces per polity per
 round — the capital, plus one rotated through the holdings by a hash of (polity, year, slot).
-Scoring every holding would be O(held × rows) inside a pass already costing ~23 s of a ~25 s
-world; the rotation still reaches every province over a run, because the round count (136 on the
-default stepped-clock ladder) is large against any one polity's holdings.
+Scoring every holding would be O(held × rows) inside the most expensive pass in generation; the
+rotation still reaches every province over a run, because the round count is large against any
+one polity's holdings.
+
+> **Round count corrected 2026-08-18.** This paragraph read "136 on the default stepped-clock
+> ladder". That is the `history_sim_params` default, not the shipped run: **generation runs 100
+> rounds** (400 years, one 4-year band — see the epoch note at the top of this document). The
+> bounded-rotation argument is unchanged at 100; the number was.
+>
+> The cost figure this paragraph used to carry (~23 s of a ~25 s world) was measured on the
+> 4000-year run and is **not re-measured here**. `hard_coded_world.cpp` now carries two
+> disagreeing cost comments of its own — one says ~110 ms for the 100-round pass, one still says
+> ~23 s. Treat both as unverified until someone times it.
 
 **A work saturates.** `apply_work_to_province` refuses to build the same row twice, so a
 province's works are a finite investment and the polity is eventually forced to spend its rounds
