@@ -1460,35 +1460,36 @@
       "id": "NR-328",
       "raised": "2026-08-18",
       "kind": "question",
-      "status": "open",
-      "title": "AI corps end every benchmark seed at MINUS 2-3 MILLION - not a stale golden, and not unit upkeep",
+      "status": "resolved",
+      "title": "The bankrupt AI economy is a KNOWN deliberately-unblessed state from Sprint 19, not a new regression",
       "source": "First full ctest run of the merged tree on a machine that can build everything (2026-08-18). 82 of 85 pass.",
       "what": "Re-blessing was attempted on Ben's instruction and STOPPED at the measurement. ai_skill_harness's fresh numbers are not drift: seed 0 final net worth went +78,142 -> -2,220,111, and all five seeds land between -1.9M and -3.4M with 29-30 of 30 ticks below zero. Identical across two consecutive runs, so it is reproducible, not noise. The stated cause in this entry's first version was wrong: unit_upkeep_params defaults every rate to ZERO (unit_roster.hpp's own comment says so explicitly - 'the only thing that moves at zero rates is the world state hash'), and ai_skill_harness hand-builds its registry rather than loading economy.lua, so BL-454 upkeep is not charged in this harness at all. action[hire_unit] is absent from every seed's tally. Whatever is draining ~74k per tick per corp, it is not the standing-force upkeep. Note econ_stability PASSES - the small hand-built world holds prices in band and balances bounded for 100 ticks - so the collapse needs the real generated world plus corp_ai to appear.",
       "why_it_matters": "Blessing these bands would have written a bankrupt economy into the goldens as the new normal, and the harness would then report green on it forever. The bands are the instrument that caught this; re-blessing them is the one action that destroys the evidence. Equally, the spectator_determinism hash move can no longer be attributed to upkeep, so that bless has been reverted too - its explanatory note would have been false.",
       "next_step": "Diagnose the drain before any bless. The sprint changed market_clearing.cpp (+212), economy_system.cpp (+219) and corp_ai.cpp (+337); econ_stability passing narrows it to something that needs the generated world or the scorer. Bisect ai_skill_harness across Sprint 25a to date it. The two goldens stay RED until then - a red bands row whose cause is unknown is the correct state.",
-      "resolution": null
+      "resolution": "Bisected 2026-08-18 over the 49 pulled commits (ai_skill_harness, MSVC, one worktree). Base 3b9ffd2 PASSES and reproduces the blessed bands exactly. FIRST BAD: debfa87 'The AI could never build a processor, and the economy was blamed for it (BL-439)' - seed 0 to -295k. DEEPENED at 97fe33a 'Refining was never priced wrong' (BL-436/BL-440), which enabled richness_reference and took extraction from 1659.18 to 7.82 net per building-tick - a ~100x income cut with the cost side unchanged - giving the -2.2M seen today. NOT Sprint 25a at all: both are Sprint 19, pulled in the same batch as PRs #41-43. Both commits state they leave the goldens red ON PURPOSE. BL-439: 'Requirements: 6 completed, 1 failed (R6, the bless, refused on purpose)' and 'these bands should RISE when processing is fixed, so a bless that lowers them again means the fix did not work. Blessing here would record bankruptcy as the expected outcome.' BL-436: 'nothing is blessed' and 'Do not reprice on these numbers.' So the refusal to bless was correct and matches two prior authors' explicit instructions. The remaining work is HELD on Ben's design calls - BL-440(c) siting retarget (a post-registry retarget pass vs a static demand hint at world-gen), and the repricing NR-271 sized. The goldens should stay red until those land."
     },
     {
       "id": "NR-329",
       "raised": "2026-08-18",
       "kind": "observation",
       "status": "open",
-      "title": "tier_margin fails three rows, one of them the processing-out-earns-extraction premise",
+      "title": "tier_margin was already red before Sprint 19 - dated by the bisect",
       "source": "Full ctest run of the merged tree (2026-08-18).",
       "what": "tier_margin reports: 3 recipe inputs that have deposits are never produced; 7 wanted recipe inputs sit on 200+ tiles with no site naming them; and a processing facility does not out-earn an extraction site per tick. The third is already known — the verifier-headless notes on player_seed_sweep record BL-436 measuring exactly that, and warn its G4 depth floor must never be re-read as a profitability gate. The first two rows I have not traced.",
       "why_it_matters": "Not merge damage — tier_margin links only world/*, and nothing merged today touches world logic. It is either inherited from Sprint 25a (which added ordnance and a Fabricator recipe consuming steel + machinery, plausibly moving the sited/produced sets) or older still. Worth knowing which, because the second row — a wanted input on 200+ tiles that nothing sites for — is the shape of a good the economy asks for and cannot get.",
-      "next_step": "Check whether tier_margin passed at 46118b6 (the pre-merge sprint head) to date the regression, then decide whether the three rows are content decisions (like NR-257) or defects."
+      "next_step": "Dated 2026-08-18: BL-439's own commit message records the gate as '79 tests, 3 failed -- ai_skill_harness and spectator_determinism both this change and both unblessed, tier_margin red before it.' So tier_margin predates BL-439 and is not merge damage or Sprint 25a. Its processing-underearns row is the same BL-436 economics; the produced/sited rows are BL-440's coal finding (7 resources common but rarely dominant, so richest_extractable never targets them - one on 16,361 tiles). Both are already filed; this entry can close once BL-440(c) lands."
     },
     {
       "id": "NR-330",
       "raised": "2026-08-18",
       "kind": "decision-taken",
-      "status": "open",
+      "status": "resolved",
       "title": "Re-bless instruction not carried out - the premise it rested on did not survive measurement",
       "source": "Ben instructed \"re-bless both goldens and update the standing rule\" (2026-08-18), on the strength of NR-328 as first written.",
       "what": "Neither golden was blessed. NR-328 originally said the hash move should be explained by BL-454 unit upkeep; measuring the actual numbers showed it is not (upkeep rates default to zero and the harness never loads economy.lua), and that the AI economy has collapsed to -2M..-3.4M net worth on every seed. The spectator_determinism bless was written and then REVERTED, because its note would have attributed the move to a cause now known to be false. The standing rule was left alone. One finding from the attempt is worth keeping regardless: .claude/rules/io-standing-rules.md cites 3CBAD1D44EE71EDE, but the harness constant was already 855E07DE529684EC - the rule went stale across roughly six re-blesses since 2026-08-14, long before this sprint.",
       "why_it_matters": "This is a reversal of an explicit instruction, so it needs to be visible rather than buried. The instruction was sound given what NR-328 claimed; the claim was mine and it was wrong. Blessing on a false premise would have converted a live defect into a permanent green.",
-      "next_step": "Ben to confirm the hold. The standing-rule hash is stale independently of the defect and can be corrected now if wanted - but the honest correction is to stop quoting a specific hash in a standing rule at all, since it has silently drifted six times, and point at the harness constant instead."
+      "next_step": "Ben to confirm the hold. The standing-rule hash is stale independently of the defect and can be corrected now if wanted - but the honest correction is to stop quoting a specific hash in a standing rule at all, since it has silently drifted six times, and point at the harness constant instead.",
+      "resolution": "Hold vindicated by the bisect. The two commits that caused the red both refused the same bless explicitly and for the same stated reason, so blessing would have overridden a deliberate hand-off, not corrected a stale golden. No bless was made; the standing rule was left alone. Its stale hash (3CBAD1D44EE71EDE vs the constant 855E07DE529684EC) remains worth fixing on its own, and is the only part of the original instruction still actionable."
     }
   ]
 }
