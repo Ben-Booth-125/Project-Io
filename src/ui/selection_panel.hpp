@@ -83,7 +83,8 @@ void draw_building_page(world& w, const recipe_registry& reg, const economy_repo
 
 /// One page of the unit Selection card's accordion — mirrors building_page_kind's
 /// role for the new Soldier card (placeholder, BL-393 notes units are largely
-/// inert today). Strength: strength + count; Roster: roster-type name + owner.
+/// inert today). Strength: the DERIVED strength (BL-459) with its count/quality/
+/// supply derivation and the BL-454 upkeep line; Roster: roster-type name + owner.
 enum class unit_page_kind { strength, roster };
 
 /// A titled accordion page for the unit card — mirrors `building_page`.
@@ -102,8 +103,9 @@ std::vector<unit_page> unit_pages(const world& w, entity_id id);
 
 /// Draw one unit accordion page's content, dispatched by kind. Read-only —
 /// unlike the building card, nothing on this placeholder card mutates the
-/// unit.
-void draw_unit_page(const world& w, entity_id id, unit_page_kind kind);
+/// unit. Takes the registry since BL-454, for the strength page's upkeep line.
+void draw_unit_page(const world& w, const recipe_registry& reg,
+                    entity_id id, unit_page_kind kind);
 
 /// Draw the **Selection content** — the polymorphic detail of the current
 /// selection (ui_state::selected_entity), emitted into whatever window the caller

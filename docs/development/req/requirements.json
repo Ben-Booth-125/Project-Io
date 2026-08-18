@@ -4000,6 +4000,276 @@
      "notes": "tier_margin is the economy-wide read named by the item."
     }
    ]
+  },
+  {
+   "brief": "ordnance-military-terminal-good",
+   "batch": "2026-08-17-sprint25a",
+   "title": "BL-457 - The militia has no military good to buy: ordnance does not exist in the roster",
+   "status": "complete",
+   "promoted_from": "backlog.json BL-457 NO_MILITARY_TERMINAL_GOOD",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "ITEM-SPANNING (headless): resource_type carries a military terminal good that is PRODUCED by an authored recipe and WANTED by a named consumer, so chain_depth's R1 orphan row stays green in both directions rather than gaining a new orphan.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET BY INSPECTION, NOT BY EXECUTION - see the environment note below. ordnance = 37 appended (components.hpp, count 37 -> 38); produced by recipes.lua id 27 (Fabricator, steel 1.0 + machinery 1.0); wanted via chain_depth's k_actor_consumed exemption naming 'BL-454 unit upkeep draw (per-tick, per unit)', which is the table's own mechanism for a non-recipe consumer (propellant and the habitability goods sit in it already). chain_depth itself COULD NOT BE RUN: it is a live-Lua harness and this session cannot build Lua/sol2 (NR-313)."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "Every hand-maintained transcription of resource_type accepts the new value: both name maps (recipe_registry.cpp for recipes/economy, world_gen_config.cpp for world_gen) and the positional UI presentation array. A missing name-map row is a hard startup crash (the 2026-08-12 medical_supplies precedent); a missing presentation row is a silent \"(unnamed resource)\".",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET and MECHANISED. tools/session/resource_table_check.js added - a static join over all four transcriptions. Reports OK for 38 values. Run against the pre-change tree in a detached worktree it FAILS with \"presentation.cpp: 34 rows for 37 enum values - indices 34..36 are value-initialised\", i.e. it was seen to fail on a real defect before being trusted."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "The base price is DERIVED from the processing roster's own convention rather than picked, and the derivation is written down where it can be re-derived.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. The roster marks an output up over its input basket at 1.415-1.443 (machinery 1.419, alloys 1.417, electronics 1.415, spacecraft_components 1.443 - computed from world_gen.lua base prices). Ordnance inputs = steel 8.0 + machinery 22.0 = 30.0; base_price 43.0 gives 1.433, inside the band. Derivation recorded in world_gen.lua, recipes.lua id 27, and RESOURCES.md."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "The whole world layer still compiles with the widened enum, and no per-resource array or switch silently mis-sizes.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. 43 of 47 world TUs compiled with g++ -std=c++20 -O2 -Wall (the other 4 need Lua/sol2 - NR-313). econ_harness links and runs ALL PASS, 0 failures. -Wswitch produced no resource_type diagnostic, and tile_generation.cpp's arrays widened to std::array<float, 38> as expected."
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "requirement": "The Lua roster actually loads: recipes.lua id 27 and world_gen.lua base_price parse and resolve against the name maps at runtime.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "NOT VERIFIED IN THIS SESSION and deliberately left pending rather than claimed. No Lua interpreter is available and the Lua-linked harnesses cannot be built (NR-313). Static checks only: brace balance clean on both files, both edits follow their neighbours' shape exactly, and resource_table_check.js confirms \"ordnance\" resolves in both name maps - which is the specific failure mode (Unknown resource) that crashed startup in 2026-08-12. Run chain_depth and any live-Lua harness on a machine with the deps before cutting."
+    }
+   ]
+  },
+  {
+   "brief": "military-points-deleted-science-wired",
+   "batch": "2026-08-17-sprint25a",
+   "title": "BL-455 - military_points is deleted and science is wired to the tech gate",
+   "status": "complete",
+   "promoted_from": "backlog.json BL-455 MILITARY_POINTS_AND_SCIENCE_ARE_WRITE_ONLY",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "ITEM-SPANNING (headless): neither accumulator is write-only any more. military_points does not exist; science is measurable by a predicate, so a tech gate or law can require a research level.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. military_capability_harness rebuilt: R4 asserts a gate at 5 research is met by the corp that earned 5 and NOT by a corp with none, and not met one step above what was earned. 8/8 PASS. condition_set_harness still 40 passed, 0 failed."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "military_points is removed at every site, not merely unread - field, Lua param, param struct member, the per-tick write, and every assertion about it.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. grep for military_points across src/, scripts/ and tools/ returns only explanatory comments recording the removal - zero live references. Sites removed: components.hpp field, economy_system.cpp write branch, recipe_registry.{hpp,cpp} param, economy.lua row, and six harness assertions."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "science is REACHED, not SPENT, matching BL-344's landed predicate model rather than inventing a second one.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET by reading BL-344 before choosing. tech_gate is a condition_set predicate over corp state and nothing in the gate system debits anything, so science became condition_subject::science (a threshold), not a currency. Recorded in the enum comment so the next reader does not re-open it."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "science compares as a continuous quantity, not rounded to a count - the classification switch is hand-maintained and a wrong entry is invisible from behaviour.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. R5 rows assert a gate at 4.5 passes for a corp holding 5.0, and that condition_subject_is_integral(science) is false."
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "requirement": "The world layer still compiles and the neighbouring harnesses are unaffected.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. 43 of 47 world TUs compile (4 need Lua - NR-313). condition_set_harness 40/40, military_capability_harness 8/8."
+    },
+    {
+     "id": "R6",
+     "status": "complete",
+     "requirement": "The serialisation seam survives the removed field.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET, VACUOUSLY, and checked rather than assumed. There is NO serialisation layer in the tree at all - no src/world/serialization.cpp exists (BL-107, save magic + version header, has not landed), and nothing writes corporation_component to disk. So removing a field from it cannot invalidate a save, because there are no saves. Worth re-reading when BL-107 lands: at that point this deletion WOULD have been a format break, and the same is true of BL-457 appending to resource_type."
+    }
+   ]
+  },
+  {
+   "brief": "convoy-dispatch-seam-and-ledger",
+   "batch": "2026-08-17-sprint25a",
+   "title": "BL-452 / BL-453 - the logistics layer joins the command seam, and gains a ledger",
+   "status": "partial",
+   "promoted_from": "backlog.json BL-452 LOGISTICS_HAS_NO_VERB + BL-453 CONVOYS_HAVE_NO_LEDGER",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "ITEM-SPANNING (headless): a player can dispatch a named cargo down a chosen lane and hold it in flight, through apply_corp_command, with no second dispatch code path.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. convoy_command harness, 50/50 PASS, rebuilt and re-run independently on the merged tree by the main session rather than taken from the agent report. R4 is the no-second-path row: a player convoy and an auto convoy on the same lane are asserted identical in cost, speed, mode and cargo, and both corps debited equally."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "The seam is an untrusted input boundary: every rejection mutates NOTHING, and out-of-domain values are refused rather than clamped.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET, and asserted against a FULL WORLD FINGERPRINT rather than a spot check - all balances, every pool quantity, every convoy field, next_convoy_id, and every market supply/demand/price/inventory, compared before and after. Eleven rejection paths (R1.1-R1.13) plus NaN, +inf, -inf and an absurd finite quantity (R2.1-R2.4), each refused, none clamped."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "Holding is conservative: cargo is neither duplicated nor lost, and a released convoy resumes rather than restarting.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. R3.5-R3.12: a held convoy does not advance over five ticks, hold toggles, a released convoy resumes from where it stopped, and the delivered cargo lands in the destination pool in full."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "Determinism: two runs of one script produce identical convoy sets, and the auto-dispatcher is behaviourally unchanged.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. R5.2 compares the convoy set at every tick across two runs and R5.3 guards against vacuity. Auto behaviour unchanged, confirmed by econ_harness, logistics_harness, order_book_harness (69/69), corp_ai_harness, procurement_harness and commercial_fog_harness all green on the merged tree."
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "requirement": "The dictionary is transcribed from the seam, not authored ahead of it, and the mirrors are regenerated rather than hand-edited.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. Two gameplay entries added to ACTIONS.json after the verbs existed; ACTIONS.md and ACTIONS_INDEX.json regenerated via render_actions.js. question_log.json gained the Convoys-tab entry (marked drafted, wording is Ben’s) with QUESTION_LOG.md regenerated. SUPPLY.md’s stale “no UI or code path yet” line replaced."
+    },
+    {
+     "id": "R6",
+     "status": "pending",
+     "requirement": "BL-453: the Convoys tab renders, lists in-flight convoys with ticks-to-arrival, and its Hold press issues the verb.",
+     "verification": [
+      "visual"
+     ],
+     "result_metric": "NOT VERIFIED - NOT COMPILED, NOT RUN, NOT PHOTOGRAPHED. The UI half is written by inspection only. This session cannot build ImGui/SDL/Lua (NR-313). Needs an integrating build plus a verifier-visual pass before anything is cut. The dispatch press on the market Selection card was CANCELLED (scope returned), recorded in SUPPLY.md Outstanding."
+    },
+    {
+     "id": "R7",
+     "status": "failed",
+     "requirement": "The existing gate stays green.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "FAILED, PRE-EXISTING, and isolated rather than assumed - see NR-319. spectator_determinism R2 byte-identity is red. Measured at three commits under g++: it was ALREADY red before this batch (4f3c4d8, observed 9744431472DE5755), the ordnance append moved it (44166a4, CCF93A83903B6B45), and the military_points deletion moved it not at all. The golden is MSVC-derived and cannot pass under g++ at any commit. Owed: a Windows re-bless citing resource_count 37->38."
+    }
+   ]
+  },
+  {
+   "brief": "unit-upkeep-and-derived-strength",
+   "batch": "2026-08-17-sprint25a",
+   "title": "BL-454 / BL-459 - an army costs something to keep, and its strength stops duplicating its headcount",
+   "status": "partial",
+   "promoted_from": "backlog.json BL-454 UNITS_COST_NOTHING_TO_KEEP + BL-459 UNIT_STRENGTH_IS_A_DUPLICATE_OF_COUNT",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "ITEM-SPANNING (headless): a standing force draws credits AND goods every tick, as a cost VECTOR resolved from the roster rather than a float, and upkeep is its own budget term rather than folded into wages.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. unit_upkeep harness 62/62, rebuilt and re-run independently on the merged tree. U1e/U1f: the upkeep term equals heads x rate and NO other budget flow moved; U1j covers the power-scaled leg. The goods draw is authored data (a {resource = qty} map), so naming a good is a data change - a better shape than the enum reference the brief implied."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "A pool can be empty, so there is ONE decay rule with TWO triggers (beyond the reach field; the draw went unmet) rather than two parallel rules - and stock never goes negative.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. U2a-U2i: a short draw is reported unmet, the pool floors at zero, supply falls by exactly the authored scalar, four unmet ticks give four subtractions, the factor floors at zero, and a met draw recovers at the authored rate. One subtraction site, two triggers, as designed. The reach trigger is opt-in so no Dijkstra is built at default rates."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "The demolish-orphan defect is fixed where it can be seen - in the unit pass, since demolish_building itself cannot see units.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. U3a-U3h. Note U3c deliberately asserts that demolish_building STILL does not touch w.units - it pins the defect in place and proves the fix is where it belongs rather than papered over at the call site. Units of an erased corp are disbanded too."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "strength stops being a stored field and becomes derived, so the duplicate cannot return; the x100 scale anchor holds.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. The stored field is REMOVED from unit_component. U6a: quality 1.0 at full supply gives strength == count * 100 exactly. U6c-U6f: equal headcount and different roster type diverge in the right order, half supply halves it, an unsupplied unit is strictly weaker, and U6f asserts strength is no longer a duplicate of count. U6h/U6i cover a negative count and an unknown roster index."
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "requirement": "The missing unit -> army_stack_entry adapter exists and feeds the resolvers deterministically.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. U7a-U7g. U7c is the load-bearing one: supply lands in the entry COUNT and NOT in the power modifier, which would square it against unit_strength. resolve_battle scores adapter-built stacks and is identical across two runs. Corroborated independently by the BL-456 doc agent, which found no such bridge anywhere in the source."
+    },
+    {
+     "id": "R6",
+     "status": "complete",
+     "requirement": "Determinism, and inertness at the shipped rates: two runs of one seed agree, and at rate zero the build is behaviourally identical to before.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET, and this is what made landing it safe. U4a-U4f: balances, pools and strengths identical across two runs, with anti-vacuity rows proving the rollout actually moved. U5a-U5h: the shipped defaults really are zero, the balance is bit-identical after 25 ticks, no pool is even CREATED, neither decay trigger can fire, and observability is not gated behind the rates. Neighbours green: condition_set_harness 41/41, econ_harness, determinism_harness, military_capability_harness."
+    },
+    {
+     "id": "R7",
+     "status": "pending",
+     "requirement": "The four changed UI surfaces render correctly: the Strength page derivation, the unsupplied callout, the upkeep block, the Force finance bar.",
+     "verification": [
+      "visual"
+     ],
+     "result_metric": "NOT VERIFIED - NOT COMPILED, NOT RUN, NOT PHOTOGRAPHED (NR-313). Written by inspection; the reg threading through draw_unit_page / draw_unit_selection_body was checked against every call site. Also owed with it: two question_log entries for the materially changed surfaces, deliberately not written until the surfaces can be seen (NR-323)."
+    },
+    {
+     "id": "R8",
+     "status": "failed",
+     "requirement": "The existing gate stays green.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "FAILED, EXPECTED, STRUCTURAL. spectator_determinism R2 moves again: unit_component gained two hashed fields, so every world hash holding a unit changes. Measured under g++ pre-change CCF93A83903B6B45, post-change C9A4EFB137D74095, MSVC golden 855E07DE529684EC. Combined with NR-319, the Windows re-bless now has TWO named structural causes: resource_count 37->38, and the unit_component field change. Also pre-existing and unrelated: ai_skill_harness 25 failures before and after, its own banner declaring its bands stale since BL-386; non-movement confirmed at processors_gained = 43 either side."
+    }
+   ]
   }
  ]
 }

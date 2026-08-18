@@ -44,7 +44,13 @@ building_opex compute_building_opex(const building_component& b,
 float body_mean_habitability(const world& w, entity_id body);
 
 /// Apply one economy tick's money loop to every corporation balance:
-///   balance += income − expenditure − maintenance − wages
+///   balance += income − expenditure − maintenance − wages − upkeep
+///
+/// BL-454 added `upkeep` — the CREDIT half of standing-force upkeep — as its
+/// own term rather than folding it into `wages`, because a hidden term is a
+/// term nobody tunes. It is zero at the shipped rates. The GOODS half of unit
+/// upkeep is not a money flow at all and is not here: it is a pool debit run by
+/// `run_unit_upkeep` (economy_system.hpp).
 /// where income/expenditure are the market cash flows (goods sold / inputs bought
 /// at base_price), maintenance is each building's flat per-tick upkeep, and wages
 /// are `effective_workforce × base_wage` per building, where effective workforce is

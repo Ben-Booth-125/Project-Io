@@ -405,6 +405,65 @@
    "reason_to_select": "An unsurveyed body cannot be evaluated or built on — survey is the discovery spend that opens new deposits and expansion sites. The press when local tiles are saturating or the corp needs its next profitable resource base; the AI's own survey_expand fires on discovery spend within its solvency floor."
   },
   {
+   "id": "gameplay.dispatch_convoy",
+   "family": "gameplay",
+   "surface": "A corp_verb with no dedicated in-app form yet (BL-452, 2026-08-17). Issued against the corp-command seam, or over --serve, which needed no new wire key: it reuses subject / counterparty / target / quantity. The Market Ledger's Convoys tab (BL-453) shows the RESULT and carries the Hold press, but composes no dispatch.",
+   "press": "No in-app press yet — issue the command. Context worth carrying: before this verb the logistics layer had NO player verb at all — supply_system.cpp, logistics.cpp, four rendering paths and the only coupling between two markets' prices were entirely automatic, and none of the fifteen prior verbs named a convoy. The verb is the auto-dispatcher's own dispatch body with its shortfall scan removed (supply_system.hpp's price_convoy_leg + commit_convoy), so a convoy you dispatch costs, travels and arrives exactly as one the engine dispatched for a rival. That is asserted, not assumed: tools/verify/convoy_command.cpp R4 compares a player convoy and an auto convoy of the same shape on cost, speed and mode.",
+   "args": [
+    {
+     "name": "source_market",
+     "type": "entity_id",
+     "meaning": "The market the cargo leaves, carried in the command's `subject` field. Only its BODY selects and prices the cargo: the pool debited is (corp, source market's body), and an intra-body haul routes from the corp's own production anchor (its lowest-id building on that body) to the destination market's centre tile — not from this market's centre. The named market is recorded on the convoy as its source endpoint, which is what the Convoys tab and the canvases draw."
+    },
+    {
+     "name": "destination_market",
+     "type": "entity_id",
+     "meaning": "Where the cargo is bound, carried in the command's `counterparty` field. This is the ONE verb where `counterparty` names a market rather than a corporation — BL-452 reuses the field as 'the other end of the transaction' rather than growing the command record for a single verb."
+    },
+    {
+     "name": "resource",
+     "type": "resource_type",
+     "meaning": "The cargo, carried in the command's `target` field, shared with build's extraction target and place_sell_order's good."
+    },
+    {
+     "name": "quantity",
+     "type": "float > 0",
+     "meaning": "Units to haul. Validated as the value that lands in the destination: finite FIRST, then strictly positive, then against what the (corp, source body) pool actually holds. A quantity above the pool is REFUSED, never clamped down to it — a caller hauls the amount it named or none at all, so a silent partial haul can never happen."
+    }
+   ],
+   "preconditions": [
+    "The acting corporation exists (rejected_no_corp otherwise).",
+    "`subject` and `counterparty` both name real markets (rejected_invalid otherwise).",
+    "The resource index is inside the enum's domain (rejected_invalid otherwise).",
+    "The quantity is finite and strictly positive (rejected_invalid otherwise). NaN, +inf and -inf are all refused — an infinite double narrows to an infinite float, so the whole command is rejected rather than the value truncated, wrapped or clamped.",
+    "The acting corp's own pool on the source market's body holds at least that quantity (rejected_state otherwise). This is also the ownership check: pools are keyed (corp, body), so there is no way to name another corp's stock.",
+    "The lane can actually be flown (rejected_placement otherwise). Intra-body: the corp holds a building on that body to route from, the destination market has a centre tile, and an A* path between them exists. Inter-body: the corp holds a Launchpad on the source body AND at least one unit of propellant there to burn on the launch — exactly the gate the auto-dispatcher applies.",
+    "The corp can afford the haul cost (rejected_funds otherwise). The solvency gate lives inside commit_convoy, shared with the auto-dispatcher, so the two cannot disagree about affordability."
+   ],
+   "expected_output": "One `convoy_component` appended to `world::convoys`, carrying a stable nonzero `id` that `hold_convoy` later names (see that entry: the id is TRANSIENT). Cargo leaves the source pool AT DISPATCH, not on arrival — goods in transit are committed (SUPPLY.md § Convoy entity), which is why there is no cancel verb and never will be one. The haul cost is debited from the corp's balance in the same step and recorded on the convoy as `cost_paid`; a space-mode launch also burns one unit of propellant from the source pool. Mode is DERIVED, never named: land, or sea when the intra-body path crosses water, or space between bodies (air is never dispatched). Speed is 1/travel_ticks, and travel_ticks is the terrain-weighted, physically-scaled figure — since 2026-08-12 a long haul genuinely takes several quarters, so a dispatch commits that stock for that many ticks. NOTHING reaches the destination market at dispatch: the cargo credits the destination (corp, body) pool on arrival and reaches pricing through the ordinary auto-surplus path at the next clear. A rejected command mutates nothing at all — asserted against a full world fingerprint, not a spot check (convoy_command.cpp R1).",
+   "reason_to_select": "The only way to move goods on purpose. The auto-dispatcher fills a market's measured SHORTFALL from the cheapest source, which is a reactive rule and a poor one for anything forward-looking: pre-positioning stock before a construction project needs it, moving a good to a market that PRICES it better rather than to the one merely short of it, or supplying a body whose demand has not registered yet. Weigh it against the cost of being wrong, which is real — the stock is committed the moment the convoy leaves, cannot be recalled, and on a long lane will not land for several quarters. All `hold_convoy` can do afterwards is stop it arriving."
+  },
+  {
+   "id": "gameplay.hold_convoy",
+   "family": "gameplay",
+   "surface": "The 'Hold' / 'Release' button on each row of the Market Ledger's Convoys tab (BL-453); also a corp_verb, issuable directly against the seam.",
+   "press": "Open the Market Ledger, switch to the Convoys tab; each in-flight convoy of the player's corp renders as a row — cargo and quantity, source and destination market, mode, a progress bar carrying its TICKS TO ARRIVAL, and the haul cost already paid — with a small 'Hold' button, reading 'Release' when the convoy is already held. Immediate, no confirmation. The row queues a corp_command naming the convoy's id, which the frame's end applies through apply_corp_command — the same call an agent makes.",
+   "args": [
+    {
+     "name": "convoy",
+     "type": "uint32 convoy id",
+     "meaning": "Which convoy to stop or release, by its stable `convoy_component::id` — NOT its index in world::convoys, which an arrival re-points by erasing from the middle of the vector. THIS IS A TRANSIENT SUBJECT, the dictionary's first: unlike a sell_order id or a building entity, a convoy id is valid for only a handful of ticks. It is minted at dispatch and gone the moment the cargo lands, and ids are never reused, so a command composed against a convoy that has since arrived is refused rather than silently re-aimed at whichever convoy inherited its slot. An agent must read the live convoy list and act on it in the same tick; a convoy id carried across a long deliberation is worthless."
+    }
+   ],
+   "preconditions": [
+    "The acting corporation exists (rejected_no_corp otherwise).",
+    "`convoy` is nonzero and names a convoy in the ACTING CORP'S OWN fleet (rejected_invalid otherwise). Another corp's convoy and a nonexistent one are deliberately indistinguishable — both answer rejected_invalid, for the same reason remove_sell_order collapses its two cases (BL-397): convoy ids are one global monotonic sequence, so a distinguishable rejection would let an id sweep map every rival's cargo in flight, precisely the intelligence the BL-068 competitor-visibility rule keeps private.",
+    "The convoy has not already arrived (rejected_state otherwise — there is nothing left to hold)."
+   ],
+   "expected_output": "The convoy's `held` flag flips. A held convoy is SKIPPED by advance_convoys — it stops dead on its lane rather than slowing, makes no progress, does not arrive, and costs nothing further, because the haul was paid once at dispatch. Issuing the verb again releases it and it resumes from exactly the progress it stopped at, at its original speed. This is a TOGGLE, and it is deliberately NOT a cancel: the cargo left the source pool at dispatch, so a cancel would have to invent a return leg or mint the goods back at the source. Neither exists and no verb offers one. A rejected command mutates nothing.",
+   "reason_to_select": "Stop a delivery that has stopped being the right one — the destination market's price collapsed, the stock turns out to be wanted at the source, a better destination appeared — without losing the cargo. The honest limit, and the thing to weigh before dispatching rather than after: holding does NOT bring the goods back. The stock is out of the pool either way; hold only stops it arriving somewhere you no longer want it, and buys time to decide. Release when the reason passes."
+  },
+  {
    "id": "canvas.ascend_key",
    "family": "canvas",
    "surface": "Keyboard.",

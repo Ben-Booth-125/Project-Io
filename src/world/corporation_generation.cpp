@@ -1600,12 +1600,17 @@ std::vector<entity_id> generate_corporations(
                     // a player-hired one.
                     constexpr int starting_unit_manpower = 50;
                     const entity_id unit_id = w.create_entity();
+                    // BL-459: no `strength` — it was a duplicate of `count` and
+                    // is derived now (unit_strength, unit_roster.hpp). BL-454's
+                    // `muster_base` records the base this unit was raised at, so
+                    // demolishing that base disbands it rather than orphaning it.
                     w.units[unit_id] = unit_component{
                         .position = best_tid,
                         .owner    = player_corp_id,
                         .count    = starting_unit_manpower,
                         .type     = 0,
-                        .strength = starting_unit_manpower,
+                        .supply_factor_permille = 1000,
+                        .muster_base = base_id,
                     };
                 }
             }

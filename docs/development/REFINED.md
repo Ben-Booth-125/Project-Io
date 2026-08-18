@@ -1,5 +1,61 @@
 # Project Io — REFINED (active worklist)
 
+## Sprint 25a — the draw (promoted 2026-08-17) — **6/6 DONE** (closed 2026-08-18)
+
+Requirements: requirements.json § `ordnance-military-terminal-good`,
+§ `military-points-deleted-science-wired`, § `convoy-dispatch-seam-and-ledger`
+
+The half of Sprint 25 that runs without Sprints 21 and 23. Phase 25b (BL-458, interdiction) is
+**not promoted** — it requires BL-315 (conflict spine) and BL-448 (stance), neither opened.
+
+- **[3] A — BL-457 ordnance.** The blocking foundation: nothing below draws without a good.
+  `resource_type` 37 → 38, Fabricator recipe (`steel + machinery`), `base_price` 43.0 **derived**
+  from the roster's 1.415–1.443 markup band. Both name maps, the UI presentation row, and
+  `chain_depth`'s R1 exemption naming BL-454 as the consumer. **DONE** (`44166a4`).
+  Files: `components.hpp`, `recipe_registry.cpp`, `world_gen_config.cpp`, `presentation.cpp`,
+  `recipes.lua`, `world_gen.lua`, `chain_depth.cpp`, `RESOURCES.md`, `PRODUCTION.md`.
+- **[1] A′ — the presentation-table gap A forced.** A positional array cannot gain index 37
+  without filling 34–36, so the three habitability goods that had rendered as
+  "(unnamed resource)" since 2026-08-11 are now authored. Guard added
+  (`tools/session/resource_table_check.js`), **shown to fail on the pre-change tree first**.
+  **DONE** (`44166a4`). Unplanned; recorded as NR-314.
+- **[2] B — BL-455 accumulators.** `military_points` deleted at every site; `science` wired as
+  `condition_subject::science`, reached-not-spent per BL-344. Harness retargeted, 8/8.
+  **DONE** (`9644eaa`). Files: `components.hpp`, `economy_system.cpp`, `recipe_registry.{hpp,cpp}`,
+  `condition_set.{hpp,cpp}`, `economy.lua`, `military_capability_harness.cpp`.
+- **[2] C — BL-456 military authority doc.** `docs/military/MILITARY.md` + the CLAUDE.md entry;
+  ten items repointed. **DONE** (`6153278`, sub-agent, merged and reconciled — it was written
+  against a base predating B and described `military_points` as scheduled for deletion).
+- **[3] D — BL-452 convoy seam.** `dispatch_convoy` + `hold_convoy`, with the auto-dispatcher's
+  dispatch half factored into `price_convoy_leg` / `commit_convoy` so there is **no second code
+  path**. **DONE** (`bd71143`, sub-agent). Satisfies R1–R5.
+- **[3] E — BL-453 Convoys tab.** Ticks-to-arrival, Hold press, question-log entry.
+  **DONE but UNVERIFIED** (`bd71143`) — not compiled, not run, not photographed (NR-313).
+  R6 stays `pending`. The market-Selection dispatch press was **CANCELLED**, scope returned.
+- **[4] F — BL-454 unit upkeep + BL-459 unit strength.** Paired: the upkeep pass writes the
+  `supply_factor` the strength model reads, so splitting them strands both. **DONE** (`0936400`,
+  sub-agent). Upkeep as a cost vector and its own budget term; one decay rule with two triggers;
+  stored `strength` **removed** and derived instead; the demolish-orphan fix in the unit pass; and
+  the missing `unit_component` → `army_stack_entry` adapter. `unit_upkeep` 62/62,
+  `condition_set_harness` 41/41, `combat_harness` and `campaign_battle_harness` (16/0) green.
+  **Inert as shipped** — every rate zero, balance bit-identical after 25 ticks. Its four UI
+  surfaces are unverified (R7 `pending`) and owe two question-log entries.
+
+**Owed before any cut**, and none of it is optional:
+
+1. **`chain_depth`** — unrunnable here, and it is BL-457's own named guard.
+2. **A Lua load** of the four edited scripts (`recipes.lua`, `world_gen.lua`, `economy.lua`,
+   plus the registry loader) — no interpreter was available, so none was ever parsed.
+3. **A `verifier-visual` pass** over the Convoys tab and the four unit/finance surfaces, which
+   between them are five uncompiled UI changes. Two question-log entries land with it (NR-323).
+4. **A Windows re-bless of `spectator_determinism`** with **two** named structural causes, isolated
+   across three commits rather than assumed (NR-319): `resource_count` 37 → 38, and
+   `unit_component`'s two new hashed fields. The `military_points` deletion moved it not at all.
+5. **Set the upkeep rates** (NR-321) — until then nothing consumes ordnance at runtime, and the
+   R1 exemption naming BL-454 as its consumer is structurally true but not true in play.
+
+---
+
 ## Widen the price band (promoted from BL-442 step 2) — **5/5 DONE** (2026-08-17)
 
 Requirements: requirements.json § price-band-derived-ceiling (R1–R5)

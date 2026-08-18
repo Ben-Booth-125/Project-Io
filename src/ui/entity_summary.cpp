@@ -3,6 +3,7 @@
 #include "presentation.hpp"
 
 #include "format.hpp"
+#include "world/unit_roster.hpp" // BL-459: unit_strength (strength is derived, not stored)
 
 #include <imgui.h>
 
@@ -258,7 +259,15 @@ void draw_unit_summary(const world& w, entity_id id)
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
                        "Unit group");
     ImGui::Text("Count: %d", u.count);
-    ImGui::Text("Strength: %d", u.strength);
+    // BL-459: strength is DERIVED (count x roster quality x supply factor,
+    // x100 fixed point) — it used to be a stored field every writer set equal
+    // to `count`, so this line and the Count line above printed the same
+    // number twice. The hover card stays a two-line summary; the derivation and
+    // the BL-454 upkeep breakdown live on the Selection card's Strength page.
+    ImGui::Text("Strength: %lld", static_cast<long long>(unit_strength(w, u)));
+    if (u.supply_factor_permille < 1000)
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative),
+                           "Supply: %.0f%%", u.supply_factor_permille / 10.0f);
 
     // Location: position is a tile id (BL-157/BL-324) — resolve the tile, then
     // name the body it belongs to.

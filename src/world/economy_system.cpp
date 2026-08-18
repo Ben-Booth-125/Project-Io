@@ -6,6 +6,7 @@
 #include "logistics.hpp"       // invalidate_logistics_caches (anchor-set changes)
 #include "market_clearing.hpp" // market_for_tile (BL-095 construction gate)
 #include "placement_rules.hpp" // stack_output_scalar (BL-193 building stacks)
+#include "unit_roster.hpp"     // resolve_unit_upkeep (BL-454 unit pass)
 #include "workforce.hpp"
 
 #include <algorithm>
@@ -762,10 +763,10 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         if (b.recipe_switch_cooldown > 0)
             --b.recipe_switch_cooldown;
 
-    // BL-332 capability points: a flat per-tick credit to the owning corp's
-    // military_points / science for every COMPLETED military_base /
-    // research_institute it holds — passive, no workforce dependency (both
-    // types staff at zero), symmetric across every corp. Runs after
+    // BL-332 research points: a flat per-tick credit to the owning corp's
+    // science for every COMPLETED research_institute it holds — passive, no
+    // workforce dependency (the type staffs at zero), symmetric across every
+    // corp. Read by condition_subject::science (BL-455). Runs after
     // run_construction so a base finishing this tick already counts, mirroring
     // the rest of this function's build-then-produce ordering. Iterates each
     // corp's own `assets` vector (not w.buildings), so per-corp determinism
@@ -783,9 +784,11 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                 const building_component& b = bit->second;
                 if (b.ticks_remaining > 0 || b.decommissioned)
                     continue; // still under construction, or torn down
-                if (b.type == building_type::military_base)
-                    cc.military_points += mp.military_points_per_base_tick;
-                else if (b.type == building_type::research_institute)
+                // BL-455 (2026-08-17): the military_base branch that credited
+                // cc.military_points was removed with the field. It had no
+                // reader anywhere in src/ — see components.hpp for why deletion
+                // beat inventing a consumer.
+                if (b.type == building_type::research_institute)
                     cc.science += mp.science_per_research_institute_tick;
             }
         }
@@ -1449,7 +1452,126 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         run_corp_strategic_step(w, reg, report, w.current_day_tick, p);
     }
 
+    // BL-454: the unit pass — goods draw, the decay rule, orphan cleanup. LAST,
+    // deliberately: the strategic tier above demolishes at tick rate, so running
+    // after it means a muster base torn down THIS tick orphans its units in the
+    // same tick rather than leaving them live for one. See run_unit_upkeep.
+    run_unit_upkeep(w, reg);
+
     return report;
+}
+
+// ---------------------------------------------------------------------------
+// BL-454 — the unit pass
+// ---------------------------------------------------------------------------
+
+unit_upkeep_tick run_unit_upkeep(world& w, const recipe_registry& reg)
+{
+    unit_upkeep_tick out;
+    if (w.units.empty())
+        return out;
+
+    const unit_upkeep_params& up = reg.military().upkeep;
+
+    // Ascending unit id. `w.units` is an unordered_map and this pass writes a
+    // SHARED pool (two units of one corp on one body draw the same stock), so
+    // the visit order decides which one goes short — it is load-bearing, not
+    // cosmetic. io-standing-rules § Determinism.
+    std::vector<entity_id> ids;
+    ids.reserve(w.units.size());
+    for (const auto& kv : w.units)
+        ids.push_back(kv.first);
+    std::sort(ids.begin(), ids.end());
+
+    std::vector<entity_id> disband;
+
+    for (const entity_id id : ids)
+    {
+        unit_component& u = w.units.at(id);
+
+        // --- 1. Orphan cleanup ------------------------------------------------
+        // A unit whose owner, tile, or muster base has been erased has nothing
+        // holding it in the world. `muster_base == null_entity` means "no base
+        // recorded" (a unit that predates the muster rule) and never orphans.
+        if (w.corporations.find(u.owner) == w.corporations.end())
+        {
+            disband.push_back(id);
+            continue;
+        }
+        if (u.muster_base != null_entity && w.buildings.find(u.muster_base) == w.buildings.end())
+        {
+            disband.push_back(id);
+            continue;
+        }
+        const auto tit = w.tiles.find(u.position);
+        if (tit == w.tiles.end())
+        {
+            disband.push_back(id);
+            continue;
+        }
+        const entity_id body = tit->second.body;
+
+        bool unsupplied = false;
+
+        // --- 2a. Trigger (a): beyond the reach field (BL-325 S3) --------------
+        // Opt-in: a non-positive limit disables the trigger AND, with it, the
+        // Dijkstra, so the default rates cost nothing.
+        if (up.out_of_supply_reach > 0.0f)
+        {
+            body_reach_field(w, body); // builds/refreshes the cached field
+            const float rc = tile_reach_cost(w, u.position);
+            // `!(rc <= limit)` rather than `rc > limit` so infinity (unreachable)
+            // and a NaN both read as out of supply; rc < 0 is "not computed".
+            if (rc < 0.0f || !(rc <= up.out_of_supply_reach))
+            {
+                unsupplied = true;
+                ++out.out_of_reach;
+            }
+        }
+
+        // --- 2b. The goods draw ------------------------------------------------
+        const unit_upkeep_draw d = resolve_unit_upkeep(u, up);
+        if (d.any_goods)
+        {
+            // pool_for inserts on first access, so it is reached only when there
+            // is something to draw — an all-zero goods table never creates a pool.
+            stockpile_component& pool = w.pool_for(u.owner, body);
+            bool unmet = false;
+            for (std::size_t r = 0; r < resource_count; ++r)
+            {
+                const float need = d.goods[r];
+                if (need <= 0.0f)
+                    continue;
+                const float have = std::max(0.0f, pool.quantities[r]);
+                const float take = std::min(need, have);
+                pool.quantities[r] = have - take; // never negative, by construction
+                if (take < need)
+                    unmet = true;
+            }
+            if (unmet)
+            {
+                unsupplied = true;
+                ++out.unmet;
+            }
+        }
+
+        // --- 3. The decay rule: ONE subtraction, TWO triggers ------------------
+        if (unsupplied)
+            u.supply_factor_permille =
+                std::max(0, u.supply_factor_permille - up.supply_decay_permille);
+        else
+            u.supply_factor_permille =
+                std::min(1000, u.supply_factor_permille + up.supply_recovery_permille);
+
+        ++out.units;
+    }
+
+    for (const entity_id id : disband)
+    {
+        w.units.erase(id);
+        ++out.disbanded;
+    }
+    return out;
 }
 
 // inject_substrate_demand (BL-078) was removed by BL-365: the abstract

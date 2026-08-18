@@ -129,7 +129,14 @@ uint64_t world::state_hash(int tick) const
             fnv1a_u32(h, u.owner);
             fnv1a_i32(h, u.count);
             fnv1a_u32(h, u.type);
-            fnv1a_i32(h, u.strength);
+            // BL-459 dropped the stored `strength` (a duplicate of `count`, so
+            // it fed this hash the same bytes twice). BL-454's supply factor and
+            // muster base replace it — both are real state the upkeep pass
+            // writes, so BOTH must be hashed. THIS MOVES EVERY WORLD-HASH
+            // GOLDEN in a world that holds any unit, and it moves them
+            // structurally (new state), not behaviourally.
+            fnv1a_i32(h, u.supply_factor_permille);
+            fnv1a_u32(h, u.muster_base);
         }
     }
 

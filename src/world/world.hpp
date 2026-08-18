@@ -193,9 +193,27 @@ struct world
     /// Active convoys — goods in transit. Appended by dispatch_convoys, advanced by
     /// advance_convoys, and retired (erased) by credit_arrived_convoys in
     /// supply_system.hpp. A std::vector (not a map) because convoys have no persistent
-    /// entity ID — they are identified by index while in flight. Order is
-    /// dispatch-time insertion; stable between ticks.
+    /// entity ID. Order is dispatch-time insertion; stable between ticks.
+    ///
+    /// BL-452: "identified by index while in flight" (as this read until
+    /// 2026-08-17) stopped being adequate the moment a convoy became a command
+    /// SUBJECT — an arrival erases from the middle of the vector, so an index a
+    /// press composed last frame names a different convoy this frame. Each
+    /// convoy now carries a `convoy_component::id` from `allocate_convoy_id`
+    /// below; the index remains the storage order and nothing else.
     std::vector<convoy_component> convoys;
+
+    /// Next stable convoy handle. Monotonic and never reused, exactly like
+    /// `next_order_id`: an arrived convoy's id does not come back, so a command
+    /// naming a convoy that has already landed is refused rather than silently
+    /// re-aimed at whichever convoy inherited its slot.
+    uint32_t next_convoy_id = 1;
+
+    /// Allocate the next stable convoy id. Deterministic (a plain counter, in
+    /// dispatch order); the single point convoy ids are minted from.
+    ///
+    /// @return A fresh, never-before-issued convoy handle (always nonzero).
+    uint32_t allocate_convoy_id() { return next_convoy_id++; }
 
     /// Persistent trade routes — durable body-pair lanes a corporation's commerce
     /// has run (BL-088). Upserted by credit_arrived_convoys when a convoy completes

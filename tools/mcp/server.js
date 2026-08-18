@@ -64,6 +64,7 @@ const VERBS = [
   'hire_unit',                                         // BL-324
   'place_sell_order', 'remove_sell_order', 'set_workforce_auto', // BL-293
   'request_quote', 'accept_quote', 'cancel_contract',  // BL-350
+  'dispatch_convoy', 'hold_convoy',                    // BL-452
 ];
 
 // ---------------------------------------------------------------------------
@@ -176,7 +177,7 @@ const TOOLS = [
         subject: { type: 'integer', description: 'Building (demolish/set_recipe/set_workforce/idle/resume/set_workforce_auto), or body (survey / place_sell_order / request_quote) entity id.' },
         tile: { type: 'integer', description: 'Target tile entity id (build / place_road / hire_unit muster tile).' },
         type: { type: 'integer', description: 'building_type (build only): 0 none, 1 extraction_site, 2 processing_facility, 3 port, 4 launchpad, 5 inland_logistics_hub, 6 military_base.' },
-        target: { type: 'integer', description: 'resource_type index — the extracted good (build), the good offered (place_sell_order) or the good sought (request_quote). See docs/economy/RESOURCES.md.' },
+        target: { type: 'integer', description: 'resource_type index — the extracted good (build), the good offered (place_sell_order), the good sought (request_quote) or the cargo (dispatch_convoy). See docs/economy/RESOURCES.md.' },
         recipe: { type: 'integer', description: 'Recipe id (set_recipe, and build seed).' },
         workforce: { type: 'integer', description: 'set_workforce value, 0-200.' },
         road_tier: { type: 'integer', description: 'place_road tier, 1-3.' },
@@ -185,10 +186,10 @@ const TOOLS = [
         // an argument absent from THIS schema is an argument the model is never
         // told exists and never sends.
         unit_type: { type: 'integer', description: 'hire_unit: index into unit_roster_table() (BL-324).' },
-        quantity: { type: 'number', description: 'place_sell_order: max units offered per tick (> 0). request_quote: units sought.' },
+        quantity: { type: 'number', description: 'place_sell_order: max units offered per tick (> 0). request_quote: units sought. dispatch_convoy: units of cargo to haul (> 0, and no more than the source pool holds).' },
         floor_price: { type: 'number', description: 'place_sell_order: minimum unit price (>= 0; 0 means accept the market price).' },
-        order: { type: 'integer', description: 'remove_sell_order: the sell_order id to erase. accept_quote / cancel_contract: the procurement quote / contract id.' },
-        counterparty: { type: 'integer', description: 'request_quote: the supplier corporation being asked (BL-350).' },
+        order: { type: 'integer', description: 'remove_sell_order: the sell_order id to erase. accept_quote / cancel_contract: the procurement quote / contract id. hold_convoy: the convoy id to stop or release — TRANSIENT, valid only while that convoy is in flight (a handful of ticks).' },
+        counterparty: { type: 'integer', description: 'request_quote: the supplier corporation being asked (BL-350). dispatch_convoy: the DESTINATION market entity (BL-452; `subject` is the source market).' },
       },
       required: ['corp', 'verb'],
     },

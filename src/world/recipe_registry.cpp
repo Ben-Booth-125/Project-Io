@@ -57,6 +57,7 @@ resource_type resource_from_name(const std::string& name, bool& ok)
         { "clean_water",           resource_type::clean_water },
         { "consumer_goods",        resource_type::consumer_goods },
         { "medical_supplies",      resource_type::medical_supplies },
+        { "ordnance",              resource_type::ordnance }, // BL-457
     };
 
     const auto it = table.find(name);
@@ -307,16 +308,38 @@ void recipe_registry::load_from_lua(lua_state& lua)
         }
     }
 
-    // BL-332 capability-point accumulation rates (economy.military).
+    // BL-332 research accumulation rate (economy.military). BL-455 removed
+    // military_points_per_base_tick; an economy.lua still carrying the key is
+    // simply ignored, which is the same tolerance every other get_or here has.
     sol::optional<sol::table> military = (*econ)["military"];
     if (military)
     {
         military_capability_params mp;
-        mp.military_points_per_base_tick       = military->get_or("military_points_per_base_tick",       mp.military_points_per_base_tick);
         mp.science_per_research_institute_tick = military->get_or("science_per_research_institute_tick", mp.science_per_research_institute_tick);
         // BL-394: hire_unit's credit cost (floor + power-scaled component).
         mp.hire_base_cost      = military->get_or("hire_base_cost",      mp.hire_base_cost);
         mp.hire_cost_per_power = military->get_or("hire_cost_per_power", mp.hire_cost_per_power);
+
+        // BL-454: standing-force upkeep (economy.military.unit_upkeep). Absent
+        // table = every rate zero = the pre-BL-454 arithmetic, unchanged.
+        sol::optional<sol::table> upk = (*military)["unit_upkeep"];
+        if (upk)
+        {
+            unit_upkeep_params up;
+            up.credits_per_head           = upk->get_or("credits_per_head",           up.credits_per_head);
+            up.credits_per_head_per_power = upk->get_or("credits_per_head_per_power", up.credits_per_head_per_power);
+            up.supply_decay_permille      = upk->get_or("supply_decay_permille",      up.supply_decay_permille);
+            up.supply_recovery_permille   = upk->get_or("supply_recovery_permille",   up.supply_recovery_permille);
+            up.out_of_supply_reach        = upk->get_or("out_of_supply_reach",        up.out_of_supply_reach);
+            // The goods half of the cost VECTOR, authored as an ordinary
+            // {resource_name = qty} table so naming the good (ordnance, rations)
+            // is a data change and never a code change.
+            sol::optional<sol::table> goods = (*upk)["goods_per_head"];
+            if (goods)
+                read_resource_map(*goods, up.goods_per_head, "military.unit_upkeep.goods_per_head");
+            mp.upkeep = up;
+        }
+
         m_military = mp;
     }
 

@@ -96,7 +96,14 @@ fixture make_fixture()
     uc.owner    = f.corp;
     uc.position = null_entity;
     uc.count    = 4;
-    uc.strength = 250;
+    // BL-459: `strength` is no longer a stored field — it is derived from count,
+    // the roster row's quality and the supply factor. Roster row 15 is Rifle
+    // Regiment (power_mod 380 -> quality 1380), chosen so the measured strength
+    // (4 * 1380 * 1000 / 10000 = 552) is distinct from BOTH the headcount and
+    // from count x 100, which is what C6d needs in order to prove it is reading
+    // strength rather than a neighbouring quantity.
+    uc.type     = 15;
+    uc.supply_factor_permille = 1000;
     f.w.units[u] = uc;
 
     return f;
@@ -270,8 +277,11 @@ int main()
         u.operand = 5.0f;
         check(!evaluate_condition(u, w, f.corp), "C6c units >= 5 fails at 4");
 
-        condition s = make(condition_subject::military_strength, condition_comparator::at_least, 250.0f);
-        check(measure_condition(s, w, f.corp) == 250.0f, "C6d military_strength sums unit strength");
+        // BL-459: the derived strength of the fixture's one Rifle Regiment —
+        // count 4 x quality 1.380 x supply 1.000 x 100 = 552.
+        condition s = make(condition_subject::military_strength, condition_comparator::at_least, 552.0f);
+        check(measure_condition(s, w, f.corp) == 552.0f, "C6d military_strength sums derived unit strength");
+        check(evaluate_condition(s, w, f.corp), "C6d2 strength >= 552 holds at exactly 552");
 
         // A mixed economic + military AND-list — the shape a governing-body law
         // or a military tech gate actually needs.

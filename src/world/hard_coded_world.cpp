@@ -995,11 +995,14 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // Player unit stub on Kepler, sited on the same home tile the installations
     // used (BL-324: position is a tile id, not a body).
     const entity_id kepler_unit = w.create_entity();
+    // BL-459 removed the stored `strength` field it used to set to 50 alongside
+    // count 50 — a literal duplicate. Strength is derived now (unit_strength,
+    // unit_roster.hpp). No muster base: the hard-coded world has none, so this
+    // stub is deliberately never orphaned by BL-454's unit pass.
     w.units[kepler_unit] = unit_component{
         .position = kepler_home_tile,
         .owner    = w.player_entity,
         .count    = 50,
-        .strength = 50,
     };
 
     // -----------------------------------------------------------------------

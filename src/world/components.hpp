@@ -119,7 +119,30 @@ enum class resource_type : uint8_t
     clean_water            = 34, ///< Water Treatment Plant, from water. Reduces habitability if undersupplied.
     consumer_goods         = 35, ///< Consumer Goods Factory, from food_rations + steel. Reduces workforce efficiency if undersupplied.
     medical_supplies       = 36, ///< Pharmaceutical Lab, from water + agricultural_produce. Reduces habitability if undersupplied.
-    count                  = 37
+    // --- The military terminal good (BL-457, 2026-08-17) ---
+    //
+    // The 2026-08-10 refocus (NR-120) put the player as a militia whose trade is
+    // "coloured directly with military use, and space equipment". The space half
+    // landed with BL-340 — the chain terminates in spacecraft_components, which
+    // BL-350's procurement contracts buy. The military half had NO OBJECT AT ALL
+    // until this value: no ordnance, no munitions, no small arms anywhere in the
+    // roster. It went unnoticed because nothing consumed one.
+    //
+    // Admission rule (PRODUCTION.md / BL-340) satisfied on both ends, which is
+    // what makes it admissible now and not before: PRODUCED by an authored
+    // Fabricator recipe (steel + machinery, recipes.lua), and CONSUMED by
+    // BL-454's per-tick unit upkeep draw — a named actor, carried in
+    // chain_depth's R1 exemption table beside propellant and the habitability
+    // goods rather than assumed.
+    //
+    // ONE value, not the three Ben's words named ("supplies, rations, weapons"):
+    // food_rations already covers rations and is already produced, and a
+    // "supplies" value with no distinct consumer is exactly the
+    // produced-by-nothing shape NR-257 deleted five of. A distinct field ration
+    // or medical draw later is an APPEND with its behaviour filed in the same
+    // change — never a re-insertion here, which would repoint every id after it.
+    ordnance               = 37, ///< Fabricator, from steel + machinery. Terminal military good; drawn per-tick by unit upkeep (BL-454).
+    count                  = 38
 };
 
 static constexpr std::size_t resource_count = static_cast<std::size_t>(resource_type::count);
@@ -574,14 +597,43 @@ struct population_centre_component
 /// struct shipped with a `body` field ahead of that ruling — `position`
 /// (BL-324, 2026-08-08) is the fix, landed with the hire-unit item that first
 /// needed tile grain rather than deferring it back to BL-157.
+/// BL-459 (2026-08-17) REMOVED the stored `strength` field. It was documented as
+/// a "fixed-point combat strength scalar" and BOTH writers set it to the same
+/// value as `count` — a literal duplicate kept in sync by hand, with nothing
+/// enforcing it. Strength is now DERIVED, never stored:
+///
+///     strength = count x roster_type_quality x supply_factor   (x100 fixed point)
+///
+/// computed by `unit_strength(world, unit_component)` in world/unit_roster.hpp.
+/// A stored writable field would let the duplicate come straight back, so the
+/// field is gone rather than merely deprecated. `count` stays the honest
+/// headcount; `supply_factor_permille` is the only new state, and it is written
+/// by BL-454's upkeep pass, not by the hire path.
 struct unit_component
 {
     entity_id position;      ///< Tile the unit currently occupies (BL-157: tile-canonical).
     entity_id owner;         ///< Corporation or faction entity that controls this unit.
     int       count;         ///< Number of units in the group.
     uint16_t  type = 0;      ///< Opaque roster-type index; see combat.hpp's army_stack_entry.
-    int32_t   strength = 0;  ///< Fixed-point combat strength scalar (BL-157). Not a stat block —
-                              ///< a single number, same spirit as building_component's own scalars.
+
+    /// BL-454. How well this unit is supplied, per-mille (1000 = fully supplied).
+    /// Lowered by the ONE decay rule with TWO triggers in the upkeep pass
+    /// (economy_system.cpp § run_unit_upkeep): the unit is beyond the reach field,
+    /// or its upkeep goods draw went unmet. Both are the same subtraction for the
+    /// same reason — an army that is not being supplied gets weaker — so they are
+    /// deliberately not two rules. Feeds `unit_strength` and the combat adapter,
+    /// so an unsupplied army is measurably weaker IN THE RESOLVER, not merely
+    /// more expensive.
+    int32_t   supply_factor_permille = 1000;
+
+    /// BL-454. The military_base this unit was mustered at, or `null_entity` for
+    /// a unit that predates the muster rule (the hard-coded world's stub). The
+    /// ORPHAN KEY: `demolish_building` erases the building, the corp asset and the
+    /// stockpile but never touches `w.units`, so demolishing a muster base used to
+    /// leave every unit raised there orphaned. The upkeep pass is the only place
+    /// that can see it; it disbands a unit whose muster base has been erased.
+    /// Null means "no muster base recorded" and is never orphaned.
+    entity_id muster_base = null_entity;
 };
 
 // ---------------------------------------------------------------------------
@@ -605,6 +657,28 @@ struct convoy_component
     float       speed          = 0.0f; ///< Progress increment per Tick (1/distance in ticks).
     entity_id   corp           = null_entity; ///< Dispatching corporation.
     bool        arrived        = false; ///< Set true when progress >= 1.0; retirement pending.
+
+    // --- BL-452: the layer becomes reachable by command (2026-08-17) ---
+
+    /// Stable handle, allocated at dispatch from `world::allocate_convoy_id`.
+    /// A convoy is a **transient** subject — it exists for a handful of ticks
+    /// and is then erased — but `hold_convoy` has to name one, and naming it by
+    /// vector index would let one convoy's arrival re-point a command already
+    /// composed against another. Same "stable across erase, never reused"
+    /// contract as `sell_order::id` (world.hpp § next_order_id), and carried in
+    /// `corp_command::order` for the same reason: it is a handle, not an entity.
+    uint32_t    id             = 0;
+    /// True while the convoy is **held** — `advance_convoys` skips it, so it
+    /// stops making progress and simply waits on its lane. Deliberately NOT a
+    /// cancel: the cargo left the source pool at dispatch, so a cancel would
+    /// have to invent a return leg or mint the goods back. Toggled by the
+    /// `hold_convoy` verb; a held convoy costs nothing further (the haul is paid
+    /// once, at dispatch) and resumes exactly where it stopped.
+    bool        held           = false;
+    /// Credits the dispatch actually charged for this haul — recorded so the
+    /// Convoys tab can report what the cargo in flight has already cost, which
+    /// is otherwise unrecoverable once the balance has moved on.
+    float       cost_paid      = 0.0f;
 };
 
 // ---------------------------------------------------------------------------
@@ -711,17 +785,38 @@ struct corporation_component
     entity_id hq_building     = null_entity;
     float     influence_range = 0.0f;
 
-    /// Capability-point accumulators (BL-332). Stockpiled, market-invisible,
-    /// never decaying — closer to "research points" than a resource_type
-    /// good (no market slot, no price, not held in a (corp, body) pool).
-    /// military_points is produced passively by every completed military_base
-    /// the corp owns (Ben, 2026-08-08: "produced by bases"); science by every
-    /// completed research_institute. Symmetric across every corp — player,
-    /// rival, background — matching the same-clock extension BL-324 gave
-    /// hire_unit. No spend mechanism reads either yet: BL-087's constellation
-    /// (band progress) is the intended sink, not built by this item.
-    float military_points = 0.0f;
-    float science          = 0.0f;
+    /// Research accumulator (BL-332). Stockpiled, market-invisible, never
+    /// decaying — closer to "research points" than a resource_type good (no
+    /// market slot, no price, not held in a (corp, body) pool). Produced
+    /// passively by every completed research_institute the corp owns, symmetric
+    /// across player, rival and background alike.
+    ///
+    /// READ BY `condition_subject::science` (BL-455, 2026-08-17), so a tech gate
+    /// or a law can require a research level. It is REACHED, not SPENT: a
+    /// condition_set is a predicate over corp state and nothing in the gate
+    /// system debits anything. See condition_set.hpp for why spending would be a
+    /// different mechanism rather than a tuning choice.
+    ///
+    /// **`military_points` was REMOVED here on 2026-08-17 (BL-455, Ben's call on
+    /// NR-307).** It sat beside `science` and was credited per tick by every
+    /// completed military_base — and read by nothing at all: no gate, no
+    /// surface, no scorer, not the blackboard. Three sites in all of `src/`
+    /// (this declaration, the Lua param load, the write) and no fourth.
+    ///
+    /// It was deleted rather than wired because no consumer could be named for
+    /// it. The economy→military interface is already the base tile plus the
+    /// reach field (BL-325's ruling 3), and the recurring cost of force is
+    /// already credits and ordnance (BL-454's upkeep) — a third abstract
+    /// military currency beside those either duplicates them or gates something
+    /// nobody has specified. `science` survived the same test because its
+    /// consumer already existed and was merely unconnected.
+    ///
+    /// This is NR-257's orphan-resource rule applied to a component field:
+    /// a value earns its place by having a consumer, and the honest response to
+    /// "there is no consumer" is deletion, not a placeholder. If the
+    /// governing-body pivot (BL-094) later wants a military capacity scalar, it
+    /// is an append with its behaviour filed in the same change.
+    float science = 0.0f;
 
     /// BL-428 growth spine: every good this corporation has EVER produced, set the
     /// tick a building of its actually makes some (economy_system.cpp's

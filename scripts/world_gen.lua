@@ -58,6 +58,15 @@ world_gen = {
             consumer_goods         = 12.0,
             medical_supplies       = 14.0,
 
+            -- BL-457: the military terminal good. DERIVED from the processing
+            -- roster's own markup convention rather than picked — that roster
+            -- prices an output at 1.415-1.443x its input basket (machinery
+            -- 1.419, alloys 1.417, electronics 1.415, spacecraft_components
+            -- 1.443). Ordnance draws steel 8.0 + machinery 22.0 = 30.0, so
+            -- 43.0 is a ratio of 1.433, inside that band. Re-derive if either
+            -- input's price or the recipe quantities change (recipes.lua id 27).
+            ordnance               = 43.0,
+
             -- BL-429: the ANCIENT tier. BL-340 closed the minable-but-unsellable
             -- asymmetry for the space chain and left it wide open here — every one
             -- of these had authored deposits and extraction rules (tile_generation

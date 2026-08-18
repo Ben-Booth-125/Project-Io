@@ -1,6 +1,7 @@
 #pragma once
 
 #include "components.hpp"
+#include "unit_roster.hpp" // BL-454: unit_upkeep_params — per-type unit data lives with the roster
 
 #include <array>
 #include <cstdint>
@@ -360,13 +361,15 @@ struct logistics_node_params
     float discount_cap            = 0.50f; ///< ceiling on the summed node discount (fraction of the haul cost).
 };
 
-/// BL-332 capability-point accumulation rates, authored in scripts/economy.lua under the
+/// BL-332 research accumulation rate, authored in scripts/economy.lua under the
 /// top-level `military` table. A flat per-tick credit to the owning corp's
-/// corporation_component.military_points / .science for every COMPLETED military_base /
-/// research_institute it owns — see economy_system.cpp's capability-points pass.
+/// corporation_component.science for every COMPLETED research_institute it owns —
+/// see economy_system.cpp's research-points pass.
+///
+/// `military_points_per_base_tick` was removed 2026-08-17 (BL-455) with the field
+/// it fed. The struct keeps its name because BL-394's hire costs live in it too.
 struct military_capability_params
 {
-    float military_points_per_base_tick       = 1.0f;
     float science_per_research_institute_tick = 1.0f;
 
     /// BL-394: hire_unit's credit cost, debited from the corp's balance at
@@ -377,6 +380,14 @@ struct military_capability_params
     /// registry charges hires sensibly without Lua.
     float hire_base_cost      = 40.0f;
     float hire_cost_per_power = 0.5f;
+
+    /// BL-454: standing-force UPKEEP — what it costs to KEEP a unit, as opposed
+    /// to `hire_*` above, which is what it costs to raise one. Authored under
+    /// `economy.military.unit_upkeep`; see unit_upkeep_params (unit_roster.hpp)
+    /// for the field-by-field contract and for why every rate defaults to zero.
+    /// BL-394's own comment flagged upkeep as "deliberately absent" and pointed
+    /// at the contract loop; this is where it actually landed.
+    unit_upkeep_params upkeep = {};
 };
 
 /// BL-350 procurement/contract tunables, authored in scripts/economy.lua under the top-level

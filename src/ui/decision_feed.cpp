@@ -2,6 +2,7 @@
 
 #include "foldout_column.hpp" // the shell-column host this ledger draws into
 #include "format.hpp"         // fmt::date_from_day / month_abbrev / ordinal_day
+#include "market_ledger.hpp"  // market_city_name (BL-452: dispatch_convoy names two markets)
 #include "presentation.hpp"   // palette, building_type_name, resource_name
 #include "world/components.hpp"
 #include "world/corp_command.hpp"
@@ -54,6 +55,8 @@ const char* verb_label(corp_verb v)
         case corp_verb::request_quote:      return "quote request";
         case corp_verb::accept_quote:       return "quote acceptance";
         case corp_verb::cancel_contract:    return "contract cancellation";
+        case corp_verb::dispatch_convoy:    return "convoy dispatch";
+        case corp_verb::hold_convoy:        return "convoy hold";
     }
     return "action";
 }
@@ -208,6 +211,19 @@ std::string target_label(const world& w, const corp_command& c)
 
         case corp_verb::cancel_contract:
             std::snprintf(buf, sizeof buf, "contract #%u", static_cast<unsigned>(c.order));
+            return buf;
+
+        // BL-452. `subject` is the SOURCE market and `counterparty` the
+        // destination — the one verb where counterparty names a market rather
+        // than a corporation, so it gets market_city_name, not corp_name.
+        case corp_verb::dispatch_convoy:
+            std::snprintf(buf, sizeof buf, " x%.0f from ", c.quantity);
+            return std::string(resource_name(c.target)) + buf
+                 + market_city_name(w, c.subject) + " to "
+                 + market_city_name(w, c.counterparty);
+
+        case corp_verb::hold_convoy:
+            std::snprintf(buf, sizeof buf, "convoy #%u", static_cast<unsigned>(c.order));
             return buf;
     }
     return "-";
