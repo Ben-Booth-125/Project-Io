@@ -55,10 +55,14 @@ sessions before 2026-08 live in `docs/development/archive/DEVLOG-2026.md`. Regen
 index with `node tools/session/devlog_index.js` after adding an entry; roll older entries out
 with `--rollover <YYYY-MM>`.
 
-**`docs/development/SPRINTS.md`**
+**`docs/development/sprints.json`** and **`docs/development/SPRINTS.md`**
 Weekly goal + retro rhythm layered over the backlog — a goal stated at the week's start, a retro
-comparing what landed against it, including the DEVLOG Runtime pacing signal. Feedback for Ben,
-not a new authority. Read/update when starting or closing out a week's work.
+comparing what landed against it. Feedback for Ben, not a new authority. Split 2026-08-19 on the
+same shape as backlog.json/BACKLOG.md: **`sprints.json`** is the canonical substance store —
+every sprint's goal, plan, retro prose, rulings and audit tables; **`SPRINTS.md`** is a thin
+header (the format convention plus a regenerated status table) pointing into it. No query tool
+exists for `sprints.json` yet — read/grep it directly. Read/update when starting or closing out
+a week's work.
 
 **`docs/development/backlog.json`**, **`docs/development/BACKLOG.md`**, **`docs/development/REFINED.md`**, and **`docs/development/DELIVERY.md`**
 The backlog and delivery system. **`backlog.json`** is the canonical **metadata index and design
