@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*112 entries — 73 open, 39 resolved.*
+*112 entries — 70 open, 42 resolved.*
 
 ---
 
@@ -757,31 +757,12 @@ CMakeLists' generic glob target for tools/verify/*.cpp links io_world_obj only, 
 
 BL-464's settled prose recorded LP as a stock, written from Ben's 'lean heavily on the shadow empire system' ruling. The research says Shadow Empire's LP is a per-turn throughput allowance that is regenerated each turn and then used or wasted - the pipe, not the tank. What carries over is the resource stock it moved.
 
-### NR-344 — Goods beat armies to the supply network by accident, not by design
-*observation · raised 2026-08-18 · from Research pass 2026-08-18.*
-
-dispatch_convoys runs in tick phase 0; run_unit_upkeep runs last inside phase 1 (app.cpp:1147-1157, economy_system.cpp:1455-1459). So on every code path convoys claim network capacity before armies do. If any shared throughput limit is ever introduced, 'the army goes unsupplied' becomes the default outcome of an over-subscribed network - inherited from tick ordering, never chosen by anyone.
-
 ### NR-345 — The unit card is unreachable to the verify harness - battle-visual work needs a unit-selection driver first
 *observation · raised 2026-08-18 · from Battle-visual design browse (2026-08-18 session): toured canvases and military surfaces via --verify captures.*
 
 verify_api.cpp has select_tile (selects the TILE entity directly) and select_building, but no binding selects a UNIT - the click-cycle (unit -> building -> tile) exists only in live mouse handling. So the Selection unit card (Strength / Roster pages) cannot be captured headless, and any battle-visual requirement over units cannot be verified until a driver hook (e.g. verify.select_unit or a cycling select) is added. Pairs with the known no-unit-marker gap in MILITARY.md section What is absent.
 
 *Files: `src/core/verify_api.cpp`, `docs/military/MILITARY.md`*
-
-### NR-346 — Battle-surface item set filed from the elicitation rulings - two calls proposed on Ben's behalf, plus the version slot
-*decision taken on your behalf · raised 2026-08-19 · from 2026-08-19 battle-surface design session; Ben's four elicitation rulings (envelope footprint, one terrain pair, several rounds per tick, card + dispatches).*
-
-Filed BL-466 (province partition), BL-467 (battle state in world), BL-468 (battle dispatches), BL-469 (battle card). Three subsidiary calls were taken to make the items fileable, all overturnable: (1) THE TERRAIN PAIR - the battle reads the defender-side tile with the highest terrain_defence inside the envelope, on the reasoning that defending means anchoring on the best ground; alternatives are the first-engaged unit's tile or the province's dominant terrain. (2) THE DISPATCH CHANNEL - a standing Field channel beside Public, so battle traffic does not drown market chatter and can be muted; the alternative is posting into Public. (3) VERSION GOAL - all four slotted at v0.1.17 (v0.1.16 carries stance + Logistic Points); re-slot freely. Also recorded: BL-467 takes over the engagement-trigger and battle-state strand MILITARY.md attributes to BL-315 (armed house conflict spine), reconciling - not overturning - the 2026-08-13 tile-token ruling: command grain stays the tile, the province is the engagement grain.
-
-*Files: `docs/development/backlog.json`, `docs/military/MILITARY.md`*
-
-### NR-347 — Unit-verb item set filed from the elicitation rulings - the delegated calls inside
-*decision taken on your behalf · raised 2026-08-19 · from 2026-08-19 unit-verb design session; Ben's four rulings (path march, one seam, march+halt+disband, marker rides along) plus the formations note.*
-
-Filed BL-470 (unit march seam), BL-471 (unit marker and command surface), BL-472 (unit formations); amended BL-314 (unit verb family - now transcribes from BL-470) and BL-393 (units write-only - export half carried by BL-470). Delegated calls, all overturnable: (1) march_points per tick as authored data with one speed for all units in the first cut; (2) path computed once at order time, ties by ascending tile id, recomputed only on invalidation; (3) convoys-before-armies stays the DECLARED first-cut claim order pending Ben's NR-344 verdict; (4) the five-template formation wheel (Line > Screen > Wing > Line, Spearhead counter-free, Train siege-purpose) as the preset set, ratios era-invariant over classes; (5) version slots - verbs and surface at v0.1.17 with the battle set, formations at v0.1.18.
-
-*Files: `docs/development/backlog.json`, `docs/military/MILITARY.md`*
 
 ---
 
@@ -1208,4 +1189,23 @@ BL-464 (Logistic Points) was filed with four materially different readings: per-
 *question · raised 2026-08-18 · from Ben, 2026-08-18: "I was also thinking we can use provinces on some level, as a higher grouping than tiles. Just consider if there's room for that in a later sprint. Things like getting a discount on resources in the same province, so locality is priced in before the market level."*
 
 Raised as a later-sprint consideration, not a now-instruction, so it is recorded rather than built. The important fact is that provinces ALREADY EXIST: run_settlement generates roughly 82 with real nation ownership, the Era -1 sim moves them between polities, and the campaign handoff discards the mapping. So this is closer to retaining something already generated than to adding a new layer.
+
+### NR-344 — Goods beat armies to the supply network by accident, not by design
+*observation · raised 2026-08-18 · from Research pass 2026-08-18.*
+
+dispatch_convoys runs in tick phase 0; run_unit_upkeep runs last inside phase 1 (app.cpp:1147-1157, economy_system.cpp:1455-1459). So on every code path convoys claim network capacity before armies do. If any shared throughput limit is ever introduced, 'the army goes unsupplied' becomes the default outcome of an over-subscribed network - inherited from tick ordering, never chosen by anyone.
+
+### NR-346 — Battle-surface item set filed from the elicitation rulings - two calls proposed on Ben's behalf, plus the version slot
+*decision taken on your behalf · raised 2026-08-19 · from 2026-08-19 battle-surface design session; Ben's four elicitation rulings (envelope footprint, one terrain pair, several rounds per tick, card + dispatches).*
+
+Filed BL-466 (province partition), BL-467 (battle state in world), BL-468 (battle dispatches), BL-469 (battle card). Three subsidiary calls were taken to make the items fileable, all overturnable: (1) THE TERRAIN PAIR - the battle reads the defender-side tile with the highest terrain_defence inside the envelope, on the reasoning that defending means anchoring on the best ground; alternatives are the first-engaged unit's tile or the province's dominant terrain. (2) THE DISPATCH CHANNEL - a standing Field channel beside Public, so battle traffic does not drown market chatter and can be muted; the alternative is posting into Public. (3) VERSION GOAL - all four slotted at v0.1.17 (v0.1.16 carries stance + Logistic Points); re-slot freely. Also recorded: BL-467 takes over the engagement-trigger and battle-state strand MILITARY.md attributes to BL-315 (armed house conflict spine), reconciling - not overturning - the 2026-08-13 tile-token ruling: command grain stays the tile, the province is the engagement grain.
+
+*Files: `docs/development/backlog.json`, `docs/military/MILITARY.md`*
+
+### NR-347 — Unit-verb item set filed from the elicitation rulings - the delegated calls inside
+*decision taken on your behalf · raised 2026-08-19 · from 2026-08-19 unit-verb design session; Ben's four rulings (path march, one seam, march+halt+disband, marker rides along) plus the formations note.*
+
+Filed BL-470 (unit march seam), BL-471 (unit marker and command surface), BL-472 (unit formations); amended BL-314 (unit verb family - now transcribes from BL-470) and BL-393 (units write-only - export half carried by BL-470). Delegated calls, all overturnable: (1) march_points per tick as authored data with one speed for all units in the first cut; (2) path computed once at order time, ties by ascending tile id, recomputed only on invalidation; (3) convoys-before-armies stays the DECLARED first-cut claim order pending Ben's NR-344 verdict; (4) the five-template formation wheel (Line > Screen > Wing > Line, Spearhead counter-free, Train siege-purpose) as the preset set, ratios era-invariant over classes; (5) version slots - verbs and surface at v0.1.17 with the battle set, formations at v0.1.18.
+
+*Files: `docs/development/backlog.json`, `docs/military/MILITARY.md`*
 

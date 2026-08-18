@@ -1735,7 +1735,7 @@
    "id": "NR-344",
    "raised": "2026-08-18",
    "kind": "observation",
-   "status": "open",
+   "status": "resolved",
    "title": "Goods beat armies to the supply network by accident, not by design",
    "source": "Research pass 2026-08-18.",
    "what": "dispatch_convoys runs in tick phase 0; run_unit_upkeep runs last inside phase 1 (app.cpp:1147-1157, economy_system.cpp:1455-1459). So on every code path convoys claim network capacity before armies do. If any shared throughput limit is ever introduced, 'the army goes unsupplied' becomes the default outcome of an over-subscribed network - inherited from tick ordering, never chosen by anyone.",
@@ -1744,7 +1744,8 @@
     "BL-464",
     "BL-454",
     "BL-325"
-   ]
+   ],
+   "outcome": "RESOLVED 2026-08-19 (Ben, review-verdict form): WAR FLIPS THE QUEUE. At peace convoys claim the supply network first; a corp party to any declared hostility row (either direction) feeds its units first that tick, evaluated per corp at tick start from the stance table. Written into BL-470 (unit march seam) as the settled claim-order rule; the accident becomes a rule the moment the seam lands."
   },
   {
    "id": "NR-345",
@@ -1764,7 +1765,7 @@
    "title": "Battle-surface item set filed from the elicitation rulings - two calls proposed on Ben's behalf, plus the version slot",
    "raised": "2026-08-19",
    "kind": "decision-taken",
-   "status": "open",
+   "status": "resolved",
    "source": "2026-08-19 battle-surface design session; Ben's four elicitation rulings (envelope footprint, one terrain pair, several rounds per tick, card + dispatches).",
    "what": "Filed BL-466 (province partition), BL-467 (battle state in world), BL-468 (battle dispatches), BL-469 (battle card). Three subsidiary calls were taken to make the items fileable, all overturnable: (1) THE TERRAIN PAIR - the battle reads the defender-side tile with the highest terrain_defence inside the envelope, on the reasoning that defending means anchoring on the best ground; alternatives are the first-engaged unit's tile or the province's dominant terrain. (2) THE DISPATCH CHANNEL - a standing Field channel beside Public, so battle traffic does not drown market chatter and can be muted; the alternative is posting into Public. (3) VERSION GOAL - all four slotted at v0.1.17 (v0.1.16 carries stance + Logistic Points); re-slot freely. Also recorded: BL-467 takes over the engagement-trigger and battle-state strand MILITARY.md attributes to BL-315 (armed house conflict spine), reconciling - not overturning - the 2026-08-13 tile-token ruling: command grain stays the tile, the province is the engagement grain.",
    "files": [
@@ -1780,14 +1781,15 @@
     "BL-448",
     "NR-342",
     "NR-345"
-   ]
+   ],
+   "outcome": "RESOLVED 2026-08-19 (Ben, review-verdict form): all three delegated calls confirmed as filed. Terrain pair = the defender-side tile with the highest terrain_defence in the envelope (BL-467 updated to settled). Dispatches = a standing Field channel beside Public (BL-468 updated to settled). Version slot v0.1.17 stands."
   },
   {
    "id": "NR-347",
    "title": "Unit-verb item set filed from the elicitation rulings - the delegated calls inside",
    "raised": "2026-08-19",
    "kind": "decision-taken",
-   "status": "open",
+   "status": "resolved",
    "source": "2026-08-19 unit-verb design session; Ben's four rulings (path march, one seam, march+halt+disband, marker rides along) plus the formations note.",
    "what": "Filed BL-470 (unit march seam), BL-471 (unit marker and command surface), BL-472 (unit formations); amended BL-314 (unit verb family - now transcribes from BL-470) and BL-393 (units write-only - export half carried by BL-470). Delegated calls, all overturnable: (1) march_points per tick as authored data with one speed for all units in the first cut; (2) path computed once at order time, ties by ascending tile id, recomputed only on invalidation; (3) convoys-before-armies stays the DECLARED first-cut claim order pending Ben's NR-344 verdict; (4) the five-template formation wheel (Line > Screen > Wing > Line, Spearhead counter-free, Train siege-purpose) as the preset set, ratios era-invariant over classes; (5) version slots - verbs and surface at v0.1.17 with the battle set, formations at v0.1.18.",
    "files": [
@@ -1804,7 +1806,8 @@
     "NR-344",
     "NR-345",
     "NR-322"
-   ]
+   ],
+   "outcome": "RESOLVED 2026-08-19 (Ben, review-verdict form): march speed OVERTURNED to per-class from the roster row's cls, authored per-class table (BL-470 updated). The five-template wheel accepted in full - and the presets REFRAMED as COMPOSITE UNITS (one entity, class-mix composition, mustered by template press), with formations kept as the customisable grouping layer above them (BL-472 amended; Ben: \"We can use both though\"). Path rule and version slots stand as filed. Rider: BL-473 filed from the same form - the province rendered in the Selection band and tile preview on click."
   }
  ]
 }
