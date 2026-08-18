@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*112 entries — 70 open, 42 resolved.*
+*113 entries — 71 open, 42 resolved.*
 
 ---
 
@@ -763,6 +763,13 @@ BL-464's settled prose recorded LP as a stock, written from Ben's 'lean heavily 
 verify_api.cpp has select_tile (selects the TILE entity directly) and select_building, but no binding selects a UNIT - the click-cycle (unit -> building -> tile) exists only in live mouse handling. So the Selection unit card (Strength / Roster pages) cannot be captured headless, and any battle-visual requirement over units cannot be verified until a driver hook (e.g. verify.select_unit or a cycling select) is added. Pairs with the known no-unit-marker gap in MILITARY.md section What is absent.
 
 *Files: `src/core/verify_api.cpp`, `docs/military/MILITARY.md`*
+
+### NR-348 — Province partition algorithm settled - the numeric sub-details delegated to promotion
+*decision taken on your behalf · raised 2026-08-19 · from 2026-08-19 partition elicitation: Ben chose terrain-seam jitter blocks and lowest-id fragment merging.*
+
+BL-466 (province partition) flipped design-owed -> designed with the three-pass algorithm (base 2x2 blocks with seeded origin offset; one-sweep terrain-seam jitter clamped to 3-5 and connectivity; strait split + single-tile fragment merge). Delegated calls, to be fixed at promotion: (1) seam-evidence weights - river vs landform vs composition edge; (2) the swap-score threshold governing how often borders bend; (3) the origin-offset fold; (4) which tile fields carry river evidence (the canvas draws rivers; the authoritative field is named at promotion, not guessed). Also recorded: post-merge coastal provinces may exceed 5 tiles - the band bends at coasts by design.
+
+*Files: `docs/development/backlog.json`*
 
 ---
 

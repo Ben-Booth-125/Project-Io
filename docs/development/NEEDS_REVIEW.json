@@ -1808,6 +1808,23 @@
     "NR-322"
    ],
    "outcome": "RESOLVED 2026-08-19 (Ben, review-verdict form): march speed OVERTURNED to per-class from the roster row's cls, authored per-class table (BL-470 updated). The five-template wheel accepted in full - and the presets REFRAMED as COMPOSITE UNITS (one entity, class-mix composition, mustered by template press), with formations kept as the customisable grouping layer above them (BL-472 amended; Ben: \"We can use both though\"). Path rule and version slots stand as filed. Rider: BL-473 filed from the same form - the province rendered in the Selection band and tile preview on click."
+  },
+  {
+   "id": "NR-348",
+   "title": "Province partition algorithm settled - the numeric sub-details delegated to promotion",
+   "raised": "2026-08-19",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "2026-08-19 partition elicitation: Ben chose terrain-seam jitter blocks and lowest-id fragment merging.",
+   "what": "BL-466 (province partition) flipped design-owed -> designed with the three-pass algorithm (base 2x2 blocks with seeded origin offset; one-sweep terrain-seam jitter clamped to 3-5 and connectivity; strait split + single-tile fragment merge). Delegated calls, to be fixed at promotion: (1) seam-evidence weights - river vs landform vs composition edge; (2) the swap-score threshold governing how often borders bend; (3) the origin-offset fold; (4) which tile fields carry river evidence (the canvas draws rivers; the authoritative field is named at promotion, not guessed). Also recorded: post-merge coastal provinces may exceed 5 tiles - the band bends at coasts by design.",
+   "files": [
+    "docs/development/backlog.json"
+   ],
+   "refs": [
+    "BL-466",
+    "BL-467",
+    "BL-473"
+   ]
   }
  ]
 }
