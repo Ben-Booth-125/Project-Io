@@ -1,6 +1,6 @@
 # Project Io — REFINED (active worklist)
 
-## Sprint 25a — the draw (promoted 2026-08-17) — **5/6 DONE, 1 IN FLIGHT**
+## Sprint 25a — the draw (promoted 2026-08-17) — **6/6 DONE** (closed 2026-08-18)
 
 Requirements: requirements.json § `ordnance-military-terminal-good`,
 § `military-points-deleted-science-wired`, § `convoy-dispatch-seam-and-ledger`
@@ -33,14 +33,26 @@ The half of Sprint 25 that runs without Sprints 21 and 23. Phase 25b (BL-458, in
   **DONE but UNVERIFIED** (`bd71143`) — not compiled, not run, not photographed (NR-313).
   R6 stays `pending`. The market-Selection dispatch press was **CANCELLED**, scope returned.
 - **[4] F — BL-454 unit upkeep + BL-459 unit strength.** Paired: the upkeep pass writes the
-  `supply_factor` the strength model reads, so splitting them strands both. **IN FLIGHT**
-  (worktree agent). Carries the demolish-orphan fix and the missing
-  `unit_component` → `army_stack_entry` adapter.
+  `supply_factor` the strength model reads, so splitting them strands both. **DONE** (`0936400`,
+  sub-agent). Upkeep as a cost vector and its own budget term; one decay rule with two triggers;
+  stored `strength` **removed** and derived instead; the demolish-orphan fix in the unit pass; and
+  the missing `unit_component` → `army_stack_entry` adapter. `unit_upkeep` 62/62,
+  `condition_set_harness` 41/41, `combat_harness` and `campaign_battle_harness` (16/0) green.
+  **Inert as shipped** — every rate zero, balance bit-identical after 25 ticks. Its four UI
+  surfaces are unverified (R7 `pending`) and owe two question-log entries.
 
-**Owed before any cut**, and none of it is optional: `chain_depth` (unrunnable here — BL-457's own
-guard), a Lua load of the three edited scripts, a `verifier-visual` pass over the Convoys tab, and a
-Windows re-bless of `spectator_determinism` citing `resource_count` 37 → 38 (NR-319 isolates the
-cause to the ordnance append, not to B).
+**Owed before any cut**, and none of it is optional:
+
+1. **`chain_depth`** — unrunnable here, and it is BL-457's own named guard.
+2. **A Lua load** of the four edited scripts (`recipes.lua`, `world_gen.lua`, `economy.lua`,
+   plus the registry loader) — no interpreter was available, so none was ever parsed.
+3. **A `verifier-visual` pass** over the Convoys tab and the four unit/finance surfaces, which
+   between them are five uncompiled UI changes. Two question-log entries land with it (NR-323).
+4. **A Windows re-bless of `spectator_determinism`** with **two** named structural causes, isolated
+   across three commits rather than assumed (NR-319): `resource_count` 37 → 38, and
+   `unit_component`'s two new hashed fields. The `military_points` deletion moved it not at all.
+5. **Set the upkeep rates** (NR-321) — until then nothing consumes ordnance at runtime, and the
+   R1 exemption naming BL-454 as its consumer is structurally true but not true in play.
 
 ---
 
