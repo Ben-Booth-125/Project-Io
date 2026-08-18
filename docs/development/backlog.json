@@ -6942,7 +6942,8 @@
    "version_goal": "v0.1.16",
    "requires": [
     "BL-157",
-    "BL-274"
+    "BL-274",
+    "BL-470"
    ],
    "authority_doc": "docs/ai/ACTIONS.md",
    "files": [
@@ -6952,7 +6953,7 @@
     "Project-Rival/docs/ai/SANDBOX-0CE.md"
    ],
    "summary": "The verb half of the unit dictionary — the military gameplay.* family ACTIONS.json entirely lacks (all 11 gameplay entries are economic). SANDBOX-0CE.md already names the four verbs by their building analogues: levy/raise (≈ build), march (≈ place_road’s route binds), garrison/disband (≈ idle/demolish), scout (≈ survey). Filed design-owed rather than authored: there is no unit_command seam to transcribe from, and authoring dictionary entries ahead of code inverts BL-270’s transcription discipline — the exact failure mode that makes a dictionary lie about a seam.",
-   "design": "## Session rulings (2026-08-07, Ben)\n\n- **Roster now, verbs design-owed** — the ruled split. UNITS.json (the noun half, BL-274) ships first; this item holds the verb half open with the transcription debt NAMED: entries are written only when a unit_command seam exists, then transcribed from it, preconditions mirroring its rejection enum exactly as the gameplay family mirrors corp_command_result.\n- **Verbs act at UNIT grain** (BL-157 amendment carries the same ruling). Args bind a unit id; no force record, no province-grain manpower verbs — raise_manpower stays a sim-internal call, not a dictionary press.\n- **Verbs are era-invariant.** Era-keying lives in UNITS.json’s availability derivation; one precondition string per raising verb points at it (\"the unit type is in the acting nation’s available roster — see UNITS.json\").\n- **Military ideology bias is DOCTRINE PREFERENCE, not per-verb keys** — VOICES.json’s doctrine_preference field (authored 2026-08-07): per-stance multipliers over siege_stance plus a frontal_risk scalar. The scorer applies it where a doctrine_row is chosen (BL-277’s seam), so a war-leaning creed changes HOW it fights before any verb exists.\n- Diplomacy verbs at nation grain (offer_peace, demand_tribute, propose_pact, threaten) stay BL-297’s, not this item’s.\n\n## Deliverable when unblocked\n\nThe gameplay.* military entries in ACTIONS.json (canonical), rendered mirrors, PHRASINGS.json stance sets per verb (Battery B’s reserved slots), and the SANDBOX-0CE Battery B run that tests era-portability of the stance taxonomy."
+   "design": "## Session rulings (2026-08-07, Ben)\n\n- **Roster now, verbs design-owed** — the ruled split. UNITS.json (the noun half, BL-274) ships first; this item holds the verb half open with the transcription debt NAMED: entries are written only when a unit_command seam exists, then transcribed from it, preconditions mirroring its rejection enum exactly as the gameplay family mirrors corp_command_result.\n- **Verbs act at UNIT grain** (BL-157 amendment carries the same ruling). Args bind a unit id; no force record, no province-grain manpower verbs — raise_manpower stays a sim-internal call, not a dictionary press.\n- **Verbs are era-invariant.** Era-keying lives in UNITS.json’s availability derivation; one precondition string per raising verb points at it (\"the unit type is in the acting nation’s available roster — see UNITS.json\").\n- **Military ideology bias is DOCTRINE PREFERENCE, not per-verb keys** — VOICES.json’s doctrine_preference field (authored 2026-08-07): per-stance multipliers over siege_stance plus a frontal_risk scalar. The scorer applies it where a doctrine_row is chosen (BL-277’s seam), so a war-leaning creed changes HOW it fights before any verb exists.\n- Diplomacy verbs at nation grain (offer_peace, demand_tribute, propose_pact, threaten) stay BL-297’s, not this item’s.\n\n## Deliverable when unblocked\n\nThe gameplay.* military entries in ACTIONS.json (canonical), rendered mirrors, PHRASINGS.json stance sets per verb (Battery B’s reserved slots), and the SANDBOX-0CE Battery B run that tests era-portability of the stance taxonomy.\n\n## 2026-08-19 - the seam exists as an item (elicitation rulings)\n\nBen's unit-verb elicitation settled the seam shape this item left open: the verbs EXTEND\ncorp_verb - one seam, one dictionary family, one rejection enum - rather than a parallel\nunit_command enum. BL-470 (unit march seam) is the code half; this item now requires it and\ntranscribes the gameplay.* military entries from it once landed, preconditions mirroring the\nrejection rows exactly as the economic family mirrors corp_command_result. The four\nbuilding-analogue verbs resolve as: levy/raise = hire_unit (shipped), march = march_unit\n(BL-470), garrison/disband = disband_unit now with garrison deferred, scout = deferred."
   },
   {
    "category": "AI",
@@ -8976,7 +8977,7 @@
     "src/world/corp_command.hpp"
    ],
    "summary": "A player raised 25 units including a full industrial roster and found nothing to do with any of them. No blackboard predicate mentions units, so they cannot be read back. No verb takes a unit as a subject, so they are pinned to the muster tile forever. And demolishing the muster base silently orphans every unit standing on it.",
-   "design": "DESIGNED 2026-08-13, from a play session whose entire second half was unreachable.\n\n## Three separate gaps that together make the verb pointless\n\n**1. Write-only.** `export_corp_blackboard` has four sections and none concerns units. A corp can raise a unit and then has no way to confirm it exists, where it is, or how many it has. The player verified their own force by reading source.\n\n**2. No verb takes a unit.** `hire_unit` names a TILE; every other verb names a building, a body or an order. So a unit cannot be moved, merged, disbanded, garrisoned or ordered. It is created at a tile and stays there for the rest of the campaign.\n\n**3. Demolish orphans them.** `demolish_building` erases the muster base and its stockpile without touching `w.units`, so the units standing on it survive with a `position` pointing at a tile that no longer carries their base. Nothing cleans them up and nothing reports it.\n\n## What this item is NOT\n\nIt is not 'build the conflict layer' — that is BL-315, and the fact that `resolve_battle`'s only caller is the Era -1 sim (BL-384) is a bigger and separate problem. This item is narrower: the units that CAN be raised today are unobservable and unmanageable, and two of the three gaps are cheap.\n\n## PROPOSED FIX, and it is deliberately partial\n\nDo (1) and (3) now, leave (2) to the conflict spine.\n\n* **Export units** as `own_asset` facts — unit id, tile, type, count, strength — in BL-390's self-state section. A corp reading its own force engages no visibility rule.\n* **Decide what demolish does to garrisoned units** and do it explicitly: refuse the demolish while units stand there (`rejected_state`, cheapest and most legible), or disband them with an agency event. Either is fine; silently orphaning them is not.\n* **Leave unit movement alone.** A `move_unit` verb without a conflict layer to move toward is scope creep, and BL-315 should own the shape of unit command when it lands."
+   "design": "DESIGNED 2026-08-13, from a play session whose entire second half was unreachable.\n\n## Three separate gaps that together make the verb pointless\n\n**1. Write-only.** `export_corp_blackboard` has four sections and none concerns units. A corp can raise a unit and then has no way to confirm it exists, where it is, or how many it has. The player verified their own force by reading source.\n\n**2. No verb takes a unit.** `hire_unit` names a TILE; every other verb names a building, a body or an order. So a unit cannot be moved, merged, disbanded, garrisoned or ordered. It is created at a tile and stays there for the rest of the campaign.\n\n**3. Demolish orphans them.** `demolish_building` erases the muster base and its stockpile without touching `w.units`, so the units standing on it survive with a `position` pointing at a tile that no longer carries their base. Nothing cleans them up and nothing reports it.\n\n## What this item is NOT\n\nIt is not 'build the conflict layer' — that is BL-315, and the fact that `resolve_battle`'s only caller is the Era -1 sim (BL-384) is a bigger and separate problem. This item is narrower: the units that CAN be raised today are unobservable and unmanageable, and two of the three gaps are cheap.\n\n## PROPOSED FIX, and it is deliberately partial\n\nDo (1) and (3) now, leave (2) to the conflict spine.\n\n* **Export units** as `own_asset` facts — unit id, tile, type, count, strength — in BL-390's self-state section. A corp reading its own force engages no visibility rule.\n* **Decide what demolish does to garrisoned units** and do it explicitly: refuse the demolish while units stand there (`rejected_state`, cheapest and most legible), or disband them with an agency event. Either is fine; silently orphaning them is not.\n* **Leave unit movement alone.** A `move_unit` verb without a conflict layer to move toward is scope creep, and BL-315 should own the shape of unit command when it lands.\n\n## 2026-08-19 - the open half is carried forward\n\nGap (3) (demolish orphans) was closed by BL-454's upkeep cleanup. Gap (1) (write-only) is\nnow a rider on BL-470 (unit march seam): the blackboard units section lands with the verbs,\nsince a scorer cannot command what it cannot read. Gap (2) (no verb takes a unit) is BL-470\nitself. This item stays open only until BL-470 lands its export rider."
   },
   {
    "status": "complete",
@@ -10824,6 +10825,201 @@
    "authority_doc": "docs/economy/MARKETS.md",
    "summary": "Found 2026-08-18 by the research pass that was sent to evaluate Ben's same-province discount. The discount was rejected as a duplicate of convoy haulage cost - but the pass found the REAL hole it was reaching for. Ordinary auto-surplus clearing debits the corp pool and credits income at ref_price with no convoy created and no leg priced (market_clearing.cpp:747-760). So distance INSIDE a market catchment costs nothing at all: a site on the market centre tile and one forty tiles away clear identically.",
    "design": "## The defect\n\n`market_clearing.cpp:747-760` — the auto-surplus path debits the corp's pool and credits income at `ref_price`. **No convoy is created and no leg is priced.** Distance within a catchment is therefore free.\n\nThat is the honest version of *\"locality is not priced\"*. Ben reached for it with a same-province discount; this is the same instinct aimed at the actual hole.\n\n## Why it matters beyond realism\n\nIt silently flattens every siting decision inside a catchment. A remote deposit and a deposit on the market's doorstep are worth the same, so the map's geography stops paying — which undercuts the placement-suitability surface, the Opportunity lens, and BL-436's (processing underearns extraction) whole margin question.\n\n## Why it needs NO new grouping\n\nThis is the finding that killed the province-discount framing. `price_convoy_leg` **already computes exactly this leg**, over the same reach field BL-325 ruling 3 makes canonical. Nothing new has to be invented, partitioned or named.\n\n## Where to charge it\n\n**At the accrual site, never inside `resolve_price`.** The precedent is BL-343's extraction levy: charge where the flow is *accounted*, not where the price is *resolved*, so the market's quote stays one honest number and the order book's total order is untouched.\n\nCharging inside `resolve_price` would make price depend on who is asking, turning one number into a per-pair matrix and breaking the determinism hash with it.\n\n## Open, and owed to Ben\n\nFull leg cost, or a fraction? Full cost makes remote extraction abruptly unprofitable everywhere at once.\n\n**Measure first.** This makes every remote site less profitable simultaneously, and it lands on an economy whose value-add step is already inverted (BL-436) and whose benchmark reads bankrupt. Sequence it *after* BL-443 (debt floor) so the measurement is readable."
+  },
+  {
+   "id": "BL-466",
+   "short_name": "PROVINCE_PARTITION",
+   "category": "Generation",
+   "title": "The province becomes real - a seeded 3-5 tile partition of the land, with the battle footprint as its first consumer",
+   "status": "design-owed",
+   "glyph": "~",
+   "priority": "A",
+   "difficulty": 3,
+   "parked": false,
+   "version_goal": "v0.1.17",
+   "requires": [],
+   "blocked_on": [],
+   "written": "2026-08-19",
+   "files": [
+    "src/world/province.hpp",
+    "src/world/province.cpp",
+    "src/world/world.hpp",
+    "docs/GLOSSARY.md"
+   ],
+   "authority_doc": "docs/GLOSSARY.md",
+   "summary": "Filed 2026-08-19 from Ben's battle-surface elicitation ruling: a battle's footprint is the PROVINCE ENVELOPE, so the province (the 3-5 tile locality cell named in the 2026-08-18 spatial vocabulary, designed-not-built) gains its first confirmed consumer. Its founding purpose - the same-province locality discount - was REJECTED by NR-342's research pass, so without this consumer the object had none. Design-owed: the partition algorithm.",
+   "design": "## Why now\n\nThe spatial vocabulary (settled 2026-08-18) defines the province as a small, uniform, purely\nspatial cell of ~3-5 tiles between tile and region - and GLOSSARY.md records it designed, not\nbuilt: no province type, no tile->province mapping. The one job it was named for (pricing\nlocality before the market) was rejected the same day (NR-342: it duplicates convoy haulage\ncost). BL-467 (battle state in the world) now needs it as the engagement envelope, which is a\nreal consumer rather than a speculative one.\n\n## Shape\n\n- A deterministic, seeded partition of each body's LAND tiles into contiguous cells of ~3-5\n  tiles. Every land tile in exactly one province. Ocean excluded - water is a movement mode\n  (the terrain functions' own ruling), and a sea battle is not this item.\n- Purely spatial and uniform, deliberately NOT the region: no name, no owner, no culture, no\n  serialised state. Derived at generation and recomputable - nothing crosses a save seam\n  (there is no save layer).\n- Owed before build: the algorithm. Two candidates - (a) seeded anchor scatter + bounded BFS\n  fill (the region machinery's shape at a smaller grain), (b) regular tiling deformed at\n  coasts. Whichever wins must be pure, seeded, and order-independent.\n\n## Constraints\n\n- **The partition enters battle identity.** BL-467 folds the province id into the battle's\n  seed stream, so a partition change re-rolls every battle in a world. The partition is part\n  of world generation and versions with it; it is never patchable in place.\n- **Not a price mechanism.** NR-342's rejection of the same-province discount stands; this\n  item must not smuggle a locality price back in. If Logistic Points (BL-464, the throughput\n  layer) later wants the province as its node grain, that coupling is filed there.\n\n## Consumers, in order\n\n1. BL-467 (battle state) - the engagement envelope and the battle map frame. Confirmed.\n2. BL-464 (Logistic Points) - candidate node grain, named by NR-342. Not settled."
+  },
+  {
+   "id": "BL-467",
+   "short_name": "BATTLE_STATE_IN_WORLD",
+   "category": "Military",
+   "title": "A battle becomes a thing in the world - the province engagement envelope, the stepped span, and the withdraw verb",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 5,
+   "parked": false,
+   "version_goal": "v0.1.17",
+   "requires": [
+    "BL-448",
+    "BL-314",
+    "BL-466"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-19",
+   "files": [
+    "src/world/campaign_battle.hpp",
+    "src/world/campaign_battle.cpp",
+    "src/world/world.hpp",
+    "src/world/corp_command.hpp",
+    "src/world/corp_command.cpp",
+    "src/world/economy_system.cpp",
+    "docs/military/MILITARY.md"
+   ],
+   "authority_doc": "docs/military/MILITARY.md",
+   "summary": "SETTLED 2026-08-19 (Ben, battle-surface elicitation): footprint = the PROVINCE ENVELOPE with units keeping tile positions; terrain = ONE pair for the whole battle; pacing = SEVERAL ROUNDS PER TICK. Takes over the uncalled-resolver strand of BL-315 (armed house conflict spine): the engagement trigger and world-held battle state that MILITARY.md lists absent. resolve_campaign_battle finally gets its production caller.",
+   "design": "## The three rulings this item is built on (Ben, 2026-08-19, elicitation form)\n\n1. **Footprint: the province envelope, units keep tiles.** Hostile units standing in the same\n   province are drawn into one battle; the province frames the fight. Units never abstract\n   into a pool.\n2. **Terrain: one pair for the whole battle**, exactly as resolve_battle already takes it.\n   Per-unit terrain was offered and declined.\n3. **Pacing: several rounds per tick** - a shorter, but still real, withdrawal window.\n\n## Reconciliation with the 2026-08-13 tile-token ruling - extension, not overturn\n\nBL-315's ruling 2 (units as tokens on the tile map, \"not armies at province grain\") stands\nuntouched: command grain stays the tile - units move tile to tile and stand on one. What the\nprovince adds is the ENGAGEMENT grain: which standing tokens are in the same fight, and what\nmap the battle draws. The two grains answer different questions and both rulings are Ben's,\nfive days apart, and compatible.\n\n## What it takes over\n\nMILITARY.md § What is absent attributes the engagement trigger and battle state to BL-315\n(armed house conflict spine). This item now owns both; BL-315 keeps the resolver, the\nforce-command model and the single-sourced roster. The bridge (unit_to_stack_entry, BL-459)\nalready exists with only a harness caller - this item gives it the production caller.\n\n## The engagement trigger\n\nAfter stance (BL-448) lands: a battle OPENS when units of two corps stand in the same\nprovince and at least one holds a hostile stance toward the other. Directed hostility\nsuffices - the ambush property BL-448 paid two tables for: the declarer attacks, the target\nis drawn in regardless. Discovery each tick walks provinces in sorted (province id, corp-pair)\norder, so battle creation is order-independent. A corp pair fights at most one battle per\nprovince at a time.\n\n## The state\n\nA world-held record: {province, attacker, defender, participating unit ids, rounds_fought,\nper-round trace}. The trace is retained for the span (dispatches BL-468 and the card BL-469\nread it) and discarded at battle end - nothing crosses a tick boundary except the record\nitself. Seed identity: fold the PROVINCE id where campaign_battle_identity folds tile_index\ntoday - same splitmix64 shape, role order preserved (a role swap stays a different stream).\n\n**Determinism harness first, in-memory replay only** - the BL-448 precedent verbatim: no\nserialiser exists, so assert on replay, never a save round-trip.\n\n## Pacing and the window\n\nrounds_per_tick is AUTHORED DATA in campaign_battle_params (the corp_ai_params precedent),\nnot code. At the shipped max_rounds 6 and a first-cut rounds_per_tick 3, a full battle spans\n2 ticks and the player gets one real between-tick decision. Tuning the window is a data edit.\n\n## The terrain pair - PROPOSED, not settled (flagged NR-346)\n\nThe envelope spans 3-5 tiles and the battle reads one pair. Proposal: the pair comes from the\nDEFENDER-side tile with the highest terrain_defence inside the envelope - the defender is\npresumed to anchor on the best ground, which is what defending means, and terrain_defence\nalready multiplies the defender only. Deterministic: max over sorted tile ids. Ben may prefer\nthe anchor tile of the first-engaged unit, or the province's dominant terrain.\n\n## Per-unit hits\n\nresolve_battle returns per-side loss fractions; the map needs per-unit hits. Each side's\nround loss is distributed across its participating units deterministically: proportional to\ncount, remainder assigned by ascending entity id. No new draws - a pure function of the\nround outcome. Supply and quality already enter through unit_to_stack_entry, so an\nunsupplied unit is weaker and its losses bite harder, with no second mechanism.\n\n## The withdraw verb\n\ncorp_verb::withdraw_from_battle {province}. Legal for either participant; applies at the tick\nboundary before the next round batch; price is the existing three-term withdrawal cost (base\n+ per-round + pursuit), which the card surfaces live. A rejection mutates nothing. The\nACTIONS.json dictionary entry lands with the verb - the stale-entry rule. The rival scorer\nmay call it under the standing scored-utility exception; scoring it well is future work, not\nthis item.\n\n## Aftermath\n\nLosses land on unit counts per round batch (a battle weakens units while it runs). Field\nheld by the side that stayed, defender on ties - both resolver rules already. Zero-count\nunits are disbanded by the upkeep pass's existing cleanup, which runs last in the economy\nstep."
+  },
+  {
+   "id": "BL-468",
+   "short_name": "BATTLE_DISPATCHES",
+   "category": "UI",
+   "title": "The battle speaks - deterministic round dispatches in the comms dock",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 3,
+   "parked": false,
+   "version_goal": "v0.1.17",
+   "requires": [
+    "BL-467"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-19",
+   "files": [
+    "src/ui/chat_panel.hpp",
+    "src/ui/chat_panel.cpp",
+    "docs/ui/question_log.json",
+    "docs/ui/LAYOUT.md"
+   ],
+   "authority_doc": "docs/ui/LAYOUT.md",
+   "summary": "SETTLED 2026-08-19 (Ben, battle-surface elicitation): the battle surface is the Selection card PLUS comms dispatches - no dedicated ledger. Each round batch appends dispatch lines to the comms dock: deterministic text, a pure function of the round trace, phrased as the company's field officer reporting. The design-research finding this encodes: commanders in every era experienced battle as dispatches, so the comms dock is the historically honest channel - and it is native to the corporate-console fiction.",
+   "design": "## Shape\n\nEach stepped tick, every live battle (BL-467) appends one dispatch per round batch to the\ncomms dock. Text is a PURE FUNCTION of the retained round trace - no extra draws, so the\ndispatch layer can never move the sim. Phrase selection folds from the battle identity plus\nround index, through seeded template banks (the BL-290 tongue-bank precedent): sci-fi\nvoice, never Earth-flavoured, per the naming rule.\n\n## The phase vocabulary - presentation only\n\nRounds are mechanically uniform; the dispatches ladder them: opening rounds speak as\nskirmish, the middle as commitment, a large swing as crisis, an approach to the rout\nthreshold as wavering, withdrawal as breaking off WITH ITS PRICE NAMED, and the aftermath\nnames who holds the field and what it cost. The same vocabulary keys the battle card's phase\nreadout (BL-469), so the two surfaces never disagree.\n\n## The channel - PROPOSED, not settled (flagged NR-346)\n\nA standing **Field** channel beside Public (chat_state's channel model takes this in one\nrow; the player is an implicit member). Reason: battle traffic must not drown the market\nchatter the Public channel carries, and a channel can be muted. The alternative - posting\ninto Public - costs nothing but mixes voices. Ben's call.\n\n## Question-log entry (BL-260, required)\n\n\"What is happening in my battle, and is it time to leave?\" - the dispatch stream is the\nanswer surface; the card (BL-469) is the command surface. Enforcement is authorship, not\nmachinery."
+  },
+  {
+   "id": "BL-469",
+   "short_name": "BATTLE_CARD",
+   "category": "UI",
+   "title": "The battle card - the province map in the Selection band, each unit hit by hit, and the priced exit",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 4,
+   "parked": false,
+   "version_goal": "v0.1.17",
+   "requires": [
+    "BL-467"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-19",
+   "files": [
+    "src/ui/selection_panel.cpp",
+    "src/ui/icons.hpp",
+    "src/ui/icons.cpp",
+    "src/ui/entity_summary.cpp",
+    "docs/ui/SELECTION.md",
+    "docs/ui/ICONS.md",
+    "docs/ui/question_log.json"
+   ],
+   "authority_doc": "docs/ui/SELECTION.md",
+   "summary": "SETTLED 2026-08-19 (Ben, battle-surface elicitation): the battle is watched and commanded from a new Selection-band card kind. Centrepiece: the province's 3-5 hexes drawn large, each participating unit a marker on its own tile, hits landing per round, with the withdraw price live while the window is open. Ben's framing verbatim: \"sketch a map of each unit being hit.\"",
+   "design": "## Selection model\n\nA new Selection kind: **battle**. Clicking any tile inside an active battle's envelope - or\nthe battle's canvas marker - selects the battle first; the click-cycle extends to\nbattle -> unit -> building -> tile. Deselection rules unchanged (SELECTION.md owns them).\n\n## The card\n\n- **The map**: the province's hexes drawn large - the tile card's hex-neighbourhood widget\n  is the pattern to reuse. Each participating unit a marker on its own tile (positions are\n  real; the envelope ruling kept them). Per-round hits render as decaying flashes plus a\n  loss pip per unit, read from BL-467's retained trace.\n- **Per-unit strength bars** with the existing derivation read: count x quality x supply -\n  the unit card already prints it; the battle card keeps the decomposition so an unsupplied\n  unit visibly fights weaker.\n- **Readouts**: round / max, the phase word (shared vocabulary with BL-468, so card and\n  dispatches never disagree), both sides' aggregate strength.\n- **The withdraw press**: shows the CURRENT price with all three terms legible (base +\n  per-round + pursuit) updating as rounds pass - the one decision the span contains, made\n  visible while the window is open. Confirm on press (the declare_hostile confirm pattern,\n  BL-449). Disabled with a reason when the battle is not the player's.\n\n## Canvas marker\n\nA battle-in-progress glyph over the envelope (ICONS.md discipline: shape, meaning, usage,\ncolour source catalogued; identity colours stay in presentation.hpp). The deleted unit\nchevron (BL-294) is the cautionary precedent - this marker earns its place as the alert that\npulls the eye to a fight, which a battle with no glyph cannot do.\n\n## Visibility\n\nThe player's own battles show everything. A rival-vs-rival battle shows under the\ncompetitor-visibility rule (BL-068): the marker, the participants, the outcome - internals\nprivate, no per-unit detail.\n\n## Verify driver rider (NR-345)\n\nNo headless binding can select a unit - or a battle. The work adds verify.select_battle (or\nextends the select cycle) so the card is photographable; without it every visual requirement\non this item is green-but-blind, which is the exact failure NR-345 records.\n\n## Question-log entries (BL-260, required)\n\nThe card: \"How is my battle going, and what does leaving cost right now?\" The marker:\n\"Where is fighting happening?\""
+  },
+  {
+   "id": "BL-470",
+   "short_name": "UNIT_MARCH_SEAM",
+   "category": "Military",
+   "title": "Units learn to walk - march, halt and disband as corp verbs, path-marching across ticks on the one distance metric",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 4,
+   "parked": false,
+   "version_goal": "v0.1.17",
+   "requires": [],
+   "blocked_on": [],
+   "written": "2026-08-19",
+   "files": [
+    "src/world/corp_command.hpp",
+    "src/world/corp_command.cpp",
+    "src/world/components.hpp",
+    "src/world/economy_system.cpp",
+    "src/world/corp_ai.cpp",
+    "docs/military/MILITARY.md"
+   ],
+   "authority_doc": "docs/military/MILITARY.md",
+   "summary": "SETTLED 2026-08-19 (Ben, unit-verb elicitation): movement is a PATH MARCH across ticks paying the one distance metric; the seam EXTENDS corp_verb (one seam, one dictionary family, one rejection enum); first cut is MARCH + HALT + DISBAND. Unpins the unit from its muster tile - the gap BL-393 (units write-only) documented and deliberately deferred. Carries two riders: the blackboard export of units (BL-393's open half) and a deliberate, recorded goods-vs-armies claim order (NR-344).",
+   "design": "## The three rulings this item is built on (Ben, 2026-08-19, elicitation form)\n\n1. **Path march.** A unit walks tile-by-tile across ticks toward a destination, paying the\n   SAME traversal costs everything else pays (road_traversal_multiplier, the reach metric).\n   Instant hop and step-per-press were offered and declined.\n2. **One seam.** march/halt/disband are corp_verb rows with a unit-id argument - no parallel\n   unit_command enum. BL-314's \"future unit_command seam\" phrasing resolves to THIS: the\n   seam corp_command.hpp already is, extended. One dictionary family, one rejection enum.\n3. **First cut: march + halt + disband.** Merge/split, garrison and scout stay out; the\n   formation item (BL-472) owns group behaviour.\n\n## Why path march is the load-bearing choice\n\nIt makes BL-325 ruling 3 kinetic: roads genuinely project force, because a marching column\nmoves at the speed of its ground. A column crossing provinces can be MET - which is what\ngives BL-467's engagement trigger honest work - and a unit can now walk beyond the reach\nenvelope, which is what makes the (currently disabled) out-of-supply decay reachable in play.\n\n## The verbs\n\n- **march_unit {unit, dest tile}.** Sets a movement order on the unit. Rejections:\n  unit not the actor's (rejected_not_owner), unit or tile nonexistent / dest is ocean\n  (rejected_invalid), unit currently in a battle (rejected_state - withdraw first, BL-467's\n  verb). A rejection mutates nothing - the seam is an untrusted input boundary.\n- **halt_unit {unit}.** Clears the order. Halting an unordered unit is rejected_state.\n- **disband_unit {unit}.** Erases the unit. No refund - manpower walks away. Confirm lives\n  in the UI (BL-471), never in the seam.\n\n## Movement resolution - deterministic by construction\n\n- A movement order stores {dest, path, progress}. The path is computed ONCE at order time -\n  cheapest route under the same cost function body_reach_field uses, ties broken by ascending\n  tile id - and recomputed only when invalidated (a blocked step). No per-tick Dijkstra.\n- **march_points per tick is AUTHORED DATA** (economy.lua § military, the campaign_battle_params\n  precedent), spent against per-tile traversal cost with fractional carry-over. One speed for\n  all units in the first cut; per-class speed (a wing outpacing a line) is BL-472's ground,\n  and any speed stat derives from the roster row - the NR-322 one-source discipline.\n- The pass visits marching units in ascending entity id (the upkeep pass's rule, same reason),\n  after battle discovery: a unit that marched into a hostile province this tick fights before\n  it can march out next tick.\n\n## Rider 1 - the blackboard export (takes over BL-393's open half)\n\nexport_corp_blackboard gains a units section: id, tile, type, count, derived strength, order\nstate (marching to / holding / in battle). A corp reading its OWN force engages no visibility\nrule; rival units stay under BL-068's competitor rule. Without this the rival scorer would\ncommand blind, and BL-314's dictionary entries could not state an expected_output honestly.\n\n## Rider 2 - the claim order is decided on purpose (NR-344)\n\nGoods currently beat armies to the supply network by tick phase order alone. FIRST-CUT\nPROPOSAL, recorded not settled: keep convoys-before-armies as the DECLARED default - trade\nis the base identity and force is the expensive exception - but state it in MILITARY.md and\neconomy_system.cpp's phase comment, so when Logistic Points (BL-464) makes the two contend\nfor one pool, the priority is a written rule, not an accident. NR-344 stays open for Ben.\n\n## Downstream\n\n- The rival scorer gets march as a candidate under the standing scored-utility exception -\n  legality here, scoring quality is conflict-AI work (BL-450's arc), not this item.\n- ACTIONS.json entries are transcribed AFTER the seam lands - BL-314 (unit verb family) owns\n  the transcription and now requires this item.\n- The determinism guard: state-hash replay with marching units, plus a harness case where a\n  re-run recomputes an invalidated path identically."
+  },
+  {
+   "id": "BL-471",
+   "short_name": "UNIT_MARKER_AND_COMMAND_SURFACE",
+   "category": "UI",
+   "title": "The army becomes visible and commandable - the unit canvas marker, the march target mode, and the unit card presses",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 3,
+   "parked": false,
+   "version_goal": "v0.1.17",
+   "requires": [
+    "BL-470"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-19",
+   "files": [
+    "src/ui/icons.hpp",
+    "src/ui/icons.cpp",
+    "src/ui/selection_panel.cpp",
+    "src/ui/entity_summary.cpp",
+    "src/core/verify_api.cpp",
+    "docs/ui/ICONS.md",
+    "docs/ui/SELECTION.md",
+    "docs/ui/question_log.json"
+   ],
+   "authority_doc": "docs/ui/SELECTION.md",
+   "summary": "SETTLED 2026-08-19 (Ben, unit-verb elicitation): the unit marker rides with the verbs - marching invisible armies is absurd. Replaces the chevron deleted uncalled in BL-294 with a marker that has earned its place: units now do something. Adds the march target mode, the unit card's March / Halt / Disband presses, and the headless drivers NR-345 demands.",
+   "design": "## The marker\n\nA unit glyph at the unit's tile (ICONS.md discipline: shape, meaning, usage, colour source\ncatalogued; identity colours from presentation.hpp). A marching unit shows its heading; a\nunit in battle defers to the battle marker (BL-469). BL-294's deletion is the standard to\nclear: that chevron drew nothing anyone could act on. This one marks an object with verbs.\n\n## The command surface\n\n- The unit card (Strength / Roster pages exist) gains an Orders page: current order state\n  (holding / marching-to with remaining cost / in battle), and the March, Halt, Disband\n  presses. Disband confirms (the BL-449 declare_hostile pattern); Halt is plain; March\n  enters target mode.\n- **March target mode**: the place-road/place-building targeting pattern - click a\n  destination tile, escape cancels. The projected path and its tick cost preview on the\n  canvas before the click commits, so distance is priced BEFORE the order, not discovered\n  after. Toggle rule applies: re-pressing March while armed disarms it.\n- The hover card adds the order state line.\n\n## Verify drivers (the NR-345 debt, paid here)\n\nverify.select_unit(id-or-tile) and verify.march_unit(unit, col, row) land with the surface,\nso the card, the marker and the target mode are all photographable headless. Without them\nevery visual requirement on this item is green-but-blind.\n\n## Question-log entries (BL-260, required)\n\nThe marker: \"Where are my forces, and where are they going?\" The Orders page: \"What is this\nunit doing, and what can I tell it to do?\""
+  },
+  {
+   "id": "BL-472",
+   "short_name": "UNIT_FORMATIONS",
+   "category": "Military",
+   "title": "Formations - composite units that march and fight as one, with preset templates keeping the rock-paper-scissors legible",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 5,
+   "parked": false,
+   "version_goal": "v0.1.18",
+   "requires": [
+    "BL-470",
+    "BL-467"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-19",
+   "files": [
+    "src/world/components.hpp",
+    "src/world/corp_command.hpp",
+    "src/world/campaign_battle.cpp",
+    "src/world/unit_roster.hpp",
+    "docs/military/MILITARY.md",
+    "docs/GLOSSARY.md"
+   ],
+   "authority_doc": "docs/military/MILITARY.md",
+   "summary": "Filed 2026-08-19 from Ben's elicitation note: \"a structure to manage groups of units that work as one team over a series of regions... beforehand we should just use common groups, such as 1000 infantry split by groups of 200. And 100 tanks + 400 infantry.\" A formation is a named grouping of units that marches as one and fights as one side, carrying a doctrine row - which finally gives doctrine_row its campaign consumer. Preset templates first, player-authored composition deferred. The template wheel preserves the class matrix's rock-paper-scissors at formation grain.",
+   "design": "## What a formation is\n\nA world-held grouping: {members: unit ids, template, name}. Members keep their own\nunit_component rows - count, type, supply, tile - so nothing about the settled unit model\nmoves. The formation adds three behaviours:\n\n1. **Marches as one.** One movement order for the group; the formation moves at its slowest\n   member's speed (the historical truth - a column is its baggage). Members co-tile with the\n   formation's anchor tile in the first cut; spreading members over adjacent tiles is a\n   follow-on, not this item.\n2. **Fights as one.** In BL-467's envelope, a formation is one side's stack: members'\n   unit_to_stack_entry rows plus the TEMPLATE'S doctrine_row. This is the design's quiet\n   win: doctrine_row (frontal_bonus, flank_fragility, mountain_penalty, siege_stance) ships\n   today as pure data with no campaign consumer - the formation template is that consumer.\n3. **Is commanded as one.** form_up {units, template} / disband_formation {formation} as\n   corp_verbs on the one seam (the BL-470 ruling). march_unit accepts a formation id where\n   it accepts a unit id.\n\n## Ben's examples, read against the model (2026-08-19 note, verbatim anchors)\n\n\"1000 infantry split by groups of 200\" - a template speaks RATIOS over classes and a\nsub-group granularity, not absolute headcounts (hire_batch_manpower is 50 today; the batch\nsize is data and may move). \"100 tanks + 400 infantry\" - a 1:4 shock-to-foot combined-arms\nmix; in class terms the tank IS the cavalry class's industrial row, so the template is\nera-invariant: the same mix is lancers-and-levies at 0 CE and armour-and-rifles at 1960.\nEra-invariance of templates matches BL-314's verbs-are-era-invariant ruling exactly.\n\n## The template wheel - keeping rock-paper-scissors legible\n\nThe class matrix already runs infantry > ranged > cavalry > infantry. Templates COMPOSE it\nrather than replace it, and the wheel must survive at formation grain:\n\n| Template | Mix (by weight) | Doctrine lean | Beats | Loses to | Ground |\n|---|---|---|---|---|---|\n| **Line** | 80 infantry / 20 ranged | frontal_bonus high, flank_fragility high | Screen | Wing | anchored, rough - defence country |\n| **Screen** | 60 ranged / 40 infantry | low frontal, low fragility | Wing | Line | forest, highland - cover country |\n| **Wing** | 60 cavalry / 20 infantry / 20 ranged | high frontal, mountain_penalty high | Line | Screen | plains - open country |\n| **Spearhead** | 20 cavalry / 60 infantry / 20 ranged | moderate everything, low fragility | none hard | none hard | any - the generalist premium |\n| **Train** | 30 siege / 50 infantry / 20 ranged | invest stance | (fortifications, future) | everything in the open | roads - it barely moves |\n\n- **Line > Screen > Wing > Line** is the wheel, and it derives from the matrix: a Line's\n  infantry mass closes on a Screen's ranged core; a Screen's massed ranged shreds a Wing's\n  cavalry; a Wing flanks a Line's fragility. No template beats its counter through raw\n  numbers alone at even strength - that is the legibility invariant, and the harness asserts\n  it the way combat_harness R3 already asserts doctrine purity.\n- **Spearhead is deliberately counter-free both ways** - the combined-arms generalist\n  (hammer-and-anvil, armour-plus-infantry). Its edge is flexibility, priced by never having\n  a favourable matchup. Ben's tanks+infantry example lands here.\n- **Train exists for the future fortification system**; in the open field it is prey, which\n  the matrix already encodes (siege uniformly weak). Its escort keeps it from being a free\n  kill, no more.\n- **Terrain rotates the wheel, it never breaks it**: mountain and forest amplify Line and\n  Screen (terrain_defence, doctrine mountain_penalty against the Wing), plains amplify the\n  Wing, wetland punishes Wing and Train (attrition 350, the marsh-stops-armies reading).\n  All of that is EXISTING numbers - templates add no new terrain table.\n\n## Presets first, customisation deferred - explicitly\n\nThe five templates ship as AUTHORED DATA (lua, the params precedent): ratios, sub-group\ngranularity, doctrine values. Player-authored templates (choose your own mix and doctrine)\nare a named follow-on slice, not silently dropped - the note's \"this can be customizable\"\nis the licence, and the deferral is so the wheel is proven legible before it is player-bent.\n\n## Determinism and naming\n\n- form_up validates every member (owned, same tile, not in battle) and mutates nothing on\n  rejection. Formation ids are entity ids; iteration follows the sorted-id rule everywhere.\n- \"Formation\" enters GLOSSARY.md with the work (the name-it-first rule). Template display\n  names are authored data and must come from the seeded banks if they are ever generated -\n  never Earth proper nouns. Line/Screen/Wing/Spearhead/Train above are design labels, not\n  shipped strings.\n\n## Open, named\n\n- Per-class march speed (a Wing should outpace a Line) - interacts with slowest-member rule;\n  derive any speed from the roster row (NR-322's one-source discipline).\n- Whether a formation's members can straddle tiles (frontage on the battle map) - deferred\n  with the spreading follow-on.\n- Reinforcement: can a unit join a formation mid-campaign at distance, or only co-tile?\n  First cut: co-tile only."
   }
  ]
 }
