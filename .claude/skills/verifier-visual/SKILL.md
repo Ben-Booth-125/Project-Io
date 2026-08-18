@@ -54,9 +54,12 @@ the "authorising a new check = naming it" convention:
   views: **Story** (the oral-history biography, including Continents/Drift's merged lines),
   **Chain** (the wizard's generation stage charts redrawn from the persisted report, captured
   for each of the three rounds), and **Tiles**; plus the Public comms channel's epoch line
-  confirming it is nation-voiced, not corporation-voiced. Drivers: `verify.goto_surface`,
-  `verify.show_panel("tile", ...)`, and `verify.panel_view("history"|"history_round", i)` —
-  the sub-view hook that lets a capture reach a ledger tab without a click.
+  confirming it is nation-voiced, not corporation-voiced. Story is captured **twice** —
+  head and foot — because the column clips the biography after ~8 lines and the head
+  capture alone could never prove the recent-epoch events render. Drivers:
+  `verify.goto_surface`, `verify.show_panel("tile", ...)`,
+  `verify.panel_view("history"|"history_round", i)` — the sub-view hook that lets a
+  capture reach a ledger tab without a click — and `verify.scroll_panel` (below).
 
 - **`corp_choice.lua`** (BL-435, 2026-08-16) — the starting-corp selection stage. Notable for
   *how it reaches the screen*: the stage lives in one frame of the real start-up sequence, and
@@ -126,9 +129,49 @@ machines, so CI and any dev box agree.
    `set_zoom`/`set_pan`/`add_pan`, `center_tile(col,row[,zoom])`, `command(name)`
    (the shared canvas command vocabulary), `capture`, `buildings`, `log_buildings`.
    SDL logs each `Screenshot saved:` line to stderr — that is success, not failure.
+   Panel drivers: `show_panel(name, open)`, `panel_view(name, i)`,
+   `scroll_panel(name, fraction)`, `frames(n)` — see § Content below the fold.
 3. **Inspect** every capture with the Read tool (PNG is directly readable) and
    report what each frame shows against the requirement being checked. Cite the
    capture file names.
+
+## Content below the fold (a golden's quietest blind spot)
+
+A capture composits the panel **exactly as laid out**, so anything the shell column
+clips is invisible to the golden — and a diff over content that was never rendered
+reads `0.0000% differing`. That is the failure mode worth naming: not a red FAIL,
+but a green PASS over a panel whose lower half could be rewritten unnoticed. It hid
+the whole of the Generation History biography past its first ~8 lines.
+
+`verify.scroll_panel(name, fraction)` parks a fold-out ledger's vertical scroll at a
+fraction of its extent — `0` = top, `1` = foot. Names mirror `show_panel`'s
+vocabulary (`tile`/`history`, `market`, `economy`, `balance`, `corporation`,
+`construction`); an unknown name clears the request.
+
+**It is sticky, and it lands on the FOLLOWING frame** (ImGui resolves a scroll target
+inside `Begin`, and the fraction resolves against the previous frame's content
+height). So two rules, both learned the hard way:
+
+```lua
+verify.scroll_panel("history", 1.0)
+verify.frames(2)                      -- or the capture shows the OLD scroll
+verify.capture("history_story_kepler_foot")
+
+verify.scroll_panel("history", 0.0)   -- reset, don't clear: clearing merely stops
+verify.frames(1)                      -- setting it, leaving the panel at the foot
+```
+
+Skipping that reset+frame is what made a later Chain capture come out **blank** —
+the view changed but the scroll was still at the old foot.
+
+Limit: it scrolls the ledger **window**. A panel nesting its own `BeginChild`
+scroller (Market Ledger's `##price_scroll`) is not reached and would need its own
+hook. Implementation: `ui::foldout_request_scroll` (`src/ui/foldout_column.cpp`),
+bound to Lua in `src/core/verify_api.cpp`.
+
+When a check covers a panel whose content can outgrow the column, capture it **twice**
+— head and foot — as `history_ledger_and_comms.lua` now does.
+
 
 ## Golden-image diffing (automatic PASS/FAIL — demoted to a curated set, 2026-08-15)
 

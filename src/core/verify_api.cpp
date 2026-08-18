@@ -21,6 +21,7 @@
 
 #include "ui/canvas_command.hpp"
 #include "ui/detail_level.hpp"
+#include "ui/foldout_column.hpp"
 #include "ui/fonts.hpp"
 #include "ui/frame_stats.hpp"
 #include "ui/market_ledger.hpp"
@@ -641,6 +642,28 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         else if (name == "economy")       m_ui.economy_view = view;
         else if (name == "market")        m_ui.market_ledger_view = view;
         else if (name == "tech_tree")     m_ui.tech_tree_view = view;
+    });
+
+    // Park a fold-out ledger's SCROLL at a fraction of its extent (0 = top,
+    // 1 = foot), so a capture can reach content the column clips. Without this the
+    // verify API could open a panel and pick its view but never see past the fold —
+    // the Generation History biography was captured at its first ~8 lines, so a
+    // rewrite of everything below it diffed at 0.0000% against the golden.
+    //
+    // Sticky, landing on the FOLLOWING frame and against the previous frame's
+    // content height, so a script must render at least one more frame before
+    // capturing — and another after resetting to 0, or the next capture inherits it:
+    //   verify.scroll_panel("history", 1.0); verify.frames(2); verify.capture(...)
+    // Names mirror show_panel's vocabulary; an unknown name clears the request.
+    v.set_function("scroll_panel", [](const std::string& name, double fraction) {
+        const char* window = "";
+        if (name == "tile" || name == "history") window = "Tile Ledger";
+        else if (name == "market")               window = "Market Ledger";
+        else if (name == "economy")              window = "Economy";
+        else if (name == "balance")              window = "Balance Ledger";
+        else if (name == "corporation")          window = "Corporations";
+        else if (name == "construction")         window = "Building";
+        ui::foldout_request_scroll(window, static_cast<float>(fraction));
     });
 
     // Park a surface's drill-through disclosure state (BL-214) so a capture can show
