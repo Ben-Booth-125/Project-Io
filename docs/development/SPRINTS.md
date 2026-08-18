@@ -437,6 +437,85 @@ anywhere, and only BL-107's format header is filed. Ruling 2 makes Sprint 29 the
 project whose loss on reload actually matters. It does not block the arc — the collapse stays
 re-derivable from seed plus params — but it is the moment the project stops being able to defer it.
 
+## The adversarial pass — nine corrections to this arc
+
+Three judges (dependency realism, determinism/standing rules, scope honesty) were run against the
+candidate plans with instructions to default to finding the flaw. Nine findings land on **this**
+arc, and three of them are correctness bugs rather than sequencing preferences.
+
+**1. The strain accumulator must be asserted on its SHAPE, not its value.** The best single line
+from the whole pass, and it inverts Sprint 30's premise. The burden of breadth
+(`history_sim.cpp:507-524`) is **stateless** — `burden = (held − 40) × 4`, recomputed each round
+from the *current* holding count. So losing provinces immediately *reduces* the burden: shrinking
+makes an empire logistically stronger. **That is a negative feedback actively opposing collapse.**
+Sprint 30's harness must assert the strain term **does not decrease when holdings decrease**.
+
+**2. BL-317's timelapse is a data race, not a plumbing job.** `app.cpp:440` runs
+`make_hard_coded_world` under `std::async`, and the report crosses on completion. Reading
+`owner_changes` mid-generation is an unsynchronised read of a vector the worker is **appending to**.
+Sprint 31 must either publish per-year snapshots through a synchronised channel, or replay only
+*after* the join. Ruling 1 (watched replay) makes the second option legal and cheap — take it.
+
+**3. A seceding polity has no name, and the naming rule is absolute.** `struct polity` has no name
+field. Sprint 30 creates entities by fragmentation and Sprint 29 seeds nations from survivors; both
+must route through the seeded phoneme generator. A placeholder written under time pressure is
+exactly how an Earth-flavoured name enters generation, which the standing rules forbid outright.
+
+**4. "Inevitable" is not "possible", and this arc has not yet bridged the gap.** A done-when of
+"at least one world in twelve" demonstrates collapse is *reachable*. Ben's word was **inevitable**.
+Sprint 30 must pin a real rate — and pin it **before** the fix, so the number is not chosen to match
+the result. Every unbound `N` in a done-when is unfalsifiable as written.
+
+**5. BL-450 (rivals score stance) is a widening of the BL-202/BL-203 corp-AI exception, and
+ruling 4 does not cover it.** Ruling 4 grants *nation* behaviour; a rival scoring stance toward the
+**player's** corp is a different grant, at corp grain, against the one actor the prohibition exists
+to protect. Every other widening in the standing rules carries a dated paragraph. This one needs its
+own, in Sprint 26 alongside the nation grant — not assumed under it.
+
+**6. Pin the toolchain before any baseline.** Every re-measurement this arc depends on
+(`history_sweep`, `tier_margin`, `ai_skill_harness`, the era-on determinism case) is a comparator,
+and `spectator_determinism` already records that its hash is MSVC-version-specific. A baseline taken
+under the wrong compiler is not a baseline. Pin MSVC 14.44 in the sprint, not in someone's memory.
+
+**7. `condition_subject` is entirely corp-scoped and self-measuring.** All nine values measure the
+evaluating corp. So BL-155's own worked examples — a wartime tax, a levy past a density threshold —
+are **inexpressible**, and Lane D3's conditional laws would ship unable to state their own design
+doc's cases. Lane D needs the *condition* side widened (nation, body, hostility subjects) as well as
+the modifier side. This is the one appender to `condition_set.hpp`, so it belongs to D, not C.
+
+**8. Sprint 26 is two sprints wearing one label.** Close-out, the v0.1.16 split, the determinism
+case, the doc-truth pass, the standing-rule grants and the un-park is a lot for a gate. Split it:
+**26a** is the three authority edits plus the determinism case (they block Lane D and Lane A),
+**26b** is close-out and the doc pass (they block nothing, and can run alongside 27).
+
+**9. Add BL-392 before BL-445, or not at all.** Procurement currently debits the buyer per tick and
+credits goods with **no supplier** — it mints goods and destroys money. Putting a player press on
+that surface makes a live defect reachable. If Lane D touches procurement, the conservation fix
+leads.
+
+**Two things the pass confirmed rather than corrected.** BL-393's unit seam must run **alone** —
+REFINED.md quarantines it as a serialised-record change, and this arc already says so. And the
+capital carry must land **in the same sprint** as the polity→nation handoff, because polities are
+one-per-culture while nations are one-per-province-anchor; carried early, most nations get no
+capital. Sprint 29 already pairs them.
+
+## Sizing, and the deferral tripwire
+
+**The judges' fairest hit: no plan stated a total.** On this repo's empirical cadence — 1–3 sessions
+per sprint, 1–7 items — this arc is **roughly 12–20 sessions**. It is a two-month arc at the
+observed pace, not a two-week one. Ben should size against that number rather than against the
+sprint count.
+
+**And the military surface is NOT deferred a fifth time by this arc** — which is the one structural
+advantage the lane shape buys, and it is worth stating plainly. All three candidate plans put the
+fight at position 8, 9 and 12 respectively. Here **Lane C runs concurrently from day one**, so the
+fight is reachable in parallel with the spine rather than behind it. Sprint 19's retro warned that
+the accumulation had to stop somewhere; this is the shape that stops it.
+
+**The tripwire:** if Lane C has not opened by the time Lane A reaches Sprint 29, the arc has
+silently reverted to deferring it, and that should be named at the retro rather than discovered a
+sixth time.
+
 ## What this arc deliberately does not carry
 
 **Escort, blockade and ambient banditry** stay out, per Sprint 25's own boundary. **A second reach
