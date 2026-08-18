@@ -198,3 +198,94 @@ std::vector<army_stack_entry> roster_stack(int64_t         manpower,
     }
     return stack;
 }
+
+// ===========================================================================
+// BL-454 / BL-459 — upkeep resolution and derived strength
+// ===========================================================================
+
+namespace
+{
+
+/// The row @p roster_type names, or nullptr when the index is out of range.
+/// An unknown index is a data problem; every caller here degrades to the
+/// neutral row rather than making the unit free or infinitely strong.
+const roster_row* row_or_null(uint16_t roster_type)
+{
+    const std::vector<roster_row>& t = unit_roster_table();
+    const std::size_t idx = static_cast<std::size_t>(roster_type);
+    return (idx < t.size()) ? &t[idx] : nullptr;
+}
+
+} // namespace
+
+unit_upkeep_draw resolve_unit_upkeep(const unit_component& u, const unit_upkeep_params& p)
+{
+    unit_upkeep_draw d;
+    const int heads = (u.count > 0) ? u.count : 0;
+    if (heads == 0)
+        return d;
+
+    const roster_row* row  = row_or_null(u.type);
+    const int         powr = row ? row->power_mod : 0;
+    const float       n    = static_cast<float>(heads);
+
+    d.credits = n * (p.credits_per_head
+                     + p.credits_per_head_per_power * static_cast<float>(powr));
+
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        const float per_head = p.goods_per_head[r];
+        if (per_head <= 0.0f)
+            continue;
+        d.goods[r]  = n * per_head;
+        d.any_goods = true;
+    }
+    return d;
+}
+
+int roster_type_quality_permille(uint16_t roster_type)
+{
+    const roster_row* row = row_or_null(roster_type);
+    // 1000 + power_mod: neutral for a levy, 1.38x for a rifle regiment. Floored
+    // at 1 so a hypothetical row with power_mod <= -1000 cannot produce zero or
+    // negative strength from a positive headcount.
+    const int q = 1000 + (row ? row->power_mod : 0);
+    return (q < 1) ? 1 : q;
+}
+
+int64_t unit_strength(const world& w, const unit_component& u)
+{
+    (void)w; // Reserved — see the declaration's @param note.
+    if (u.count <= 0)
+        return 0;
+
+    const int64_t heads   = static_cast<int64_t>(u.count);
+    const int64_t quality = static_cast<int64_t>(roster_type_quality_permille(u.type));
+    const int64_t supply  = std::clamp<int64_t>(u.supply_factor_permille, 0, 1000);
+
+    // count x (quality/1000) x (supply/1000) x 100, evaluated as ONE integer
+    // expression so there is no rounding step in the middle. At quality 1000 and
+    // supply 1000 this is exactly count * 100 (the documented scale anchor).
+    return heads * quality * supply / 10000;
+}
+
+army_stack_entry unit_to_stack_entry(const world& w, const unit_component& u)
+{
+    (void)w; // Reserved, for the same reason unit_strength takes it.
+
+    const roster_row* row = row_or_null(u.type);
+
+    army_stack_entry e;
+    e.type_id = u.type;                     // Opaque to combat.cpp by contract.
+    e.cls     = row ? row->cls : unit_class::infantry;
+
+    // Supply lands in the COUNT — the heads that can actually be put in the
+    // field — and quality in type_power_mod, which is where the resolver's
+    // matchup already expects it. Putting quality in both would square it
+    // against unit_strength.
+    const int64_t supply = std::clamp<int64_t>(u.supply_factor_permille, 0, 1000);
+    const int64_t heads  = (u.count > 0) ? static_cast<int64_t>(u.count) : 0;
+    e.count   = static_cast<int>(heads * supply / 1000);
+    e.type_power_mod = row ? row->power_mod : 0;
+    return e;
+}

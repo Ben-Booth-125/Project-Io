@@ -152,18 +152,22 @@ int rollup_body(const corp_rollups& r, int card, bool drillable)
     {
         if (r.budget_measured)
         {
-            // Six flows, not five: BL-343 added Levies — what enacted law took
-            // out of this quarter. It sits as its OWN bar rather than folded into
-            // maintenance, because the whole argument for the enforcement seam is
-            // that the player sees the tax as a number instead of as an
-            // unexplained worse price (law.hpp § the enforcement seam).
-            charts::bar fb[6] = {
+            // Seven flows now. BL-343 added Levies — what enacted law took out
+            // of this quarter — and BL-454 added Force: what the standing army
+            // costs to KEEP. Each sits as its OWN bar rather than folded into
+            // maintenance or wages, on the same argument: the whole point of the
+            // enforcement seam is that the player sees the tax as a number
+            // instead of as an unexplained worse price (law.hpp § the
+            // enforcement seam), and a force cost buried inside Wages is a term
+            // nobody can tune against.
+            charts::bar fb[7] = {
                 {r.budget.income,      palette::positive, "Income",      false},
                 {r.budget.expenditure, palette::negative, "Inputs",      false},
                 {r.budget.maintenance, IM_COL32(190, 150, 100, 255), "Maintenance", false},
                 {r.budget.wages,       IM_COL32(150, 160, 210, 255), "Wages",       false},
                 {r.budget.interest,    IM_COL32(200, 110, 160, 255), "Interest",    false},
                 {r.budget.levies,      IM_COL32(210, 175, 90, 255),  "Levies",      false},
+                {r.budget.upkeep,      IM_COL32(200, 130, 110, 255), "Force",       false},
             };
             float peak = 0.0f;
             for (const charts::bar& b : fb) peak = std::max(peak, b.value);
@@ -177,9 +181,24 @@ int rollup_body(const corp_rollups& r, int card, bool drillable)
             const float  cw    = ImGui::GetContentRegionAvail().x;
             ImGui::Dummy({cw, bar_h});
             charts::draw_bars(ImGui::GetWindowDrawList(), p, {p.x + cw, p.y + bar_h},
-                              fb, 6, ceiling, "%.1f");
+                              fb, 7, ceiling, "%.1f");
             ImGui::Spacing();
             ImGui::Text("Net this quarter: %+.1f", static_cast<double>(r.budget.net()));
+
+            // BL-454's force line. The UNMET part is called out explicitly: an
+            // army quietly weakening because its goods never arrived is exactly
+            // the thing the player must not have to infer from a falling
+            // strength number somewhere else. Silent when the corp fields no
+            // units, which is the common case today.
+            if (r.budget.force_units > 0)
+            {
+                if (r.budget.force_unsupplied > 0)
+                    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative),
+                                       "Force: %d units, %d UNSUPPLIED and weakening",
+                                       r.budget.force_units, r.budget.force_unsupplied);
+                else
+                    ImGui::Text("Force: %d units, all supplied", r.budget.force_units);
+            }
         }
         else
         {

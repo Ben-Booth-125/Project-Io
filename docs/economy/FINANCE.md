@@ -14,7 +14,7 @@ Code home: `src/world/budget_system.{hpp,cpp}`, breakdown struct in
 Once per economy tick (one quarter), `apply_budget` applies to every corporation:
 
 ```
-balance += income − expenditure − maintenance − wages − interest − levies
+balance += income − expenditure − maintenance − wages − interest − levies − upkeep
 ```
 
 - **Income / expenditure** — the market cash flows from `clear_markets`
@@ -23,10 +23,54 @@ balance += income − expenditure − maintenance − wages − interest − lev
 - **Interest** — the debt charge, zero while the balance is non-negative.
 - **Levies** — what enacted law took (BL-343, below). Zero unless a law is enacted
   that reaches this corp, which is the shipped default.
+- **Upkeep** — standing-force upkeep (BL-454, below). Zero at the shipped rates.
 
-The six flows are retained per corp in `corp_budget` (BL-072); its `net()` is exactly
+The seven flows are retained per corp in `corp_budget` (BL-072); its `net()` is exactly
 the delta applied to the balance, so the ledger can never disagree with the loop. The
 breakdown sink is optional — the headless harnesses skip it and take only the mutation.
+
+## Standing-force upkeep (BL-454)
+
+Until this, `w.units` appeared in `economy_system.cpp`, `budget_system.cpp` and
+`construction.cpp` **zero times**: `hire_unit` debited once and a regiment was then
+free forever, while every building beside it paid maintenance and wages every tick.
+
+Upkeep is **credits AND military goods** (Ben, 2026-08-17), so the cost is a **vector**,
+not a float — a credit wage plus a set of `{resource, qty}` draws. The two halves land
+in two different places on purpose:
+
+- The **credit** half is a money flow, so it is `apply_budget`'s own `upkeep` term —
+  deliberately *not* folded into `wages`, because a hidden term is a term nobody tunes
+  and the ledger has to be able to say what the army costs as against the factories.
+- The **goods** half is not money at all. It is a pool debit, run by `run_unit_upkeep`
+  (`economy_system.hpp`) against the owner's pool **on the unit's own body**, in
+  ascending unit id — the order is load-bearing, because two units of one corp on one
+  body draw the same stock and the order decides which goes short.
+
+Rates are authored in `scripts/economy.lua` under `economy.military.unit_upkeep`
+(`unit_upkeep_params`, declared with the roster in `world/unit_roster.hpp`, since the
+cost is per-type data). **Ordnance** is the good (BL-457 added it for this consumer);
+`food_rations` is the sanctioned second line. Both are authored at **zero on landing**,
+so the item ships inert and no shipped economy golden moved with it.
+
+**The shortfall rule is ONE rule with TWO triggers.** A pool can be empty, and when the
+goods do not arrive the unit *weakens* rather than vanishing. The unit's
+`supply_factor_permille` takes the same subtraction whether (a) it is beyond the reach
+field (BL-325 S3's out-of-supply decay) or (b) its draw went unmet. Same subtraction,
+same reason; a met draw and a unit in reach recover it. Deterministic scalar arithmetic,
+no RNG. Because the supply factor feeds `unit_strength` and the combat adapter, an
+unsupplied army is measurably weaker **in the resolver**, not merely more expensive.
+
+The pass also carries **orphan cleanup**: `demolish_building` erases the building, the
+corp asset and the building stockpile but never touches `w.units`, so demolishing a
+muster base used to orphan every unit raised there. Each unit records the
+`muster_base` it was raised at, and the pass disbands a unit whose base, tile or owner
+has been erased. A unit with no recorded muster base is never disbanded.
+
+Surfaced as its own **Force** bar in the Corporations dashboard's Finance card, with a
+force line beneath the net that calls the **unsupplied** count out explicitly, and as
+the upkeep block on the unit Selection card's Strength page.
+Check: `tools/verify/unit_upkeep.cpp`.
 
 ## Levies — the law enforcement seam (BL-343)
 

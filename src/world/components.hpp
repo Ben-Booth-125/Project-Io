@@ -597,14 +597,43 @@ struct population_centre_component
 /// struct shipped with a `body` field ahead of that ruling — `position`
 /// (BL-324, 2026-08-08) is the fix, landed with the hire-unit item that first
 /// needed tile grain rather than deferring it back to BL-157.
+/// BL-459 (2026-08-17) REMOVED the stored `strength` field. It was documented as
+/// a "fixed-point combat strength scalar" and BOTH writers set it to the same
+/// value as `count` — a literal duplicate kept in sync by hand, with nothing
+/// enforcing it. Strength is now DERIVED, never stored:
+///
+///     strength = count x roster_type_quality x supply_factor   (x100 fixed point)
+///
+/// computed by `unit_strength(world, unit_component)` in world/unit_roster.hpp.
+/// A stored writable field would let the duplicate come straight back, so the
+/// field is gone rather than merely deprecated. `count` stays the honest
+/// headcount; `supply_factor_permille` is the only new state, and it is written
+/// by BL-454's upkeep pass, not by the hire path.
 struct unit_component
 {
     entity_id position;      ///< Tile the unit currently occupies (BL-157: tile-canonical).
     entity_id owner;         ///< Corporation or faction entity that controls this unit.
     int       count;         ///< Number of units in the group.
     uint16_t  type = 0;      ///< Opaque roster-type index; see combat.hpp's army_stack_entry.
-    int32_t   strength = 0;  ///< Fixed-point combat strength scalar (BL-157). Not a stat block —
-                              ///< a single number, same spirit as building_component's own scalars.
+
+    /// BL-454. How well this unit is supplied, per-mille (1000 = fully supplied).
+    /// Lowered by the ONE decay rule with TWO triggers in the upkeep pass
+    /// (economy_system.cpp § run_unit_upkeep): the unit is beyond the reach field,
+    /// or its upkeep goods draw went unmet. Both are the same subtraction for the
+    /// same reason — an army that is not being supplied gets weaker — so they are
+    /// deliberately not two rules. Feeds `unit_strength` and the combat adapter,
+    /// so an unsupplied army is measurably weaker IN THE RESOLVER, not merely
+    /// more expensive.
+    int32_t   supply_factor_permille = 1000;
+
+    /// BL-454. The military_base this unit was mustered at, or `null_entity` for
+    /// a unit that predates the muster rule (the hard-coded world's stub). The
+    /// ORPHAN KEY: `demolish_building` erases the building, the corp asset and the
+    /// stockpile but never touches `w.units`, so demolishing a muster base used to
+    /// leave every unit raised there orphaned. The upkeep pass is the only place
+    /// that can see it; it disbands a unit whose muster base has been erased.
+    /// Null means "no muster base recorded" and is never orphaned.
+    entity_id muster_base = null_entity;
 };
 
 // ---------------------------------------------------------------------------

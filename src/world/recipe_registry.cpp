@@ -318,6 +318,27 @@ void recipe_registry::load_from_lua(lua_state& lua)
         // BL-394: hire_unit's credit cost (floor + power-scaled component).
         mp.hire_base_cost      = military->get_or("hire_base_cost",      mp.hire_base_cost);
         mp.hire_cost_per_power = military->get_or("hire_cost_per_power", mp.hire_cost_per_power);
+
+        // BL-454: standing-force upkeep (economy.military.unit_upkeep). Absent
+        // table = every rate zero = the pre-BL-454 arithmetic, unchanged.
+        sol::optional<sol::table> upk = (*military)["unit_upkeep"];
+        if (upk)
+        {
+            unit_upkeep_params up;
+            up.credits_per_head           = upk->get_or("credits_per_head",           up.credits_per_head);
+            up.credits_per_head_per_power = upk->get_or("credits_per_head_per_power", up.credits_per_head_per_power);
+            up.supply_decay_permille      = upk->get_or("supply_decay_permille",      up.supply_decay_permille);
+            up.supply_recovery_permille   = upk->get_or("supply_recovery_permille",   up.supply_recovery_permille);
+            up.out_of_supply_reach        = upk->get_or("out_of_supply_reach",        up.out_of_supply_reach);
+            // The goods half of the cost VECTOR, authored as an ordinary
+            // {resource_name = qty} table so naming the good (ordnance, rations)
+            // is a data change and never a code change.
+            sol::optional<sol::table> goods = (*upk)["goods_per_head"];
+            if (goods)
+                read_resource_map(*goods, up.goods_per_head, "military.unit_upkeep.goods_per_head");
+            mp.upkeep = up;
+        }
+
         m_military = mp;
     }
 

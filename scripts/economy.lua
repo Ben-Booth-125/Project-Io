@@ -207,6 +207,45 @@ economy = {
         -- BL-377's contract loop, not decided here.
         hire_base_cost      = 40.0,
         hire_cost_per_power = 0.5,
+
+        -- BL-454: standing-force UPKEEP — what it costs to KEEP a unit, as
+        -- against hire_* above, which is what it costs to raise one. Before
+        -- this, `w.units` appeared in the economy, budget and construction
+        -- systems exactly zero times: a regiment was debited once and was then
+        -- free forever, while every building beside it paid maintenance and
+        -- wages every tick.
+        --
+        -- Upkeep is credits AND military goods (Ben, 2026-08-17), so the cost
+        -- is a VECTOR: a credit wage plus a set of {resource, qty} draws
+        -- against the corp's pool on the unit's own body. When the goods do not
+        -- arrive the unit WEAKENS rather than vanishing — one decay rule with
+        -- two triggers (out of reach, or the draw went unmet), which is the
+        -- same subtraction for the same reason.
+        --
+        -- EVERY RATE IS ZERO ON LANDING, deliberately. The item ships INERT so
+        -- no shipped economy golden moves on landing and the pricing can be
+        -- tuned by playtest against a measured baseline rather than guessed
+        -- here. Turning it on is this table, not a code change.
+        unit_upkeep = {
+            credits_per_head           = 0.0,  -- flat wage per head per tick
+            credits_per_head_per_power  = 0.0, -- wage scaled by the roster row's power_mod
+
+            -- The goods half of the vector, per head per tick. ORDNANCE is the
+            -- good (BL-457 added it as the roster's first terminal MILITARY
+            -- good precisely so this draw could consume it); food_rations is
+            -- the sanctioned second line. Both are named here, at ZERO, so
+            -- turning upkeep on is editing a number rather than adding a line
+            -- — and so a reader can see what the draw WILL be. A zero entry is
+            -- skipped by the pass exactly as an absent one is.
+            goods_per_head = {
+                ordnance     = 0.0,
+                food_rations = 0.0,
+            },
+
+            supply_decay_permille    = 0,   -- the ONE decay subtraction, per tick
+            supply_recovery_permille = 0,   -- regained per tick while supplied
+            out_of_supply_reach      = 0.0, -- reach cost past which a unit is out of supply; <= 0 disables
+        },
     },
 
     -- BL-350: the procurement/contract seam — "a build order placed with

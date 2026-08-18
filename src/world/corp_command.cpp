@@ -429,19 +429,24 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             // base under construction (ticks_remaining > 0) or a decommissioned
             // one does not qualify, mirroring the completed-hub idiom
             // (supply_system.cpp's inland_logistics_hub check).
+            entity_id muster_base = null_entity;
             {
-                bool has_muster_base = false;
+                // BL-454: the WINNING base id is captured, not just a bool — it
+                // becomes the unit's `muster_base`, the key the upkeep pass uses
+                // to disband a unit whose base has been demolished. Lowest id
+                // wins rather than first-found, because w.buildings is an
+                // unordered_map and "first" is not a defined answer.
                 for (const auto& [bid, bc] : w.buildings)
                 {
                     if (bc.tile == cmd.tile && bc.type == building_type::military_base
                         && bc.ticks_remaining <= 0 && !bc.decommissioned
                         && owns(w, cmd.corp, bid))
                     {
-                        has_muster_base = true;
-                        break;
+                        if (muster_base == null_entity || bid < muster_base)
+                            muster_base = bid;
                     }
                 }
-                if (!has_muster_base)
+                if (muster_base == null_entity)
                     return corp_command_result::rejected_placement;
             }
 
@@ -466,12 +471,19 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             payer.balance -= hire_cost;
 
             const entity_id unit = w.create_entity();
+            // BL-459: no `strength` — it was set to the same value as `count`,
+            // a literal duplicate kept in sync by hand. Strength is derived
+            // (unit_strength, unit_roster.hpp) from count x the row's quality x
+            // the supply factor, so a heavy row is genuinely worth more than a
+            // levy at equal headcount and an unsupplied army is measurably
+            // weaker in the resolver.
             w.units[unit] = unit_component{
                 .position = cmd.tile,
                 .owner    = cmd.corp,
                 .count    = hire_batch_manpower,
                 .type     = cmd.unit_type,
-                .strength = hire_batch_manpower,
+                .supply_factor_permille = 1000, // raised fully supplied (BL-454)
+                .muster_base            = muster_base,
             };
             if (out_building)
                 *out_building = unit;

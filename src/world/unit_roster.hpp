@@ -32,8 +32,10 @@
 // Both are recorded on the row so a reader can see what is standing in for what.
 
 #include "combat.hpp"
+#include "components.hpp" // resource_count, unit_component (the upkeep vector)
 #include "entity.hpp"
 
+#include <array>
 #include <cstdint>
 #include <vector>
 
@@ -134,3 +136,121 @@ std::vector<army_stack_entry> roster_stack(int64_t     manpower,
 /// Map a polity's military capacity band (1-6, the ladder's own numbering) onto
 /// its roster band. This is the ONE place the two numberings meet.
 roster_band roster_band_for_capacity(int military_capacity);
+
+// ===========================================================================
+// BL-454 / BL-459 — standing-force upkeep and derived strength
+// ===========================================================================
+//
+// Until BL-454, `w.units` appeared in economy_system.cpp, budget_system.cpp and
+// construction.cpp exactly ZERO times: hire_unit debited once and the regiment
+// was then free forever, while every building beside it paid maintenance and
+// wages every tick. Upkeep is credits AND military goods (Ben, 2026-08-17), so
+// the cost is a VECTOR from the start — a float with goods bolted on later is a
+// rewrite, not an extension.
+//
+// The per-type data belongs to the ROSTER, so it lives here rather than being
+// invented in the economy step. What the economy step owns is the PASS (drawing
+// the pool, applying the decay); what the budget owns is the CREDIT term.
+
+/// Per-tick standing-force upkeep rates, authored in scripts/economy.lua under
+/// `economy.military.unit_upkeep`. Reached through
+/// `recipe_registry::military().upkeep`.
+///
+/// EVERY RATE DEFAULTS TO ZERO. The item lands INERT: with the rates at zero no
+/// credit is charged, no pool is drawn, no draw can go unmet, and (with
+/// `out_of_supply_reach` at zero, which disables the reach trigger entirely)
+/// no unit's supply factor ever moves. That is what lets the shipped economy
+/// goldens be re-blessed honestly — the only thing that moves at zero rates is
+/// the world state hash, because `unit_component` gained two fields.
+struct unit_upkeep_params
+{
+    /// Credits per head per tick, flat. The wage half of the vector.
+    float credits_per_head = 0.0f;
+
+    /// Credits per head per tick, scaled by the roster row's `power_mod`
+    /// (per-mille, 0..420 across the shipped table) — the same "floor plus a
+    /// power-scaled component" shape BL-394 gave the hire cost, so a heavy row
+    /// costs more to keep as well as more to raise.
+    float credits_per_head_per_power = 0.0f;
+
+    /// Goods drawn per head per tick, resource-indexed — the goods half of the
+    /// vector, authored as an ordinary `{resource_name = qty}` table.
+    ///
+    /// ORDNANCE IS THE GOOD (Ben, 2026-08-17) — BL-457 added `resource_type::
+    /// ordnance` as the roster's first terminal MILITARY good for exactly this
+    /// consumer, and chain_depth.cpp's actor-consumed exemption names this pass
+    /// by name. It is authored as DATA rather than hard-coded here so that
+    /// naming a good is a one-line economy.lua change and never a code change;
+    /// `food_rations` is the sanctioned second line. Both are authored at ZERO
+    /// on landing — see the struct comment.
+    std::array<float, resource_count> goods_per_head = {};
+
+    /// The ONE decay rule's subtraction, per-mille of supply factor per tick.
+    /// Applied when EITHER trigger fires: the unit is out of reach, or its goods
+    /// draw went unmet. Same subtraction, same reason — not two rules.
+    int supply_decay_permille = 0;
+
+    /// Recovery per tick, per-mille, while neither trigger fires. Ceilinged at
+    /// 1000 (fully supplied).
+    int supply_recovery_permille = 0;
+
+    /// Trigger (a) — BL-325 S3's out-of-supply decay. A unit whose tile's
+    /// logistics reach cost exceeds this (or which is unreachable outright) is
+    /// out of supply. ZERO OR BELOW DISABLES THE TRIGGER ENTIRELY, which also
+    /// means the reach field is never built from the upkeep pass at the default
+    /// rates — the Dijkstra cost is opt-in.
+    float out_of_supply_reach = 0.0f;
+};
+
+/// One unit's resolved upkeep for one tick — the cost VECTOR, not a float.
+struct unit_upkeep_draw
+{
+    float credits = 0.0f;                              ///< Charged by apply_budget (its own term).
+    std::array<float, resource_count> goods = {};      ///< Drawn from the (owner, body) pool.
+    bool  any_goods = false;                           ///< True iff some entry of `goods` is > 0.
+};
+
+/// Resolve @p u's upkeep for one tick against @p p and the roster row @p u.type
+/// names. A `type` outside the table resolves against a zero-power row rather
+/// than failing — an unknown roster index is a data problem, not a reason to
+/// make a unit free.
+unit_upkeep_draw resolve_unit_upkeep(const unit_component& u, const unit_upkeep_params& p);
+
+/// The per-type quality scalar of BL-459's formula, per-mille (1000 = neutral).
+/// DERIVED from the row's `power_mod` rather than authored as a second number,
+/// so there is exactly one per-type quality figure and it cannot drift from the
+/// one combat already reads. Levy Spear (power_mod 0) is 1000; Rifle Regiment
+/// (power_mod 380) is 1380.
+int roster_type_quality_permille(uint16_t roster_type);
+
+/// BL-459. A unit's combat strength, DERIVED — there is no stored field:
+///
+///     strength = count x roster_type_quality x supply_factor   (x100 fixed point)
+///
+/// Integral throughout (the x100 fixed point makes that natural), so a caller
+/// may accumulate strengths over an unordered container without the float
+/// non-associativity that would make the sum order-dependent — which
+/// condition_set.cpp's `military_strength` subject relies on.
+///
+/// SCALE ANCHOR: at quality 1.0 and full supply, `strength == count * 100`
+/// exactly.
+///
+/// @param w Reserved. The roster is one global table today, so nothing here
+///          reads the world; the parameter is the seam for the per-era /
+///          per-polity roster BL-274 already anticipates, and it keeps every
+///          call site from having to change when that lands.
+int64_t unit_strength(const world& w, const unit_component& u);
+
+/// BL-459's ADAPTER — the only place the roster meets combat. Both resolvers
+/// (`resolve_battle`, `resolve_campaign_battle`) take fully-resolved
+/// `army_stack_entry` values and deliberately never look a roster up
+/// (combat.hpp's own stated boundary), and until now NOTHING converted a live
+/// `unit_component` into one, so no unit in `w.units` could reach a battle at
+/// all.
+///
+/// Supply is carried in the entry's `count` (the headcount that can actually be
+/// put in the field) and quality in `type_power_mod` (the row's own modifier,
+/// which is what the resolver's matchup expects). Deliberately NOT both in one
+/// place: doubling quality into count as well would square it against
+/// `unit_strength`.
+army_stack_entry unit_to_stack_entry(const world& w, const unit_component& u);

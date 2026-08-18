@@ -1334,21 +1334,61 @@ std::vector<unit_page> unit_pages(const world& w, entity_id id)
     return pages;
 }
 
-// Strength page: strength + count. NOTE (logged NEEDS_REVIEW): components.hpp
-// documents unit_component::strength as a "fixed-point combat strength scalar
-// (BL-157)", but every writer in the codebase today (corp_command.cpp's
-// hire_unit, corporation_generation.cpp, hard_coded_world.cpp) sets it equal
-// to the raw manpower count with no scale factor, and the existing hover-card
-// reader (entity_summary.cpp's draw_unit_summary) prints it raw too — so this
-// prints the raw value rather than guessing a divisor that would disagree
-// with the one other place in the UI that already shows this number.
-void draw_unit_strength_page(const unit_component& u)
+// Strength page: the DERIVED strength, its two multipliers, and what the unit
+// costs to keep.
+//
+// The NEEDS_REVIEW note this comment used to carry is resolved: strength was a
+// stored duplicate of `count` (every writer set the two equal), and BL-459
+// removed the stored field. It is computed now — count x the roster row's
+// quality x the unit's supply factor, x100 fixed point — so the page shows the
+// derivation rather than one opaque number the player cannot account for.
+//
+// BL-454 adds the upkeep line beneath it: a unit's per-tick credit wage and its
+// goods draw. Both read the SAME resolve_unit_upkeep the budget and the unit
+// pass read, so the card cannot disagree with the money.
+void draw_unit_strength_page(const world& w, const recipe_registry& reg, const unit_component& u)
 {
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Strength");
-    ImGui::Text("%d", u.strength);
+    ImGui::Text("%lld", static_cast<long long>(unit_strength(w, u)));
+    ImGui::TextDisabled("%d x %.2f quality x %.2f supply",
+                        u.count,
+                        roster_type_quality_permille(u.type) / 1000.0f,
+                        u.supply_factor_permille / 1000.0f);
+
     ImGui::Spacing();
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Count");
     ImGui::Text("%d", u.count);
+
+    // Supply: called out only when it is NOT full, so a healthy unit spends no
+    // space on a line that always says the same thing.
+    if (u.supply_factor_permille < 1000)
+    {
+        ImGui::Spacing();
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Supply");
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative),
+                           "%.0f%% — unsupplied, weakening",
+                           u.supply_factor_permille / 10.0f);
+    }
+
+    // Upkeep (BL-454): the credit wage plus every good actually drawn. Silent
+    // when no rate is authored, which is the shipped default — an all-zero
+    // upkeep line would be chrome that says nothing.
+    const unit_upkeep_draw d = resolve_unit_upkeep(u, reg.military().upkeep);
+    if (d.credits > 0.0f || d.any_goods)
+    {
+        ImGui::Spacing();
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Upkeep / tick");
+        if (d.credits > 0.0f)
+            ImGui::Text("%.1f cr", static_cast<double>(d.credits));
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            if (d.goods[r] <= 0.0f)
+                continue;
+            ImGui::Text("%.2f %s",
+                        static_cast<double>(d.goods[r]),
+                        resource_name(static_cast<resource_type>(r)));
+        }
+    }
 }
 
 // Roster page: type name (real lookup, see unit_roster_display_name) + owner
@@ -1364,7 +1404,7 @@ void draw_unit_roster_page(const world& w, const unit_component& u)
     ImGui::Text("%s", cit != w.corporations.end() ? cit->second.name.c_str() : "\xe2\x80\x94");
 }
 
-void draw_unit_page(const world& w, entity_id id, unit_page_kind kind)
+void draw_unit_page(const world& w, const recipe_registry& reg, entity_id id, unit_page_kind kind)
 {
     const auto uit = w.units.find(id);
     if (uit == w.units.end())
@@ -1374,8 +1414,9 @@ void draw_unit_page(const world& w, entity_id id, unit_page_kind kind)
     }
     switch (kind)
     {
-        case unit_page_kind::strength: draw_unit_strength_page(uit->second);    break;
-        case unit_page_kind::roster:   draw_unit_roster_page(w, uit->second);   break;
+        // BL-454: the strength page now reads the registry, for the upkeep line.
+        case unit_page_kind::strength: draw_unit_strength_page(w, reg, uit->second); break;
+        case unit_page_kind::roster:   draw_unit_roster_page(w, uit->second);        break;
     }
 }
 
@@ -1386,7 +1427,7 @@ namespace {
 // read-only (a unit is not yet operable) and with only "Go to" wired for real
 // in the action grid, the rest reserved (matching the tile/building cards'
 // own reserved-slot idiom).
-void draw_unit_selection_body(const world& w, ui_state& ui)
+void draw_unit_selection_body(const world& w, const recipe_registry& reg, ui_state& ui)
 {
     const entity_id sel = ui.selected_entity;
     const auto uit = w.units.find(sel);
@@ -1461,7 +1502,7 @@ void draw_unit_selection_body(const world& w, ui_state& ui)
             ImGui::Spacing();
             ImGui::BeginChild("##unit_page_body", {0.0f, 0.0f}, false,
                               ImGuiWindowFlags_NoSavedSettings);
-            draw_unit_page(w, sel, up.kind);
+            draw_unit_page(w, reg, sel, up.kind);
             ImGui::EndChild();
         }
 
@@ -2072,7 +2113,7 @@ void draw_selection_content(world& w, const recipe_registry& reg,
     // than the generic action|facts split — see draw_unit_selection_body.
     if (kind == selection_kind::unit)
     {
-        draw_unit_selection_body(w, ui);
+        draw_unit_selection_body(w, reg, ui);
         return;
     }
 
