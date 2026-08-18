@@ -354,7 +354,7 @@ void draw_tile_derivation(const world& w, const generation_record& rec,
 
     ImGui::TextWrapped("Rolled from the (%s, %s) deposit profile, then post-multiplied by "
                        "the abundance scalar (x%.2f), the Planetology endowment, and the ore-"
-                       "province field. Those multiplies draw no RNG, so the figure above is "
+                       "region field. Those multiplies draw no RNG, so the figure above is "
                        "the roll times a known set of factors - not a separate draw.",
                        composition_name(t.composition), landform_name(t.landform),
                        static_cast<double>(entry.tiles.deposit_scalar));

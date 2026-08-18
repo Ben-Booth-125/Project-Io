@@ -6,13 +6,13 @@
 // src/world/settlement.cpp, over the real generated world.
 //
 //   S1  DETERMINISM. The pass is a pure function of (seed, tiles, creeds): the
-//       same world generated twice yields identical provinces, cultures,
+//       same world generated twice yields identical regions, cultures,
 //       industrialisation dates, checkpoints and lacunae. The standing
 //       invariant everything else answers to.
 //
-//   S2  BELIEF IS MAPPED ONTO GROUND. Every province carries a culture index
+//   S2  BELIEF IS MAPPED ONTO GROUND. Every region carries a culture index
 //       into the creeds' pantheon list, and it is the NEAREST cradle's — not a
-//       per-province re-roll. A province whose people raised a forge god and
+//       per-region re-roll. A region whose people raised a forge god and
 //       whose window holds ore must not be indistinguishable from one that has
 //       neither.
 //
@@ -20,17 +20,17 @@
 //       axes must track the quantities they are declared to derive from:
 //       expansionism against the border-contest integral, ideology against
 //       industrialisation timing, economic_focus against the resource class of
-//       the provinces settled during industrialisation. If these are
+//       the regions settled during industrialisation. If these are
 //       independent of the settlement record, the rewrite did not happen.
 //
 //   S4  THE SEEDS ARE THE PROVINCES. nation_params::seed_tiles must actually
-//       be consumed — every province anchor is owned by SOME nation, and the
+//       be consumed — every region anchor is owned by SOME nation, and the
 //       political map is different from the random-placement one. "Seeding
 //       changes, expansion does not."
 //
 //   S5  THE RECORD CAN BE DESTROYED, AND THE HOLE IS VISIBLE. Where a war
 //       fires, lines are erased and a dated lacuna replaces them; the count is
-//       reported rather than hidden. A conquered province keeps its FOUNDERS
+//       reported rather than hidden. A conquered region keeps its FOUNDERS
 //       in founding_culture and its conquerors in culture, so the erasure is
 //       of the record, never of the fact.
 //
@@ -39,7 +39,7 @@
 //       branch labels are drawn only from the three designed ones, and no
 //       rupture leaves a nation with zero tiles.
 //
-//   S7  BL-219's READ. focus_from_province is a pure function of the province's
+//   S7  BL-219's READ. focus_from_region is a pure function of the region's
 //       ancient endowment and its industrialisation timing, and the movement
 //       UP the value chain fires only for early industrialisers.
 //
@@ -77,16 +77,16 @@ const generation_report::body_entry* kepler_of(const generation_report& r)
     return nullptr;
 }
 
-bool same_provinces(const settlement_state& a, const settlement_state& b)
+bool same_regions(const settlement_state& a, const settlement_state& b)
 {
-    if (a.provinces.size() != b.provinces.size()) return false;
+    if (a.regions.size() != b.regions.size()) return false;
     if (a.lacunae != b.lacunae) return false;
     if (a.median_industrial_year != b.median_industrial_year) return false;
     if (a.checkpoints.size() != b.checkpoints.size()) return false;
-    for (std::size_t i = 0; i < a.provinces.size(); ++i)
+    for (std::size_t i = 0; i < a.regions.size(); ++i)
     {
-        const province& p = a.provinces[i];
-        const province& q = b.provinces[i];
+        const region& p = a.regions[i];
+        const region& q = b.regions[i];
         if (p.anchor != q.anchor || p.culture != q.culture
          || p.founding_culture != q.founding_culture
          || p.dominant != q.dominant || p.name != q.name
@@ -127,47 +127,47 @@ int main()
     const settlement_state& s2 = k2->settlement;
 
     // --- S1 determinism --------------------------------------------------------
-    check(!s1.provinces.empty(), "S1a  Kepler settles at least one province");
-    check(same_provinces(s1, s2),
+    check(!s1.regions.empty(), "S1a  Kepler settles at least one region");
+    check(same_regions(s1, s2),
           "S1b  two generations of the same seed produce an identical settlement record");
 
     // --- S2 belief mapped onto ground -----------------------------------------
     {
         bool all_have_culture = true;
-        for (const province& p : s1.provinces)
+        for (const region& p : s1.regions)
             if (p.culture < 0 || p.founding_culture < 0) { all_have_culture = false; break; }
-        check(all_have_culture, "S2a  every province carries a cradle culture (whose gods it keeps)");
+        check(all_have_culture, "S2a  every region carries a cradle culture (whose gods it keeps)");
 
-        // More than one culture reaches the map: if every province inherited the
+        // More than one culture reaches the map: if every region inherited the
         // same pantheon the mapping is decorative rather than geographic.
         std::vector<int> seen;
-        for (const province& p : s1.provinces)
+        for (const region& p : s1.regions)
             if (std::find(seen.begin(), seen.end(), p.founding_culture) == seen.end())
                 seen.push_back(p.founding_culture);
         check(seen.size() >= 2,
               "S2b  the pantheons are distributed across the map, not uniform");
 
-        // The endowment actually separates provinces into classes.
+        // The endowment actually separates regions into classes.
         bool ore = false, farm = false, other = false;
-        for (const province& p : s1.provinces)
+        for (const region& p : s1.regions)
         {
-            if (p.dominant == province_class::ore) ore = true;
-            else if (p.dominant == province_class::farm) farm = true;
+            if (p.dominant == region_class::ore) ore = true;
+            else if (p.dominant == region_class::farm) farm = true;
             else other = true;
         }
         check((ore || farm) && (ore + farm + other) >= 2,
-              "S2c  ancient deposits separate provinces into more than one class");
+              "S2c  ancient deposits separate regions into more than one class");
 
         int hist[5] = { 0, 0, 0, 0, 0 };
         int q_farm = 0, q_ore = 0, q_energy = 0, q_port = 0;
-        for (const province& p : s1.provinces)
+        for (const region& p : s1.regions)
         {
             ++hist[static_cast<std::size_t>(p.dominant)];
             q_farm += p.farm_q; q_ore += p.ore_q; q_energy += p.energy_q; q_port += p.port_q;
         }
-        const int n = std::max<int>(1, static_cast<int>(s1.provinces.size()));
+        const int n = std::max<int>(1, static_cast<int>(s1.regions.size()));
         std::printf("      (classes: %d none / %d farm / %d ore / %d energy / %d port"
-                    "; mean q: farm %d ore %d energy %d port %d over %d provinces)\n",
+                    "; mean q: farm %d ore %d energy %d port %d over %d regions)\n",
                     hist[0], hist[1], hist[2], hist[3], hist[4],
                     q_farm / n, q_ore / n, q_energy / n, q_port / n, n);
     }
@@ -176,12 +176,12 @@ int main()
     {
         // Ideology must track industrialisation timing: the nation holding the
         // EARLIEST furnace cannot be the late-industrialiser archetype, and a
-        // nation with no industrial province at all must read isolationist.
+        // nation with no industrial region at all must read isolationist.
         int earliest_idx = -1;
         int64_t earliest = 1 << 30;
-        for (std::size_t i = 0; i < s1.provinces.size(); ++i)
+        for (std::size_t i = 0; i < s1.regions.size(); ++i)
         {
-            const province& p = s1.provinces[i];
+            const region& p = s1.regions[i];
             if (!p.industrialised || p.nation < 0) continue;
             if (p.industrial_year < earliest) { earliest = p.industrial_year; earliest_idx = static_cast<int>(i); }
         }
@@ -191,11 +191,11 @@ int main()
         {
             // Find that nation and assert it did NOT come out authoritarian
             // (the late catch-up archetype) or isolationist (never industrialised).
-            const int ni = s1.provinces[static_cast<std::size_t>(earliest_idx)].nation;
+            const int ni = s1.regions[static_cast<std::size_t>(earliest_idx)].nation;
             int walked = 0;
             for (const auto& kv : w1.nations)
             {
-                // Provinces store an index into generate_nations' return order,
+                // Regions store an index into generate_nations' return order,
                 // which the report does not carry; instead assert the weaker but
                 // still load-bearing property below.
                 (void)kv;
@@ -230,18 +230,18 @@ int main()
         check(any_contested, "S3c  the border-contest integral reaches the expansionism axis");
     }
 
-    // --- S4 the seeds are the provinces ---------------------------------------
+    // --- S4 the seeds are the regions ---------------------------------------
     {
-        // Every province anchor is on land owned by somebody: the political pass
+        // Every region anchor is on land owned by somebody: the political pass
         // grew from these tiles, so an unowned anchor would mean the seed list
         // was ignored.
         int unowned = 0, owned = 0;
-        for (const province& p : s1.provinces)
+        for (const region& p : s1.regions)
         {
             if (p.nation >= 0) ++owned; else ++unowned;
         }
         check(owned > 0 && unowned * 4 <= owned,
-              "S4a  province anchors are the nation seeds (the vast majority are owned)");
+              "S4a  region anchors are the nation seeds (the vast majority are owned)");
         check(static_cast<int>(w1.nations.size()) >= 2,
               "S4b  the political map still produced a multipolar world");
     }
@@ -250,11 +250,11 @@ int main()
     {
         // Lacunae are only produced by a war branch. If no war fired this seed
         // the count is legitimately zero — assert the INVARIANT instead of the
-        // outcome: a conquered province keeps its founders, and the lacuna count
+        // outcome: a conquered region keeps its founders, and the lacuna count
         // is never negative or unexplained.
         bool founders_kept = true;
         int conquered = 0;
-        for (const province& p : s1.provinces)
+        for (const region& p : s1.regions)
         {
             if (!p.creed_conquered) continue;
             ++conquered;
@@ -262,7 +262,7 @@ int main()
                 founders_kept = false;
         }
         check(founders_kept,
-              "S5a  a conquered province keeps its founders and records its conquerors");
+              "S5a  a conquered region keeps its founders and records its conquerors");
         check(s1.lacunae >= 0, "S5b  the lacuna count is reported, not hidden");
 
         bool war_fired = false;
@@ -270,7 +270,7 @@ int main()
             if (c.branch_taken == "war") war_fired = true;
         check(!war_fired || conquered >= 0,
               "S5c  a war that fired is consistent with the conquest bookkeeping");
-        std::printf("      (seed 0: %d checkpoints, %d conquered provinces, %d lines erased)\n",
+        std::printf("      (seed 0: %d checkpoints, %d conquered regions, %d lines erased)\n",
                     static_cast<int>(s1.checkpoints.size()), conquered, s1.lacunae);
     }
 
@@ -295,33 +295,33 @@ int main()
 
     // --- S7 BL-219's read ------------------------------------------------------
     {
-        province ore_late;
-        ore_late.dominant = province_class::ore;
+        region ore_late;
+        ore_late.dominant = region_class::ore;
         ore_late.industrialised = true;
         ore_late.industrial_year = 1900;
 
-        province ore_early = ore_late;
+        region ore_early = ore_late;
         ore_early.industrial_year = 1780;
 
-        province port_never;
-        port_never.dominant = province_class::port;
+        region port_never;
+        port_never.dominant = region_class::port;
 
         const int64_t median = 1850;
-        check(focus_from_province(ore_late, median) == industrial_focus::extraction,
-              "S7a  a late-industrialising ore province stays extraction-heavy");
-        check(focus_from_province(ore_early, median) == industrial_focus::processing,
+        check(focus_from_region(ore_late, median) == industrial_focus::extraction,
+              "S7a  a late-industrialising ore region stays extraction-heavy");
+        check(focus_from_region(ore_early, median) == industrial_focus::processing,
               "S7b  an early industrialiser moves one tier UP the value chain");
-        check(focus_from_province(port_never, median) == industrial_focus::trade,
-              "S7c  a harbour province with no furnaces reads as trade");
+        check(focus_from_region(port_never, median) == industrial_focus::trade,
+              "S7c  a harbour region with no furnaces reads as trade");
 
         // The world-level diversity floor (BL-349, softened 2026-08-10).
         //
         // THIS USED TO ASSERT ALL THREE CLASSES REPRESENTED, and that asserted
         // something corporation_generation.cpp explicitly declines to promise:
         // "the last attempt's emergent set stands rather than being patched — an
-        // unmet floor is HONEST". The reroll only re-picks provinces inside a
+        // unmet floor is HONEST". The reroll only re-picks regions inside a
         // corp's own home nation, so the floor is simply unmeetable when no
-        // corp's nation holds a processing-capable province — which is a fact
+        // corp's nation holds a processing-capable region — which is a fact
         // about who owns what after an unrelated generation change, not about
         // corporations at all.
         //
@@ -332,7 +332,7 @@ int main()
         // value. The implementer volunteered that, which is the only reason it
         // was ever visible.
         //
-        // What is asserted now is the property that does NOT depend on province
+        // What is asserted now is the property that does NOT depend on region
         // ownership: the corporation set is not a MONOCULTURE. An all-one-focus
         // world is a real defect in the derivation; a world missing one of three
         // classes is the generator being honest about the ground it was given.
@@ -353,7 +353,7 @@ int main()
 
     // --- Seed spread: the pass must not depend on one lucky world -------------
     {
-        int worlds = 0, with_provinces = 0, with_ruptures = 0, with_lacunae = 0;
+        int worlds = 0, with_regions = 0, with_ruptures = 0, with_lacunae = 0;
         for (int s = 0; s < 6; ++s)
         {
             world_params p;
@@ -369,12 +369,12 @@ int main()
             const generation_report::body_entry* k = kepler_of(rr);
             if (!k) continue;
             ++worlds;
-            if (!k->settlement.provinces.empty()) ++with_provinces;
+            if (!k->settlement.regions.empty()) ++with_regions;
             if (!k->settlement.checkpoints.empty()) ++with_ruptures;
             if (k->settlement.lacunae > 0) ++with_lacunae;
         }
-        check(worlds > 0 && with_provinces == worlds,
-              "S8a  every seed in the spread settles provinces");
+        check(worlds > 0 && with_regions == worlds,
+              "S8a  every seed in the spread settles regions");
         check(with_ruptures > 0, "S8b  the rupture checkpoints fire across the spread");
         std::printf("      (%d/%d worlds lost part of their record to a war)\n",
                     with_lacunae, worlds);

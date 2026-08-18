@@ -16,7 +16,7 @@
 namespace
 {
 
-// Gates are thresholds on the province endowment windows the settlement pass
+// Gates are thresholds on the region endowment windows the settlement pass
 // already surveyed, so nothing here needs a new generation input.
 const std::vector<roster_row> g_table = {
     // --- Classical (ladder T1): massed iron infantry, siegecraft -----------
@@ -51,7 +51,7 @@ const std::vector<roster_row> g_table = {
     {"Mechanised Column", roster_band::industrial, unit_class::cavalry,{750,  0,   0, 700}, 420, 160},
 };
 
-/// The shared primitive both gate paths (province, campaign) funnel through —
+/// The shared primitive both gate paths (region, campaign) funnel through —
 /// a threshold check against four 0-1000 axis values, whatever supplied them.
 bool gate_met(const roster_gate& g, int ore_q, int farm_q, int port_q, int energy_q)
 {
@@ -62,7 +62,7 @@ bool gate_met(const roster_gate& g, int ore_q, int farm_q, int port_q, int energ
     return true;
 }
 
-bool gate_met(const roster_gate& g, const province& p)
+bool gate_met(const roster_gate& g, const region& p)
 {
     return gate_met(g, p.ore_q, p.farm_q, p.port_q, p.energy_q);
 }
@@ -81,7 +81,7 @@ roster_band roster_band_for_capacity(int military_capacity)
     return roster_band::industrial;
 }
 
-std::vector<const roster_row*> available_rows(const province& p, roster_band band)
+std::vector<const roster_row*> available_rows(const region& p, roster_band band)
 {
     std::vector<const roster_row*> out;
     for (const roster_row& r : g_table)
@@ -133,13 +133,13 @@ campaign_roster_gate_input campaign_gate_input(const world& w, entity_id corp)
     // ore_q: metallurgy access — refined steel or either raw ore counts.
     g.ore_q = (has(resource_type::steel) || has(resource_type::iron_ore)
                || has(resource_type::iron_nickel_ore)) ? 1000 : 0;
-    // farm_q: PROXY FOR PASTURE, same convention the province table already
+    // farm_q: PROXY FOR PASTURE, same convention the region table already
     // uses (the roster has no horse/pasture signal at all) — food access stands in.
     g.farm_q = (has(resource_type::food_rations)
                 || has(resource_type::agricultural_produce)) ? 1000 : 0;
     // port_q: a building, not a resource — does the corp hold a port anywhere.
     g.port_q = corp_owns_port(w, corp) ? 1000 : 0;
-    // energy_q: PROXY FOR SALTPETRE/FUEL, same convention as the province table.
+    // energy_q: PROXY FOR SALTPETRE/FUEL, same convention as the region table.
     g.energy_q = (has(resource_type::coal) || has(resource_type::refined_fuel)
                   || has(resource_type::petroleum)) ? 1000 : 0;
     return g;
@@ -159,7 +159,7 @@ std::vector<const roster_row*> available_rows(const world& w, entity_id corp, ro
 }
 
 std::vector<army_stack_entry> roster_stack(int64_t         manpower,
-                                           const province& p,
+                                           const region& p,
                                            roster_band     band,
                                            int             readiness_q)
 {

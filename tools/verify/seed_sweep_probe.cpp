@@ -36,7 +36,7 @@ int main(int argc, char* argv[])
             recipe_registry reg;
             const auto firms = generate_background_firms(w, reg, p.seed ^ 0x8A21F00Du);
             std::printf("[firms=%zu] ", firms.size());
-            std::printf("ok  (corps=%zu nations=%zu provinces_hint=%lld battles=%lld)\n",
+            std::printf("ok  (corps=%zu nations=%zu regions_hint=%lld battles=%lld)\n",
                         w.corporations.size(), w.nations.size(),
                         (long long)rep.prehistory_foundings, (long long)rep.prehistory_battles);
         }

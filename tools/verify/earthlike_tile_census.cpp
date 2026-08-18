@@ -107,10 +107,10 @@ struct seed_metrics
     float river_pct = 0.0f;
     float temperate_forest_pct = 0.0f; ///< forest as % of land in the middle latitudes
 
-    // Ore provinces (Open calls 4). `top10` is the share of a resource's whole
+    // ore fields (Open calls 4). `top10` is the share of a resource's whole
     // world total sitting in its richest 10% of bearing tiles — a flat endowment
-    // lands near 10-20%, a province model much higher. `total` is the world sum,
-    // carried so a provinces-on/off comparison can confirm the field only
+    // lands near 10-20%, a region model much higher. `total` is the world sum,
+    // carried so a regions-on/off comparison can confirm the field only
     // REDISTRIBUTES ore rather than creating it.
     float coal_top10 = 0.0f, oil_top10 = 0.0f, copper_top10 = 0.0f, iron_top10 = 0.0f;
     float coal_total = 0.0f, oil_total = 0.0f, copper_total = 0.0f, iron_total = 0.0f;
@@ -269,7 +269,7 @@ seed_metrics census_one(uint32_t campaign_seed)
     }
     m.coast_pct = 100.0f * static_cast<float>(n_coast) / land_f;
 
-    // Province concentration, per resource that has a placement mechanism.
+    // Region concentration, per resource that has a placement mechanism.
     {
         std::vector<float> coal, oil, cu, fe;
         for (int i = 0; i < static_cast<int>(ids.size()); ++i)
@@ -345,13 +345,13 @@ int main(int argc, char** argv)
     report("river-tile %", col(&seed_metrics::river_pct),  "(no clean figure)");
     report("forest % in mid-lat", col(&seed_metrics::temperate_forest_pct), "(orientation only)");
 
-    std::printf("\nORE PROVINCES — share of the world total in the richest 10%% of bearing tiles\n");
-    std::printf("(a flat endowment lands near 10-20%%; a province model well above it)\n");
+    std::printf("\nORE FIELDS — share of the world total in the richest 10%% of bearing tiles\n");
+    std::printf("(a flat endowment lands near 10-20%%; a region model well above it)\n");
     report("coal top-10%",      col(&seed_metrics::coal_top10),   "(concentration)");
     report("petroleum top-10%", col(&seed_metrics::oil_top10),    "(concentration)");
     report("copper top-10%",    col(&seed_metrics::copper_top10), "(concentration)");
     report("iron top-10%",      col(&seed_metrics::iron_top10),   "(concentration)");
-    std::printf("  world totals (for a provinces-on/off conservation check):\n");
+    std::printf("  world totals (for a regions-on/off conservation check):\n");
     report("coal total",      col(&seed_metrics::coal_total),   "(sum, not a rate)");
     report("petroleum total", col(&seed_metrics::oil_total),    "(sum, not a rate)");
     report("copper total",    col(&seed_metrics::copper_total), "(sum, not a rate)");

@@ -5,7 +5,7 @@
 // Era -1 logistics — BL-314 is the unit verb family; label fixed 2026-08-07).
 //
 // This lives OUTSIDE history_sim on purpose. That header states the sim's whole
-// decision path is province-level and binding it to the ECS would buy nothing
+// decision path is region-level and binding it to the ECS would buy nothing
 // and cost headless testability — so the ECS-to-view adapter sits here, where
 // callers that already hold a `world` can use it, and the sim keeps taking two
 // plain const pointers.

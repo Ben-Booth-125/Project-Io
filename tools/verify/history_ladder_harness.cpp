@@ -198,7 +198,7 @@ int main()
         // the recorded-history window be strictly older than the next, which
         // only held while the ladder owned that window alone. It no longer
         // does: the creeds (BL-235) and now the settlement pass (BL-218) write
-        // into the same window, and two provinces founded in the same year are
+        // into the same window, and two regions founded in the same year are
         // a fact about the world, not a stage-ordering violation. The
         // whole-biography ORDER is already asserted just above; what belongs
         // here is the ladder's own causal claim, so it is asserted directly on

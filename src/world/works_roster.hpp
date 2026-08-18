@@ -7,7 +7,7 @@
 //
 // The noun axis of the Era -1 sim had exactly one half built: unit_roster.hpp
 // says what a polity can FIELD. This says what it can BUILD. Availability is
-// DERIVED — a row is offered when the province's ground and population clear
+// DERIVED — a row is offered when the region's ground and population clear
 // its gate — with no research, no unlock events and no player choice.
 //
 // THIS IS NOT `building_component`. components.hpp's building is the campaign
@@ -15,7 +15,7 @@
 // auto-solver flag, credit and per-resource build cost, per-tick maintenance
 // and wages, decommission state and construction ticks. Era -1 has no credits,
 // no market, no recipe registry and no economy tick — it has a year loop over
-// provinces. Sharing that struct would drag the whole campaign economy into the
+// regions. Sharing that struct would drag the whole campaign economy into the
 // generation layer to satisfy fields nothing sets. A work is a small id held by
 // the PROVINCE, and its effects are per-mille deltas on quantities the sim
 // already computes.
@@ -43,14 +43,14 @@
 #include <string>
 #include <vector>
 
-struct province;
+struct region;
 
 // Forward-declared so this header carries no sol2/Lua dependency — the same
 // reason recipe_registry.hpp forward-declares it.
 class lua_state;
 
 /// What a work needs from the ground before a polity can raise it. The four
-/// endowment axes are thresholds on the province windows (0-1000); zero means
+/// endowment axes are thresholds on the region windows (0-1000); zero means
 /// "no gate". `population` is an absolute headcount floor — a granary wants
 /// people before it wants grain.
 struct work_gate
@@ -66,16 +66,16 @@ struct work_gate
 /// new simulation concepts: every field here names something that exists.
 struct work_effect
 {
-    /// Demographic carrying capacity — BL-273's logistic ceiling for this province.
+    /// Demographic carrying capacity — BL-273's logistic ceiling for this region.
     int capacity_mod = 0;
-    /// The manpower ceiling: what this province can raise.
+    /// The manpower ceiling: what this region can raise.
     int manpower_mod = 0;
-    /// Discount on the terrain-weighted supply cost through/from this province.
+    /// Discount on the terrain-weighted supply cost through/from this region.
     /// THE LOAD-BEARING FIELD. BL-316 charges a polity for breadth; without a
     /// work to buy, the only answer to that charge is to stop expanding. This
     /// is the counter-move that makes the frontier stall a decision.
     int reach_mod = 0;
-    /// Modifier this province contributes when DEFENDING, resolved through
+    /// Modifier this region contributes when DEFENDING, resolved through
     /// combat.cpp's existing path. Never a new combat concept.
     int defence_mod = 0;
     /// Pull-forward on the Stage 4 furnace date.
@@ -97,7 +97,7 @@ struct work_row
     int weight = 0;
 };
 
-/// How many rows `province::works_built` can address. The province records its
+/// How many rows `region::works_built` can address. The region records its
 /// works as a 32-bit mask rather than a heap-owning vector (settlement.hpp
 /// § Era -1 works), so this is a hard ceiling on the table — enforced by the
 /// loader, because a 33rd row would otherwise be silently unbuildable forever.
@@ -148,7 +148,7 @@ public:
     ///
     /// Exists because the obvious call is `id_of(row->name)`, and that is a
     /// linear scan with a string compare at every step, run once per available
-    /// row per candidate province per polity per decision round. Cheap-looking
+    /// row per candidate region per polity per decision round. Cheap-looking
     /// and quadratic; this is the same answer without the scan. Returns -1 for
     /// a pointer that is not one of ours.
     int index_of(const work_row* r) const
@@ -159,11 +159,11 @@ public:
     }
 
     /// The works @p p's ground and @p band make available, cheapest gate first.
-    /// Two provinces at the same date offer different works because their ground
+    /// Two regions at the same date offer different works because their ground
     /// differs — the asymmetry the roster pair exists to make visible.
     ///
-    /// Bands are cumulative: a gunpowder-band province may still raise a Granary.
-    std::vector<const work_row*> available(const province& p, roster_band band) const;
+    /// Bands are cumulative: a gunpowder-band region may still raise a Granary.
+    std::vector<const work_row*> available(const region& p, roster_band band) const;
 
     /// Sum the effects of the works @p built (ids into `rows()`). Unknown ids
     /// are SKIPPED, not clamped: a record written against an older, shorter
@@ -186,7 +186,7 @@ public:
     }
 
     /// `total_effect`'s bitmask sibling — the form the sim actually uses, since
-    /// `province::works_built` is a mask rather than a list (settlement.hpp
+    /// `region::works_built` is a mask rather than a list (settlement.hpp
     /// § Era -1 works). Bits past `works_mask_bits` and past the table's end
     /// are SKIPPED for the same reason unknown ids are: a record written
     /// against a different table shrinks gracefully instead of reading a
@@ -218,20 +218,20 @@ private:
 
 /// True iff @p p clears @p g. Free function rather than a member so the gate
 /// rule can be asserted directly by a harness without a registry.
-bool work_gate_met(const work_gate& g, const province& p);
+bool work_gate_met(const work_gate& g, const region& p);
 
 /// Raise work @p id on @p p: set its bit and fold its effect into the
-/// province's accumulators. Returns false — changing nothing — when the id is
+/// region's accumulators. Returns false — changing nothing — when the id is
 /// out of range, unaddressable by the mask, or ALREADY BUILT.
 ///
 /// The refusal to double-build is the load-bearing half. Without it the scorer
 /// would happily re-raise the same Granary every round it stayed the best
-/// candidate, and a province's capacity would compound without bound; with it,
-/// a province's works are a finite, saturating investment and the polity is
+/// candidate, and a region's capacity would compound without bound; with it,
+/// a region's works are a finite, saturating investment and the polity is
 /// eventually forced to spend its rounds on something else.
 ///
 /// Incremental rather than a recompute from the mask because the sim reads
 /// these accumulators every decision round and writes them at most once per
 /// polity per round — an O(1) write against an O(rows) read is the wrong way
 /// round for a pass costing ~23 s of a ~25 s world.
-bool apply_work_to_province(province& p, const works_registry& reg, int id);
+bool apply_work_to_region(region& p, const works_registry& reg, int id);

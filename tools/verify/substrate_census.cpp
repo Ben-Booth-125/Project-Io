@@ -51,7 +51,7 @@
 //
 // PREHISTORY AT ITS DEFAULT (400 years). Every other world-shaped harness opts
 // out via `no_prehistory()` because the era is not their subject. Here it is:
-// the province set the Era -1 sim leaves behind is what the population centres,
+// the region set the Era -1 sim leaves behind is what the population centres,
 // roads and markets are carved onto, so a census run without it would describe
 // a world nobody plays. That makes this harness STRUCTURALLY long-running, not
 // slow by accident. Measured 2026-08-18, MSVC 14.44, one box:

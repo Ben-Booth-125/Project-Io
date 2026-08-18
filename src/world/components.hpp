@@ -593,7 +593,7 @@ struct population_centre_component
 /// index into whichever roster table the current era supplies (BL-274 owns
 /// rosters, not this file) — unit_component itself does not interpret it.
 ///
-/// BL-157 ruled tile position canonical over body/province (2026-08-07); this
+/// BL-157 ruled tile position canonical over body/region (2026-08-07); this
 /// struct shipped with a `body` field ahead of that ruling — `position`
 /// (BL-324, 2026-08-08) is the fix, landed with the hire-unit item that first
 /// needed tile grain rather than deferring it back to BL-157.

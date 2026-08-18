@@ -6,18 +6,18 @@
 // "you cannot look at a screenshot and see whether relations are interesting"
 // (DEVLOG 2026-08-04 handoff: build the instrument before the feature).
 //
-//   R1  THE STOP HOLDS. Every province exists by year 0 (founded_year <= 0),
+//   R1  THE STOP HOLDS. Every region exists by year 0 (founded_year <= 0),
 //       none is industrialised, and the median industrial year is 0 (nobody).
-//   R2  DEMOGRAPHY IS SEEDED. Every province holds population in
+//   R2  DEMOGRAPHY IS SEEDED. Every region holds population in
 //       (0, carrying_capacity]; manpower sits within its ceiling. The 1960
 //       world stays unseeded (graduation is the antiquity path's job).
 //   R3  MULTIPOLAR BY CONSTRUCTION. More than one nation exists at 0 CE —
 //       the precondition for BL-309's two-great-powers seed to mean anything.
-//   R4  DETERMINISM. Two epoch-0 generations produce byte-identical province
+//   R4  DETERMINISM. Two epoch-0 generations produce byte-identical region
 //       tables (the settlement pass's whole deterministic surface).
 //   R5  THE 1960 ARC IS UNTOUCHED. An explicit epoch_year = 1960 world still
 //       industrialises, still resolves ruptures (lacunae or checkpoints
-//       present), and holds at least as many provinces as the 0 CE world.
+//       present), and holds at least as many regions as the 0 CE world.
 //
 // Exits non-zero on any FAIL. Links the generation TU superset (as
 // world_audit / determinism_harness).
@@ -49,13 +49,13 @@ const generation_report::body_entry* kepler_entry(const generation_report& rep)
     return nullptr;
 }
 
-bool provinces_identical(const std::vector<province>& a, const std::vector<province>& b)
+bool regions_identical(const std::vector<region>& a, const std::vector<region>& b)
 {
     if (a.size() != b.size()) return false;
     for (std::size_t i = 0; i < a.size(); ++i)
     {
-        const province& x = a[i];
-        const province& y = b[i];
+        const region& x = a[i];
+        const region& y = b[i];
         if (x.anchor != y.anchor || x.name != y.name || x.culture != y.culture
             || x.founded_year != y.founded_year || x.industrial_year != y.industrial_year
             || x.population != y.population || x.manpower_stock != y.manpower_stock
@@ -92,35 +92,35 @@ int main()
     check(ka && kb && k60, "Kepler entry present in all three reports");
     if (!ka || !kb || !k60) return 1;
 
-    const std::vector<province>& ps = ka->settlement.provinces;
-    const std::vector<province>& ps60 = k60->settlement.provinces;
+    const std::vector<region>& ps = ka->settlement.regions;
+    const std::vector<region>& ps60 = k60->settlement.regions;
 
     // --- R1: the stop holds -------------------------------------------------
     bool all_founded = !ps.empty(), none_industrial = true;
-    for (const province& p : ps)
+    for (const region& p : ps)
     {
         if (p.founded_year > 0) all_founded = false;
         if (p.industrialised || p.industrial_year != 0) none_industrial = false;
     }
-    check(all_founded, "R1 every 0 CE province was founded by year 0");
-    check(none_industrial, "R1 no 0 CE province has lit a furnace");
+    check(all_founded, "R1 every 0 CE region was founded by year 0");
+    check(none_industrial, "R1 no 0 CE region has lit a furnace");
     check(ka->settlement.median_industrial_year == 0, "R1 median industrial year is 0 (nobody)");
 
     // --- R2: demography seeded ----------------------------------------------
     bool pop_ok = !ps.empty(), mp_ok = true;
     int64_t total_pop = 0, total_mp = 0;
-    for (const province& p : ps)
+    for (const region& p : ps)
     {
-        const int64_t cap = province_carrying_capacity(p.farm_q);
+        const int64_t cap = region_carrying_capacity(p.farm_q);
         if (p.population <= 0 || p.population > cap) pop_ok = false;
         if (p.manpower_stock < 0 || p.manpower_stock > manpower_ceiling(p.population)) mp_ok = false;
         total_pop += p.population;
         total_mp += p.manpower_stock;
     }
-    check(pop_ok, "R2 every 0 CE province holds population within (0, capacity]");
+    check(pop_ok, "R2 every 0 CE region holds population within (0, capacity]");
     check(mp_ok, "R2 manpower sits within its population ceiling");
     bool unseeded_1960 = true;
-    for (const province& p : ps60)
+    for (const region& p : ps60)
         if (p.population != 0) unseeded_1960 = false;
     check(unseeded_1960, "R2 the 1960 world stays demography-unseeded (graduation not its path)");
 
@@ -128,19 +128,19 @@ int main()
     check(wa.nations.size() > 1, "R3 more than one nation at 0 CE");
 
     // --- R4: determinism -----------------------------------------------------
-    check(provinces_identical(ps, kb->settlement.provinces),
-          "R4 two 0 CE generations produce identical province tables");
+    check(regions_identical(ps, kb->settlement.regions),
+          "R4 two 0 CE generations produce identical region tables");
 
     // --- R5: the 1960 arc untouched ------------------------------------------
     bool any_industrial_1960 = false;
-    for (const province& p : ps60)
+    for (const region& p : ps60)
         if (p.industrialised) { any_industrial_1960 = true; break; }
     check(any_industrial_1960, "R5 the 1960 world still industrialises");
     check(k60->settlement.lacunae > 0 || !k60->settlement.checkpoints.empty(),
           "R5 the 1960 world still resolves ruptures");
-    // R5's province-count comparison is against the SETTLEMENT PASS's 0 CE
+    // R5's region-count comparison is against the SETTLEMENT PASS's 0 CE
     // output, not against `ps`. Since the year-tick sim was wired into
-    // generation (2026-08-12) the 0 CE world keeps founding provinces for 400
+    // generation (2026-08-12) the 0 CE world keeps founding regions for 400
     // years after the settlement pass stops — 1107 of them on a measured run —
     // so `ps` is no longer "what had been settled by year 0" and comparing 1960
     // against it asks the wrong question. The claim worth checking is unchanged:
@@ -152,39 +152,39 @@ int main()
     const auto* k_settled = kepler_entry(rep_settled);
     check(k_settled != nullptr, "R5 the settlement-only 0 CE control generated");
     if (k_settled != nullptr)
-        check(ps60.size() >= k_settled->settlement.provinces.size(),
-              "R5 the 1960 world holds at least as many provinces as the 0 CE settlement pass");
+        check(ps60.size() >= k_settled->settlement.regions.size(),
+              "R5 the 1960 world holds at least as many regions as the 0 CE settlement pass");
 
     // --- The dossier ---------------------------------------------------------
     std::printf("\n=== KEPLER AT 0 CE ===\n");
     // Signed difference deliberately: the 0 CE world now out-founds the 1960 one
     // (the year-tick sim keeps settling for 400 years), so an unsigned subtraction
     // here wrapped to a nonsense number.
-    std::printf("provinces: %zu at 0 CE (the 1960 arc reaches %zu — a difference of %" PRId64 ")\n",
+    std::printf("regions: %zu at 0 CE (the 1960 arc reaches %zu — a difference of %" PRId64 ")\n",
                 ps.size(), ps60.size(),
                 static_cast<int64_t>(ps60.size()) - static_cast<int64_t>(ps.size()));
     std::printf("nations:   %zu\n", wa.nations.size());
-    std::printf("people:    %" PRId64 " across all provinces; %" PRId64 " recruitable under arms\n",
+    std::printf("people:    %" PRId64 " across all regions; %" PRId64 " recruitable under arms\n",
                 total_pop, total_mp);
 
     int64_t oldest = 0, youngest = -100000;
-    for (const province& p : ps)
+    for (const region& p : ps)
     {
         oldest = std::min(oldest, p.founded_year);
         youngest = std::max(youngest, p.founded_year);
     }
     std::printf("founding:  %" PRId64 " to %" PRId64 " (negative = years before epoch)\n\n", oldest, youngest);
 
-    std::vector<const province*> by_pop;
-    for (const province& p : ps) by_pop.push_back(&p);
-    std::sort(by_pop.begin(), by_pop.end(), [](const province* a, const province* b) {
+    std::vector<const region*> by_pop;
+    for (const region& p : ps) by_pop.push_back(&p);
+    std::sort(by_pop.begin(), by_pop.end(), [](const region* a, const region* b) {
         return a->population != b->population ? a->population > b->population : a->name < b->name;
     });
-    std::printf("%-34s %10s %9s %8s %7s\n", "province", "population", "manpower", "founded", "farm_q");
+    std::printf("%-34s %10s %9s %8s %7s\n", "region", "population", "manpower", "founded", "farm_q");
     const std::size_t shown = std::min<std::size_t>(12, by_pop.size());
     for (std::size_t i = 0; i < shown; ++i)
     {
-        const province& p = *by_pop[i];
+        const region& p = *by_pop[i];
         std::printf("%-34s %10" PRId64 " %9" PRId64 " %8" PRId64 " %7d\n",
                     p.name.c_str(), p.population, p.manpower_stock, p.founded_year, p.farm_q);
     }

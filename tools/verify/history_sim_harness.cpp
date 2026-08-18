@@ -15,7 +15,7 @@
 // AND (BL-384) the full-run OUTCOME group B384a-d, which is a different kind of
 // claim from everything above and is deliberately last. Every check before it
 // asks whether a mechanism is live; B384 asks whether the run these mechanisms
-// compose into ever reaches a conclusion — whether a province ever changes
+// compose into ever reaches a conclusion — whether a region ever changes
 // hands by war across a spread of generated worlds. That question had no
 // assertion behind it, which is how "267 battles, zero conquests" survived: the
 // conquest count was compared between two runs for determinism (`same_run`,
@@ -69,18 +69,18 @@ bool same_run(const history_sim_state& a, const history_sim_state& b,
     if (a.owner_changes.size() != b.owner_changes.size()) return false;
     for (std::size_t i = 0; i < a.owner_changes.size(); ++i)
         if (a.owner_changes[i].year != b.owner_changes[i].year
-         || a.owner_changes[i].province != b.owner_changes[i].province
+         || a.owner_changes[i].region != b.owner_changes[i].region
          || a.owner_changes[i].owner != b.owner_changes[i].owner)
             return false;
-    if (a.province_stride != b.province_stride) return false;
+    if (a.region_stride != b.region_stride) return false;
     if (a.battles != b.battles || a.conquests != b.conquests
      || a.foundings != b.foundings || a.winter_campaigns != b.winter_campaigns)
         return false;
-    if (sa.provinces.size() != sb.provinces.size()) return false;
-    for (std::size_t i = 0; i < sa.provinces.size(); ++i)
+    if (sa.regions.size() != sb.regions.size()) return false;
+    for (std::size_t i = 0; i < sa.regions.size(); ++i)
     {
-        const province& p = sa.provinces[i];
-        const province& q = sb.provinces[i];
+        const region& p = sa.regions[i];
+        const region& q = sb.regions[i];
         if (p.nation != q.nation || p.population != q.population
          || p.manpower_stock != q.manpower_stock || p.culture != q.culture
          || p.contest_q != q.contest_q)
@@ -89,25 +89,25 @@ bool same_run(const history_sim_state& a, const history_sim_state& b,
     return true;
 }
 
-/// A minimal two-province world: one rich target, one owner, at a chosen
+/// A minimal two-region world: one rich target, one owner, at a chosen
 /// distance. Used to isolate the supply-decay stall from everything else.
 settlement_state two_polity_world(int separation)
 {
     settlement_state ss;
 
-    province a;
+    region a;
     a.col = 0; a.row = 0; a.anchor = 0;
     a.culture = 0; a.founding_culture = 0;
     a.farm_q = 900; a.ore_q = 500; a.port_q = 100;
     a.settle_score_q = 900; a.name = "Home";
-    ss.provinces.push_back(a);
+    ss.regions.push_back(a);
 
-    province b;
+    region b;
     b.col = separation; b.row = 0; b.anchor = separation;
     b.culture = 1; b.founding_culture = 1;
     b.farm_q = 950; b.ore_q = 900; b.port_q = 100;
     b.settle_score_q = 880; b.name = "Prize";
-    ss.provinces.push_back(b);
+    ss.regions.push_back(b);
 
     return ss;
 }
@@ -147,7 +147,7 @@ bool differs(const history_sim_state& a, const history_sim_state& b)
     if (a.owner_changes.size() != b.owner_changes.size()) return true;
     for (std::size_t i = 0; i < a.owner_changes.size(); ++i)
         if (a.owner_changes[i].year != b.owner_changes[i].year
-         || a.owner_changes[i].province != b.owner_changes[i].province
+         || a.owner_changes[i].region != b.owner_changes[i].region
          || a.owner_changes[i].owner != b.owner_changes[i].owner)
             return true;
     return false;
@@ -158,7 +158,7 @@ bool differs(const history_sim_state& a, const history_sim_state& b)
 // ---------------------------------------------------------------------------
 //
 // ONE DEFINITION OF DOMINANCE, NOT TWO. `history_sweep.cpp` already fixed what
-// "a power dominates this world" means — half of all owned provinces, held as a
+// "a power dominates this world" means — half of all owned regions, held as a
 // per-mille REPORTING threshold that gates nothing — and the shape it reads it
 // through is `slice_shape` over a materialised owner slice. Both are reproduced
 // here rather than re-invented, because a second definition of the same word
@@ -171,10 +171,10 @@ bool differs(const history_sim_state& a, const history_sim_state& b)
 // column.
 constexpr int hegemony_threshold_q = 500; // history_sweep.cpp § hegemony_threshold_q
 
-/// Distinct owners and the largest owner's share (per-mille of OWNED provinces)
-/// in one materialised year slice. `owner_none` cells are provinces that do not
+/// Distinct owners and the largest owner's share (per-mille of OWNED regions)
+/// in one materialised year slice. `owner_none` cells are regions that do not
 /// exist yet at that year, and are excluded from the denominator — a share of
-/// "all provinces including ones nobody has founded" would fall as the Settle
+/// "all regions including ones nobody has founded" would fall as the Settle
 /// verb ran and read as de-concentration that never happened.
 void slice_shape(const std::vector<uint16_t>& slice, int& powers, int& top_share_q)
 {
@@ -211,7 +211,7 @@ struct outcome_row
     ///
     /// Counted against the start slice rather than against `polities.size()`
     /// deliberately: the sim seeds one polity per culture, and a culture that
-    /// never held a province would otherwise be counted as somebody the run had
+    /// never held a region would otherwise be counted as somebody the run had
     /// killed. That would report a positive elimination rate for a run in which
     /// nothing whatsoever happened, which is the exact failure this row exists
     /// to detect.
@@ -219,7 +219,7 @@ struct outcome_row
     int polities_at_end   = 0;
     int eliminated        = 0;
 
-    /// The largest polity's share of owned provinces at the epoch, per-mille,
+    /// The largest polity's share of owned regions at the epoch, per-mille,
     /// and whether that crossed `hegemony_threshold_q`.
     int  top_share_q   = 0;
     bool hegemon       = false;
@@ -257,8 +257,8 @@ int main()
 
     // AND THE GRID MUST BE THE REAL GRID. These runs passed 168x90 against a
     // Kepler that is home_grid_width x home_grid_height (312x145). `gw` is the
-    // cylinder's circumference: understate it and `province_distance` wraps
-    // columns that do not wrap, silently reporting two provinces on opposite
+    // cylinder's circumference: understate it and `region_distance` wraps
+    // columns that do not wrap, silently reporting two regions on opposite
     // sides of the map as neighbours. Same class of defect as the sweep's
     // 168x90-vs-180x84 terrain misalignment, and just as quiet.
     constexpr int kgw = home_grid_width;
@@ -278,7 +278,7 @@ int main()
     // --- R6/R7/R8  ring size, runtime, and founding ------------------------
     {
         settlement_state s = k1->settlement;
-        const std::size_t before = s.provinces.size();
+        const std::size_t before = s.regions.size();
 
         const auto t0 = std::chrono::steady_clock::now();
         const history_sim_state a = run_history_sim(s, nullptr, no_terrain, kgw, kgh, params, 7u);
@@ -286,10 +286,10 @@ int main()
         const int64_t ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
 
         const int64_t bytes = owner_ring_bytes(a);
-        std::printf("      run: %lld provinces -> %lld, %lld battles, %lld conquests, "
+        std::printf("      run: %lld regions -> %lld, %lld battles, %lld conquests, "
                     "%lld foundings, %lld winter, ring %lld bytes, %lld ms\n",
                     static_cast<long long>(before),
-                    static_cast<long long>(s.provinces.size()),
+                    static_cast<long long>(s.regions.size()),
                     static_cast<long long>(a.battles),
                     static_cast<long long>(a.conquests),
                     static_cast<long long>(a.foundings),
@@ -300,25 +300,25 @@ int main()
         check(bytes > 0 && bytes < 1024 * 1024,
               "R6   the ownership time-lapse substrate stays under 1 MB");
         // The <1s target moved to BL-320 (Era -1 sim runtime): the settle-occupancy
-        // fix quadrupled real province count (correct behaviour, ~4x work), and the
+        // fix quadrupled real region count (correct behaviour, ~4x work), and the
         // measured full run is ~2.1s. Bound against that reality so the harness
         // stays honest; the sub-second bar returns when BL-320 lands its index.
         check(ms < 3000,
               "R7   a full 4000 BCE -> 0 CE run fits the measured budget (BL-320)");
-        check(s.provinces.size() > before,
-              "R8   the Settle verb founds provinces during the run");
+        check(s.regions.size() > before,
+              "R8   the Settle verb founds regions during the run");
         check(a.years == params.stop_year - params.start_year,
               "R6b  the run covers one tick per simulated year");
 
         // The change list must actually replay: the final slice has to agree
-        // with the provinces' own nation field, or the time-lapse would drift
+        // with the regions' own nation field, or the time-lapse would drift
         // from the world it claims to depict.
         const std::vector<uint16_t> last = owner_slice_at(a, params.stop_year);
-        bool replay_agrees = (last.size() == s.provinces.size());
+        bool replay_agrees = (last.size() == s.regions.size());
         if (replay_agrees)
-            for (std::size_t i = 0; i < s.provinces.size(); ++i)
-                if (s.provinces[i].nation >= 0
-                 && last[i] != static_cast<uint16_t>(s.provinces[i].nation))
+            for (std::size_t i = 0; i < s.regions.size(); ++i)
+                if (s.regions[i].nation >= 0
+                 && last[i] != static_cast<uint16_t>(s.regions[i].nation))
                     { replay_agrees = false; break; }
         check(replay_agrees,
               "R6c  replaying the change list reproduces the final political map");
@@ -327,7 +327,7 @@ int main()
     // --- R3  the supply-decay stall ----------------------------------------
     //
     // Same two polities, same prize, different distance. Near, the campaign is
-    // supplied and the province can change hands; far, supply decays to
+    // supplied and the region can change hands; far, supply decays to
     // nothing and the frontier stalls on arithmetic alone.
     {
         history_sim_params p2 = params;
@@ -371,10 +371,10 @@ int main()
         check(b.stalled_campaigns > 0,
               "R3a3 those far campaigns arrive under-supplied (the stall is real, not absence)");
         // WHAT ACTUALLY STOPS DISTANT EXPANSION — measured, not assumed. On
-        // plains, with the burden of breadth inert (two provinces is far under
+        // plains, with the burden of breadth inert (two regions is far under
         // `free_holdings`), supply only mitigates attrition and attrition on
         // plains is 100/1000. So the whole span from fully supplied to totally
-        // cut off is 10% of combat power, and the far province can still fall.
+        // cut off is 10% of combat power, and the far region can still fall.
         //
         // This is RECORDED rather than asserted away, and it is why BL-316 exists:
         // the fix for a 10% dynamic range is not to inflate the supply term but
@@ -391,7 +391,7 @@ int main()
         // DIRECTION, NOT AN ABSOLUTE. This was `c.battles == 0` — the claim that
         // the score's distance penalty vetoes the far target outright. That was
         // true of the flat `w_dist` and is deliberately no longer true: a flat
-        // subtraction from a ~200-300 province value suppressed every war on a
+        // subtraction from a ~200-300 region value suppressed every war on a
         // large map, so `w_dist` became a proportional discount. Asserting the
         // old absolute would now be asserting the bug back. What must still hold
         // is the direction — pricing distance cannot make the far target MORE
@@ -494,7 +494,7 @@ int main()
     // Ben's mechanism: supply available to a campaign falls with the polity's
     // TOTAL holdings, so expansion eventually pays for itself in reach and the
     // frontier stall becomes ARITHMETIC rather than a scoring preference.
-    // Before this slice, holding 500 provinces cost exactly what holding 5 did.
+    // Before this slice, holding 500 regions cost exactly what holding 5 did.
     //
     // Isolated by turning the burden on and off over the same world. `burden`
     // is subtracted from supply directly, so the direction is unambiguous:
@@ -509,7 +509,7 @@ int main()
         off.holdings_burden_q = 0;      // No cost of breadth at all — the old world.
 
         history_sim_params on = base;
-        on.free_holdings     = 0;       // Every province held costs supply...
+        on.free_holdings     = 0;       // Every region held costs supply...
         on.holdings_burden_q = 300;     // ...and costs it visibly.
 
         settlement_state w_off = two_polity_world(12);
@@ -537,8 +537,8 @@ int main()
     // The failure this item names is a SCORER whose argmax is decided by scale
     // rather than by desirability: one verb pins at its ceiling and wins every
     // year forever. Both observed cuts had exactly that shape — Invest-dominated
-    // (82 provinces, ownership frozen after year 458 of 1960), then
-    // Settle-dominated (1532 provinces, 1450 foundings, conquests ZERO).
+    // (82 regions, ownership frozen after year 458 of 1960), then
+    // Settle-dominated (1532 regions, 1450 foundings, conquests ZERO).
     //
     // So the check is not "the numbers look right", which is unfalsifiable, but
     // that NO VERB HAS SWALLOWED THE RUN: the sim must still be deciding things
@@ -589,34 +589,34 @@ int main()
               "R5b  winter campaigns are a subset of all campaigns");
     }
 
-    // --- R4  province granularity ------------------------------------------
+    // --- R4  region granularity ------------------------------------------
     //
     // Structural, not observational: run_history_sim takes no mutable tile
     // access at all — its terrain view is two const pointers — so it CANNOT
     // write a tile. The assertion below records that transfer moves the
-    // province's own owner field and nothing wider.
+    // region's own owner field and nothing wider.
     {
         settlement_state s = two_polity_world(3);
         history_sim_params p4 = params;
         p4.start_year = 0;   // Synthetic world: its own flat span (see R3).
         p4.stop_year  = 400;
         const history_sim_state a = run_history_sim(s, nullptr, no_terrain, syn_gw, syn_gh, p4, 5u);
-        bool anchors_intact = (s.provinces[0].anchor == 0 && s.provinces[1].anchor == 3);
+        bool anchors_intact = (s.regions[0].anchor == 0 && s.regions[1].anchor == 3);
         check(anchors_intact,
-              "R4   a run never rewrites a province's anchor tile — transfer is province-granular");
-        check(a.province_stride == static_cast<int>(s.provinces.size()),
-              "R4b  the ring's stride matches the final province count");
+              "R4   a run never rewrites a region's anchor tile — transfer is region-granular");
+        check(a.region_stride == static_cast<int>(s.regions.size()),
+              "R4b  the ring's stride matches the final region count");
     }
 
     // --- BL-274  era-keyed rosters ----------------------------------------
     //
-    // Asymmetry is the point: two provinces at the same band field different
+    // Asymmetry is the point: two regions at the same band field different
     // rosters because their ground differs. A test that only checked "a stack
     // comes back" would pass on a table that ignored endowment entirely.
     {
-        province bare;  bare.farm_q = 100; bare.ore_q = 0;   bare.port_q = 0;   bare.energy_q = 0;
-        province forge; forge.farm_q = 100; forge.ore_q = 900; forge.port_q = 0; forge.energy_q = 0;
-        province coast; coast.farm_q = 100; coast.ore_q = 0;  coast.port_q = 900; coast.energy_q = 0;
+        region bare;  bare.farm_q = 100; bare.ore_q = 0;   bare.port_q = 0;   bare.energy_q = 0;
+        region forge; forge.farm_q = 100; forge.ore_q = 900; forge.port_q = 0; forge.energy_q = 0;
+        region coast; coast.farm_q = 100; coast.ore_q = 0;  coast.port_q = 900; coast.energy_q = 0;
 
         const auto bare_rows  = available_rows(bare,  roster_band::classical);
         const auto forge_rows = available_rows(forge, roster_band::classical);
@@ -630,7 +630,7 @@ int main()
         bool bare_has_naval = false;
         for (const roster_row* r : bare_rows) if (r->cls == unit_class::naval) bare_has_naval = true;
         check(coast_has_naval && !bare_has_naval,
-              "B274b a port fields ships and a landlocked province does not");
+              "B274b a port fields ships and a landlocked region does not");
 
         // The stirrup is a MEDIEVAL unlock — the T1/T2 boundary settled with the
         // roster grouping. A classical roster must not contain heavy horse.
@@ -823,14 +823,14 @@ int main()
         // to hand the campaign a world with a past (hard_coded_world.cpp: "the
         // campaign opened onto a world that had been settled and then stood
         // perfectly still: no wars, no borders that had ever moved, nothing to
-        // inherit"). A world that runs four thousand years without one province
+        // inherit"). A world that runs four thousand years without one region
         // changing hands is that world again — the pass ran and produced the
         // state it was written to prevent.
         //
         // The achieved share is printed above regardless, so a later decision
         // to accept some peaceful worlds has the number to argue from.
         check(worlds_with_conquest == n,
-              "B384a every world sees at least one province change hands by war");
+              "B384a every world sees at least one region change hands by war");
 
         // THE DEFECT EXACTLY AS FILED: 267 battles, zero conquests. A world
         // that campaigns for an era and takes nothing means the transfer branch
@@ -853,10 +853,10 @@ int main()
         // That is the project's own statement that a zero here is a defect and
         // not a preference, which is what makes it assertable at all. It is
         // stated across the WHOLE set rather than per world: one polity losing
-        // its last province somewhere in N worlds is the weakest form of "the
+        // its last region somewhere in N worlds is the weakest form of "the
         // death spiral terminates", and anything weaker is not a claim.
         check(total_eliminated > 0,
-              "B384c a polity somewhere in the set loses its last province (BL-308's spiral ends)");
+              "B384c a polity somewhere in the set loses its last region (BL-308's spiral ends)");
 
         // DOMINANCE IS REPORTED AND GATES NOTHING — history_sweep.cpp's ruling,
         // inherited with its threshold. BL-224's non-hegemony is a tuning

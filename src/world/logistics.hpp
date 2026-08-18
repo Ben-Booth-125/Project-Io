@@ -155,7 +155,7 @@ inline constexpr float earth_radius_km = 6371.0f;
 ///
 /// At Earth mass on the 312-column grid this is ~128 km per tile, which puts a
 /// day's march (~25 km) at about a fifth of a tile and makes a tile a
-/// province-sized unit rather than a field.
+/// region-sized unit rather than a field.
 ///
 /// Returns 0 for an unknown body, which callers must treat as "no scale" rather
 /// than "instant".

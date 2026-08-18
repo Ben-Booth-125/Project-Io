@@ -1,21 +1,21 @@
 // ---------------------------------------------------------------------------
-// Headless province-demography harness (BL-273; no SDL / Lua / ImGui)
+// Headless region-demography harness (BL-273; no SDL / Lua / ImGui)
 // ---------------------------------------------------------------------------
 // Exercises src/world/settlement.{hpp,cpp}'s demography model in isolation —
-// synthetic provinces, not a generated world, since the model is deliberately
+// synthetic regions, not a generated world, since the model is deliberately
 // self-contained (BL-273 design: "you don't need to wire that graduation
-// path, just make the province-level model correct").
+// path, just make the region-level model correct").
 //
-//   R1  LOGISTIC GROWTH TRACKS farm_q. Two provinces seeded with the same
+//   R1  LOGISTIC GROWTH TRACKS farm_q. Two regions seeded with the same
 //       starting population but different farm_q must diverge: the richer
 //       farm endowment carries a higher carrying capacity and so a higher
 //       population after the same number of simulated years.
 //
 //   R2  WAR AND PLAGUE BOTH DRAW POPULATION DOWN. War pressure measurably
 //       suppresses growth relative to a no-war control. Plague goes through
-//       `resolve_plague_event`'s checkpoint-eligibility filter — a province
+//       `resolve_plague_event`'s checkpoint-eligibility filter — a region
 //       with nobody left (population == 0) must never be chosen as an
-//       epicentre, and a call where EVERY province is ineligible must fail
+//       epicentre, and a call where EVERY region is ineligible must fail
 //       out rather than silently picking one anyway.
 //
 //   R3  MANPOWER IS A BOUNDED, SELF-LIMITING BUDGET. The stock never exceeds
@@ -47,9 +47,9 @@ void check(bool ok, const char* what)
     ok ? ++g_pass : ++g_fail;
 }
 
-province make_province(const char* name, int col, int row, int farm_q, int64_t population)
+region make_region(const char* name, int col, int row, int farm_q, int64_t population)
 {
-    province p;
+    region p;
     p.name = name;
     p.col = col;
     p.row = row;
@@ -62,34 +62,34 @@ province make_province(const char* name, int col, int row, int farm_q, int64_t p
 
 int main()
 {
-    std::printf("=== demography harness (BL-273 province demography) ===\n");
+    std::printf("=== demography harness (BL-273 region demography) ===\n");
 
     // --- R1 logistic growth tracks farm_q ---------------------------------------
     {
-        province lean = make_province("Lean Farm", 0, 0, /*farm_q=*/50, /*population=*/1000);
-        province rich = make_province("Rich Farm", 10, 10, /*farm_q=*/950, /*population=*/1000);
+        region lean = make_region("Lean Farm", 0, 0, /*farm_q=*/50, /*population=*/1000);
+        region rich = make_region("Rich Farm", 10, 10, /*farm_q=*/950, /*population=*/1000);
 
-        const int64_t k_lean = province_carrying_capacity(lean.farm_q);
-        const int64_t k_rich = province_carrying_capacity(rich.farm_q);
+        const int64_t k_lean = region_carrying_capacity(lean.farm_q);
+        const int64_t k_rich = region_carrying_capacity(rich.farm_q);
         check(k_rich > k_lean, "R1a  a higher farm_q carries a higher capacity");
 
-        advance_province_demography(lean, /*years=*/300, /*war_pressure_q=*/0);
-        advance_province_demography(rich, /*years=*/300, /*war_pressure_q=*/0);
+        advance_region_demography(lean, /*years=*/300, /*war_pressure_q=*/0);
+        advance_region_demography(rich, /*years=*/300, /*war_pressure_q=*/0);
 
-        check(lean.population > 1000, "R1b  the lean-farm province still grows from its seed");
+        check(lean.population > 1000, "R1b  the lean-farm region still grows from its seed");
         check(rich.population > lean.population,
-              "R1c  the richer farm_q province ends up with more people over the same span");
+              "R1c  the richer farm_q region ends up with more people over the same span");
         check(lean.population <= k_lean && rich.population <= k_rich,
-              "R1d  neither province's population ever exceeds its own carrying capacity");
+              "R1d  neither region's population ever exceeds its own carrying capacity");
         check(lean.last_demography_year == 300 && rich.last_demography_year == 300,
               "R1e  last_demography_year advances by exactly the years simulated");
 
         // Approaching, not overshooting: a few more years should still gain
         // ground while comfortably below K (monotone rise, no oscillation).
-        province mid = make_province("Mid Farm", 0, 0, /*farm_q=*/500, /*population=*/1000);
-        advance_province_demography(mid, 10, 0);
+        region mid = make_region("Mid Farm", 0, 0, /*farm_q=*/500, /*population=*/1000);
+        advance_region_demography(mid, 10, 0);
         const int64_t after_10 = mid.population;
-        advance_province_demography(mid, 10, 0);
+        advance_region_demography(mid, 10, 0);
         check(mid.population > after_10, "R1f  population keeps climbing while below capacity");
         std::printf("      (lean K=%lld pop=%lld; rich K=%lld pop=%lld)\n",
                     static_cast<long long>(k_lean), static_cast<long long>(lean.population),
@@ -98,22 +98,22 @@ int main()
 
     // --- R2 war and plague both draw population down ---------------------------
     {
-        province at_peace = make_province("Peaceful Vale", 0, 0, 500, 50000);
-        province at_war    = make_province("Contested Vale", 0, 0, 500, 50000);
+        region at_peace = make_region("Peaceful Vale", 0, 0, 500, 50000);
+        region at_war    = make_region("Contested Vale", 0, 0, 500, 50000);
 
-        advance_province_demography(at_peace, 40, /*war_pressure_q=*/0);
-        advance_province_demography(at_war, 40, /*war_pressure_q=*/900);
+        advance_region_demography(at_peace, 40, /*war_pressure_q=*/0);
+        advance_region_demography(at_war, 40, /*war_pressure_q=*/900);
 
         check(at_war.population < at_peace.population,
               "R2a  sustained heavy war pressure leaves fewer people than the same span at peace");
 
-        // Plague eligibility: only one survivor among several empty provinces
+        // Plague eligibility: only one survivor among several empty regions
         // must always be the epicentre it picks.
-        std::vector<province> ring;
-        ring.push_back(make_province("Empty A", 0, 0, 500, 0));
-        ring.push_back(make_province("Empty B", 2, 0, 500, 0));
-        ring.push_back(make_province("Survivor", 1, 1, 500, 20000));
-        ring.push_back(make_province("Empty C", 3, 3, 500, 0));
+        std::vector<region> ring;
+        ring.push_back(make_region("Empty A", 0, 0, 500, 0));
+        ring.push_back(make_region("Empty B", 2, 0, 500, 0));
+        ring.push_back(make_region("Survivor", 1, 1, 500, 20000));
+        ring.push_back(make_region("Empty C", 3, 3, 500, 0));
 
         std::vector<checkpoint_record> checkpoints;
         bool eligibility_held = true;
@@ -127,17 +127,17 @@ int main()
                 eligibility_held = false;
         }
         check(eligibility_held,
-              "R2b  with only one populated province, the plague eligibility filter always picks it");
+              "R2b  with only one populated region, the plague eligibility filter always picks it");
         check(ring[2].population <= survivor_before,
               "R2c  the actual eligible epicentre loses population (drawdown happened, not just filtering)");
         check(ring[0].population == 0 && ring[1].population == 0 && ring[3].population == 0,
-              "R2d  provinces already at zero stay at zero (never go negative)");
+              "R2d  regions already at zero stay at zero (never go negative)");
 
-        // Now make EVERY province ineligible: the call must fail out, not
+        // Now make EVERY region ineligible: the call must fail out, not
         // silently choose an ineligible candidate.
-        std::vector<province> empty_only;
-        empty_only.push_back(make_province("Nobody A", 0, 0, 500, 0));
-        empty_only.push_back(make_province("Nobody B", 5, 5, 500, 0));
+        std::vector<region> empty_only;
+        empty_only.push_back(make_region("Nobody A", 0, 0, 500, 0));
+        empty_only.push_back(make_region("Nobody B", 5, 5, 500, 0));
         std::vector<checkpoint_record> empty_checkpoints;
         const bool applied_when_none_eligible =
             resolve_plague_event(empty_only, empty_checkpoints, /*seed=*/1, /*stage_tag=*/2, /*gw=*/64);
@@ -152,11 +152,11 @@ int main()
 
     // --- R3 manpower is a bounded, self-limiting budget -------------------------
     {
-        province p = make_province("Levy Province", 0, 0, 500, 100000);
-        advance_province_demography(p, 1, 0); // One step to replenish the stock.
+        region p = make_region("Levy Region", 0, 0, 500, 100000);
+        advance_region_demography(p, 1, 0); // One step to replenish the stock.
 
         const int64_t ceiling = manpower_ceiling(p.population);
-        check(ceiling > 0, "R3a  a populated province has a positive manpower ceiling");
+        check(ceiling > 0, "R3a  a populated region has a positive manpower ceiling");
         check(p.manpower_stock >= 0 && p.manpower_stock <= ceiling,
               "R3b  the stock sits inside [0, ceiling] after a replenish step");
 
@@ -175,7 +175,7 @@ int main()
         bool ever_negative = false;
         for (int step = 0; step < 20; ++step)
         {
-            advance_province_demography(p, 5, /*war_pressure_q=*/300);
+            advance_region_demography(p, 5, /*war_pressure_q=*/300);
             const int64_t raised = raise_manpower(p, 1'000'000'000LL);
             if (p.manpower_stock < 0 || raised < 0) ever_negative = true;
         }
@@ -185,28 +185,28 @@ int main()
 
     // --- R4 determinism ----------------------------------------------------------
     {
-        auto run = [](std::vector<province>& out, std::vector<checkpoint_record>& cps) {
+        auto run = [](std::vector<region>& out, std::vector<checkpoint_record>& cps) {
             out.clear();
-            out.push_back(make_province("Alpha", 0, 0, 300, 5000));
-            out.push_back(make_province("Beta", 4, 4, 700, 5000));
-            out.push_back(make_province("Gamma", 8, 8, 500, 5000));
+            out.push_back(make_region("Alpha", 0, 0, 300, 5000));
+            out.push_back(make_region("Beta", 4, 4, 700, 5000));
+            out.push_back(make_region("Gamma", 8, 8, 500, 5000));
 
             for (int step = 0; step < 15; ++step)
             {
                 for (std::size_t i = 0; i < out.size(); ++i)
                 {
                     const int war_q = (step % 3 == 0 && i == 0) ? 400 : 0;
-                    advance_province_demography(out[i], /*years=*/10, war_q);
+                    advance_region_demography(out[i], /*years=*/10, war_q);
                 }
                 if (step % 4 == 0)
                     resolve_plague_event(out, cps, /*seed=*/0xB2730001u,
                                         /*stage_tag=*/0x9000u + static_cast<uint32_t>(step), /*gw=*/64);
-                for (province& pr : out)
+                for (region& pr : out)
                     raise_manpower(pr, 50);
             }
         };
 
-        std::vector<province> run_a, run_b;
+        std::vector<region> run_a, run_b;
         std::vector<checkpoint_record> cps_a, cps_b;
         run(run_a, cps_a);
         run(run_b, cps_b);

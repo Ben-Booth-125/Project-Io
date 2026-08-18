@@ -7,7 +7,7 @@
 // The creeds pass (BL-235) already rolls one small consonant/vowel inventory
 // per cradle-culture and coins that culture's own name and its gods out of it.
 // This header lifts that inventory out of creeds.cpp so it can be CONSUMED
-// downstream: a nation grown from a province settled by a culture is named in
+// downstream: a nation grown from a region settled by a culture is named in
 // THAT culture's tongue, and so is every city on its ground. The shared sound
 // system is therefore a consequence of the generation chain, not a coincidence
 // of two banks that happened to be written in the same accent.
@@ -45,14 +45,14 @@ struct tongue_lexicon
     std::vector<std::string> settlement; ///< "town" morphemes, suffixed to a city root.
     std::vector<std::string> qualifier;  ///< Standing epithets, preceding a name.
 
-    /// Region words a province name takes ("<People> <Region>"), BL-348. NINE,
+    /// Region words a region name takes ("<People> <Region>"), BL-348. NINE,
     /// because `settlement.cpp`'s positional mapping selects from a 5-band
     /// (north→south) axis and a 4-sector (dawnward→outer) axis: indices 0-4 are
     /// the bands, 5-8 the sectors. Sized to that mapping deliberately, so the
     /// name keeps carrying a FACT ABOUT THE GROUND rather than becoming
-    /// decorative — a coastal province and an interior one still read
+    /// decorative — a coastal region and an interior one still read
     /// differently, they just read differently in their own language.
-    std::vector<std::string> region;
+    std::vector<std::string> quarter;
 };
 
 /// Roll one tongue. Draws a deterministic subset of each pool with an

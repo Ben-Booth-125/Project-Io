@@ -245,7 +245,7 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed)
         // This pass runs BEFORE the creeds, so there is no culture to name
         // from yet: roll one tongue for the body and name every centre from
         // it, so the placeholder names are at least internally consistent.
-        // `name_population_centres` overwrites them per-province once the
+        // `name_population_centres` overwrites them per-region once the
         // settlement record exists (BL-290).
         mt_picker picker(name_rng);
         const tongue body_speech = roll_tongue(picker);

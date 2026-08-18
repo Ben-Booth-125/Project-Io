@@ -36,9 +36,9 @@ struct world_params
     /// Calendar year the generated world BEGINS at (BL-271, the Era -1 sandbox).
     /// 1960 (default) is the campaign epoch: the full pre-computed history runs
     /// (industrialisation, ruptures, globalisation). Any year below 1700 stops
-    /// the settlement pass at that year instead: provinces founded later do not
+    /// the settlement pass at that year instead: regions founded later do not
     /// exist yet, no furnace ever lights, no rupture is pre-resolved — that
-    /// history is the year-tick sim's to produce — and province demography is
+    /// history is the year-tick sim's to produce — and region demography is
     /// seeded at founding and grown to the start year. Sandbox-only: the
     /// 1960-era economy scaffolding (corps, markets, roads) still generates
     /// underneath and is out of frame; gating it is BL-271's build.
@@ -260,7 +260,7 @@ inline const char* const generation_stage_labels[] = {
     "Raising terrain",      // 4
     "Carving rivers",       // 5
     "Seeding peoples",      // 6
-    "Founding provinces",   // 7
+    "Founding regions",   // 7
     "Running the ancient era", // 8 — the long one
     "Drawing borders",      // 9
     "Laying roads",         // 10
@@ -320,7 +320,7 @@ struct generation_report
         /// What the settlement/industrialisation pass computed for this body
         /// (BL-218/BL-219). Its `history` is empty here for the same reason
         /// `continents.history` is — those lines were merged into
-        /// `state.history` at generation. What is kept is the province set (who
+        /// `state.history` at generation. What is kept is the region set (who
         /// settled where, whose gods they keep, which ancient deposits they sit
         /// on, when their furnaces lit), the rupture `checkpoints`, and the
         /// `lacunae` count — the holes the wars left in the record. Nothing
@@ -377,8 +377,8 @@ struct generation_report
     // Zero on a 1960-era world, where the antiquity branch does not run.
     int64_t prehistory_years     = 0; ///< Years simulated before the epoch.
     int64_t prehistory_battles   = 0; ///< Battles fought in that span.
-    int64_t prehistory_conquests = 0; ///< Provinces that changed hands.
-    int64_t prehistory_foundings = 0; ///< Provinces founded by the sim.
+    int64_t prehistory_conquests = 0; ///< Regions that changed hands.
+    int64_t prehistory_foundings = 0; ///< Regions founded by the sim.
 };
 
 /// Construct and return a world populated with the prototype's authored bodies.

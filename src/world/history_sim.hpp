@@ -9,7 +9,7 @@
 // WHAT THIS IS. `run_settlement` (BL-218) simulates settlement ->
 // industrialisation -> war ONCE, at generation time, then freezes the result.
 // Below the industrial era it generates the world AT its stop year and leaves
-// later provinces unfounded, with the comment "the year-tick sim founds them".
+// later regions unfounded, with the comment "the year-tick sim founds them".
 // This file is that sim: a YEAR tick from a start year to a stop year in which
 // polities settle, campaign, invest and consolidate, so wars and expansion
 // RECUR rather than firing once as checkpoints.
@@ -25,7 +25,7 @@
 // thousandths (1000 = 1.0). No floats anywhere in the decision path, and no
 // transcendentals — the standing determinism rule (io-standing-rules
 // § Determinism & data model) applies to `world/*` without exception, and this
-// loop feeds province ownership, which every later pass reads.
+// loop feeds region ownership, which every later pass reads.
 //
 // NO RNG. Scoring is pure. `seed` below does not drive a generator; it
 // deterministically perturbs each polity's weights so polities do not all
@@ -44,9 +44,9 @@
 // `army_stack_entry::type_power_mod`. combat.{hpp,cpp} is NOT modified.
 //
 // TERRITORY MOVES AT PROVINCE GRANULARITY, NEVER TILE. A won campaign
-// reassigns `province::nation` and nothing else. That keeps the per-year
+// reassigns `region::nation` and nothing else. That keeps the per-year
 // ownership ring small enough to be the History Log time-lapse substrate
-// (~82 provinces x 2000 years x 2 bytes), which a tile-granular border model
+// (~82 regions x 2000 years x 2 bytes), which a tile-granular border model
 // would not be.
 
 #include "combat.hpp"
@@ -68,7 +68,7 @@
 /// `resolve_battle`'s terrain scalars.
 ///
 /// Deliberately NOT `const world&` + tile_ids the way `run_settlement` takes
-/// them. The sim's whole decision path is province-level, so binding it to the
+/// them. The sim's whole decision path is region-level, so binding it to the
 /// ECS would buy nothing and cost headless testability. Both pointers may be
 /// null, in which case every battle is fought on the neutral default terrain —
 /// legal, and what the harness's synthetic cases use.
@@ -95,7 +95,7 @@ struct sim_terrain_view
 ///
 /// The consequence for the tunables below: a quantity that is a **rate** (per
 /// year) must be multiplied by the step when it is applied, and a quantity that
-/// is an **event** (a battle is lost, a province changes hands) must not.
+/// is an **event** (a battle is lost, a region changes hands) must not.
 /// `run_history_sim` scales exactly three rates — tech progress, cohesion
 /// recovery and contest decay — and nothing else.
 struct sim_tick_band
@@ -140,7 +140,7 @@ struct history_sim_params
     int tick_band_count = 6; ///< Live entries in `tick_bands`.
 
     // --- Objective selection (BL-277 Q1) ----------------------------------
-    int w_farm = 300; ///< Weight on a target province's farm endowment.
+    int w_farm = 300; ///< Weight on a target region's farm endowment.
     int w_ore  = 250; ///< Weight on its ore endowment.
     int w_port = 200; ///< Weight on its port endowment.
     int w_ring = 400; ///< Weight on ENCLOSED-SEA RING CLOSURE — see `ring_closure_q`.
@@ -155,7 +155,7 @@ struct history_sim_params
     ///
     /// THIS TERM ALONE DOES NOT STALL A FRONTIER, and the harness records it
     /// rather than asserting it away: with the score's distance preference
-    /// zeroed, a province 34 tiles out was still taken despite every campaign
+    /// zeroed, a region 34 tiles out was still taken despite every campaign
     /// arriving under-supplied. The reason is upstream in combat.cpp — supply
     /// only mitigates ATTRITION, and attrition is terrain x season, so on plains
     /// the entire span from fully supplied to totally cut off is 10% of combat
@@ -169,7 +169,7 @@ struct history_sim_params
     /// place all three are priced.
     int supply_decay_per_tile_q = 28;
 
-    /// Fraction of a province's banked manpower a campaign may raise.
+    /// Fraction of a region's banked manpower a campaign may raise.
     int levy_fraction_q = 400;
 
     // --- Season as an action axis -----------------------------------------
@@ -189,8 +189,8 @@ struct history_sim_params
     // the NORMALISED margin `(raw - threshold) / (ceiling - threshold)`.
     //
     // The first cut compared raw scores directly and it did not work. Invest's
-    // raw score was population/4000 clamped to 1000, and province population is
-    // hard-capped near 505,000 and only grows — so a few mature provinces pinned
+    // raw score was population/4000 clamped to 1000, and region population is
+    // hard-capped near 505,000 and only grows — so a few mature regions pinned
     // Invest at 1000 forever, while Campaign could not arithmetically exceed
     // ~750 and Settle ~600. The result was a simulation whose last ownership
     // change happened at median year 458 of a 0-1960 run: three quarters of
@@ -222,16 +222,16 @@ struct history_sim_params
     // favours the verb with the NARROWEST range. Settle's usable span is 220
     // wide and Campaign's ~540, so equal relative desirability gave Settle the
     // larger margin — the run went from Invest-dominated to Settle-dominated
-    // (82 -> 1532 provinces, 1450 foundings, conquests ZERO). Same failure,
+    // (82 -> 1532 regions, 1450 foundings, conquests ZERO). Same failure,
     // different verb. Rescaling incommensurable numbers cannot make them
     // commensurable.
     //
     // WHAT LANDED INSTEAD (BL-318): the verbs are scored on one scale BY
-    // CONSTRUCTION. `province_value_q` in the .cpp is the common unit — a
-    // province is worth the mean of its three endowment windows — and every
+    // CONSTRUCTION. `region_value_q` in the .cpp is the common unit — a
+    // region is worth the mean of its three endowment windows — and every
     // verb answers the same question in it: what is this worth to me this year,
-    // in provinces-worth-of-endowment. Campaign values the ground taken times
-    // the odds of taking it, less supply; Settle values the daughter province
+    // in regions-worth-of-endowment. Campaign values the ground taken times
+    // the odds of taking it, less supply; Settle values the daughter region
     // times the pressure driving it; Invest values holdings times yield over the
     // payback period; Consolidate values holdings at risk times the cohesion
     // shortfall. The argmax is then an honest comparison rather than a
@@ -239,11 +239,11 @@ struct history_sim_params
     //
     // THE COROLLARY, and the trap this item kept falling into: a term that is
     // NOT in the currency must not be SUBTRACTED from something that is. Both
-    // `w_cult` and `w_dist` were flat subtractions from a province value of only
+    // `w_cult` and `w_dist` were flat subtractions from a region value of only
     // ~200-300, so each acted as a veto rather than a preference — measured,
     // w_cult 150 gave 0 battles and w_cult 0 gave 266. Both are now
     // PROPORTIONAL (a per-mille discount on the prize), which says the same
-    // thing at any province value and at any map size. Supply is priced ONCE,
+    // thing at any region value and at any map size. Supply is priced ONCE,
     // by a single lambda both the scorer and the executed battle call, for the
     // same reason — see `campaign_supply` in the .cpp.
 
@@ -251,24 +251,24 @@ struct history_sim_params
     /// hands. Below it the battle is a raid: losses and contest, no transfer.
     int transfer_decisiveness_q = 300;
 
-    /// Adjacency radius in tiles — two provinces closer than this are
+    /// Adjacency radius in tiles — two regions closer than this are
     /// neighbours, and only neighbours are campaign candidates.
     int neighbour_radius = 9;
 
     // --- Logistics (BL-314) -----------------------------------------------
     //
     // Ben, 2026-08-04: "it should definitely be tangibly harder to supply more
-    // provinces, and fight further away battles." Before this item neither was
+    // regions, and fight further away battles." Before this item neither was
     // true. Supply was straight-line Chebyshev distance feeding a term whose
     // whole dynamic range was 10% of combat power, and breadth cost nothing at
-    // all — holding 500 provinces cost exactly what holding 5 cost.
+    // all — holding 500 regions cost exactly what holding 5 cost.
 
     /// Extra supply cost per tile of TERRAIN-WEIGHTED reach, on top of the
     /// per-tile decay. Mountains cost roughly twice what plains cost, using the
     /// same landform ratios logistics.cpp already defines for the 1960 era.
     int terrain_reach_cost_q = 10;
 
-    /// THE BURDEN OF BREADTH. Supply lost per province held beyond
+    /// THE BURDEN OF BREADTH. Supply lost per region held beyond
     /// `free_holdings`, in per-mille. An empire spread thin supplies every
     /// campaign worse, so expansion eventually pays for itself in reach — the
     /// arithmetic stall BL-277 Q2 claimed but never had.
@@ -285,30 +285,30 @@ struct history_sim_params
     int stalled_supply_q = 300;
 
     /// Population pressure (population * 1000 / carrying capacity) above which
-    /// a polity will consider founding a new province.
+    /// a polity will consider founding a new region.
     int settle_pressure_q = 780;
 
     // --- Defeat compounds (BL-308) ----------------------------------------
-    /// Cohesion lost when a province is taken from this polity.
+    /// Cohesion lost when a region is taken from this polity.
     int cohesion_loss_on_defeat_q = 110;
     /// Cohesion regained per year of Consolidate — deliberately slower than the
     /// loss, so recovery costs several quiet years and a two-front collapse is
     /// not simply walked back.
     int cohesion_recovery_q = 14;
     /// Floor cohesion can fall to. Above zero so a dying polity still fights,
-    /// badly, rather than becoming a free province with a flag on it.
+    /// badly, rather than becoming a free region with a flag on it.
     int cohesion_floor_q = 180;
-    /// Cohesion below which a polity stops founding new provinces. A state
+    /// Cohesion below which a polity stops founding new regions. A state
     /// fighting for its life does not colonise, and letting it do so was the
     /// main reason losers regrew faster than they were conquered.
     int settle_cohesion_gate_q = 620;
 
-    /// Fraction of a conquered province's population lost in the taking.
+    /// Fraction of a conquered region's population lost in the taking.
     /// The collapse path the first sweep had none of: population rose to
     /// carrying capacity by ~1300 CE and never fell again in any world.
     int sack_population_loss_q = 220;
 
-    /// How much a province's accumulated `contest_q` lowers the decisiveness a
+    /// How much a region's accumulated `contest_q` lowers the decisiveness a
     /// victory needs before territory changes hands. A frontier ground down
     /// over centuries should eventually give, which a flat threshold never let
     /// it do — battles outnumbered conquests by up to 1000:1.
@@ -317,7 +317,7 @@ struct history_sim_params
     // --- Works (BL-321) ---------------------------------------------------
     //
     // THE COUNTER-MOVE TO THE BURDEN OF BREADTH. BL-314 charges a polity supply
-    // for every province past `free_holdings`, and before this item there was
+    // for every region past `free_holdings`, and before this item there was
     // nothing to buy with: the only answer to the charge was to stop expanding,
     // which makes the frontier stall a CEILING. Works make it a DECISION —
     // spend a round on a Way Station and the same breadth costs less.
@@ -358,12 +358,12 @@ struct history_sim_params
     /// which is what keeps BL-224's non-hegemony emergent.
     int work_reach_relief_cap_q = 800;
 
-    /// How many held provinces a polity considers building on per round. Two:
+    /// How many held regions a polity considers building on per round. Two:
     /// its capital, and one rotated deterministically through its holdings.
     /// Scoring every holding would be O(held x rows) inside a pass already
     /// costing ~23 s of a ~25 s world; rotating spreads works across the empire
     /// over a run without paying for a full scan every round.
-    int work_candidate_provinces = 2;
+    int work_candidate_regions = 2;
 
     // --- Great-power seed (BL-299) ----------------------------------------
     /// Seed two opposed majors: one preserving, one expansionist. Off by
@@ -395,15 +395,15 @@ enum class sim_domain : uint8_t
 inline constexpr int sim_domain_count = 7;
 
 /// One governing entity. At the antiquity start these are CULTURES, not
-/// nations — `run_settlement` leaves `province::nation` at -1 until the
+/// nations — `run_settlement` leaves `region::nation` at -1 until the
 /// political pass runs, and a pre-national ladder (BL-221) is exactly a world
-/// whose actors are peoples. The sim writes `province::nation` as it goes, so
+/// whose actors are peoples. The sim writes `region::nation` as it goes, so
 /// by the stop year the political map is this loop's output.
 struct polity
 {
     int id      = -1; ///< Index into `history_sim_state::polities`.
     int culture = -1; ///< Index into `creed_state::cultures`.
-    int capital = -1; ///< Province index; the origin supply decays from.
+    int capital = -1; ///< Region index; the origin supply decays from.
 
     /// Doctrine lean, 0-1000, from the culture's `aggression_q` (BL-277 Q5).
     int aggression_q = 0;
@@ -420,8 +420,8 @@ struct polity
     /// compound instead of merely accumulating.
     ///
     /// Without it the first sweep produced elimination in 0 of 12 worlds:
-    /// losing a province cost a polity that province's manpower and nothing
-    /// else, so its remaining provinces defended exactly as well as before and
+    /// losing a region cost a polity that region's manpower and nothing
+    /// else, so its remaining regions defended exactly as well as before and
     /// no defeat ever led to another. Cohesion falls when ground is lost and
     /// multiplies the power of every stack the polity fields, so a losing
     /// polity gets easier to beat — which is what a death spiral is.
@@ -444,7 +444,7 @@ struct polity
     /// and an opposed strategic creed; the periphery stays alive as actors.
     bool major = false;
 
-    bool alive = true; ///< False once the polity holds no provinces.
+    bool alive = true; ///< False once the polity holds no regions.
 };
 
 /// What the scorer chose for one polity in one year — kept for the harness and
@@ -457,31 +457,31 @@ enum class sim_verb : uint8_t
     campaign,
     invest,
     consolidate,
-    build_work, ///< Raise an Era -1 work on a held province (BL-321).
+    build_work, ///< Raise an Era -1 work on a held region (BL-321).
 };
 
 // ---------------------------------------------------------------------------
 // Result
 // ---------------------------------------------------------------------------
 
-/// One ownership change: province `province` came under polity `owner` in
+/// One ownership change: region `region` came under polity `owner` in
 /// year `year`.
 ///
-/// `owner_none` is reserved for a province leaving all ownership, but NOTHING
-/// EMITS IT TODAY: once settled or conquered a province always has an owner,
+/// `owner_none` is reserved for a region leaving all ownership, but NOTHING
+/// EMITS IT TODAY: once settled or conquered a region always has an owner,
 /// and no code path resets one to unowned. The value is kept because
-/// `owner_slice_at` needs it for provinces that do not exist yet in an early
+/// `owner_slice_at` needs it for regions that do not exist yet in an early
 /// year, and because depopulation-to-abandonment is a plausible later mechanic
 /// — but a reader should not infer from the sentinel that abandonment exists
 /// (BL-312).
 ///
 /// This is the whole time-lapse format. It is a change LIST rather than a
 /// per-year grid because ownership is overwhelmingly static — most years, on
-/// most provinces, nothing happens, and a dense grid pays for all of it.
+/// most regions, nothing happens, and a dense grid pays for all of it.
 struct owner_change
 {
     int32_t  year     = 0;
-    uint16_t province = 0;
+    uint16_t region = 0;
     uint16_t owner    = 0;
 };
 
@@ -492,10 +492,10 @@ struct history_sim_state
     std::vector<polity> polities;
 
     /// The History Log time-lapse substrate (Ben, 2026-08-04), DELTA-ENCODED:
-    /// one record per ownership CHANGE, not per province per year.
+    /// one record per ownership CHANGE, not per region per year.
     ///
     /// A dense year-major grid was the obvious first cut and it is the wrong
-    /// one: the Settle verb grows the province count during a run (82 -> ~480
+    /// one: the Settle verb grows the region count during a run (82 -> ~480
     /// over 2000 years on Kepler), so a dense ring costs stride x years and
     /// reached ~1.9 MB in practice. Almost every cell in it repeats the cell
     /// above. The change list is ~8 bytes per actual event and lands three
@@ -506,7 +506,7 @@ struct history_sim_state
     /// each change, and you have the map at any year. `owner_slice_at` does
     /// exactly that for a caller that wants one year materialised.
     std::vector<owner_change> owner_changes;
-    int      province_stride = 0; ///< Final province count (slice width for replay).
+    int      region_stride = 0; ///< Final region count (slice width for replay).
     int64_t  years           = 0; ///< Years simulated.
     int64_t  start_year      = 0; ///< First simulated year, for replay bounds.
 
@@ -543,12 +543,12 @@ struct history_sim_state
     int64_t peak_year       = 0;
 };
 
-/// Sentinel for "no polity owns this province in this year slice".
+/// Sentinel for "no polity owns this region in this year slice".
 inline constexpr uint16_t owner_none = 0xFFFFu;
 
-/// Hard cap on the province count, because `owner_change::province` is a
+/// Hard cap on the region count, because `owner_change::region` is a
 /// uint16_t and `owner_none` claims the top value. The Settle verb grows the
-/// province vector without any natural bound, so this is the guard that stops
+/// region vector without any natural bound, so this is the guard that stops
 /// a long run silently wrapping the index and replaying a plausible-but-wrong
 /// political map (BL-312).
 inline constexpr std::size_t owner_index_limit = 0xFFFEu;
@@ -557,8 +557,8 @@ inline constexpr std::size_t owner_index_limit = 0xFFFEu;
 // Entry point
 // ---------------------------------------------------------------------------
 
-/// Run the year-tick history sim over @p ss, mutating it in place: province
-/// ownership, population, manpower and culture all move, and new provinces are
+/// Run the year-tick history sim over @p ss, mutating it in place: region
+/// ownership, population, manpower and culture all move, and new regions are
 /// appended as the Settle verb founds them.
 ///
 /// PURE AND DETERMINISTIC in the sense the harness checks: two runs from
@@ -580,7 +580,7 @@ inline constexpr std::size_t owner_index_limit = 0xFFFEu;
 ///                and every headless caller) costs nothing and changes nothing —
 ///                the sim never reads it back, so determinism is untouched.
 /// @param works   The Era -1 works table (BL-321), or null to run with works
-///                DISABLED — no `build_work` candidate is scored and no province
+///                DISABLED — no `build_work` candidate is scored and no region
 ///                gains one. Injected rather than fetched from a global for the
 ///                reason works_roster.hpp gives: the table is authored in Lua,
 ///                and a sim that reached for a Lua-loaded global could not be
@@ -598,11 +598,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                   std::atomic<int>*         year_progress = nullptr,
                                   const works_registry*     works         = nullptr);
 
-/// Tile distance between two provinces on the cylinder — column difference
+/// Tile distance between two regions on the cylinder — column difference
 /// wraps, row difference does not. Exposed because the harness asserts the
 /// supply-decay stall against it, and a test that recomputed distance its own
 /// way would be testing its own arithmetic rather than the sim's.
-int province_distance(const province& a, const province& b, int gw);
+int region_distance(const region& a, const region& b, int gw);
 
 /// Years between decision rounds at calendar year @p y, read from @p p's band
 /// table. Returns the first band whose `until_year` exceeds @p y, falling back
@@ -610,7 +610,7 @@ int province_distance(const province& a, const province& b, int gw);
 ///
 /// Exposed because the harness binds to the band schedule directly — a test
 /// that recomputed the ladder its own way would be testing its own arithmetic,
-/// the same reason `province_distance` is public.
+/// the same reason `region_distance` is public.
 int step_for_year(const history_sim_params& p, int64_t y);
 
 /// Bytes the time-lapse substrate occupies — the quantity the requirement
@@ -621,8 +621,8 @@ inline int64_t owner_ring_bytes(const history_sim_state& s)
 }
 
 /// Materialise the ownership map as it stood at the END of @p year — the
-/// time-lapse read. Returns `province_stride` entries, `owner_none` where the
-/// province did not exist yet or was unowned.
+/// time-lapse read. Returns `region_stride` entries, `owner_none` where the
+/// region did not exist yet or was unowned.
 ///
 /// Linear in the change list, which is the point: a whole 2000-year playback
 /// is one forward walk, and a seek to a single year costs no more than the

@@ -44,7 +44,7 @@ void name_population_centres(world& w, entity_id body_id, int gw,
                              const settlement_state& ss, const creed_state& cs,
                              uint32_t seed)
 {
-    if (ss.provinces.empty() || cs.cultures.empty() || gw <= 0)
+    if (ss.regions.empty() || cs.cultures.empty() || gw <= 0)
         return;
 
     // Sorted-id order over this body's centres, from an independent stream —
@@ -65,12 +65,12 @@ void name_population_centres(world& w, entity_id body_id, int gw,
         const auto tit = w.tiles.find(w.population_centre_tile[cid]);
         if (tit == w.tiles.end()) continue;
 
-        // WHOSE GROUND. The nearest province owns the settlement's speech, the
-        // same rule that gave the province its own culture from the nearest
-        // cradle — so a city, its province and its gods share one tongue.
-        const int pi = nearest_province(ss, tit->second.grid_x, tit->second.grid_y, gw);
+        // WHOSE GROUND. The nearest region owns the settlement's speech, the
+        // same rule that gave the region its own culture from the nearest
+        // cradle — so a city, its region and its gods share one tongue.
+        const int pi = nearest_region(ss, tit->second.grid_x, tit->second.grid_y, gw);
         if (pi < 0) continue;
-        const int ci = ss.provinces[static_cast<std::size_t>(pi)].culture;
+        const int ci = ss.regions[static_cast<std::size_t>(pi)].culture;
         if (ci < 0 || ci >= static_cast<int>(cs.cultures.size())) continue;
 
         const tongue& t = cs.cultures[static_cast<std::size_t>(ci)].speech;

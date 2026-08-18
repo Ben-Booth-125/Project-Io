@@ -8,7 +8,7 @@
 // clock gets a fast harness of its own that the gate can actually run.
 //
 // Everything here is bounded: the longest run is 4000 simulated years over a
-// hand-built 12-province world, which is the point — the stepped clock is
+// hand-built 12-region world, which is the point — the stepped clock is
 // supposed to make a 4000-year run CHEAPER than the old 1960-year one.
 // ---------------------------------------------------------------------------
 
@@ -31,28 +31,28 @@ void check(bool ok, const std::string& what)
         ++g_failures;
 }
 
-/// A small deterministic province table. Deliberately hand-built rather than
+/// A small deterministic region table. Deliberately hand-built rather than
 /// generated: this harness is about the CLOCK, and a generated world would make
 /// every assertion depend on the generator too.
-settlement_state make_world(int provinces)
+settlement_state make_world(int regions)
 {
     settlement_state ss;
-    for (int i = 0; i < provinces; ++i)
+    for (int i = 0; i < regions; ++i)
     {
-        province p;
+        region p;
         p.col                = (i * 41) % 300;
         p.row                = (i * 23) % 140;
         p.culture            = i % 4;
         p.nation             = -1;
         p.settle_score_q     = 400 + (i * 37) % 400;
-        // Carrying capacity is DERIVED from farm_q (province_carrying_capacity),
+        // Carrying capacity is DERIVED from farm_q (region_carrying_capacity),
         // not stored, so the endowment below is what bounds growth.
         p.population         = 8000 + i * 250;
         p.manpower_stock     = 2000 + i * 60;
         p.farm_q             = 300 + (i * 53) % 500;
         p.ore_q              = 200 + (i * 29) % 500;
         p.port_q             = (i % 3 == 0) ? 600 : 100;
-        ss.provinces.push_back(p);
+        ss.regions.push_back(p);
     }
     return ss;
 }
@@ -144,14 +144,14 @@ int main()
         history_sim_params p;
         settlement_state s = make_world(12);
         int64_t before = 0;
-        for (const province& q : s.provinces) before += q.population;
+        for (const region& q : s.regions) before += q.population;
 
         run_history_sim(s, nullptr, no_terrain, 60, 30, p, 7u);
 
         int64_t after = 0;
-        for (const province& q : s.provinces) after += q.population;
+        for (const region& q : s.regions) after += q.population;
 
-        // Growth runs toward province_carrying_capacity(farm_q) over 4000 years,
+        // Growth runs toward region_carrying_capacity(farm_q) over 4000 years,
         // so it must be large — not the sliver a gated demography would leave.
         check(after > before * 3,
               "R5 population grows across the full span (demography is not gated by the band)");
@@ -288,7 +288,7 @@ int main()
         p.tick_bands[0]   = {0, 4}; // one band, 4-year step -> 100 rounds
         p.tick_band_count = 1;
 
-        settlement_state s = make_world(40); // nearer a real world's province count
+        settlement_state s = make_world(40); // nearer a real world's region count
         const auto t0 = std::chrono::steady_clock::now();
         const history_sim_state a = run_history_sim(s, nullptr, no_terrain, 100, 50, p, 31337u);
         const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -298,7 +298,7 @@ int main()
         for (const polity& q : a.polities)
             if (!q.alive) ++owners_lost;
 
-        std::printf("      [R8] 400y @ 4y/tick, 40 provinces, %lld ms\n",
+        std::printf("      [R8] 400y @ 4y/tick, 40 regions, %lld ms\n",
                     static_cast<long long>(ms));
         std::printf("      [R8] battles=%lld conquests=%lld foundings=%lld polities=%zu dead=%d\n",
                     static_cast<long long>(a.battles), static_cast<long long>(a.conquests),

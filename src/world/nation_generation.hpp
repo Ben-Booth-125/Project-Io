@@ -58,7 +58,7 @@ struct nation_params
     /// in order, as the nation cores.
     ///
     /// This is the whole of BL-218's "seeding changes, expansion does not": the
-    /// settlement pass (`src/world/settlement.{hpp,cpp}`) places provinces on
+    /// settlement pass (`src/world/settlement.{hpp,cpp}`) places regions on
     /// ground people would actually have settled and hands the anchors over here,
     /// so the BFS/growth machinery BL-053 tuned is reused untouched and only its
     /// starting points become historical. Empty (the default) preserves the
@@ -72,7 +72,7 @@ struct nation_params
     std::vector<int> seed_tiles;
 
     /// Parallel to `seed_tiles`: the tongue of the culture that settled each
-    /// anchor (BL-290). Pass 5 names a nation in the speech of the province it
+    /// anchor (BL-290). Pass 5 names a nation in the speech of the region it
     /// grew from, so a realm, its gods and its cities share one sound system as
     /// a consequence of the generation chain rather than by coincidence. Short,
     /// empty, or unusable entries fall back to a tongue rolled in Pass 5.

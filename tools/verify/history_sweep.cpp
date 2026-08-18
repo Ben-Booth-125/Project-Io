@@ -106,20 +106,20 @@ works_registry works_fixture()
     return reg;
 }
 
-/// A minimal one-polity world of `n` provinces in a row, each with the ground
+/// A minimal one-polity world of `n` regions in a row, each with the ground
 /// the caller asks for. Cheap enough to run several of inside a sweep.
 settlement_state strip_world(int n, int farm_q, int ore_q, int port_q, int culture)
 {
     settlement_state ss;
     for (int i = 0; i < n; ++i)
     {
-        province p;
+        region p;
         p.col = i * 3; p.row = 0; p.anchor = i * 3;
         p.culture = culture; p.founding_culture = culture;
         p.farm_q = farm_q; p.ore_q = ore_q; p.port_q = port_q;
         p.settle_score_q = 900 - i;
         p.name = "Strip" + std::to_string(i);
-        ss.provinces.push_back(p);
+        ss.regions.push_back(p);
     }
     return ss;
 }
@@ -132,22 +132,22 @@ settlement_state rival_strip(int per_side, int farm_q, int ore_q, int port_q)
 {
     settlement_state ss = strip_world(per_side, farm_q, ore_q, port_q, 0);
     settlement_state b  = strip_world(per_side, farm_q, ore_q, port_q, 1);
-    for (province& p : b.provinces)
+    for (region& p : b.regions)
     {
         p.col += per_side * 3;      // Continue the row, so the two sides adjoin.
         p.anchor = p.col;
         p.name += "B";
     }
-    ss.provinces.insert(ss.provinces.end(), b.provinces.begin(), b.provinces.end());
+    ss.regions.insert(ss.regions.end(), b.regions.begin(), b.regions.end());
     return ss;
 }
 
-/// One province's works mask, so a check can say WHICH works stand rather than
+/// One region's works mask, so a check can say WHICH works stand rather than
 /// only how many.
 uint32_t masks_of(const settlement_state& ss)
 {
     uint32_t all = 0;
-    for (const province& p : ss.provinces) all |= p.works_built;
+    for (const region& p : ss.regions) all |= p.works_built;
     return all;
 }
 
@@ -156,29 +156,29 @@ struct sweep_row
 {
     uint32_t seed = 0;
 
-    int provinces_start = 0;
-    int provinces_end   = 0;
+    int regions_start = 0;
+    int regions_end   = 0;
     int powers_start    = 0;
     int powers_end      = 0;
 
-    /// Largest single polity's share of provinces at the epoch, per-mille.
+    /// Largest single polity's share of regions at the epoch, per-mille.
     int  top_share_q     = 0;
     /// First year any polity crossed the hegemony threshold, or -1 for never.
     int64_t hegemony_year = -1;
     int  peak_share_q     = 0; ///< The highest share reached at any point.
-    /// Provinces held by the WEAKEST surviving power at the epoch — how close
+    /// Regions held by the WEAKEST surviving power at the epoch — how close
     /// the model gets to eliminating anyone (BL-308).
     int  smallest_holding = 0;
 
     int64_t battles   = 0;
     int64_t conquests = 0;
     int64_t foundings = 0;
-    /// Works raised over the run (BL-321), and how many provinces ended the run
+    /// Works raised over the run (BL-321), and how many regions ended the run
     /// with at least one. Reported rather than gated, like every other metric
     /// here — but a column of zeroes would mean the roster never fired at all,
     /// which is the failure this item is most likely to have.
     int64_t works_raised   = 0;
-    int     provinces_with_works = 0;
+    int     regions_with_works = 0;
 
     int64_t peak_population  = 0;
     int64_t peak_year        = 0;
@@ -200,7 +200,7 @@ struct sweep_row
     int      early_change_pct = 0;
 };
 
-/// A polity holding this share of all provinces counts as a hegemon. 0.5 is
+/// A polity holding this share of all regions counts as a hegemon. 0.5 is
 /// the plainest reading of "one power dominates the world" and is a REPORTING
 /// threshold only — it gates nothing.
 constexpr int hegemony_threshold_q = 500;
@@ -209,7 +209,7 @@ constexpr int hegemony_threshold_q = 500;
 /// materialised slice.
 ///
 /// The smallest holding is the diagnostic for BL-308: "elimination rate 0/12"
-/// alone cannot distinguish a model that is one province away from killing
+/// alone cannot distinguish a model that is one region away from killing
 /// somebody from one where the weakest power still holds fifty. Those need
 /// completely different fixes, so the sweep reports the distance rather than
 /// just the binary.
@@ -301,7 +301,7 @@ int main(int argc, char** argv)
 
         sweep_row row;
         row.seed            = wp.seed;
-        row.provinces_start = static_cast<int>(ss.provinces.size());
+        row.regions_start = static_cast<int>(ss.regions.size());
         row.lacunae         = k->settlement.lacunae;
 
         // THE DEFAULT EPOCH IS THE ONE THE GAME RUNS. This was pinned to
@@ -340,7 +340,7 @@ int main(int argc, char** argv)
                     static_cast<int>((early * 100) / static_cast<int64_t>(sim.owner_changes.size()));
         }
 
-        row.provinces_end = static_cast<int>(ss.provinces.size());
+        row.regions_end = static_cast<int>(ss.regions.size());
         row.battles       = sim.battles;
         row.conquests     = sim.conquests;
         row.foundings     = sim.foundings;
@@ -348,10 +348,10 @@ int main(int argc, char** argv)
         row.peak_year       = sim.peak_year;
 
         row.works_raised = sim.works_raised;
-        for (const province& p : ss.provinces)
-            if (p.works_built != 0) ++row.provinces_with_works;
+        for (const region& p : ss.regions)
+            if (p.works_built != 0) ++row.regions_with_works;
 
-        for (const province& p : ss.provinces) row.epoch_population += p.population;
+        for (const region& p : ss.regions) row.epoch_population += p.population;
 
         // Shape at the start and at the epoch, plus the highest concentration
         // reached at any century — a world can form a hegemony and lose it
@@ -370,7 +370,7 @@ int main(int argc, char** argv)
         }
 
         std::vector<int64_t> ind;
-        for (const province& p : ss.provinces)
+        for (const region& p : ss.regions)
             if (p.industrialised) ind.push_back(p.industrial_year);
         if (!ind.empty())
         {
@@ -398,14 +398,14 @@ int main(int argc, char** argv)
         else                     std::snprintf(heg, sizeof heg, "%5lld",
                                                static_cast<long long>(r.hegemony_year));
         std::printf("%4u  %5d > %5d  %6d > %6d  %3d%%  %3d  %s  %7lld  %4lld  %11lld (%4lld)  %12lld  %4lld  %5lld (%4d)\n",
-                    r.seed, r.provinces_start, r.provinces_end,
+                    r.seed, r.regions_start, r.regions_end,
                     r.powers_start, r.powers_end,
                     r.top_share_q / 10, r.smallest_holding, heg,
                     static_cast<long long>(r.battles), static_cast<long long>(r.conquests),
                     static_cast<long long>(r.peak_population), static_cast<long long>(r.peak_year),
                     static_cast<long long>(r.epoch_population),
                     static_cast<long long>(r.ms),
-                    static_cast<long long>(r.works_raised), r.provinces_with_works);
+                    static_cast<long long>(r.works_raised), r.regions_with_works);
     }
 
     // --- The distributions -------------------------------------------------
@@ -420,7 +420,7 @@ int main(int argc, char** argv)
             tops.push_back(r.top_share_q);
             battles.push_back(r.battles);
             conq.push_back(r.conquests);
-            ends.push_back(r.provinces_end);
+            ends.push_back(r.regions_end);
             if (r.hegemony_year >= 0) ++hegemonies;
             if (r.powers_end < r.powers_start) ++eliminations;
         }
@@ -441,7 +441,7 @@ int main(int argc, char** argv)
                     static_cast<long long>(bs.first), static_cast<long long>(bs.second));
         std::printf("  conquests per world  median %lld\n",
                     static_cast<long long>(median_of(conq)));
-        std::printf("  provinces at epoch   median %lld\n",
+        std::printf("  regions at epoch   median %lld\n",
                     static_cast<long long>(median_of(ends)));
         std::vector<int64_t> lasts;
         for (const sweep_row& r : rows) lasts.push_back(r.last_change_year);
@@ -458,7 +458,7 @@ int main(int argc, char** argv)
         const auto ss_ = span(smalls);
         std::printf("  ELIMINATION RATE     %d / %d worlds lost even one power\n",
                     eliminations, static_cast<int>(rows.size()));
-        std::printf("  WEAKEST POWER holds  median %lld provinces   range %lld..%lld\n",
+        std::printf("  WEAKEST POWER holds  median %lld regions   range %lld..%lld\n",
                     static_cast<long long>(median_of(smalls)),
                     static_cast<long long>(ss_.first), static_cast<long long>(ss_.second));
         std::printf("\n  (Both rates are REPORTED, not asserted — BL-224's non-hegemony becomes a\n"
@@ -476,14 +476,14 @@ int main(int argc, char** argv)
         {
             const sweep_row& r = rows[i];
             std::fprintf(f,
-                "  {\"seed\": %u, \"provinces_start\": %d, \"provinces_end\": %d, "
+                "  {\"seed\": %u, \"regions_start\": %d, \"regions_end\": %d, "
                 "\"powers_start\": %d, \"powers_end\": %d, \"top_share_q\": %d, "
                 "\"peak_share_q\": %d, \"smallest_holding\": %d, \"hegemony_year\": %lld, \"battles\": %lld, "
                 "\"conquests\": %lld, \"foundings\": %lld, \"peak_population\": %lld, "
                 "\"peak_year\": %lld, \"epoch_population\": %lld, \"lacunae\": %d, "
                 "\"industrial_first\": %lld, \"industrial_median\": %lld, "
                 "\"industrial_last\": %lld, \"ms\": %lld}%s\n",
-                r.seed, r.provinces_start, r.provinces_end, r.powers_start, r.powers_end,
+                r.seed, r.regions_start, r.regions_end, r.powers_start, r.powers_end,
                 r.top_share_q, r.peak_share_q, r.smallest_holding,
                 static_cast<long long>(r.hegemony_year),
                 static_cast<long long>(r.battles), static_cast<long long>(r.conquests),
@@ -555,11 +555,11 @@ int main(int argc, char** argv)
         {
             settlement_state rich = strip_world(1, 900, 900, 900, 0);
             settlement_state poor = strip_world(1, 900,   0, 900, 0);
-            rich.provinces[0].population = 50000;
-            poor.provinces[0].population = 50000;
+            rich.regions[0].population = 50000;
+            poor.regions[0].population = 50000;
 
-            const auto ra = works.available(rich.provinces[0], roster_band::classical);
-            const auto pa = works.available(poor.provinces[0], roster_band::classical);
+            const auto ra = works.available(rich.regions[0], roster_band::classical);
+            const auto pa = works.available(poor.regions[0], roster_band::classical);
 
             bool rich_has_pits = false, poor_has_pits = false;
             for (const work_row* r : ra) if (r->name == "Test Pits") rich_has_pits = true;
@@ -580,18 +580,18 @@ int main(int argc, char** argv)
         // W2 — the population floor gates independently of the endowment.
         {
             settlement_state small = strip_world(1, 900, 900, 900, 0);
-            small.provinces[0].population = 1000; // Under every population floor here.
-            const auto sa = works.available(small.provinces[0], roster_band::classical);
+            small.regions[0].population = 1000; // Under every population floor here.
+            const auto sa = works.available(small.regions[0], roster_band::classical);
             check(sa.empty(),
-                  "W2   a province under every population floor is offered nothing");
+                  "W2   a region under every population floor is offered nothing");
         }
 
         // W3 — bands gate, and are CUMULATIVE.
         {
             settlement_state p = strip_world(1, 900, 900, 900, 0);
-            p.provinces[0].population = 50000;
-            const auto classical = works.available(p.provinces[0], roster_band::classical);
-            const auto medieval  = works.available(p.provinces[0], roster_band::medieval);
+            p.regions[0].population = 50000;
+            const auto classical = works.available(p.regions[0], roster_band::classical);
+            const auto medieval  = works.available(p.regions[0], roster_band::medieval);
 
             bool cl_fortress = false, md_fortress = false, md_way = false;
             for (const work_row* r : classical) if (r->name == "Test Fortress") cl_fortress = true;
@@ -611,24 +611,24 @@ int main(int argc, char** argv)
         {
             works_registry r2 = works;
             settlement_state p = strip_world(1, 900, 900, 900, 0);
-            p.provinces[0].population = 50000;
+            p.regions[0].population = 50000;
 
             const int gid = r2.id_of("Test Granary");
-            const bool applied = gid >= 0 && apply_work_to_province(p.provinces[0], r2, gid);
-            const bool refused = gid >= 0 && !apply_work_to_province(p.provinces[0], r2, gid);
+            const bool applied = gid >= 0 && apply_work_to_region(p.regions[0], r2, gid);
+            const bool refused = gid >= 0 && !apply_work_to_region(p.regions[0], r2, gid);
 
             check(applied && refused,
                   "W4   a work applies once and REFUSES to be built twice");
-            check(p.provinces[0].work_capacity_mod == 180
-               && p.provinces[0].work_manpower_mod == 40,
-                  "W4b  the province's accumulators carry the row's effect");
+            check(p.regions[0].work_capacity_mod == 180
+               && p.regions[0].work_manpower_mod == 40,
+                  "W4b  the region's accumulators carry the row's effect");
 
-            const work_effect derived = r2.total_effect_mask(p.provinces[0].works_built);
-            check(derived.capacity_mod == p.provinces[0].work_capacity_mod
-               && derived.manpower_mod == p.provinces[0].work_manpower_mod,
+            const work_effect derived = r2.total_effect_mask(p.regions[0].works_built);
+            check(derived.capacity_mod == p.regions[0].work_capacity_mod
+               && derived.manpower_mod == p.regions[0].work_manpower_mod,
                   "W4c  the accumulators agree with a fresh recompute from the mask");
 
-            check(province_carrying_capacity(900, 180) > province_carrying_capacity(900)
+            check(region_carrying_capacity(900, 180) > region_carrying_capacity(900)
                && manpower_ceiling(100000, 40) > manpower_ceiling(100000),
                   "W4d  the capacity and manpower effects reach their consumers");
         }
@@ -640,9 +640,9 @@ int main(int argc, char** argv)
             history_sim_params wp2;
             wp2.start_year = -400;
             wp2.stop_year  = 0;
-            // Settle OFF (an unreachable pressure threshold), so the province
+            // Settle OFF (an unreachable pressure threshold), so the region
             // count is fixed and the comparison isolates the capacity effect.
-            // Left on, a works run would found a different number of provinces
+            // Left on, a works run would found a different number of regions
             // from the plain one and the population totals would be measuring
             // that instead — a true-for-the-wrong-reason check either way.
             wp2.settle_pressure_q = 1001;
@@ -656,8 +656,8 @@ int main(int argc, char** argv)
                 run_history_sim(off, nullptr, no_terrain, 60, 30, wp2, 4242u, nullptr, nullptr);
 
             int64_t pop_on = 0, pop_off = 0;
-            for (const province& p : on.provinces)  pop_on  += p.population;
-            for (const province& p : off.provinces) pop_off += p.population;
+            for (const region& p : on.regions)  pop_on  += p.population;
+            for (const region& p : off.regions) pop_off += p.population;
 
             std::printf("      works on: %lld raised, pop %lld   |   off: %lld raised, pop %lld\n",
                         static_cast<long long>(a.works_raised), static_cast<long long>(pop_on),
@@ -669,12 +669,12 @@ int main(int argc, char** argv)
             check(pop_on > pop_off,
                   "W5c  capacity works leave the world carrying more people than without them");
             check(masks_of(on) != 0 && masks_of(off) == 0,
-                  "W5d  the works land on provinces, and only when a registry was supplied");
+                  "W5d  the works land on regions, and only when a registry was supplied");
         }
 
         // W6 — determinism, the binding invariant. Two runs at one seed must
         // produce not merely the same counts but the same works on the same
-        // provinces: a roster that chose differently on a replay would make
+        // regions: a roster that chose differently on a replay would make
         // every downstream generation pass irreproducible.
         {
             history_sim_params wp2;
@@ -690,19 +690,19 @@ int main(int argc, char** argv)
                 run_history_sim(s2, nullptr, no_terrain, 60, 30, wp2, 77u, nullptr, &works);
 
             bool identical = a.works_raised == b.works_raised
-                          && s1.provinces.size() == s2.provinces.size();
+                          && s1.regions.size() == s2.regions.size();
             if (identical)
-                for (std::size_t i = 0; i < s1.provinces.size(); ++i)
-                    if (s1.provinces[i].works_built     != s2.provinces[i].works_built
-                     || s1.provinces[i].work_reach_mod  != s2.provinces[i].work_reach_mod
-                     || s1.provinces[i].work_capacity_mod != s2.provinces[i].work_capacity_mod)
+                for (std::size_t i = 0; i < s1.regions.size(); ++i)
+                    if (s1.regions[i].works_built     != s2.regions[i].works_built
+                     || s1.regions[i].work_reach_mod  != s2.regions[i].work_reach_mod
+                     || s1.regions[i].work_capacity_mod != s2.regions[i].work_capacity_mod)
                     { identical = false; break; }
 
             check(identical,
-                  "W6   two runs at one seed raise the same works on the same provinces");
+                  "W6   two runs at one seed raise the same works on the same regions");
         }
 
-        // W7 — the reach effect reaches the supply path. Pre-seed every province
+        // W7 — the reach effect reaches the supply path. Pre-seed every region
         // with the reach work and the polity's campaigns are supplied better, so
         // the run DIVERGES from the unseeded one.
         //
@@ -718,7 +718,7 @@ int main(int argc, char** argv)
 
             // THE COEFFICIENTS ARE AMPLIFIED ON PURPOSE, and the amplification
             // is the reason this check is trustworthy rather than a reason to
-            // doubt it. At the authored values the terrain term on a ten-province
+            // doubt it. At the authored values the terrain term on a ten-region
             // strip is worth a couple of points of supply out of 1000, so a 12%
             // discount on it truncates to zero and an inert field would pass.
             // Scaling the coefficient scales the thing being discounted, not the
@@ -733,16 +733,16 @@ int main(int argc, char** argv)
 
             settlement_state seeded = rival_strip(5, 800, 600, 500);
             settlement_state plain  = rival_strip(5, 800, 600, 500);
-            for (province& p : seeded.provinces)
+            for (region& p : seeded.regions)
             {
                 p.population = 60000;
-                apply_work_to_province(p, r2, way);
-                apply_work_to_province(p, r2, mole);
+                apply_work_to_region(p, r2, way);
+                apply_work_to_region(p, r2, mole);
             }
-            for (province& p : plain.provinces) p.population = 60000;
+            for (region& p : plain.regions) p.population = 60000;
 
             // Works OFF in both runs, so the only difference is the reach the
-            // provinces already carry — otherwise the scorer's own building
+            // regions already carry — otherwise the scorer's own building
             // would confound the comparison.
             const history_sim_state a =
                 run_history_sim(seeded, nullptr, no_terrain, 60, 30, wp2, 909u, nullptr, nullptr);

@@ -138,14 +138,14 @@ void works_registry::load_from_lua(lua_state& lua)
     if (m_rows.empty())
         throw std::runtime_error("works.lua: the works table is empty");
 
-    // A province records its works as a 32-bit mask (settlement.hpp § Era -1
+    // A region records its works as a 32-bit mask (settlement.hpp § Era -1
     // works), so a 33rd row would be authored, validated, offered by
     // `available` — and then silently impossible to build, because
-    // `apply_work_to_province` cannot address its bit. Caught here, where the
+    // `apply_work_to_region` cannot address its bit. Caught here, where the
     // author is looking, rather than becoming a row that mysteriously never
     // appears in any world.
     if (m_rows.size() > works_mask_bits)
-        throw std::runtime_error("works.lua: more than 32 works — province::works_built is a "
+        throw std::runtime_error("works.lua: more than 32 works — region::works_built is a "
                                  "32-bit mask and could not address the extra rows");
 
     // --- table-level invariant -------------------------------------------
@@ -169,6 +169,6 @@ void works_registry::load_from_lua(lua_state& lua)
                                  "have no way to buy its way past the burden of breadth");
     if (!ungated_reach)
         throw std::runtime_error("works.lua: every reach-bearing work is endowment-gated — "
-                                 "a province with poor ground could never buy reach, which "
+                                 "a region with poor ground could never buy reach, which "
                                  "turns breadth back into a ceiling");
 }

@@ -599,7 +599,7 @@ void assign_political_character(nation_component& nc, std::mt19937& rng)
 // ---------------------------------------------------------------------------
 
 // There is NO name bank (BL-290). A nation is named in the tongue of the
-// culture that settled the province its seed grew from — the same phoneme
+// culture that settled the region its seed grew from — the same phoneme
 // inventory the creeds pass coined that culture's own name and its gods from
 // (world/tongue.hpp). The structural words go with it: the "realm" noun and
 // the standing epithet are morphemes the culture coined for itself, so the
@@ -696,7 +696,7 @@ std::vector<entity_id> generate_nations(
 
     // --- Pass 1: seed placement ---
     // Historical seeds win when the caller supplies them (BL-218): the cores are
-    // the settlement pass's province anchors, so the political map grows out of
+    // the settlement pass's region anchors, so the political map grows out of
     // places people settled rather than out of a random draw. The RNG stream is
     // still constructed and left unconsumed on this path, which keeps every
     // *later* pass's stream identical to the random-placement path.
@@ -808,7 +808,7 @@ std::vector<entity_id> generate_nations(
         assign_political_character(nation_data[static_cast<std::size_t>(ni)], pol_rng);
 
     // --- Pass 5: naming ---
-    // A nation speaks the tongue of the province its seed grew from: walk the
+    // A nation speaks the tongue of the region its seed grew from: walk the
     // seeds in order and give each surviving nation the speech of the LOWEST-
     // indexed seed still inside it (a seed absorbed by Pass 2c contributes
     // nothing — the surviving core names the realm). Ties broken on the lowest

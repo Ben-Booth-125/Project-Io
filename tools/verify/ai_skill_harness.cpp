@@ -519,13 +519,13 @@ float output. Bless a set from a fresh Clang run and add its own block."
 //   seed 4: final=639130.4 min=203033.9 solvency=7/30 survival=0.71 build=0 dial=257
 //
 // EXPLAINED, not a skill regression, and the direction is the evidence. BL-218
-// replaced the nation seeds with the settlement pass's province anchors and
-// BL-219 derived corporate focus from the province a corp anchors to, so every
+// replaced the nation seeds with the settlement pass's region anchors and
+// BL-219 derived corporate focus from the region a corp anchors to, so every
 // seed now generates a different political map and a different corporate mix —
 // the same class of change as BL-221/BL-233 above, which this block was last
 // re-blessed for. Every divergence is UPWARD (net worth rose on seeds 0/2/4; the
 // dial counts crept past their old ceiling on 0/1/4) while solvency and survival
-// stayed in band on all five seeds. Corps anchored to provinces that actually
+// stayed in band on all five seeds. Corps anchored to regions that actually
 // industrialised sit on better ground than randomly-placed ones did, which is
 // the intended consequence of the rewrite rather than noise to suppress.
 //
@@ -694,7 +694,7 @@ const char* const k_bands_blessed =
 //
 //   * BL-283 — corps now anchor inside their HOME PROVINCE. Measured on seed 0,
 //     holdings moved off dead ground onto settled ground: barren 6->3, icy 5->3,
-//     grassland 3->7. Provinces sit where people settled, so the same corp works
+//     grassland 3->7. Regions sit where people settled, so the same corp works
 //     better land. Seed 1 +82% and seed 4 +153% are that, compounded over 300 ticks.
 //   * BL-338 — wetland exists again (12 tiles -> 159 on the home body), and it is
 //     a habitable composition, so there is more workable ground to anchor on.

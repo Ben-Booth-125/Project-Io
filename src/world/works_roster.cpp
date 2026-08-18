@@ -24,7 +24,7 @@ int gate_burden(const work_gate& g)
 
 } // namespace
 
-bool work_gate_met(const work_gate& g, const province& p)
+bool work_gate_met(const work_gate& g, const region& p)
 {
     if (g.ore_q      > 0 && p.ore_q      < g.ore_q)      return false;
     if (g.farm_q     > 0 && p.farm_q     < g.farm_q)     return false;
@@ -34,7 +34,7 @@ bool work_gate_met(const work_gate& g, const province& p)
     return true;
 }
 
-std::vector<const work_row*> works_registry::available(const province& p, roster_band band) const
+std::vector<const work_row*> works_registry::available(const region& p, roster_band band) const
 {
     std::vector<const work_row*> out;
     for (const work_row& r : m_rows)
@@ -53,7 +53,7 @@ std::vector<const work_row*> works_registry::available(const province& p, roster
     return out;
 }
 
-bool apply_work_to_province(province& p, const works_registry& reg, int id)
+bool apply_work_to_region(region& p, const works_registry& reg, int id)
 {
     if (id < 0) return false;
     const std::size_t i = static_cast<std::size_t>(id);

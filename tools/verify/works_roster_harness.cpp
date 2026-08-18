@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 // Exercises the works LOGIC in src/world/works_roster.cpp — the gate rule, the
 // availability derivation, and effect accumulation. Everything here is a pure
-// function of a hand-built province and a hand-built registry: no world
+// function of a hand-built region and a hand-built registry: no world
 // generation, and no Lua.
 //
 // WHY THE TABLE ITSELF IS NOT ASSERTED HERE. The works data moved to
@@ -18,8 +18,8 @@
 //
 //   R1  work_gate_met is a pure AND over the five axes, and an absent gate
 //       (zero) never rejects.
-//   R2  Availability is DERIVED from the ground: a province failing a gate is
-//       not offered that row, and two provinces with different endowments at
+//   R2  Availability is DERIVED from the ground: a region failing a gate is
+//       not offered that row, and two regions with different endowments at
 //       the same band are offered different sets.
 //   R3  Bands are CUMULATIVE — a later band offers everything an earlier one
 //       does; nothing un-invents a granary.
@@ -71,17 +71,17 @@ works_registry make_registry()
     return reg;
 }
 
-province rich_province()
+region rich_region()
 {
-    province p;
+    region p;
     p.ore_q = p.farm_q = p.port_q = p.energy_q = 1000;
     p.population = 1'000'000;
     return p;
 }
 
-province bare_province()
+region bare_region()
 {
-    province p;
+    region p;
     p.ore_q = p.farm_q = p.port_q = p.energy_q = 0;
     p.population = 1'000'000;
     return p;
@@ -103,24 +103,24 @@ int main()
 
     // --- R1: the gate rule -------------------------------------------------
     {
-        const province rich = rich_province();
-        const province bare = bare_province();
+        const region rich = rich_region();
+        const region bare = bare_region();
 
         check(work_gate_met(work_gate{}, bare),
-              "R1 an empty gate accepts any province");
+              "R1 an empty gate accepts any region");
         check(work_gate_met(work_gate{0, 300, 0, 0, 4000}, rich),
               "R1 a met gate accepts");
         check(!work_gate_met(work_gate{0, 300, 0, 0, 4000}, bare),
               "R1 an unmet endowment axis rejects");
 
-        province few;
+        region few;
         few.ore_q = few.farm_q = few.port_q = few.energy_q = 1000;
         few.population = 10;
         check(!work_gate_met(work_gate{0, 0, 0, 0, 4000}, few),
               "R1 an unmet population floor rejects on its own");
 
         // Every axis is ANDed: one failure is enough.
-        province ore_only = bare_province();
+        region ore_only = bare_region();
         ore_only.ore_q = 1000;
         check(!work_gate_met(work_gate{400, 300, 0, 0, 0}, ore_only),
               "R1 the gate is an AND — meeting one axis is not enough");
@@ -128,31 +128,31 @@ int main()
 
     // --- R2: availability is derived from the ground -----------------------
     {
-        const auto rich_rows = reg.available(rich_province(), roster_band::industrial);
-        const auto bare_rows = reg.available(bare_province(), roster_band::industrial);
+        const auto rich_rows = reg.available(rich_region(), roster_band::industrial);
+        const auto bare_rows = reg.available(bare_region(), roster_band::industrial);
 
         check(rich_rows.size() == reg.size(),
-              "R2 a province meeting every gate is offered the whole table");
+              "R2 a region meeting every gate is offered the whole table");
         check(bare_rows.size() < rich_rows.size(),
-              "R2 a province with no endowment is offered strictly fewer works");
+              "R2 a region with no endowment is offered strictly fewer works");
         check(!bare_rows.empty(),
-              "R2 an endowment-poor province is still offered the ungated works");
+              "R2 an endowment-poor region is still offered the ungated works");
 
-        province ore = bare_province();  ore.ore_q  = 1000;
-        province port = bare_province(); port.port_q = 1000;
+        region ore = bare_region();  ore.ore_q  = 1000;
+        region port = bare_region(); port.port_q = 1000;
         check(names_of(reg.available(ore,  roster_band::medieval)) !=
               names_of(reg.available(port, roster_band::medieval)),
-              "R2 two provinces at the same band with different ground field different works");
+              "R2 two regions at the same band with different ground field different works");
 
-        province depopulated = rich_province();
+        region depopulated = rich_region();
         depopulated.population = 0;
         check(reg.available(depopulated, roster_band::industrial).empty(),
-              "R2 a province with no population is offered nothing");
+              "R2 a region with no population is offered nothing");
     }
 
     // --- R3: bands are cumulative ------------------------------------------
     {
-        const province rich = rich_province();
+        const region rich = rich_region();
         const auto classical  = names_of(reg.available(rich, roster_band::classical));
         const auto industrial = names_of(reg.available(rich, roster_band::industrial));
 
@@ -174,12 +174,12 @@ int main()
             if (static_cast<int>(r->band) > static_cast<int>(roster_band::classical))
                 no_future_rows = false;
         check(no_future_rows,
-              "R3 a classical-band province is offered no later-band work");
+              "R3 a classical-band region is offered no later-band work");
     }
 
     // --- R4: deterministic, order-stable, cheapest gate first --------------
     {
-        const province rich = rich_province();
+        const region rich = rich_region();
         const auto a = names_of(reg.available(rich, roster_band::gunpowder));
         const auto b = names_of(reg.available(rich, roster_band::gunpowder));
         check(a == b, "R4 repeated calls return an identical sequence");

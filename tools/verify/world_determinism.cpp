@@ -96,7 +96,7 @@ world_metrics measure(const world& w)
 // It is the wrong instrument for the Era -1 year-tick sim, and reusing it for
 // R3 would be the vacuity trap this file exists to catch elsewhere. The sim
 // runs AFTER the tile surface is fixed and changes nothing in it — it moves
-// provinces between owners, and reaches the world only through the nation
+// regions between owners, and reaches the world only through the nation
 // carve, the derived national character, the generated names and the corporate
 // charter placement downstream of them. Two worlds with entirely different
 // political histories can hold the identical terrain histogram, the identical
@@ -372,7 +372,7 @@ int main()
     // 75 s at seed B, same Debug build, same 400-year span), and the counters
     // are what makes that legible rather than mysterious. Note which counter
     // tracks it: seed B is 3x the cost with FEWER battles (193 vs 365) and more
-    // FOUNDINGS (994 vs 765), so the era sim's cost scales with the province
+    // FOUNDINGS (994 vs 765), so the era sim's cost scales with the region
     // table it carries, not with how much fighting happens in it. The arc about
     // to change this pass needs that distinction, not just the total.
     std::printf("     report seedB/on: years=%lld battles=%lld conquests=%lld foundings=%lld\n",

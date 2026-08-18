@@ -358,8 +358,8 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\history_log_harness.cpp ^
 :: generated history at 0 CE. Asserts the stop holds (R1: founded_year <= 0, no
 :: furnace, median 0), demography seeded within (0, capacity] with manpower under
 :: ceiling while the 1960 world stays unseeded (R2), multipolar at 0 CE (R3),
-:: byte-identical province tables across two generations (R4), and the default
-:: 1960 arc untouched (R5). Prints the 0 CE dossier: provinces by population,
+:: byte-identical region tables across two generations (R4), and the default
+:: 1960 arc untouched (R5). Prints the 0 CE dossier: regions by population,
 :: nations by tiles. Calls make_hard_coded_world, so it links the full
 :: SDL/Lua-free world superset (mirror IO_WORLD_SOURCES, as history_log_harness).
 :: Prefer the CMake target: cmake --build build --target era_world_harness

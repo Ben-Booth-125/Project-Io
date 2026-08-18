@@ -10,8 +10,8 @@
 // ---------------------------------------------------------------------------
 // Campaign battle resolver (BL-315) — the SECOND combat path, deliberately.
 //
-// WHY THERE ARE TWO. combat.hpp's resolve_battle answers "province beats
-// province, this year" in one scored evaluation, because the Era -1 sim runs
+// WHY THERE ARE TWO. combat.hpp's resolve_battle answers "region beats
+// region, this year" in one scored evaluation, because the Era -1 sim runs
 // millions of those and cannot afford a loop. This file answers a different
 // question: two forces standing on a TILE, fought out over a short span, with
 // a player watching who may pull out partway. Folding both into one function

@@ -27,7 +27,7 @@
 // NAMED SUBSTITUTIONS (BL-221's convention: name the stand-in, never fake the
 // input). Two material signals do not exist yet and are read through proxies:
 //   - HORSES have no pasture or domesticable-clade axis at all. Proxy: the
-//     province's grassland-ish farm endowment. Named in the row itself.
+//     region's grassland-ish farm endowment. Named in the row itself.
 //   - GUNPOWDER has no saltpetre/sulphur signal. Proxy: the energy endowment.
 // Both are recorded on the row so a reader can see what is standing in for what.
 
@@ -39,7 +39,7 @@
 #include <cstdint>
 #include <vector>
 
-struct province;
+struct region;
 struct world;
 
 /// The four roster bands. Values are the ladder's own grouping, so a band index
@@ -61,7 +61,7 @@ inline constexpr int roster_band_count = 4;
 inline constexpr roster_band campaign_roster_band = roster_band::industrial;
 
 /// What a row needs from the ground before a polity can field it. Each is a
-/// threshold on a province endowment window (0-1000); zero means "no gate".
+/// threshold on a region endowment window (0-1000); zero means "no gate".
 struct roster_gate
 {
     int ore_q   = 0; ///< Metallurgy: iron, then steel.
@@ -98,10 +98,10 @@ const std::vector<roster_row>& unit_roster_table();
 ///
 /// Bands are cumulative: a gunpowder-band polity still fields infantry. A row
 /// from an EARLIER band stays available, because nothing un-invents a spear.
-std::vector<const roster_row*> available_rows(const province& p, roster_band band);
+std::vector<const roster_row*> available_rows(const region& p, roster_band band);
 
-/// The campaign-side stand-in for a province's authored ground endowment
-/// (BL-324, 2026-08-08 — the 1960 campaign has no provinces to gate on). Read
+/// The campaign-side stand-in for a region's authored ground endowment
+/// (BL-324, 2026-08-08 — the 1960 campaign has no regions to gate on). Read
 /// from the corp's OWN stockpile and market access. Presence is binary by
 /// design (1000, the table's own max threshold, or 0) — "you may field
 /// rifles because you can buy steel" is a yes/no supply-chain question here,
@@ -121,15 +121,15 @@ float corp_stockpile_total(const world& w, entity_id corp, resource_type res);
 campaign_roster_gate_input campaign_gate_input(const world& w, entity_id corp);
 
 /// available_rows' campaign-side sibling — gates on @p corp's stockpile/market
-/// access (via campaign_gate_input) instead of a province endowment. The
-/// Era -1 sim is untouched: it keeps calling the province-gated overload above.
+/// access (via campaign_gate_input) instead of a region endowment. The
+/// Era -1 sim is untouched: it keeps calling the region-gated overload above.
 std::vector<const roster_row*> available_rows(const world& w, entity_id corp, roster_band band);
 
 /// Compose an army stack from @p manpower over the rows @p p and @p band make
 /// available, scaled by @p readiness_q (1000 = full). Returns an empty stack
 /// for non-positive manpower.
 std::vector<army_stack_entry> roster_stack(int64_t     manpower,
-                                           const province& p,
+                                           const region& p,
                                            roster_band     band,
                                            int             readiness_q);
 

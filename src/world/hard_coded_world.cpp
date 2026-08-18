@@ -480,16 +480,16 @@ world make_hard_coded_world(world_params params, generation_report* report,
     record_tribal_conflict(kepler_creeds, kepler_hist, /*seed=*/params.seed ^ 0xC4EED5u);
 
     // Settlement & industrialisation (BL-218, docs/lore/HISTORY.md Stages 3-4).
-    // Provinces are placed BEFORE the political map and become its seeds, so
+    // Regions are placed BEFORE the political map and become its seeds, so
     // nation borders grow out of ground people settled rather than out of a
-    // random draw — "seeding changes, expansion does not". Each province
+    // random draw — "seeding changes, expansion does not". Each region
     // inherits its nearest cradle's culture, so the pantheons the creeds pass
     // raised are now mapped onto specific ground and specific ancient deposits.
     settlement_state kepler_settlement;
     nation_params kepler_np =
         nation_params_from_ladder(kepler_hist, nation_params{ .min_seed_separation = 5 });
     {
-        // Aim the province budget at the political pass's own seed budget, so
+        // Aim the region budget at the political pass's own seed budget, so
         // the two agree by construction rather than by a tuned constant.
         int kepler_land = 0;
         for (const entity_id tid : kepler_tiles)
@@ -508,7 +508,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
         // ------------------------------------------------------------------
         // The year-tick sim, wired into generation (Ben, 2026-08-12).
         //
-        // run_settlement founds provinces and stops. Below the industrial era
+        // run_settlement founds regions and stops. Below the industrial era
         // it deliberately leaves the rest to "the year-tick sim", and that sim
         // HAS EXISTED SINCE BL-271 WITHOUT EVER BEING CALLED HERE — its only
         // caller was the tile inspector. So the campaign opened onto a world
@@ -524,7 +524,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
         // chain currently spends 2.4 s of.
         bump(8);
         if (params.epoch_year < 1700 && params.prehistory_years > 0
-            && !kepler_settlement.provinces.empty())
+            && !kepler_settlement.regions.empty())
         {
             const sim_terrain_arrays terr =
                 build_sim_terrain(w, kepler, home_grid_width, home_grid_height);
@@ -591,11 +591,11 @@ world make_hard_coded_world(world_params params, generation_report* report,
 
         kepler_np.seed_tiles = settlement_seed_tiles(kepler_settlement);
 
-        // Each anchor carries its province's tongue across into Pass 5, so a
+        // Each anchor carries its region's tongue across into Pass 5, so a
         // nation is named in the speech of the people who settled its core
         // rather than out of a bank of its own (BL-290).
-        kepler_np.seed_tongues.reserve(kepler_settlement.provinces.size());
-        for (const province& p : kepler_settlement.provinces)
+        kepler_np.seed_tongues.reserve(kepler_settlement.regions.size());
+        for (const region& p : kepler_settlement.regions)
         {
             if (p.anchor < 0) continue;
             kepler_np.seed_tongues.push_back(
@@ -606,7 +606,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
 
         // Same act for the cities: the placeholder names generate_population_
         // centres coined before there was any culture are replaced with names
-        // in the nearest province's tongue.
+        // in the nearest region's tongue.
         name_population_centres(w, kepler, home_grid_width, kepler_settlement, kepler_creeds,
                                 /*seed=*/params.seed ^ 0xC17910E6u);
     }
@@ -618,7 +618,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
 
     // The political axes are OUTPUTS now (BL-218): expansionism from the
     // border-contest integral, economic_focus from the resource class of the
-    // provinces settled during industrialisation, ideology from
+    // regions settled during industrialisation, ideology from
     // industrialisation timing against neighbours. This overwrites the random
     // Pass 4 draw, which stays as the fallback for bodies with no settlement.
     derive_national_character(kepler_settlement, kepler_creeds, w,
@@ -672,7 +672,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
             if (be.id != kepler) continue;
             be.state.history.insert(be.state.history.end(),
                                     kepler_hist.history.begin(), kepler_hist.history.end());
-            // The province set / checkpoints / lacunae travel with the report
+            // The region set / checkpoints / lacunae travel with the report
             // (its `history` is already merged above and stays empty here,
             // matching the continents convention).
             be.settlement = kepler_settlement;

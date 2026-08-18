@@ -186,7 +186,7 @@ creed_state run_creeds(const planetology_state& pl,
         add_god("war", "who counts the spears", 6, 10, 3, 9);
         add_god("the door of the dead", "who takes no bribe", 0, 3, 8, 10);
 
-        // Conditional seats: an ore province raises a forge; the charter
+        // Conditional seats: an ore region raises a forge; the charter
         // cradle raises an oath god — the seed Stage 1's Charter Act grows
         // from, planted here so the enforceable promise has a creed behind it.
         if (land.ore)

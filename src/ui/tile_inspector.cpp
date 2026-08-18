@@ -212,7 +212,7 @@ void draw_tile_inspector(const world& w, ui_state& s,
 
     // --- Ages: the Era -1 political time-lapse (BL-277) -------------------
     //
-    // Two thousand years of province ownership, scrubbable. The sim is run HERE,
+    // Two thousand years of region ownership, scrubbable. The sim is run HERE,
     // lazily, over a COPY of the body's settlement state — it does not run in
     // the generation path and nothing it does reaches the world. That is the
     // whole point of building this view first: the time-lapse is visible without
@@ -221,7 +221,7 @@ void draw_tile_inspector(const world& w, ui_state& s,
     //
     // The cache is keyed on body name and survives across frames, because a
     // 2000-year run costs ~2.1 s and re-running it per frame would stall the UI.
-    // (~600 ms before the settle-occupancy fix; ~749 real provinces instead of
+    // (~600 ms before the settle-occupancy fix; ~749 real regions instead of
     // ~191 is roughly four times the work, and the growth is the improvement.)
     if (view == view_ages)
     {
@@ -230,7 +230,7 @@ void draw_tile_inspector(const world& w, ui_state& s,
         // Name alone is not enough: body names are hard-coded literals, so
         // regenerating the world left the key matching and the view rendered the
         // PREVIOUS world's political history over the previous world's
-        // provinces — confidently, with no cue that anything was wrong.
+        // regions — confidently, with no cue that anything was wrong.
         static entity_id          cached_body = null_entity; // identity, not display name (BL-257)
         static uint64_t           cached_gen = 0;
         static settlement_state   cached_ss;
@@ -247,7 +247,7 @@ void draw_tile_inspector(const world& w, ui_state& s,
         // Two different seeds essentially never agree on all four.
         const uint64_t gen_id =
               (static_cast<uint64_t>(report.bodies.size()) << 48)
-            ^ (static_cast<uint64_t>(entry->settlement.provinces.size()) << 32)
+            ^ (static_cast<uint64_t>(entry->settlement.regions.size()) << 32)
             ^ (static_cast<uint64_t>(entry->settlement.median_industrial_year & 0xFFFF) << 16)
             ^  static_cast<uint64_t>(report.attempts);
 
@@ -314,7 +314,7 @@ void draw_tile_inspector(const world& w, ui_state& s,
             if (o != owner_none && std::find(seen.begin(), seen.end(), o) == seen.end())
                 seen.push_back(o);
 
-        ImGui::TextDisabled("%d CE  |  %d provinces  |  %d powers",
+        ImGui::TextDisabled("%d CE  |  %d regions  |  %d powers",
                             s.ages_year, live, static_cast<int>(seen.size()));
 
         const float avail = ImGui::GetContentRegionAvail().x;
@@ -328,14 +328,14 @@ void draw_tile_inspector(const world& w, ui_state& s,
         dl->AddRectFilled(origin, ImVec2(origin.x + avail, origin.y + mh),
                           IM_COL32(18, 20, 26, 255));
 
-        // One dot per province, at its anchor's grid position, in its owner's
-        // colour. Province granularity is what makes this cheap to draw as well
+        // One dot per region, at its anchor's grid position, in its owner's
+        // colour. Region granularity is what makes this cheap to draw as well
         // as cheap to store — there is no tile loop here at all.
         const float r = scale * 1.6f < 2.5f ? 2.5f : scale * 1.6f;
-        for (std::size_t i = 0; i < slice.size() && i < cached_ss.provinces.size(); ++i)
+        for (std::size_t i = 0; i < slice.size() && i < cached_ss.regions.size(); ++i)
         {
             if (slice[i] == owner_none) continue;
-            const province& p = cached_ss.provinces[i];
+            const region& p = cached_ss.regions[i];
             const ImVec2 at(origin.x + (static_cast<float>(p.col) + 0.5f) * scale,
                             origin.y + (static_cast<float>(p.row) + 0.5f) * scale);
             dl->AddCircleFilled(at, r,

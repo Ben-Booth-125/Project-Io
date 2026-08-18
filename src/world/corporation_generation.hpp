@@ -63,10 +63,10 @@ struct corporation_params
 /// @param seed   Per-run RNG seed for independent, reproducible results.
 /// @param settle Optional settlement/industrialisation record for the home body
 ///               (BL-219). When supplied, Pass 2 stops drawing a focus from the
-///               authored weighting table and DERIVES it from the province the
-///               corporation is anchored to: a province that industrialised
+///               authored weighting table and DERIVES it from the region the
+///               corporation is anchored to: a region that industrialised
 ///               around ore emits extraction/processing corps, a coastal trade
-///               province emits trade-focused ones, and an early industrialiser
+///               region emits trade-focused ones, and an early industrialiser
 ///               skews one tier further up the value chain. Diversity then comes
 ///               from a world-level reject-and-reroll against a floor on the
 ///               SET — never a quota on any member — so Pass 2's

@@ -8,7 +8,7 @@
 // Each agrarian cradle becomes a CULTURE: it rolls its own phonology (a small
 // consonant/vowel inventory), names itself and its gods in that tongue, and
 // derives its pantheon's shape from the land it sits on — a coastal cradle
-// raises a sea god, an ore province a forge god, the charter cradle an oath
+// raises a sea god, an ore region a forge god, the charter cradle an oath
 // god. ONE pantheon per culture (Ben, 2026-07-31): the tongue and the creed
 // are the same act of self-description.
 //

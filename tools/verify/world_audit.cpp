@@ -51,7 +51,7 @@ static std::size_t ri(resource_type r) { return static_cast<std::size_t>(r); }
 //     landmass containing NO seed, and when it does it hands the whole landmass
 //     to one nation in a single act.
 //
-// So: an exclave sitting on a SEEDED landmass (one holding at least one province
+// So: an exclave sitting on a SEEDED landmass (one holding at least one region
 // anchor) is emergent — the sim itself produced it, either by a front stalling
 // or by a rival cutting it off, plus whatever the ruptures later redrew. An
 // exclave on a SEEDLESS landmass was authored by Pass 2b's cleanup and is not
@@ -143,7 +143,7 @@ static frag_stats measure_fragmentation(const world& w, const generation_report&
         if (be.name == bit->second.name) { home_entry = &be; break; }
     if (home_entry)
     {
-        for (const province& p : home_entry->settlement.provinces)
+        for (const region& p : home_entry->settlement.regions)
         {
             if (p.anchor < 0 || p.anchor >= total) continue;
             const int lm = landmass[static_cast<std::size_t>(p.anchor)];
@@ -1010,9 +1010,9 @@ int main()
     std::printf("  BL-182 R2 HQ designation identical across two generations (%d mismatched): %s\n",
                 hq_det_bad, hq_det_bad == 0 ? "PASS" : "FAIL");
 
-    // --- BL-283 (corp assets anchor in the home province): the spatial spread of
-    // corporate holdings, as the province window sees it. Reported, not asserted —
-    // a corp legitimately spills into a neighbouring province when its own has no
+    // --- BL-283 (corp assets anchor in the home region): the spatial spread of
+    // corporate holdings, as the region window sees it. Reported, not asserted —
+    // a corp legitimately spills into a neighbouring region when its own has no
     // room, so the number to watch is the DISTRIBUTION, not a bound. ---
     {
         const auto  kbit = w.bodies.find(kepler);
@@ -1021,8 +1021,8 @@ int main()
         for (const auto& be : report.bodies)
             if (kbit != w.bodies.end() && be.name == kbit->second.name) { kentry = &be; break; }
 
-        int corps_measured = 0, holdings_total = 0, provinces_spanned_total = 0;
-        int single_province_corps = 0;
+        int corps_measured = 0, holdings_total = 0, regions_spanned_total = 0;
+        int single_region_corps = 0;
         long long spread_sum = 0; // summed max grid separation within a corp's holdings
         std::map<terrain_composition, int> holding_comp;
         for (const auto& [cid, corp] : w.corporations)
@@ -1040,15 +1040,15 @@ int main()
                 pts.emplace_back(t->second.grid_x, t->second.grid_y);
                 if (kentry && kgw > 0)
                 {
-                    const int pi = nearest_province(kentry->settlement,
+                    const int pi = nearest_region(kentry->settlement,
                                                     t->second.grid_x, t->second.grid_y, kgw);
                     if (pi >= 0) provs.insert(pi);
                 }
             }
             if (pts.empty()) continue;
             ++corps_measured;
-            provinces_spanned_total += static_cast<int>(provs.size());
-            if (provs.size() <= 1) ++single_province_corps;
+            regions_spanned_total += static_cast<int>(provs.size());
+            if (provs.size() <= 1) ++single_region_corps;
             long long worst = 0;
             for (std::size_t i = 0; i < pts.size(); ++i)
                 for (std::size_t j = i + 1; j < pts.size(); ++j)
@@ -1062,11 +1062,11 @@ int main()
             (void)cid;
         }
         std::printf("Corp holdings spatial spread: %d corps, %d holdings, "
-                    "%.2f provinces/corp (%d of %d single-province), "
+                    "%.2f regions/corp (%d of %d single-region), "
                     "mean max separation %.1f tiles\n",
                     corps_measured, holdings_total,
-                    corps_measured ? static_cast<double>(provinces_spanned_total) / corps_measured : 0.0,
-                    single_province_corps, corps_measured,
+                    corps_measured ? static_cast<double>(regions_spanned_total) / corps_measured : 0.0,
+                    single_region_corps, corps_measured,
                     corps_measured ? static_cast<double>(spread_sum) / corps_measured : 0.0);
         std::printf("  holdings by terrain composition:");
         for (const auto& [c, n] : holding_comp)

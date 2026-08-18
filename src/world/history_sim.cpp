@@ -51,7 +51,7 @@ int jitter(int base, uint32_t s, uint32_t axis, int spread)
 }
 
 /// THE COMMON CURRENCY (BL-309). Every verb scores in ONE unit: expected
-/// annual gain in ENDOWMENT VALUE HELD, where a province is worth the mean of
+/// annual gain in ENDOWMENT VALUE HELD, where a region is worth the mean of
 /// its three endowment windows (0-1000).
 ///
 /// This replaces comparing four incommensurable numbers. The first cut compared
@@ -61,9 +61,9 @@ int jitter(int base, uint32_t s, uint32_t axis, int spread)
 /// handed the win to Settle instead. Neither was fixable by tuning, because the
 /// error was upstream of the constants: quantities that mean different things
 /// cannot be ranked. So each verb now answers the same question — what is this
-/// worth to me this year, in provinces-worth-of-endowment — and the argmax is
+/// worth to me this year, in regions-worth-of-endowment — and the argmax is
 /// an honest comparison rather than a coincidence of scales.
-int province_value_q(const province& p)
+int region_value_q(const region& p)
 {
     return (p.farm_q + p.ore_q + p.port_q) / 3;
 }
@@ -71,10 +71,10 @@ int province_value_q(const province& p)
 /// What a candidate work is worth this year, IN THE SHARED CURRENCY (BL-321).
 ///
 /// The split between the two terms is the honest part. A Granary feeds THIS
-/// province and nowhere else, so it is valued against this province's own
+/// region and nowhere else, so it is valued against this region's own
 /// endowment. A Way Station shortens marches across the whole polity, so reach
 /// is valued against the polity's MEAN holding — mean, not total, because a
-/// road through one province does not carry the empire's entire traffic, and
+/// road through one region does not carry the empire's entire traffic, and
 /// scoring it against the total made reach worth ~40x every local effect and
 /// reduced the roster to its five road rows.
 ///
@@ -82,7 +82,7 @@ int province_value_q(const province& p)
 /// alike, as a 0.65x-1.3x multiplier over the table's 130-260 weight range. It
 /// is a pull, not a cost — works.lua says so at the point of authoring.
 int work_score_q(const work_row&           r,
-                 const province&           p,
+                 const region&           p,
                  int                       mean_holding_value,
                  const history_sim_params& params)
 {
@@ -94,7 +94,7 @@ int work_score_q(const work_row&           r,
                        + e.industrial_mod * params.w_work_industrial) / 1000;
     const int empire_q = (e.reach_mod * params.w_work_reach) / 1000;
 
-    const int64_t gain = (static_cast<int64_t>(province_value_q(p)) * local_q
+    const int64_t gain = (static_cast<int64_t>(region_value_q(p)) * local_q
                         + static_cast<int64_t>(mean_holding_value)  * empire_q) / 1000;
 
     const int years = params.work_amortise_years > 0 ? params.work_amortise_years : 1;
@@ -143,7 +143,7 @@ doctrine_row doctrine_for(const polity& p)
 /// `readiness_q` is the caller-side lever the winter-campaign candidate uses
 /// against a defender (history_sim.hpp § season).
 std::vector<army_stack_entry> build_stack(int64_t manpower,
-                                          const province& home,
+                                          const region& home,
                                           const polity&   owner,
                                           int             readiness_q)
 {
@@ -172,16 +172,16 @@ int64_t stack_size(const std::vector<army_stack_entry>& s)
 
 std::vector<uint16_t> owner_slice_at(const history_sim_state& s, int64_t year)
 {
-    std::vector<uint16_t> slice(static_cast<std::size_t>(s.province_stride), owner_none);
+    std::vector<uint16_t> slice(static_cast<std::size_t>(s.region_stride), owner_none);
     for (const owner_change& c : s.owner_changes)
     {
         if (static_cast<int64_t>(c.year) > year) break; // Appended in year order.
-        if (c.province < slice.size()) slice[c.province] = c.owner;
+        if (c.region < slice.size()) slice[c.region] = c.owner;
     }
     return slice;
 }
 
-int province_distance(const province& a, const province& b, int gw)
+int region_distance(const region& a, const region& b, int gw)
 {
     int dc = a.col - b.col;
     if (dc < 0) dc = -dc;
@@ -220,18 +220,18 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                   const works_registry*     works)
 {
     history_sim_state out;
-    if (ss.provinces.empty() || params.stop_year <= params.start_year)
+    if (ss.regions.empty() || params.stop_year <= params.start_year)
         return out;
 
     // --- Seed polities from cultures --------------------------------------
     //
-    // At the antiquity start `province::nation` is -1: the political pass has
+    // At the antiquity start `region::nation` is -1: the political pass has
     // not run, and a pre-national world's actors ARE its peoples (BL-221). The
     // sim writes `nation` as it goes, so the political map is this loop's
     // output rather than its input.
     {
         std::vector<int> cultures;
-        for (const province& p : ss.provinces)
+        for (const region& p : ss.regions)
             if (p.culture >= 0 && std::find(cultures.begin(), cultures.end(), p.culture) == cultures.end())
                 cultures.push_back(p.culture);
         std::sort(cultures.begin(), cultures.end()); // Order must not depend on placement.
@@ -246,12 +246,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
             else
                 q.aggression_q = 500; // Neutral when creeds were not supplied.
 
-            // Capital: the best-settled province of this culture. Ties break on
+            // Capital: the best-settled region of this culture. Ties break on
             // the lower index, which is placement order (best ground first).
             int best = -1, best_q = -1;
-            for (std::size_t i = 0; i < ss.provinces.size(); ++i)
+            for (std::size_t i = 0; i < ss.regions.size(); ++i)
             {
-                const province& p = ss.provinces[i];
+                const region& p = ss.regions[i];
                 if (p.culture != c) continue;
                 if (p.settle_score_q > best_q) { best_q = p.settle_score_q; best = static_cast<int>(i); }
             }
@@ -276,7 +276,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
         for (const polity& q : out.polities)
         {
             int n = 0;
-            for (const province& p : ss.provinces) if (p.culture == q.culture) ++n;
+            for (const region& p : ss.regions) if (p.culture == q.culture) ++n;
             by_size.push_back({n, q.id});
         }
         std::sort(by_size.begin(), by_size.end(),
@@ -293,50 +293,50 @@ history_sim_state run_history_sim(settlement_state&         ss,
         preserving.aggression_q   = clampi(params.major_preserving_aggression_q, 0, 1000);
     }
 
-    // Province -> owning polity. Seeded from culture, then owned by conquest.
-    std::vector<int> owner(ss.provinces.size(), -1);
-    for (std::size_t i = 0; i < ss.provinces.size(); ++i)
+    // Region -> owning polity. Seeded from culture, then owned by conquest.
+    std::vector<int> owner(ss.regions.size(), -1);
+    for (std::size_t i = 0; i < ss.regions.size(); ++i)
         for (const polity& q : out.polities)
-            if (q.culture == ss.provinces[i].culture) { owner[i] = q.id; break; }
+            if (q.culture == ss.regions[i].culture) { owner[i] = q.id; break; }
 
-    for (std::size_t i = 0; i < ss.provinces.size(); ++i)
+    for (std::size_t i = 0; i < ss.regions.size(); ++i)
     {
-        province& p = ss.provinces[i];
+        region& p = ss.regions[i];
         p.nation = owner[i];
         // Seed a headcount so demography has something to grow from — the
         // graduation path settlement.hpp's demography note leaves to this item.
         if (p.population <= 0)
-            p.population = clampi64(province_carrying_capacity(p.farm_q) / 8, 1, 1 << 30);
+            p.population = clampi64(region_carrying_capacity(p.farm_q) / 8, 1, 1 << 30);
         p.last_demography_year = params.start_year;
         replenish_manpower(p);
     }
 
     // --- Per-year war pressure, reset each tick ---------------------------
-    std::vector<int> war_pressure(ss.provinces.size(), 0);
+    std::vector<int> war_pressure(ss.regions.size(), 0);
 
     // --- Neighbour index --------------------------------------------------
     //
     // Campaign candidates are NEIGHBOURS ONLY, so the neighbourhood is built
-    // once rather than rediscovered by scanning every province from every held
-    // province every year. That scan is quadratic in province count and, with
-    // the Settle verb growing the map past 400 provinces, it dominated the
+    // once rather than rediscovered by scanning every region from every held
+    // region every year. That scan is quadratic in region count and, with
+    // the Settle verb growing the map past 400 regions, it dominated the
     // whole run (2.5s of a 2.5s run). Built once here, extended when a
-    // province is founded, it is a lookup.
-    std::vector<std::vector<int>> neighbours(ss.provinces.size());
-    const auto link_province = [&](std::size_t i) {
-        for (std::size_t j = 0; j < ss.provinces.size(); ++j)
+    // region is founded, it is a lookup.
+    std::vector<std::vector<int>> neighbours(ss.regions.size());
+    const auto link_region = [&](std::size_t i) {
+        for (std::size_t j = 0; j < ss.regions.size(); ++j)
         {
             if (i == j) continue;
-            if (province_distance(ss.provinces[i], ss.provinces[j], gw) <= params.neighbour_radius)
+            if (region_distance(ss.regions[i], ss.regions[j], gw) <= params.neighbour_radius)
             {
                 neighbours[i].push_back(static_cast<int>(j));
                 neighbours[j].push_back(static_cast<int>(i));
             }
         }
     };
-    for (std::size_t i = 0; i < ss.provinces.size(); ++i)
-        for (std::size_t j = i + 1; j < ss.provinces.size(); ++j)
-            if (province_distance(ss.provinces[i], ss.provinces[j], gw) <= params.neighbour_radius)
+    for (std::size_t i = 0; i < ss.regions.size(); ++i)
+        for (std::size_t j = i + 1; j < ss.regions.size(); ++j)
+            if (region_distance(ss.regions[i], ss.regions[j], gw) <= params.neighbour_radius)
             {
                 neighbours[i].push_back(static_cast<int>(j));
                 neighbours[j].push_back(static_cast<int>(i));
@@ -349,10 +349,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // plains does, using the landform ratios logistics.cpp already defines for
     // the 1960 era. Computed by Dijkstra from the capital and cached until the
     // capital moves, so the per-year cost stays a lookup.
-    std::vector<int> reach;            // Per-province cost from the current capital.
+    std::vector<int> reach;            // Per-region cost from the current capital.
     int reach_capital = -2;            // Which capital `reach` was built for.
 
-    const auto tile_cost = [&](const province& p) {
+    const auto tile_cost = [&](const region& p) {
         // Landform ratios, x100: plains 100, highland 125, mountain 200, ...
         switch (lf_at(terrain, p.anchor))
         {
@@ -367,15 +367,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
     };
 
     const auto rebuild_reach = [&](int capital) {
-        reach.assign(ss.provinces.size(), 1 << 28);
-        if (capital < 0 || capital >= static_cast<int>(ss.provinces.size())) return;
+        reach.assign(ss.regions.size(), 1 << 28);
+        if (capital < 0 || capital >= static_cast<int>(ss.regions.size())) return;
         reach[static_cast<std::size_t>(capital)] = 0;
 
-        // Dijkstra without a heap: province counts are hundreds, and a simple
+        // Dijkstra without a heap: region counts are hundreds, and a simple
         // scan keeps the order deterministic without depending on a tie-break
         // inside a priority queue.
-        std::vector<bool> done(ss.provinces.size(), false);
-        for (std::size_t iter = 0; iter < ss.provinces.size(); ++iter)
+        std::vector<bool> done(ss.regions.size(), false);
+        for (std::size_t iter = 0; iter < ss.regions.size(); ++iter)
         {
             int best = -1, best_c = 1 << 28;
             for (std::size_t i = 0; i < reach.size(); ++i)
@@ -383,11 +383,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
             if (best < 0) break;
             done[static_cast<std::size_t>(best)] = true;
 
-            const province& bp = ss.provinces[static_cast<std::size_t>(best)];
+            const region& bp = ss.regions[static_cast<std::size_t>(best)];
             for (int nb : neighbours[static_cast<std::size_t>(best)])
             {
-                const province& np2 = ss.provinces[static_cast<std::size_t>(nb)];
-                const int step = province_distance(bp, np2, gw)
+                const region& np2 = ss.regions[static_cast<std::size_t>(nb)];
+                const int step = region_distance(bp, np2, gw)
                                * (tile_cost(bp) + tile_cost(np2)) / 200;
                 const int cand = best_c + (step > 0 ? step : 1);
                 if (cand < reach[static_cast<std::size_t>(nb)])
@@ -428,11 +428,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
         // ---- Demography -------------------------------------------------
         int64_t total_pop = 0;
-        for (std::size_t i = 0; i < ss.provinces.size(); ++i)
+        for (std::size_t i = 0; i < ss.regions.size(); ++i)
         {
-            advance_province_demography(ss.provinces[i], 1, war_pressure[i]);
+            advance_region_demography(ss.regions[i], 1, war_pressure[i]);
             war_pressure[i] = 0;
-            total_pop += ss.provinces[i].population;
+            total_pop += ss.regions[i].population;
         }
         if (total_pop > out.peak_population)
         {
@@ -466,15 +466,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
             if (held.empty()) { q.alive = false; continue; }
             if (q.capital < 0 || owner[static_cast<std::size_t>(q.capital)] != q.id)
                 // Capital fell. The successor is the polity's lowest-indexed
-                // surviving province — placement order, which is best-ground
+                // surviving region — placement order, which is best-ground
                 // first, so it is a reasonable seat without being "the largest
                 // holding" the first cut's comment claimed (BL-312).
                 q.capital = held.front();
 
-            const province& cap = ss.provinces[static_cast<std::size_t>(q.capital)];
+            const region& cap = ss.regions[static_cast<std::size_t>(q.capital)];
             const uint32_t  qs  = salt(seed, static_cast<uint32_t>(q.id));
 
-            if (reach_capital != q.capital || reach.size() != ss.provinces.size())
+            if (reach_capital != q.capital || reach.size() != ss.regions.size())
                 rebuild_reach(q.capital);
 
             // ---- What this polity's WORKS are worth it (BL-321) -----------
@@ -487,15 +487,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
             //
             // MEANS, NOT TOTALS, throughout. A total would make every aggregate
             // grow with conquest alone, so a large empire would count itself as
-            // well-roaded for having many unroaded provinces — the opposite of
+            // well-roaded for having many unroaded regions — the opposite of
             // what the burden of breadth is measuring.
             int64_t holdings_value_sum = 0;
             int64_t works_reach_sum    = 0;
             int64_t works_ind_sum      = 0;
             for (int hi : held)
             {
-                const province& hp = ss.provinces[static_cast<std::size_t>(hi)];
-                holdings_value_sum += province_value_q(hp);
+                const region& hp = ss.regions[static_cast<std::size_t>(hi)];
+                holdings_value_sum += region_value_q(hp);
                 works_reach_sum    += hp.work_reach_mod;
                 works_ind_sum      += hp.work_industrial_mod;
             }
@@ -504,7 +504,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             const int mean_reach_q       = static_cast<int>(works_reach_sum / n_held);
             const int mean_industrial_q  = static_cast<int>(works_ind_sum / n_held);
 
-            // THE BURDEN OF BREADTH (BL-314 S3). Every province held past
+            // THE BURDEN OF BREADTH (BL-314 S3). Every region held past
             // `free_holdings` costs supply on every campaign this polity runs.
             const int over = static_cast<int>(held.size()) - params.free_holdings;
             int burden = over > 0 ? over * params.holdings_burden_q : 0;
@@ -539,10 +539,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // The three terms are the three costs the design names: LOCAL
             // staging distance, STRATEGIC terrain-weighted reach from the
             // capital (BL-316 S2), and the BURDEN OF BREADTH (BL-316 S3).
-            // `hub` is the province the campaign is STAGED FROM, and it is a
+            // `hub` is the region the campaign is STAGED FROM, and it is a
             // parameter rather than a capture because its works discount the
             // terrain cost (BL-321): reach_mod is authored as a discount on the
-            // supply cost through/from a province, so it is the staging
+            // supply cost through/from a region, so it is the staging
             // holding's roads and wharves doing the carrying, not the capital's.
             //
             // The discount applies to the TERRAIN term alone. A span bridge
@@ -552,7 +552,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const int reach_here = (ti < reach.size() && reach[ti] < (1 << 27))
                                      ? static_cast<int>(reach[ti]) : hub_dist;
                 const int hub_reach_q = (hub >= 0)
-                    ? clampi(ss.provinces[static_cast<std::size_t>(hub)].work_reach_mod,
+                    ? clampi(ss.regions[static_cast<std::size_t>(hub)].work_reach_mod,
                              0, params.work_reach_relief_cap_q)
                     : 0;
                 const int terrain_cost = reach_here * params.terrain_reach_cost_q / 100;
@@ -574,8 +574,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
             bool     best_winter = false;
             // Which works row `build_work` chose. A second field rather than an
             // overload of `best_target`, because build_work needs BOTH a
-            // province and a row and the other verbs' single target already
-            // means three different things (province, parent, domain).
+            // region and a row and the other verbs' single target already
+            // means three different things (region, parent, domain).
             int      best_work_row = -1;
 
             // -- Campaign --------------------------------------------------
@@ -587,27 +587,27 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     const int to = owner[ti];
                     if (to == q.id || to < 0) continue;
 
-                    const province& tgt = ss.provinces[ti];
-                    const int cap_dist = province_distance(cap, tgt, gw);
+                    const region& tgt = ss.regions[ti];
+                    const int cap_dist = region_distance(cap, tgt, gw);
 
                     // SUPPLY PROJECTS FROM THE STAGING HOLDING, NOT THE CAPITAL
                     // (Ben, 2026-08-12: "perhaps we can try instructing supply
                     // hubs?").
                     //
-                    // `hi` is already the polity's own province adjacent to the
+                    // `hi` is already the polity's own region adjacent to the
                     // target — it IS a supply hub, and the loop was standing in
                     // it while measuring supply all the way back to the capital.
                     // That made reach a property of empire SHAPE rather than of
                     // frontier presence: a large polity could not attack its own
                     // border because its capital was far away.
                     //
-                    // Measuring from the staging province instead is both the
+                    // Measuring from the staging region instead is both the
                     // better model (armies victual at the frontier) and what
                     // makes reach scale-free — hub_dist is bounded by
                     // neighbour_radius, so it cannot blow up when the map does.
                     // The capital still matters, as the preference term below.
                     const int hub_dist =
-                        province_distance(ss.provinces[static_cast<std::size_t>(hi)], tgt, gw);
+                        region_distance(ss.regions[static_cast<std::size_t>(hi)], tgt, gw);
 
                     // Defender's fielded power, as a headcount proxy, raised by
                     // whatever the target has BUILT (BL-321). A Wall Circuit
@@ -635,8 +635,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     {
                         int coastal_held = 0;
                         for (int h2 : held)
-                            if (ss.provinces[static_cast<std::size_t>(h2)].port_q > 400
-                             && province_distance(ss.provinces[static_cast<std::size_t>(h2)], tgt, gw)
+                            if (ss.regions[static_cast<std::size_t>(h2)].port_q > 400
+                             && region_distance(ss.regions[static_cast<std::size_t>(h2)], tgt, gw)
                                     <= params.neighbour_radius)
                                 ++coastal_held;
                         const int ring_closure_q = clampi(coastal_held * 250, 0, 1000);
@@ -653,8 +653,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
                     int64_t atk_men = 0;
                     for (int hi2 : held)
-                        if (ss.provinces[static_cast<std::size_t>(hi2)].manpower_stock > atk_men)
-                            atk_men = ss.provinces[static_cast<std::size_t>(hi2)].manpower_stock;
+                        if (ss.regions[static_cast<std::size_t>(hi2)].manpower_stock > atk_men)
+                            atk_men = ss.regions[static_cast<std::size_t>(hi2)].manpower_stock;
                     const int64_t atk_est = (atk_men * supply_here / 1000)
                                           * clampi(q.cohesion_q, 1, 1000) / 1000;
                     const int64_t def_est = tgt.manpower_stock > 0 ? tgt.manpower_stock : 1;
@@ -671,7 +671,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     //
                     // This was `value -= w_dist * cap_dist / 10`, flat. It was
                     // survivable on a 180-wide map and fatal on a 312-wide one:
-                    // capital-to-frontier distances scale with the map, province
+                    // capital-to-frontier distances scale with the map, region
                     // values do not, so tripling the grid tripled this penalty
                     // against an unchanged prize and drove every campaign score
                     // below threshold. Measured on the real world: 0 battles,
@@ -689,7 +689,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // toll (2026-08-12).
                     //
                     // This was `value -= w_cult`, a flat 150 subtracted from a
-                    // province value that measures only ~200-300. It therefore
+                    // region value that measures only ~200-300. It therefore
                     // ate half to three quarters of the entire prize on every
                     // cross-cultural target, which is nearly all of them, and it
                     // alone suppressed EVERY war: measured across a 400-year run,
@@ -700,7 +700,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     //
                     // That is BL-318's incommensurability in miniature: a cost
                     // authored on one scale subtracted from a value on another.
-                    // As a fraction it means the same thing at any province
+                    // As a fraction it means the same thing at any region
                     // value — foreign ground is worth (1000 - w_cult)/1000 of
                     // what home ground is — so the signal survives and the veto
                     // does not.
@@ -739,20 +739,20 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // -- Settle ----------------------------------------------------
             //
             // The growth-without-war axis. `run_settlement` founds every
-            // province before the stop year and leaves none after it, so
-            // without this verb a 2000-year run has a frozen province count.
+            // region before the stop year and leaves none after it, so
+            // without this verb a 2000-year run has a frozen region count.
             {
                 int pressure_best = -1, pressure_src = -1;
                 for (int hi : held)
                 {
-                    const province& p = ss.provinces[static_cast<std::size_t>(hi)];
+                    const region& p = ss.regions[static_cast<std::size_t>(hi)];
                     // The works-aware ceiling (BL-321), matching what
-                    // `advance_province_demography` actually grows toward. The
-                    // plain overload would have read a Granary province as far
+                    // `advance_region_demography` actually grows toward. The
+                    // plain overload would have read a Granary region as far
                     // more crowded than it is and sent it out to settle land it
                     // did not need — the settle pressure and the growth model
                     // must divide by the same K or the verb fires on a fiction.
-                    const int64_t K = province_carrying_capacity(p.farm_q, p.work_capacity_mod);
+                    const int64_t K = region_carrying_capacity(p.farm_q, p.work_capacity_mod);
                     if (K <= 0) continue;
                     const int pressure = static_cast<int>(clampi64((p.population * 1000) / K, 0, 1000));
                     if (pressure > pressure_best) { pressure_best = pressure; pressure_src = hi; }
@@ -763,8 +763,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const bool may_settle = q.cohesion_q >= params.settle_cohesion_gate_q;
                 if (may_settle && pressure_src >= 0 && pressure_best >= params.settle_pressure_q)
                 {
-                    const province& sp = ss.provinces[static_cast<std::size_t>(pressure_src)];
-                    const int daughter_value = (province_value_q(sp) * 800) / 1000;
+                    const region& sp = ss.regions[static_cast<std::size_t>(pressure_src)];
+                    const int daughter_value = (region_value_q(sp) * 800) / 1000;
                     const int s = (daughter_value * pressure_best) / 1000
                                 - (static_cast<int>(held.size()) > params.free_holdings
                                    ? params.holdings_burden_q * 4 : 0);
@@ -784,15 +784,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     if (q.capacity[d] < q.capacity[dom]) dom = d;
 
                 int64_t pop = 0;
-                for (int hi : held) pop += ss.provinces[static_cast<std::size_t>(hi)].population;
+                for (int hi : held) pop += ss.regions[static_cast<std::size_t>(hi)].population;
 
                 // Divided by the band already held: each further band costs more
                 // to want, so investment does not pin at its ceiling the moment
-                // a polity has a few mature provinces (BL-309). Marginal value,
+                // a polity has a few mature regions (BL-309). Marginal value,
                 // not accumulated size.
                 int64_t holdings_value = 0;
                 for (int hi : held)
-                    holdings_value += province_value_q(ss.provinces[static_cast<std::size_t>(hi)]);
+                    holdings_value += region_value_q(ss.regions[static_cast<std::size_t>(hi)]);
                 const int band_now = clampi(q.capacity[dom], 1, 6);
                 const int s = static_cast<int>(clampi64(
                     (holdings_value * params.invest_yield_q)
@@ -816,7 +816,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             {
                 int64_t hv = 0;
                 for (int hi : held)
-                    hv += province_value_q(ss.provinces[static_cast<std::size_t>(hi)]);
+                    hv += region_value_q(ss.regions[static_cast<std::size_t>(hi)]);
                 const int shortfall = 1000 - clampi(q.cohesion_q, 0, 1000);
                 const int s = static_cast<int>(clampi64(
                     (hv * shortfall) / (1000LL * params.consolidate_divisor), 0, 1000));
@@ -834,10 +834,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // one path that just wrote it.
             //
             // BOUNDED BY CONSTRUCTION, like the other four. Two candidate
-            // provinces — the capital, and one rotated through the holdings by
+            // regions — the capital, and one rotated through the holdings by
             // the year — rather than every holding. Scoring all of them would be
             // O(held x rows) per polity per round inside a pass already costing
-            // ~23 s of a ~25 s world; the rotation still reaches every province
+            // ~23 s of a ~25 s world; the rotation still reaches every region
             // over a run, because the round count (136 on the default ladder) is
             // large against any one polity's holdings.
             if (works != nullptr && works->size() > 0)
@@ -851,7 +851,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const roster_band band =
                     roster_band_for_capacity(clampi(q.capacity[static_cast<int>(sim_domain::materials)], 1, 6));
 
-                for (int slot = 0; slot < clampi(params.work_candidate_provinces, 0, 8); ++slot)
+                for (int slot = 0; slot < clampi(params.work_candidate_regions, 0, 8); ++slot)
                 {
                     int pi = -1;
                     if (slot == 0)
@@ -863,15 +863,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         // Rotation is a hash of (polity, year, slot), not a
                         // counter: nothing is carried between rounds, so
                         // inserting or removing a decision cannot shift which
-                        // province a later round looks at. Same reason the rest
+                        // region a later round looks at. Same reason the rest
                         // of this file uses `salt` rather than a generator.
                         const uint32_t h = salt(qs, static_cast<uint32_t>(y) * 977u
                                                     + static_cast<uint32_t>(slot));
                         pi = held[static_cast<std::size_t>(h % static_cast<uint32_t>(n_held))];
                     }
-                    if (pi < 0 || pi >= static_cast<int>(ss.provinces.size())) continue;
+                    if (pi < 0 || pi >= static_cast<int>(ss.regions.size())) continue;
 
-                    const province& bp = ss.provinces[static_cast<std::size_t>(pi)];
+                    const region& bp = ss.regions[static_cast<std::size_t>(pi)];
                     const std::vector<const work_row*> avail = works->available(bp, band);
 
                     for (const work_row* r : avail)
@@ -904,16 +904,16 @@ history_sim_state run_history_sim(settlement_state&         ss,
             case sim_verb::campaign:
             {
                 const std::size_t ti = static_cast<std::size_t>(best_target);
-                province& tgt = ss.provinces[ti];
+                region& tgt = ss.regions[ti];
 
-                // Nearest holding is the staging province.
+                // Nearest holding is the staging region.
                 int src = held.front(), src_d = 1 << 30;
                 for (int hi : held)
                 {
-                    const int d = province_distance(ss.provinces[static_cast<std::size_t>(hi)], tgt, gw);
+                    const int d = region_distance(ss.regions[static_cast<std::size_t>(hi)], tgt, gw);
                     if (d < src_d) { src_d = d; src = hi; }
                 }
-                province& home = ss.provinces[static_cast<std::size_t>(src)];
+                region& home = ss.regions[static_cast<std::size_t>(src)];
 
                 const int64_t want   = (home.manpower_stock * params.levy_fraction_q) / 1000;
                 const int64_t raised = raise_manpower(home, want);
@@ -921,7 +921,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
                 // FORCE COMMITMENT (BL-277 Q2), priced by the SAME lambda the
                 // scorer used. `src_d` is the staging hub's distance — the army
-                // victuals at the frontier province it marched from, and the
+                // victuals at the frontier region it marched from, and the
                 // capital still bears on the result through the terrain-weighted
                 // reach term inside `campaign_supply`.
                 //
@@ -989,7 +989,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // TERRITORY MOVES AT PROVINCE GRANULARITY, NEVER TILE.
                 //
                 // A ground-down frontier eventually gives (BL-308): the bar a
-                // victory must clear falls as the province's accumulated
+                // victory must clear falls as the region's accumulated
                 // contest rises. A flat threshold meant centuries of fighting
                 // over the same ground moved nothing — battles outnumbered
                 // conquests by up to 1000:1 in the first sweep.
@@ -1029,14 +1029,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
             }
             case sim_verb::settle:
             {
-                const province& src = ss.provinces[static_cast<std::size_t>(best_target)];
+                const region& src = ss.regions[static_cast<std::size_t>(best_target)];
 
                 // BL-310: find an UNOCCUPIED cell, widening the ring as the
                 // neighbourhood fills. The first cut offered nine candidate
                 // cells with no occupancy test and re-picked the same mature
-                // parent every year, so provinces piled up — 132 provinces on
+                // parent every year, so regions piled up — 132 regions on
                 // 33 distinct cells in one measured run, worst stack nine deep.
-                // Co-located provinces then had province_distance 0 and the
+                // Co-located regions then had region_distance 0 and the
                 // Ages map drew a whole stack as one dot.
                 int nc = -1, nr = -1;
                 for (int ring = 1; ring <= 6 && nc < 0; ++ring)
@@ -1055,14 +1055,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         const int rr = clampi(src.row + dr, 0, gh > 0 ? gh - 1 : 0);
 
                         bool taken = false;
-                        for (const province& e : ss.provinces)
+                        for (const region& e : ss.regions)
                             if (e.col == cc && e.row == rr) { taken = true; break; }
                         if (!taken) { nc = cc; nr = rr; break; }
                     }
                 }
                 if (nc < 0) break; // Neighbourhood full — no room to expand here.
 
-                province np;
+                region np;
                 np.col = nc;
                 np.row = nr;
                 np.anchor = (gw > 0) ? np.row * gw + np.col : -1;
@@ -1080,24 +1080,24 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 np.founded_year = y;
                 np.last_demography_year = y;
                 np.nation = q.id;
-                np.population = clampi64(province_carrying_capacity(np.farm_q) / 16, 1, 1 << 30);
+                np.population = clampi64(region_carrying_capacity(np.farm_q) / 16, 1, 1 << 30);
                 replenish_manpower(np);
 
-                // The change list indexes provinces as uint16_t, so refuse to
+                // The change list indexes regions as uint16_t, so refuse to
                 // create one the time-lapse could not address (BL-312). Past
                 // 65,535 the cast wrapped silently and owner_slice_at's bounds
                 // check could not catch it — the wrapped index is small and in
                 // range, so replay produced a plausible but WRONG map.
-                if (ss.provinces.size() >= owner_index_limit) break;
+                if (ss.regions.size() >= owner_index_limit) break;
 
-                ss.provinces.push_back(np);
+                ss.regions.push_back(np);
                 owner.push_back(q.id);
                 war_pressure.push_back(0);
                 neighbours.emplace_back();
-                link_province(ss.provinces.size() - 1); // Keep the index complete.
+                link_region(ss.regions.size() - 1); // Keep the index complete.
                 out.owner_changes.push_back(owner_change{
                     static_cast<int32_t>(y),
-                    static_cast<uint16_t>(ss.provinces.size() - 1),
+                    static_cast<uint16_t>(ss.regions.size() - 1),
                     static_cast<uint16_t>(q.id)});
                 ++out.foundings;
                 out.history.push_back(history_event{
@@ -1141,12 +1141,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
             case sim_verb::build_work:
             {
                 if (works == nullptr || best_target < 0
-                 || best_target >= static_cast<int>(ss.provinces.size())) break;
+                 || best_target >= static_cast<int>(ss.regions.size())) break;
 
-                province& bp = ss.provinces[static_cast<std::size_t>(best_target)];
+                region& bp = ss.regions[static_cast<std::size_t>(best_target)];
                 const work_row* r = works->row_at(static_cast<std::size_t>(best_work_row));
                 if (r == nullptr) break;
-                if (!apply_work_to_province(bp, *works, best_work_row)) break;
+                if (!apply_work_to_region(bp, *works, best_work_row)) break;
 
                 // The manpower ceiling just moved, so the stock's headroom did
                 // too. Without this the Arsenal a polity built this round would
@@ -1165,7 +1165,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             default:
                 for (int hi : held)
                 {
-                    province& p = ss.provinces[static_cast<std::size_t>(hi)];
+                    region& p = ss.regions[static_cast<std::size_t>(hi)];
                     // A RATE: a frontier cools by the year, not by the round.
                     p.contest_q = clampi(p.contest_q - 8 * step_years, 0, 1000);
                 }
@@ -1187,7 +1187,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
         // so there is nothing to snapshot at the end of a year.
     }
 
-    out.province_stride = static_cast<int>(ss.provinces.size());
+    out.region_stride = static_cast<int>(ss.regions.size());
     out.years           = years;
     out.start_year      = params.start_year;
 

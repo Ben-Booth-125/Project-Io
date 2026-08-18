@@ -1,6 +1,6 @@
 #include "settlement.hpp"
 
-#include "tongue.hpp" // BL-348: province region words are coined, not borrowed
+#include "tongue.hpp" // BL-348: quarter words are coined, not borrowed
 
 #include <algorithm>
 #include <array>
@@ -41,7 +41,7 @@ struct rng
 // FRESH stage tags — none collides with the ladder's (0x5A11 / 0xC4A7 /
 // 0xF2A6), the creeds' (0xD317 / 0x1B47), the continents' (0xC017) or the
 // planetology chain's.
-constexpr uint32_t tag_settle   = 0x5E77u; // Province placement + founding dates.
+constexpr uint32_t tag_settle   = 0x5E77u; // Region placement + founding dates.
 constexpr uint32_t tag_furnace  = 0xF0F6u; // Industrialisation timing.
 constexpr uint32_t tag_rupture  = 0x8017u; // The historical-rupture checkpoints.
 
@@ -125,8 +125,8 @@ bool touches_ocean(const world& w, const std::vector<entity_id>& ids,
     return false;
 }
 
-/// The ANCIENT endowment under a province — surveyed once, over the window the
-/// province's people would have walked. These deposits predate everyone; what
+/// The ANCIENT endowment under a region — surveyed once, over the window the
+/// region's people would have walked. These deposits predate everyone; what
 /// changes across a campaign is who ends up standing on them.
 ///
 /// Held as RAW per-tile-mean richness in thousandths, not as a 0-1000 score:
@@ -179,13 +179,13 @@ endowment survey_endowment(const world& w, const std::vector<entity_id>& ids,
 }
 
 /// Score one class against the world's own mean for that class: an average
-/// province scores 500, twice the average scores 1000.
+/// region scores 500, twice the average scores 1000.
 ///
 /// RELATIVE, NOT ABSOLUTE, and that is the load-bearing choice. "Ore country"
 /// only means anything next to the rest of the map, and a world-relative score
 /// also survives the `deposit_scalar` abundance tier (GENERATION_STRATEGY.md §
 /// The resource ceiling) without re-tuning — a lean world still has its own
-/// ore provinces, they are just poorer in absolute terms.
+/// ore regions, they are just poorer in absolute terms.
 int score_against(int raw, int mean)
 {
     return clampi((raw * 500) / std::max(1, mean), 0, 1000);
@@ -193,30 +193,30 @@ int score_against(int raw, int mean)
 
 /// Argmax over the scored endowment, with an explicit fixed order so a tie is
 /// resolved by the class list rather than by container order.
-province_class classify(int farm_q, int ore_q, int energy_q, int port_q)
+region_class classify(int farm_q, int ore_q, int energy_q, int port_q)
 {
     int best = farm_q;
-    province_class c = province_class::farm;
-    if (ore_q    > best) { best = ore_q;    c = province_class::ore; }
-    if (energy_q > best) { best = energy_q; c = province_class::energy; }
+    region_class c = region_class::farm;
+    if (ore_q    > best) { best = ore_q;    c = region_class::ore; }
+    if (energy_q > best) { best = energy_q; c = region_class::energy; }
 
-    // A harbour competes, but at a discount: a coastal province sitting on real
-    // ore is an ore province that happens to have a harbour, not the reverse.
-    // What lives on trade is the province with a coastline and nothing under it.
-    if ((port_q * 4) / 5 > best) { best = (port_q * 4) / 5; c = province_class::port; }
+    // A harbour competes, but at a discount: a coastal region sitting on real
+    // ore is an ore region that happens to have a harbour, not the reverse.
+    // What lives on trade is the region with a coastline and nothing under it.
+    if ((port_q * 4) / 5 > best) { best = (port_q * 4) / 5; c = region_class::port; }
 
     // Below the world's average on every axis, there is nothing to name.
-    return best < 300 ? province_class::none : c;
+    return best < 300 ? region_class::none : c;
 }
 
-const char* class_word(province_class c)
+const char* class_word(region_class c)
 {
     switch (c)
     {
-        case province_class::farm:   return "grain";
-        case province_class::ore:    return "ore";
-        case province_class::energy: return "coal and oil";
-        case province_class::port:   return "harbour";
+        case region_class::farm:   return "grain";
+        case region_class::ore:    return "ore";
+        case region_class::energy: return "coal and oil";
+        case region_class::port:   return "harbour";
         default:                     return "little";
     }
 }
@@ -233,13 +233,13 @@ bool creed_holds(const creed_state& cs, int culture, const char* domain)
     return false;
 }
 
-/// Which of the nine region slots this anchor falls in: 0-4 are the north→south
+/// Which of the nine quarter slots this anchor falls in: 0-4 are the north→south
 /// bands, 5-8 the dawnward→outer sectors. Split out from the word lookup so the
 /// POSITIONAL rule and the LANGUAGE it is spoken in stay independent — BL-348
 /// changed the second and deliberately left the first alone, because the point
-/// of naming a province for where it sits is that the name carries a fact about
+/// of naming a region for where it sits is that the name carries a fact about
 /// the ground.
-int region_slot(int col, int row, int gw, int gh)
+int quarter_slot(int col, int row, int gw, int gh)
 {
     const int band = (row * 5) / std::max(1, gh);
     const int sect = (col * 4) / std::max(1, gw);
@@ -247,24 +247,24 @@ int region_slot(int col, int row, int gw, int gh)
     return ((band + sect) & 1) ? clampi(band, 0, 4) : 5 + clampi(sect, 0, 3);
 }
 
-/// The region half of a province name, in the province's OWN tongue (BL-348).
+/// The quarter half of a region name, in the region's OWN tongue (BL-348).
 ///
 /// Before BL-290 the whole name was Earth-flavoured, which was at least
-/// consistent. After it, the culture half was coined from the province's own
+/// consistent. After it, the culture half was coined from the region's own
 /// phonology and this half was still English — "MelethWorirUlael Reach" put two
 /// naming systems side by side in one string, which reads as a bug rather than
 /// a style. This is consumption again, not a new mechanism: `coin_lexicon` is a
-/// pure function of the tongue, so a culture's region words are the same
+/// pure function of the tongue, so a culture's quarter words are the same
 /// wherever they are asked for, without any pass sharing a stream.
 ///
 /// The English table survives ONLY as the unusable-tongue fallback — a culture
-/// with no phoneme inventory cannot coin anything, and a province with no name
+/// with no phoneme inventory cannot coin anything, and a region with no name
 /// at all would be worse than one with an out-of-register name.
-std::string region_word(const tongue_lexicon& lex, int col, int row, int gw, int gh)
+std::string quarter_word(const tongue_lexicon& lex, int col, int row, int gw, int gh)
 {
-    const int slot = region_slot(col, row, gw, gh);
-    if (static_cast<std::size_t>(slot) < lex.region.size())
-        return lex.region[static_cast<std::size_t>(slot)];
+    const int slot = quarter_slot(col, row, gw, gh);
+    if (static_cast<std::size_t>(slot) < lex.quarter.size())
+        return lex.quarter[static_cast<std::size_t>(slot)];
 
     static const char* fallback[9] = { "northern", "upper", "middle", "lower", "southern",
                                        "dawnward", "inland", "duskward", "outer" };
@@ -283,22 +283,22 @@ settlement_state run_settlement(const planetology_state& pl,
                                 const world& w,
                                 const std::vector<entity_id>& tile_ids,
                                 int gw, int gh,
-                                int target_provinces,
+                                int target_regions,
                                 uint32_t seed,
                                 int64_t stop_year)
 {
     settlement_state out;
-    if (gw <= 0 || gh <= 0 || target_provinces <= 0 || hl.cradles.empty())
+    if (gw <= 0 || gh <= 0 || target_regions <= 0 || hl.cradles.empty())
         return out;
 
     const int total = gw * gh;
     rng r(seed, tag_settle);
 
-    // BL-348: each culture's region words, coined once and reused. `coin_lexicon`
-    // is a pure function of the tongue, so calling it per province would give the
-    // same answer — this only avoids re-hashing an inventory per province. An
+    // BL-348: each culture's quarter words, coined once and reused. `coin_lexicon`
+    // is a pure function of the tongue, so calling it per region would give the
+    // same answer — this only avoids re-hashing an inventory per region. An
     // out-of-range or unusable culture yields an empty lexicon, which is exactly
-    // what `region_word`'s fallback branch is written for.
+    // what `quarter_word`'s fallback branch is written for.
     std::unordered_map<int, tongue_lexicon> lex_cache;
     const auto lexicon_for = [&](int culture) -> const tongue_lexicon& {
         const auto it = lex_cache.find(culture);
@@ -334,28 +334,28 @@ settlement_state run_settlement(const planetology_state& pl,
         return sa != sb ? sa > sb : a < b;
     });
 
-    // --- Place provinces greedily under a separation rule ----------------------
-    std::vector<endowment> raw; // Parallel to out.provinces; scored below.
+    // --- Place regions greedily under a separation rule ----------------------
+    std::vector<endowment> raw; // Parallel to out.regions; scored below.
     const int sep = std::max(3, gw / 40);
     for (int idx : order)
     {
-        if (static_cast<int>(out.provinces.size()) >= target_provinces) break;
+        if (static_cast<int>(out.regions.size()) >= target_regions) break;
         const int col = idx % gw, row = idx / gw;
 
         bool too_close = false;
-        for (const province& p : out.provinces)
+        for (const region& p : out.regions)
             if (grid_dist(col, row, p.col, p.row, gw) < sep) { too_close = true; break; }
         if (too_close) continue;
 
-        province p;
+        region p;
         p.anchor = idx;
         p.col = col;
         p.row = row;
         p.settle_score_q = clampi(score[static_cast<std::size_t>(idx)] * 10, 0, 1000);
 
-        // WHOSE GODS. A province inherits the nearest surviving cradle's
+        // WHOSE GODS. A region inherits the nearest surviving cradle's
         // culture, so the pantheon map is a map of who actually walked where —
-        // not a per-province re-roll of belief.
+        // not a per-region re-roll of belief.
         int best_c = -1, best_d = 1 << 30;
         for (std::size_t ci = 0; ci < cs.cultures.size(); ++ci)
         {
@@ -378,12 +378,12 @@ settlement_state run_settlement(const planetology_state& pl,
         const std::string people = best_c >= 0
             ? cs.cultures[static_cast<std::size_t>(best_c)].name
             : std::string("nameless");
-        p.name = people + " " + region_word(lexicon_for(best_c), col, row, gw, gh);
+        p.name = people + " " + quarter_word(lexicon_for(best_c), col, row, gw, gh);
 
-        out.provinces.push_back(std::move(p));
+        out.regions.push_back(std::move(p));
     }
 
-    if (out.provinces.empty())
+    if (out.regions.empty())
         return out;
 
     // --- Score the endowments against the world's own means --------------------
@@ -397,9 +397,9 @@ settlement_state run_settlement(const planetology_state& pl,
         const int mf = static_cast<int>(sf / n), mo = static_cast<int>(so / n);
         const int me = static_cast<int>(se / n), mw = static_cast<int>(sw / n);
 
-        for (std::size_t i = 0; i < out.provinces.size(); ++i)
+        for (std::size_t i = 0; i < out.regions.size(); ++i)
         {
-            province& p = out.provinces[i];
+            region& p = out.regions[i];
             const endowment& e = raw[i];
             p.farm_q   = score_against(e.farm,   mf);
             p.ore_q    = score_against(e.ore,    mo);
@@ -411,25 +411,25 @@ settlement_state run_settlement(const planetology_state& pl,
 
     // --- Antiquity stop (BL-271) ----------------------------------------------
     // Below the industrial era the pass generates the world AT `stop_year`:
-    // provinces founded later do not exist yet (the year-tick sim founds them),
+    // regions founded later do not exist yet (the year-tick sim founds them),
     // and the population that HAS arrived is seeded at founding and grown
     // logistically to the start year. RNG-safe: the founding loop above already
     // consumed its draws for every candidate, so the streams match the 1960 arc.
     const bool antiquity = stop_year < 1700;
     if (antiquity)
     {
-        out.provinces.erase(
-            std::remove_if(out.provinces.begin(), out.provinces.end(),
-                           [stop_year](const province& p) { return p.founded_year > stop_year; }),
-            out.provinces.end());
+        out.regions.erase(
+            std::remove_if(out.regions.begin(), out.regions.end(),
+                           [stop_year](const region& p) { return p.founded_year > stop_year; }),
+            out.regions.end());
 
-        for (province& p : out.provinces)
+        for (region& p : out.regions)
         {
             // Founding band ~2k-26k settlers, richer ground drawing more; the
             // logistic model then does the two millennia (or fewer) of growth.
             p.population = 2000 + static_cast<int64_t>(p.farm_q) * 24;
             p.last_demography_year = p.founded_year;
-            advance_province_demography(
+            advance_region_demography(
                 p, static_cast<int>(stop_year - p.founded_year), /*war_pressure_q=*/0);
         }
     }
@@ -443,11 +443,11 @@ settlement_state run_settlement(const planetology_state& pl,
     rng rf(seed, tag_furnace);
     const int arable_q = clampi(static_cast<int>(pl.arable_share * 1000.0f), 0, 1000);
 
-    for (province& p : out.provinces)
+    for (region& p : out.regions)
     {
         if (antiquity) break;
         // The gate is ABOVE-AVERAGE fuel, not any fuel: the scores are relative
-        // to the world's own means (500 = average), so an average province sits
+        // to the world's own means (500 = average), so an average region sits
         // at 750 here and does not industrialise. Only the endowed do.
         const int fuel = p.energy_q + p.ore_q / 2;
         if (fuel < 900) continue; // No fuel, no ceiling to break.
@@ -469,7 +469,7 @@ settlement_state run_settlement(const planetology_state& pl,
     // Median over the industrialised set — BL-219's early/late pivot.
     {
         std::vector<int64_t> years;
-        for (const province& p : out.provinces)
+        for (const region& p : out.regions)
             if (p.industrialised) years.push_back(p.industrial_year);
         if (!years.empty())
         {
@@ -480,12 +480,12 @@ settlement_state run_settlement(const planetology_state& pl,
 
     // --- The founding lines ----------------------------------------------------
     // Bounded deliberately: a biography with seventy founding lines is a table,
-    // not a history. The six best-placed provinces speak for the settlement
+    // not a history. The six best-placed regions speak for the settlement
     // stage; the rest exist in the data and drive the map regardless.
-    const int named = std::min<int>(6, static_cast<int>(out.provinces.size()));
+    const int named = std::min<int>(6, static_cast<int>(out.regions.size()));
     for (int i = 0; i < named; ++i)
     {
-        const province& p = out.provinces[static_cast<std::size_t>(i)];
+        const region& p = out.regions[static_cast<std::size_t>(i)];
         out.history.push_back(history_event{
             years_from_calendar_year(p.founded_year), chain_stage::legacy,
             "The " + p.name + " is settled under the same gods as its cradle.",
@@ -498,18 +498,18 @@ settlement_state run_settlement(const planetology_state& pl,
 std::vector<int> settlement_seed_tiles(const settlement_state& ss)
 {
     std::vector<int> seeds;
-    seeds.reserve(ss.provinces.size());
-    for (const province& p : ss.provinces)
+    seeds.reserve(ss.regions.size());
+    for (const region& p : ss.regions)
         if (p.anchor >= 0) seeds.push_back(p.anchor);
     return seeds;
 }
 
-int nearest_province(const settlement_state& ss, int col, int row, int gw)
+int nearest_region(const settlement_state& ss, int col, int row, int gw)
 {
     int best = -1, best_d = 1 << 30;
-    for (std::size_t i = 0; i < ss.provinces.size(); ++i)
+    for (std::size_t i = 0; i < ss.regions.size(); ++i)
     {
-        const int d = grid_dist(col, row, ss.provinces[i].col, ss.provinces[i].row, gw);
+        const int d = grid_dist(col, row, ss.regions[i].col, ss.regions[i].row, gw);
         if (d < best_d) { best_d = d; best = static_cast<int>(i); }
     }
     return best;
@@ -552,12 +552,12 @@ std::vector<int> owner_map_of(const world& w,
     return owner;
 }
 
-economic_focus focus_of_class(province_class c)
+economic_focus focus_of_class(region_class c)
 {
     switch (c)
     {
-        case province_class::energy: return economic_focus::processing;
-        case province_class::port:   return economic_focus::trade;
+        case region_class::energy: return economic_focus::processing;
+        case region_class::port:   return economic_focus::trade;
         default:                     return economic_focus::extraction; // farm, ore, none
     }
 }
@@ -571,7 +571,7 @@ void derive_national_character(settlement_state& ss,
                                const std::vector<entity_id>& tile_ids,
                                int gw, int gh)
 {
-    if (ss.provinces.empty() || nation_ids.empty() || gw <= 0 || gh <= 0)
+    if (ss.regions.empty() || nation_ids.empty() || gw <= 0 || gh <= 0)
         return;
 
     const auto nidx = nation_index(nation_ids);
@@ -579,8 +579,8 @@ void derive_national_character(settlement_state& ss,
     const int nations = static_cast<int>(nation_ids.size());
     const int total = gw * gh;
 
-    // --- Attribute every province to whoever ended up holding it ---------------
-    for (province& p : ss.provinces)
+    // --- Attribute every region to whoever ended up holding it ---------------
+    for (region& p : ss.regions)
         p.nation = (p.anchor >= 0 && p.anchor < total)
                  ? owner[static_cast<std::size_t>(p.anchor)] : -1;
 
@@ -610,16 +610,16 @@ void derive_national_character(settlement_state& ss,
     }
 
     std::vector<int> rival_pressure(static_cast<std::size_t>(nations), 0);
-    std::vector<int> province_count(static_cast<std::size_t>(nations), 0);
-    for (std::size_t i = 0; i < ss.provinces.size(); ++i)
+    std::vector<int> region_count(static_cast<std::size_t>(nations), 0);
+    for (std::size_t i = 0; i < ss.regions.size(); ++i)
     {
-        const province& a = ss.provinces[i];
+        const region& a = ss.regions[i];
         if (a.nation < 0) continue;
-        ++province_count[static_cast<std::size_t>(a.nation)];
-        for (std::size_t j = 0; j < ss.provinces.size(); ++j)
+        ++region_count[static_cast<std::size_t>(a.nation)];
+        for (std::size_t j = 0; j < ss.regions.size(); ++j)
         {
             if (i == j) continue;
-            const province& b = ss.provinces[j];
+            const region& b = ss.regions[j];
             if (b.nation < 0 || b.nation == a.nation) continue;
             if (grid_dist(a.col, a.row, b.col, b.row, gw) <= 12)
                 ++rival_pressure[static_cast<std::size_t>(a.nation)];
@@ -632,19 +632,19 @@ void derive_national_character(settlement_state& ss,
         const int share = owned[static_cast<std::size_t>(ni)] > 0
             ? (border[static_cast<std::size_t>(ni)] * 1000) / owned[static_cast<std::size_t>(ni)]
             : 0;
-        const int press = province_count[static_cast<std::size_t>(ni)] > 0
+        const int press = region_count[static_cast<std::size_t>(ni)] > 0
             ? (rival_pressure[static_cast<std::size_t>(ni)] * 150)
-              / province_count[static_cast<std::size_t>(ni)]
+              / region_count[static_cast<std::size_t>(ni)]
             : 0;
         contest[static_cast<std::size_t>(ni)] = clampi(share * 2 + press, 0, 1000);
     }
-    for (province& p : ss.provinces)
+    for (region& p : ss.regions)
         if (p.nation >= 0) p.contest_q = contest[static_cast<std::size_t>(p.nation)];
 
     // --- Industrialisation timing, per nation ----------------------------------
     constexpr int64_t never = 1 << 30;
     std::vector<int64_t> first_furnace(static_cast<std::size_t>(nations), never);
-    for (const province& p : ss.provinces)
+    for (const region& p : ss.regions)
     {
         if (p.nation < 0 || !p.industrialised) continue;
         int64_t& f = first_furnace[static_cast<std::size_t>(p.nation)];
@@ -674,17 +674,17 @@ void derive_national_character(settlement_state& ss,
                    : cq >= 280 ? expansionism::moderate
                                : expansionism::passive;
 
-        // economic_focus <- the dominant resource class of the provinces
+        // economic_focus <- the dominant resource class of the regions
         // settled DURING industrialisation, not of everything it holds.
         std::array<int, 3> tally = { 0, 0, 0 };
-        for (const province& p : ss.provinces)
+        for (const region& p : ss.regions)
         {
             if (p.nation != ni) continue;
             if (!p.industrialised) continue;
             ++tally[static_cast<std::size_t>(focus_of_class(p.dominant))];
         }
         if (tally[0] + tally[1] + tally[2] == 0)
-            for (const province& p : ss.provinces)
+            for (const region& p : ss.regions)
                 if (p.nation == ni) ++tally[static_cast<std::size_t>(focus_of_class(p.dominant))];
 
         int best = 0;
@@ -712,12 +712,12 @@ void derive_national_character(settlement_state& ss,
     // The earliest three furnaces only: this is the seed's own Britain, and
     // naming it is the whole payload HISTORY.md Stage 4 asks for.
     std::vector<int> by_year;
-    for (std::size_t i = 0; i < ss.provinces.size(); ++i)
-        if (ss.provinces[i].industrialised && ss.provinces[i].nation >= 0)
+    for (std::size_t i = 0; i < ss.regions.size(); ++i)
+        if (ss.regions[i].industrialised && ss.regions[i].nation >= 0)
             by_year.push_back(static_cast<int>(i));
     std::sort(by_year.begin(), by_year.end(), [&](int a, int b) {
-        const province& pa = ss.provinces[static_cast<std::size_t>(a)];
-        const province& pb = ss.provinces[static_cast<std::size_t>(b)];
+        const region& pa = ss.regions[static_cast<std::size_t>(a)];
+        const region& pb = ss.regions[static_cast<std::size_t>(b)];
         return pa.industrial_year != pb.industrial_year
              ? pa.industrial_year < pb.industrial_year : a < b;
     });
@@ -725,7 +725,7 @@ void derive_national_character(settlement_state& ss,
     const int lines = std::min<int>(3, static_cast<int>(by_year.size()));
     for (int i = 0; i < lines; ++i)
     {
-        const province& p = ss.provinces[static_cast<std::size_t>(by_year[static_cast<std::size_t>(i)])];
+        const region& p = ss.regions[static_cast<std::size_t>(by_year[static_cast<std::size_t>(i)])];
         const auto it = w.nations.find(nation_ids[static_cast<std::size_t>(p.nation)]);
         const std::string nation = it != w.nations.end() ? it->second.name : std::string("a realm");
         const bool forge = creed_holds(cs, p.culture, "the forge");
@@ -815,7 +815,7 @@ void resolve_historical_ruptures(settlement_state& ss,
                                  int gw, int gh,
                                  uint32_t seed)
 {
-    if (ss.provinces.empty() || nation_ids.size() < 2 || gw <= 0 || gh <= 0)
+    if (ss.regions.empty() || nation_ids.size() < 2 || gw <= 0 || gh <= 0)
         return;
 
     const auto nidx = nation_index(nation_ids);
@@ -849,7 +849,7 @@ void resolve_historical_ruptures(settlement_state& ss,
     for (int ni = 0; ni < nations; ++ni) candidates.push_back(ni);
     std::sort(candidates.begin(), candidates.end(), [&](int a, int b) {
         int ca = 0, cb = 0;
-        for (const province& p : ss.provinces)
+        for (const region& p : ss.regions)
         {
             if (p.nation == a) ca = std::max(ca, p.contest_q);
             if (p.nation == b) cb = std::max(cb, p.contest_q);
@@ -867,10 +867,10 @@ void resolve_historical_ruptures(settlement_state& ss,
         const auto nit = w.nations.find(nid);
         if (nit == w.nations.end() || nit->second.tiles.empty()) continue;
 
-        // Province inventory for this nation, in placement order.
+        // Region inventory for this nation, in placement order.
         std::vector<int> mine;
-        for (std::size_t i = 0; i < ss.provinces.size(); ++i)
-            if (ss.provinces[i].nation == ni) mine.push_back(static_cast<int>(i));
+        for (std::size_t i = 0; i < ss.regions.size(); ++i)
+            if (ss.regions[i].nation == ni) mine.push_back(static_cast<int>(i));
         if (mine.empty()) continue;
 
         // Strongest real neighbour, by shared border (tie: lowest index).
@@ -881,7 +881,7 @@ void resolve_historical_ruptures(settlement_state& ss,
             if (b > rival_border) { rival_border = b; rival = nj; }
         }
 
-        const int contest = ss.provinces[static_cast<std::size_t>(mine.front())].contest_q;
+        const int contest = ss.regions[static_cast<std::size_t>(mine.front())].contest_q;
         const int64_t year = 1901 + static_cast<int64_t>(k) * 6 + pick_rng.pick(9);
 
         bool applied = false;
@@ -909,7 +909,7 @@ void resolve_historical_ruptures(settlement_state& ss,
                     scale_abundance(w, nid, 0.92f);
                     ss.history.push_back(history_event{
                         years_from_calendar_year(year), chain_stage::spend,
-                        "The " + ss.provinces[static_cast<std::size_t>(mine.front())].name +
+                        "The " + ss.regions[static_cast<std::size_t>(mine.front())].name +
                             " rises; " + self + " is remade from the inside.",
                         "-> ideology flips; territory untouched" });
                     applied = true;
@@ -919,12 +919,12 @@ void resolve_historical_ruptures(settlement_state& ss,
                 if (label == "collapse")
                 {
                     // Contract toward the core: the two most peripheral
-                    // provinces are lost, and their industrial clock resets.
+                    // regions are lost, and their industrial clock resets.
                     std::vector<int> ordered = mine;
-                    const province& core = ss.provinces[static_cast<std::size_t>(mine.front())];
+                    const region& core = ss.regions[static_cast<std::size_t>(mine.front())];
                     std::sort(ordered.begin(), ordered.end(), [&](int a, int b) {
-                        const province& pa = ss.provinces[static_cast<std::size_t>(a)];
-                        const province& pb = ss.provinces[static_cast<std::size_t>(b)];
+                        const region& pa = ss.regions[static_cast<std::size_t>(a)];
+                        const region& pb = ss.regions[static_cast<std::size_t>(b)];
                         const int da = grid_dist(pa.col, pa.row, core.col, core.row, gw);
                         const int db = grid_dist(pb.col, pb.row, core.col, core.row, gw);
                         return da != db ? da > db : a < b;
@@ -934,10 +934,10 @@ void resolve_historical_ruptures(settlement_state& ss,
                     for (int pi : ordered)
                     {
                         if (lost >= 2) break;
-                        province& p = ss.provinces[static_cast<std::size_t>(pi)];
+                        region& p = ss.regions[static_cast<std::size_t>(pi)];
                         if (pi == mine.front()) continue;
 
-                        // Hand the province's anchor window to the nearest
+                        // Hand the region's anchor window to the nearest
                         // OTHER nation that already borders it.
                         int taker = -1;
                         for (int nj = 0; nj < nations && taker < 0; ++nj)
@@ -968,7 +968,7 @@ void resolve_historical_ruptures(settlement_state& ss,
                     ss.history.push_back(history_event{
                         years_from_calendar_year(year), chain_stage::spend,
                         self + " cannot hold its periphery; " + std::to_string(lost) +
-                            " provinces answer to someone else by winter.",
+                            " regions answer to someone else by winter.",
                         "-> territory contracts; the industrial clock resets where it went" });
                     applied = true;
                     return;
@@ -982,7 +982,7 @@ void resolve_historical_ruptures(settlement_state& ss,
                 // The stronger is the one with more to fight with: territory
                 // plus how much of it is industrial.
                 int my_industry = 0, their_industry = 0;
-                for (const province& p : ss.provinces)
+                for (const region& p : ss.regions)
                 {
                     if (!p.industrialised) continue;
                     if (p.nation == ni) ++my_industry;
@@ -1033,21 +1033,21 @@ void resolve_historical_ruptures(settlement_state& ss,
                 scale_abundance(w, los_nid, 0.75f);
                 scale_abundance(w, win_nid, 0.90f);
 
-                // THE VICTOR'S GODS TRAVEL WITH THE BORDER. A province taken
+                // THE VICTOR'S GODS TRAVEL WITH THE BORDER. A region taken
                 // keeps its founders in `founding_culture` and its conquerors
                 // in `culture` — which is exactly the pair a later religion or
                 // population layer needs to describe a grievance.
                 int converted = 0;
                 int victor_culture = -1;
-                for (const province& p : ss.provinces)
+                for (const region& p : ss.regions)
                     if (p.nation == win_ni) { victor_culture = p.culture; break; }
 
-                for (province& p : ss.provinces)
+                for (region& p : ss.regions)
                 {
                     if (p.nation != los_ni) continue;
                     if (p.anchor < 0) continue;
                     bool near_front = false;
-                    for (const province& q : ss.provinces)
+                    for (const region& q : ss.regions)
                         if (q.nation == win_ni
                          && grid_dist(p.col, p.row, q.col, q.row, gw) <= 10) { near_front = true; break; }
                     if (!near_front) continue;
@@ -1066,13 +1066,13 @@ void resolve_historical_ruptures(settlement_state& ss,
                     win_name + " and " + los_name + " fight over the same frontier; " +
                         win_name + " keeps it.",
                     "-> " + std::to_string(moved) + " tiles change hands; " +
-                        std::to_string(converted) + " provinces change gods" });
+                        std::to_string(converted) + " regions change gods" });
 
                 // And now the erasure. The loser's own account of itself is
                 // what a sack destroys first.
                 if (!mine.empty())
                 {
-                    for (const province& p : ss.provinces)
+                    for (const region& p : ss.regions)
                     {
                         if (p.nation != win_ni || !p.creed_conquered) continue;
                         redact(ss, p.name, year, "the " + win_name + " occupation");
@@ -1089,7 +1089,7 @@ void resolve_historical_ruptures(settlement_state& ss,
                 {
                     ss.history.push_back(history_event{
                         years_from_calendar_year(year + 1), chain_stage::spend,
-                        "The shrines of the taken provinces are rededicated to " +
+                        "The shrines of the taken regions are rededicated to " +
                             cs.cultures[static_cast<std::size_t>(victor_culture)].pantheon[0].name + ".",
                         "-> the founders' names survive only in the land registry" });
                 }
@@ -1113,17 +1113,17 @@ void resolve_historical_ruptures(settlement_state& ss,
 }
 
 // ---------------------------------------------------------------------------
-// BL-219's read — a corporation operates at the tier its province earned
+// BL-219's read — a corporation operates at the tier its region earned
 // ---------------------------------------------------------------------------
 
-industrial_focus focus_from_province(const province& p, int64_t median)
+industrial_focus focus_from_region(const region& p, int64_t median)
 {
     // The ancient endowment sets the base tier.
     industrial_focus f = industrial_focus::extraction;
     switch (p.dominant)
     {
-        case province_class::energy: f = industrial_focus::processing; break;
-        case province_class::port:   f = industrial_focus::trade;      break;
+        case region_class::energy: f = industrial_focus::processing; break;
+        case region_class::port:   f = industrial_focus::trade;      break;
         default:                     f = industrial_focus::extraction; break;
     }
 
@@ -1158,15 +1158,15 @@ constexpr int      demog_plague_radius    = 6;      // Neighbours beyond this fe
 
 } // namespace
 
-int64_t province_carrying_capacity(int farm_q)
+int64_t region_carrying_capacity(int farm_q)
 {
     const int q = clampi(farm_q, 0, 1000);
     return demog_capacity_floor + static_cast<int64_t>(q) * demog_capacity_per_q;
 }
 
-int64_t province_carrying_capacity(int farm_q, int capacity_mod_q)
+int64_t region_carrying_capacity(int farm_q, int capacity_mod_q)
 {
-    const int64_t base = province_carrying_capacity(farm_q);
+    const int64_t base = region_carrying_capacity(farm_q);
     // Clamped at -999 so the multiplier stays positive: a modifier of -1000
     // would zero the ceiling and make the logistic term divide by zero.
     const int m = clampi(capacity_mod_q, -999, 100000);
@@ -1186,9 +1186,9 @@ int64_t manpower_ceiling(int64_t population, int manpower_mod_q)
     return base + (base * m) / 1000;
 }
 
-void replenish_manpower(province& p)
+void replenish_manpower(region& p)
 {
-    // Reads the province's own works (BL-321) rather than taking the modifier
+    // Reads the region's own works (BL-321) rather than taking the modifier
     // as an argument: an Arsenal is a property of the place, and every existing
     // caller should get its effect without being told the works exist.
     const int64_t ceiling = manpower_ceiling(p.population, p.work_manpower_mod);
@@ -1198,7 +1198,7 @@ void replenish_manpower(province& p)
     p.manpower_stock = clampi64(p.manpower_stock, 0, ceiling);
 }
 
-int64_t raise_manpower(province& p, int64_t want)
+int64_t raise_manpower(region& p, int64_t want)
 {
     if (want <= 0 || p.manpower_stock <= 0) return 0;
     const int64_t raised = std::min(want, p.manpower_stock);
@@ -1206,16 +1206,16 @@ int64_t raise_manpower(province& p, int64_t want)
     return raised;
 }
 
-void advance_province_demography(province& p, int years, int war_pressure_q)
+void advance_region_demography(region& p, int years, int war_pressure_q)
 {
     if (years <= 0) return;
     const int wq = clampi(war_pressure_q, 0, 1000);
-    // The ceiling the province's WORKS raised (BL-321). A Granary is a change
+    // The ceiling the region's WORKS raised (BL-321). A Granary is a change
     // to how many people the ground feeds, so it belongs in K rather than in a
     // one-off population grant: it lifts the asymptote the logistic term is
     // growing toward, which is a permanent change in trajectory rather than a
     // step that growth would simply re-flatten.
-    const int64_t K = province_carrying_capacity(p.farm_q, p.work_capacity_mod);
+    const int64_t K = region_carrying_capacity(p.farm_q, p.work_capacity_mod);
 
     for (int y = 0; y < years; ++y)
     {
@@ -1239,31 +1239,31 @@ void advance_province_demography(province& p, int years, int war_pressure_q)
     replenish_manpower(p);
 }
 
-bool resolve_plague_event(std::vector<province>& provinces,
+bool resolve_plague_event(std::vector<region>& regions,
                           std::vector<checkpoint_record>& checkpoints,
                           uint32_t seed, uint32_t stage_tag, int gw)
 {
-    if (provinces.empty()) return false;
+    if (regions.empty()) return false;
 
     bool applied = false;
     return resolve_checkpoint(
         chain_stage::spend, seed, stage_tag,
         /*max_attempts=*/4,
-        // propose — one branch per province; eligibility is a FILTER
-        // (BL-217's rule), never a weight: a province with nobody left
+        // propose — one branch per region; eligibility is a FILTER
+        // (BL-217's rule), never a weight: a region with nobody left
         // cannot be an epicentre.
         [&](checkpoint_rng&, uint32_t) {
-            // Each label is the address of that province's OWN name buffer
+            // Each label is the address of that region's OWN name buffer
             // (a std::string's storage is per-object even when empty via
             // SSO), so identity comparison in apply() below is exact and
             // survives duplicate name text.
             std::vector<checkpoint_branch> b;
-            b.reserve(provinces.size());
-            for (const province& p : provinces)
+            b.reserve(regions.size());
+            for (const region& p : regions)
                 b.push_back({ p.name.c_str(), p.population > 0 });
             return b;
         },
-        // apply — the chosen province is the epicentre; nearby provinces
+        // apply — the chosen region is the epicentre; nearby regions
         // (grid-proximity connectivity proxy, see the header comment on why
         // not the full trade graph) lose population too, tapering with
         // distance.
@@ -1271,17 +1271,17 @@ bool resolve_plague_event(std::vector<province>& provinces,
             if (applied) return; // A reroll must not stack losses.
 
             // Identity, not content, comparison: `chosen.label` is the address
-            // of a specific province's own `name.c_str()` (set in propose,
+            // of a specific region's own `name.c_str()` (set in propose,
             // same call), so a pointer match is exact even when two
-            // provinces share a name string (region-word collisions do
+            // regions share a name string (quarter-word collisions do
             // happen — see settle-name generation in run_settlement).
             int epicentre = -1;
-            for (std::size_t i = 0; i < provinces.size(); ++i)
-                if (provinces[i].name.c_str() == chosen.label) { epicentre = static_cast<int>(i); break; }
+            for (std::size_t i = 0; i < regions.size(); ++i)
+                if (regions[i].name.c_str() == chosen.label) { epicentre = static_cast<int>(i); break; }
             if (epicentre < 0) return;
 
-            const province& origin = provinces[static_cast<std::size_t>(epicentre)];
-            for (province& p : provinces)
+            const region& origin = regions[static_cast<std::size_t>(epicentre)];
+            for (region& p : regions)
             {
                 if (p.population <= 0) continue;
                 const int dist = grid_dist(p.col, p.row, origin.col, origin.row, gw);

@@ -463,9 +463,9 @@ entity_id author_building(world& w,
 /// carrying a matching extractable deposit) — tiles that fail are skipped, so a
 /// deposit-poor anchor neighbourhood simply yields fewer extraction sites.
 ///
-/// BL-283 constrains the ANCHOR search to the corporation's home province via
+/// BL-283 constrains the ANCHOR search to the corporation's home region via
 /// @p anchor_window; the neighbourhood the remaining slots walk stays national, so
-/// a corp whose own province is small spills into the ground next door rather than
+/// a corp whose own region is small spills into the ground next door rather than
 /// opening short. The window is a *subset of `home_nation.tiles` in the same order*,
 /// so nothing about the search's determinism changes.
 ///
@@ -608,7 +608,7 @@ std::vector<entity_id> place_starting_assets(world& w,
 }
 
 /// The grid width of the body a nation's territory sits on, or 0 when it has no
-/// resolvable tiles. Needed because `nearest_province` works in raster space and
+/// resolvable tiles. Needed because `nearest_region` works in raster space and
 /// the column axis wraps.
 int nation_grid_width(const world& w, const nation_component& home_nation)
 {
@@ -624,10 +624,10 @@ int nation_grid_width(const world& w, const nation_component& home_nation)
 }
 
 /// The nation's tiles that fall inside any of @p accepted, in the nation's own
-/// stored order. "Inside a province" is `nearest_province` — provinces are anchor
-/// points, not stored tile sets, so the nearest anchor IS the province a tile
+/// stored order. "Inside a region" is `nearest_region` — regions are anchor
+/// points, not stored tile sets, so the nearest anchor IS the region a tile
 /// belongs to (the same rule the settlement pass itself reads by).
-std::vector<entity_id> province_window(const world& w,
+std::vector<entity_id> region_window(const world& w,
                                        const nation_component& home_nation,
                                        const settlement_state& ss,
                                        const std::vector<int>& accepted,
@@ -641,7 +641,7 @@ std::vector<entity_id> province_window(const world& w,
     {
         const auto t = w.tiles.find(tid);
         if (t == w.tiles.end()) continue;
-        const int pi = nearest_province(ss, t->second.grid_x, t->second.grid_y, gw);
+        const int pi = nearest_region(ss, t->second.grid_x, t->second.grid_y, gw);
         if (pi < 0) continue;
         if (std::find(accepted.begin(), accepted.end(), pi) != accepted.end())
             window.push_back(tid);
@@ -649,30 +649,30 @@ std::vector<entity_id> province_window(const world& w,
     return window;
 }
 
-/// The @p k provinces of the same nation whose anchors lie nearest @p home_pi,
+/// The @p k regions of the same nation whose anchors lie nearest @p home_pi,
 /// @p home_pi itself first. The second rung of BL-283's fallback ladder: a corp
-/// whose own province cannot host its anchor looks next door before it gives up
-/// on the province meaning anything at all. Column-wrapped distance; ties break on
-/// the lower province index, so the result is a pure function of the settlement
+/// whose own region cannot host its anchor looks next door before it gives up
+/// on the region meaning anything at all. Column-wrapped distance; ties break on
+/// the lower region index, so the result is a pure function of the settlement
 /// record.
-std::vector<int> home_and_nearest_provinces(const settlement_state& ss,
+std::vector<int> home_and_nearest_regions(const settlement_state& ss,
                                             int home_pi,
                                             int nation_idx,
                                             int gw,
                                             int k)
 {
     std::vector<int> out{ home_pi };
-    if (home_pi < 0 || home_pi >= static_cast<int>(ss.provinces.size()) || gw <= 0)
+    if (home_pi < 0 || home_pi >= static_cast<int>(ss.regions.size()) || gw <= 0)
         return out;
 
-    const province& home = ss.provinces[static_cast<std::size_t>(home_pi)];
+    const region& home = ss.regions[static_cast<std::size_t>(home_pi)];
 
     struct near { long long d2; int pi; };
     std::vector<near> others;
-    for (std::size_t i = 0; i < ss.provinces.size(); ++i)
+    for (std::size_t i = 0; i < ss.regions.size(); ++i)
     {
         if (static_cast<int>(i) == home_pi) continue;
-        const province& p = ss.provinces[i];
+        const region& p = ss.regions[i];
         if (p.nation != nation_idx) continue;
         long long dc = std::abs(p.col - home.col);
         if (dc > gw / 2) dc = gw - dc;
@@ -1188,18 +1188,18 @@ std::vector<entity_id> generate_corporations(
 
     std::vector<industrial_focus> corp_focuses(static_cast<std::size_t>(corp_count));
 
-    // home_province_idx[c] = index into settle->provinces, or -1. Only the
+    // home_region_idx[c] = index into settle->regions, or -1. Only the
     // BL-219 path fills it; it is what makes two corps in the SAME nation differ
     // — a nation average would make every corp in a nation alike and destroy
     // the specialists premise this rewrite is required to preserve.
-    std::vector<int> home_province_idx(static_cast<std::size_t>(corp_count), -1);
+    std::vector<int> home_region_idx(static_cast<std::size_t>(corp_count), -1);
 
-    if (settle && !settle->provinces.empty())
+    if (settle && !settle->regions.empty())
     {
-        // BL-219 — focus DERIVED from the corp's home province, then a
+        // BL-219 — focus DERIVED from the corp's home region, then a
         // world-level reject-and-reroll against a diversity floor. A floor on
         // the SET is not a quota on any MEMBER, so no individual corporation's
-        // focus ever becomes inexplicable; the reroll re-picks which provinces
+        // focus ever becomes inexplicable; the reroll re-picks which regions
         // the corps anchor to, it never patches a corp's focus directly.
         constexpr int max_attempts = 6;
         for (int attempt = 0; attempt < max_attempts; ++attempt)
@@ -1212,11 +1212,11 @@ std::vector<entity_id> generate_corporations(
                 const entity_id home_nid = nation_ids[static_cast<std::size_t>(
                     home_nation_idx[static_cast<std::size_t>(c)])];
 
-                // The provinces this corp could anchor to, in placement order.
+                // The regions this corp could anchor to, in placement order.
                 std::vector<int> options;
-                for (std::size_t pi = 0; pi < settle->provinces.size(); ++pi)
+                for (std::size_t pi = 0; pi < settle->regions.size(); ++pi)
                 {
-                    const province& p = settle->provinces[pi];
+                    const region& p = settle->regions[pi];
                     if (p.nation < 0 || p.nation >= nation_count) continue;
                     if (nation_ids[static_cast<std::size_t>(p.nation)] != home_nid) continue;
                     options.push_back(static_cast<int>(pi));
@@ -1226,7 +1226,7 @@ std::vector<entity_id> generate_corporations(
                 {
                     // A nation the settlement pass never reached (all its land
                     // arrived by conquest or orphan assignment). Fall back to
-                    // the national character rather than inventing a province.
+                    // the national character rather than inventing a region.
                     const auto it = w.nations.find(home_nid);
                     const economic_focus ef = (it != w.nations.end())
                         ? it->second.focus : economic_focus::extraction;
@@ -1238,10 +1238,10 @@ std::vector<entity_id> generate_corporations(
 
                 std::uniform_int_distribution<int> pick(0, static_cast<int>(options.size()) - 1);
                 const int pi = options[static_cast<std::size_t>(pick(attempt_rng))];
-                home_province_idx[static_cast<std::size_t>(c)] = pi;
+                home_region_idx[static_cast<std::size_t>(c)] = pi;
 
-                const industrial_focus f = focus_from_province(
-                    settle->provinces[static_cast<std::size_t>(pi)],
+                const industrial_focus f = focus_from_region(
+                    settle->regions[static_cast<std::size_t>(pi)],
                     settle->median_industrial_year);
                 corp_focuses[static_cast<std::size_t>(c)] = f;
                 focus_counts[static_cast<std::size_t>(f)]++;
@@ -1301,20 +1301,20 @@ std::vector<entity_id> generate_corporations(
             continue;
 
         // BL-283 — the anchor is searched inside the corp's HOME PROVINCE, not
-        // across its whole nation. The province already decides what the corp is
+        // across its whole nation. The region already decides what the corp is
         // (Pass 2); this makes it decide where it is, so holdings cluster where the
         // corp's history says it came from instead of scattering nation-wide.
         //
         // The fallback ladder, in order, each rung deterministic:
-        //   1. the home province alone;
-        //   2. the home province plus the three nearest same-nation provinces —
-        //      a small province that cannot host the anchor type looks next door;
+        //   1. the home region alone;
+        //   2. the home region plus the three nearest same-nation regions —
+        //      a small region that cannot host the anchor type looks next door;
         //   3. the whole nation, the pre-BL-283 behaviour.
         // A rung that finds no anchorable tile consumes no randomness, so widening
         // costs nothing in stream terms. Rung 3 is reached only when the corp's own
         // corner of the map is unusable for its focus; it is the honest floor, not a
-        // silent abandonment of the province.
-        const int home_pi = home_province_idx[static_cast<std::size_t>(c)];
+        // silent abandonment of the region.
+        const int home_pi = home_region_idx[static_cast<std::size_t>(c)];
 
         std::vector<entity_id> assets;
         if (settle && home_pi >= 0)
@@ -1322,13 +1322,13 @@ std::vector<entity_id> generate_corporations(
             const int gw = nation_grid_width(w, it->second);
 
             const std::vector<int> rung1{ home_pi };
-            const std::vector<int> rung2 = home_and_nearest_provinces(
+            const std::vector<int> rung2 = home_and_nearest_regions(
                 *settle, home_pi, home_nation_idx[static_cast<std::size_t>(c)], gw, 3);
 
             for (const std::vector<int>* accepted : { &rung1, &rung2 })
             {
                 const std::vector<entity_id> window =
-                    province_window(w, it->second, *settle, *accepted, gw);
+                    region_window(w, it->second, *settle, *accepted, gw);
                 if (window.empty())
                     continue;
                 assets = place_starting_assets(
