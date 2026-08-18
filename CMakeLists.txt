@@ -665,6 +665,30 @@ target_link_libraries(haulage_measure PRIVATE io_world_obj lua54)
 target_compile_features(haulage_measure PRIVATE cxx_std_20)
 target_compile_options(haulage_measure PRIVATE ${IO_WARNING_FLAGS})
 
+# substrate_census (NEW-10, 2026-08-18) — live-Lua, and NOT as a convenience.
+# It censuses the world at the point the player first sees it, which is AFTER
+# generate_background_firms (BL-365). That pass's measured stop condition reads
+# economy.lua's population_demand/background_demand baskets, which are all-zero
+# on a default-constructed registry — so with a hand-built registry it places
+# ZERO firms and the census reports a world the game never builds. world_gen.lua
+# (base prices/market seeding) and works.lua (the Era -1 roster, which generation
+# forwards to the pre-history sim) are loaded for the same reason: this harness's
+# whole subject is the SHIPPED world, so every authored input must be the real one.
+add_executable(substrate_census
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/substrate_census.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/works_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(substrate_census PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(substrate_census PRIVATE io_world_obj lua54)
+target_compile_features(substrate_census PRIVATE cxx_std_20)
+target_compile_options(substrate_census PRIVATE ${IO_WARNING_FLAGS})
+
 # font_glyph_harness (BL-234) is the one harness that links ImGui rather than
 # ${IO_WORLD_SOURCES}: the defect it guards is the ImFontConfig handed to
 # AddFontFromFileTTF, which lives in src/ui/fonts.cpp, not in world/*. It still
@@ -824,6 +848,20 @@ set(IO_TEST_SWEEP_HARNESSES
     # by name when a seed is suspected.
     seed_sweep_probe
 
+    # CATEGORY (1), added 2026-08-18. substrate_census (NEW-10) generates a full
+    # world PER SEED *with the pre-epoch era at its shipped 400 years* — it cannot
+    # use no_prehistory(), because the province set that era leaves behind is what
+    # the settlements, roads and markets it counts are carved onto. Measured
+    # 2026-08-18: ~1.0 s/world Release, ~62 s/world Debug. Its three-seed default
+    # is therefore ~186 s in a Debug tree — past the 60 s default tier and inside
+    # 25% of the 240 s long tier, which is precisely the "2s under the bound —
+    # flaky by luck" shape the BL-288 re-tier above exists to stop. It REPORTS and
+    # gates nothing but structure, so it has nothing to contribute to a routine
+    # run in any case; registering it here is the honest reading of NR-259 (a
+    # Timeout is a silent failure, so a harness that cannot reliably fit the gate
+    # must not be registered as though it could).
+    substrate_census
+
     # PARKED FOR A DIFFERENT REASON (2026-08-12), and the distinction matters.
     #
     # The two above are open-ended exploration tools whose cost IS the point.
@@ -887,6 +925,10 @@ set(IO_TEST_SCRIPT_ROOTED_HARNESSES
     # the comment at the foreach below already warns about, found twice more.
     price_band_harness
     tier_margin
+    # ADDED 2026-08-18 (NEW-10). Loads recipes/economy/world_gen/works by relative
+    # path and FATALs on an empty recipe set rather than measuring a world the
+    # game never builds — but only if it is looking at the real scripts/.
+    substrate_census
 )
 
 foreach(harness_src ${IO_VERIFY_HARNESSES})
