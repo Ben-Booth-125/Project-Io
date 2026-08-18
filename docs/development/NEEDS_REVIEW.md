@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*96 entries — 64 open, 32 resolved.*
+*98 entries — 66 open, 32 resolved.*
 
 ---
 
@@ -733,6 +733,19 @@ First, route labels are clipped mid-word — rows read "Huhaidar -> Kai Sa..." a
 tier_margin reports: 3 recipe inputs that have deposits are never produced; 7 wanted recipe inputs sit on 200+ tiles with no site naming them; and a processing facility does not out-earn an extraction site per tick. The third is already known — the verifier-headless notes on player_seed_sweep record BL-436 measuring exactly that, and warn its G4 depth floor must never be re-read as a profitability gate. The first two rows I have not traced.
 
 **Why it matters.** Not merge damage — tier_margin links only world/*, and nothing merged today touches world logic. It is either inherited from Sprint 25a (which added ordnance and a Fabricator recipe consuming steel + machinery, plausibly moving the sited/produced sets) or older still. Worth knowing which, because the second row — a wanted input on 200+ tiles that nothing sites for — is the shape of a good the economy asks for and cannot get.
+
+### NR-332 — Ordnance has no ancient route — does the 0 CE arc get one, or a different military good?
+*question · raised 2026-08-18 · from Sprint 26b doc truth pass, 2026-08-18; confirmed against scripts/recipes.lua:450 and recipe_registry.hpp:36-38.*
+
+The only military terminal good in the game is tagged era = industrial, and a 0 CE campaign resolves to era_band::ancient, so ordnance cannot be produced in the shipped product. The recipe author deferred an ancient route to BL-429 (ancient building roster) in a source comment and no item was filed, so the deferral went invisible. Filed as BL-460 (ordnance unproducible at 0 CE), priority A.
+
+- (a) Give ordnance an iron_blooms + charcoal ancient route now — small, and it unblocks the rate rollout.
+- (b) Give the ancient arc a DIFFERENT military terminal good, and leave ordnance industrial for the parked space arc.
+
+### NR-333 — Two independent notions of era have drifted apart, and each stranded something
+*observation · raised 2026-08-18 · from Sprint 26b doc truth pass, 2026-08-18.*
+
+The recipe registry has era_band_for_epoch (recipe_registry.hpp:36-38), derived from epoch_year. The unit roster has campaign_roster_band (unit_roster.hpp:61), a hard constant set to industrial with a comment still reading 1960s. Neither consults the other. BL-460 is the recipe side stranding ordnance; BL-461 is the roster side offering industrial units in a 0 CE campaign.
 
 ---
 

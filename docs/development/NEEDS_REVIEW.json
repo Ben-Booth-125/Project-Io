@@ -1518,6 +1518,44 @@
     "NR-312",
     "NR-315"
    ]
+  },
+  {
+   "id": "NR-332",
+   "raised": "2026-08-18",
+   "kind": "question",
+   "status": "open",
+   "title": "Ordnance has no ancient route — does the 0 CE arc get one, or a different military good?",
+   "source": "Sprint 26b doc truth pass, 2026-08-18; confirmed against scripts/recipes.lua:450 and recipe_registry.hpp:36-38.",
+   "what": "The only military terminal good in the game is tagged era = industrial, and a 0 CE campaign resolves to era_band::ancient, so ordnance cannot be produced in the shipped product. The recipe author deferred an ancient route to BL-429 (ancient building roster) in a source comment and no item was filed, so the deferral went invisible. Filed as BL-460 (ordnance unproducible at 0 CE), priority A.",
+   "why": "It blocks NR-321 (turning the upkeep rates off zero). The moment rates are non-zero, an ancient army draws a good nobody in the world can make. The choice is Ben's because it is a content-design call rather than a defect fix.",
+   "options": [
+    "(a) Give ordnance an iron_blooms + charcoal ancient route now — small, and it unblocks the rate rollout.",
+    "(b) Give the ancient arc a DIFFERENT military terminal good, and leave ordnance industrial for the parked space arc."
+   ],
+   "refs": [
+    "BL-460",
+    "BL-457",
+    "BL-454",
+    "BL-429",
+    "BL-433",
+    "NR-321"
+   ]
+  },
+  {
+   "id": "NR-333",
+   "raised": "2026-08-18",
+   "kind": "observation",
+   "status": "open",
+   "title": "Two independent notions of era have drifted apart, and each stranded something",
+   "source": "Sprint 26b doc truth pass, 2026-08-18.",
+   "what": "The recipe registry has era_band_for_epoch (recipe_registry.hpp:36-38), derived from epoch_year. The unit roster has campaign_roster_band (unit_roster.hpp:61), a hard constant set to industrial with a comment still reading 1960s. Neither consults the other. BL-460 is the recipe side stranding ordnance; BL-461 is the roster side offering industrial units in a 0 CE campaign.",
+   "why": "Worth recording as one pattern rather than two bugs. The 0 CE refocus (NR-177, 2026-08-12) moved the epoch, and neither data-side era concept followed it. The durable fix is that the roster derives from era_band_for_epoch so the two agree by construction — plus an era-aware widening of chain_depth R1, which today asserts a consumer EXISTS but not that producer and consumer are reachable in the same band. Both were found by a doc pass rather than by any check, which is the part worth fixing.",
+   "refs": [
+    "BL-460",
+    "BL-461",
+    "BL-274",
+    "NR-177"
+   ]
   }
  ]
 }
