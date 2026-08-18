@@ -400,6 +400,43 @@ runs stance first, which is the order both the audit and Sprint 23's block suppo
 
 **Sprint 22 (reachability)** survives untouched and is good filler for any lane that finishes short.
 
+## Five amendments from the candidate-plan pass
+
+Three independent plans were generated against the same audits — substrate-first, seam-first and
+playable-first — then judged adversarially. They converged on this arc's shape; these five are what
+they changed about it.
+
+**1. Decide the relationship idiom ONCE, in the sim.** The sharpest structural finding. Lane A's
+collapse needs polity-pair state (enmity, obligation), and Lane C needs corp-pair stance. Both are
+the same question — directed map or canonicalised pair — and answering it twice produces two
+incompatible idioms in one codebase. **Settle it in Sprint 30 and have Lane C consume it**, rather
+than letting C1 pick first under implementation pressure.
+
+**2. Era −1 tech state dies at the handoff too.** `polity::capacity[7]` — a polity's entire
+technological standing at the stop year — is discarded alongside its borders. Under ruling 2
+(*borders plus character*) it should ride the same crossing: a nation that inherits a collapsed
+empire's roads should inherit its knowledge. Add to Sprint 29's payload.
+
+**3. The campaign roster band is hard-coded to INDUSTRIAL** (`unit_roster.hpp:61`) while the default
+epoch is 0 CE. A 0 CE product currently musters industrial-era units. Cheap, embarrassing, and Lane
+C's natural home.
+
+**4. Markets are era-blind.** `base_price`, the background demand basket and the population basket
+are ungated by era, the way BL-433 already gates building types. Prices in the ancient arc still
+belong to 1960. Lane B, alongside the density work.
+
+**5. The economy-truth arc is carried, not dropped — and this is the one deferral to watch.**
+Sprint 19 closed with its goal **unmet**: processing underearns extraction, and `ai_skill_harness`
+reads −1.9M to −3.4M final net worth on every seed, deliberately red and unblessed. Lane D's tax and
+wage work is measured against that benchmark. **BL-443 (debt floor) is the cheapest unblock** —
+interest is 98.8% of every benchmark deficit — and it should ride inside Lane D's first sprint
+rather than waiting for its own. Ben's brief did not name it; naming the deferral is the point.
+
+**And one honest gap all three plans flagged: there is no serialiser.** No save/load path exists
+anywhere, and only BL-107's format header is filed. Ruling 2 makes Sprint 29 the first work in the
+project whose loss on reload actually matters. It does not block the arc — the collapse stays
+re-derivable from seed plus params — but it is the moment the project stops being able to defer it.
+
 ## What this arc deliberately does not carry
 
 **Escort, blockade and ambient banditry** stay out, per Sprint 25's own boundary. **A second reach
