@@ -71,8 +71,26 @@ struct corp_budget
     /// indistinguishable from an unimplemented one.
     float levies      = 0.0f;
 
+    /// BL-454: standing-force upkeep — the CREDIT half of what it costs to keep
+    /// the corp's units this tick. Its OWN term, deliberately not folded into
+    /// `wages`: a hidden term is a term nobody tunes, and the budget ledger has
+    /// to be able to show the player what the army costs as against what the
+    /// factories cost. The GOODS half is not here at all — that is a pool debit
+    /// (economy_system.hpp § run_unit_upkeep), not a money flow.
+    float upkeep      = 0.0f;
+
+    /// BL-454 observability, not money: how many units the corp fields, and how
+    /// many of those are not fully supplied. The budget ledger's force line
+    /// calls the unmet part out — an army quietly weakening because its goods
+    /// never arrive is exactly the thing a player must not have to infer.
+    int   force_units      = 0;
+    int   force_unsupplied = 0;
+
     /// The per-tick balance delta: income less every outflow.
-    float net() const { return income - expenditure - maintenance - wages - interest - levies; }
+    float net() const
+    {
+        return income - expenditure - maintenance - wages - interest - levies - upkeep;
+    }
 };
 
 /// One background-corp agency action taken this tick (the BL-079 reflexes). Pure
@@ -182,6 +200,54 @@ struct economy_report
 /// @return    The step report (building states + auto-bought shortfalls).
 economy_report run_economy_step(world& w, const recipe_registry& reg,
                                 bool spectating = false);
+
+// ---------------------------------------------------------------------------
+// BL-454 — the unit pass
+// ---------------------------------------------------------------------------
+
+/// What one run of the unit pass did. Pure observability; nothing reads it to
+/// make a decision, so recording it cannot perturb determinism.
+struct unit_upkeep_tick
+{
+    int units        = 0; ///< Units alive after the pass.
+    int disbanded    = 0; ///< Orphaned units erased this tick (see run_unit_upkeep).
+    int unmet        = 0; ///< Units whose goods draw could not be met from the pool.
+    int out_of_reach = 0; ///< Units beyond the reach field (trigger (a)).
+};
+
+/// BL-454's unit pass — the GOODS half of standing-force upkeep, plus the one
+/// decay rule, plus orphan cleanup. Runs inside run_economy_step; exported so a
+/// harness can drive it directly.
+///
+/// Per unit, in ASCENDING UNIT ID (the map is unordered, so the id list is
+/// sorted first — the pass writes a shared pool and its order is therefore
+/// load-bearing):
+///
+///  1. ORPHAN CLEANUP. `demolish_building` erases the building, the corp asset
+///     and the building stockpile but never touches `w.units`, so demolishing a
+///     muster base left every unit raised there orphaned — a real defect, and
+///     this pass is the only place that can see it. A unit is disbanded when its
+///     owning corp is gone, when its tile is gone, or when its recorded
+///     `muster_base` is no longer in `w.buildings`. A unit with no recorded
+///     muster base (the hard-coded world's stub) is never disbanded.
+///
+///  2. THE GOODS DRAW. `resolve_unit_upkeep` resolves the cost vector from the
+///     roster; each good is drawn from the unit owner's pool ON THE UNIT'S OWN
+///     BODY. A pool can be empty, so the draw takes what is there and NEVER goes
+///     negative; a short draw marks the unit unmet.
+///
+///  3. THE DECAY RULE — ONE rule, TWO triggers. (a) the unit is beyond the reach
+///     field (BL-325 S3's out-of-supply decay), or (b) the draw in step 2 went
+///     unmet. Either fires the SAME subtraction on `supply_factor_permille`;
+///     neither firing lets it recover. Deterministic scalar arithmetic, no RNG.
+///
+/// The CREDIT half is deliberately not here — it is a budget flow and lands as
+/// its own term in apply_budget's decomposition (budget_system.hpp).
+///
+/// Inert at the shipped rates: every `unit_upkeep_params` rate defaults to zero,
+/// which means no pool is touched (not even created), no draw can go unmet, and
+/// the reach field is never built from here.
+unit_upkeep_tick run_unit_upkeep(world& w, const recipe_registry& reg);
 
 /// BL-430: outcome of a PLAYER-grade recipe-switch attempt (try_switch_recipe).
 enum class recipe_switch_result : uint8_t

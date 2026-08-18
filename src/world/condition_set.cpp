@@ -1,5 +1,6 @@
 #include "condition_set.hpp"
 
+#include "unit_roster.hpp" // BL-459: unit_strength (strength is derived, not stored)
 #include "world.hpp"
 
 #include <algorithm>
@@ -136,10 +137,16 @@ float measure_condition(const condition& c, const world& w, entity_id subject_co
 
         case condition_subject::military_strength:
         {
-            long long s = 0; // int32 accumulated as an integer, then converted once
+            // BL-459: strength is DERIVED, not stored — unit_strength() applies
+            // the roster's per-type quality and the unit's supply factor. It
+            // returns an INTEGER (the x100 fixed point) on purpose, so this sum
+            // stays integral and therefore order-independent; the loop reads an
+            // unordered_map, and a float accumulator here would make it
+            // nondeterministic (float addition is not associative).
+            long long s = 0; // integer sum: order-independent by construction
             for (const auto& [uid, uc] : w.units)
                 if (uc.owner == subject_corp)
-                    s += uc.strength;
+                    s += unit_strength(w, uc);
             return static_cast<float>(s);
         }
     }

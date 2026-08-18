@@ -1,9 +1,11 @@
 #include "budget_system.hpp"
 
-#include "law.hpp" // BL-343: evaluate_laws at the enforcement seam
+#include "law.hpp"         // BL-343: evaluate_laws at the enforcement seam
+#include "unit_roster.hpp" // BL-454: resolve_unit_upkeep (the credit half)
 
 #include <algorithm>
 #include <map>
+#include <vector>
 
 float body_mean_habitability(const world& w, entity_id body)
 {
@@ -68,6 +70,27 @@ void apply_budget(world& w,
     // BL-042B: mean habitability per body (from population centres) scales wages.
     // Cached per body — body_mean_habitability scans every centre, so compute each
     // body once; building_profit.hpp's estimate reads the same helper (no drift).
+    // BL-454: standing-force upkeep, bucketed by owner ONCE. Ascending unit id
+    // within each bucket, because `w.units` is an unordered_map and a float sum
+    // over it would otherwise be order-dependent (float addition is not
+    // associative) — the same trap condition_set.cpp's military_strength sum
+    // avoids by staying integral. std::map, so the buckets themselves are
+    // ordered too.
+    //
+    // Skipped entirely when the corp fields no units, so a unit-free world runs
+    // the pre-BL-454 arithmetic untouched.
+    const unit_upkeep_params& upkeep_rates = reg.military().upkeep;
+    std::map<entity_id, std::vector<entity_id>> units_by_owner;
+    {
+        std::vector<entity_id> unit_ids;
+        unit_ids.reserve(w.units.size());
+        for (const auto& kv : w.units)
+            unit_ids.push_back(kv.first);
+        std::sort(unit_ids.begin(), unit_ids.end());
+        for (const entity_id uid : unit_ids)
+            units_by_owner[w.units.at(uid).owner].push_back(uid);
+    }
+
     std::map<entity_id, float> hab_cache;
     const auto mean_hab_of = [&](entity_id body) -> float {
         const auto it = hab_cache.find(body);
@@ -127,6 +150,37 @@ void apply_budget(world& w,
             delta           -= opex.maintenance;
             bud.wages       += opex.wages;
             delta           -= opex.wages;
+        }
+
+        // BL-454: standing-force upkeep — its OWN term, after the buildings and
+        // before the levies. Until this, `w.units` appeared in this file exactly
+        // zero times: hire_unit debited once and the regiment was free forever
+        // while every building beside it paid maintenance and wages every tick.
+        //
+        // Only the CREDIT half is here. The goods half is a pool debit and lives
+        // in the unit pass (economy_system.cpp § run_unit_upkeep), which has also
+        // already run this tick and written each unit's supply factor — which is
+        // why the force counts below read live state rather than needing to be
+        // plumbed through.
+        {
+            const auto uit = units_by_owner.find(corp);
+            if (uit != units_by_owner.end())
+            {
+                float force_upkeep = 0.0f;
+                for (const entity_id uid : uit->second)
+                {
+                    const unit_component& u = w.units.at(uid);
+                    force_upkeep += resolve_unit_upkeep(u, upkeep_rates).credits;
+                    ++bud.force_units;
+                    if (u.supply_factor_permille < 1000)
+                        ++bud.force_unsupplied;
+                }
+                if (force_upkeep != 0.0f)
+                {
+                    bud.upkeep = force_upkeep;
+                    delta     -= force_upkeep;
+                }
+            }
         }
 
         // BL-343: enacted-law levies. The predicates are resolved ONCE per law

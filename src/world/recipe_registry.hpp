@@ -1,6 +1,7 @@
 #pragma once
 
 #include "components.hpp"
+#include "unit_roster.hpp" // BL-454: unit_upkeep_params — per-type unit data lives with the roster
 
 #include <array>
 #include <cstdint>
@@ -379,6 +380,14 @@ struct military_capability_params
     /// registry charges hires sensibly without Lua.
     float hire_base_cost      = 40.0f;
     float hire_cost_per_power = 0.5f;
+
+    /// BL-454: standing-force UPKEEP — what it costs to KEEP a unit, as opposed
+    /// to `hire_*` above, which is what it costs to raise one. Authored under
+    /// `economy.military.unit_upkeep`; see unit_upkeep_params (unit_roster.hpp)
+    /// for the field-by-field contract and for why every rate defaults to zero.
+    /// BL-394's own comment flagged upkeep as "deliberately absent" and pointed
+    /// at the contract loop; this is where it actually landed.
+    unit_upkeep_params upkeep = {};
 };
 
 /// BL-350 procurement/contract tunables, authored in scripts/economy.lua under the top-level

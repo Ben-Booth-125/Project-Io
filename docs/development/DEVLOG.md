@@ -10,7 +10,109 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — the score was never the reason (BL-417 step 1, BL-439) (2026-08-17, latest)
+## Session — Sprint 25a: armies get something to eat (BL-457, BL-455, BL-452/453, BL-456, BL-454/459) (2026-08-17 → 08-18, latest)
+
+Full mode, Batch Delivery, three worktree sub-agents. Ben's brief was *"what can we build to pad out
+the military and logistics systems?"* — answered by proposing the **seam between them** rather than
+more of either, then rescoped on his steer to carry interdiction, then split when the rescope cost
+the sprint its independence. Six items landed; PR #44.
+
+**The audit's finding, which shaped everything after it.** Both systems are largely built and
+largely unreachable. The convoy layer — `supply_system.cpp` plus the whole pathfinder plus four
+rendering paths, and the *only* coupling between two markets' prices — owned **zero of the fifteen
+`corp_verb`s**. And `w.units` appeared in `economy_system.cpp`, `budget_system.cpp` and
+`construction.cpp` **zero times**, so an army was bought once and free forever while every building
+beside it paid maintenance and wages every tick.
+
+**Sprint 22's reachability audit could not have found the first one, and the reason is structural**
+(NR-308). It joined seam, dictionary, surface and scorer *over the verbs that exist*, and all fifteen
+are reachable from at least one direction. A join over existing verbs is blind to the absent verb.
+BL-444 gains an authored subsystem column so a subsystem owning no verb is visible rather than
+inferred.
+
+**The military half of the refocus had no object at all.** BL-340 terminates the chain in
+`spacecraft_components` and BL-350's contracts buy it, so the *space equipment* half of the
+2026-08-10 militia refocus landed — and **weapons did not exist anywhere in the 37-value enum**. It
+went unnoticed for a week because nothing consumed one, which is the admission rule working in
+reverse: a good with no consumer never announces its own absence. **BL-457** appends `ordnance`,
+one value not the three Ben named, priced **derived rather than picked** — the processing roster
+marks outputs up over their input basket at 1.415–1.443, and 43.0 puts ordnance at 1.433.
+
+**Seven review rulings were taken live, and two overruled the recommendation on file.** Stance is
+the **hybrid** — hostility directed, friendship symmetric — which is the most expensive of the three
+options and the only one honest to both halves at once (you can be attacked without agreeing; you
+cannot be befriended without agreeing). Unit strength becomes **genuinely fixed-point** rather than
+having its doc comment corrected. Putting that question found a sharper defect than either review
+entry had recorded: both writers set `strength` to the *same value* as `count`, so it was a literal
+duplicate, not an ambiguously-scaled field.
+
+**The resolution is that `strength` stops being stored at all** — derived as
+`count × roster_type_quality × supply_factor` at ×100, so the duplicate cannot return. `supply_factor`
+is written by the upkeep pass, which means an unpaid ordnance draw weakens an army **in the
+resolver**, not merely in the budget. BL-325 S3's decay, BL-454's shortfall and this factor collapsed
+into **one rule with two triggers**.
+
+**And it landed the adapter three items had been waiting on.** Nothing anywhere converted a
+`unit_component` into an `army_stack_entry`, so neither battle resolver could ever have been handed a
+campaign force. The BL-456 doc agent found this independently while reading the source, which is
+the corroboration that made it safe to act on.
+
+### What the method did, and where it failed
+
+**Verification was partial by force, and every gap is written down rather than papered over
+(NR-313).** This session could not build Lua, sol2, SDL or ImGui — the dependency host is blocked by
+egress policy, and it was not routed around. So `chain_depth` (BL-457's own named guard) never ran,
+no Lua file was ever parsed, and the entire UI half of two items is unverified. **43 of 47 world TUs
+compile with plain g++**, which is what made the rest possible: `unit_upkeep` 62/62,
+`convoy_command` 50/50, `condition_set_harness` 41/41, `order_book_harness` 69/69, plus the usual
+sweep. Requirement rows that could not be executed are marked **pending**, not complete.
+
+**Every new guard was shown to fail before it was trusted, and one found a real defect immediately.**
+`resource_table_check.js` — a static join across the four hand-maintained transcriptions of
+`resource_type` — was run against the pre-change tree in a detached worktree and failed with the
+three habitability goods that had rendered as "(unnamed resource)" since 2026-08-11. That defect is
+**structurally invisible to the compiler**: a short initialiser list for a sized array is legal C++
+and silently zero-fills.
+
+**All three worktree agents branched from the session-start commit, not the branch head** (NR-316).
+This is verbatim the v0.1.9 failure Sprint 17's retro recorded — *worktrees isolate writes, not
+history* — and the mitigation recorded then (read every hunk at integration) is a cure, not a
+prevention. The severe case was the upkeep agent: `ordnance` did not exist in its tree and its whole
+item is "units draw ordnance", so it was one step from a second append to a serialised enum. Caught
+because the docs agent mentioned its `backlog.json` looked stale. **The prevention is one line —
+`git merge <working-branch>` as the first instruction in every worktree brief.**
+
+**A claim was made and retracted inside the same task.** An alignment check on `presentation.cpp`
+reported eight goods rendering under wrong names; the check had skipped the three explicit
+`{ nullptr }` placeholder rows that hold the alignment. Re-reading the file gave the real and much
+smaller defect. Worth recording because the wrong version was more interesting than the right one,
+which is exactly when a measurement wants re-reading.
+
+**The agents outperformed their briefs twice.** The convoy agent found that convoys are not entities
+at all — `w.convoys` is a plain vector — so the `subject` field the brief specified had nothing real
+to name, and it used a monotonic id in `cmd.order` instead, following `sell_order` (NR-318). The
+upkeep agent structured the goods draw as authored data before the merge brought it `ordnance`, and
+kept that shape afterwards — so naming a good is now a data change rather than an enum reference.
+
+### Left open
+
+- **The rates ship at ZERO** (NR-321), so nothing consumes ordnance at runtime yet and BL-457's
+  admission argument is true structurally but not in play. One line in `economy.lua`, and it wants a
+  measurement rather than a guess.
+- **`spectator_determinism` needs a Windows re-bless with TWO named causes**, isolated across three
+  commits rather than assumed: `resource_count` 37 → 38, and `unit_component`'s two new hashed
+  fields. The `military_points` deletion moved it not at all. Its golden is MSVC-derived and cannot
+  pass under g++ at any commit (NR-319).
+- **Phase 25b (BL-458, interdiction) is not promoted** — it needs Sprints 21 and 23.
+- Two `question_log` entries owed for materially changed surfaces (NR-323); three tools want skill
+  wraps (NR-320); a held convoy is still free forever (NR-317).
+
+**Runtime:** not summed — seventh consecutive entry. The format's Runtime line has now gone
+uncollected far longer than it was ever collected; wire `tools/session/timer.js` in or drop the line.
+
+---
+
+## Session — the score was never the reason (BL-417 step 1, BL-439) (2026-08-17)
 
 Full mode. Continued Sprint 19 on its next item, BL-417 (AI build score is quadratic). The item
 landed as designed — its **step 1 only**, which is what it asks for. The session's actual result is

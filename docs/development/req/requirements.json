@@ -4189,6 +4189,87 @@
      "result_metric": "FAILED, PRE-EXISTING, and isolated rather than assumed - see NR-319. spectator_determinism R2 byte-identity is red. Measured at three commits under g++: it was ALREADY red before this batch (4f3c4d8, observed 9744431472DE5755), the ordnance append moved it (44166a4, CCF93A83903B6B45), and the military_points deletion moved it not at all. The golden is MSVC-derived and cannot pass under g++ at any commit. Owed: a Windows re-bless citing resource_count 37->38."
     }
    ]
+  },
+  {
+   "brief": "unit-upkeep-and-derived-strength",
+   "batch": "2026-08-17-sprint25a",
+   "title": "BL-454 / BL-459 - an army costs something to keep, and its strength stops duplicating its headcount",
+   "status": "partial",
+   "promoted_from": "backlog.json BL-454 UNITS_COST_NOTHING_TO_KEEP + BL-459 UNIT_STRENGTH_IS_A_DUPLICATE_OF_COUNT",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "ITEM-SPANNING (headless): a standing force draws credits AND goods every tick, as a cost VECTOR resolved from the roster rather than a float, and upkeep is its own budget term rather than folded into wages.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. unit_upkeep harness 62/62, rebuilt and re-run independently on the merged tree. U1e/U1f: the upkeep term equals heads x rate and NO other budget flow moved; U1j covers the power-scaled leg. The goods draw is authored data (a {resource = qty} map), so naming a good is a data change - a better shape than the enum reference the brief implied."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "A pool can be empty, so there is ONE decay rule with TWO triggers (beyond the reach field; the draw went unmet) rather than two parallel rules - and stock never goes negative.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. U2a-U2i: a short draw is reported unmet, the pool floors at zero, supply falls by exactly the authored scalar, four unmet ticks give four subtractions, the factor floors at zero, and a met draw recovers at the authored rate. One subtraction site, two triggers, as designed. The reach trigger is opt-in so no Dijkstra is built at default rates."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "The demolish-orphan defect is fixed where it can be seen - in the unit pass, since demolish_building itself cannot see units.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. U3a-U3h. Note U3c deliberately asserts that demolish_building STILL does not touch w.units - it pins the defect in place and proves the fix is where it belongs rather than papered over at the call site. Units of an erased corp are disbanded too."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "strength stops being a stored field and becomes derived, so the duplicate cannot return; the x100 scale anchor holds.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. The stored field is REMOVED from unit_component. U6a: quality 1.0 at full supply gives strength == count * 100 exactly. U6c-U6f: equal headcount and different roster type diverge in the right order, half supply halves it, an unsupplied unit is strictly weaker, and U6f asserts strength is no longer a duplicate of count. U6h/U6i cover a negative count and an unknown roster index."
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "requirement": "The missing unit -> army_stack_entry adapter exists and feeds the resolvers deterministically.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET. U7a-U7g. U7c is the load-bearing one: supply lands in the entry COUNT and NOT in the power modifier, which would square it against unit_strength. resolve_battle scores adapter-built stacks and is identical across two runs. Corroborated independently by the BL-456 doc agent, which found no such bridge anywhere in the source."
+    },
+    {
+     "id": "R6",
+     "status": "complete",
+     "requirement": "Determinism, and inertness at the shipped rates: two runs of one seed agree, and at rate zero the build is behaviourally identical to before.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "MET, and this is what made landing it safe. U4a-U4f: balances, pools and strengths identical across two runs, with anti-vacuity rows proving the rollout actually moved. U5a-U5h: the shipped defaults really are zero, the balance is bit-identical after 25 ticks, no pool is even CREATED, neither decay trigger can fire, and observability is not gated behind the rates. Neighbours green: condition_set_harness 41/41, econ_harness, determinism_harness, military_capability_harness."
+    },
+    {
+     "id": "R7",
+     "status": "pending",
+     "requirement": "The four changed UI surfaces render correctly: the Strength page derivation, the unsupplied callout, the upkeep block, the Force finance bar.",
+     "verification": [
+      "visual"
+     ],
+     "result_metric": "NOT VERIFIED - NOT COMPILED, NOT RUN, NOT PHOTOGRAPHED (NR-313). Written by inspection; the reg threading through draw_unit_page / draw_unit_selection_body was checked against every call site. Also owed with it: two question_log entries for the materially changed surfaces, deliberately not written until the surfaces can be seen (NR-323)."
+    },
+    {
+     "id": "R8",
+     "status": "failed",
+     "requirement": "The existing gate stays green.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "FAILED, EXPECTED, STRUCTURAL. spectator_determinism R2 moves again: unit_component gained two hashed fields, so every world hash holding a unit changes. Measured under g++ pre-change CCF93A83903B6B45, post-change C9A4EFB137D74095, MSVC golden 855E07DE529684EC. Combined with NR-319, the Windows re-bless now has TWO named structural causes: resource_count 37->38, and the unit_component field change. Also pre-existing and unrelated: ai_skill_harness 25 failures before and after, its own banner declaring its bands stale since BL-386; non-movement confirmed at processors_gained = 43 either side."
+    }
+   ]
   }
  ]
 }

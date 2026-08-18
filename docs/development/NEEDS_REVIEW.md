@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*85 entries — 57 open, 28 resolved.*
+*88 entries — 60 open, 28 resolved.*
 
 ---
 
@@ -684,6 +684,27 @@ The R2 byte-identity row fails on the merged branch. The implementing agent repo
 Sprint 25a added three checks that are currently loose. tools/verify/convoy_command.cpp (50 assertions over the dispatch/hold seam, including a full-world-fingerprint rejection check) and, pending the upkeep agent, tools/verify/unit_upkeep.cpp - neither is named in the verifier-headless skill, so neither is discoverable by a future session even though CMake's glob already picks them up as CTest tests. And tools/session/resource_table_check.js, the static join across the four hand-maintained transcriptions of resource_type, is wrapped in no skill at all.
 
 **Why it matters.** The standing rule is explicit that a loose tool is the forgotten kind, and this is three of them in one batch. resource_table_check.js is the one that matters most: it caught a real defect the compiler is structurally unable to see (a short initialiser list for a sized array silently zero-fills), and that defect had already survived six days unnoticed.
+
+### NR-321 — Ordnance's upkeep rate ships at 0.0, so nothing consumes it at runtime and BL-457's admission argument is not yet true in play
+*question · raised 2026-08-18 · from Sprint 25a, integrating BL-454. The implementing agent flagged the tension rather than resolving it silently.*
+
+BL-454's goods draw ships with every rate at ZERO - my instruction, so the item lands inert and no economy golden moves on landing. The agent followed it and named the consequence: ordnance and food_rations are NAMED in economy.lua's unit_upkeep table at 0.0, so the machinery is wired end to end but nothing actually draws a unit of ordnance until one number changes. chain_depth's R1 exemption says ordnance's consumer is 'BL-454 unit upkeep draw (per-tick, per unit)'. That is true STRUCTURALLY - the pass exists, resolves the vector and would debit - and false at RUNTIME today.
+
+**Why it matters.** BL-457's whole admission argument was that ordnance satisfies PRODUCTION.md's rule because BL-454 consumes it, and NR-257 deleted five resources for failing exactly that test. At rate zero, ordnance is produced-by-a-recipe and consumed-by-nobody-in-practice - the same shape, one layer subtler, and the guard cannot see it because an exemption table is a static string list. It is not a defect to fix by weakening the guard; it is a live number waiting for a decision. Worth stating plainly since I claimed the consumer in BL-457's commit message.
+
+### NR-322 — Unit quality is DERIVED from the roster row power_mod, not authored as a second column
+*decision taken on your behalf · raised 2026-08-18 · from Sprint 25a, BL-459. Agent judgement call, flagged for overturning.*
+
+BL-459's formula is strength = count x roster_type_quality x supply_factor. Rather than add a quality column to all 19 roster rows, the agent derived quality from each row's existing power_mod as (1000 + power_mod)/1000 - so a Levy Spear at power_mod 0 is quality 1.000 and a Rifle Regiment at 380 is 1.380. Related calls: supply lands in the stack entry's COUNT and quality in its type_power_mod, because putting quality in both would square it against unit_strength; and unit_strength takes an unused const world& to match the signature condition_set.cpp calls, documented as the seam for a future per-era roster.
+
+**Why it matters.** One number cannot drift from itself, which is the real argument for it - a second authored column would need keeping in sync with combat power forever, and nothing would enforce it. The cost is that quality and combat power become the same dial: a unit cannot be expensive-but-fragile or cheap-but-tough, because its upkeep-weighted strength and its battlefield power are the same figure scaled. That is a design constraint, not a bug, and it is invisible unless someone says so.
+
+### NR-323 — Two surfaces changed materially and their question_log entries were deliberately not written
+*observation · raised 2026-08-18 · from Sprint 25a, BL-454/BL-459 integration. The agent flagged it rather than editing the shared files.*
+
+The unit Selection card's Strength page now shows a derived figure with its count x quality x supply derivation, an unsupplied callout and an upkeep block; the Corporation dashboard gains a seventh Finance bar (Force) and a force line beneath the net. Both are material content changes to existing surfaces. The agent did not touch docs/ui/question_log.json or docs/ai/ACTIONS.json because both were live merge hazards against concurrent work, and said so rather than editing them.
+
+**Why it matters.** BL-260's rule is that every information surface declares the question it answers, and the enforcement is authorship rather than machinery - so a missed entry is missed permanently and silently. This is exactly the gap the question log exists to expose: a surface that changed with no recorded justification. The merge-hazard reasoning was correct at the time and the debt is now mine, not the agent's.
 
 ---
 
