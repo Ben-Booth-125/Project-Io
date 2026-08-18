@@ -1,5 +1,81 @@
 # Project Io — REFINED (active worklist)
 
+## Sprints 26a / 26b / 27 / B1 — The Fall opens, four lanes at once (promoted 2026-08-18)
+
+Four sprints opened together because their file sets are disjoint. Requirements groups are owed
+for the two that change `tools/verify/*` behaviour and are written before the results land.
+
+**Main session owns** `.claude/rules/io-standing-rules.md`, `ROADMAP.md`, `backlog.json`,
+`SPRINTS.md` and this file. **No agent touches any of them** — that is what keeps four concurrent
+worktrees mergeable.
+
+### Sprint 26a — the three authority edits
+
+- **[1] A — NEW-12 the nation-behaviour grant.** BL-054's prohibition widened for both grains in
+  the BL-202/BL-203 shape: pure, seeded, deterministic, scored-utility, legal verbs, never a
+  planner. Explicit exclusions written in (nothing timing-dependent; no cloud model).
+  **DONE.** File: `.claude/rules/io-standing-rules.md`.
+- **[1] A′ — the BL-450 corp-grain grant.** Stated as its own widening, not folded into A. Its
+  subject is the one actor the prohibition protects. Hostility stays a **declared** state a corp
+  opts into — a rival may score and declare it, never acquire it ambiently. **DONE.** Same file.
+- **[1] B — un-park v0.1.11.** Seven items flipped `parked: false`; ROADMAP gains the minor back
+  under the ancient arc, themed on *who enacts*. **DONE.**
+  Files: `backlog.json`, `ROADMAP.md`.
+- **[2] C — NEW-1 the prehistory-on determinism case.** **IN FLIGHT** (sub-agent, worktree).
+  File: `tools/verify/world_determinism.cpp`. Three cases: same-seed replay, different-seed
+  divergence, and prehistory-on ≠ prehistory-off (proving the pass is not a silent no-op).
+  **A red result is a finding and must be reported, not softened.**
+
+### Sprint 26b — close-out and the doc truth pass
+
+- **[1] D — close-out on evidence.** Six items → `complete`, each with a commit hash in this
+  file's Sprint 25a block (BL-452, BL-454, BL-455, BL-456, BL-457, BL-459). **DONE.**
+- **[0] D′ — the deliberate non-flips, recorded so they are not re-litigated.** BL-453 (convoy
+  ledger) stays open: *"DONE but UNVERIFIED"*, R6 pending, NR-313. BL-417, BL-429, BL-437, BL-439,
+  BL-440, BL-441, BL-442, BL-443 stay open pending per-item verification — Sprint 19/20's records
+  show several held or forked, and a bulk flip on an audit's count lies in the other direction.
+- **[3] E — the doc truth pass.** **IN FLIGHT** (sub-agent, worktree).
+  Files: `docs/lore/HISTORY.md`, `docs/economy/ERAS.md`, `docs/tech/TECH_FOUNDATIONS.md`,
+  `docs/military/MILITARY.md`. Span → 400 in one band; combat/weaponry/military-logistics
+  un-excluded; MILITARY.md's Build status corrected to say upkeep ships at **rate zero**, and
+  the industrial-band roster in a 0 CE product recorded as a known defect.
+
+### Sprint 27 — Lane A: the run is retained, and its failure is falsifiable
+
+- **[3] F — BL-384 the assertion half.** **IN FLIGHT** (sub-agent, worktree).
+  File: `tools/verify/history_sim_harness.cpp`. Conquest-count assertion plus elimination and
+  dominance-share counters, reusing `history_sweep.cpp`'s `hegemony_threshold_q` shape.
+  **Expected outcome is RED.** No constant tuned, no scorer term touched.
+- **[3] G — NEW-2 retain the generation run.** Not promoted; follows F.
+  Would touch `hard_coded_world.cpp`, `history_sim.hpp`.
+- **[3] H — NEW-3 the per-year decision trace.** Not promoted; follows F.
+
+### Sprint B1 — Lane B: the substrate becomes a number
+
+- **[3] I — NEW-10 substrate census.** **IN FLIGHT** (sub-agent, worktree).
+  File: `tools/verify/substrate_census.cpp` (new). Report, never a gate. Measured **after**
+  `generate_background_firms`, at `prehistory_years` default. Runtime reported explicitly — over
+  60 s it Times Out under ctest, which has hidden a harness before (NR-259).
+
+### Collision map — why these four can run concurrently
+
+| Sprint | Writes | Collides with |
+|---|---|---|
+| 26a C | `tools/verify/world_determinism.cpp` | nothing |
+| 26b E | four docs under `docs/` | nothing |
+| 27 F | `tools/verify/history_sim_harness.cpp` | nothing |
+| B1 I | `tools/verify/substrate_census.cpp` (new) | nothing |
+| main | standing rules, ROADMAP, backlog.json, SPRINTS.md, REFINED.md | all agents, by exclusion |
+
+**The collisions this arc will hit LATER, named now:** Sprint 29 and Sprint B3 both touch
+`settlement.cpp`; Lanes C and D both append to `condition_subject` in `condition_set.hpp`, an
+append-only serialised enum, so one appender per batch and it belongs to **D**.
+
+**Toolchain.** Every agent is instructed to pin MSVC 14.44 — `spectator_determinism` records that
+its hash is toolchain-specific, so a baseline taken under the wrong compiler is not a baseline.
+
+---
+
 ## Sprint 25a — the draw (promoted 2026-08-17) — **6/6 DONE** (closed 2026-08-18)
 
 Requirements: requirements.json § `ordnance-military-terminal-good`,

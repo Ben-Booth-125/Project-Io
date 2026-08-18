@@ -74,6 +74,27 @@ rule has a fuller authority, it is cited — this file does not redefine it.
   the genuine pre-BL-409 build, `state_hash 3CBAD1D44EE71EDE`), and admitting one more
   corp **shifts no rival's cadence slot**, since the index is over the sorted corp set.
   Outside spectate the prohibition is unchanged and absolute.
+  **Nation and polity behaviour is GRANTED (Ben, 2026-08-18, ruling 4 of NR-331), in the
+  BL-202/BL-203 shape.** This is the exception that BL-054 (nation behaviour) had deferred
+  indefinitely, and it is granted for **both** grains Ben named: Era −1 polities inside the
+  generation sim, and campaign-era nations. The binding constraints are unchanged and are the
+  whole basis of the grant — the behaviour must be **pure, seeded, deterministic and replayable**,
+  a scored-utility layer issuing only legal verbs, and **never a planner**. What it admits: a
+  polity choosing among its sim verbs; a nation holding a treasury, setting a tariff or tax rate,
+  and enacting a law; a polity carrying pair-state toward another. What it does **not** admit:
+  anything whose timing, latency or ordering can vary the generated world (`docs/lore/HISTORY.md`
+  is the authority for what the ladder produces, not a licence to randomise it), and any cloud
+  model in the loop — the no-cloud invariant in `docs/ai/AI_OPPONENT.md` § 10 is untouched.
+  Reason for the grant: three of the four systems Ben's 2026-08-18 brief names — international
+  trade, logistics and diplomacy — are nation-grain, and `GENERATION_STRATEGY.md`'s economic
+  premise already assumes nations that act. See `docs/development/SPRINTS.md` § Sprints 26–33.
+  **A rival scoring STANCE toward the player's corp is a separate, corp-grain widening
+  (BL-450, rivals score stance) and is GRANTED on the same terms and date.** It is called out
+  separately because every other widening above is dated and scoped, and because its subject is
+  the one actor this prohibition exists to protect: it is the first time a rival takes a
+  *relational* action against a corp a human owns. Same constraints — deterministic, seeded,
+  scored-utility, legal verbs only. Hostility remains a **declared state a corp opts into**
+  (Ben, 2026-08-17), so a rival may score and declare it, never acquire it ambiently.
 - Do **not** introduce a retained-mode UI framework in place of ImGui for the prototype.
 - **An AI-facing seam is an untrusted input boundary (recorded 2026-08-14 with BL-387/BL-396/
   BL-397, after four instances of the pattern in one session; promotion to a standing rule is a

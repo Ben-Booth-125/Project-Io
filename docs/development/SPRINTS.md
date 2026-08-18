@@ -53,6 +53,10 @@ and/or a version goal (v0.1.1 etc.).
 | 20 | Not yet chosen | **Proposed 2026-08-17** — three candidates laid out below; Ben's call |
 | 25a | The draw (upkeep, ordnance, convoy seam) | **Closed 2026-08-18** — 6/6; goldens left red and attributed |
 | 26–33 | **The Fall** — the arc to the Era −1 collapse | **Proposed 2026-08-18** — eight rulings settled; Sprint 26 is the gate. Supersedes 21, 23, 25b |
+| 26a | The three authority edits | **Open 2026-08-18** — grants landed, v0.1.11 un-parked; determinism case in flight |
+| 26b | Close-out and the doc truth pass | **Open 2026-08-18** — 6 items closed on evidence; doc pass in flight |
+| 27 | The run is retained, and its failure falsifiable | **Open 2026-08-18** — Lane A; BL-384 assertion half only, expected RED |
+| B1 | The substrate becomes a number | **Open 2026-08-18** — Lane B; substrate census harness in flight |
 
 **Next up (2026-08-10).** Sprint 5 is closed on Ben's call — *"I am happy with the generation
 progress we made"* — and the board went momentarily to zero goaled sprints. The plan for
@@ -63,6 +67,123 @@ tail is *for* — military and space-hardware trade stop being a later layer and
 the remaining minors are supposed to carry. **NR-102 (sequencing decoupling)** is the standing
 structural item this plan is the first answer to: every open item names a minor, but until now
 nothing said in what order to build them.
+
+---
+
+# Sprint 26a — The three authority edits (opened 2026-08-18)
+
+**Goal.** Make Lanes A and D legal to build. Three edits to authorities, plus the determinism case
+that has never existed, and nothing else. This is a gate, not a feature.
+
+**Planned.**
+- **NEW-12 — the nation-behaviour grant.** BL-054 (nation behaviour) deferred nation agency
+  indefinitely. Ruling 4 grants it for **both** grains, in the BL-202/BL-203 shape: pure, seeded,
+  deterministic, scored-utility, legal verbs only, never a planner. **DONE** — appended to
+  `.claude/rules/io-standing-rules.md` with its date, scope, reason and explicit exclusions.
+- **The BL-450 corp-grain grant.** Called out separately because its subject is the one actor the
+  prohibition exists to protect: a rival scoring stance toward the *player's* corp. **DONE** — same
+  paragraph block, same terms, stated as its own widening rather than folded into the nation grant.
+- **Un-park v0.1.11** (ruling 5). **DONE** — seven items flipped `parked: false` (BL-155
+  law/policy surface, BL-156 tech system design, BL-186 laws ledger, BL-280 negotiated tax, BL-211
+  player-facing history ledger, BL-212 nation-voiced comms, BL-309 deed history lines), and
+  ROADMAP.md gains the minor back under the ancient arc with its theme rewritten around *who
+  enacts*.
+- **NEW-1 — the prehistory-on determinism case.** `world_determinism.cpp` zeroes
+  `prehistory_years` on all six call sites, so the determinism guarantee excludes the exact pass
+  this arc changes. Sub-agent, worktree-isolated.
+
+**Done when** the standing rules carry both dated grants, ROADMAP carries v0.1.11 in the ancient
+arc, `backlog_query.js --version v0.1.11` returns unparked items, and `world_determinism` has a
+prehistory-on case whose result — pass or fail — is recorded.
+
+**Risk.** The determinism case has never run. **A red result is a finding, not a failure of this
+sprint**, and it must not be made green by weakening the assertion. That instruction is in the
+agent's brief verbatim.
+
+---
+
+# Sprint 26b — Close-out and the doc truth pass (opened 2026-08-18)
+
+**Goal.** Stop the board and the authority docs from lying. Blocks nothing, so it runs alongside
+Sprint 27.
+
+**Planned.**
+- **Close-out.** Six items flipped `complete` on hard evidence — a commit hash recorded in
+  REFINED.md against each (BL-452 logistics verb, BL-454 unit upkeep, BL-455 accumulators, BL-456
+  military doc, BL-457 ordnance, BL-459 unit strength). **DONE.**
+- **BL-453 (convoy ledger) deliberately NOT flipped.** REFINED.md records it *"DONE but
+  UNVERIFIED — not compiled, not run, not photographed"* (NR-313), and requirement R6 is still
+  pending. Flipping it would be exactly the false-board problem this sprint exists to fix.
+- **The remaining candidates need per-item verification, not a bulk flip.** The audit counted ~15
+  landed-but-open; six are evidenced. BL-417, BL-429, BL-437, BL-439, BL-440, BL-441, BL-442 and
+  BL-443 are **not** flipped here — Sprint 19/20's records show several of them held, forked or
+  still to run, and a bulk flip on an audit's count is how a board starts lying in the other
+  direction.
+- **The doc truth pass** — HISTORY.md and ERAS.md corrected to the shipped 400 years in one band
+  (ruling 8: the code is right); TECH_FOUNDATIONS.md re-based where landed work falsified it;
+  MILITARY.md's Build status corrected, including the fact that upkeep, ordnance draw and supply
+  decay all ship at **rate zero**. Sub-agent, worktree-isolated.
+
+**Done when** every flipped item has a commit hash behind it, every unflipped candidate has a
+one-line reason, and the four docs assert nothing the build contradicts.
+
+**Risk.** The doc agent corrects four authority docs at once. Its brief requires verifying each
+claim against source before writing, and reporting any claim it found was actually *true*.
+
+---
+
+# Sprint 27 — The run is retained, and its failure is falsifiable (opened 2026-08-18)
+
+**Goal.** Lane A opens. Make "the sim conquers nothing" a red assertion rather than a remembered
+observation — and stop discarding the history the world was generated from.
+
+**Planned.**
+- **BL-384 (Era −1 sim conquers nothing) — THE ASSERTION HALF ONLY.** Its own design prescribes
+  assertion-before-fix. A conquest-count assertion, plus the elimination and dominance-share
+  counters the harness lacks, reusing `history_sweep.cpp`'s existing `hegemony_threshold_q` shape
+  rather than inventing a second definition. Sub-agent, worktree-isolated. **The expected outcome
+  is a RED assertion committed against today's build.**
+- **NEW-2 — retain the generation run** (`hard_coded_world.cpp:561` currently discards
+  `history_sim_state`). Not yet promoted; it follows the assertion.
+- **NEW-3 — the per-year decision trace.** `sim_verb` is computed at `history_sim.cpp:571-899` and
+  thrown away as a loop local. Not yet promoted.
+
+**Done when** `history_sim_harness` fails on conquest count against today's build, with the
+measured conquest, elimination and dominance numbers recorded as the baseline Sprint 28 moves.
+
+**Risk.** If the assertion unexpectedly **passes**, the 267-battles/0-conquests measurement is
+stale and Sprint 28's premise changes. The agent is instructed to report that as a major finding
+rather than adjust the seed set.
+
+**Explicitly out.** The fix. No constant is tuned, no scorer term is changed, and the
+instrumentation is committed as evidence first — BL-384's own ordering discipline.
+
+---
+
+# Sprint B1 — The substrate becomes a number (opened 2026-08-18)
+
+**Goal.** Lane B opens. Turn Ben's *"the current world does not appear physically civilised"* from
+an impression into a measured baseline, before anything is tuned to address it.
+
+**Planned.**
+- **NEW-10 — `tools/verify/substrate_census.cpp`.** Tiles by composition and landform; population
+  centres per nation; corporations and their focus distribution; buildings by type and per nation;
+  road tiles and **how many nations have no road network at all**; markets, and nations containing
+  none; and the share of land within N tiles of any building, settlement or road — the closest
+  single proxy for "civilised". Sub-agent, worktree-isolated.
+- **A report, not a gate**, per BL-224's own settled discipline: measure across seeds, never fail
+  the build on a per-world threshold.
+- Deliberately measured **after** `generate_background_firms` — a census taken before it reports a
+  near-empty world and would be wrong.
+
+**Done when** the census runs over at least three seeds and the three numbers that most directly
+answer Ben's complaint are on record.
+
+**Risk.** Runtime. A harness over 60 s Times Out under ctest, which has silently hidden a harness
+before (NR-259). The agent is instructed to report the measured runtime explicitly.
+
+**What this does not do.** It changes nothing about the world. The density, road-reach and
+corp-kind work (B2, B3) is deliberately *after* the measurement.
 
 ---
 

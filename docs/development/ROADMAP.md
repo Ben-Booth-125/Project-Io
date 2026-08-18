@@ -68,6 +68,16 @@ async loading screen, and the startup-hang fix. SPRINTS.md § Sprint 15 is the r
 - **Still live from the old band, arc-agnostic:** v0.1.5's remainder (BL-325 unit supply decay),
   v0.1.6 (politics stub), v0.1.7 (generation visibility — generation is shared by both arcs),
   v0.1.13's infra tail (BL-107 save format and friends), and the v0.1.2 UI leftovers.
+- **v0.1.11 — Policy, tech meta and the nation as an actor. UN-PARKED into the ancient arc
+  2026-08-18** (Ben, ruling 5 of NR-331). *Theme: the player is subject to a law, and someone
+  enacts it.* The minor was parked with the space arc on 2026-08-12 and never opened; it comes
+  back whole — **BL-155** (law/policy surface), **BL-156** (tech system early design), **BL-186**
+  (laws ledger), **BL-280** (negotiated tax rate), plus **BL-211** (player-facing history ledger),
+  **BL-212** (nation-voiced comms) and **BL-309** (deed history lines). What changes on the way
+  back is *who enacts*: under the mercenary player, law is an **input** to the player's problem,
+  not an output of their agency. It is Lane D of § Sprints 26–33 in
+  [`SPRINTS.md`](SPRINTS.md), and it is legal only because the same ruling set granted
+  nation-grain behaviour — see `.claude/rules/io-standing-rules.md`, 2026-08-18.
 - **Owed, recorded in NR-177 and not yet items:** the mercenary *sell* side beyond BL-377's
   seam (win/lose consequences, reputation), the product's **name** (Io is a moon of Jupiter),
   and the commercial cut's own done-definition.
