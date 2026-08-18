@@ -1704,7 +1704,7 @@
    "id": "NR-342",
    "raised": "2026-08-18",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "title": "Provinces as a campaign-level grouping above tiles, with locality priced before the market",
    "source": "Ben, 2026-08-18: \"I was also thinking we can use provinces on some level, as a higher grouping than tiles. Just consider if there's room for that in a later sprint. Things like getting a discount on resources in the same province, so locality is priced in before the market level.\"",
    "what": "Raised as a later-sprint consideration, not a now-instruction, so it is recorded rather than built. The important fact is that provinces ALREADY EXIST: run_settlement generates roughly 82 with real nation ownership, the Era -1 sim moves them between polities, and the campaign handoff discards the mapping. So this is closer to retaining something already generated than to adding a new layer.",
@@ -1714,6 +1714,36 @@
     "BL-464",
     "BL-325",
     "NR-340"
+   ],
+   "outcome": "RESOLVED 2026-08-18 by the research pass. THE SAME-PROVINCE DISCOUNT IS REJECTED - it duplicates convoy haulage cost, which already prices distance as unit_cost * dist * qty * (1 - node_discount) (supply_system.cpp:371), where node_discount is ALREADY locality priced by geography rather than by fiat. The grain is also inverted from the framing: provinces are FINER than market catchments, not coarser, so a same-province discount would fire almost entirely inside a single market - and market_component holds one price array with no corp dimension, so a per-asker price is unrepresentable without breaking the order book's total order and the determinism hash. It would also be a fifth partition of one map beside nations, market catchments, plates and survey bands. WHAT SURVIVES: the real hole is that intra-catchment distance is free (filed as BL-465), which needs no new grouping at all. AND province RETENTION - not construction - remains a genuine future win: settlement_state is generated on every world and discarded at hard_coded_world.cpp:678, a discard that has already cost one workaround (campaign_roster_gate_input exists verbatim because 'the campaign has no provinces to gate on'). Its natural consumer is the nation/polity behaviour granted by NR-331 ruling 4, not a price. Prerequisite is a defect, not a design: the Era -1 Settle verb founds daughter provinces with NO terrain test (history_sim.cpp:1057-1060), so an unknown share sit on ocean and names compound as '<X> Reach Reach'."
+  },
+  {
+   "id": "NR-343",
+   "raised": "2026-08-18",
+   "kind": "question",
+   "status": "open",
+   "title": "Confirm LP is a per-tick RATE, not a stock - the one load-bearing claim with no file:line",
+   "source": "Research pass 2026-08-18, from Shadow Empire guides rather than from this repo.",
+   "what": "BL-464's settled prose recorded LP as a stock, written from Ben's 'lean heavily on the shadow empire system' ruling. The research says Shadow Empire's LP is a per-turn throughput allowance that is regenerated each turn and then used or wasted - the pipe, not the tank. What carries over is the resource stock it moved.",
+   "why": "It is the only assertion in the LP design with no file:line behind it, and it decides whether LP needs serialisation at all. As a rate it crosses no tick boundary, needs no state_hash entry, and needs no save format - which matters because Io has no save/load layer. As a stock it needs all three. Ben knows Shadow Empire; one sentence from him settles it more cheaply than any further research.",
+   "refs": [
+    "BL-464",
+    "NR-341"
+   ]
+  },
+  {
+   "id": "NR-344",
+   "raised": "2026-08-18",
+   "kind": "observation",
+   "status": "open",
+   "title": "Goods beat armies to the supply network by accident, not by design",
+   "source": "Research pass 2026-08-18.",
+   "what": "dispatch_convoys runs in tick phase 0; run_unit_upkeep runs last inside phase 1 (app.cpp:1147-1157, economy_system.cpp:1455-1459). So on every code path convoys claim network capacity before armies do. If any shared throughput limit is ever introduced, 'the army goes unsupplied' becomes the default outcome of an over-subscribed network - inherited from tick ordering, never chosen by anyone.",
+   "why": "Worth recording independently of BL-464 (Logistic Points), because it is true of any future shared-capacity mechanic and it is invisible from either system's own source. Note the research's own proposed fix - reserving a military share - was rejected by adversarial review for deleting the guns-versus-butter coupling it exists to create. So the ordering question is open, not answered.",
+   "refs": [
+    "BL-464",
+    "BL-454",
+    "BL-325"
    ]
   }
  ]
