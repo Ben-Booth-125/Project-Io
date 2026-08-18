@@ -268,17 +268,17 @@ The honest split:
   workforce-efficiency multiplier (BL-069), and met-supply-gated centre growth (BL-048B/BL-078),
   all in `run_economy_step` (`src/world/economy_system.cpp`).
 
-**Also landed (2026-08-02) — province-level demography, ahead of the population-centre coupling
-above:** `src/world/settlement.{hpp,cpp}`'s `province` struct now carries `population`,
-`last_demography_year`, and `manpower_stock`, driven by `advance_province_demography`
-(integer-fixed-point logistic growth toward `province_carrying_capacity(farm_q)`, plus
+**Also landed (2026-08-02) — region-level demography, ahead of the population-centre coupling
+above:** `src/world/settlement.{hpp,cpp}`'s `region` struct now carries `population`,
+`last_demography_year`, and `manpower_stock`, driven by `advance_region_demography`
+(integer-fixed-point logistic growth toward `region_carrying_capacity(farm_q)`, plus
 war-pressure drawdown), `resolve_plague_event` (a checkpoint-eligibility draw reusing
 `resolve_checkpoint` from `planetology.hpp`, per BL-217's reuse rule — severity uses a
 grid-proximity connectivity proxy rather than the full logistics/trade graph, a noted
 simplification), and the manpower budget triple (`manpower_ceiling` / `replenish_manpower` /
 `raise_manpower` — a bounded fraction of population that depletes, self-limiting rather than
 capped by fiat). This is **BL-273**, filed for the eventual Era -1 history sim (BL-271) —
-self-contained at the province level; it does **not** yet seed population-centre scale (the
+self-contained at the region level; it does **not** yet seed population-centre scale (the
 graduation path noted above stays open). Verified by `tools/verify/demography_harness.cpp`.
 
 **Not built:**

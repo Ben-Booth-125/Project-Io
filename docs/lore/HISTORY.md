@@ -143,7 +143,7 @@ sovereigns squeezed companies far more often than they destroyed them.
 
 **Built, partially (BL-218, 2026-08-02).** The stage's *mechanism* — credit disciplining the
 sovereign — is not simulated. What landed is its two legible consequences: the charter culture's
-**sealed-oath god** buys its provinces an industrialisation-date bonus (contract law reaching
+**sealed-oath god** buys its regions an industrialisation-date bonus (contract law reaching
 capital, one stage early), and the **war** rupture branch costs both belligerents abundance
 rather than paying the winner. The seizure-cost half is still owed to BL-223 (averted rupture).
 
@@ -161,11 +161,11 @@ first, purely from tile data. Each seed gets its own Britain.
 History line: `"YYYY: {nation} lights the first coke furnaces of the {region} basin."`
 
 **BUILT (BL-218, landed 2026-08-02).** The hook is closed: `run_settlement` scores each
-province's ancient fuel endowment against the world's own mean, gates industrialisation on
+region's ancient fuel endowment against the world's own mean, gates industrialisation on
 *above-average* fuel, and `derive_national_character` names the three earliest furnaces once
 nations exist. Each seed does get its own Britain, chosen from tile data alone. The creed sits
 on top of the endowment rather than beside it — a people who raised a forge god did so because
-their cradle held ore (`CREEDS.md`), so that god's provinces light up earlier. Endowment, not
+their cradle held ore (`CREEDS.md`), so that god's regions light up earlier. Endowment, not
 virtue, in both directions.
 
 ### Stage 5 — The Rupture (hegemony fails its final audition)
@@ -278,19 +278,19 @@ but unreached. Ben asked to *see* failure cases, so this is a tuning target for 
 run_history_ladder            ->  cradles, fragmentation
 run_creeds / tribal conflict  ->  one pantheon per cradle; welding
 run_settlement                ->  PROVINCES: culture, ancient endowment, furnaces
-generate_nations                  seeded on the province anchors
+generate_nations                  seeded on the region anchors
 derive_national_character     ->  the three axes, as outputs
 resolve_historical_ruptures   ->  collapse / war / revolution, and the erasure
-generate_corporations         ->  focus from the corp's home province
+generate_corporations         ->  focus from the corp's home region
 ```
 
-**The province is the new unit, and it exists to carry two things at once.** A cradle was a
+**The region is the new unit, and it exists to carry two things at once.** A cradle was a
 *people*; a nation is a *territory*; neither can say "these particular fields, under these
-particular gods, sitting on this particular ore". The province can, which is why belief,
+particular gods, sitting on this particular ore". The region can, which is why belief,
 endowment and industrial timing all hang off it and why BL-219 could read corporate focus
 straight out of it without a new mechanism.
 
-**Pantheons are mapped, not re-rolled.** A province inherits its nearest cradle's culture, so
+**Pantheons are mapped, not re-rolled.** A region inherits its nearest cradle's culture, so
 the distribution of gods across the map is a record of who walked where. That mapping then feeds
 back into the material history: a forge god only exists where the cradle window held ore, so
 "the forge god's country industrialises early" is not flavour laid over the data — it is the
@@ -298,18 +298,18 @@ same fact read twice, one stage apart.
 
 **Scores are world-relative.** Every endowment class scores 500 at the world's mean and 1000 at
 twice it. An absolute gain either saturates one class or never fires another (the first
-implementation classified all 75 provinces `farm`); relative scoring also survives the
+implementation classified all 75 regions `farm`); relative scoring also survives the
 `deposit_scalar` abundance tier without re-tuning.
 
-**Seeding changes, expansion does not.** `nation_params::seed_tiles` carries the province
+**Seeding changes, expansion does not.** `nation_params::seed_tiles` carries the region
 anchors into Pass 1 and the BL-053-tuned growth machinery is reused untouched. The size variance
 now emerges from where people settled instead of being dialled in — and the cheap alternative
 (keep Voronoi, narrate over it) was rejected as the lying-figure problem: prose asserting a
 settlement history the territory does not reflect.
 
 **The record is destructible, and the hole is visible.** A won war plants the victor's pantheon
-on the provinces taken and erases the lines naming them, leaving a dated lacuna with a count of
-what was lost (Ben, 2026-08-02). A conquered province keeps its founders in `founding_culture`
+on the regions taken and erases the lines naming them, leaving a dated lacuna with a count of
+what was lost (Ben, 2026-08-02). A conquered region keeps its founders in `founding_culture`
 and its conquerors in `culture` — the erasure is of the record, never of the fact, which is the
 pair a later religion or diplomacy layer needs to describe a grievance. Across a six-seed spread,
 four worlds lost part of their record to a war.
@@ -330,7 +330,7 @@ nations, so their count is a property of the design rather than of the map size.
 > abstract scalar comparisons and fight with **real typed units and doctrine-parameter tactics**
 > — the same combat engine the main era inherits ("drives, not narrates" survives; the *abstract*
 > half does not). Filed as **BL-271 (Era −1 sim)** · **BL-272 (unit/doctrine combat — records
-> the overturn)** · **BL-273 (province demography)** · **BL-274 (era-keyed unit rosters)** ·
+> the overturn)** · **BL-273 (region demography)** · **BL-274 (era-keyed unit rosters)** ·
 > **BL-275 (history sweep — BL-210's batch-sweep payload)**; Sprint 5's theme.
 
 ---
@@ -340,12 +340,12 @@ nations, so their count is a property of the design rather than of the map size.
 **What a pre-history polity builds, and what those works do.** The Era −1 layer had a noun axis
 with one half built: `unit_roster` said what a polity could **field**, and nothing said what it
 could **build**. This is the other half — an authored, endowment-gated table of works, each a
-small id held by the **province**.
+small id held by the **region**.
 
 **It is not `building_component`.** That struct is the campaign-era building: a tile entity with a
 recipe index, a workforce target, credit and resource build costs, per-tick maintenance and wages,
 decommission state. Era −1 has no credits, no market, no recipe registry and no economy tick — it
-has a year loop over provinces. Sharing the struct would have dragged the campaign economy into
+has a year loop over regions. Sharing the struct would have dragged the campaign economy into
 the generation layer to satisfy fields nothing sets.
 
 **Where the table lives.** In `scripts/works.lua`, loaded by `src/world/works_registry.cpp` — the
@@ -371,19 +371,19 @@ Twenty-one, across the four `roster_band` values (cumulative — nothing un-inve
 | Gunpowder | Bastion Fort · Powder Mill · Counting House · Cut Canal · Naval Yard |
 | Industrial | Blast Works · Rail Head · Signal Line · Arsenal · Coaling Station |
 
-Availability is **derived from the ground** — a row is offered when the province's endowment
+Availability is **derived from the ground** — a row is offered when the region's endowment
 windows and population clear its gate. No research, no unlock events, no player choice. Names are
 generic mechanism nouns; the standing rule that real history is a *mechanism* reference and never
 a name source applies here as everywhere.
 
-The band a province builds at is keyed off the polity's **materials** capacity, not its military
+The band a region builds at is keyed off the polity's **materials** capacity, not its military
 one. The unit roster reads the military column because that is the column whose rows turn over at
 a roster boundary; a Blast Works turns over with metallurgy instead. Two tables, one band enum,
 different columns.
 
 ### Reach is the row that matters
 
-BL-314 charged a polity supply for every province held past `free_holdings` — **the burden of
+BL-314 charged a polity supply for every region held past `free_holdings` — **the burden of
 breadth**. Before this item there was nothing to buy with it, so the only answer to the charge was
 to stop expanding, which makes the frontier stall a **ceiling**. Works make it a **decision**: a
 polity that spends its rounds on Way Stations and Cut Canals administers the same breadth more
@@ -397,7 +397,7 @@ own choice. BL-224's non-hegemony stays emergent.
 
 | Effect | Consumer |
 |---|---|
-| `capacity_mod` | `province_carrying_capacity(farm_q, mod)` — raises the **asymptote** the logistic growth term climbs toward, so it changes trajectory rather than granting a step growth would re-flatten. Read by `advance_province_demography` and by the Settle verb's pressure test, which must divide by the same K. |
+| `capacity_mod` | `region_carrying_capacity(farm_q, mod)` — raises the **asymptote** the logistic growth term climbs toward, so it changes trajectory rather than granting a step growth would re-flatten. Read by `advance_region_demography` and by the Settle verb's pressure test, which must divide by the same K. |
 | `manpower_mod` | `manpower_ceiling(population, mod)`, read by `replenish_manpower` — so every existing caller gets the effect without being told works exist. |
 | `reach_mod` | Two places: the **staging hub's** own works discount the terrain-weighted term of `supply_here` (scorer) and `supply_raw` (execution) — the two must agree, or a polity decides on one supply figure and fights on another — and the polity's **mean** reach relieves the burden of breadth. Mean, not total, so conquest alone cannot make an empire count itself as well-roaded. |
 | `defence_mod` | Readiness on the defender's stack, which `roster_stack` turns into an additive per-mille offset on `type_power_mod` — the same channel cohesion uses, and for the reason `combat.hpp` gives: the engine scores whatever stack it is handed and knows nothing about walls. Also visible to the **scorer**, so a polity does not walk into a bastion it could not see. A Bastion Fort at +640 is worth ~+64 against row power values of 90–380: it tilts a fight, never decides one. |
@@ -412,13 +412,13 @@ polity's one action that round, which is the whole point of putting it on the sh
 than beside it.
 
 A work's benefit splits honestly by who receives it: local effects are valued against the
-province's own endowment, reach against the polity's **mean** holding. Scoring reach against the
+region's own endowment, reach against the polity's **mean** holding. Scoring reach against the
 *total* made it worth ~40× every local effect and reduced the roster to its five road rows.
 
-**Bounded by construction**, like the other four verbs. Two candidate provinces per polity per
+**Bounded by construction**, like the other four verbs. Two candidate regions per polity per
 round — the capital, plus one rotated through the holdings by a hash of (polity, year, slot).
 Scoring every holding would be O(held × rows) inside the most expensive pass in generation; the
-rotation still reaches every province over a run, because the round count is large against any
+rotation still reaches every region over a run, because the round count is large against any
 one polity's holdings.
 
 > **Round count corrected 2026-08-18.** This paragraph read "136 on the default stepped-clock
@@ -431,22 +431,22 @@ one polity's holdings.
 > disagreeing cost comments of its own — one says ~110 ms for the 100-round pass, one still says
 > ~23 s. Treat both as unverified until someone times it.
 
-**A work saturates.** `apply_work_to_province` refuses to build the same row twice, so a
-province's works are a finite investment and the polity is eventually forced to spend its rounds
+**A work saturates.** `apply_work_to_region` refuses to build the same row twice, so a
+region's works are a finite investment and the polity is eventually forced to spend its rounds
 on something else. Without that refusal the scorer would re-raise the same Granary every round it
 stayed the best candidate.
 
 ### Storage
 
-`province::works_built` is a **32-bit mask** plus five plain-int accumulators — no heap ownership,
+`region::works_built` is a **32-bit mask** plus five plain-int accumulators — no heap ownership,
 because the struct is copied on every Settle and lives in a vector that grows past 400 entries.
 The accumulators are maintained incrementally, so every read is O(1) against a write that happens
 at most once per polity per round. The mask imposes a hard 32-row ceiling on the table, which the
 loader checks: a 33rd row would otherwise be authored, validated, offered — and silently
 impossible to build.
 
-Works are **physical**: conquest transfers them with the province rather than razing them, which
-is what makes a developed province worth taking.
+Works are **physical**: conquest transfers them with the region rather than razing them, which
+is what makes a developed region worth taking.
 
 ### Honest scope
 
@@ -477,11 +477,11 @@ Kepler learned, and when, is BL-223's to restate.
   (BL-221): `record_institutional_history` counts surviving realms into the accord line.
 - [x] History pass names the first-industrialiser nation from tile fossil/ore data (Stage 4) —
   **landed** (BL-218): `derive_national_character` names the three earliest furnaces from the
-  province endowment scores. BL-222 (industrial ladder) is thereby substantially overtaken.
+  region endowment scores. BL-222 (industrial ladder) is thereby substantially overtaken.
 - [ ] Charter Age line names the player corporation's home-nation legal tradition (Stage 1) —
   the nation-naming half landed with BL-221 (the Charter Act names the charter cradle's
   nation), and BL-218 added the creed half (the charter culture's sealed-oath god buys its
-  provinces an industrialisation bonus); the *player-corp* linkage remains owed, and is
+  regions an industrialisation bonus); the *player-corp* linkage remains owed, and is
   complicated by **BL-094 (player-nation pivot)**.
 - [ ] Rupture event text (Era 0 → Era 1 transition) — the Stage 5 framing rule it referenced
   is superseded; owed to **BL-223 (averted rupture, design-owed)**.

@@ -66,35 +66,35 @@ Each corporation receives a primary `industrial_focus`:
 | `processing` | Refiners and converters | Processing building near an extraction cluster |
 | `trade` | Logistics and market operators | Warehouse or depot near a high-traffic zone |
 
-**Rewritten 2026-08-02 (BL-219): focus is DERIVED from the corporation's home province, and the
+**Rewritten 2026-08-02 (BL-219): focus is DERIVED from the corporation's home region, and the
 authored weighting table is retired.** When `generate_corporations` is handed a `settlement_state`
-(Kepler; every other body keeps the old path unchanged), the corp first picks a **home province**
-among its home nation's provinces, and its focus follows that province's history:
+(Kepler; every other body keeps the old path unchanged), the corp first picks a **home region**
+among its home nation's regions, and its focus follows that region's history:
 
-- **The ancient endowment sets the base tier.** An ore or farm province emits extraction, an
-  energy province processing, a harbour province trade.
+- **The ancient endowment sets the base tier.** An ore or farm region emits extraction, an
+  energy region processing, a harbour region trade.
 - **Movement up the value chain sets the shift.** The specific post-war pattern being modelled is
   that *early industrialisers moved up the chain and late ones stayed extraction-heavy*: a
-  province that lit its furnaces before the world median moves one tier up (extraction →
+  region that lit its furnaces before the world median moves one tier up (extraction →
   processing → trade); one that industrialised late, or never, stays raw. This reads the same
   industrialisation-timing scalar BL-218 already produces for the ideology axis, so it is one
   mapping rather than new machinery — and the coupling is itself a good outcome, since a late
   statist industrialiser with raw-heavy corporations is a recognisable, coherent thing.
 
-**Per-province, not per-nation, and that is the point.** A nation average would make every
+**Per-region, not per-nation, and that is the point.** A nation average would make every
 corporation in a nation alike and destroy the specialists premise. Two corps in the same nation
-differ because their provinces differ, while each stays internally coherent.
+differ because their regions differ, while each stays internally coherent.
 
 **Diversity survives as a floor on the SET, not a quota on any member.** Rather than keeping the
 authored table as a per-corp fallback bias — two mechanisms deciding one field is how that field
 becomes unexplainable — the check is a world-level **reject-and-reroll**: derive every focus
-emergently, then, if any focus class is wholly unrepresented, reroll which provinces the corps
+emergently, then, if any focus class is wholly unrepresented, reroll which regions the corps
 anchor to. It never patches an individual corp. This is the same reject-and-reroll idiom as
 BL-167's viability floors and BL-217's checkpoints, so it adds no new concept. The floor does not
 apply when there are fewer corps than classes (unmeetable by construction), and an unmet floor
 after the attempt cap stands as-is — an honest unmet floor beats a hand-fixed corporation.
 
-**Player-corp parity is unchanged**: the player's corporation goes through the same province read,
+**Player-corp parity is unchanged**: the player's corporation goes through the same region read,
 the same emergent focus, and the same world-level reroll, with no special case.
 
 The pre-BL-219 path, still used for any body with no settlement pass: focus is drawn with weighted
@@ -116,34 +116,34 @@ not a broad presence across the nation.
   too cramped or deposit-poor to host the drawn count yields fewer — the count is a ceiling the
   placement walks up to, not a guarantee.
 - **Anchored in the home PROVINCE** *(BL-283, landed 2026-08-09)*. The anchor tile is searched
-  **inside the corporation's home province** — the same province Pass 2 read its focus from — not
-  across the whole nation. The province therefore decides *where* the corp is as well as *what* it
+  **inside the corporation's home region** — the same region Pass 2 read its focus from — not
+  across the whole nation. The region therefore decides *where* the corp is as well as *what* it
   is, and a corp's holdings cluster where its history says it came from instead of scattering
-  nation-wide. "Inside a province" is `nearest_province`: provinces are anchor points, not stored
-  tile sets, so the nearest anchor is the province a tile belongs to.
+  nation-wide. "Inside a region" is `nearest_region`: regions are anchor points, not stored
+  tile sets, so the nearest anchor is the region a tile belongs to.
 - **Cluster around the anchor.** The remaining slots fill the nearest valid unoccupied tiles by
-  grid distance, searched **nation-wide** rather than inside the province — so a corp whose own
-  province is small spills onto the ground next door rather than opening short. In practice the
+  grid distance, searched **nation-wide** rather than inside the region — so a corp whose own
+  region is small spills onto the ground next door rather than opening short. In practice the
   cluster is tight anyway (mean maximum separation between a corp's holdings: **1.2 tiles**), so
   the anchor constraint is what determines where the operation sits. The lean counts ride on top
   of this retained clustering.
 - **The fallback ladder** *(BL-283)*. Each rung is deterministic, and a rung that finds no
   anchorable tile consumes no randomness, so widening is free in stream terms:
-  1. the home province alone;
-  2. the home province plus the **three nearest same-nation provinces** (by column-wrapped anchor
-     distance, ties to the lower province index);
+  1. the home region alone;
+  2. the home region plus the **three nearest same-nation regions** (by column-wrapped anchor
+     distance, ties to the lower region index);
   3. the whole nation — the pre-BL-283 behaviour.
 
   **How often it fires** (measured across 8 generations / 64 corporations, seeds 0–5): rung 1
   **89 %**, rung 2 **0 %**, rung 3 **11 %** — and *every* rung-3 case was a corporation with **no
-  home province at all**, in a nation the settlement pass never reached (all its land arrived by
+  home region at all**, in a nation the settlement pass never reached (all its land arrived by
   conquest or orphan assignment), which already falls back to the national character for its focus.
-  Where a home province exists, it has never yet failed to host the anchor. Rung 2 is therefore an
+  Where a home region exists, it has never yet failed to host the anchor. Rung 2 is therefore an
   unfired guard, kept because the cost is a sort and the failure it covers is real.
 
   **What it moved.** Corporate holdings shifted off barren and icy ground onto settled land —
   seed 0, 18 holdings: barren 6→3, icy 5→3, grassland 3→7, forest 1→2, wetland 0→1. That is the
-  expected causal read, not a tuning: provinces sit where people settled, so anchoring inside one
+  expected causal read, not a tuning: regions sit where people settled, so anchoring inside one
   pulls the corporation onto habitable ground.
 - **Mix follows focus.** The asset mix is shaped by `industrial_focus` — an extraction corp
   places extractors on its richest deposits, a processing corp pairs processors with feed, a
@@ -373,7 +373,7 @@ Cross-doc item — also in `GENERATION_STRATEGY.md`.
 
 **Post-WW2 industrial grounding for the asset mix.** *Half-closed 2026-08-02 (BL-219).* The
 **focus** half is now grounded in a named pattern — early industrialisers moved up the value
-chain, late ones stayed extraction-heavy — derived from the province's industrialisation timing
+chain, late ones stayed extraction-heavy — derived from the region's industrialisation timing
 (§ Pass 2). What remains open is the **asset-mix** half: the per-focus building patterns in Pass 3
 are still authored, and grounding *those* in the post-war pathway toward off-world reach is
 untouched. Cross-doc item — also in `GENERATION_STRATEGY.md`.
@@ -392,7 +392,7 @@ state-adjacent extraction corporation. This is an open behavioural design item t
 interacts with both the nation system and the tax/licence layer.
 
 > *The hook arrived 2026-08-02 (BL-219); the mechanism did not.* The underserved-industry
-> condition is now precisely **expressible** — an industrialised province with no corporation
+> condition is now precisely **expressible** — an industrialised region with no corporation
 > operating in its resource class — where before the rewrite there was no way to state it at all.
 > Building it stays a follow-on: nations seeding corporations at runtime is nation *behaviour*,
 > which the standing rules bound, and the generation-time version is a different feature from the

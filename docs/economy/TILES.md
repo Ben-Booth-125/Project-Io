@@ -76,7 +76,7 @@ It **extends** the table rather than contradicting it, and so stays out of the b
 table has already named what wet ground is: polar wet ground is icy, and subpolar wet ground is
 *tundra*. Real subpolar peatland arguably belongs, but claiming it would overrule the table's own
 answer for that band — and tundra scores 9 for settle quality against wetland's 58, so converting
-it redraws the province map. Left as the table's call to make.
+it redraws the region map. Left as the table's call to make.
 
 Measured: Kepler **159 wetland tiles, 2.61% of land** (from 0.20%); across the 120-seed
 `earthlike_tile_census`, wetland median **4.3% of land** against Earth's ~6%. Coming in under Earth
@@ -117,9 +117,9 @@ The deposits that can appear on a tile are determined primarily by composition, 
 >    outright rather than thinning it**. A generated world can therefore have *no coal at all*,
 >    whatever the "Coal 30–140, rarity-gated" row below says: coal is zeroed unless the biosphere
 >    reached land, petroleum unless the atmosphere oxygenated.
-> 3. **Ore provinces** (2026-08-04) — copper, petroleum, iron and coal each redistribute 45–65%
->    of the world total into 2–3 seeded provinces, so the "Relative weight" column now describes a
->    **pre-province** quantity.
+> 3. **Ore fields** (2026-08-04) — copper, petroleum, iron and coal each redistribute 45–65%
+>    of the world total into 2–3 seeded fields, so the "Relative weight" column now describes a
+>    **pre-field** quantity.
 >
 > Read the tables as the *shape* of a deposit's distribution, not its delivered magnitude.
 > `TILE_GENERATION.md` § Post-multiplies is authoritative on the chain.

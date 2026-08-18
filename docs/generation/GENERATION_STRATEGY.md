@@ -177,8 +177,8 @@ through what it produced.
 | 5 | Rivers (BL-170) | River edges on the planetary canvas | Watched |
 | 6 | Population centres | Population lens | Watched |
 | 7 | History ladder, Stages 0-2 (BL-221) | Dated lines in the body biography | Watched (as text) |
-| 8 | Creeds / pantheons (BL-235) | Biography lines; culture on provinces | Watched (as text) |
-| 9 | Settlement & industrialisation (BL-218/219) | `generation_report.settlement`; History ledger | **Owed** - provinces are the anchors the carve grows from and have no map surface of their own |
+| 8 | Creeds / pantheons (BL-235) | Biography lines; culture on regions | Watched (as text) |
+| 9 | Settlement & industrialisation (BL-218/219) | `generation_report.settlement`; History ledger | **Owed** - regions are the anchors the carve grows from and have no map surface of their own |
 | 10 | **Nation carve (Voronoi BFS)** | **Loading screen, live**; Country lens in play | Watched (BL-305) |
 | 11 | National character derivation | Nation detail in the Selection band | Watched |
 | 12 | Historical ruptures | Checkpoints + lacunae in the History ledger | Watched (as text) |
@@ -192,7 +192,7 @@ through what it produced.
 | 20 | Pre-game warm start (80 econ ticks) | The inner bar and a caption only | Partly watched - the bar is honest, but the balances it produces are not shown |
 
 Four owed items, none of them blocking: the tile-derivation ledger (already designed in
-`GENERATION_LEDGER.md`), a province surface, a market-carving explanation, and background firms -
+`GENERATION_LEDGER.md`), a region surface, a market-carving explanation, and background firms -
 which the current worker split puts out of the loading screen's reach. Recorded here rather than
 filed as items so the map stays in one place; promote from this table when one is picked up.
 
@@ -217,7 +217,7 @@ to work, and abandoning it would mean inventing social physics from nothing.
 | How an inland sea concentrates littoral power | "The Mediterranean" |
 | Plausible hegemony-formation speed, campaign-season length, supply radii | "Rome" |
 
-Every generated proper name — nation, province, population centre, corporation, body, person —
+Every generated proper name — nation, region, population centre, corporation, body, person —
 is **sci-fi / fantasy**, produced by the seeded template banks and phoneme tables described in
 the per-subject naming passes (`NATION_GENERATION.md` § Pass 5, `CORPORATION_GENERATION.md`
 § Pass 5, `generate_city_name`). Two consequences worth stating because they are easy to get

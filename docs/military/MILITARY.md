@@ -31,7 +31,7 @@ before assuming any capability here is reachable in play.
 There are **two** battle resolvers, and the split is deliberate. Ben ruled it 2026-08-13,
 overturning BL-315's (armed house conflict spine) own earlier engine-parity strand.
 
-They answer different questions. `resolve_battle` answers "province beats province, this year" in
+They answer different questions. `resolve_battle` answers "region beats region, this year" in
 one scored evaluation, because the Era −1 sim runs millions of those. `resolve_campaign_battle`
 answers "two forces on a tile, over a short span, with a player who may pull out".
 
@@ -237,7 +237,7 @@ field and made strength derived — `unit_strength(w, u)` in `src/world/unit_ros
 purpose, so a sum over the unordered `w.units` stays order-independent.
 
 **Position is tile-canonical.** BL-157 (military datamodel stub) ruled tile position canonical over
-body/province on 2026-08-07; the struct shipped with a `body` field ahead of that ruling, and
+body/region on 2026-08-07; the struct shipped with a `body` field ahead of that ruling, and
 BL-324 (unit hire surface) replaced it with `position` on 2026-08-08.
 
 Units live in `world::units`, an `unordered_map<entity_id, unit_component>`. Every consumer that
@@ -259,7 +259,7 @@ square it against `unit_strength`.
 
 **Its only caller is `tools/verify/unit_upkeep.cpp` (check U7).** So the accurate statement is now
 narrower and worse: the campaign has units, resolvers *and* a bridge, and still nothing decides
-that a fight happens. `roster_stack` — the other composition path, from *province manpower* — is
+that a fight happens. `roster_stack` — the other composition path, from *region manpower* — is
 still Era −1's alone.
 
 **What reads a unit today.** Two condition subjects — `military_units` (summed counts) and
@@ -354,8 +354,8 @@ proxies for saltpetre, then genuinely for fuel from the industrial band.
 `combat.{hpp,cpp}` as the roster's home, but `combat.hpp` states the opposite boundary in its own
 words. So the roster lives separately and *resolves into* combat's types.
 
-**Two gate paths, one table.** `available_rows(const province&, band)` is the Era −1 path, gated on
-authored province endowment. `available_rows(const world&, corp, band)` is the campaign path
+**Two gate paths, one table.** `available_rows(const region&, band)` is the Era −1 path, gated on
+authored region endowment. `available_rows(const world&, corp, band)` is the campaign path
 (BL-324), gated on the corp's own stockpile and market access.
 
 The campaign gate is **binary by design** — each axis is 1000 or 0, the table's own max threshold.
@@ -389,7 +389,7 @@ the corp's ground supports is still exposed.
 > So an ancient-era campaign offers Rifle Regiments and Mechanised Columns, filtered only by the
 > stockpile gate. Filed here in § What is absent; the fix is a separate change.
 
-`roster_stack(manpower, province, band, readiness)` composes an army stack from province manpower.
+`roster_stack(manpower, region, band, readiness)` composes an army stack from region manpower.
 Later bands crowd out earlier ones — a row's weight decays ×0.35 per band it sits below the
 polity's own, so a rifle-era army is not half levy spears. Readiness folds into each entry's
 `type_power_mod` as `(readiness − 1000) / 10`, which is the same channel cohesion and defensive
@@ -634,5 +634,5 @@ Re-verified against the source 2026-08-18.
 - **Authoring the upkeep numbers.** The pass is inert until someone sets a rate; that tuning has no owning item as of 2026-08-18
 - **Deriving `campaign_roster_band` from the epoch.** Hard-coded to `industrial` against a 0 CE default — a known defect, no owning item (§ The roster)
 - Hire price on screen (BL-405, hire has no price on screen)
-- The Era −1 sim's conquest failure — 267 battles, zero province transfers (BL-384, Era −1 sim conquers nothing)
+- The Era −1 sim's conquest failure — 267 battles, zero region transfers (BL-384, Era −1 sim conquers nothing)
 - Fortification, tactical naval, and a unit canvas marker — no owning item yet

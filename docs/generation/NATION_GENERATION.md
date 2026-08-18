@@ -65,31 +65,31 @@ untouched. Full stage design: `../lore/HISTORY.md`.
 ### Pass 0b — Settlement & industrialisation (landed 2026-08-02, BL-218 nations rewrite)
 
 Between the ladder and the seeds sits `run_settlement` (`src/world/settlement.cpp`), which turns
-the ladder's cradles and the creeds' pantheons into **provinces** — the unit that actually gets
+the ladder's cradles and the creeds' pantheons into **regions** — the unit that actually gets
 settled, industrialised, fought over, and read by corporation generation.
 
-Per province it records: the anchor tile, the **culture it inherits** (its nearest cradle's, so
-the pantheon distribution is a map of who walked where rather than a per-province re-roll), its
+Per region it records: the anchor tile, the **culture it inherits** (its nearest cradle's, so
+the pantheon distribution is a map of who walked where rather than a per-region re-roll), its
 **ancient endowment** (farm / ore / energy / harbour, surveyed once over the anchor's window), a
 founding year derived from how strongly the ground invited settlement, and — where the ground can
 pay for it — the year its furnaces lit.
 
 Two details are load-bearing:
 
-- **The endowment scores are world-relative, not absolute.** A province scores 500 on a class when
+- **The endowment scores are world-relative, not absolute.** A region scores 500 on a class when
   it holds the world's average of it, 1000 at twice the average. "Ore country" only means something
   next to the rest of the map, and the relative form also survives the `deposit_scalar` abundance
-  tier without re-tuning — a lean world still has its own ore provinces, they are simply poorer in
-  absolute terms. The industrialisation gate is *above-average* fuel, so an average province does
+  tier without re-tuning — a lean world still has its own ore regions, they are simply poorer in
+  absolute terms. The industrialisation gate is *above-average* fuel, so an average region does
   not industrialise.
 - **The creed and the deposit are the same fact seen twice.** A culture raises a forge god only
-  where its cradle window held ore (`../lore/CREEDS.md`), so a province whose people kept that god
+  where its cradle window held ore (`../lore/CREEDS.md`), so a region whose people kept that god
   *and* sits on ore lights its furnaces earlier. The charter culture's oath god buys a smaller
   bonus — Stage 3's contract law reaching capital.
 
 ### Pass 1 — Seed placement
 
-**Since BL-218 the seeds are the province anchors.** `nation_params::seed_tiles` is filled from
+**Since BL-218 the seeds are the region anchors.** `nation_params::seed_tiles` is filled from
 `settlement_seed_tiles` and consumed verbatim; the random placement described below is the
 fallback, kept intact for any body with no settlement pass and therefore bit-for-bit identical to
 pre-BL-218 behaviour there.
@@ -175,7 +175,7 @@ The attribution is exact rather than heuristic, and it turns on Pass 2 being wat
 * Pass 2b therefore only ever fires on a **seedless** landmass, and hands the whole thing to one
   nation in a single act.
 
-So an exclave on a **seeded** landmass (one holding at least one province anchor) is **emergent** —
+So an exclave on a **seeded** landmass (one holding at least one region anchor) is **emergent** —
 produced by the sim, whether by a stalled front, a rival cutting it off, or a Pass 4b rupture
 redrawing the border. An exclave on a **seedless** landmass is **Pass 2b** cleanup and is not
 evidence for BL-218's claim.
@@ -205,8 +205,8 @@ with no settlement pass.
 
 | Axis | Derived from | Rule |
 |---|---|---|
-| `expansionism` | the **border-contest integral** | Shared-border share of a nation's territory, plus the settled weight pressed against it (rival provinces within 12 tiles). A nation that expanded into empty land scores near zero on both; one that grew by pressing against neighbours scores high. ≥600 aggressive, ≥280 moderate, else passive. |
-| `economic_focus` | the dominant class of the provinces settled **during industrialisation** | Not of the tiles it merely holds — what a nation built on is what it becomes known for. Ore/farm → extraction, energy → processing, harbour → trade. An early first-mover's extraction reads as processing instead (see below). |
+| `expansionism` | the **border-contest integral** | Shared-border share of a nation's territory, plus the settled weight pressed against it (rival regions within 12 tiles). A nation that expanded into empty land scores near zero on both; one that grew by pressing against neighbours scores high. ≥600 aggressive, ≥280 moderate, else passive. |
+| `economic_focus` | the dominant class of the regions settled **during industrialisation** | Not of the tiles it merely holds — what a nation built on is what it becomes known for. Ore/farm → extraction, energy → processing, harbour → trade. An early first-mover's extraction reads as processing instead (see below). |
 | `ideology` | **industrialisation timing against neighbours** | A rank, not an absolute: earliest tercile → mercantile, middle → technocratic, latest → authoritarian (late catch-up under competitive pressure trends statist/directed). A nation that never industrialised reads isolationist. |
 
 None of the three needs a new roll — each is computable from the run's own record, which is the
@@ -217,13 +217,13 @@ standing requirement that generation produces consequences rather than dice.
 `resolve_historical_ruptures` then fires a bounded set of ruptures over the most-contested
 nations, reusing `planetology.hpp`'s class-agnostic `resolve_checkpoint` rather than inventing a
 second branch mechanism. Branch eligibility is a **filter, never a weight** (BL-217's rule): a
-nation with no land neighbour cannot go to war, a single-province nation cannot collapse. Every
+nation with no land neighbour cannot go to war, a single-region nation cannot collapse. Every
 attempt appends a `checkpoint_record`, failures included.
 
 Each branch is a **transform on state**; the line it appends is a *record of* the transform, never
 a substitute for it:
 
-- **Collapse** — the two most peripheral provinces pass to a bordering neighbour and their
+- **Collapse** — the two most peripheral regions pass to a bordering neighbour and their
   industrial clock resets; abundance falls 20%. Ideology unchanged.
 - **War** — the contested border redraws toward the stronger (bounded at a quarter of the loser's
   territory, so BL-224's non-hegemony invariant is respected rather than spent); the loser's
@@ -233,11 +233,11 @@ a substitute for it:
 - **Revolution** — territory untouched, the ideology axis flips, abundance takes a one-off hit.
   The cheapest transform and the one that most changes how the nation later behaves.
 
-**The record is not safe.** Where a war takes a province, the lines naming it are erased and a
+**The record is not safe.** Where a war takes a region, the lines naming it are erased and a
 dated **lacuna** is left in their place — "what the *X* wrote of itself does not survive the *Y*
 occupation", with a count of the lines lost. The hole is visible rather than silent, which is the
 difference between a history that was fought over and one that was merely written. A conquered
-province keeps its founders in `founding_culture` and its conquerors in `culture`, so the erasure
+region keeps its founders in `founding_culture` and its conquerors in `culture`, so the erasure
 is of the *record*, never of the fact — which is exactly the pair a later religion or population
 layer needs to describe a grievance.
 
@@ -264,7 +264,7 @@ regardless of ideology.
 ### Pass 5 — Naming
 
 **There is no name bank** (BL-290, landed 2026-08-09). A nation is named in the **tongue of the
-culture that settled the province its seed grew from** — the same phoneme inventory the creeds pass
+culture that settled the region its seed grew from** — the same phoneme inventory the creeds pass
 (BL-235) coined that culture's own name and its gods from. Naming *consumes* the phonology the
 generation chain already produces; it does not roll a second one.
 
@@ -273,7 +273,7 @@ The plumbing:
 - `world/tongue.{hpp,cpp}` owns the `tongue` (onset / vowel / coda inventory), the word builder,
   and `coin_lexicon`. `creeds.cpp` rolls the tongue through the same code it always did — the roll
   is unchanged — and now **retains** it on `culture::speech`.
-- `hard_coded_world.cpp` carries each province's tongue across into `nation_params::seed_tongues`,
+- `hard_coded_world.cpp` carries each region's tongue across into `nation_params::seed_tongues`,
   parallel to the `seed_tiles` anchors the settlement pass supplies.
 - Pass 5 gives each surviving nation the speech of the **lowest-indexed seed still inside it** (a
   seed absorbed by the Pass 2c merge contributes nothing — the surviving core names the realm), then
@@ -291,11 +291,11 @@ A body with no culture layer (no settlement pass, or a caller supplying bare see
 to **one** tongue rolled in Pass 5 for the whole body, not a per-nation re-roll: an unwritten history
 is still a shared one.
 
-**Province names** follow it too (BL-348, landed 2026-08-10). A province is `<People> <Region>`,
+**Region names** follow it too (BL-348, landed 2026-08-10). A region is `<People> <Region>`,
 and the region half was still English — *Reach*, *Coast*, *northern*, *inland* — which was *worse*
 than before BL-290 rather than merely unfixed: with the culture half native, the two naming systems
 sat side by side in one string and read as a bug rather than a style. `coin_lexicon` now coins each
-tongue **nine** region words, and `region_word` asks the province's tongue instead of returning a
+tongue **nine** region words, and `region_word` asks the region's tongue instead of returning a
 literal.
 
 Nine, because the choice of region word is **positional** and stays that way: a 5-band
@@ -311,8 +311,8 @@ and city name generated before the change is byte-identical after it.
 **City names** follow the same rule. `generate_city_name` takes a tongue and suffixes the culture's
 own coined settlement morpheme — the `-ton` / `-ford` / `-haven` / `-burg` bank is removed. Because
 population centres are placed *before* the creeds exist, they are first named from a tongue rolled
-for the body, then re-named per-province by `name_population_centres` (`world/city_names.cpp`) once
-the settlement record exists, using the **nearest province's** culture — the same "whose gods" rule
+for the body, then re-named per-region by `name_population_centres` (`world/city_names.cpp`) once
+the settlement record exists, using the **nearest region's** culture — the same "whose gods" rule
 the settlement pass uses.
 
 ### Pass 6 — Substrate density (BL-050 saturated substrate)
@@ -380,7 +380,7 @@ planetology state directly (`life_stage` peak, `arable_share`, `endemics` — BL
 half of `PLANETOLOGY.md`'s "hands nothing downstream" weakness). `generate_nations` itself
 still reads only tiles: seed preference over habitable compositions and Pass 3's
 deposit-summed resource profile are *indirectly* downstream of the biosphere, but no endowment,
-province, or biography data is read at placement time.
+region, or biography data is read at placement time.
 
 Nation system behaviour — taxes, laws, diplomatic actions, military response, territorial
 ambition — is **not implemented in the prototype**. Nations are generated and exist as data
@@ -395,7 +395,7 @@ The territory carve has a **surface**: it is drawn live on the loading screen
 (`app::draw_building_carve` in `src/core/app.cpp`, `app_screen::building`), in the seconds
 between the New World wizard's "Begin" and the first frame of play. Pass 2's weighted Voronoi
 BFS publishes each tile **at the moment it settles**, so the player watches nations grow
-outward from their province anchors and stop where a mountain, a coast, or a rival stops them.
+outward from their region anchors and stop where a mountain, a coast, or a rival stops them.
 Pass 2b and 2c rewrite indices wholesale, so the map is restated once when they finish - the
 islands join, the undersized realms are absorbed, and the final count is then reported.
 
