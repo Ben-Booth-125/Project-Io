@@ -42,6 +42,11 @@
 struct region;
 struct world;
 
+// Forward-declared rather than #including recipe_registry.hpp, which itself
+// includes THIS header (for unit_upkeep_params) — a real include cycle.
+// Must match recipe_registry.hpp's definition exactly.
+enum class era_band : uint8_t;
+
 /// The four roster bands. Values are the ladder's own grouping, so a band index
 /// converts to ladder bands via ANCIENT_TECH_LADDER.md's roster_bands table.
 enum class roster_band : uint8_t
@@ -54,11 +59,23 @@ enum class roster_band : uint8_t
 
 inline constexpr int roster_band_count = 4;
 
-/// The 1960s campaign's fixed roster band (BL-324, 2026-08-08) — not derived
-/// from a military-capacity score (that's the Era -1 settlement model); the
-/// campaign is simply industrial-era throughout, and bands are cumulative, so
-/// this still exposes every earlier-band row a corp's ground can support.
-inline constexpr roster_band campaign_roster_band = roster_band::industrial;
+/// BL-461: the campaign roster band, DERIVED from the registry's era band
+/// rather than fixed. BL-324 (2026-08-08) hard-coded this to `industrial`
+/// when the campaign only ever ran at 1960; the 0 CE refocus (NR-177,
+/// 2026-08-12) moved the default epoch to 0 without moving this constant,
+/// which let an ancient company field industrial-era units.
+///
+/// `era_band` is a coarse two-way split (ancient / industrial —
+/// recipe_registry.hpp), so this maps onto the roster's finer four-band grain
+/// at its two ends: ancient opens at the roster's lowest band (`classical`),
+/// industrial at its highest. Bands are cumulative (available_rows), so an
+/// ancient campaign still sees classical rows and nothing above; an
+/// industrial one sees every band up to and including industrial, exactly
+/// the pre-BL-461 behaviour for the 1960 arc.
+/// Defined in unit_roster.cpp, not inline here — the body needs era_band's
+/// full definition (recipe_registry.hpp), which cannot be #included from
+/// this header without the cycle noted above.
+roster_band campaign_roster_band_for(era_band band);
 
 /// What a row needs from the ground before a polity can field it. Each is a
 /// threshold on a region endowment window (0-1000); zero means "no gate".

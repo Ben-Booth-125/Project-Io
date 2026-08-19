@@ -2653,8 +2653,9 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
             }
         }
         const auto& table = unit_roster_table();
-        const auto  avail = has_muster_base ? available_rows(w, w.player_entity, campaign_roster_band)
-                                             : std::vector<const roster_row*>{};
+        const auto  avail = has_muster_base
+            ? available_rows(w, w.player_entity, campaign_roster_band_for(reg.era()))
+            : std::vector<const roster_row*>{};
         if (!avail.empty())
         {
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Hire");

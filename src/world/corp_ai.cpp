@@ -1300,7 +1300,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             if (muster_tile != null_entity && owned_units < max_units_per_corp)
             {
                 const auto& table = unit_roster_table();
-                const auto  avail = available_rows(w, corp, campaign_roster_band);
+                const auto  avail = available_rows(w, corp, campaign_roster_band_for(reg.era()));
                 for (const roster_row* row : avail)
                 {
                     const auto idx = static_cast<std::size_t>(row - table.data());

@@ -369,25 +369,15 @@ graduated dial; quantity-scaled readiness is a follow-on.
 | `port_q` | Owns a `port` building anywhere |
 | `energy_q` | Holds any coal, refined fuel or petroleum |
 
-`campaign_roster_band` is fixed at `industrial`. It is **not** derived from a military-capacity
-score — that is the Era −1 settlement model — and because bands are cumulative, every earlier row
-the corp's ground supports is still exposed.
-
-> **This is now a defect, not a design (recorded 2026-08-18; not fixed here).**
-> `inline constexpr roster_band campaign_roster_band = roster_band::industrial;`
-> (`src/world/unit_roster.hpp:61`) still carries its original comment, *"The 1960s campaign's fixed
-> roster band"*. The default campaign epoch moved to **0 CE** on 2026-08-12
-> (`world_params::epoch_year = 0`, `src/world/hard_coded_world.hpp:51`) and this constant did not
-> move with it.
->
-> It is a compile-time constant read by three call sites — the hire panel
-> (`src/ui/selection_panel.cpp:2656`), the rival scorer (`src/world/corp_ai.cpp:1303`) and the
-> `hire_unit` verb (`src/world/corp_command.cpp:421`). Nothing derives it from `epoch_year`, and
-> nothing consults `era_band` (`src/world/recipe_registry.hpp`), which *does* switch on the epoch
-> and masks the industrial building/recipe roster out of an ancient campaign.
->
-> So an ancient-era campaign offers Rifle Regiments and Mechanised Columns, filtered only by the
-> stockpile gate. Filed here in § What is absent; the fix is a separate change.
+**`campaign_roster_band_for(era_band)` derives the band from the campaign's own era (BL-461,
+2026-08-19).** It is fixed neither at `industrial` nor at any other single value — that was the
+BL-324 shape, and it went stale when the 0 CE refocus (NR-177, 2026-08-12) moved the default epoch
+to 0 without moving this constant, letting a 0 CE company field industrial-era units. It is still
+**not** derived from a military-capacity score — that is the Era −1 settlement model — but from
+`recipe_registry::era()`, the same coarse ancient/industrial split `era_band_for_epoch` already
+gives every other era gate: an ancient campaign opens at the roster's lowest band (`classical`), an
+industrial one at its highest (`industrial`). Because bands are cumulative, every earlier row the
+corp's ground supports is still exposed either way.
 
 `roster_stack(manpower, region, band, readiness)` composes an army stack from region manpower.
 Later bands crowd out earlier ones — a row's weight decays ×0.35 per band it sits below the
