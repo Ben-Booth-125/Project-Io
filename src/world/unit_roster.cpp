@@ -1,9 +1,19 @@
 #include "unit_roster.hpp"
 
+#include "recipe_registry.hpp" // era_band — BL-461
 #include "settlement.hpp"
 #include "world.hpp"
 
 #include <algorithm>
+
+roster_band campaign_roster_band_for(era_band band)
+{
+    switch (band)
+    {
+        case era_band::ancient: return roster_band::classical;
+        default:                return roster_band::industrial; // industrial, and the unset `any` default
+    }
+}
 
 // ---------------------------------------------------------------------------
 // The roster table (BL-274). Rows are authored, availability is derived.

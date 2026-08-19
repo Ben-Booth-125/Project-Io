@@ -418,7 +418,7 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             // Re-check availability against the LIVE gate rather than trusting a
             // caller's cached list — mirrors construct_building's own re-validation
             // of placement rather than the tile the UI last showed as buildable.
-            const auto avail = available_rows(w, cmd.corp, campaign_roster_band);
+            const auto avail = available_rows(w, cmd.corp, campaign_roster_band_for(reg.era()));
             if (std::find(avail.begin(), avail.end(), &row) == avail.end())
                 return corp_command_result::rejected_invalid;
 

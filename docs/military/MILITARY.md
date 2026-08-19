@@ -336,9 +336,15 @@ graduated dial; quantity-scaled readiness is a follow-on.
 | `port_q` | Owns a `port` building anywhere |
 | `energy_q` | Holds any coal, refined fuel or petroleum |
 
-`campaign_roster_band` is fixed at `industrial`. It is **not** derived from a military-capacity
-score — that is the Era −1 settlement model. The campaign is simply industrial-era throughout, and
-because bands are cumulative, every earlier row the corp's ground supports is still exposed.
+**`campaign_roster_band_for(era_band)` derives the band from the campaign's own era (BL-461,
+2026-08-19).** It is fixed neither at `industrial` nor at any other single value — that was the
+BL-324 shape, and it went stale when the 0 CE refocus (NR-177, 2026-08-12) moved the default epoch
+to 0 without moving this constant, letting a 0 CE company field industrial-era units. It is still
+**not** derived from a military-capacity score — that is the Era −1 settlement model — but from
+`recipe_registry::era()`, the same coarse ancient/industrial split `era_band_for_epoch` already
+gives every other era gate: an ancient campaign opens at the roster's lowest band (`classical`), an
+industrial one at its highest (`industrial`). Because bands are cumulative, every earlier row the
+corp's ground supports is still exposed either way.
 
 `roster_stack(manpower, province, band, readiness)` composes an army stack from province manpower.
 Later bands crowd out earlier ones — a row's weight decays ×0.35 per band it sits below the
