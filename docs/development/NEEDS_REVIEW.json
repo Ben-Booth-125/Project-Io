@@ -1940,6 +1940,25 @@
     "src/ui/corporation_panel.cpp",
     "src/ui/foldout_column.cpp"
    ]
+  },
+  {
+   "id": "NR-354",
+   "title": "Batch Delivery scoped down to BL-460/BL-441/BL-442(step1); BL-439/BL-440(c)/BL-443 deferred",
+   "raised": "2026-08-19",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "2026-08-19 Batch Delivery session survey of the v0.1.16 economy-integrity cluster (BL-439 through BL-443, BL-460).",
+   "what": "Surveyed BL-439 (AI never builds processors), BL-440 (mines only target richest), BL-441 (unmet demand never registered), BL-442 (price band is code not data), BL-443 (debt compounds with no floor) and BL-460 (ordnance unproducible at 0 CE) as a candidate batch. Chose to land only BL-460, BL-441, and BL-442's step 1 (behaviour-identical constant relocation) this pass, and deferred BL-439, BL-440's remaining part (c), and BL-443 entirely - no code touched for those three.",
+   "why_it_matters": "BL-439 explicitly reshuffles every blessed golden and every ai_skill_harness band as its stated cost ('paid once, deliberately, re-blessed as part of landing it') - not something to fold into a multi-item batch pass without dedicated attention to the re-bless. BL-440(c) needs a design call between two named implementation shapes (a post-registry retarget pass vs a static demand hint) that BL-441's own design notes partially supersedes - clearer to resolve after BL-441 lands and its effect on the coal shortage can be measured, not before. BL-443 explicitly says 'MEASURE BEFORE CHANGING ANYTHING' and requires a game-design call (debt ceiling vs forced liquidation vs restructuring) that shapes the Conflict/Trade arc - not a mechanical fix. Landing all six in one pass risked a sprawling, under-verified batch; scoping down keeps each landed item independently verifiable.",
+   "options": [
+    "A - next session: re-run tier_margin/ai_skill_harness against the BL-441+BL-442(step1) landing to see whether the coal shortage measurably improves before deciding BL-440(c)'s shape",
+    "B - bring BL-443's measure-first step (decompose a benchmark corp's balance into operating flows vs accrued interest) to Ben as its own small session before choosing (a)/(b)/(c)",
+    "C - treat BL-439 as its own dedicated Batch Delivery pass specifically because of the golden re-bless cost, rather than bundling it with anything else"
+   ],
+   "recommendation": "A, then C, then B in that order - BL-440(c) may partly resolve itself once BL-441's price signal is live, which is worth checking before spending more design effort on it; BL-439's golden re-bless deserves an isolated pass; BL-443's measurement step is cheap and can happen any time.",
+   "files": [
+    "docs/development/backlog.json"
+   ]
   }
  ]
 }
