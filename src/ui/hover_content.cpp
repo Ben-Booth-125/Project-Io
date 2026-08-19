@@ -106,11 +106,13 @@ void hover_tile_population(const world& w, const tile_component& tile)
 
 // --- Exemplar 2: building × supply lens (or any lens) ---------------------------
 
-void hover_building_supply(const world& w, const building_component& b)
+// The operational internals shared by the player card and (BL-408) the god-view
+// rival card: target/recipe, workforce, and the status why-line. Factored out of
+// hover_building_supply so the god view shows a rival THROUGH the same lines the
+// player reads about their own buildings, rather than a second wording that
+// could drift.
+void hover_building_detail(const world& w, const building_component& b)
 {
-    // Title: building type name.
-    ImGui::TextUnformatted(building_type_name(b.type));
-
     // Stat line 1: what it produces / targets.
     if (b.type == building_type::extraction_site)
         ImGui::Text("Extracting: %s", resource_name(b.target_resource));
@@ -173,11 +175,26 @@ void hover_building_supply(const world& w, const building_component& b)
     }
 }
 
+void hover_building_supply(const world& w, const building_component& b)
+{
+    // Title: building type name.
+    ImGui::TextUnformatted(building_type_name(b.type));
+
+    hover_building_detail(w, b);
+}
+
 // --- BL-068: rival building hover — type + owner only ---------------------------
 // The competitor information-asymmetry rule: a rival's marker, building type, and
 // owning corporation are public; production rate and stockpile are private. The
 // hover card therefore shows the two public facts and nothing about throughput.
-void hover_building_rival(const world& w, entity_id eid, const building_component& b)
+//
+// BL-408: under spectator god view (@p god_view) the private half opens — the
+// same detail lines the player card draws — because with no human seat there is
+// nobody the asymmetry protects. The owner attribution stays (a spectator
+// reading a field of corps needs the WHOSE more, not less), and the why-line
+// names god view so the card never passes itself off as normally-public intel.
+void hover_building_rival(const world& w, entity_id eid, const building_component& b,
+                          bool god_view = false)
 {
     // Title: building type (public).
     ImGui::TextUnformatted(building_type_name(b.type));
@@ -202,6 +219,14 @@ void hover_building_rival(const world& w, entity_id eid, const building_componen
     }
     else
         ImGui::TextDisabled("Owner: unknown");
+
+    if (god_view)
+    {
+        // The internals, through the SAME lines the player card uses.
+        hover_building_detail(w, b);
+        ImGui::TextDisabled("Competitor \xe2\x80\x94 god view");
+        return;
+    }
 
     // Why-line: name the asymmetry rather than leak production / stockpile.
     ImGui::Spacing();
@@ -305,13 +330,16 @@ void draw_hover_content(const world& w, const ui_state& ui, entity_id eid)
     }
 
     // Dispatch: building. Player-owned buildings show full operational detail;
-    // rivals show type + owner only (BL-068 visibility rule).
+    // rivals show type + owner only (BL-068 visibility rule) — unless spectator
+    // god view is on (BL-408), where the rival card opens its detail too. The
+    // rival path is kept (not switched to the player card) so the owner
+    // attribution and the god-view tell stay on the card.
     if (const auto bld_it = w.buildings.find(eid); bld_it != w.buildings.end())
     {
         if (is_player_owned(w, eid))
             hover_building_supply(w, bld_it->second);
         else
-            hover_building_rival(w, eid, bld_it->second);
+            hover_building_rival(w, eid, bld_it->second, ui.spectating && ui.god_view);
         return;
     }
 

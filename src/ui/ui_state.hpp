@@ -226,6 +226,18 @@ struct ui_state
     /// .spectating through run_economy_step's defaulted argument.
     bool spectating = false;
 
+    /// Spectator god view (BL-408): lift the survey mask and the BL-068
+    /// rival-internals redaction — in the UI layer ONLY. The flag is read at
+    /// the draw call, never at the source: `world/*`, `survey_tile_visible`,
+    /// the activity-fog store and `export_corp_blackboard` never see it, so
+    /// the AI stays exactly as visibility-honest while the watcher does not.
+    /// Meaningful only under `spectating` — every read-site tests the PAIR
+    /// (`spectating && god_view`), and the toggle (system menu, time_panel.cpp)
+    /// only renders while spectating, so a played session cannot reach it.
+    /// Defaults false: with it off, every gated surface renders byte-identical
+    /// to the pre-BL-408 build.
+    bool god_view = false;
+
     // --- Budget ledger stubbed policy levers (BL-171 UI; mechanics owed to BL-155) ---
     // The Tax and Wages tier selectors are drawn and selectable, but have NO economic
     // effect yet — they carry the intended player levers (Tax = a player-set policy;
