@@ -1841,6 +1841,31 @@
     "src/world/stance.cpp",
     "src/world/world.hpp"
    ]
+  },
+  {
+   "id": "NR-350",
+   "title": "BL-449 (stance surface) — does a hostile declaration announce itself, or is it discovered on contact?",
+   "raised": "2026-08-19",
+   "kind": "question",
+   "status": "open",
+   "source": "BL-449 design field, flagged as \"a second question for Ben\" when BL-448 (corp stance model) landed and unblocked BL-449 this session.",
+   "what": "BL-449 gates the Corporation panel's stance column on BL-068 competitor-visibility: a stance toward a corp the player has not discovered is not shown. That leaves two readings for how a declare_hostile against the player becomes visible to them — (A) it announces itself immediately, e.g. surfaced on the comms dock the moment it is declared, or (B) it stays silent and is only discovered on contact (matching a market/building becoming visible through normal BL-068 discovery). BL-449's own design notes it rides naturally on the comms dock if it announces, but does not settle which.",
+   "why_it_matters": "This decides whether an ambush is truly a surprise (reading B — the player learns they are at war only when something happens to them) or a declared-but-silent-delivery state (reading A — always immediately known, just not necessarily acted on). BL-458 (interdiction) leans on the ambush property (\"a convoy belonging to a corp that does not yet know it is at war\"), so picking A would partially undercut that design intent for player-facing hostility, though rival-on-rival hostility could still use B for AI purposes.",
+   "options": [
+    "A — announces immediately (comms dock entry the moment a hostile corp declares against the player, regardless of discovery state)",
+    "B — silent, discovered on contact (matches ordinary BL-068 visibility; the player learns only when they next interact with or are affected by the hostile corp)"
+   ],
+   "recommendation": "B, to keep the ambush property BL-458 (interdiction) explicitly relies on — a corp \"does not yet know it is at war\" only works if hostility is not always broadcast on declaration.",
+   "files": [
+    "src/ui/corporation_panel.cpp",
+    "docs/ui/question_log.json"
+   ],
+   "refs": [
+    "BL-449",
+    "BL-448",
+    "BL-068",
+    "BL-458"
+   ]
   }
  ]
 }
