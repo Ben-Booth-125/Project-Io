@@ -1998,6 +1998,34 @@
     "BL-454"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-356",
+   "title": "verb_coverage.js's first real run finds march_unit/halt_unit/disband_unit missing from the dictionary",
+   "raised": "2026-08-19",
+   "kind": "observation",
+   "status": "open",
+   "source": "BL-444 (VERB_REACHABILITY_COVERAGE_TOOL) implementation - tools/session/verb_coverage.js, run for real against src/world/corp_command.hpp, docs/ai/ACTIONS.json and src/world/corp_ai.cpp.",
+   "what": "The corp_verb enum carries 24 verbs; the ACTIONS.json gameplay family only has 21 gameplay.* entries. The three missing are march_unit, halt_unit and disband_unit - BL-470's unit march seam, appended to the enum 2026-08-19 (corp_command.hpp: 'Appended AFTER return_to_neutral, same append-only rule'). ACTIONS.md's own convention (CLAUDE.md: 'Any change to a control, binding, lens, ledger or panel must update its entry') was not followed for this landing, so the tool's exit code is currently 1 in an otherwise clean tree.",
+   "why_it_matters": "This is exactly the drift class ACTIONS.md warns about ('a stale entry misleads the AI player the way a stale golden misleads a visual check') and the reason BL-444 was commissioned - a dictionary gap on a real, landed seam addition, caught on the tool's very first run rather than staying invisible.",
+   "options": [
+    "A - author the three gameplay.march_unit / gameplay.halt_unit / gameplay.disband_unit entries now (small, mechanical - corp_command.hpp's own comments already state each verb's contract) and re-run render_actions.js",
+    "B - file a small backlog item scoped to closing this one dictionary gap, so it goes through Delivery rather than being patched ad hoc",
+    "C - leave open until the next session that touches ACTIONS.json, since verb_coverage.js now makes the gap visible and self-documenting"
+   ],
+   "recommendation": "A - this is the exact kind of small, mechanical dictionary-catch-up the tool exists to surface quickly; the three verbs' contracts are already fully specified in corp_command.hpp's comments, so authoring the entries is transcription, not design.",
+   "files": [
+    "tools/session/verb_coverage.js",
+    "docs/ai/ACTIONS.json",
+    "docs/ai/ACTIONS.md",
+    "src/world/corp_command.hpp"
+   ],
+   "refs": [
+    "BL-444",
+    "BL-470",
+    "BL-270"
+   ],
+   "resolution": null
   }
  ]
 }
