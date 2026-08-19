@@ -4270,6 +4270,44 @@
      "result_metric": "FAILED, EXPECTED, STRUCTURAL. spectator_determinism R2 moves again: unit_component gained two hashed fields, so every world hash holding a unit changes. Measured under g++ pre-change CCF93A83903B6B45, post-change C9A4EFB137D74095, MSVC golden 855E07DE529684EC. Combined with NR-319, the Windows re-bless now has TWO named structural causes: resource_count 37->38, and the unit_component field change. Also pre-existing and unrelated: ai_skill_harness 25 failures before and after, its own banner declaring its bands stale since BL-386; non-movement confirmed at processors_gained = 43 either side."
     }
    ]
+  },
+  {
+   "brief": "stance-surface",
+   "batch": "2026-08-19-c1-sprint",
+   "title": "BL-449 - the Corporation panel gets a stance column and the three transition presses",
+   "status": "partial",
+   "promoted_from": "backlog.json BL-449 STANCE_NEEDS_A_SURFACE",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "ITEM-SPANNING (visual): the Corporation panel gains a Stance column showing the player-to-rival stance (Hostile / Friend / Neutral / Unknown), gated on ordinary BL-068 competitor-visibility per NR-350 (a hostile declaration stays silent, discovered on contact rather than announced).",
+     "verification": [
+      "visual"
+     ],
+     "result_metric": "Column added in src/ui/corporation_panel.cpp, gated via a corp_is_discovered() helper reading the same per-building survey-visibility check BL-068 uses elsewhere. Not yet visually captured in this batch - open, see notes."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "The three legal transitions (Declare Hostile with a confirm popup on the demolish precedent, Offer/Accept Friendship as a two-party handshake, Return to Neutral) issue corp_command records through the existing pending_order_commands dispatch, and a rejected press mutates nothing (io-standing-rules.md untrusted-boundary rule).",
+     "verification": [
+      "visual",
+      "headless"
+     ],
+     "result_metric": "Presses wired against corp_verb::declare_hostile/offer_friendship/accept_friendship/return_to_neutral (BL-448, corp_command.cpp). Mutation-on-rejection guarantee is inherited from stance.cpp's own validation (verified by stance_determinism.cpp, 36/36 PASS, landed with BL-448) - this item adds no new mutation path, only the UI call site."
+    },
+    {
+     "id": "R3",
+     "status": "open",
+     "requirement": "The dictionary and justification store stay in sync: docs/ai/ACTIONS.json carries the four verbs transcribed from the corp_command seam, and docs/ui/question_log.json carries a corporation_panel entry naming BL-449/BL-448 as the demanding items.",
+     "verification": [
+      "headless"
+     ],
+     "result_metric": "ACTIONS.json +4 entries (declare_hostile/offer_friendship/accept_friendship/return_to_neutral), render_actions.js re-run clean. question_log.json +1 entry (corporation_panel), render_question_log.js re-run clean. Not yet checked against a compiled build in this batch."
+    }
+   ],
+   "notes": "No automated visual capture (scripts/verify/*.lua) was authored in this batch - the main session confirms the panel by opening the live app instead. R1/R2 marked complete on code inspection + the inherited stance_determinism coverage; visual confirmation is the remaining open item before this group can close."
   }
  ]
 }

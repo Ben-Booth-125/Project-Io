@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**23 surfaces** — 3 settled, 20 awaiting Ben's wording.
+**24 surfaces** — 4 settled, 20 awaiting Ben's wording.
 
 ---
 
@@ -191,6 +191,14 @@ alphabetical order.
 **Because:** Roll-up cards over holdings, balance and production, so the player has a whole-corp read without assembling it from four ledgers. Pairs existed on these cards before BL-247's log was removed. BL-343 added the sixth Finance bar, Levies: a law the player cannot see working is indistinguishable from an unimplemented one, so the levy is its own number rather than folded into maintenance.
 
 *Demanded by BL-081, BL-214, BL-343 · `src/ui/corporation_dashboard.cpp` · id `corporation_dashboard`*
+
+### Corporation panel — stance column
+
+**Answers:** What is my stance toward this rival, and can I change it?
+
+**Because:** BL-448 landed a corp stance data model (friend/neutral/hostile) with zero UI — the exact BL-350 lesson (a complete seam with no press, unnoticed for weeks) this item exists to avoid. The column shows the current stance label and the legal transition presses (Declare Hostile, Offer/Accept Friendship, Return to Neutral), gated on ordinary BL-068 competitor-visibility per NR-350 (a hostile declaration stays silent, discovered on contact rather than announced).
+
+*Demanded by BL-449, BL-448 · `src/ui/corporation_panel.cpp` · id `corporation_panel`*
 
 ### Generation charts
 

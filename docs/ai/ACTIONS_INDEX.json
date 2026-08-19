@@ -516,6 +516,22 @@
   [
    "ledger.decision_feed_filter_reason",
    "AI decision feed, reason filter"
+  ],
+  [
+   "gameplay.declare_hostile",
+   "Corporation panel, Stance column. Confirm popup on press (demolish precedent — not literally irreversible, but not unilaterally reversible by the target either)."
+  ],
+  [
+   "gameplay.offer_friendship",
+   "Corporation panel, Stance column."
+  ],
+  [
+   "gameplay.accept_friendship",
+   "Corporation panel, Stance column. Shown only on a rival row carrying a pending offer FROM that rival TO the player."
+  ],
+  [
+   "gameplay.return_to_neutral",
+   "Corporation panel, Stance column. Shown whenever the row is currently Hostile or Friend."
   ]
  ]
 }
