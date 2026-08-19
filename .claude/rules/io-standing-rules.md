@@ -142,6 +142,16 @@ rule has a fuller authority, it is cited — this file does not redefine it.
   documentation — a narrow, well-scoped agent is the unit that pays back. Integration, build, and
   commit stay in the main session (see DELIVERY.md
   § Sub-agents & worktrees).
+- **An agent blocks on its own long waits and stops once it has a decision (2026-08-19).** A
+  sub-agent running a long build or harness checks the result itself rather than yielding control
+  mid-wait; once it reaches a stated conclusion it stops, rather than continuing to re-investigate
+  a question it already answered. Brief this explicitly — it does not happen by default (see
+  DELIVERY.md § Sub-agents & worktrees).
+- **A UI requirement needs a live check (2026-08-19).** A scripted `verifier-visual` capture
+  proves a surface renders; it does not prove a press on it is reachable. Before marking any
+  `visual` requirement on an interactive surface `complete`, open the built app, click the thing,
+  and look — a clean compile and a green harness are not sufficient on their own (see DELIVERY.md
+  § The Delivery lifecycle, step 4).
 - **Save the tool.** When you build a check or helper, push it to a reusable skill or committed
   script (`CLAUDE.md` § Tool creation is skill creation), not a one-off — the saved check keeps
   paying; the loose one is forgotten.

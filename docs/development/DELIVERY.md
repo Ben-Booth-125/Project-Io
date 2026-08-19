@@ -164,6 +164,16 @@ large); for a `design-owed` item, **Design** is the implied first step.
 4. **Complete tasks** — implement, review, and verify each against its requirements. Tasks that
    prove blocked or out of scope are **cancelled** (intent returned to the backlog), not left in
    flight.
+
+   **A `visual` requirement on an interactive surface is not complete on a scripted capture
+   alone (2026-08-19).** `verifier-visual`'s PNG capture proves a surface *renders*; it does not
+   prove a button on it is *reachable*. BL-449 (stance surface) shipped clean on both a compile
+   and a 36/36 harness, and was still unusable — its Stance column's presses rendered past the
+   panel's edge, caught only when someone finally opened the live app. Any requirement whose
+   surface has a press, a popup, or user input needs one live open-and-click pass — `request_access`
+   the built exe, screenshot it, click the thing — before it flips `complete`. A static capture is
+   still the right check for pure rendering (tints, layout, glyphs); it is not a substitute for
+   proving an affordance works.
 4a. **Review barrier (before any fresh full compile).** Once slices have merged into the
    integrating tree, run the **`verifier-review`** skill over the integrated diff *before* spending
    the integrating build. It is a static, no-compile pass (the cheapest verification tier) whose
@@ -300,6 +310,12 @@ Consequences:
   dependency order, runs the integrating build, and verifies. Assume nothing about an agent's
   self-reported success — verify retroactively after merge. The retroactive pass is where the
   quietly-wrong surfaces, while it is still one slice deep.
+- **An agent blocks on its own long-running builds and harness runs (2026-08-19).** It does not
+  yield control mid-wait and report back "still waiting" — it checks the process or output file
+  directly and keeps going. And once an agent reaches a stated decision (a hypothesis refuted, a
+  stale threshold dropped), it stops: it does not keep re-investigating a question its own report
+  already answered. Both cost supervisory round-trips for no new information; a brief that says
+  so up front is cheaper than redirecting it mid-run.
 - **Sub-agents must use the Bash tool with a heredoc for all git commits.** The project's
   `settings.json` allow rule is `Bash(git commit*)` — the PowerShell tool is not covered and
   will stall on a permission prompt. Every sub-agent prompt should include: *"Use the Bash tool
