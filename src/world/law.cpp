@@ -12,6 +12,11 @@ law_effects evaluate_laws(const world& w, entity_id subject_corp)
     {
         if (!l.enacted)
             continue;
+        // BL-480: a law with no author cannot exist; an ill-formed authorless
+        // record is defensively inert (an authorless charge would destroy money,
+        // which is the exact defect this item removed).
+        if (l.enacting_nation == null_entity)
+            continue;
         if (!evaluate(l.conditions, w, subject_corp))
             continue;
 
@@ -19,15 +24,31 @@ law_effects evaluate_laws(const world& w, entity_id subject_corp)
         {
             case law_effect_kind::extraction_levy:
             {
+                // Find-or-append the author's schedule; first-appearance order
+                // over the authored list keeps the bundle deterministic.
+                law_effects::levy_schedule* sched = nullptr;
+                for (law_effects::levy_schedule& s : fx.levies)
+                    if (s.enacting_nation == l.enacting_nation)
+                    {
+                        sched = &s;
+                        break;
+                    }
+                if (!sched)
+                {
+                    fx.levies.emplace_back();
+                    sched = &fx.levies.back();
+                    sched->enacting_nation = l.enacting_nation;
+                }
+
                 if (l.scope_resource == law::all_resources)
                 {
                     for (std::size_t ri = 0; ri < resource_count; ++ri)
-                        fx.extraction_levy[ri] += l.rate;
+                        sched->extraction_levy[ri] += l.rate;
                 }
                 else if (l.scope_resource >= 0 &&
                          static_cast<std::size_t>(l.scope_resource) < resource_count)
                 {
-                    fx.extraction_levy[static_cast<std::size_t>(l.scope_resource)] += l.rate;
+                    sched->extraction_levy[static_cast<std::size_t>(l.scope_resource)] += l.rate;
                 }
                 fx.any = true;
                 break;
@@ -37,16 +58,56 @@ law_effects evaluate_laws(const world& w, entity_id subject_corp)
     return fx;
 }
 
+entity_id choose_levy_author(const world& w)
+{
+    // 1. The player corp's home nation — the seeded law should bind the player,
+    //    so the laws surface reads "whose law, what it costs me" non-vacuously.
+    const auto pit = w.corporations.find(w.player_entity);
+    if (pit != w.corporations.end() &&
+        pit->second.home_nation != null_entity &&
+        w.nations.find(pit->second.home_nation) != w.nations.end())
+        return pit->second.home_nation;
+
+    // 2. Largest territory, ties to the lowest entity id. The scan is over an
+    //    unordered_map but the (tiles, id) ordering criterion is total, so the
+    //    winner is independent of iteration order — deterministic.
+    entity_id   best       = null_entity;
+    std::size_t best_tiles = 0;
+    for (const auto& [nid, nc] : w.nations)
+    {
+        if (best == null_entity ||
+            nc.tiles.size() > best_tiles ||
+            (nc.tiles.size() == best_tiles && nid < best))
+        {
+            best       = nid;
+            best_tiles = nc.tiles.size();
+        }
+    }
+    return best; // 3. null_entity when no nations exist.
+}
+
 void seed_prototype_laws(world& w, float rate)
 {
+    // BL-480: a law with no author cannot exist. No nations, no law.
+    const entity_id author = choose_levy_author(w);
+    if (author == null_entity)
+        return;
+
     law levy;
     levy.id      = "LAW-EXTRACTION-LEVY";
     levy.name    = "Extraction Levy";
     levy.effect  = law_effect_kind::extraction_levy;
     levy.rate    = rate;
-    levy.scope_resource = law::all_resources;
+    levy.scope_resource  = law::all_resources;
+    levy.enacting_nation = author;
     // Empty condition_set: unconditional once enacted (BL-155's common case,
     // and the path that exercises BL-342's always-true degenerate branch).
-    levy.enacted = false; // shipped OFF — see the header for why.
+    //
+    // ENACTED at generation by its author nation (BL-480) — enactment is a
+    // governing-body act, not a player checkbox. The charge is now a transfer
+    // into the author's treasury, bounded by its jurisdiction, so what ships is
+    // a nation taxing extraction in its own territory rather than a free-floating
+    // money sink a corporation could switch on.
+    levy.enacted = true;
     w.laws.push_back(levy);
 }

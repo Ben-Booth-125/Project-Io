@@ -7,9 +7,11 @@
 // The bar BL-343 set is "one law you can turn on and see", so the assertions are
 // about OBSERVABILITY and about the seam holding, not about a taxonomy:
 //
-//   L1  An un-enacted law changes nothing — the shipped default is inert, and a
-//       levy that charged from turn one would be a balance change smuggled in
-//       as a feature.
+//   L1  A repealed law changes nothing — an un-enacted law is inert. Since
+//       BL-480 the shipped seed is ENACTED by its author nation (enactment is a
+//       governing-body act, not a player checkbox), so the inertness rule is
+//       asserted on the repealed state; and a law with no author cannot exist —
+//       seeding a nation-free world seeds nothing.
 //   L2  An enacted levy reduces net margin by EXACTLY rate x units extracted,
 //       and lands on its own `levies` line rather than being folded into an
 //       existing flow. `corp_budget::net()` still equals the balance delta.
@@ -51,24 +53,35 @@ void check(bool ok, const char* what)
     ok ? ++g_pass : ++g_fail;
 }
 
-/// A world with one corp, one body, and two extraction sites whose reports are
-/// hand-built. The budget seam reads `economy_report::buildings`, so the harness
-/// supplies that directly rather than running a whole economy step — the seam is
-/// what is under test, not extraction.
+/// A world with one nation, one corp, one body, and two extraction sites whose
+/// reports are hand-built. The budget seam reads `economy_report::buildings`,
+/// so the harness supplies that directly rather than running a whole economy
+/// step — the seam is what is under test, not extraction.
+///
+/// BL-480: laws carry an author nation, and jurisdiction bounds the levy, so
+/// the fixture owns a nation whose territory covers the extraction tiles (the
+/// tiles are registered in `tile_to_nation`). Every pre-BL-480 numeric
+/// expectation is unchanged by that: all charged output sits in-jurisdiction.
 struct fixture
 {
     world     w;
-    entity_id corp = null_entity;
-    entity_id body = null_entity;
+    entity_id corp   = null_entity;
+    entity_id body   = null_entity;
+    entity_id nation = null_entity;
     std::vector<building_report> production;
 };
 
-entity_id add_extraction(world& w, entity_id corp, entity_id body)
+entity_id add_extraction(world& w, entity_id corp, entity_id body, entity_id nation)
 {
     const entity_id tile = w.create_entity();
     tile_component  tc{};
     tc.body = body;
     w.tiles[tile] = tc;
+    if (nation != null_entity)
+    {
+        w.tile_to_nation[tile] = nation;          // jurisdiction (BL-480)
+        w.nations[nation].tiles.push_back(tile);  // territory list
+    }
 
     const entity_id b = w.create_entity();
     building_component bc{};
@@ -87,16 +100,22 @@ fixture make_fixture()
     f.body = f.w.create_entity();
     f.w.bodies[f.body] = body_component{};
 
+    f.nation = f.w.create_entity();
+    nation_component nc{};
+    nc.name = "Levy Test Nation";
+    f.w.nations[f.nation] = nc;
+
     f.corp = f.w.create_entity();
     corporation_component cc{};
-    cc.name      = "Levy Test Corp";
-    cc.balance   = 10000.0f;
-    cc.is_player = true;
+    cc.name        = "Levy Test Corp";
+    cc.balance     = 10000.0f;
+    cc.is_player   = true;
+    cc.home_nation = f.nation;
     f.w.corporations[f.corp] = cc;
     f.w.player_entity        = f.corp;
 
-    const entity_id a = add_extraction(f.w, f.corp, f.body);
-    const entity_id b = add_extraction(f.w, f.corp, f.body);
+    const entity_id a = add_extraction(f.w, f.corp, f.body, f.nation);
+    const entity_id b = add_extraction(f.w, f.corp, f.body, f.nation);
 
     building_report ra;
     ra.building        = a;
@@ -127,15 +146,18 @@ corp_budget run(fixture& f, const recipe_registry& reg, bool with_production)
     return breakdown[f.corp];
 }
 
-/// Append the prototype levy, enacted, at `rate` over `scope` (-1 = all).
-void enact_levy(world& w, float rate, int scope = law::all_resources)
+/// Append the prototype levy, enacted by `author`, at `rate` over `scope`
+/// (-1 = all). BL-480: a law with no author cannot exist, so the author is a
+/// required argument here.
+void enact_levy(world& w, entity_id author, float rate, int scope = law::all_resources)
 {
     law l;
     l.id      = "LAW-TEST-LEVY";
     l.name    = "Test Levy";
     l.effect  = law_effect_kind::extraction_levy;
     l.rate    = rate;
-    l.scope_resource = scope;
+    l.scope_resource  = scope;
+    l.enacting_nation = author;
     l.enacted = true;
     w.laws.push_back(l);
 }
@@ -158,24 +180,40 @@ int main()
     const corp_budget b0 = run(base, reg, /*with_production=*/true);
     const float base_balance = base.w.corporations[base.corp].balance;
 
-    // --- L1: an un-enacted law is inert ------------------------------------
-    std::printf("-- L1  un-enacted law --\n");
+    // --- L1: a repealed law is inert; a law cannot exist authorless ---------
+    std::printf("-- L1  repealed law + the author invariant --\n");
     {
         fixture f = make_fixture();
-        seed_prototype_laws(f.w, 2.0f); // the shipped seed: UN-enacted
-        check(!f.w.laws.empty() && !f.w.laws.front().enacted,
-              "L1a seed_prototype_laws ships the levy un-enacted");
+        seed_prototype_laws(f.w, 2.0f); // the shipped seed (BL-480: enacted, authored)
+        check(!f.w.laws.empty() && f.w.laws.front().enacted,
+              "L1a seed_prototype_laws ships the levy ENACTED (BL-480: enactment "
+              "is the author nation's act at generation)");
+        check(!f.w.laws.empty() && f.w.laws.front().enacting_nation == f.nation,
+              "L1b ...authored by the player's home nation, deterministically");
+
+        f.w.laws.front().enacted = false; // repealed by its author
         const corp_budget b = run(f, reg, true);
-        check(b.levies == 0.0f, "L1b an un-enacted law charges nothing");
+        check(b.levies == 0.0f, "L1c a repealed law charges nothing");
         check(same(f.w.corporations[f.corp].balance, base_balance),
-              "L1c the balance is bit-identical to a world with no laws at all");
+              "L1d the balance is bit-identical to a world with no laws at all");
+        check(same(f.w.nations[f.nation].treasury, 0.0f),
+              "L1e ...and the author's treasury is untouched");
+
+        world nationless;
+        const entity_id c2 = nationless.create_entity();
+        nationless.corporations[c2] = corporation_component{};
+        nationless.player_entity    = c2;
+        seed_prototype_laws(nationless, 2.0f);
+        check(nationless.laws.empty(),
+              "L1f a nation-free world seeds NO law - a law with no author "
+              "cannot exist");
     }
 
     // --- L2: an enacted levy charges exactly rate x units -------------------
     std::printf("\n-- L2  enacted levy --\n");
     {
         fixture f = make_fixture();
-        enact_levy(f.w, 2.0f);
+        enact_levy(f.w, f.nation, 2.0f);
         const corp_budget b = run(f, reg, true);
         check(same(b.levies, 2.0f * k_total_output),
               "L2a levies == rate x units extracted (2 x 50 = 100)");
@@ -190,7 +228,7 @@ int main()
     std::printf("\n-- L3  the market is untouched --\n");
     {
         fixture f = make_fixture();
-        enact_levy(f.w, 2.0f);
+        enact_levy(f.w, f.nation, 2.0f);
         const corp_budget b = run(f, reg, true);
         check(same(b.income, b0.income),           "L3a income unchanged");
         check(same(b.expenditure, b0.expenditure), "L3b expenditure unchanged");
@@ -203,7 +241,7 @@ int main()
     std::printf("\n-- L4  repeal --\n");
     {
         fixture f = make_fixture();
-        enact_levy(f.w, 2.0f);
+        enact_levy(f.w, f.nation, 2.0f);
         run(f, reg, true);                    // charged
         f.w.laws.front().enacted = false;     // repealed
         f.w.corporations[f.corp].balance = 10000.0f; // reset to the opening balance
@@ -216,8 +254,8 @@ int main()
     // --- L5: determinism ----------------------------------------------------
     std::printf("\n-- L5  determinism --\n");
     {
-        fixture g = make_fixture(); enact_levy(g.w, 1.5f);
-        fixture h = make_fixture(); enact_levy(h.w, 1.5f);
+        fixture g = make_fixture(); enact_levy(g.w, g.nation, 1.5f);
+        fixture h = make_fixture(); enact_levy(h.w, h.nation, 1.5f);
         const corp_budget bg = run(g, reg, true);
         const corp_budget bh = run(h, reg, true);
         check(same(bg.levies, bh.levies), "L5a two identical worlds charge identically");
@@ -229,14 +267,14 @@ int main()
     std::printf("\n-- L6  scope and stacking --\n");
     {
         fixture f = make_fixture();
-        enact_levy(f.w, 3.0f, static_cast<int>(resource_type::iron_ore));
+        enact_levy(f.w, f.nation, 3.0f, static_cast<int>(resource_type::iron_ore));
         const corp_budget b = run(f, reg, true);
         check(same(b.levies, 3.0f * 30.0f),
               "L6a a resource-scoped levy charges only that resource's output (3 x 30)");
 
         fixture g = make_fixture();
-        enact_levy(g.w, 3.0f, static_cast<int>(resource_type::iron_ore));
-        enact_levy(g.w, 1.0f); // all resources
+        enact_levy(g.w, g.nation, 3.0f, static_cast<int>(resource_type::iron_ore));
+        enact_levy(g.w, g.nation, 1.0f); // all resources
         const corp_budget bg = run(g, reg, true);
         check(same(bg.levies, 3.0f * 30.0f + 1.0f * k_total_output),
               "L6b two enacted levies stack additively (90 + 50 = 140)");
@@ -250,6 +288,7 @@ int main()
         l.id      = "LAW-COND";
         l.name    = "Conditional Levy";
         l.rate    = 2.0f;
+        l.enacting_nation = f.nation;
         l.enacted = true;
         condition c;
         c.subject    = condition_subject::structure;
@@ -289,7 +328,7 @@ int main()
         proc.output_quantity = 1000.0f; // would dominate if it were levied
         f.production.push_back(proc);
 
-        enact_levy(f.w, 2.0f);
+        enact_levy(f.w, f.nation, 2.0f);
         check(same(run(f, reg, true).levies, 2.0f * k_total_output),
               "L8a a processor's output is not levied (the ore was already levied once)");
     }
@@ -298,7 +337,7 @@ int main()
     std::printf("\n-- default caller --\n");
     {
         fixture f = make_fixture();
-        enact_levy(f.w, 2.0f);
+        enact_levy(f.w, f.nation, 2.0f);
         const corp_budget b = run(f, reg, /*with_production=*/false);
         check(b.levies == 0.0f,
               "D1 a caller that omits `production` charges nothing (pre-BL-343 arithmetic)");

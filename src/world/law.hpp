@@ -6,6 +6,7 @@
 #include <array>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 struct world; // forward-declared; law.cpp reads it.
 
@@ -56,8 +57,16 @@ enum class law_effect_kind : uint8_t
 };
 
 /// One law. `conditions` is empty for the common case — BL-155: "most laws are
-/// unconditional once enacted". `enacted` is the player/governing-body switch;
-/// an un-enacted law is inert and changes nothing.
+/// unconditional once enacted". `enacted` is the governing-body switch; an
+/// un-enacted law is inert and changes nothing.
+///
+/// BL-480: A LAW HAS AN AUTHOR. `enacting_nation` names the nation that passed
+/// it, and the law's reach is that nation's jurisdiction — the levy touches only
+/// flows landing on tiles the author owns (`world::tile_to_nation`). A law with
+/// no author cannot exist: every seeding path assigns one, and a record whose
+/// author is null (or dangling) is ill-formed and charges NOTHING — defensively
+/// inert rather than silently authorless, because an authorless charge is
+/// exactly the money-destroying flow this item removed.
 struct law
 {
     std::string     id;      ///< Stable identifier, e.g. "LAW-EXTRACTION-LEVY".
@@ -65,6 +74,11 @@ struct law
     condition_set   conditions;                                ///< Empty = always-on once enacted.
     law_effect_kind effect  = law_effect_kind::extraction_levy;
     bool            enacted = false;
+
+    /// BL-480: the nation that enacted this law. Never null on a well-formed
+    /// record; the levy is a TRANSFER into this nation's treasury, and its
+    /// jurisdiction (the tiles it owns) bounds who pays.
+    entity_id enacting_nation = null_entity;
 
     /// Effect magnitude, read per family. For `extraction_levy`: credits charged
     /// per unit of raw output extracted this tick.
@@ -77,14 +91,31 @@ struct law
 };
 
 /// The per-corp effects in force this tick, resolved once from the enacted set.
-/// A resolved bundle rather than a live query, so the money loop reads a fixed
-/// array instead of re-evaluating predicates per building (the determinism
+/// A resolved bundle rather than a live query, so the money loop reads fixed
+/// arrays instead of re-evaluating predicates per building (the determinism
 /// argument and the performance one point the same way).
+///
+/// BL-480 reshaped the bundle from one flat rate array to ONE SCHEDULE PER
+/// AUTHOR NATION, because the levy is now a transfer: the money loop must know
+/// which treasury each charged credit lands in, and jurisdiction (which tiles
+/// the levy reaches) is the author's, not the law list's. Laws by the same
+/// nation still stack additively into one schedule (the old L6 rule, kept).
 struct law_effects
 {
-    /// Credits per unit of extracted output, by resource. Zero where no enacted
-    /// law reaches that resource; levies stack additively when several do.
-    std::array<float, resource_count> extraction_levy = {};
+    struct levy_schedule
+    {
+        /// The nation whose treasury the charge is credited to, and whose
+        /// territory (`world::tile_to_nation`) bounds which output is charged.
+        entity_id enacting_nation = null_entity;
+
+        /// Credits per unit of extracted output, by resource. Zero where no
+        /// enacted law by this nation reaches that resource.
+        std::array<float, resource_count> extraction_levy = {};
+    };
+
+    /// One schedule per author nation reached, in first-appearance order over
+    /// the world's authored law list — deterministic, like everything else here.
+    std::vector<levy_schedule> levies;
 
     /// Whether any enacted law reached this corp at all — lets a surface say
     /// "no laws in force" rather than showing a row of zeroes.
@@ -101,12 +132,33 @@ struct law_effects
 /// @return             The effects in force on that corp this tick.
 law_effects evaluate_laws(const world& w, entity_id subject_corp);
 
-/// The one-law seed for the prototype (BL-343): an extraction levy on all raw
-/// output, UN-ENACTED. Appended to `world::laws` at world setup so the surface
-/// has something to switch on, and so an un-enacted law is the shipped default
-/// (a levy that charged from turn one would be a balance change smuggled in as
-/// a feature).
+/// BL-480: choose the nation that authors the seeded prototype law set,
+/// deterministically from generation output alone:
 ///
-/// @param w    World; `laws` is appended to.
-/// @param rate Credits per unit of raw output when enacted.
+///   1. The player corporation's home nation (`corporation_component::
+///      home_nation`) — the nation whose jurisdiction covers the player's
+///      starting extraction, so the seeded law is one that BINDS the player and
+///      the laws surface reads "whose law, what it costs me" non-vacuously.
+///   2. Fallback (no player corp / no home nation): the nation with the most
+///      tiles, ties broken by lowest entity id.
+///   3. No nations at all: `null_entity` — and then NO law is seeded, because a
+///      law with no author cannot exist.
+///
+/// Pure over generation state; no RNG stream is consumed.
+entity_id choose_levy_author(const world& w);
+
+/// The one-law seed for the prototype (BL-343, reshaped by BL-480): an
+/// extraction levy on all raw output, ENACTED AT GENERATION by its author
+/// nation (`choose_levy_author`). Enactment is a governing-body act, not a
+/// player one — the balance-ledger checkbox is gone, and a nation CHOOSING to
+/// enact mid-campaign is the granted nation-grain scored decision (2026-08-18
+/// grant), deliberately not built this sprint: this function is the seam it
+/// will call through.
+///
+/// Seeds nothing when no author nation exists (a law with no author cannot
+/// exist), which is also why a nation-free harness world stays law-free.
+///
+/// @param w    World; `laws` is appended to (or left untouched — see above).
+/// @param rate Credits per unit of raw output extracted in the author's
+///             jurisdiction.
 void seed_prototype_laws(world& w, float rate = 1.0f);

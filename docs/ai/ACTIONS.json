@@ -1376,25 +1376,6 @@
    "reason_to_select": "Story answers 'what is this body's biography?'; Chain answers 'how do the bodies compare through the generation stages?' - the two halves of how this world came to be."
   },
   {
-   "id": "ledger.law_enact_toggle",
-   "family": "ledger",
-   "surface": "Balance Ledger (Budget), 'Laws' section beneath the two policy-tier stubs",
-   "press": "Click the checkbox beside a law's name to enact it, or click it again to repeal it (the standing toggle rule)",
-   "args": [
-    {
-     "name": "law_index",
-     "type": "int index into world::laws",
-     "meaning": "Which law on the books to flip. The prototype ships one: Extraction Levy."
-    }
-   ],
-   "preconditions": [
-    "Balance Ledger is open",
-    "At least one law is on the books (seed_prototype_laws appends the Extraction Levy at world setup, un-enacted)"
-   ],
-   "expected_output": "The law's enacted flag flips on the next mutable pass, and a toast names it ('Extraction Levy enacted.' / '... repealed.'). It takes effect from the NEXT economy tick, never retroactively on the quarter already accounted. While enacted, every unit of RAW output the corporation extracts is charged rate x units and the total appears on the Levies bar of the Corporations dashboard's Finance card. Prices do not move: a law is a modifier over the market, never an override of it, so the levy is a separate accounted cost rather than a worse sale price. Repeal restores the previous arithmetic exactly. Unlike ledger.budget_tax_tier and ledger.budget_wage_tier, this control is NOT a stub.",
-   "reason_to_select": "The only law lever that does anything today, and the one press that demonstrates the governing-body seam end to end. For a corporation SUBJECT to the levy it is pure cost, so a corp-side agent has no reason to enact it; it is here because the pivot's legislator needs the instrument to exist and to be observable before it can be negotiated (BL-280) or politicked over (BL-186, BL-345)."
-  },
-  {
    "id": "ledger.market_body_selector",
    "family": "ledger",
    "surface": "Market Ledger, 'Body' combo",

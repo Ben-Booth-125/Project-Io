@@ -90,6 +90,34 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\military_capability_harness.cpp 
    /Fo:build_gen\verify\military_capability_harness\ /Fe:build_gen\verify\military_capability_harness.exe
 .\build_gen\verify\military_capability_harness.exe
 
+:: Laws MVP (BL-343, reshaped by BL-480) — the law record, per-tick resolution
+:: (evaluate_laws) and the enforcement seam in apply_budget: a repealed law is
+:: inert, an enacted levy charges exactly rate x in-jurisdiction units on its
+:: own `levies` line, no other flow moves, repeal is bit-identical reversal,
+:: scoping/stacking/conditions work, processing output is never levied. Since
+:: BL-480 the fixture owns a nation (laws carry an author; jurisdiction bounds
+:: the levy) and the seed ships ENACTED by the player's home nation.
+cl /nologo /std:c++20 /EHsc /I src tools\verify\law_harness.cpp ^
+   src\world\world.cpp src\world\budget_system.cpp src\world\law.cpp ^
+   src\world\condition_set.cpp src\world\unit_roster.cpp ^
+   /Fo:build_gen\verify\law_harness\ /Fe:build_gen\verify\law_harness.exe
+.\build_gen\verify\law_harness.exe
+
+:: Law author + treasury transfer (BL-480, group "law-author-and-treasury") —
+:: the levy is a TRANSFER: sum debited from in-jurisdiction corps == sum
+:: credited to the enacting nation's treasury, bit-exact over a tick span (R1);
+:: out-of-jurisdiction corps (foreign territory, unclaimed tiles) pay zero;
+:: repeal returns the arithmetic bit-identical to the never-enacted baseline
+:: (R2); a no-enactment world is bit-identical to a no-law world; author choice
+:: is deterministic (player home nation, else largest territory/lowest id, else
+:: no law) and an authorless record is inert. R3's live half (read-only ledger
+:: line) is a UI check outside this harness.
+cl /nologo /std:c++20 /EHsc /I src tools\verify\law_author_harness.cpp ^
+   src\world\world.cpp src\world\budget_system.cpp src\world\law.cpp ^
+   src\world\condition_set.cpp src\world\unit_roster.cpp ^
+   /Fo:build_gen\verify\law_author_harness\ /Fe:build_gen\verify\law_author_harness.exe
+.\build_gen\verify\law_author_harness.exe
+
 :: Procurement/contract seam (BL-350) — one contract quoted, accepted, paced
 :: and delivered end to end with the treasury debited in the split shape
 :: (deposit at accept, remainder paced across lead time), plus one decline
