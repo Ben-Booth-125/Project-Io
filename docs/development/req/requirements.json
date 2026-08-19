@@ -4363,6 +4363,56 @@
     }
    ],
    "notes": "Design settled 2026-08-19 by Ben in elicitation form (see backlog.json BL-470 design field for full text, including the two later-settled overturns: per-class march speed, and the war-flips-the-queue NR-344 resolution). Absorbs BL-393s open half (blackboard export). CLOSED 2026-08-19 - full scope landed, tools/verify/unit_march_harness.cpp authored (53/53 PASS), MILITARY.md updated with a new Marching section and corrected Build status / What is absent lists."
+  },
+  {
+   "brief": "diplomatic-lens",
+   "batch": "2026-08-19-bl474-475",
+   "title": "BL-474 - a Diplomatic lens shows stance geographically, on the bar, tile-fill",
+   "status": "open",
+   "promoted_from": "backlog.json BL-474 DIPLOMATIC_LENS",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "open",
+     "requirement": "ITEM-SPANNING (visual): a diplomatic overlay_mode exists on the lens bar; selecting it tints each discovered rival corp's owned tiles by the player's stance (Hostile red / Friend green / Neutral grey / Unknown dashed-outline grey, never a blank tile per NR-350), gated on the same BL-068 corp_is_discovered check BL-449 used."
+    },
+    {
+     "id": "R2",
+     "status": "open",
+     "requirement": "Clicking a tinted tile selects the owning corp via the existing canvas click-to-select path and the Selection panel opens on it (BL-475's surface)."
+    },
+    {
+     "id": "R3",
+     "status": "open",
+     "requirement": "A legend/key for the four states renders while the lens is active, matching the convention every other lens follows."
+    }
+   ],
+   "notes": "Design settled 2026-08-19 by Ben in elicitation form (backlog.json BL-474 design field) - tile fill and on-bar placement both deliberately overrule the filed recommendation (marker/ring, off-bar). Live UI check required before any row here flips complete (io-standing-rules.md, 2026-08-19) - this is an interactive, click-driven surface."
+  },
+  {
+   "brief": "corp-ledger-stance-detail",
+   "batch": "2026-08-19-bl474-475",
+   "title": "BL-475 - the per-corporation Selection ledger carries stance detail and the three transition presses",
+   "status": "open",
+   "promoted_from": "backlog.json BL-475 CORP_LEDGER_STANCE_DETAIL",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "open",
+     "requirement": "ITEM-SPANNING (visual): selecting a rival corp (via BL-474's lens or the existing canvas/list paths) shows its stance and, if discovered, the three legal transition presses (Declare Hostile with confirm popup, Offer/Accept Friendship, Return to Neutral) in the Selection panel - re-hosted from BL-449's retired table column, same corp_command verbs, same rejection handling."
+    },
+    {
+     "id": "R2",
+     "status": "open",
+     "requirement": "ACTIONS.json/question_log.json entries retitled from BL-449's retired corporation_panel entries to this surface, not duplicated; both generated mirrors re-rendered clean."
+    },
+    {
+     "id": "R3",
+     "status": "open",
+     "requirement": "BL-449's Stance column and press blocks are removed from corporation_panel.cpp once this surface is live - no dead second copy of the same interaction."
+    }
+   ],
+   "notes": "Companion to diplomatic-lens. Live UI check required before R1 flips complete (io-standing-rules.md, 2026-08-19)."
   }
  ]
 }

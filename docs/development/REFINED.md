@@ -1210,3 +1210,65 @@ assume disjointness.
 
 ---
 
+## BL-474 + BL-475 — the diplomatic lens and its Selection-panel detail (promoted 2026-08-19)
+
+Both settled 2026-08-19 (Ben, elicitation form) — read their full `backlog.json` design fields
+first, this is a condensed task breakdown. BL-474 supersedes BL-449's retired table-column UI;
+BL-475 is where the three transition presses (`declare_hostile`/`offer_friendship`/
+`return_to_neutral`, BL-448) actually live now.
+
+**BL-474 (Diplomatic lens, difficulty 3) tasks:**
+
+- **[1] `overlay_mode` gets a `diplomatic` value, on the bar.** Add to the enum in
+  `src/ui/ui_state.hpp` and wire it into the lens bar alongside Corporation/Country/etc. — it is
+  a primary lens per Ben's ruling, not off-bar.
+  Files: `src/ui/ui_state.hpp`, `src/ui/lens_bar.cpp`.
+- **[2] Tile-fill rendering, same family as the Corporation lens.** Tints a rival corp's owned
+  tiles by the player's stance toward it — read via `is_hostile`/`are_friends` (BL-448,
+  `stance.hpp`), gated on `corp_is_discovered` (the same BL-068 visibility check BL-449's retired
+  column used — reuse it, don't reinvent). Four states, four marks: Hostile red, Friend green,
+  Neutral grey, **Unknown a dashed/hollow grey ring — never a blank tile** (NR-350's hard rule).
+  Files: `src/ui/planetary_canvas.cpp`, `src/ui/icons.{hpp,cpp}` (the four state glyphs),
+  `docs/ui/ICONS.md`. Depends on [1].
+- **[3] Click-to-select jumps to the Selection panel.** Clicking a tinted tile under this lens
+  selects the owning corp through the existing canvas click-to-select path (SELECTION.md's
+  model) — no bespoke popup, no new selection mechanism. This is the entry point into BL-475.
+  Files: `src/ui/planetary_canvas.cpp`. Depends on [2].
+- **[4] Legend/key.** Every other lens carries a key explaining its marks (LENSES.md's own
+  convention) — four states need one here too.
+  Files: `src/ui/lens_bar.cpp` or wherever the active lens's key renders. Depends on [2].
+- **[5] Doc updates.** `docs/ui/LENSES.md`'s roster table gets a `diplomatic` row (bar position,
+  status); `docs/ui/question_log.json` gets an entry for the new surface.
+  Files: `docs/ui/LENSES.md`, `docs/ui/question_log.json`. Depends on [1]–[4].
+
+**BL-475 (corp ledger stance detail, difficulty 2) tasks:**
+
+- **[1] Move the three presses from BL-449's retired column into the Selection panel.** Same
+  `corp_command` verbs, same confirm-popup-on-`declare_hostile` (demolish precedent), same
+  rejection handling, same NR-350 visibility gate (an undiscovered corp shows nothing beyond
+  Unknown). This is a re-host, not new logic — the verbs and their validation already exist and
+  are correct (BL-448, `stance_determinism.cpp` 36/36).
+  Files: `src/ui/selection_panel.cpp`. Depends on nothing new — can start in parallel with BL-474.
+- **[2] Stance block in the existing corp-detail layout.** Position within the Selection card
+  stack is an implementation call, not re-elicited (Ben's own note) — use judgement, follow the
+  existing card rhythm.
+  Files: `src/ui/selection_panel.cpp`, `src/ui/selection_card.hpp`. Depends on [1].
+- **[3] Dictionary + justification store.** `docs/ai/ACTIONS.json` gets the three verb entries
+  **retitled** (not duplicated) from BL-449's now-retired `corporation_panel` entries to
+  reference this surface instead; `docs/ui/question_log.json`'s `corporation_panel` entry is
+  either retired or repointed. Regenerate both mirrors after editing.
+  Files: `docs/ai/ACTIONS.json`, `docs/ui/question_log.json`. Depends on [1], [2].
+
+**BL-449's retired UI — what to actually do with it.** Once BL-474/BL-475 are live, remove the
+Stance column and its three press blocks from `src/ui/corporation_panel.cpp` entirely (the
+`corp_is_discovered`/`stance_label` helpers may still be useful — check before deleting) rather
+than leaving a second, unreachable copy of the same interaction sitting in dead code. Flip
+BL-449's own `backlog.json` status once this cleanup lands — it currently reads `designed`
+(reopened) and should move to `complete` only once the column is actually gone, not before.
+
+**Collision note.** `src/ui/selection_panel.cpp` is BL-475's own file only in this batch — no
+known collision this session. `src/ui/planetary_canvas.cpp` may be touched by other lens work;
+worktree-isolate regardless.
+
+---
+
