@@ -2,8 +2,9 @@
 
 The military layer is **parts, not a system**. Two battle resolvers, a unit roster, a muster
 building, a hire verb, a terrain model, a per-tick upkeep pass and a roster→combat adapter all
-ship compiled in the binary. What does not ship is anything that makes them meet: no hostility, no
-engagement trigger, no unit verbs, and nothing in production that calls the adapter.
+ship compiled in the binary. Corp stance (hostility/friendship, BL-448/BL-449) also ships now, with
+a surface — but what still does not ship is anything that makes force meet stance: no engagement
+trigger, no unit verbs, and nothing in production that calls the adapter.
 
 This document is the authority for what is built, written 2026-08-17 against the source. It exists
 because the absence of one cost real work: three sprint proposals in a row described the campaign
@@ -615,14 +616,14 @@ Re-verified against the source 2026-08-18.
 - **`unit_to_stack_entry`** — the roster→combat adapter (BL-459). Harness-only caller
 - **`resource_type::ordnance`** — the roster's first terminal military good, named as upkeep's draw (BL-457, ordnance)
 - ~~Passive `military_points` accumulation (BL-332)~~ — **removed 2026-08-17** by BL-455 (military points and science are write-only); a base accumulates nothing
+- **Corp stance / hostility, with a surface** (BL-448, BL-449). Directed hostility, symmetric friendship, the Corporation panel Stance column and its three presses — landed 2026-08-19, still inert (no consequence wired, no serialiser)
+- **`campaign_roster_band` derives from the epoch** (BL-461). Was hard-coded to `industrial` against a 0 CE default; now `campaign_roster_band_for(era_band)` off `recipe_registry::era()` — landed 2026-08-19
 
 **Outstanding:**
 
-- Corp stance / hostility (BL-448, friend/neutral/hostile corp stance) — designed, unbuilt
 - Unit verbs and the unit-command seam (BL-314, unit verb family; BL-393, units are write-only and inert)
 - Anything that **calls** the campaign resolver: an engagement trigger, battle state in the world (BL-315). *The `unit_component` → `army_stack_entry` bridge this line used to list is built — see Landed*
 - **Authoring the upkeep numbers.** The pass is inert until someone sets a rate; that tuning has no owning item as of 2026-08-18
-- **Deriving `campaign_roster_band` from the epoch.** Hard-coded to `industrial` against a 0 CE default — a known defect, no owning item (§ The roster)
 - Hire price on screen (BL-405, hire has no price on screen)
 - The Era −1 sim's conquest failure — 267 battles, zero region transfers (BL-384, Era −1 sim conquers nothing)
 - Fortification, tactical naval, and a unit canvas marker — no owning item yet
