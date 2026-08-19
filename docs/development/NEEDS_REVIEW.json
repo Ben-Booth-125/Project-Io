@@ -2026,6 +2026,54 @@
     "BL-270"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-357",
+   "title": "presentation.cpp still carries three unauthored resource rows (charcoal, iron_blooms, trade_goods_misc) after BL-414",
+   "raised": "2026-08-19",
+   "kind": "observation",
+   "status": "open",
+   "source": "BL-414 (RESOURCE_NAME_TABLE_TRIPLE_DESYNC) implementation this session - consolidating the world-layer Lua-name lookup tables in recipe_registry.cpp and world_gen_config.cpp into src/world/resource_names.{hpp,cpp}.",
+   "what": "src/ui/presentation.cpp's resource_table (enum -> display name/abbreviation/colour, a separate concern from the Lua-name parser BL-414 consolidated) still carries three explicit { nullptr, nullptr, 0 } rows for charcoal, iron_blooms and trade_goods_misc (BL-286 logistics goods). presentation_of() falls back to \"(unnamed resource)\" for these. Left untouched by BL-414 deliberately - it is content authoring (picking a name/abbreviation/colour), not the structural desync BL-414 was scoped to fix, and src/world/ must not depend on src/ui/ so the two tables cannot simply merge.",
+   "why_it_matters": "If any code path ever surfaces one of these three resources with a positive quantity (a recipe naming them, a market listing), the player sees \"(unnamed resource)\" / \"?\" rather than a real name. Today they stay unreached because nothing produces them (per the existing comment in presentation.cpp), so this is latent, not live.",
+   "options": [
+    "A - author the three rows now (small, mechanical - display name + abbreviation + a colour distinct from neighbours) next time presentation.cpp is open for other reasons",
+    "B - file a small backlog item scoped to authoring BL-286's remaining presentation rows",
+    "C - leave as documented technical debt until one of the three resources gets a real producer/consumer (at which point it stops being latent)"
+   ],
+   "recommendation": "C for now - authoring display data for resources nothing produces or consumes yet is premature; revisit when BL-287-290 (or successors) give them behaviour.",
+   "files": [
+    "src/ui/presentation.cpp"
+   ],
+   "refs": [
+    "BL-414",
+    "BL-286"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-358",
+   "title": "Batch Delivery this session built a fresh low-collision batch (BL-414/420/444) rather than resuming NR-354's deferred economy cluster",
+   "raised": "2026-08-19",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Survey step of this Batch Delivery session, reading NR-354 (previous session's scoping decision) before picking a batch.",
+   "what": "The session brief suggested resuming BL-439/440/443 (deferred by the immediately-prior session per NR-354, for reasons specific to each - BL-439's golden re-bless cost, BL-440(c)'s design call, BL-443's measure-first requirement). Re-surveyed the open v0.1.16 set instead and picked three independent, low-risk, non-economy items: BL-414 (resource name table dedup), BL-420 (decision-feed label dedup), BL-444 (verb reachability coverage tool) - all designed, priority A, small (d1-d3), no shared files. Ran each in an isolated worktree agent, merged cleanly (no conflicts, stale-base checked against merge-base), independently re-verified (rebuilt, re-ran corp_ai_harness/econ_harness myself rather than trusting agent self-reports, confirmed econ_harness's one failure - WF.R4 - is pre-existing on main and unrelated), and did the live UI check for BL-420 (the only one touching src/ui) myself since the sub-agent had no GUI access in its sandbox.",
+   "why_it_matters": "NR-354's three deferred items still need their own dedicated attention (BL-439 especially, for the golden re-bless) - this session did not advance them, so they remain exactly where NR-354 left them. Recording this explicitly so a future session does not read \"a Batch Delivery session ran\" as progress on that cluster.",
+   "options": [],
+   "recommendation": "Next session should pick up NR-354's option A (re-run tier_margin/ai_skill_harness against BL-441/442's landing before deciding BL-440(c)'s shape) or option C (BL-439 as its own dedicated pass) - both are still live and unaddressed.",
+   "files": [
+    "docs/development/backlog.json"
+   ],
+   "refs": [
+    "BL-414",
+    "BL-420",
+    "BL-444",
+    "BL-439",
+    "BL-440",
+    "BL-443"
+   ],
+   "resolution": null
   }
  ]
 }
