@@ -1228,7 +1228,7 @@
     "docs/development/ROADMAP.md"
    ],
    "summary": "Design strand (Ben, 2026-07-01; six open questions resolved 2026-07-08) — the quest-based tech system named in concept.md. The 2026-07-08 session RE-FRAMED the Era model: ERAS ARE CATASTROPHIC EVENTS (war, satellite cascade) arriving on the world clock — the external clock; tech can move faster but never opens an Era. Capstones open QUEST TREES, not Eras (the ERAS.md Rocketry+Launchpad+propellant set is re-read as gating a quest tree). The THREADING INSIGHT survives: gate = quest = tech, one condition-set object, so a tech can gate on an ECONOMIC state (reserved for capstones + a few marquee nodes). Structure settled: quests are mostly binary trees with dead-end leaves; standing lines never gate Eras but CAN gate quest lines; research capacity comes from dedicated buildings or scales with industry (mix = playtest); payoffs mostly tangible (building/recipe/technique), passive buffs sparing; cross-quest prereqs allowed sparingly + marked. SCOPE: all post-prototype (even the lean gate-tech) — prototype keeps the hard-coded Era arrangement; ROADMAP already excludes Research. A follow-up brief session (2026-07-08, v0.2.0-horizon) resolved A–C: Era-event timing is a SEEDED DATE with a VISIBLE COUNTDOWN; the boundary event SHOCKS MARKETS + DESTROYS SOME INFRASTRUCTURE + UNLOCKS THE NEW ERA'S QUEST TREES (all three together); 'gate quest' renames to KEYSTONE QUEST (apply on the next itemisation pass). Resolutions + sketch + worked Propellant Loop table live in docs/research/ERA1_TECH_LANDSCAPE.md. A mock tree (53 techs) is already visible in a build via the F9 viewer. No open questions remain at design-sketch depth; itemisation is the next step, deferred to v0.2.0. SETTLED 2026-08-02: the status was STALE — it claimed an owed set remained (Era-event mechanics) while the section immediately below resolves A/B/C in the same 2026-07-08 session, and the \"Next: resolve A-C\" line refers to items already resolved above it. Same class as BL-040 in Sprint 1: stale bookkeeping, not open design. BL-156 (settled today) supplies the shared condition_set this item gate model inherits wholesale, and tabulates the boundary — BL-156 owns the OBJECT, this owns the SYSTEM. Difficulty 5 breaks down at promotion into three (itemise the quest map; research state + sim coupling; the Era-event shock), recorded rather than filed so promotion is mechanical. Version goal set to v0.3.0 — it was unset, which is why this kept surfacing in prototype-scoped sweeps.",
-   "design": "RED HERRINGS & THE RUPTURE (2026-08-05, Ben: 'little red herrings that make Era 1 failure (WW3) more likely... more advanced does not mean better... skilled at avoiding danger in each dimension of play'). Drafted in ERA1_TECH_LANDSCAPE.md - Red herrings and the rupture. Sits on BL-223's settled two-rupture model; adds ALARM as a second per-nation scalar beside the Ceiling, tested at the seeded Era-event date (deterministic threshold, visible countdown - no random ruptures). Seven herring kinds, one danger per dimension of play, three mitigation nodes, and one INVERSE herring so 'menacing' cannot become the tell. Every trap carries a tell that precedes commitment - the legible-in-hindsight tone rule. NR-068 carries the scalar as Ben's call.\n\nERA 1 TREE - FIRST DRAFT (2026-08-05, Ben: 'consider the shape of the Era 1 tree... it will be the first tech tree to gate keystones via quests, i.e. tangible actions done in game. I want a heavy hand in what actual nodes there are, however you are certainly capable of drafting the initial tree'). Draft lives in docs/research/ERA1_TECH_LANDSCAPE.md - The Era 1 tree - first draft: five sectors (Launch / Volatiles / Mobility / Yards / Extraction) x three rings (Reach / Foothold / Industry), Power-Automation kept as a standing line not a sector, ~45 objects, four keystone forks each OPENED BY A DEED (Ten Flights / The First Tank / The First Truss / The Empty Shift). Introduces the `deed` condition primitive - NR-067, Ben's call. NODE LIST IS EXPLICITLY DRAFT and not transcribed to any store, pending Ben's review.\n\n**Status:** design-owed — shape settled 2026-07-01; the six sketch questions **resolved 2026-07-08** (mobile design session, Ben); a smaller owed set remains (Era-event mechanics, below). The rich design store is **`docs/research/ERA1_TECH_LANDSCAPE.md`** — § 'Tech-tree structure — first sketch (2026-07-01)' for the structure, § 'Resolutions — design session (2026-07-08)' for the decisions (newest-dated wins where they differ); this field is the index summary.\n\n### The Era reframe (2026-07-08, supersedes the sketch's gate model)\n- **Eras are catastrophic events on the world clock** — e.g. a war, a satellite/Kessler cascade. The world moves on whether or not the player is ready (the Terra Invicta external-clock lesson, now literal). Tech can move *faster* than the Era clock but never opens an Era.\n- **Capstones open quest trees, not Eras.** The `ERAS.md` Rocketry + Launchpad + propellant condition set is re-read as gating a new *quest tree* ('these should have been recorded as gating new quest trees' — Ben). The threading insight survives: gate = quest = tech, one condition-set object over the vocabulary (`research` / `structure` / `stockpile` / `market` / `surplus` / `era` / line-depth).\n- **Determinism:** Era events must be seeded/deterministic — no random ruptures.\n- `ERAS.md` is deliberately *not* edited yet (authority time-slices); the reframe lives here until work lands.\n\n### Resolutions (2026-07-08)\n1. **Quest shape:** mostly a **binary tree** (branching ≤ 2, no re-converging mesh) with **dead-end leaves** (tier chains, optional techs) carrying depth.\n2. **Standing lines:** never gate Eras (nothing does, under the reframe); **can gate quest lines** — a quest tree's availability may require standing-line depth.\n3. **Build coupling is on research *generation*:** capacity from dedicated buildings (R&D Lab) or scaling with industry — mix is a playtest-tuning item. **Payoffs mostly tangible** (new building / production method / gathering technique), passive buffs sparing — rebalances the sketch's ~13/25 `efficiency` audit toward new-method payoffs.\n4. **Cross-quest prereqs:** allowed, sparingly, visually marked (Depot→Orbital Port, Rig→Automation as tabled).\n5. **Economic gates:** every capstone + 1–2 marquee nodes per Era; not liberal (stall risk — the capital/runway lesson).\n6. **Scope: all post-prototype** — even the lean gate-tech waits past v0.1.0; the prototype keeps the hard-coded Era arrangement. ROADMAP already excludes Research; ERAS ↔ ROADMAP reconcile only when post-prototype work lands.\n\n### Era-event mechanics — resolved (2026-07-08, brief follow-up, v0.2.0-horizon)\nA. **Timing:** a seeded date per campaign (deterministic), with a visible in-UI countdown once conditions near it — the Terra Invicta external-clock lesson made literal.\nB. **Boundary effects (all three fire together):** shocks nation demand/market prices; selectively destroys some buildings/infrastructure (satellite cascade → orbital assets, war → surface facilities); unlocks the new Era's quest trees. Not purely additive — the event is a shock the player manages.\nC. **Terminology:** 'gate quest' → **keystone quest**, matching the Propellant Loop's existing language. Applied on the next itemisation pass, not retroactively in the doc's earlier sections.\n\n### Retained from the sketch\nTwo quest kinds (gate quests vs standing lines: Logistics / Military / Economy-Automation, which persist and deepen); ~25 techs/quest ≈ ~10 inventions + ~15 tiers; the itemisation schema (quest + tech records, every field a tech-tree UI element); the `payoff` taxonomy (gate > resource > building > recipe > efficiency > enabling); cost model B (S/M/L/XL, default M); the worked **Propellant Loop** quest whose capstone gates on a sustained propellant *surplus*. Provenance corrections (DRACO cancelled → parked propulsion capstone; launch vs ISRU partly rivals; asteroid-mining bust = capital/runway failure → long payback curves) sourced in the doc.\n\n**Next:** resolve A–C (another design session — mobile-friendly), then itemise the quest map post-prototype. No implementation item is minted for v0.1.0 (resolution 6). This item stays the design home.\n\n**Mock landed (2026-07-08, same session):** the sketch is now *visible in a build* — `scripts/tech_tree.lua` (Propellant Loop worked + Era 0/1 stubs + standing lines, 53 techs), `world/tech_tree.{hpp,cpp}` (registry + sol2 loader), and a read-only **F9 viewer** (`ui/tech_tree_panel`). Display only — no research state, no sim coupling; resolution 6 (system post-prototype) stands. Iterate the tree by editing the Lua file alone.\n\n## SETTLED 2026-08-02 — the status was STALE; the owed set was resolved in the same 2026-07-08 session\n\nReading this item end to end during the design-owed sweep, the design is **already complete** and\ntwo lines contradict the body:\n\n- The status line says \"a smaller owed set remains (**Era-event mechanics**, below)\" — and the\n  section immediately below is headed \"**Era-event mechanics — resolved (2026-07-08)**\", settling\n  A (seeded date + visible countdown), B (all three boundary effects fire together) and C\n  (keystone-quest terminology).\n- The \"Next:\" line says \"resolve A-C (another design session)\" — A-C being the very items\n  resolved above it.\n\nBoth are leftovers from earlier in the same session, not outstanding work. This is the same\nclass of finding as BL-040 in Sprint 1: **stale bookkeeping, not an open design.** Flipped to\n`designed`.\n\n### What BL-156 (settled today) contributes\n\nBL-156's shared `condition_set` is now settled — the flat AND-list of\n`(subject, comparator, threshold, sustained_ticks)` atoms. This item's gate model (\"gate = quest\n= tech, one condition-set object\") **inherits it wholesale** rather than defining its own, which\nis exactly the precursor relationship BL-156 was written to serve.\n\nBL-156 also tabulated the boundary: BL-156 settles the tech OBJECT, this item settles the\nSYSTEM (the filter proper, availability windows, quest trees as authored content, the Era\nrename). Nothing overlaps.\n\n### Difficulty 5 — break down at promotion, into three\n\nThe schema says a difficulty 5 should be broken down. It should not be broken down *now* (that\nwould file three items nobody is going to touch before the prototype cut), but the split is\nalready legible and is recorded so promotion is mechanical:\n\n1. **Itemise the quest map** — the ~25-techs-per-quest content pass. Authoring, not design.\n2. **Research state + sim coupling** — the mock (`scripts/tech_tree.lua`, the F9 viewer) is\n   display-only today; this is what makes it a system.\n3. **The Era-event shock** — the seeded date, the countdown, and the three boundary effects.\n   This one reaches furthest into other systems and should go last.\n\n**Version goal set to v0.3.0**, matching resolution 6 (all post-prototype) and BL-156's boundary\ntable. It was unset, which is why this item kept surfacing in prototype-scoped sweeps.\n\n## OVERTURNED IN PART (2026-08-04, Ben) — Q1 quest shape\n\nThe Q1 resolution (binary tree, no re-converging mesh) is overturned by the CONSTELLATION geometry settled in docs/research/ANCIENT_TECH_LADDER.md § Geometry: one shared radial web (rings = bands, sectors = domains, endowment-flavoured entry points), travel by adjacency (OR), meaning nodes keeping the BL-156 AND condition-set, keystone forks whose untaken branch closes via an availability window, and a tech fog so the web is never fully visible. Newest-dated wins; the supersession banner sits on ERA1_TECH_LANDSCAPE.md § Q1. Q1s MOTIVE survives — the inaccessible-mess failure mode is now excluded by node-count discipline (~100-200 meaning-dense nodes) and the fog, not by forbidding re-convergence. Q2-Q6 and the Era-event resolutions are untouched. The windows concept this pulls forward was already this items v0.3.0 scope, so no new mechanism is created — the geometry just reaches it earlier.",
+   "design": "RED HERRINGS & THE RUPTURE (2026-08-05, Ben: 'little red herrings that make Era 1 failure (WW3) more likely... more advanced does not mean better... skilled at avoiding danger in each dimension of play'). Drafted in ERA1_TECH_LANDSCAPE.md - Red herrings and the rupture. Sits on BL-223's settled two-rupture model; adds ALARM as a second per-nation scalar beside the Ceiling, tested at the seeded Era-event date (deterministic threshold, visible countdown - no random ruptures). Seven herring kinds, one danger per dimension of play, three mitigation nodes, and one INVERSE herring so 'menacing' cannot become the tell. Every trap carries a tell that precedes commitment - the legible-in-hindsight tone rule. NR-068 carries the scalar as Ben's call.\n\nERA 1 TREE - FIRST DRAFT (2026-08-05, Ben: 'consider the shape of the Era 1 tree... it will be the first tech tree to gate keystones via quests, i.e. tangible actions done in game. I want a heavy hand in what actual nodes there are, however you are certainly capable of drafting the initial tree'). Draft lives in docs/research/ERA1_TECH_LANDSCAPE.md - The Era 1 tree - first draft: five sectors (Launch / Volatiles / Mobility / Yards / Extraction) x three rings (Reach / Foothold / Industry), Power-Automation kept as a standing line not a sector, ~45 objects, four keystone forks each OPENED BY A DEED (Ten Flights / The First Tank / The First Truss / The Empty Shift). Introduces the `deed` condition primitive - NR-067, Ben's call. NODE LIST IS EXPLICITLY DRAFT and not transcribed to any store, pending Ben's review.\n\n**Status:** design-owed — shape settled 2026-07-01; the six sketch questions **resolved 2026-07-08** (mobile design session, Ben); a smaller owed set remains (Era-event mechanics, below). The rich design store is **`docs/research/ERA1_TECH_LANDSCAPE.md`** — § 'Tech-tree structure — first sketch (2026-07-01)' for the structure, § 'Resolutions — design session (2026-07-08)' for the decisions (newest-dated wins where they differ); this field is the index summary.\n\n### The Era reframe (2026-07-08, supersedes the sketch's gate model)\n- **Eras are catastrophic events on the world clock** — e.g. a war, a satellite/Kessler cascade. The world moves on whether or not the player is ready (the Terra Invicta external-clock lesson, now literal). Tech can move *faster* than the Era clock but never opens an Era.\n- **Capstones open quest trees, not Eras.** The `ERAS.md` Rocketry + Launchpad + propellant condition set is re-read as gating a new *quest tree* ('these should have been recorded as gating new quest trees' — Ben). The threading insight survives: gate = quest = tech, one condition-set object over the vocabulary (`research` / `structure` / `stockpile` / `market` / `surplus` / `era` / line-depth).\n- **Determinism:** Era events must be seeded/deterministic — no random ruptures.\n- `ERAS.md` is deliberately *not* edited yet (authority time-slices); the reframe lives here until work lands.\n\n### Resolutions (2026-07-08)\n1. **Quest shape:** mostly a **binary tree** (branching ≤ 2, no re-converging mesh) with **dead-end leaves** (tier chains, optional techs) carrying depth.\n2. **Standing lines:** never gate Eras (nothing does, under the reframe); **can gate quest lines** — a quest tree's availability may require standing-line depth.\n3. **Build coupling is on research *generation*:** capacity from dedicated buildings (R&D Lab) or scaling with industry — mix is a playtest-tuning item. **Payoffs mostly tangible** (new building / production method / gathering technique), passive buffs sparing — rebalances the sketch's ~13/25 `efficiency` audit toward new-method payoffs.\n4. **Cross-quest prereqs:** allowed, sparingly, visually marked (Depot→Orbital Port, Rig→Automation as tabled).\n5. **Economic gates:** every capstone + 1–2 marquee nodes per Era; not liberal (stall risk — the capital/runway lesson).\n6. **Scope: all post-prototype** — even the lean gate-tech waits past v0.1.0; the prototype keeps the hard-coded Era arrangement. ROADMAP already excludes Research; ERAS ↔ ROADMAP reconcile only when post-prototype work lands.\n\n### Era-event mechanics — resolved (2026-07-08, brief follow-up, v0.2.0-horizon)\nA. **Timing:** a seeded date per campaign (deterministic), with a visible in-UI countdown once conditions near it — the Terra Invicta external-clock lesson made literal.\nB. **Boundary effects (all three fire together):** shocks nation demand/market prices; selectively destroys some buildings/infrastructure (satellite cascade → orbital assets, war → surface facilities); unlocks the new Era's quest trees. Not purely additive — the event is a shock the player manages.\nC. **Terminology:** 'gate quest' → **keystone quest**, matching the Propellant Loop's existing language. Applied on the next itemisation pass, not retroactively in the doc's earlier sections.\n\n### Retained from the sketch\nTwo quest kinds (gate quests vs standing lines: Logistics / Military / Economy-Automation, which persist and deepen); ~25 techs/quest ≈ ~10 inventions + ~15 tiers; the itemisation schema (quest + tech records, every field a tech-tree UI element); the `payoff` taxonomy (gate > resource > building > recipe > efficiency > enabling); cost model B (S/M/L/XL, default M); the worked **Propellant Loop** quest whose capstone gates on a sustained propellant *surplus*. Provenance corrections (DRACO cancelled → parked propulsion capstone; launch vs ISRU partly rivals; asteroid-mining bust = capital/runway failure → long payback curves) sourced in the doc.\n\n**Next:** resolve A–C (another design session — mobile-friendly), then itemise the quest map post-prototype. No implementation item is minted for v0.1.0 (resolution 6). This item stays the design home.\n\n**Mock landed (2026-07-08, same session):** the sketch is now *visible in a build* — `scripts/tech_tree.lua` (Propellant Loop worked + Era 0/1 stubs + standing lines, 53 techs), `world/tech_tree.{hpp,cpp}` (registry + sol2 loader), and a read-only **F9 viewer** (`ui/tech_tree_panel`). Display only — no research state, no sim coupling; resolution 6 (system post-prototype) stands. Iterate the tree by editing the Lua file alone.\n\n## SETTLED 2026-08-02 — the status was STALE; the owed set was resolved in the same 2026-07-08 session\n\nReading this item end to end during the design-owed sweep, the design is **already complete** and\ntwo lines contradict the body:\n\n- The status line says \"a smaller owed set remains (**Era-event mechanics**, below)\" — and the\n  section immediately below is headed \"**Era-event mechanics — resolved (2026-07-08)**\", settling\n  A (seeded date + visible countdown), B (all three boundary effects fire together) and C\n  (keystone-quest terminology).\n- The \"Next:\" line says \"resolve A-C (another design session)\" — A-C being the very items\n  resolved above it.\n\nBoth are leftovers from earlier in the same session, not outstanding work. This is the same\nclass of finding as BL-040 in Sprint 1: **stale bookkeeping, not an open design.** Flipped to\n`designed`.\n\n### What BL-156 (settled today) contributes\n\nBL-156's shared `condition_set` is now settled — the flat AND-list of\n`(subject, comparator, threshold, sustained_ticks)` atoms. This item's gate model (\"gate = quest\n= tech, one condition-set object\") **inherits it wholesale** rather than defining its own, which\nis exactly the precursor relationship BL-156 was written to serve.\n\nBL-156 also tabulated the boundary: BL-156 settles the tech OBJECT, this item settles the\nSYSTEM (the filter proper, availability windows, quest trees as authored content, the Era\nrename). Nothing overlaps.\n\n### Difficulty 5 — break down at promotion, into three\n\nThe schema says a difficulty 5 should be broken down. It should not be broken down *now* (that\nwould file three items nobody is going to touch before the prototype cut), but the split is\nalready legible and is recorded so promotion is mechanical:\n\n1. **Itemise the quest map** — the ~25-techs-per-quest content pass. Authoring, not design.\n2. **Research state + sim coupling** — the mock (`scripts/tech_tree.lua`, the F9 viewer) is\n   display-only today; this is what makes it a system.\n3. **The Era-event shock** — the seeded date, the countdown, and the three boundary effects.\n   This one reaches furthest into other systems and should go last.\n\n**Version goal set to v0.3.0**, matching resolution 6 (all post-prototype) and BL-156's boundary\ntable. It was unset, which is why this item kept surfacing in prototype-scoped sweeps.\n\n## OVERTURNED IN PART (2026-08-04, Ben) — Q1 quest shape\n\nThe Q1 resolution (binary tree, no re-converging mesh) is overturned by the CONSTELLATION geometry settled in docs/research/ANCIENT_TECH_LADDER.md § Geometry: one shared radial web (rings = bands, sectors = domains, endowment-flavoured entry points), travel by adjacency (OR), meaning nodes keeping the BL-156 AND condition-set, keystone forks whose untaken branch closes via an availability window, and a tech fog so the web is never fully visible. Newest-dated wins; the supersession banner sits on ERA1_TECH_LANDSCAPE.md § Q1. Q1s MOTIVE survives — the inaccessible-mess failure mode is now excluded by node-count discipline (~100-200 meaning-dense nodes) and the fog, not by forbidding re-convergence. Q2-Q6 and the Era-event resolutions are untouched. The windows concept this pulls forward was already this items v0.3.0 scope, so no new mechanism is created — the geometry just reaches it earlier.\n\n> ⟳ 2026-08-19: PIECE 2 EXTRACTED (Ben's form verdict 2026-08-19: \"Un-park BL-087 piece 2 into the live arc\"): the research-state + spend mechanism is extracted to BL-478 (ancient research spend, v0.1.11) rather than un-parking this whole item — the era-event/quest framing here does not fit 0 CE and stays parked with the space arc. BL-087 retains the Era 1 event/quest system only.",
    "version_goal": "v0.3.0"
   },
   {
@@ -3845,7 +3845,7 @@
    ],
    "authority_doc": "docs/ui/LAYOUT.md",
    "summary": "Filed 2026-07-19 (design session, Ben) as the UI companion BL-155 explicitly excludes from its own scope ('no UI... committed - the point is to position the model'). BL-155's design is unusually settled for design-owed - a four-family effect taxonomy and ten named laws already enumerated - but nothing yet names how the player actually SEES or ENACTS a law. Settled 2026-07-19: Budget ledger keeps its own Tax/Wages controls; the Laws ledger shows those two laws read-only alongside the other eight.",
-   "design": "**Gap.** BL-155 (v0.1.2, Laws & policy surface) settles the law object shape - `condition_set` + polymorphic `effect`, four effect families (margin modifiers, quantity clamps, cost adders, gates), ten named laws, and the determinism seam (`run_economy_step` resolves all active laws' condition-sets at one fixed point) - but is explicitly data-model + stub only, no UI. This item is the missing player-facing half: a place to browse the law list, read what's active, and enact/repeal.\n\n**Shape (matches the existing ledger family).** A new ledger window (`draw_laws_ledger`, alongside `balance_ledger.cpp` / the Market and Construction ledgers), nav-rail toggle per the standing Toggle rule (io-standing-rules.md - re-clicking the active nav icon closes it, doesn't collapse to an overview). Lists the ten BL-155 laws grouped by effect family, each row showing: name, one-line effect description, active/inactive state, and - for conditional laws - the `condition_set` gate in plain language (e.g. a wartime tax reads 'active only during war'). An enact/repeal control per law, gated on the player being able to afford/qualify (exact gate is BL-155's to define; this item only renders + dispatches the toggle).\n\n**The BL-171 reconciliation (settled below).** The Budget ledger already carries stubbed **Tax** and **Wages** tier selectors (`ui_state.budget_tax_tier` / `budget_wage_tier`, drawn, no economic effect) built ahead of BL-155 landing. Two of BL-155's ten laws - **extraction tax** and **labour-contract floor** - are exactly what those stubs anticipate.\n\n**Determinism.** Read-only + a single enact/repeal write per player action, landing on the same tick boundary BL-155's condition-set resolution already uses (laws read the *previous* tick's resolved values, never mid-tick mutating ones per BL-155's determinism seam) - this item adds no new determinism risk beyond what BL-155 itself introduces.\n\n**Sequencing.** Hard-blocked on **BL-155** landing its data model and enforcement seam first - this item is the view over that model, not a parallel track. Natural to promote as the second half of the same v0.1.2 batch rather than a fully separate session.\n\n### Settled 2026-07-19 (Ben)\n**Stay separate.** The Budget ledger keeps its own simplified Tax/Wages tier selectors as the fast-path control (`ui_state.budget_tax_tier` / `budget_wage_tier`, wired to real economics once BL-155 lands - that wiring is BL-155's job, not this item's). The Laws ledger lists all ten laws for browsing, but shows **extraction tax** and **labour-contract floor** read-only there (state mirrors the Budget ledger's tiers; enact/repeal for those two happens on the Budget ledger, not here) - the other eight get full enact/repeal controls in the Laws ledger. Two surfaces, one law each is written from exactly one place, so no drift risk despite staying separate."
+   "design": "**Gap.** BL-155 (v0.1.2, Laws & policy surface) settles the law object shape - `condition_set` + polymorphic `effect`, four effect families (margin modifiers, quantity clamps, cost adders, gates), ten named laws, and the determinism seam (`run_economy_step` resolves all active laws' condition-sets at one fixed point) - but is explicitly data-model + stub only, no UI. This item is the missing player-facing half: a place to browse the law list, read what's active, and enact/repeal.\n\n**Shape (matches the existing ledger family).** A new ledger window (`draw_laws_ledger`, alongside `balance_ledger.cpp` / the Market and Construction ledgers), nav-rail toggle per the standing Toggle rule (io-standing-rules.md - re-clicking the active nav icon closes it, doesn't collapse to an overview). Lists the ten BL-155 laws grouped by effect family, each row showing: name, one-line effect description, active/inactive state, and - for conditional laws - the `condition_set` gate in plain language (e.g. a wartime tax reads 'active only during war'). An enact/repeal control per law, gated on the player being able to afford/qualify (exact gate is BL-155's to define; this item only renders + dispatches the toggle).\n\n**The BL-171 reconciliation (settled below).** The Budget ledger already carries stubbed **Tax** and **Wages** tier selectors (`ui_state.budget_tax_tier` / `budget_wage_tier`, drawn, no economic effect) built ahead of BL-155 landing. Two of BL-155's ten laws - **extraction tax** and **labour-contract floor** - are exactly what those stubs anticipate.\n\n**Determinism.** Read-only + a single enact/repeal write per player action, landing on the same tick boundary BL-155's condition-set resolution already uses (laws read the *previous* tick's resolved values, never mid-tick mutating ones per BL-155's determinism seam) - this item adds no new determinism risk beyond what BL-155 itself introduces.\n\n**Sequencing.** Hard-blocked on **BL-155** landing its data model and enforcement seam first - this item is the view over that model, not a parallel track. Natural to promote as the second half of the same v0.1.2 batch rather than a fully separate session.\n\n### Settled 2026-07-19 (Ben)\n**Stay separate.** The Budget ledger keeps its own simplified Tax/Wages tier selectors as the fast-path control (`ui_state.budget_tax_tier` / `budget_wage_tier`, wired to real economics once BL-155 lands - that wiring is BL-155's job, not this item's). The Laws ledger lists all ten laws for browsing, but shows **extraction tax** and **labour-contract floor** read-only there (state mirrors the Budget ledger's tiers; enact/repeal for those two happens on the Budget ledger, not here) - the other eight get full enact/repeal controls in the Laws ledger. Two surfaces, one law each is written from exactly one place, so no drift risk despite staying separate.\n\n> ⟳ 2026-08-19: AMENDED per ruling 5 of NR-331 (v0.1.11 un-park: \"law is an input to the player's problem, not an output of their agency\") and the M4 churn finding. The § Settled 2026-07-19 player enact/repeal fast-path on the Budget ledger is STRUCK — that is the overturned governing-body model. The ledger is browse-only for the player: laws are read, their effects on the player's numbers are legible, and the extraction-tax row surfaces BL-280's negotiation seam instead of an enact control. Enactment belongs to the nation actor (BL-480, Sprint D3)."
   },
   {
    "id": "BL-188",
@@ -5709,7 +5709,7 @@
    ],
    "blocked_on": [],
    "written": "2026-08-02",
-   "version_goal": "v0.1.11",
+   "version_goal": "v0.1.7",
    "priority": "C",
    "category": "UI",
    "id": "BL-264",
@@ -5982,7 +5982,7 @@
    "priority": "B",
    "difficulty": 3,
    "parked": false,
-   "version_goal": "v0.1.16",
+   "version_goal": "v0.1.19",
    "requires": [
     "BL-272"
    ],
@@ -6058,7 +6058,7 @@
    "priority": "B",
    "difficulty": 4,
    "parked": false,
-   "version_goal": "v0.1.16",
+   "version_goal": "v0.1.19",
    "requires": [
     "BL-271",
     "BL-272",
@@ -6504,7 +6504,7 @@
    "status": "designed",
    "priority": "B",
    "difficulty": "M",
-   "version_goal": "v0.1.16",
+   "version_goal": "v0.1.11",
    "created": "2026-08-04",
    "authority_doc": "docs/lore/HISTORY.md",
    "touches": [
@@ -6512,11 +6512,11 @@
     "docs/lore/HISTORY.md",
     "src/world/history_sim.{hpp,cpp} (future, with BL-271)"
    ],
-   "design": "MOCKED UP 2026-08-04 (Ben: 'mock up an ancient tech tree as a basis; consider the major advancements from 0 AD, and what differences are realistic by 1960 AD'). The full mockup lives in docs/research/ANCIENT_TECH_LADDER.md — this item is its tracked home; the design conversation happens against that doc.\n\nSHAPE, in one paragraph: six bands (T1 Classical -> T6 Machine Age) x seven domains (Agriculture / Materials / Energy / Transport / Institutions / Military / Medicine), ~60 load-bearing nodes with prereqs, endowment gates over settlement_state (ore_q / fuel / arable / coastal / grassland), and a three-class DIFFUSION axis (artifact / practice / capacity) that generates the realistic 1960 inequality: knowledge spread ~0 bands, capacity spread 3-4 bands, military-artifact spread 1-2 bands. Honours the BL-274 stance in full — derived availability, never a player-facing research tree; the tree structure is data the BL-271 year-tick sim evaluates.\n\nRELATION TO SIBLINGS: BL-271 (Era -1 sim) is the consumer of the acquisition model (invention at the frontier / practice diffusion by contact / artifact flow by trade / capacity regression on rupture). BL-274 (era-keyed rosters) reads the Military band boundaries plus the capacity-vs-artifact split (what a nation FIELDS vs what it can REPLACE under blockade). BL-273 (province demography) reads the Medicine and Agriculture bands. The T6 exit hands off to scripts/tech_tree.lua (BL-087) at the campaign epoch.\n\nOPEN QUESTIONS (in the doc, section-final): band-count reconciliation with BL-274 four-band lean; per-domain capacity + artifact-access state representation; C++ table vs Lua data home; whether the player ever sees a 1960 codex rendering. NR-054 / NR-055 record the two calls taken on Ben behalf.\n\nGEOMETRY SETTLED (2026-08-04, follow-up session, Ben): the constellation — see the docs § Geometry (rings = bands, sectors = domains, entry = endowment, travel-OR / meaning-AND, keystone exclusion via windows, tech fog). This overturns BL-087 Q1 (recorded there and in ERA1_TECH_LANDSCAPE.md § Q1). NEXT STEP, per Ben: test how much detail makes the game FUN against worked examples — the docs § Density test carries one slice (the steam transition) at three grains; recommendation medium (~100-150 nodes web-wide, fine grain only around keystones); NR-056 holds the call.\n\nSECOND DENSITY SLICE (2026-08-04, same day): Institutions at medium grain, as the contrast test — practice-class nodes, an ideological keystone (Sovereign Doctrine: Chartered Capital vs Command Estate — HISTORY.md Stage 3 turned into a choice, creed-picked for AI nations), and three invented VERTEX QUESTS (The Enforceable Promise / The Disciplined Sovereign / The Lettered Public). New geometry rule recorded same day: VERTICES ARE QUESTS — the BL-087 gate=quest=tech object placed at ring crossings, capstone carrying the economic conditions, completion opening the next ring region in that sector.\n\nGRAIN SETTLED: MEDIUM (Ben, 2026-08-04 — NR-056 resolved), and the RING-1-TO-2 NEIGHBOURHOOD is worked in full at that grain (docs § The ring-1-to-2 neighbourhood): 19 techs + 5 vertex quests (The Common Forge / The Tireless Wheel / All Roads Home / The Written Ledger / The Fed Village) + the GRANARY DOCTRINE keystone (Temple Stores vs Open Granaries — the campaigns markets-not-command premise made a ring-1 choice) + 2 roster regimes = 27 objects (count corrected 2026-08-04 against the BL-307 data store), extrapolating to ~130-150 web-wide. New rule adopted with the pass: the SPARSE-SECTOR RULE — a sector earns a vertex quest only at a genuine capability regime (Military crosses on the BL-274 roster turnover, Medicine on a plain edge). Visual sketch generated (scratchpad, session artifact).\n\nINDUSTRIAL NEIGHBOURHOOD (2026-08-05, Ben: 'another pre-game tech tree centred around the industrial revolution, to go alongside the pre-game early Civilisation tech tree'): the second complete region, worked at the settled medium grain in the doc's SS The industrial neighbourhood — rings T4-T5 and the T4/T5 crossings. Scope read as a second worked REGION of the one shared web, not a second web (NR-063). Content: 7 new techs (Coal Haulage & Urban Fuel, Patent Grants, Preventive Inoculation, High-Pressure & Compound Engines, Framed Construction & Cement, Soil Chemistry & Fertiliser Trade, General Incorporation), 4 new vertex quests (The Unwearied Fire / The Cheap Ton / The Scheduled World / The Freed Hands, joining the existing Disciplined Sovereign), and 2 new keystones — LABOUR DOCTRINE (Cleared Holdings vs Smallholder Tenure; the human price of the divergence, feeding BL-273 demography) and WORKS DOCTRINE (State Arsenal vs Private Works; who owns the heavy plant, and therefore the terms a player corporation operates on in 1960). Fuel Doctrine relocated ring T5 -> T4 so The Cheap Ton can require it taken (the ring-1 interlock, repeated — now the house rule). New authoring rule: FORK COUNT SCALES WITH THE BAND'S DIVERGENCE (ring 1 carries one keystone; this region carries four). Region totals 38 objects, 13 new here; web-wide 88 objects with two of five ring-crossings worked, extrapolating to ~120-135. ladder_lint.js generalised to print one line per worked region. Open: NR-064 asks whether Works Doctrine gates corporation generation (lean: yes, file an item when this lands) and whether the region earns its own viewer tab (lean: no — the era strip means eras). EFFECTS PASS (2026-08-05, Ben: 'let's map this to real buildings and units'): every tech, regime and keystone branch in rings T4-T5 now carries an `effects` array in the store - 62 effects, modifier 19 / institution 11 / unlock 10 / upgrade 5 / reach 4 / retire 4 / access 3 / intel 3 / resource 2 / doctrine 1, at shipped 15 / designed 29 / unbuilt 18. Taxonomy authored in docs/research/TECH_EFFECTS.md under BL-156. ladder_lint.js validates the kind/status vocabulary and enforces that no object in the typed region is left untyped.",
+   "design": "MOCKED UP 2026-08-04 (Ben: 'mock up an ancient tech tree as a basis; consider the major advancements from 0 AD, and what differences are realistic by 1960 AD'). The full mockup lives in docs/research/ANCIENT_TECH_LADDER.md — this item is its tracked home; the design conversation happens against that doc.\n\nSHAPE, in one paragraph: six bands (T1 Classical -> T6 Machine Age) x seven domains (Agriculture / Materials / Energy / Transport / Institutions / Military / Medicine), ~60 load-bearing nodes with prereqs, endowment gates over settlement_state (ore_q / fuel / arable / coastal / grassland), and a three-class DIFFUSION axis (artifact / practice / capacity) that generates the realistic 1960 inequality: knowledge spread ~0 bands, capacity spread 3-4 bands, military-artifact spread 1-2 bands. Honours the BL-274 stance in full — derived availability, never a player-facing research tree; the tree structure is data the BL-271 year-tick sim evaluates.\n\nRELATION TO SIBLINGS: BL-271 (Era -1 sim) is the consumer of the acquisition model (invention at the frontier / practice diffusion by contact / artifact flow by trade / capacity regression on rupture). BL-274 (era-keyed rosters) reads the Military band boundaries plus the capacity-vs-artifact split (what a nation FIELDS vs what it can REPLACE under blockade). BL-273 (province demography) reads the Medicine and Agriculture bands. The T6 exit hands off to scripts/tech_tree.lua (BL-087) at the campaign epoch.\n\nOPEN QUESTIONS (in the doc, section-final): band-count reconciliation with BL-274 four-band lean; per-domain capacity + artifact-access state representation; C++ table vs Lua data home; whether the player ever sees a 1960 codex rendering. NR-054 / NR-055 record the two calls taken on Ben behalf.\n\nGEOMETRY SETTLED (2026-08-04, follow-up session, Ben): the constellation — see the docs § Geometry (rings = bands, sectors = domains, entry = endowment, travel-OR / meaning-AND, keystone exclusion via windows, tech fog). This overturns BL-087 Q1 (recorded there and in ERA1_TECH_LANDSCAPE.md § Q1). NEXT STEP, per Ben: test how much detail makes the game FUN against worked examples — the docs § Density test carries one slice (the steam transition) at three grains; recommendation medium (~100-150 nodes web-wide, fine grain only around keystones); NR-056 holds the call.\n\nSECOND DENSITY SLICE (2026-08-04, same day): Institutions at medium grain, as the contrast test — practice-class nodes, an ideological keystone (Sovereign Doctrine: Chartered Capital vs Command Estate — HISTORY.md Stage 3 turned into a choice, creed-picked for AI nations), and three invented VERTEX QUESTS (The Enforceable Promise / The Disciplined Sovereign / The Lettered Public). New geometry rule recorded same day: VERTICES ARE QUESTS — the BL-087 gate=quest=tech object placed at ring crossings, capstone carrying the economic conditions, completion opening the next ring region in that sector.\n\nGRAIN SETTLED: MEDIUM (Ben, 2026-08-04 — NR-056 resolved), and the RING-1-TO-2 NEIGHBOURHOOD is worked in full at that grain (docs § The ring-1-to-2 neighbourhood): 19 techs + 5 vertex quests (The Common Forge / The Tireless Wheel / All Roads Home / The Written Ledger / The Fed Village) + the GRANARY DOCTRINE keystone (Temple Stores vs Open Granaries — the campaigns markets-not-command premise made a ring-1 choice) + 2 roster regimes = 27 objects (count corrected 2026-08-04 against the BL-307 data store), extrapolating to ~130-150 web-wide. New rule adopted with the pass: the SPARSE-SECTOR RULE — a sector earns a vertex quest only at a genuine capability regime (Military crosses on the BL-274 roster turnover, Medicine on a plain edge). Visual sketch generated (scratchpad, session artifact).\n\nINDUSTRIAL NEIGHBOURHOOD (2026-08-05, Ben: 'another pre-game tech tree centred around the industrial revolution, to go alongside the pre-game early Civilisation tech tree'): the second complete region, worked at the settled medium grain in the doc's SS The industrial neighbourhood — rings T4-T5 and the T4/T5 crossings. Scope read as a second worked REGION of the one shared web, not a second web (NR-063). Content: 7 new techs (Coal Haulage & Urban Fuel, Patent Grants, Preventive Inoculation, High-Pressure & Compound Engines, Framed Construction & Cement, Soil Chemistry & Fertiliser Trade, General Incorporation), 4 new vertex quests (The Unwearied Fire / The Cheap Ton / The Scheduled World / The Freed Hands, joining the existing Disciplined Sovereign), and 2 new keystones — LABOUR DOCTRINE (Cleared Holdings vs Smallholder Tenure; the human price of the divergence, feeding BL-273 demography) and WORKS DOCTRINE (State Arsenal vs Private Works; who owns the heavy plant, and therefore the terms a player corporation operates on in 1960). Fuel Doctrine relocated ring T5 -> T4 so The Cheap Ton can require it taken (the ring-1 interlock, repeated — now the house rule). New authoring rule: FORK COUNT SCALES WITH THE BAND'S DIVERGENCE (ring 1 carries one keystone; this region carries four). Region totals 38 objects, 13 new here; web-wide 88 objects with two of five ring-crossings worked, extrapolating to ~120-135. ladder_lint.js generalised to print one line per worked region. Open: NR-064 asks whether Works Doctrine gates corporation generation (lean: yes, file an item when this lands) and whether the region earns its own viewer tab (lean: no — the era strip means eras). EFFECTS PASS (2026-08-05, Ben: 'let's map this to real buildings and units'): every tech, regime and keystone branch in rings T4-T5 now carries an `effects` array in the store - 62 effects, modifier 19 / institution 11 / unlock 10 / upgrade 5 / reach 4 / retire 4 / access 3 / intel 3 / resource 2 / doctrine 1, at shipped 15 / designed 29 / unbuilt 18. Taxonomy authored in docs/research/TECH_EFFECTS.md under BL-156. ladder_lint.js validates the kind/status vocabulary and enforces that no object in the typed region is left untyped.\n\n> ⟳ 2026-08-19: Re-homed v0.1.16 -> v0.1.11 in the split: the ladder is the meta minor's substrate — Sprint D2 / BL-478 consume it. Content authoring unchanged.",
    "parked": false
   },
   {
-   "parked": true,
+   "parked": false,
    "blocked_on": [],
    "written": "2026-08-04",
    "id": "BL-306",
@@ -6527,7 +6527,7 @@
    "glyph": "✓",
    "priority": "B",
    "difficulty": 3,
-   "version_goal": "v0.2.0",
+   "version_goal": "v0.1.16",
    "requires": [],
    "files": [
     "Project-Rival/tools/harness/ (new)",
@@ -6535,7 +6535,7 @@
    ],
    "authority_doc": "Project-Rival/docs/ENVIRONMENT.md",
    "summary": "Filed 2026-08-04 from the text-only SOTA sweep (NR-057). 0 A.D. ships --rl-interface (Alpha 24, official HTTP seam) driven by the in-tree zero_ad Python client: JSON scenario in, full JSON state per step, programmatic commands, exact step control, headless. The harness replaces computer-use as the campaign mode: text observations beat pixels for decision quality (BALROG, lmgame-Bench), year marks become exact ticks, and the rite gains machine-checkable conformance. Rival constraint honoured: the seam is an official engine flag - nothing patched, nothing hooked.",
-   "design": "## Shape (settled 2026-08-04)\n\nThree layers, mirroring the TextStarCraft-II pattern (arXiv:2312.11865) and Io's own word-interface triple:\n\n1. **Summarizer (read).** zero_ad JSON state -> terse situation report: holdings, hosts, rival's visible works, fog-as-gaps. This IS station 1 (Omens); Muninn's law becomes machine-checkable (report only what the JSON showed).\n2. **Macro-action vocabulary (write).** The dispatch grammar - god sends soldiers to place, for purpose - compiles to grouped macro-actions (train / build / group attack-move). No unit micro. Validation with error echo + fallback; every invalid action logged as a first-class metric (BALROG practice).\n3. **MCP wrapper (meaning).** A thin server mirroring Io's five tools (get_blackboard / issue_command / advance_tick / lookup_action / list_actions), so 0 A.D. play rehearses exactly the seam Io's AI opponent will use (Orak precedent: MCP as the game-agent socket).\n\n## Constraints\n\n- Pin Release 28; the seam is lightly-maintained research tooling. First harness task is a **conformance smoke test** against the R28 JSON schema; it gates every campaign session.\n- Frontier weakness guard: carry a map summary / pathfinder-style tool in the harness rather than expecting the model to do geometry (FLE, CivRealm findings).\n- Memory-as-files: the annals remain the durable memory layer (Claude-Pokemon lineage pattern); context resets against them, not against transcript.\n- Lives entirely under Project-Rival/; never writes Io source.\n\n## Re-aim (2026-08-04, same day — NR-060)\n\nThe RTS arena is retired: \"0 AD\" means the year, not Wildfire Games' game, and the install\nwas removed the day it landed. The harness re-aims at **Project Io's own word interface**:\nthe MCP seam (BL-278) today, the Era -1 sandbox (BL-271) with the diplomacy seam (BL-307)\nas the destination board.\n\nWhat survives unchanged: the three-layer shape (summarizer -> Omens; dispatch grammar ->\nmacro-actions; MCP as the socket), the conformance-smoke-gates-every-session rule, the\ninvalid-action metric, memory-as-files via the annals. What falls away: everything\nzero_ad-specific (the protocol knowledge is preserved in tools/harness/smoke_test.js as a\nrecord). The summarizer now reads the corp/nation blackboard; the grammar compiles\ndispatches to corp_command / diplomacy verbs instead of RTS macros."
+   "design": "## Shape (settled 2026-08-04)\n\nThree layers, mirroring the TextStarCraft-II pattern (arXiv:2312.11865) and Io's own word-interface triple:\n\n1. **Summarizer (read).** zero_ad JSON state -> terse situation report: holdings, hosts, rival's visible works, fog-as-gaps. This IS station 1 (Omens); Muninn's law becomes machine-checkable (report only what the JSON showed).\n2. **Macro-action vocabulary (write).** The dispatch grammar - god sends soldiers to place, for purpose - compiles to grouped macro-actions (train / build / group attack-move). No unit micro. Validation with error echo + fallback; every invalid action logged as a first-class metric (BALROG practice).\n3. **MCP wrapper (meaning).** A thin server mirroring Io's five tools (get_blackboard / issue_command / advance_tick / lookup_action / list_actions), so 0 A.D. play rehearses exactly the seam Io's AI opponent will use (Orak precedent: MCP as the game-agent socket).\n\n## Constraints\n\n- Pin Release 28; the seam is lightly-maintained research tooling. First harness task is a **conformance smoke test** against the R28 JSON schema; it gates every campaign session.\n- Frontier weakness guard: carry a map summary / pathfinder-style tool in the harness rather than expecting the model to do geometry (FLE, CivRealm findings).\n- Memory-as-files: the annals remain the durable memory layer (Claude-Pokemon lineage pattern); context resets against them, not against transcript.\n- Lives entirely under Project-Rival/; never writes Io source.\n\n## Re-aim (2026-08-04, same day — NR-060)\n\nThe RTS arena is retired: \"0 AD\" means the year, not Wildfire Games' game, and the install\nwas removed the day it landed. The harness re-aims at **Project Io's own word interface**:\nthe MCP seam (BL-278) today, the Era -1 sandbox (BL-271) with the diplomacy seam (BL-307)\nas the destination board.\n\nWhat survives unchanged: the three-layer shape (summarizer -> Omens; dispatch grammar ->\nmacro-actions; MCP as the socket), the conformance-smoke-gates-every-session rule, the\ninvalid-action metric, memory-as-files via the annals. What falls away: everything\nzero_ad-specific (the protocol knowledge is preserved in tools/harness/smoke_test.js as a\nrecord). The summarizer now reads the corp/nation blackboard; the grammar compiles\ndispatches to corp_command / diplomacy verbs instead of RTS macros.\n\n> ⟳ 2026-08-19: UN-PARKED into v0.1.16 (The watch) on Ben's form verdict. Its 2026-08-04 re-aim (drive Io's own word interface, not 0 A.D.) is the live scope: the structured local-model client loop (summariser/grammar/MCP) that BL-412's rendered seam will host."
   },
   {
    "parked": false,
@@ -6549,7 +6549,7 @@
    "glyph": "✓",
    "priority": "B",
    "difficulty": 4,
-   "version_goal": "v0.1.16",
+   "version_goal": "v0.1.19",
    "requires": [
     "BL-271",
     "BL-277"
@@ -6574,7 +6574,7 @@
    "glyph": "✓",
    "priority": "B",
    "difficulty": 3,
-   "version_goal": "v0.1.16",
+   "version_goal": "v0.1.19",
    "requires": [
     "BL-297"
    ],
@@ -6598,7 +6598,7 @@
    "glyph": "✓",
    "priority": "B",
    "difficulty": 3,
-   "version_goal": "v0.1.16",
+   "version_goal": "v0.1.19",
    "requires": [
     "BL-218"
    ],
@@ -6621,7 +6621,7 @@
    "glyph": "~",
    "priority": "B",
    "difficulty": 4,
-   "version_goal": "v0.1.16",
+   "version_goal": "v0.1.19",
    "requires": [
     "BL-218"
    ],
@@ -6939,7 +6939,7 @@
    "title": "Unit verb family for the action dictionary — levy/march/garrison/scout at unit grain, design-owed until a unit_command seam exists to transcribe from",
    "priority": "B",
    "difficulty": 3,
-   "version_goal": "v0.1.16",
+   "version_goal": "v0.1.20",
    "requires": [
     "BL-157",
     "BL-274",
@@ -7096,7 +7096,7 @@
    "priority": "B",
    "difficulty": 2,
    "parked": false,
-   "version_goal": "v0.1.16",
+   "version_goal": "v0.1.19",
    "requires": [],
    "blocked_on": [],
    "written": "2026-08-04",
@@ -7469,8 +7469,8 @@
    "glyph": "~",
    "priority": "C",
    "difficulty": 1,
-   "parked": true,
-   "version_goal": "v0.2.0",
+   "parked": false,
+   "version_goal": "v0.1.16",
    "requires": [
     "BL-278"
    ],
@@ -7481,7 +7481,7 @@
    ],
    "authority_doc": "docs/ai/AI_OPPONENT.md",
    "summary": "docs/ai/LANGUAGE_POLICY_FEASIBILITY.md § 10 flags its ~300-token-per-decision figure (feeding the § 5 latency budget) as an assumption, not a measurement, and names the fix: one real decision through the already-landed BL-278 MCP server settles it at essentially zero cost. Filed as its own item (NR-094's ruling left it as a noted follow-up, not a precondition) so it does not stay a footnote nobody picks up.",
-   "design": "Design-owed only in the sense that it needs a tiny plan, not a build: drive one real blackboard->issue_command round trip through the MCP server (any attached client — Claude, another local model, even a scripted stub) against the canonical world, and record the actual input/output token counts for the exchange that produced a corp_command. Feeds back into AI_OPPONENT.md § 10g / § 5's latency math with a measured figure in place of the assumed one. No dependency on BL-334 landing first — this can run against the existing scorer-driven blackboard/command shape today."
+   "design": "Design-owed only in the sense that it needs a tiny plan, not a build: drive one real blackboard->issue_command round trip through the MCP server (any attached client — Claude, another local model, even a scripted stub) against the canonical world, and record the actual input/output token counts for the exchange that produced a corp_command. Feeds back into AI_OPPONENT.md § 10g / § 5's latency math with a measured figure in place of the assumed one. No dependency on BL-334 landing first — this can run against the existing scorer-driven blackboard/command shape today.\n\n> ⟳ 2026-08-19: UN-PARKED into v0.1.16 (The watch) on Ben's form verdict, to run as a one-off measurement this batch — its own design says it is runnable today against --serve with no BL-334 dependency."
   },
   {
    "id": "BL-336",
@@ -7519,7 +7519,7 @@
    "parked": false,
    "blocked_on": [],
    "written": "2026-08-09",
-   "version_goal": "v0.1.16",
+   "version_goal": "v0.1.19",
    "requires": [
     "BL-271"
    ],
@@ -8415,7 +8415,7 @@
    "category": "UI",
    "priority": "B",
    "difficulty": 3,
-   "version_goal": "v0.1.2",
+   "version_goal": "v0.1.7",
    "authority_doc": "docs/ui/SELECTION.md",
    "files": [
     "src/ui/ui_state.hpp",
@@ -8492,7 +8492,7 @@
    "category": "Economy",
    "priority": "A",
    "difficulty": 3,
-   "version_goal": "v0.1.14",
+   "version_goal": "v0.2.0",
    "authority_doc": "docs/economy/ERAS.md",
    "files": [
     "docs/economy/ERAS.md",
@@ -8920,7 +8920,7 @@
    "title": "Falling below the procurement reputation floor is permanent — the only way to raise reputation requires a contract you can no longer get",
    "priority": "A",
    "difficulty": 3,
-   "version_goal": "v0.1.14",
+   "version_goal": "v0.1.15",
    "requires": [],
    "authority_doc": "docs/economy/FINANCE.md",
    "files": [
@@ -8944,7 +8944,7 @@
    "title": "A procurement contract delivers to the supplier's body at the supplier's price, where it is immediately auto-sold — the buyer pays a deposit for nothing",
    "priority": "A",
    "difficulty": 4,
-   "version_goal": "v0.1.14",
+   "version_goal": "v0.1.11",
    "requires": [],
    "authority_doc": "docs/economy/MARKETS.md",
    "files": [
@@ -9121,7 +9121,7 @@
    "title": "The company's answerability - which laws and polity terms an armed trading house operates under, and what breaking them costs",
    "priority": "B",
    "difficulty": 3,
-   "version_goal": "v0.1.16",
+   "version_goal": "v0.1.20",
    "requires": [
     "BL-315"
    ],
@@ -9416,7 +9416,7 @@
    ],
    "authority_doc": "docs/ui/CANVASES.md",
    "summary": "Filed 2026-08-14. Nothing moves the camera on its own, so a spectator stares at one body while the interesting build happens two bodies away. Two affordances: click a decision-feed row to select its subject and navigate the zoom ladder to it, and an opt-in auto-follow that each econ tick moves to that tick's heaviest decision. The severity ordering already exists - session_history.cpp's severity_of ranks idled/demolished (4) above built/hired (3) above recipe_switch/resumed (2) above road/workforce/survey/order traffic (1).",
-   "design": "## Two modes, one mechanism\n\n**Jump-to (manual).** A decision-feed row knows its `corp_decision.command`, which\ncarries the target entity. Clicking it sets `selected_entity` and drives the zoom\nladder to the owning body - the same descend-by-click path CANVASES.md already\ndefines, invoked programmatically rather than by a press.\n\n**Auto-follow (opt-in, off by default).** Each econ tick, pick the heaviest decision\nby the existing `severity_of` ordering, break ties by lowest corp id (determinism),\nand navigate there. Reuse `severity_of` rather than authoring a second ranking - a\nsecond ordering that disagrees with the comms feed's would be a bug generator.\n\n## The pacing problem, which is the real design work\n\nAt speed 5 an econ tick resolves every ~11 real seconds (16x multiplier, 2 s/day at\n1x, 90-day quarter). Auto-follow that snaps the camera every 11 seconds is unwatchable,\nand at lower speeds it is dead air. Three things make it read:\n\n1. **Ease, never snap.** Route through `interp.cpp`, over roughly a second. The\n   transition is what tells the eye *where it went*, which is most of the value.\n2. **Hold a minimum dwell.** Never retarget within ~4 real seconds of the last move,\n   even if a heavier decision lands. A camera that twitches shows nothing.\n3. **Ignore the noise floor.** Do not follow severity-1 traffic (roads, workforce\n   nudges, order-book churn) at all. Follow builds, demolitions, idles and hires -\n   the decisions that change the industrial landscape.\n\n## Determinism\n\nThe director is presentation and must not touch the sim. Camera state lives in\n`ui_state`; nothing in `world/*` learns that it exists.\n\n## Obligations\n\nCANVASES.md gains the programmatic-navigation note when this lands. `question_log.json`\nfor the follow toggle; `ACTIONS.json` for the new controls."
+   "design": "## Two modes, one mechanism\n\n**Jump-to (manual).** A decision-feed row knows its `corp_decision.command`, which\ncarries the target entity. Clicking it sets `selected_entity` and drives the zoom\nladder to the owning body - the same descend-by-click path CANVASES.md already\ndefines, invoked programmatically rather than by a press.\n\n**Auto-follow (opt-in, off by default).** Each econ tick, pick the heaviest decision\nby the existing `severity_of` ordering, break ties by lowest corp id (determinism),\nand navigate there. Reuse `severity_of` rather than authoring a second ranking - a\nsecond ordering that disagrees with the comms feed's would be a bug generator.\n\n## The pacing problem, which is the real design work\n\nAt speed 5 an econ tick resolves every ~11 real seconds (16x multiplier, 2 s/day at\n1x, 90-day quarter). Auto-follow that snaps the camera every 11 seconds is unwatchable,\nand at lower speeds it is dead air. Three things make it read:\n\n1. **Ease, never snap.** Route through `interp.cpp`, over roughly a second. The\n   transition is what tells the eye *where it went*, which is most of the value.\n2. **Hold a minimum dwell.** Never retarget within ~4 real seconds of the last move,\n   even if a heavier decision lands. A camera that twitches shows nothing.\n3. **Ignore the noise floor.** Do not follow severity-1 traffic (roads, workforce\n   nudges, order-book churn) at all. Follow builds, demolitions, idles and hires -\n   the decisions that change the industrial landscape.\n\n## Determinism\n\nThe director is presentation and must not touch the sim. Camera state lives in\n`ui_state`; nothing in `world/*` learns that it exists.\n\n## Obligations\n\nCANVASES.md gains the programmatic-navigation note when this lands. `question_log.json`\nfor the follow toggle; `ACTIONS.json` for the new controls.\n\n> ⟳ 2026-08-19: FIRST TASK (verdict O4): the spectate initial viewpoint fix folds in here — spectate currently inherits the would-be player corp, which on seed 0 is insolvent and asset-less (NR-231). Opening camera = heaviest-decision corp of the first evaluated tick, a natural special case of auto-follow."
   },
   {
    "status": "designed",
@@ -9445,7 +9445,7 @@
    ],
    "authority_doc": "docs/ai/AI_OPPONENT.md",
    "summary": "Filed 2026-08-14. The literal answer to the question that prompted the spectator session - Ben, 2026-08-14: watch AI play \"and discover what strategies emerge from the current game\", to have \"a better way to describe and explain our main aims\". The decision feed (BL-407) shows the moves; this shows the SHAPE across a run. Aggregates the same two stores into a per-corp profile: verb mix, spend split across the must-have / should-have / nice-to-have buckets (corp_ai.hpp bucket_for_reason), reason-code tally, and how those shift over the run.",
-   "design": "## What a strategy looks like in this engine\n\nThe scorer has no strategy object - `corp_strategy` is a direct read of\n`industrial_focus`, kept as its own name precisely so it can diverge later\n(corp_ai.hpp). So an emergent strategy is not a thing to read out of a field; it is a\n**distribution over decisions**. Three distributions carry almost all of it:\n\n1. **Verb mix.** What fraction of this corp's decisions were builds, dials, surveys,\n   roads, hires, orders. An expander and a consolidator have visibly different mixes.\n2. **Spend by priority bucket.** `bucket_for_reason` already classifies every reason\n   into must-have (solvency defence) / should-have (feed the running assets) /\n   nice-to-have (expansion). A corp spending most of its run in must-have is drowning;\n   one that stays in nice-to-have is running unopposed. This is the single most\n   legible health signal available, and it is free - the mapping is a pure function\n   that already exists.\n3. **Reason-code tally.** Which reasons actually fired. § 10h's idle/resume\n   oscillation would have shown here as two reciprocal codes dominating the tally.\n\n## Over the run, not just at the end\n\nEach quarter, plot the bucket split as a stacked band per corp. The interesting\nartifact is the *transition* - the quarter a corp falls out of nice-to-have and never\nrecovers is the quarter it lost, and being able to point at that quarter is exactly\nthe \"describe and explain our main aims\" the session asked for. Use `charts.cpp` and\nthe existing per-tick history recorder pattern in `session_history.cpp` rather than a\nnew store.\n\n## Feeds two things beyond spectating\n\n- **STRATEGIES.md's invention loop.** The deck is AI-invented and the schema authored\n  (Ben, 2026-08-06), and a card earns its slot by same-seed comparison. This readout is\n  the measuring instrument that comparison needs; without it \"the card worked\" is an\n  assertion.\n- **BL-279 (trace corpus).** The same aggregation labels a run, which is what a\n  fine-tuning corpus needs alongside the traces.\n\n## Honesty constraint\n\nReport the distribution; do not name the strategy. A label like \"aggressive expander\"\nrendered from three thresholds is a fiction the reader will trust more than it earns,\nand naming it would also pre-empt STRATEGIES.md's settled position that the deck is\ndiscovered rather than authored. Show the mix and let the shape speak."
+   "design": "## What a strategy looks like in this engine\n\nThe scorer has no strategy object - `corp_strategy` is a direct read of\n`industrial_focus`, kept as its own name precisely so it can diverge later\n(corp_ai.hpp). So an emergent strategy is not a thing to read out of a field; it is a\n**distribution over decisions**. Three distributions carry almost all of it:\n\n1. **Verb mix.** What fraction of this corp's decisions were builds, dials, surveys,\n   roads, hires, orders. An expander and a consolidator have visibly different mixes.\n2. **Spend by priority bucket.** `bucket_for_reason` already classifies every reason\n   into must-have (solvency defence) / should-have (feed the running assets) /\n   nice-to-have (expansion). A corp spending most of its run in must-have is drowning;\n   one that stays in nice-to-have is running unopposed. This is the single most\n   legible health signal available, and it is free - the mapping is a pure function\n   that already exists.\n3. **Reason-code tally.** Which reasons actually fired. § 10h's idle/resume\n   oscillation would have shown here as two reciprocal codes dominating the tally.\n\n## Over the run, not just at the end\n\nEach quarter, plot the bucket split as a stacked band per corp. The interesting\nartifact is the *transition* - the quarter a corp falls out of nice-to-have and never\nrecovers is the quarter it lost, and being able to point at that quarter is exactly\nthe \"describe and explain our main aims\" the session asked for. Use `charts.cpp` and\nthe existing per-tick history recorder pattern in `session_history.cpp` rather than a\nnew store.\n\n## Feeds two things beyond spectating\n\n- **STRATEGIES.md's invention loop.** The deck is AI-invented and the schema authored\n  (Ben, 2026-08-06), and a card earns its slot by same-seed comparison. This readout is\n  the measuring instrument that comparison needs; without it \"the card worked\" is an\n  assertion.\n- **BL-279 (trace corpus).** The same aggregation labels a run, which is what a\n  fine-tuning corpus needs alongside the traces.\n\n## Honesty constraint\n\nReport the distribution; do not name the strategy. A label like \"aggressive expander\"\nrendered from three thresholds is a fiction the reader will trust more than it earns,\nand naming it would also pre-empt STRATEGIES.md's settled position that the deck is\ndiscovered rather than authored. Show the mix and let the shape speak.\n\n> ⟳ 2026-08-19: FENCE (NR-226 / verdict O1): decision-ring score fields are EXCLUDED from aggregation — runner_up can legitimately exceed winning_score because candidate_before sorts by priority bucket before score (AI_OPPONENT.md § 10i). If margins are ever wanted, normalise within priority bucket first. The readout aggregates verb mix, spend buckets and reason codes only, as designed."
   },
   {
    "status": "designed",
@@ -9586,7 +9586,7 @@
    "category": "AI",
    "difficulty": 2,
    "priority": "B",
-   "version_goal": "v0.1.16",
+   "version_goal": "v0.1.21",
    "requires": [],
    "title": "The build candidate score is quadratic in net margin - `net / payback` collapses to net squared over capex, and the tuning was calibrated against that curve without anyone deciding it should be there",
    "files": [
@@ -9636,7 +9636,7 @@
    "category": "UI",
    "difficulty": 2,
    "priority": "B",
-   "version_goal": "v0.1.16",
+   "version_goal": "v0.1.21",
    "requires": [
     "BL-407"
    ],
@@ -9761,7 +9761,7 @@
    "priority": "A",
    "difficulty": 3,
    "status": "design-owed",
-   "version_goal": "v0.1.16",
+   "version_goal": "v0.1.22",
    "files": [
     "src/ui/history_panel.cpp",
     "src/world/history_sim.cpp",
@@ -9779,7 +9779,7 @@
    "priority": "A",
    "difficulty": 2,
    "status": "designed",
-   "version_goal": "v0.1.16",
+   "version_goal": "v0.1.22",
    "files": [
     "CMakeLists.txt",
     "tools/verify/"
@@ -9796,7 +9796,7 @@
    "priority": "A",
    "difficulty": 3,
    "status": "designed",
-   "version_goal": "v0.1.16",
+   "version_goal": "v0.1.22",
    "files": [
     "src/core/verify_api.cpp",
     "src/world/world_io.cpp"
@@ -10137,7 +10137,7 @@
    "category": "AI",
    "difficulty": 3,
    "priority": "A",
-   "version_goal": "v0.1.16",
+   "version_goal": "v0.1.21",
    "requires": [],
    "title": "The AI build scorer cannot build a processing facility - it enumerates extraction sites and one military base, and nothing else, so no rival can ever climb the production chain",
    "authority_doc": "docs/ai/AI_OPPONENT.md",
@@ -10161,7 +10161,7 @@
    "category": "Economy",
    "difficulty": 3,
    "priority": "A",
-   "version_goal": "v0.1.16",
+   "version_goal": "v0.1.21",
    "requires": [],
    "title": "An extraction site can only target the RICHEST resource on its tile, so a resource that is never the richest anywhere is never mined — coal has 1,671 tiles, 0 mines, and binds 54% of all starved processor ticks",
    "authority_doc": "docs/economy/PRODUCTION.md",
@@ -10236,7 +10236,7 @@
    "category": "Economy",
    "difficulty": 3,
    "priority": "A",
-   "version_goal": "v0.1.16",
+   "version_goal": "v0.1.11",
    "requires": [],
    "title": "A corp that dips one quarter into the red compounds at 2%/tick forever, so a few thousand of operating loss reads as millions and every economy measurement downstream becomes unreadable",
    "authority_doc": "docs/economy/FINANCE.md",
@@ -10246,7 +10246,7 @@
     "tools/verify/econ_bankruptcy.cpp"
    ],
    "summary": "Found 2026-08-17 while reading ai_skill_harness's -2M to -3.4M net worths (NR-269). k_debt_interest_per_quarter is 0.02 and the benchmark rollout is 300 ticks: 1.02^300 = 380x. Per-building extraction nets +5 to +11 on every seed, so a corp cannot lose millions by operating. It dips a few thousand negative on processor upkeep and compounding does the rest. The rate itself is defensible (~8%/yr); what is missing is any floor, recovery path or terminal state. An insolvent corp is not resolved, it just accelerates away from zero.",
-   "design": "MEASURE BEFORE CHANGING ANYTHING, and the measurement is the first deliverable: decompose a benchmark corp's final balance into operating flows versus accrued interest. The claim that the -3M is 'almost entirely compounding' is arithmetic inference from 1.02^300, not an observation, and it should be confirmed or overturned before a lever is chosen.\n\nNote tools/verify/econ_bankruptcy.cpp ALREADY EXISTS and budget_system.hpp names it as a reader of the interest constant, yet budget_system.cpp contains no bankruptcy handling at all. Read that harness first: it may already pin the spiral as expected behaviour, in which case this item is partly a disagreement with an existing check rather than a new defect, and that has to be settled openly rather than by editing the check.\n\nThe design question is what insolvency MEANS, and it is a game-design call, not an arithmetic one. Candidates, deliberately not chosen here: (a) a debt ceiling past which no further interest accrues, cheapest and least meaningful; (b) forced liquidation - assets sold to clear debt, which gives 'survival' a real definition and makes the survival metric mean something it currently does not; (c) restructuring, where a corp idles or sheds buildings to return to solvency, which is the version that composes with the existing BL-079 reflex tier and the BL-202 scorer rather than sitting beside them.\n\n(b) and (c) are the ones that feed Conflict and Trade; (a) only silences a number. Prefer whichever the measurement supports, and state the reason.\n\nGUARD: a corp driven insolvent reaches a defined terminal or recovered state within a bounded number of ticks, rather than diverging. Must be shown to fail pre-change - today it diverges by construction.",
+   "design": "MEASURE BEFORE CHANGING ANYTHING, and the measurement is the first deliverable: decompose a benchmark corp's final balance into operating flows versus accrued interest. The claim that the -3M is 'almost entirely compounding' is arithmetic inference from 1.02^300, not an observation, and it should be confirmed or overturned before a lever is chosen.\n\nNote tools/verify/econ_bankruptcy.cpp ALREADY EXISTS and budget_system.hpp names it as a reader of the interest constant, yet budget_system.cpp contains no bankruptcy handling at all. Read that harness first: it may already pin the spiral as expected behaviour, in which case this item is partly a disagreement with an existing check rather than a new defect, and that has to be settled openly rather than by editing the check.\n\nThe design question is what insolvency MEANS, and it is a game-design call, not an arithmetic one. Candidates, deliberately not chosen here: (a) a debt ceiling past which no further interest accrues, cheapest and least meaningful; (b) forced liquidation - assets sold to clear debt, which gives 'survival' a real definition and makes the survival metric mean something it currently does not; (c) restructuring, where a corp idles or sheds buildings to return to solvency, which is the version that composes with the existing BL-079 reflex tier and the BL-202 scorer rather than sitting beside them.\n\n(b) and (c) are the ones that feed Conflict and Trade; (a) only silences a number. Prefer whichever the measurement supports, and state the reason.\n\nGUARD: a corp driven insolvent reaches a defined terminal or recovered state within a bounded number of ticks, rather than diverging. Must be shown to fail pre-change - today it diverges by construction.\n\n> ⟳ 2026-08-19: Re-homed v0.1.16 -> v0.1.11: rides Lane D's first batch as its cheapest economy-truth unblock (Fall-arc amendment 5: interest is 98.8% of every benchmark deficit). Verify build state first — N1 lists this among the seven unaudited Sprint-26 items.",
    "consequences_for_shipped_claims": "It puts a question mark over ai_skill_harness's net-worth bands as a SKILL signal at all. If final net worth is dominated by compounding on an early dip, the metric is measuring how early a corp first went negative, not how well it played - and the bands have been blessed and re-blessed against that number repeatedly. The survival fraction may be the sounder signal; it is currently the one metric that has stayed green throughout Sprint 19."
   },
   {
@@ -10285,7 +10285,7 @@
    "category": "UI",
    "difficulty": 3,
    "priority": "A",
-   "version_goal": "v0.1.16",
+   "version_goal": "v0.1.21",
    "requires": [],
    "title": "Three procurement verbs are reachable by an agent and by no human",
    "files": [
@@ -10309,7 +10309,7 @@
    "category": "AI",
    "difficulty": 3,
    "priority": "B",
-   "version_goal": "v0.1.16",
+   "version_goal": "v0.1.21",
    "requires": [
     "BL-445"
    ],
@@ -10334,7 +10334,7 @@
    "category": "AI",
    "difficulty": 3,
    "priority": "B",
-   "version_goal": "v0.1.16",
+   "version_goal": "v0.1.21",
    "requires": [],
    "title": "Three verbs the docs say the scorer uses, it does not emit",
    "files": [
@@ -10384,7 +10384,7 @@
    "category": "UI",
    "difficulty": 3,
    "priority": "A",
-   "version_goal": "v0.1.16",
+   "version_goal": "v0.1.20",
    "requires": [
     "BL-448"
    ],
@@ -10410,7 +10410,7 @@
    "category": "AI",
    "difficulty": 4,
    "priority": "A",
-   "version_goal": "v0.1.16",
+   "version_goal": "v0.1.20",
    "requires": [
     "BL-448"
    ],
@@ -10733,7 +10733,7 @@
    "priority": "A",
    "difficulty": 3,
    "parked": false,
-   "version_goal": "v0.1.16",
+   "version_goal": "v0.1.22",
    "requires": [],
    "blocked_on": [],
    "written": "2026-08-18",
@@ -10758,7 +10758,7 @@
    "priority": "A",
    "difficulty": 3,
    "parked": false,
-   "version_goal": "v0.1.16",
+   "version_goal": "v0.1.22",
    "requires": [],
    "blocked_on": [],
    "written": "2026-08-18",
@@ -10783,7 +10783,7 @@
    "priority": "A",
    "difficulty": 5,
    "parked": false,
-   "version_goal": "v0.1.16",
+   "version_goal": "v0.1.20",
    "requires": [
     "BL-448"
    ],
@@ -11002,7 +11002,7 @@
    "priority": "A",
    "difficulty": 5,
    "parked": false,
-   "version_goal": "v0.1.18",
+   "version_goal": "v0.1.20",
    "requires": [
     "BL-470",
     "BL-467"
@@ -11071,7 +11071,7 @@
    "authority_doc": "docs/ui/LENSES.md",
    "summary": "Ben, 2026-08-19: the all-corporations Stance table (BL-449) is too much information at once and not the shape he pictures for this. Redirect: a Diplomatic overlay_mode joining the corporation/country/resource/etc. roster, tinting tiles or corp markers by the players stance toward the owning corp (Hostile/Friend/Neutral/Unknown per NR-350), so relationships read on the map the way ownership and production already do. Supersedes the table-column approach BL-449 shipped and NR-353 found unreachable - that column is retired, not fixed. [PARKED 2026-08-19 (Ben): basic military function (each corp starts with an army) takes priority; diplomacy surfacing is a tangent for now. In-flight WIP (not landed, not verified) sits uncommitted-to-main on branch worktree-agent-a2b81665b3439a110, commit 6ad58a3 - resume from there rather than restarting.]",
    "design": "## Why this instead of the table\n\nBL-449 tried to put four extra facts (Reach/Capital/Share/Stance) plus three presses into the all-corporations table already living in the narrow shell fold-out column. NR-353 found the result unreachable in play - the Stance columns buttons render off the panel edge, and BL-111 had already narrowed that same table once before for the identical reason (six columns collapsed to single-glyph headers).\n\nBen's redirect, 2026-08-19: this is backend-useful information, not player-facing information in that shape. A lens is the existing vocabulary for at-a-glance relational state across many entities at once - Corporation lens already tints tiles by owner, Country lens by nation. Diplomatic stance is the same shape of fact (a per-corp category) and belongs in the same family, not in a giant table.\n\n## Scope (design-owed - settle before promoting)\n\n- Where the tint reads: tile fill (like Corporation lens) vs. a marker/ring on each rivals HQ/buildings (lighter-weight, avoids implying stance is a REGION when it is a relationship between two corps). Lean toward the marker/ring approach given stance is corp-to-corp, not corp-to-territory - but this is the first open question for Ben.\n- Colour/glyph vocabulary for Hostile/Friend/Neutral/Unknown - four states need four legible marks, and Unknown (BL-068 gated, NR-350) must read as distinct from Neutral rather than simply absent.\n- Bar or off-bar placement (LENSES.md \"Bar\" column) - stance is not yet consequential (BL-448 lands the substrate inert), so off-bar (like Scarcity/Industry/Reach) may be the honest placement until BL-315/BL-467 give it a gameplay payoff, matching how those lenses graduated onto the bar only once their consequence landed.\n- Whether the three transition presses (Declare Hostile / Offer Friendship / Return to Neutral) live in the lens itself (a marker click opens a small popup) or move entirely into the Selection panel (see BL-475) - if the latter, this lens is READ-ONLY and simpler to design.\n\n## What it does not carry\n\nNo new data model - BL-448s stance.hpp tables are already correct and load-bearing. This item is purely the map-surface read; BL-475 is the per-corp detail + action surface.\n\n## SETTLED 2026-08-19 (Ben, elicitation form)\n\n- **Tint target: TILE FILL, not the marker/ring recommendation.** A deliberate overrule — Ben wants stance to read as a territory tint like the Corporation lens, not a per-building marker. This makes the corp-vs-territory framing in this item's earlier text moot; the lens colours the rival's owned tiles by the player's stance toward them, same visual family as Corporation/Country.\n- **Bar placement: ON THE BAR, not off-bar.** A second deliberate overrule of the \"not consequential yet\" reasoning — Diplomatic joins Corporation/Country/Resource/etc. as a primary, always-reachable lens from day one rather than waiting for BL-315/BL-467 to give stance a gameplay payoff.\n- **Marker click: clicking a tinted tile/rival selects that corp and jumps to its Selection panel** (BL-475) — the lens is a read surface, selection is the existing canvas click-to-select path, no bespoke popup.\n- **Presses live ONLY in the Selection panel (BL-475)** — confirmed, matches the recommendation. This lens carries no interactive presses of its own.\n- **Colour vocabulary: the recommended scheme, confirmed.** Hostile red, Friend green, Neutral grey, Unknown a dashed/hollow grey ring — Unknown must never read as a blank tile (NR-350).\n\nBoth overrules recorded per this project's standing practice of flagging where Ben's choice differs from the filed recommendation and why it matters: tile fill reads Diplomatic as territory-like from the start, and bar placement means it ships visible before it has any gameplay consequence — a deliberate legibility-first call, not an oversight.",
-   "version_goal": "v0.1.16"
+   "version_goal": "v0.1.20"
   },
   {
    "id": "BL-475",
@@ -11096,7 +11096,7 @@
    "authority_doc": "docs/ui/SELECTION.md",
    "summary": "Ben, 2026-08-19, companion to BL-474: expand the per-corporation Selection ledger to carry stance and any other relevant from-our-perspective detail, replacing the all-corporations tables Stance column as the place the three transition presses (Declare Hostile / Offer Friendship / Return to Neutral) actually live. Selecting a rival corp (from the canvas, a lens marker, or the corporations list) shows the relationship as ONE corps detail, not a row in a giant comparison table. [PARKED 2026-08-19 (Ben): basic military function (each corp starts with an army) takes priority; diplomacy surfacing is a tangent for now. In-flight WIP (not landed, not verified) sits uncommitted-to-main on branch worktree-agent-a2b81665b3439a110, commit 6ad58a3 - resume from there rather than restarting.]",
    "design": "## Why the Selection panel, not the table\n\nSELECTION.md already owns the pattern for one-entity detail across the game (Active/Focus/Selection states, shared per-entity content builders the Tile Ledger and hover card also use). Stance-toward-one-corp is exactly that shape of fact - it belongs where a player already looks to learn about ONE thing, not crammed into a table meant to compare MANY things at once (which is what made BL-449s column unreachable, NR-353).\n\n## Scope (design-owed - settle before promoting)\n\n- Where in the Selection cards existing layout the stance block sits, relative to whatever a corp selection already shows (BL-081/BL-214s roll-up cards, per question_log.jsons corporation_dashboard entry).\n- The three presses (Declare Hostile with its confirm popup on the demolish precedent, Offer/Accept Friendship, Return to Neutral) move here from the retired table column - same corp_command verbs from BL-448, same rejection handling, same NR-350 visibility gate (do not show anything for an undiscovered corp beyond Unknown).\n- Whether BL-474s lens markers are clickable to select-and-jump here, or selection only happens via the existing canvas/list paths - affects whether BL-474 needs any interactivity of its own.\n\n## What it does not carry\n\nNo new data model or verbs - BL-448s stance.hpp and its four corp_command verbs are unchanged. This is purely re-hosting an already-correct interaction onto the right surface. ACTIONS.json/question_log.json entries move with it (retitle rather than duplicate - BL-449s existing corporation_panel entries describe the retired surface).\n\n## SETTLED 2026-08-19 (Ben, elicitation form, alongside BL-474)\n\n- **This item now owns ALL three transition presses exclusively** — BL-474's lens is confirmed read-only, so Declare Hostile / Offer Friendship / Return to Neutral live here and nowhere else.\n- **Entry point confirmed: selecting a tinted tile/rival under the Diplomatic lens (BL-474) jumps here** — the existing canvas click-to-select path, no new selection mechanism needed.\n- Layout position within the existing Selection card stack is still an implementation call for whoever promotes this — not re-elicited, low-stakes relative to the placement/interaction questions above.",
-   "version_goal": "v0.1.16"
+   "version_goal": "v0.1.20"
   },
   {
    "id": "BL-476",
@@ -11119,6 +11119,103 @@
    "summary": "Ben, 2026-08-19: park the diplomatic lens tangent, basic military function first - at the very least, each corporation must start with an army. `corporation_generation.cpp:1507` seeds a `military_base` + one unit for the PLAYER ONLY (\"Rival corps get no such seeding\", BL-330/BL-331). Extend the same seeding to every named rival (not BL-365 background filler firms, per Ben's scoping call) so the military layer is symmetric from turn one instead of a player-only opener. [COMPLETE 2026-08-19: extracted the player-only block into `seed_starting_military(world&, entity_id)` (anonymous namespace, corporation_generation.cpp), called once for the player FIRST (byte-identical tile pick vs pre-BL-476) then once per generated rival in stable corp_ids order - never for a BL-365 background firm, since generate_background_firms runs in a separate later pass. New harness tools/verify/rival_military_seeding_harness.cpp: 8/8 non-background corps seeded (1 military_base + 1 unit each) in the canonical world, determinism confirmed across two generations, land-poor-nation graceful skip confirmed via a synthetic all-ocean-tile world - 17/17 PASS. corp_terrain_matrix and military_capability_harness re-run clean; determinism_harness 25/25 PASS. docs/military/MILITARY.md corrected (Build status + writers list).]",
    "design": "## What exists today\n\n`corporation_generation.cpp` (~line 1506-1617) seeds the PLAYER corp, and only the player corp, with one `military_base` building near its HQ (or the nearest valid land tile) and one `unit_component` (roster index 0, 50 manpower, `supply_factor_permille = 1000`). The comment there is explicit: *\"Rival corps get no such seeding; this is a player-experience opener, not a generation-wide asset.\"* Rivals can only ever acquire military opportunistically, later, through `corp_ai.cpp`'s scored `hire_unit` candidate (BL-324) - and that candidate presumably scores near-zero early game since a rival with no military_base has nowhere to hire FROM.\n\n## Scope, settled 2026-08-19 (Ben, asked directly given the cost/balance fork)\n\n**Player + named rivals, NOT BL-365 background firms.** A background firm (`corporation_component::is_background`) exists purely to fill a body's production/demand gap and is not meant to read as a competitor - arming it is out of scope here and would be a separate, larger balance call (especially once upkeep rates move off zero, BL-454).\n\n## The fix\n\nThe player-only block is a single inline scope, not a function - lift its body into a shared helper (e.g. `seed_starting_military(world&, entity_id corp_id)`) taking the corp id, keeping the exact same logic (nearest valid land tile to HQ, one military_base, one 50-manpower unit at roster index 0). Call it once for the player (unchanged behaviour) and once per generated rival corp (`is_player == false && is_background == false`) in the same corp-generation pass, so the seeding stays deterministic and generation-time rather than becoming a first-tick economy action.\n\n**Graceful-empty stays graceful-empty.** The existing skip-if-no-valid-land-tile behaviour (a land-poor nation just does not get seeded, no crash) applies per-corp exactly as it does today for the player.\n\n**No change to `corp_ai.cpp`'s ongoing hire_unit scoring** - this is only the generation-time seed, not a change to how rivals grow their military afterward.\n\n## Requirement (item-spanning, headless)\n\nAssert every non-background corp (player + rivals) ends generation owning exactly one `military_base` and one `unit_component`, deterministic across two same-seed runs, and that a background firm owns neither. A land-poor nation with no valid tile is exempted, matching the existing graceful-empty case - assert this does not crash rather than asserting every corp always gets seeded.",
    "version_goal": "v0.1.16"
+  },
+  {
+   "id": "BL-477",
+   "short_name": "ERA_COLLAPSE_DEFINES_META",
+   "category": "Design",
+   "title": "Each era has a collapse state to avoid — that is what defines meta",
+   "status": "design-owed",
+   "glyph": "~",
+   "priority": "A",
+   "difficulty": 3,
+   "parked": false,
+   "requires": [],
+   "blocked_on": [],
+   "written": "2026-08-19",
+   "files": [
+    "docs/economy/ERAS.md",
+    "docs/lore/HISTORY.md"
+   ],
+   "authority_doc": "docs/economy/ERAS.md",
+   "summary": "Ben, 2026-08-19 (version-alignment form, verbatim): \"We should have a paradigm that makes nuclear war unlikely, but a clear looming threat for this Era. In general, each era has a 'collapse' state to avoid - and that's what defines meta.\" The paradigm: every era names ONE collapse state — the ancient era's is imperial collapse (the Fall arc, Sprint 30's strain machinery); the industrial/space era's is the nuclear rupture (BL-333's parked arc, HISTORY.md stage 6). Meta systems (tech BL-479, law BL-480, policy BL-155/BL-156) must couple their levers to the era's collapse pressure — a tech or law is interesting because it moves the world toward or away from the brink, not because it moves a growth curve.",
+   "design": "## The paradigm\n\nEach era carries one named collapse state the world can fall into, and the meta layer — tech, law, policy — is defined by its relationship to that state. Design-owed: (1) name the ancient era's collapse pressure in ERAS.md terms and wire it to the Fall arc's strain/hegemony machinery (Sprint 30) so campaign-era play inherits a live, legible threat, not lore; (2) specify how the modifier vocabulary (BL-479) expresses collapse-coupled effects — e.g. a law that trades treasury for cohesion, a tech that extends reach at the cost of strain; (3) the nuclear paradigm for the space arc stays parked with BL-333 but this item's framing must not contradict it. Open question for Ben: is the collapse state ALWAYS avoidable at a price (a pressure valve the meta buys), or genuinely reachable in campaign play as it is in generation?",
+   "version_goal": "v0.1.11"
+  },
+  {
+   "id": "BL-478",
+   "short_name": "ANCIENT_RESEARCH_SPEND",
+   "category": "Economy",
+   "title": "Research becomes a currency the corp spends",
+   "status": "design-owed",
+   "glyph": "~",
+   "priority": "A",
+   "difficulty": 4,
+   "parked": false,
+   "requires": [
+    "BL-296",
+    "BL-479"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-19",
+   "files": [
+    "src/world/tech_gate.hpp",
+    "src/world/tech_gate.cpp",
+    "src/world/condition_set.hpp",
+    "docs/research/ancient_tech_ladder.json"
+   ],
+   "summary": "Extracted from parked BL-087 (Era-1 tech/quest system) piece 2 on Ben's 2026-08-19 verdict — the accrual/cost/debit mechanism Sprint D2 needs. Fall-arc ruling 6: science is SPENT, not reached. What shipped 2026-08-17 (BL-455) is a LEVEL — condition_subject::science as a threshold; spending needs a debit the level model never had: an accrual (exists), a cost per ladder node, a debit at the moment a node is taken. Loads docs/research/ancient_tech_ladder.json (92 objects) and authors the T1-T2 gates with ENFORCED prerequisites. The condition_set.hpp:70-75 comment block asserting reached-not-spent must be rewritten in the same change (verdict M2) — it is true today and becomes a lie the day this opens.",
+   "design": "Design-owed. Boundary settled 2026-08-19 (verdict M3, Ben's pick): this is the live arc's spend mechanism, extracted from BL-087 piece 2; BL-087's era-event/quest framing stays parked. Sprint D2 is the build home; sequence after BL-479 (the effect union) so a purchased node can express more than a building unlock.",
+   "version_goal": "v0.1.11"
+  },
+  {
+   "id": "BL-479",
+   "short_name": "TECH_EFFECT_UNION",
+   "category": "Economy",
+   "title": "A tech can express a buff — the effect union and the modifier vocabulary",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 3,
+   "parked": false,
+   "requires": [],
+   "blocked_on": [],
+   "written": "2026-08-19",
+   "files": [
+    "src/world/tech_gate.hpp",
+    "src/world/tech_gate.cpp",
+    "src/world/modifier_set.hpp",
+    "src/world/economy_system.cpp",
+    "tools/verify/"
+   ],
+   "summary": "Sprint D1's build item (Lane D, opened 2026-08-19). The whole tech effect vocabulary today is one field — tech_gate's unlocks_structure (audit finding 5: a 9:1 condition-to-effect asymmetry). Widen it to a closed tagged union {unlock_structure, modify_scalar}, and author the closed modifier-subject vocabulary — every scalar a tech OR A LAW may move — shared between tech and law, which is the reason tech and law are one lane.",
+   "design": "## Shape\n\n1. `tech_effect` becomes a closed tagged union: `unlock_structure` (existing behaviour, unchanged) + `modify_scalar {modifier_subject, op (+/-/×), magnitude}`. No open-ended callback, no Lua hook — a closed vocabulary keeps it deterministic, serialisable and legible.\n2. `modifier_subject` is a new closed enum in `src/world/modifier_set.hpp`, authored once and shared by tech (this item) and law (BL-480): the scalars a meta effect may move (e.g. extraction_rate, processing_yield, unit_upkeep, logistics_cost, wage_floor). Append-only once serialised; ONE appender per batch (the Fall-arc collision rule, which assigns the append to Lane D).\n3. Application seam: effects apply PER-CORPORATION at the economy tick's existing read sites — research is not a world fact (v0.1.4 done-definition). An empty effect list is a no-op; a world where no tech carries modify_scalar is bit-identical to today.\n4. Serialisation window: no save format exists (BL-107 open), so the stored-field change is compile-time today and a migration later — the same cheap window BL-344 used.\n5. Collapse coupling (BL-477): the vocabulary should be able to name at least one strain/cohesion-adjacent subject so era-collapse meta is expressible, even if no tech uses it yet.\n\nGuards: harness proves (a) a granted modify_scalar tech moves the named scalar for the earning corp only, (b) rivals' scalars unchanged, (c) no-effect worlds bit-identical (state_hash), (d) union round-trips through the recipe/tech registries without touching the ImGui viewer (BL-310's radial viewer reads names only).",
+   "version_goal": "v0.1.11"
+  },
+  {
+   "id": "BL-480",
+   "short_name": "LAW_HAS_AN_AUTHOR",
+   "category": "Economy",
+   "title": "A law has an author, and a tax is a transfer",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 4,
+   "parked": false,
+   "requires": [],
+   "blocked_on": [],
+   "written": "2026-08-19",
+   "files": [
+    "src/world/law.hpp",
+    "src/world/law.cpp",
+    "src/world/components.hpp",
+    "src/world/budget_system.cpp",
+    "src/ui/balance_ledger.cpp",
+    "tools/verify/"
+   ],
+   "summary": "Sprint D3's build item (Lane D, opened 2026-08-19 in one batch with D1 per Ben's verdict). Three defects, one item: struct law has no author (BL-155: non-deferrable — \"a law with no author is not migratable later\"); the enacted levy DESTROYS money (debited from the corp, credited to nothing); and enactment is a debug checkbox on the player's balance ledger — a corporation flipping world law.",
+   "design": "## Shape\n\n1. `struct law` gains `enacting_nation` (entity id) and an applicability scope (the enacting nation's jurisdiction — corps whose taxed flow lands in its territory). A law with no author cannot exist any more.\n2. `nation_component` gains a `treasury` (credits). The levy becomes a TRANSFER: debit the payer, credit the enacting nation's treasury, sum conserved — asserted by harness.\n3. Enactment moves off the player's ledger. The balance-ledger checkbox (balance_ledger.cpp:277-279) is removed; the seeded law set is enacted at generation by its author nation, deterministically. A nation CHOOSING to enact mid-campaign is the BL-202/BL-203-shaped scored decision the 2026-08-18 nation grant permits — may stub as generation-seeded only this sprint, with the seam shaped for the scorer.\n4. The player's laws surface (BL-186, amended today) reads: which laws bind me, whose, what they cost me — browse-only.\n5. Wages-above-a-legal-floor: severable; take only if the modifier vocabulary (BL-479) lands first and names wage_floor, else leave to a follow-on.\n\nGuards: harness proves (a) conservation (levy sum debited == treasury sum credited), (b) scope (an out-of-jurisdiction corp pays nothing), (c) repeal returns bit-identical to baseline, (d) no player-reachable enact control remains (the untrusted-boundary rule applies if any seam verb is added — reject, never clamp).",
+   "version_goal": "v0.1.11"
   }
  ]
 }

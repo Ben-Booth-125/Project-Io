@@ -1,5 +1,76 @@
 # Project Io — REFINED (active worklist)
 
+## Sprints W1 / D1+D3 — The watch + meta open (promoted 2026-08-19)
+
+Requirements: requirements.json § `live-agent-control-seam`, § `spectator-god-view`,
+§ `emergent-strategy-readout`, § `tech-effect-union`, § `law-author-and-treasury`.
+
+Ben's verdicts (version-alignment form, 2026-08-19): watch path now, Era −1 replay stays on
+Lane A; D1 then D3 in one batch; hygiene + watch + meta in parallel worktrees. **Main session
+owns** the board files (`backlog.json`, `ROADMAP.md`, `SPRINTS.md`, `sprints.json`,
+`NEEDS_REVIEW.json`, `requirements.json`, this file) plus `question_log.json` updates at merge —
+**no agent touches them**.
+
+### Sprint W1 — the watch (cuts toward v0.1.16)
+
+- **[4] WA — BL-412 live agent control seam.** **IN FLIGHT** (sub-agent, worktree).
+  Files: `src/main.cpp`, `src/app.cpp`, new `src/app_agent_seam.{hpp,cpp}` (or equivalent),
+  `tools/mcp/` client-side touch only if needed. The rendered app gains a local **listen**
+  socket drained non-blocking at tick boundaries into `apply_corp_command`; agent-gates-the-clock;
+  commands arrival-ordered and recorded (transcript = replay artifact). Untrusted input boundary:
+  validate as-landed values, reject whole commands, rejection mutates nothing.
+- **[3] WB — BL-408 spectator god view.** **IN FLIGHT** (sub-agent, worktree).
+  Files: `src/ui/*` fog/visibility read sites per the item's design. Spectate sees every corp's
+  internals; ordinary play unaffected (flag-gated, default off).
+- **[3] WC — BL-411 emergent strategy readout.** **IN FLIGHT** (sub-agent, worktree).
+  Files: `src/ui/decision_feed.*` + new readout surface. Aggregates verb mix / spend buckets /
+  reason codes; **score fields excluded** (NR-226 fence in the item).
+- **[2] WD — BL-335 token-cost measurement (one-off).** Queued behind WA's merge — runs against
+  `--serve` as-is, so it can also run before if the batch stalls.
+- **[1] WE — local model runtime setup.** Main session, after WA merges: Ollama-class runtime +
+  a small instruct model as a stock MCP client. Engine untouched (it only listens).
+
+### Sprints D1+D3 — meta opens (cuts toward v0.1.11)
+
+- **[3] MA — BL-479 tech effect union + modifier vocabulary.** **IN FLIGHT** (sub-agent,
+  worktree). Files: `src/world/tech_gate.{hpp,cpp}`, new `src/world/modifier_set.hpp`,
+  `src/world/economy_system.cpp` (application seam), harness. Lane D owns the one-appender rule
+  for serialised enums. No-effect worlds bit-identical (state_hash).
+- **[4] MB — BL-480 law author + treasury.** **IN FLIGHT** (sub-agent, worktree).
+  Files: `src/world/law.{hpp,cpp}`, `src/world/components.hpp` (nation treasury),
+  `src/world/budget_system.cpp`, `src/ui/balance_ledger.cpp`, harness. Levy becomes a conserved
+  transfer; enactment off the player's ledger; wages lever severable (only if MA's vocabulary
+  names `wage_floor` in time).
+- **[2] MC — BL-443 debt floor (rider).** Held pending the N1 audit's verdict that it is
+  genuinely unbuilt; if confirmed, promote into this batch per Fall-arc amendment 5.
+
+### Hygiene lane (main session + one read-only audit agent)
+
+- **[1] HA — N1 audit: the seven un-flipped Sprint-26 items** (BL-417, BL-429, BL-437, BL-439,
+  BL-440, BL-443, BL-453). **IN FLIGHT** (read-only sub-agent). Verdict per item: complete
+  (with hash) / held (with reason) / genuinely open.
+- **[1] HB — board surgery.** **DONE** this session: v0.1.16 split (→ v0.1.19–22 + v0.1.11),
+  v0.1.18 defined, four stale re-goals, BL-306/BL-335 un-parked, BL-477–BL-480 filed, design
+  amendments (BL-186, BL-410, BL-411, BL-087), ROADMAP/SPRINTS records corrected.
+
+### Collision map
+
+| Task | Writes | Collides with |
+|---|---|---|
+| WA | `main.cpp`, `app.cpp`, new seam files | nothing (WB/WC are ui/*) |
+| WB | `src/ui/` fog read sites | WC only if both touch a shared panel — WC's surface is new; flag at merge |
+| WC | `decision_feed.*`, new readout | WB (see above) |
+| MA | `tech_gate.*`, new `modifier_set.hpp`, `economy_system.cpp` | MB via `components.hpp`? — MA does not touch it; MB does not touch `economy_system.cpp`. Disjoint. |
+| MB | `law.*`, `components.hpp`, `budget_system.cpp`, `balance_ledger.cpp` | nothing in this batch |
+| main | board files, `question_log.json` | all agents, by exclusion |
+
+Merge order: MA → MB (vocabulary before its first consumer), WA → WB → WC (seam before
+surfaces). Integrating build + `verifier-review` before the first merge commit, per DELIVERY
+step 4a. Live checks owed on WB/WC surfaces before their `visual` rows complete (2026-08-19
+standing rule).
+
+---
+
 ## Sprints 26a / 26b / 27 / B1 — The Fall opens, four lanes at once (promoted 2026-08-18)
 
 Four sprints opened together because their file sets are disjoint. Requirements groups are owed
@@ -21,7 +92,8 @@ worktrees mergeable.
 - **[1] B — un-park v0.1.11.** Seven items flipped `parked: false`; ROADMAP gains the minor back
   under the ancient arc, themed on *who enacts*. **DONE.**
   Files: `backlog.json`, `ROADMAP.md`.
-- **[2] C — NEW-1 the prehistory-on determinism case.** **IN FLIGHT** (sub-agent, worktree).
+- **[2] C — NEW-1 the prehistory-on determinism case.** **DONE** (merged `0fa76ce`, 8/8 green;
+  marker flipped 2026-08-19 — it sat stale a day after the merge, NR-361).
   File: `tools/verify/world_determinism.cpp`. Three cases: same-seed replay, different-seed
   divergence, and prehistory-on ≠ prehistory-off (proving the pass is not a silent no-op).
   **A red result is a finding and must be reported, not softened.**
@@ -34,7 +106,7 @@ worktrees mergeable.
   ledger) stays open: *"DONE but UNVERIFIED"*, R6 pending, NR-313. BL-417, BL-429, BL-437, BL-439,
   BL-440, BL-441, BL-442, BL-443 stay open pending per-item verification — Sprint 19/20's records
   show several held or forked, and a bulk flip on an audit's count lies in the other direction.
-- **[3] E — the doc truth pass.** **IN FLIGHT** (sub-agent, worktree).
+- **[3] E — the doc truth pass.** **DONE** (merged `d4cdc5e`; marker flipped 2026-08-19).
   Files: `docs/lore/HISTORY.md`, `docs/economy/ERAS.md`, `docs/tech/TECH_FOUNDATIONS.md`,
   `docs/military/MILITARY.md`. Span → 400 in one band; combat/weaponry/military-logistics
   un-excluded; MILITARY.md's Build status corrected to say upkeep ships at **rate zero**, and
@@ -42,7 +114,8 @@ worktrees mergeable.
 
 ### Sprint 27 — Lane A: the run is retained, and its failure is falsifiable
 
-- **[3] F — BL-384 the assertion half.** **IN FLIGHT** (sub-agent, worktree).
+- **[3] F — BL-384 the assertion half.** **DONE** (merged `400df47` + `1a2057d`; assertion
+  committed RED as planned — the finding stands, no constant tuned; marker flipped 2026-08-19).
   File: `tools/verify/history_sim_harness.cpp`. Conquest-count assertion plus elimination and
   dominance-share counters, reusing `history_sweep.cpp`'s `hegemony_threshold_q` shape.
   **Expected outcome is RED.** No constant tuned, no scorer term touched.
@@ -52,7 +125,7 @@ worktrees mergeable.
 
 ### Sprint B1 — Lane B: the substrate becomes a number
 
-- **[3] I — NEW-10 substrate census.** **IN FLIGHT** (sub-agent, worktree).
+- **[3] I — NEW-10 substrate census.** **DONE** (merged `a8a5bbd`; marker flipped 2026-08-19).
   File: `tools/verify/substrate_census.cpp` (new). Report, never a gate. Measured **after**
   `generate_background_firms`, at `prehistory_years` default. Runtime reported explicitly — over
   60 s it Times Out under ctest, which has hidden a harness before (NR-259).

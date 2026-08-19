@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*124 entries — 81 open, 43 resolved.*
+*132 entries — 89 open, 43 resolved.*
 
 ---
 
@@ -897,6 +897,52 @@ The session brief suggested resuming BL-439/440/443 (deferred by the immediately
 > **Recommendation:** Next session should pick up NR-354's option A (re-run tier_margin/ai_skill_harness against BL-441/442's landing before deciding BL-440(c)'s shape) or option C (BL-439 as its own dedicated pass) - both are still live and unaddressed.
 
 *Files: `docs/development/backlog.json`*
+
+### NR-359 — BL-476 rival military seeding: iteration order and shared-occupancy threading, plus the is_background exclusion mechanism
+*decision taken on your behalf · raised 2026-08-19 · from Implementing BL-476 (RIVALS_START_UNARMED) in src/world/corporation_generation.cpp.*
+
+Two calls made while extending the player-only military seeding block to every corp: (1) iterated `corp_ids` in its existing generation-order sequence (player + rivals, no BL-365 background firms - they are created by a separate, later pass and never appear in this vector) rather than re-sorting by entity_id first, since corp_ids is already deterministic and re-sorting would add a step with no behavioural difference; (2) threaded ONE shared `occupied_tiles` set across every corp's seed_starting_military call (rebuilt once from w.buildings before the loop, then mutated in place by author_building each iteration) so two corps can never be placed on the same tile - this widens the original player-only rebuild-from-w.buildings pattern to a loop without changing its semantics for the player's own case.
+
+**Why it matters.** Both calls are load-bearing for determinism: a different iteration order or a per-corp-rebuilt occupancy set could change which tile a given rival lands on, or (worse) let two corps collide on one tile. The is_background exclusion is implicit (corp_ids never contains a background firm) rather than an explicit filter - correct today because generate_background_firms runs strictly after generate_corporations, but a future refactor that reorders those two passes would silently arm background firms again with no compile error.
+
+> **Recommendation:** If the two generation passes are ever reordered or merged, add an explicit `!cc.is_background` guard in the seeding loop rather than relying on the passes' current call order - noted here so that refactor does not quietly reintroduce armed background firms.
+
+*Files: `src/world/corporation_generation.cpp`*
+
+### NR-360 — The v0.1.16 split executed: destination mapping chosen on Ben's behalf
+*decision taken on your behalf · raised 2026-08-19 · from Version-alignment session 2026-08-19: six-agent research workflow + 27-verdict contradiction audit + Ben's form verdicts.*
+
+Ben ruled "split the 36-item v0.1.16 holding pen now" but not the destinations. Mapping chosen: v0.1.16 keeps The watch (BL-408/410/411/412/413/418/451 + un-parked BL-306/BL-335); v0.1.19 Ancient conflict & seams (BL-274/277/297/298/299/300/320/337); v0.1.20 Stance & force (BL-314/399/449/450/464/474/475 + BL-472 from v0.1.18); v0.1.21 The credible rival (BL-417/419/439/440/445/446/447); v0.1.22 Harness truth (BL-425/426/427/462/463); BL-296 + BL-443 to v0.1.11 (meta). Rationale: theme coherence per the roadmap grain; the watch keeps the number because its items were already there and Sprint W1 cuts it.
+
+### NR-361 — Stale-goal re-homing destinations chosen (BL-372/375/391/392, BL-264)
+*decision taken on your behalf · raised 2026-08-19 · from Version-alignment session 2026-08-19: six-agent research workflow + 27-verdict contradiction audit + Ben's form verdicts.*
+
+BL-372 (lens-keyed selection) -> v0.1.7 (UI alignment); BL-375 (time-to-space pacing, parked) -> v0.2.0; BL-391 (reputation floor deadlock) -> v0.1.15 (the contract/pay loop owns reputation); BL-392 (procurement destroys value) -> v0.1.11 (Lane D guard: D4 says fix before BL-445); BL-264 (wizard layout, orphaned by the v0.1.11 supersession) -> v0.1.7. BL-341 found complete, untouched.
+
+### NR-362 — BL-087 piece 2 extracted as BL-478 rather than un-parking the whole item
+*decision taken on your behalf · raised 2026-08-19 · from Version-alignment session 2026-08-19: six-agent research workflow + 27-verdict contradiction audit + Ben's form verdicts.*
+
+Ben's verdict said "Un-park BL-087 piece 2 into the live arc". Executed as an EXTRACTION: new item BL-478 (ancient research spend, v0.1.11, design-owed) carries the research-state + spend mechanism; BL-087 itself stays parked with the space arc, its design noting the extraction.
+
+### NR-363 — BL-477 filed: "each era has a collapse state to avoid - that defines meta" - wording is yours to confirm
+*question · raised 2026-08-19 · from Version-alignment session 2026-08-19: six-agent research workflow + 27-verdict contradiction audit + Ben's form verdicts.*
+
+Your form note is now BL-477 (design-owed, A, v0.1.11), quoted verbatim, with the reading: ancient era's collapse state = imperial collapse (Fall arc Sprint 30 strain machinery); industrial/space = nuclear rupture (BL-333, parked); meta systems must couple levers to the era's collapse pressure. Open question filed in the item: is the collapse state always avoidable at a price, or genuinely reachable in campaign play as it is in generation?
+
+### NR-364 — BL-186 laws-ledger design amended to the who-enacts model without a fresh ask
+*decision taken on your behalf · raised 2026-08-19 · from Version-alignment session 2026-08-19: six-agent research workflow + 27-verdict contradiction audit + Ben's form verdicts.*
+
+BL-186's § Settled 2026-07-19 (player enact/repeal fast-path on the Budget ledger) struck with a dated note: ledger is browse-only, extraction tax surfaces BL-280's negotiation, enactment belongs to the nation actor (BL-480).
+
+### NR-365 — Sizing note: the Fall arc's "12-20 sessions / two-month" line left standing as a ceiling
+*observation · raised 2026-08-19 · from Version-alignment session 2026-08-19: six-agent research workflow + 27-verdict contradiction audit + Ben's form verdicts.*
+
+Measured cadence: median sprint closes in 1 day (14 dated sprints across 29 days); the two design-heavy sprints ran 8-10 days. Honest range for the arc: ~3 weeks (median-like) to ~2 months (design-heavy-like). The risk line is denominated in sessions, which dates cannot measure; not edited.
+
+### NR-366 — Worktree/branch debt named, not swept: 29 merged worktree-agent branches, ~15 stale mounts, one superseded rename branch
+*observation · raised 2026-08-19 · from Version-alignment session 2026-08-19: six-agent research workflow + 27-verdict contradiction audit + Ben's form verdicts.*
+
+Cleanup NOT run this session (deletion is destructive and was not on the form). The rename branch worktree-agent-ac68172a carries a9f1e52, superseded 42 minutes later by main's 70b2470 - eyeball-diff owed before deletion per the stale-base memory. The two unmerged branches: that one, plus the deliberate BL-474/475 paused WIP.
 
 ---
 

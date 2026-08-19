@@ -67,14 +67,19 @@ commit timestamps rather than reviving an unstarted timer.)
 | 27 | The run is retained, and its failure falsifiable | **Open 2026-08-18** — Lane A; BL-384 assertion half only, expected RED |
 | B1 | The substrate becomes a number | **Open 2026-08-18** — Lane B; substrate census harness in flight |
 | C1 | Stance, and the first cut of Logistic Points | **Open 2026-08-18** — BL-448+449+461 build, BL-464 design-only |
+| W1 | The watch — an agent plays, a human watches | **Open 2026-08-19** — BL-412 seam + BL-408 god view + BL-411 readout; cuts toward v0.1.16 (re-themed The watch) |
+| D1 | A tech can express a buff | **Open 2026-08-19** — BL-479 effect union + modifier vocabulary; one batch with D3 |
+| D3 | A law has an author, and a tax is a transfer | **Open 2026-08-19** — BL-480; enactment off the player's ledger |
 
 Every other sprint number that has ever appeared in this file (3–5's original theming, 17–18,
 20–24, 25b, and the full Lane A/B/C/D breakdown of the 26–33 arc — 28, 29, 30, 31, B2, B3, C2,
 C3, D1–D4) is recorded in `sprints.json` with its full goal/planned/risk/notes prose, whether it
 closed, was superseded, or is still a live proposal awaiting Ben's pick.
 
-**Next up.** Sprint C1 (stance + Logistic Points design) and the 26–33 "Fall" arc's Lane A/B
-gate sprints (26a, 26b, 27, B1) are the open work as of 2026-08-18; see their entries in
-`sprints.json` for planned items, done-when criteria and risk. Sprint 20's three candidates
-(finish the economy thread / the military engagement surface / the debt amplifier alone) remain
-Ben's call, unopened.
+**Next up.** As of 2026-08-19 the open work is Sprint W1 (the watch — BL-412 agent seam, BL-408
+god view, BL-411 strategy readout, toward v0.1.16), Sprints D1+D3 as one Lane D batch (BL-479
+tech effect union, BL-480 law author + treasury, toward v0.1.11), plus the still-open Fall gate
+sprints (26a remainder, 26b remainder, 27, B1) and C1's BL-464 design half. The 2026-08-19
+version-alignment session also executed Sprint 26's dropped board-surgery half — see entry 26's
+amendment and ROADMAP § the ancient arc for the v0.1.16 split (v0.1.19–v0.1.22 named). Sprint
+20's three candidates remain Ben's call, unopened.

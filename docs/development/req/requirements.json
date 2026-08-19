@@ -4441,6 +4441,121 @@
     }
    ],
    "notes": "Scope settled directly with Ben, 2026-08-19: player + named rivals only, not background filler firms. No UI surface, so the live-UI-check rule does not apply here - a headless harness is sufficient for this item. Player's own tile pick verified byte-identical: seed_starting_military is now called for the player FIRST (before any rival), against the same w.buildings-derived occupied_tiles snapshot the pre-BL-476 code used, so no rival can claim the tile the player would previously have picked - see the code comment in corporation_generation.cpp and NR-359."
+  },
+  {
+   "brief": "live-agent-control-seam",
+   "batch": "2026-08-19-watch-and-meta",
+   "title": "BL-412 - live agent control seam",
+   "status": "pending",
+   "promoted_from": "backlog.json BL-412 LIVE_AGENT_CONTROL_SEAM",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING (headless): with the rendered app replaced by a headless drain loop, a command stream delivered over the new local listen socket at tick boundaries produces a world state_hash identical to the same schedule applied in-process through apply_corp_command. Arrival order is application order; the transcript (tick, corp, verb, args) is recorded and REPLAYS to the same hash."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "Untrusted boundary (headless): a command with any out-of-domain field (non-finite double, out-of-range id, unknown verb) is rejected WHOLE with a typed reason; world state_hash before == after rejection. No clamp, no truncation."
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "LIVE check (human): the built app runs windowed; an external MCP client connects, issues a build/hire command; the effect appears on canvas within one tick and the app remains interactive. A clean compile and a green harness are not sufficient (2026-08-19 rule)."
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "requirement": "The engine only LISTENS: no outbound connection code, no HTTP client, no API key (AI_OPPONENT.md section 10 invariant) - asserted by grep-level review in verifier-review, not by a harness."
+    }
+   ]
+  },
+  {
+   "brief": "spectator-god-view",
+   "batch": "2026-08-19-watch-and-meta",
+   "title": "BL-408 - spectator god view",
+   "status": "pending",
+   "promoted_from": "backlog.json BL-408 SPECTATOR_GOD_VIEW",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING (visual + live): under spectate with god view on, a rival corp's internals (stockpile/production detail the competitor-visibility rule normally hides) are readable on its Selection/hover surfaces; with the flag off, the BL-068 visibility rule is byte-identical to today. Live click-through required before completion."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "Ordinary (non-spectate) play is unaffected: god view unreachable, default off, no new always-on cost in the frame path."
+    }
+   ]
+  },
+  {
+   "brief": "emergent-strategy-readout",
+   "batch": "2026-08-19-watch-and-meta",
+   "title": "BL-411 - emergent strategy readout",
+   "status": "pending",
+   "promoted_from": "backlog.json BL-411 EMERGENT_STRATEGY_READOUT",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING (visual + live): a per-corp readout aggregating verb mix, spend buckets and reason codes over a rolling window renders and updates as the sim ticks; score/margin fields are ABSENT from the aggregation (NR-226 fence - runner_up can exceed winning_score by bucket-before-score sorting)."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "question_log.json pair authored for the new surface (question answered + earning item BL-411), drafted status acceptable pending Ben's wording."
+    }
+   ]
+  },
+  {
+   "brief": "tech-effect-union",
+   "batch": "2026-08-19-watch-and-meta",
+   "title": "BL-479 - tech effect union + modifier vocabulary (Sprint D1)",
+   "status": "pending",
+   "promoted_from": "backlog.json BL-479 TECH_EFFECT_UNION",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING (headless): a tech carrying modify_scalar, once earned by corp X, moves exactly the named scalar for X and no other corp; a world where no tech carries an effect beyond unlock_structure is bit-identical (state_hash) to the pre-change build."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "The modifier-subject vocabulary lives in one shared header (modifier_set.hpp), is a closed enum, and names at least one strain/cohesion-adjacent subject so BL-477's collapse-coupled meta is expressible."
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "The E0-ML-01 gate (Standing Garrison Doctrine -> military_base) behaves identically through the union - the existing tech_gate harness assertions still pass unmodified."
+    }
+   ]
+  },
+  {
+   "brief": "law-author-and-treasury",
+   "batch": "2026-08-19-watch-and-meta",
+   "title": "BL-480 - law author + nation treasury (Sprint D3)",
+   "status": "pending",
+   "promoted_from": "backlog.json BL-480 LAW_HAS_AN_AUTHOR",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING (headless): with the levy enacted by nation N, sum(levy debited from corps in N's scope) == sum(credited to N's treasury) over any tick span - money conserved, the BL-392-class destruction gone from this flow. An out-of-scope corp pays zero."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "Repeal returns the world bit-identical to the never-enacted baseline (the v0.1.3 done-definition's inertness rule, now with an author)."
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "No player-reachable enact/repeal control remains (balance_ledger.cpp checkbox removed); enactment is generation-seeded by the author nation this sprint, seam shaped for the granted nation-grain scorer. LIVE check: the balance ledger renders its levy line read-only."
+    }
+   ]
   }
  ]
 }

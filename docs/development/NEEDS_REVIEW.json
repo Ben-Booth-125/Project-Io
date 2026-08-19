@@ -2093,6 +2093,83 @@
     "BL-476"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-360",
+   "title": "The v0.1.16 split executed: destination mapping chosen on Ben's behalf",
+   "raised": "2026-08-19",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Version-alignment session 2026-08-19: six-agent research workflow + 27-verdict contradiction audit + Ben's form verdicts.",
+   "what": "Ben ruled \"split the 36-item v0.1.16 holding pen now\" but not the destinations. Mapping chosen: v0.1.16 keeps The watch (BL-408/410/411/412/413/418/451 + un-parked BL-306/BL-335); v0.1.19 Ancient conflict & seams (BL-274/277/297/298/299/300/320/337); v0.1.20 Stance & force (BL-314/399/449/450/464/474/475 + BL-472 from v0.1.18); v0.1.21 The credible rival (BL-417/419/439/440/445/446/447); v0.1.22 Harness truth (BL-425/426/427/462/463); BL-296 + BL-443 to v0.1.11 (meta). Rationale: theme coherence per the roadmap grain; the watch keeps the number because its items were already there and Sprint W1 cuts it.",
+   "why": "Sprint 26's dropped board-surgery half (verdict N2); Ben picked \"split now\" on the form.",
+   "how_to_apply": "Object to any single destination and it moves; the split is data-only (version_goal fields + ROADMAP bullets)."
+  },
+  {
+   "id": "NR-361",
+   "title": "Stale-goal re-homing destinations chosen (BL-372/375/391/392, BL-264)",
+   "raised": "2026-08-19",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Version-alignment session 2026-08-19: six-agent research workflow + 27-verdict contradiction audit + Ben's form verdicts.",
+   "what": "BL-372 (lens-keyed selection) -> v0.1.7 (UI alignment); BL-375 (time-to-space pacing, parked) -> v0.2.0; BL-391 (reputation floor deadlock) -> v0.1.15 (the contract/pay loop owns reputation); BL-392 (procurement destroys value) -> v0.1.11 (Lane D guard: D4 says fix before BL-445); BL-264 (wizard layout, orphaned by the v0.1.11 supersession) -> v0.1.7. BL-341 found complete, untouched.",
+   "why": "Four open items targeted already-tagged versions (verdict C) - a goal that can never be met.",
+   "how_to_apply": "Any of the five is a one-field move if you prefer a different home."
+  },
+  {
+   "id": "NR-362",
+   "title": "BL-087 piece 2 extracted as BL-478 rather than un-parking the whole item",
+   "raised": "2026-08-19",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Version-alignment session 2026-08-19: six-agent research workflow + 27-verdict contradiction audit + Ben's form verdicts.",
+   "what": "Ben's verdict said \"Un-park BL-087 piece 2 into the live arc\". Executed as an EXTRACTION: new item BL-478 (ancient research spend, v0.1.11, design-owed) carries the research-state + spend mechanism; BL-087 itself stays parked with the space arc, its design noting the extraction.",
+   "why": "BL-087's era-event/quest framing is 1960-era and does not fit 0 CE; un-parking the whole item would drag space-arc scope across the boundary the parking discipline protects.",
+   "how_to_apply": "If you meant the whole item live, flip BL-087 parked:false and BL-478 becomes its first task instead."
+  },
+  {
+   "id": "NR-363",
+   "title": "BL-477 filed: \"each era has a collapse state to avoid - that defines meta\" - wording is yours to confirm",
+   "raised": "2026-08-19",
+   "kind": "question",
+   "status": "open",
+   "source": "Version-alignment session 2026-08-19: six-agent research workflow + 27-verdict contradiction audit + Ben's form verdicts.",
+   "what": "Your form note is now BL-477 (design-owed, A, v0.1.11), quoted verbatim, with the reading: ancient era's collapse state = imperial collapse (Fall arc Sprint 30 strain machinery); industrial/space = nuclear rupture (BL-333, parked); meta systems must couple levers to the era's collapse pressure. Open question filed in the item: is the collapse state always avoidable at a price, or genuinely reachable in campaign play as it is in generation?",
+   "why": "A paradigm statement deserves an item Ben has actually read, not a paraphrase buried in a session log.",
+   "how_to_apply": "Read BL-477's design field; correct the reading or answer the avoidability question and it graduates to designed."
+  },
+  {
+   "id": "NR-364",
+   "title": "BL-186 laws-ledger design amended to the who-enacts model without a fresh ask",
+   "raised": "2026-08-19",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Version-alignment session 2026-08-19: six-agent research workflow + 27-verdict contradiction audit + Ben's form verdicts.",
+   "what": "BL-186's § Settled 2026-07-19 (player enact/repeal fast-path on the Budget ledger) struck with a dated note: ledger is browse-only, extraction tax surfaces BL-280's negotiation, enactment belongs to the nation actor (BL-480).",
+   "why": "Verdict M4: three-way churn with the stalest prose standing in the item an implementer would be handed; your ruling 5 (2026-08-18) already governs under newest-dated-wins - this applies it rather than re-asking.",
+   "how_to_apply": "The struck paragraph is preserved under the dated note if you want any of it back."
+  },
+  {
+   "id": "NR-365",
+   "title": "Sizing note: the Fall arc's \"12-20 sessions / two-month\" line left standing as a ceiling",
+   "raised": "2026-08-19",
+   "kind": "observation",
+   "status": "open",
+   "source": "Version-alignment session 2026-08-19: six-agent research workflow + 27-verdict contradiction audit + Ben's form verdicts.",
+   "what": "Measured cadence: median sprint closes in 1 day (14 dated sprints across 29 days); the two design-heavy sprints ran 8-10 days. Honest range for the arc: ~3 weeks (median-like) to ~2 months (design-heavy-like). The risk line is denominated in sessions, which dates cannot measure; not edited.",
+   "why": "You flagged \"we historically move faster\" - the record partially supports it; the conservative line reads as deliberate expectation-setting.",
+   "how_to_apply": "If you want it restated as a range, it is a one-line edit to sprints.json entry 26-33."
+  },
+  {
+   "id": "NR-366",
+   "title": "Worktree/branch debt named, not swept: 29 merged worktree-agent branches, ~15 stale mounts, one superseded rename branch",
+   "raised": "2026-08-19",
+   "kind": "observation",
+   "status": "open",
+   "source": "Version-alignment session 2026-08-19: six-agent research workflow + 27-verdict contradiction audit + Ben's form verdicts.",
+   "what": "Cleanup NOT run this session (deletion is destructive and was not on the form). The rename branch worktree-agent-ac68172a carries a9f1e52, superseded 42 minutes later by main's 70b2470 - eyeball-diff owed before deletion per the stale-base memory. The two unmerged branches: that one, plus the deliberate BL-474/475 paused WIP.",
+   "why": "Every listing/status read pays a small tax on this debt; but a bulk branch delete deserves an explicit go-ahead.",
+   "how_to_apply": "Say \"sweep the merged worktrees\" in any session and it is a 10-minute pass with the a9f1e52 diff check first."
   }
  ]
 }
