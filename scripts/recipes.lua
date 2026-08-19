@@ -452,6 +452,36 @@ recipes = {
         inputs  = { steel = 1.0, machinery = 1.0 },
         outputs = { ordnance = 1.0 },
     },
+
+    -- id 28 — Smithy, ANCIENT ordnance route (BL-460): iron_blooms + charcoal
+    -- -> ordnance. The route id 27's own comment named and deliberately left
+    -- out ("belongs with BL-429's ancient roster, not smuggled in beside an
+    -- industrial-era recipe") — that deferral shipped without a tracking item,
+    -- so the ancient campaign (epoch_year = 0, the shipped default) drew a good
+    -- it could never make: BL-454's unit upkeep is band-independent (units
+    -- exist in both arcs), but ordnance's only producer was industrial-only.
+    --
+    -- SAME BUILDING AS id 19 (Smithy, "Metal Foundry" group), not a new one —
+    -- the task explicitly asks to reuse the roster rather than invent a
+    -- fourth ancient metalworking building. The Smithy already turns
+    -- iron_blooms + charcoal into steel; this is BL-430's alternate-recipe
+    -- mechanic doing exactly what it exists for — one built facility,
+    -- switchable between its steel and ordnance recipes.
+    --
+    -- SAME QUANTITIES AS id 19's steel recipe (2 iron_blooms + 1 charcoal),
+    -- deliberately: this is the identical basket the Smithy already draws,
+    -- not a retuned one, so the switch between "make steel" and "make
+    -- ordnance" is a straight recipe swap rather than a new resourcing
+    -- decision. Ordnance's base_price (43.0, world_gen.lua, BL-457) is
+    -- already authored and unchanged by this recipe.
+    {
+        name    = "ordnance_from_blooms",
+        display_name = "Smithy", -- same building as id 19
+        era     = "ancient",
+        group   = "Metal Foundry", -- BL-434, with the Bloomery/Smithy steel chain
+        inputs  = { iron_blooms = 2.0, charcoal = 1.0 },
+        outputs = { ordnance = 1.0 },
+    },
 }
 
 print(string.format("[Lua] recipes.lua loaded  recipe_count=%d", #recipes))

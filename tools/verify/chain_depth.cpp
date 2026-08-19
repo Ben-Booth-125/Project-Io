@@ -54,6 +54,13 @@
 //       BL-286 is the precedent this exists for — eleven values added with
 //       "behaviour unfiled", and no diff review ever caught the ones with no
 //       consumer.
+//   R1b No orphan-in-a-BAND resources (BL-460, 2026-08-19): R1 only checks a
+//       consumer EXISTS somewhere in the roster, not that producer and
+//       consumer are reachable under the SAME concrete campaign band —
+//       `ordnance` passed R1 (BL-454's upkeep is its named consumer) while
+//       being genuinely unproducible at the shipped ancient-band default. This
+//       row generalises the check per band; known, tracked, out-of-scope gaps
+//       of the same shape are named rather than silently passed (NR-355).
 //   R2  No dominant production method — but only between recipes a corp can
 //       actually choose between. See the axis note at the row itself: disjoint-raw
 //       siblings are supply routes, not methods, and comparing them on price is
@@ -457,6 +464,140 @@ int main()
               "every resource is obtainable - produced by a recipe or extractable from a deposit");
         check(unwanted.empty(),
               "every resource is wanted - consumed by a recipe, or by a named actor on the exemption list");
+    }
+
+    // --- R1b: producer and consumer reachable in the SAME era band ------------
+    //
+    // BL-460. R1 above only checks that a consumer EXISTS somewhere in the
+    // roster; `era = "..."` tags gate PLACEMENT, not existence, so a resource
+    // can pass R1 (some recipe or named actor consumes it, some recipe
+    // produces it) and still be UNPRODUCIBLE at the one concrete campaign band
+    // that actually wants it. This is exactly what happened to `ordnance`:
+    // BL-457 gave it an industrial-only Fabricator recipe while BL-454's unit
+    // upkeep draws it every tick in EITHER band (units exist in both arcs), so
+    // the shipped default campaign (epoch_year = 0, era_band::ancient) consumed
+    // a good it could never make. R1's own exemption table is the thing that
+    // hid it: a consumer NAMED is not the same as a consumer REACHABLE.
+    //
+    // The check, per concrete band B in {ancient, industrial}: is the resource
+    // WANTED in B (some recipe consumes it under era_permits(B, recipe.era), or
+    // a named actor-consumed exemption applies) but NOT REACHABLE in B (no
+    // recipe produces it under era_permits(B, recipe.era), and no deposit
+    // yields it)? Deposits are band-independent — world generation does not
+    // gate extraction by era — so only the RECIPE side of reachability can
+    // strand a good.
+    //
+    // Actor-consumed goods are treated as WANTED IN EVERY BAND, mirroring R1's
+    // table exactly (same list, same reasons) rather than guessing per-actor
+    // era scope: none of those consumers (unit upkeep, population demand,
+    // mercantile demand, procurement) is itself era-gated in economy_system.cpp
+    // or market_clearing.cpp today, so treating them as universal is the
+    // faithful reading of the CURRENT code, not an assumption layered over it.
+    std::printf("\nR1b - producer and consumer reachable in the SAME era band\n");
+    {
+        lua_state lua;
+        lua.load("scripts/recipes.lua");
+        lua.load("scripts/economy.lua");
+        recipe_registry reg;
+        reg.load_from_lua(lua);
+        reg.set_era(era_band::any);
+
+        std::vector<bool> extractable(resource_count, false);
+        for (const resource_type e : placement_rules::k_extractable)
+            extractable[static_cast<std::size_t>(e)] = true;
+        for (const resource_type e : { resource_type::tobacco, resource_type::spices,
+                                       resource_type::coffee,  resource_type::furs })
+            extractable[static_cast<std::size_t>(e)] = true;
+
+        // A NARROWER list than R1's own exemption table, and deliberately so.
+        // R1 only needs to know a good is wanted by SOMEONE, so it lumps every
+        // named actor together. This row asks whether that want is genuinely
+        // BAND-INDEPENDENT, which only holds for a REAL per-tick/per-contract
+        // stockpile draw — verified against source, not assumed:
+        //   spacecraft_components -> BL-350 procurement contracts (economy_system.cpp)
+        //   propellant             -> per-convoy dispatch (supply_system.cpp / corp_command.cpp)
+        //   clean_water/consumer_goods/medical_supplies -> inject_population_demand
+        //       (market_clearing.cpp:233, called unconditionally at :545)
+        //   ordnance                -> BL-454 unit upkeep, per-tick per-unit
+        // EXCLUDED on purpose: tobacco/spices/coffee/furs/trade_goods_misc.
+        // Grepping the C++ finds no programmatic draw against any of them at
+        // all — "mercantile demand" in R1's table means they are SELLABLE on
+        // the open market, not that any system requires them to exist. An
+        // ancient-only producer for an ancient-only endemic-luxury good is
+        // therefore a design choice (industrial fills the same role with
+        // consumer_goods), not a strand, and must not be flagged here.
+        static const resource_type k_actor_consumed[] = {
+            resource_type::spacecraft_components, resource_type::propellant,
+            resource_type::clean_water,           resource_type::consumer_goods,
+            resource_type::medical_supplies,      resource_type::ordnance,
+        };
+        auto actor_consumed = [&](std::size_t r) {
+            for (const resource_type e : k_actor_consumed)
+                if (static_cast<std::size_t>(e) == r)
+                    return true;
+            return false;
+        };
+
+        // Known, tracked gaps of this SAME defect class, found by this row but
+        // out of BL-460's scope (a single-good, difficulty-2 fix) to also
+        // repair. Each is a genuine finding — none of the named actors above
+        // are era-gated, so an ancient campaign really can starve these goods
+        // exactly as it starved ordnance — filed rather than silently fixed or
+        // silently ignored (io-standing-rules "named rather than assumed").
+        // Remove an entry the moment its own item lands an ancient (or
+        // industrial) route.
+        struct known_gap { resource_type res; era_band band; const char* tracking; };
+        static const known_gap k_known_gaps[] = {
+            { resource_type::spacecraft_components, era_band::ancient, "NR-355: BL-350 procurement is not era-gated; no ancient producer exists" },
+            { resource_type::propellant,             era_band::ancient, "NR-355: propellant dispatch is not era-gated; no ancient producer exists" },
+            { resource_type::clean_water,            era_band::ancient, "NR-355: population demand is not era-gated; no ancient producer exists" },
+            { resource_type::consumer_goods,         era_band::ancient, "NR-355: population demand is not era-gated; no ancient producer exists" },
+            { resource_type::medical_supplies,       era_band::ancient, "NR-355: population demand is not era-gated; no ancient producer exists" },
+        };
+        auto known_gap_tracked = [&](std::size_t r, era_band band) {
+            for (const known_gap& g : k_known_gaps)
+                if (static_cast<std::size_t>(g.res) == r && g.band == band)
+                    return true;
+            return false;
+        };
+
+        const int n = reg.recipe_count(building_type::processing_facility);
+        std::vector<std::string> stranded;
+        int gap_count = 0;
+        for (const era_band band : { era_band::ancient, era_band::industrial })
+        {
+            const char* band_name = (band == era_band::ancient) ? "ancient" : "industrial";
+            for (std::size_t r = 0; r < resource_count; ++r)
+            {
+                bool wanted    = actor_consumed(r);
+                bool reachable = extractable[r];
+                for (int i = 0; i < n && (!wanted || !reachable); ++i)
+                {
+                    const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
+                    if (!era_permits(band, rc.era))
+                        continue;
+                    if (rc.inputs[r]  > 0.0f) wanted    = true;
+                    if (rc.outputs[r] > 0.0f) reachable = true;
+                }
+                if (wanted && !reachable)
+                {
+                    if (known_gap_tracked(r, band))
+                    {
+                        ++gap_count;
+                        std::printf("      known gap (tracked): resource id %zu (%s)\n", r, band_name);
+                        continue;
+                    }
+                    stranded.push_back("resource id " + std::to_string(r) + " (" + band_name + ")");
+                }
+            }
+        }
+        for (const std::string& s : stranded)
+            std::printf("      STRANDED: %s - wanted in this band, no producer reaches it there\n", s.c_str());
+        std::printf("      %d stranded, %d known-and-tracked gap%s (see k_known_gaps)\n",
+                    static_cast<int>(stranded.size()), gap_count, gap_count == 1 ? "" : "s");
+        check(stranded.empty(),
+              "every resource wanted in a band has a producer reachable in that same band, "
+              "or an authored, tracked exemption");
     }
 
     // --- R2: no dominant production method ------------------------------------

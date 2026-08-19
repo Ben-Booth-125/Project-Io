@@ -1970,6 +1970,34 @@
    "what": "Before writing any code, git history showed both items already fully landed on main from the 2026-08-17 session: BL-441 at commits 37989d1/f0a50ce, BL-442 step 1 at 9fb90e2/5e442d1, and BL-442 STEP 2 (the band widening this session was explicitly told not to do) at 2a7aa01 - deriving ceil_mult=10.0 from measured haulage via tools/verify/haulage_measure.cpp, with the derivation written into MARKETS.md as the item's own design asked. Only backlog.json's status field for both items was stale (still 'designed'), plus REFINED.md and NEEDS_REVIEW.json already carry the landing detail from that session. No source file was changed this session.",
    "why_it_matters": "The task brief, written without this knowledge, said to leave BL-442 as 'designed' with step 2 noted as remaining. Following that instruction literally would have recorded a false claim (step 2 outstanding) against a codebase where it had already shipped, reviewed, and measured. Flipped both items to 'complete' instead, with CLOSED notes in each item's design field pointing at the actual landing commits, on the grounds that backlog.json's job is to reflect reality and a stale instruction should not be allowed to reintroduce a stale doc.",
    "next_step": "No action needed unless Ben disagrees with treating BL-442 as fully closed - if step 2's derivation (ceil_mult 4.0 -> 10.0, haulage-measured) needs revisiting, reopen BL-442 rather than reverting this status flip."
+  },
+  {
+   "id": "NR-355",
+   "title": "chain_depth's new era-aware R1b row finds five more goods with the same ordnance-era-strand shape",
+   "raised": "2026-08-19",
+   "kind": "observation",
+   "status": "open",
+   "source": "BL-460 (ORDNANCE_UNPRODUCIBLE_AT_0CE) implementation this session - the new R1b row in tools/verify/chain_depth.cpp checks, per concrete campaign band, that every WANTED resource has a producer REACHABLE in that same band.",
+   "what": "spacecraft_components, propellant, clean_water, consumer_goods and medical_supplies are all industrial-only-produced (recipes.lua, era = \"industrial\", no ancient route) yet drawn by consumers that are NOT era-gated in the C++: BL-350 procurement (economy_system.cpp:798-829), the propellant dispatch draw, and inject_population_demand (market_clearing.cpp:233, called unconditionally at market_clearing.cpp:545). So an ancient campaign (epoch_year < 1700, the shipped default) can in principle starve on all five exactly as it starved on ordnance before this item's fix - R1b would fail on all five if they were not exempted. They are exempted in R1b's k_known_gaps table (each with this note as its tracking reference) so the row stays green and honest rather than silently ignoring or silently fixing five goods outside BL-460's stated scope (a single-good, difficulty-2 item).",
+   "why_it_matters": "This is the SAME defect class BL-460 fixed for ordnance, found by the guard BL-460 built specifically to catch it. Whether each of these five is a live bug depends on whether population centres / procurement contracts / propellant dispatch are actually reachable in an ancient (0 CE) campaign today - PRODUCTION.md and POPULATION.md suggest population centres are still largely prototype-deferred, and procurement/propellant read as Era 1 (space) mechanics that may simply never fire for an ancient corp - but nothing in the code enforces that as a fact, only as an assumption, which is exactly the shape NR-257 and this item both exist to catch.",
+   "options": [
+    "A - one item per good (or one batched item) auditing whether each consumer actually fires in an ancient campaign; if any does, either give the good an ancient route (BL-460's pattern) or make the consumer era-gated",
+    "B - leave the five in R1b's known-gap table indefinitely as a documented, accepted limitation of the ancient arc (these goods/mechanics are implicitly industrial-only)",
+    "C - do nothing until a future item independently trips over one of these five in play, at which point R1b's known-gap table already names the fix location"
+   ],
+   "recommendation": "B for now, revisited as A once population centres (POPULATION.md) or the ancient-vs-industrial procurement question comes up on its own - filing five difficulty-2 items today would be scope creep on BL-460, which is a single-good fix. R1b's known-gap table is the durable record either way.",
+   "files": [
+    "tools/verify/chain_depth.cpp",
+    "src/world/market_clearing.cpp",
+    "src/world/economy_system.cpp",
+    "scripts/recipes.lua"
+   ],
+   "refs": [
+    "BL-460",
+    "BL-457",
+    "BL-454"
+   ],
+   "resolution": null
   }
  ]
 }

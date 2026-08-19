@@ -315,6 +315,17 @@ components 1.443. Ordnance draws steel 8.0 + machinery 22.0 = 30.0, so its `base
 is a ratio of **1.433**, inside that band rather than beside it. Re-derive if either input's price
 or the recipe quantities move.
 
+**BL-460 (2026-08-19): the Fabricator route above was industrial-only, and BL-454's upkeep draw is
+not.** The Fabricator recipe carries `era = "industrial"`, so an ancient campaign (the shipped
+default, `epoch_year = 0`) masked its only producer out while unit upkeep kept drawing ordnance
+every tick regardless of band — a good that passed the admission rule's *consumer exists* test and
+still could not be made. The fix is a second producer, not a second good: the Smithy — the same
+ancient building that already turns `iron_blooms + charcoal` into steel — gained an alternate
+recipe to `ordnance` at the identical basket (`docs/economy/PRODUCTION.md` § The ancient chain).
+`tools/verify/chain_depth.cpp`'s R1 row (no orphan resources) only checked that *a* consumer
+existed; it now carries an **R1b** row checking producer and consumer are reachable in the *same*
+concrete era band, which would have caught this before it shipped.
+
 ---
 
 ## Habitability goods
