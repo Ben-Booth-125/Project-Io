@@ -105,6 +105,26 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\procurement_harness.cpp ^
    /Fo:build_gen\verify\procurement_harness\ /Fe:build_gen\verify\procurement_harness.exe
 .\build_gen\verify\procurement_harness.exe
 
+:: Corp stance (BL-448) — the directed hostility map + canonicalised friendship
+:: map + pending-offer table, and the four corp_command verbs that mutate them
+:: (declare_hostile / offer_friendship / accept_friendship / return_to_neutral).
+:: Asserts directed hostility (not reciprocal), symmetric accepted friendship,
+:: a pending offer never reading as a stance, declare_hostile atomically
+:: dissolving an existing friendship, return_to_neutral's unilateral/
+:: direction-scoped rules, rejections mutating nothing, and determinism across
+:: both independent world construction and sequence replay. In-memory only —
+:: this project has no save-format serialiser to round-trip through yet.
+cl /nologo /std:c++20 /EHsc /I src tools\verify\stance_determinism.cpp ^
+   src\world\world.cpp src\world\corp_command.cpp src\world\construction.cpp ^
+   src\world\placement_rules.cpp src\world\condition_set.cpp src\world\survey_system.cpp ^
+   src\world\logistics.cpp src\world\unit_roster.cpp src\world\economy_system.cpp ^
+   src\world\market_clearing.cpp src\world\budget_system.cpp src\world\supply_system.cpp ^
+   src\world\stance.cpp src\world\tech_gate.cpp src\world\river_generation.cpp ^
+   src\world\building_profit.cpp src\world\corp_ai.cpp src\world\law.cpp ^
+   src\world\orbital_system.cpp ^
+   /Fo:build_gen\verify\stance_determinism\ /Fe:build_gen\verify\stance_determinism.exe
+.\build_gen\verify\stance_determinism.exe
+
 :: World audit — Kepler biome balance (S2) + extraction placement (S1) +
 :: deposit-reserve seeding (resource_remaining = richness x reserve factor).
 cl /nologo /std:c++20 /EHsc /I src tools\verify\world_audit.cpp ^

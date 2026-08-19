@@ -373,6 +373,29 @@ struct world
     /// economy_system.cpp's bldg_count_by_corp_body).
     std::map<std::pair<entity_id, entity_id>, float> corp_reputation;
 
+    /// Corp stance (BL-448): the directed hostility map, keyed (from, to) —
+    /// presence means `from` has declared hostile toward `to`; absence means
+    /// no such declaration, NOT "not hostile" in the other direction. Not
+    /// `standing.{hpp,cpp}` (BL-262's coarse power read — a different axis).
+    /// std::set, not a bool-valued map — presence alone is the fact; there is
+    /// nothing else to store per entry. See src/world/stance.hpp for the
+    /// verbs and the two-table HYBRID rationale (Ben, 2026-08-17, NR-302).
+    std::set<std::pair<entity_id, entity_id>> corp_hostile_pairs;
+
+    /// Corp stance (BL-448): the symmetric, ACCEPTED friendship table, keyed
+    /// canonical (min id, max id) — order-independent by construction. A row
+    /// here is always evidence both corps chose it (reached only via
+    /// offer_friendship + accept_friendship). Declaring hostility between the
+    /// pair dissolves the row atomically — see stance.hpp's declare_hostile.
+    std::set<std::pair<entity_id, entity_id>> corp_friend_pairs;
+
+    /// Corp stance (BL-448): PENDING friendship offers, keyed directed
+    /// (offerer, target). Deliberately a separate table from
+    /// `corp_friend_pairs` (invariant 1 in stance.hpp) — an unaccepted offer
+    /// must never be readable as a friendship by any consumer that only
+    /// checks the friendship table.
+    std::set<std::pair<entity_id, entity_id>> corp_friend_offers;
+
     /// Strategic AI decision log (BL-202): a fixed 256-entry ring of the most
     /// recent corp commands + score rationale, in deterministic application
     /// order. Derived observability (the chat feed / harness read it), not

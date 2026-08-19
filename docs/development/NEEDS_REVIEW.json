@@ -1825,6 +1825,22 @@
     "BL-467",
     "BL-473"
    ]
+  },
+  {
+   "id": "NR-349",
+   "title": "BL-448 (corp stance) skipped serialization.cpp — the file does not exist",
+   "raised": "2026-08-19",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-448, corp stance data model + verbs delivery.",
+   "what": "BL-448's file scope named src/world/serialization.cpp as a wiring target. No such file exists anywhere in the repo (confirmed by search); persistence is done per-subsystem (e.g. procurement.cpp's own write_procurement/read_procurement, never called from a production save path). The item's own design text says the harness must assert in-memory replay only because \"no serialiser exists yet in this project; do not invent one.\" Read together with the empty file, this was taken as licence to land the whole substrate with no persistence path at all, matching the design's explicit framing (\"Landing the substrate inert is deliberate\").",
+   "why_it_matters": "A save made after this lands will silently drop every corp's hostility/friendship/pending-offer state on reload, since nothing writes or reads it. Consistent with the design's stated scope (no consequence yet, substrate only), but worth Ben seeing named rather than discovered later as a save-format gap.",
+   "next_step": "When BL-315 (or whatever lands the first serialisation seam these tables need) adds persistence, follow procurement.cpp's write_/read_ pattern for corp_hostile_pairs / corp_friend_pairs / corp_friend_offers in world.hpp.",
+   "files": [
+    "src/world/stance.hpp",
+    "src/world/stance.cpp",
+    "src/world/world.hpp"
+   ]
   }
  ]
 }
