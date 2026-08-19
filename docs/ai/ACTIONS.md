@@ -16,7 +16,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*134 entries — 21 gameplay · 24 canvas · 15 lens · 45 ledger · 29 chrome.*
+*135 entries — 21 gameplay · 24 canvas · 15 lens · 45 ledger · 30 chrome.*
 
 ---
 
@@ -1841,6 +1841,17 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Expected output.** Toggles simulation pause via the same pause_toggle path as the Space hotkey. Resuming restores the previous speed tier. The button label flips accordingly.
 
 **Reason to select.** To halt or resume the simulation clock from the mouse-driven session menu.
+
+### `chrome.sysmenu_god_view` — System menu popup, spectate-only checkbox
+
+**Press.** Toggle the God view checkbox. Rendered only while spectating (corp_ai_params::spectating); unreachable in a played session by construction.
+
+**Valid when:**
+- App is in game; the system menu popup is open; the session is spectating (BL-409).
+
+**Expected output.** While on, competitor-visibility redactions lift for the WATCHER only: rival building internals (production, stockpile, profitability read-only page), corp cash/reserve facts, and the survey tell (unsurveyed tiles render through a lock-colour wash so the corp's own blindness stays visible). Off restores the BL-068 redactions with no residue. Never changes what any AI reads; the rival action grid stays disabled - sight, never hands.
+
+**Reason to select.** To audit a watched corp's decisions against what it actually knew, held and ran - honest watching vs omniscient watching is a deliberate, visible state (BL-408).
 
 ### `chrome.tech_tree_era_tab` — Tech-tree viewer (F9), era tab strip
 

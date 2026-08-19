@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <map>
+#include <tuple>
 #include <vector>
 
 float body_mean_habitability(const world& w, entity_id body)
@@ -100,6 +101,14 @@ void apply_budget(world& w,
         hab_cache.emplace(body, v);
         return v;
     };
+
+    // BL-480 review fix (2026-08-19 #2): the treasury credit is the first
+    // CROSS-corp float accumulation in this loop, and `corporations` is an
+    // unordered_map — float addition is not associative, so summing credits in
+    // iteration order would make the treasury total platform-dependent the day
+    // anything reads it. Collect (corp, nation, levy) here and apply after the
+    // loop in sorted order. Debits stay per-corp and are untouched.
+    std::vector<std::tuple<entity_id, entity_id, float>> levy_credits;
 
     for (auto& [corp, cc] : w.corporations)
     {
@@ -235,8 +244,11 @@ void apply_budget(world& w,
                     }
                     if (levy != 0.0f)
                     {
-                        levy_total          += levy;
-                        nat->second.treasury += levy; // the credit half of the transfer
+                        levy_total += levy;
+                        // Credit half of the transfer — deferred to the post-loop
+                        // sorted application (same float, same tick, so the
+                        // conservation guarantee is unchanged).
+                        levy_credits.emplace_back(corp, ls.enacting_nation, levy);
                     }
                 }
                 if (levy_total != 0.0f)
@@ -261,5 +273,20 @@ void apply_budget(world& w,
 
         if (breakdown)
             (*breakdown)[corp] = bud;
+    }
+
+    // Apply the levy credits in (corp, nation) order — a total independent of
+    // unordered_map iteration. The author nation was verified to exist at
+    // collection time; re-find defensively anyway (a dangling author credits
+    // nothing, mirroring the charge-nothing rule above).
+    if (!levy_credits.empty())
+    {
+        std::sort(levy_credits.begin(), levy_credits.end());
+        for (const auto& [payer, nation, amount] : levy_credits)
+        {
+            const auto nat = w.nations.find(nation);
+            if (nat != w.nations.end())
+                nat->second.treasury += amount;
+        }
     }
 }

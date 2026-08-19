@@ -124,8 +124,10 @@ public:
 
     const std::vector<agent_transcript_entry>& transcript() const { return m_transcript; }
 
-    /// Append-write the transcript as one line per command:
-    /// "T=<tick> R=<result> <raw line>". Returns false on I/O failure.
+    /// Write the transcript (TRUNCATING any previous file — each call carries
+    /// the full transcript; app.cpp writes on detach and again on exit) as one
+    /// line per command: "T=<tick> R=<result> <raw line>". Returns false on
+    /// I/O failure.
     bool write_transcript(const std::string& path) const;
 
     /// Drop the client (keeps listening). Clears pending queues; keeps the

@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**24 surfaces** — 4 settled, 20 awaiting Ben's wording.
+**27 surfaces** — 4 settled, 23 awaiting Ben's wording.
 
 ---
 
@@ -83,6 +83,22 @@ alphabetical order.
 **Because:** The six-pass pipeline discards its intermediates, so a surprising tile was previously unanswerable without a debugger: the heightmap, the sea score it was tested against, the moisture and the band all vanish before the tile exists. The breadcrumb names the input value and the rule that fired at each pass, which turns 'that looks wrong' into a specific pass to go and read. It is also the shared content builder the hover card and the Selection element are intended to wrap, so the space it earns is paid for more than once.
 
 *Demanded by BL-303 · `src/ui/generation_ledger.cpp` · id `generation_ledger_tile`*
+
+### God-view corp/rival readouts (Selection facts column, rival Status rows, rival hover detail) + the survey tell on the Planetary canvas
+
+**Answers:** What does this corp actually know, hold, and run — and where is its own blindness?
+
+**Because:** A spectator otherwise sees LESS than the AI being watched; the lift makes a rival's decisions auditable without touching what the AI reads. Sight, never hands: the action grid stays disabled; the survey tell (lock-wash on unsurveyed tiles) keeps the corp's own blindness visible so the watcher is not misled into judging a decision against information the corp never had.
+
+*Demanded by BL-408 · `src/ui/selection_panel.cpp`, `src/ui/hover_content.cpp`, `src/ui/body_surface_canvas.cpp` · id `god_view_readouts`*
+
+### System menu — God view checkbox (spectate only)
+
+**Answers:** Am I watching honestly or omnisciently?
+
+**Because:** The lift must be a visible, deliberate state, never ambient — a watcher who forgets which mode they are in draws wrong conclusions about what the AI could see. Rendered only under spectate, so a played session cannot reach it by construction.
+
+*Demanded by BL-408 · `src/ui/time_panel.cpp` · id `god_view_toggle`*
 
 ### Header
 
@@ -163,6 +179,14 @@ alphabetical order.
 **Because:** Which corp the player ran was an invisible lottery: the generator drew one and flagged it. Measured over 24 seeds (tools/verify/player_seed_sweep), that handed the player a pure-extraction corp on 13 of them, so the chain-depth ladder (BL-428) and the Method page (BL-430/BL-431) had no rung to stand on - while better openings sat unchosen in the same world. The screen earns its space by converting a hidden draw into a stated choice, which is also the honest alternative to rejection-sampling seeds (that would have hidden the distribution instead of exposing it). It shows name, industrial focus, home nation and holdings as N proc / N extr / N other. BALANCE IS DELIBERATELY ABSENT: opening balances are seeded BY the pre-game warm start, which has not run at this point, so every corp would read 0.0. And the screen deliberately does NOT rank the openings - BL-436 measured a processing facility as currently earning LESS per tick than the extraction site it replaces, so a processor-bearing corp is the DEEPER opening, not the richer one.
 
 *Demanded by BL-435 · `src/core/app.cpp`, `src/core/app.hpp`, `src/core/verify_api.cpp`, `scripts/verify/corp_choice.lua` · id `starting_corp_choice`*
+
+### Strategy readout (nav slot 12)
+
+**Answers:** What strategy is emerging from each corporation's run — what mix of verbs is it taking, which spending priorities dominate, and which reasons keep firing?
+
+**Because:** The decision feed (BL-407) shows the moves; nothing showed the SHAPE across a run — the thing Ben asked for (2026-08-14: watch AI play "and discover what strategies emerge"). The scorer has no strategy object, so an emergent strategy IS a distribution over decisions: the verb mix separates an expander from a consolidator; the must/should/nice bucket split is the most legible health signal in the stream; the reason tally is where a pathology like § 10h's idle/resume oscillation shows as two reciprocal codes. Score/margin figures deliberately absent (NR-226); no strategy is ever named (STRATEGIES.md's discovered-not-authored position).
+
+*Demanded by BL-411 · `src/ui/strategy_readout.cpp` · id `strategy_readout`*
 
 ### Tech tree viewer (F9)
 

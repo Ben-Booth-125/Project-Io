@@ -21,8 +21,10 @@ balance += income − expenditure − maintenance − wages − interest − lev
   (`corp_cash_flow`): goods sold, inputs bought.
 - **Maintenance / wages** — per-building operating costs, summed (below).
 - **Interest** — the debt charge, zero while the balance is non-negative.
-- **Levies** — what enacted law took (BL-343, below). Zero unless a law is enacted
-  that reaches this corp, which is the shipped default.
+- **Levies** — what enacted law took (BL-343, below; authored per BL-480 since
+  2026-08-19). The shipped default is no longer zero: the prototype extraction levy is
+  generation-seeded *enacted*, authored by the player's home nation, so it reaches the
+  player from turn one (NR-369).
 - **Upkeep** — standing-force upkeep (BL-454, below). Zero at the shipped rates.
 
 The seven flows are retained per corp in `corp_budget` (BL-072); its `net()` is exactly
@@ -94,8 +96,14 @@ runs the pre-BL-343 arithmetic bit-identically, which is why every headless harn
 was untouched by the change.
 
 Surfaced as its own **Levies** bar in the Corporations dashboard's Finance card, and
-switched on from the Budget ledger's *Laws* section. Authority for the law object
-itself: `docs/SYSTEMS.md` § Policy.
+read — browse-only — in the Budget ledger's *Laws* section. **The enact/repeal
+checkbox is gone (BL-480, 2026-08-19):** a law now carries an **enacting nation** and
+an applicability scope, enactment belongs to the nation actor (generation-seeded
+today; the granted nation-grain scorer later), and the levy is a **transfer**, not a
+sink — the same amount debited from the payer is credited to the author nation's
+`treasury`, conserved bit-exactly (`tools/verify/law_author_harness.cpp`). A
+corporation cannot flip world law. Authority for the law object itself:
+`docs/SYSTEMS.md` § Policy.
 
 ## Building operating cost (the BL-049 split)
 

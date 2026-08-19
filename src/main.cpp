@@ -456,7 +456,13 @@ int main(int argc, char* argv[])
 
         for (int i = 1; i < argc; ++i)
             if (std::string(argv[i]) == "--autostart")
-                return app{}.run_autostart();
+            {
+                // Review 2026-08-19 #9: this path used to ignore --host-agent
+                // silently; wire it like every sibling path.
+                app a;
+                a.host_agent(agent_port);
+                return a.run_autostart();
+            }
 
         {
             app a;

@@ -960,5 +960,9 @@ struct nation_component
     /// class of silent money destruction is gone from this flow). Written only
     /// by `apply_budget`'s levy pass today; the spend side is future nation-
     /// grain work under the 2026-08-18 grant.
+    /// NOT yet serialised and NOT covered by state_hash (nations are hashed
+    /// nowhere) — BL-107 must pick this field up; until then a treasury
+    /// divergence is only detectable through the debit half on corp balances
+    /// (review 2026-08-19 #3).
     float treasury = 0.0f;
 };

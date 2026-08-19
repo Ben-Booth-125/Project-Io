@@ -17,8 +17,9 @@ namespace ui {
 /// The emergent-strategy readout (BL-411) — a per-corp aggregation over the
 /// same corp_decision stream the AI decision feed (BL-407) lists row by row.
 /// The feed shows the moves; this shows the SHAPE across a run: verb mix,
-/// spend split across the must-have / should-have / nice-to-have priority
-/// buckets (`bucket_for_reason`, corp_ai.hpp), and the reason-code tally.
+/// DECISION-COUNT split across the must-have / should-have / nice-to-have
+/// priority buckets (`bucket_for_reason`, corp_ai.hpp), and the reason-code
+/// tally. Counts, not credits — no money figure is aggregated here.
 ///
 /// **Score fields are excluded — deliberately and permanently** (NR-226 fence,
 /// 2026-08-19): `runner_up` can legitimately exceed `winning_score`, because

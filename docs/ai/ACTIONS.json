@@ -1989,6 +1989,18 @@
    "reason_to_select": "To halt or resume the simulation clock from the mouse-driven session menu."
   },
   {
+   "id": "chrome.sysmenu_god_view",
+   "family": "chrome",
+   "surface": "System menu popup, spectate-only checkbox",
+   "press": "Toggle the God view checkbox. Rendered only while spectating (corp_ai_params::spectating); unreachable in a played session by construction.",
+   "args": [],
+   "preconditions": [
+    "App is in game; the system menu popup is open; the session is spectating (BL-409)."
+   ],
+   "expected_output": "While on, competitor-visibility redactions lift for the WATCHER only: rival building internals (production, stockpile, profitability read-only page), corp cash/reserve facts, and the survey tell (unsurveyed tiles render through a lock-colour wash so the corp's own blindness stays visible). Off restores the BL-068 redactions with no residue. Never changes what any AI reads; the rival action grid stays disabled - sight, never hands.",
+   "reason_to_select": "To audit a watched corp's decisions against what it actually knew, held and ran - honest watching vs omniscient watching is a deliberate, visible state (BL-408)."
+  },
+  {
    "id": "chrome.tech_tree_era_tab",
    "family": "chrome",
    "surface": "Tech-tree viewer (F9), era tab strip",

@@ -1286,9 +1286,18 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         sol::state& s = m_lua.state();
         sol::table  out = s.create_table();
         int idx = 0;
-        for (const auto& [corp_id, corp] : m_world.corporations)
+        // Sorted corp order (review 2026-08-19 #11): corporations is an
+        // unordered_map, and which rival a script's "first non-player row"
+        // lands on must not vary by platform or stdlib.
+        std::vector<entity_id> sorted_corp_ids;
+        sorted_corp_ids.reserve(m_world.corporations.size());
+        for (const auto& [cid, c] : m_world.corporations)
+            sorted_corp_ids.push_back(cid);
+        std::sort(sorted_corp_ids.begin(), sorted_corp_ids.end());
+        for (entity_id corp_id : sorted_corp_ids)
         {
-            const bool player = (corp_id == m_world.player_entity);
+            const auto& corp   = m_world.corporations.at(corp_id);
+            const bool  player = (corp_id == m_world.player_entity);
             for (entity_id bld_id : corp.assets)
             {
                 const auto bld_it = m_world.buildings.find(bld_id);

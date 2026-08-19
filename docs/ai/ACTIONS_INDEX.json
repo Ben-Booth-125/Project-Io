@@ -474,6 +474,10 @@
    "System menu popup, top button"
   ],
   [
+   "chrome.sysmenu_god_view",
+   "System menu popup, spectate-only checkbox"
+  ],
+  [
    "chrome.tech_tree_era_tab",
    "Tech-tree viewer (F9), era tab strip"
   ],
