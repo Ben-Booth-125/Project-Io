@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*133 entries — 90 open, 43 resolved.*
+*138 entries — 95 open, 43 resolved.*
 
 ---
 
@@ -948,6 +948,31 @@ Cleanup NOT run this session (deletion is destructive and was not on the form). 
 *observation · raised 2026-08-19 · from Read-only N1 audit agent over the seven un-flipped Sprint-26 items, evidence file:line + hashes; item-commits.json regenerated (350 entries — the seven were missing because the generator had not been re-run).*
 
 BL-437 (co-extraction) complete at 2884f6c. Held with bounded remainders: BL-417 (step 2 = your NR-265/268 call), BL-429 (one GUI look), BL-439 (task C re-bless = your NR-269 pick; sequence after the debt lever), BL-440 (task D doc + re-run tier_margin R4b), BL-453 (build + capture + live Hold press; do not re-build). BL-443 genuinely unbuilt; the audit resolved the item's own existing-guard worry (econ_bankruptcy asserts nothing).
+
+### NR-368 — BL-335 measured: the 300-token assumption holds on output, fails ~60x on input — BL-481 filed as the fix
+*observation · raised 2026-08-19 · from BL-335 one-off measurement over build/ProjectIo.exe --serve (pre-batch binary; the MCP surface is unchanged by the in-flight work). Raw table in the item summary; script + raw output preserved in the session scratchpad.*
+
+A MINIMAL decision round is ~19-20K input tokens, a NAIVE one ~26K, against LANGUAGE_POLICY_FEASIBILITY's compact-blackboard premise; output stays under 300 tokens with margin. 96% of input bulk is the market and rival-building triples with a repeated 70-byte envelope. BL-481 (compact encoding, v0.1.16, designed) carries the fix: fuse + hoist + filter = ~1.5-5K tokens per round for the BL-306 client loop.
+
+### NR-369 — BL-480 delegated call: the seeded levy's author nation is the player's home nation
+*decision taken on your behalf · raised 2026-08-19 · from BL-480 build agent (worktree branch worktree-agent-a9ac4a6bca1072bf3 @ 95a68d8), barred from board files; entry filed by the main session per Rule 0c.*
+
+The generation-seeded extraction levy needs an enacting nation. Chosen: the PLAYER corp's home_nation — consumes no RNG, and makes the ledger's read-only levy line non-vacuous from turn one (the law binds the player). Fallback: largest territory, ties to lowest entity id; no nations, no law. Asserted deterministic in law_author_harness (14/14). Consequence stated plainly: the levy now charges the player from turn one by design — the item's stated shape, not a side effect.
+
+### NR-370 — BL-408 findings: a pre-existing BL-068 leak (filed as BL-482) and a dead module its design named
+*observation · raised 2026-08-19 · from BL-408 build agent report (branch worktree-agent-aa5fd296e1318e86e @ 701cba5); entries filed by the main session.*
+
+(1) economy_panel.cpp draw_pools already shows every corp's pool quantities to a PLAYED session — past the competitor-visibility rule, predating god view; filed as BL-482 (economy panel pools leak, v0.1.7, B). (2) entity_summary.cpp's draw_corporation_summary — which BL-408's own design named as a lift site — is dead code; nothing calls the module. The live corp surface is the Selection band's facts column, where the lift was implemented instead. (3) The comms-redaction lift (BL-408 lift 2) was deliberately deferred: post_nation_agency_comms is a post-time store, and flag-gating it would latch state — it needs a small read-time-filter design of its own, recorded in DISCOVERY.md's new god-view section.
+
+### NR-371 — BL-479 delegated calls: mirror field, earn-time accumulation (BL-107 debt), fixture seam, modifier-blind estimators, skill listing owed
+*decision taken on your behalf · raised 2026-08-19 · from BL-479 build agent report (branch worktree-agent-ac0ff6e87868aed58 @ 8c62fe1); filed by the main session per Rule 0c.*
+
+Five calls: (1) unlocks_structure kept as a mirror field maintained solely by add_effect, so the existing tech-gate harness compiles unmodified (R3) with one authoring point. (2) Modifiers accumulate on world.corp_modifiers at earn time — derived, unhashed, unserialised; BL-107 now carries the recompute-on-load debt as a dated design note. (3) The gate-table overload of advance_tech_gates is the fixture seam — the shipped table carries NO modify_scalar tech, because authoring live buff content is yours, not a test's; it is also the natural sharing shape for law. (4) Estimator sites (Build-door stack pricing, generation census, workforce solver, corp_ai scorer) stay modifier-blind — exact today with no shipped buff, but the FIRST authored buff tech makes them approximations; revisit then. (5) The new harness is in README.md + the CMake glob but NOT in verifier-headless SKILL.md — skill edits need your permission; the listing is owed.
+
+### NR-372 — BL-412 delegated calls: agent-gated clock semantics, boundary drain, detach/second-client policy, MCP lockstep pairing
+*decision taken on your behalf · raised 2026-08-19 · from BL-412 build agent report (branch worktree-agent-a51c6af46393ea9de @ 8d092a7); filed by the main session per Rule 0c.*
+
+Six calls: (1) attach PAUSES the sim and TICK releases one econ tick (agent gates the clock per the REFINED brief); human speed keys still override, and even free-running, commands land only at tick boundaries — the transcript stays a replay artifact either way. (2) Commands drain at the boundary BEFORE the next step, stamped with the completed tick — run_serve's exact tick-tag contract. (3) SHUTDOWN on the live seam closes the CONNECTION, never the app. (4) Detach discards never-answered commands and leaves the world paused. (5) One client at a time; a second connection is refused outright. (6) The MCP --attach transport sends COMMAND+TICK as one exchange so a lockstep client cannot deadlock against the gated clock. Also observed: server.js's hand-maintained VERBS array is stale (missing stance + unit-march) — noted on BL-306, whose loop should derive verbs from ACTIONS_INDEX.json.
 
 ---
 
