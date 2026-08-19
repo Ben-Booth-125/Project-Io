@@ -1270,5 +1270,38 @@ BL-449's own `backlog.json` status once this cleanup lands — it currently read
 known collision this session. `src/ui/planetary_canvas.cpp` may be touched by other lens work;
 worktree-isolate regardless.
 
+**Status (2026-08-19): PARKED.** Ben redirected to basic military function (BL-476) before this
+landed. WIP preserved on `worktree-agent-a2b81665b3439a110`, commit `6ad58a3` — not merged, not
+verified. Resume from that branch rather than restarting when this comes back around.
+
+---
+
+## BL-476 — every corporation starts with an army (promoted 2026-08-19)
+
+Difficulty 2, priority A. Read the full design in `backlog.json` first. Scope settled directly
+with Ben: player + named rivals, **not** BL-365 background filler firms.
+
+- **[1] Lift the player-only seeding block into a shared helper.**
+  `src/world/corporation_generation.cpp` (~line 1506–1617) currently seeds a `military_base` +
+  one `unit_component` for the player corp only, inline. Extract the body into
+  `seed_starting_military(world&, entity_id corp_id)` (or similar), same logic unchanged: nearest
+  valid land tile to HQ, one base, one 50-manpower unit at roster index 0, graceful no-op on a
+  land-poor nation.
+  Files: `src/world/corporation_generation.cpp`.
+- **[2] Call it for every non-background corp.** Once for the player (unchanged behaviour), once
+  per generated rival (`is_player == false && is_background == false`) in the same generation
+  pass — deterministic, generation-time, not a first-tick economy action.
+  Files: `src/world/corporation_generation.cpp`. Depends on [1].
+- **[3] Determinism harness.** Assert every non-background corp ends generation owning exactly
+  one `military_base` and one `unit_component`, identical across two same-seed runs; a background
+  firm owns neither; a land-poor nation's graceful skip doesn't crash.
+  File: `tools/verify/` — new or extended harness, item-spanning requirement per DELIVERY.md
+  step 0.
+- **[4] `docs/military/MILITARY.md` correction.** § Build status currently describes starting
+  military presence as player-only (BL-331) — correct once rivals are seeded too.
+
+**Explicitly NOT this item:** no change to `corp_ai.cpp`'s ongoing `hire_unit` scoring — this is
+only the generation-time seed. No change to BL-365 background firms.
+
 ---
 

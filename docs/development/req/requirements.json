@@ -4413,6 +4413,31 @@
     }
    ],
    "notes": "Companion to diplomatic-lens. Live UI check required before R1 flips complete (io-standing-rules.md, 2026-08-19)."
+  },
+  {
+   "brief": "rivals-start-armed",
+   "batch": "2026-08-19-bl476",
+   "title": "BL-476 - every corporation starts with an army, not just the player",
+   "status": "open",
+   "promoted_from": "backlog.json BL-476 RIVALS_START_UNARMED",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "open",
+     "requirement": "ITEM-SPANNING (headless): every non-background corp (player + named rivals) ends generation owning exactly one military_base and one unit_component (roster index 0, 50 manpower), placed on the nearest valid land tile to its HQ. A BL-365 background firm owns neither."
+    },
+    {
+     "id": "R2",
+     "status": "open",
+     "requirement": "Deterministic: two same-seed generation runs produce identical seeding (same tiles, same unit fields) for every corp."
+    },
+    {
+     "id": "R3",
+     "status": "open",
+     "requirement": "A land-poor nation with no valid placement tile is skipped gracefully (no crash), matching the existing player-only behavior."
+    }
+   ],
+   "notes": "Scope settled directly with Ben, 2026-08-19: player + named rivals only, not background filler firms. No UI surface, so the live-UI-check rule does not apply here - a headless harness is sufficient for this item."
   }
  ]
 }
