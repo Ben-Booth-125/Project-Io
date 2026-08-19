@@ -137,6 +137,18 @@ uint64_t world::state_hash(int tick) const
             // structurally (new state), not behaviourally.
             fnv1a_i32(h, u.supply_factor_permille);
             fnv1a_u32(h, u.muster_base);
+            // BL-470: the march order. `position` above already moves every
+            // tick a marching unit steps, but the ORDER ITSELF (dest, the
+            // remaining path, how far along it, the banked fractional
+            // progress) is real state a replay must reproduce exactly — the
+            // whole point of the determinism guard below is to prove two
+            // independent runs agree on this, not just on where the unit
+            // ends up.
+            fnv1a_u32(h, u.order.dest);
+            fnv1a_u32(h, static_cast<uint32_t>(u.order.path.size()));
+            for (const entity_id t : u.order.path) fnv1a_u32(h, t);
+            fnv1a_u32(h, static_cast<uint32_t>(u.order.next_index));
+            fnv1a_f32(h, u.order.progress);
         }
     }
 

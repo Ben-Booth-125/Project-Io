@@ -63,6 +63,12 @@ enum class corp_verb : uint8_t
     offer_friendship,   ///< `corp` offers friendship to `counterparty`. Records a PENDING offer only, not a stance.
     accept_friendship,  ///< `corp` accepts a pending offer FROM `counterparty`.
     return_to_neutral,  ///< `corp` clears its own hostility toward, and/or any friendship with, `counterparty`. Unilateral.
+    // --- BL-470: the unit march seam (2026-08-19) ---
+    // Appended AFTER return_to_neutral, same append-only rule. One seam, one
+    // dictionary family — NOT a parallel unit_command type (BL-470's ruling 2).
+    march_unit,    ///< Set/replace `subject`'s (a unit) movement order toward `tile`, path-marched across ticks.
+    halt_unit,     ///< Clear `subject`'s movement order. rejected_state if it has none.
+    disband_unit,  ///< Erase `subject` (a unit) outright. No refund — manpower walks away.
 };
 
 /// One past the highest verb — the wire parser's range gate (BL-396: run_serve
@@ -72,7 +78,7 @@ enum class corp_verb : uint8_t
 /// appending a verb means moving this with it — and only this, since existing
 /// values never renumber.
 inline constexpr uint8_t corp_verb_count =
-    static_cast<uint8_t>(corp_verb::return_to_neutral) + 1;
+    static_cast<uint8_t>(corp_verb::disband_unit) + 1;
 
 /// Ceiling on one corporation's outstanding sell orders. The book is now
 /// reachable by command, so it is reachable by a scorer with a bug in it — this
@@ -92,12 +98,13 @@ struct corp_command
     corp_verb  verb = corp_verb::build;
 
     /// Primary subject: the building (demolish / set_recipe / set_workforce /
-    /// idle / resume / set_workforce_auto) or the body (survey,
-    /// place_sell_order). null for build / place_road, whose subject is `tile`,
+    /// idle / resume / set_workforce_auto), the body (survey,
+    /// place_sell_order), or the unit (march_unit / halt_unit / disband_unit,
+    /// BL-470). null for build / place_road, whose subject is `tile`,
     /// and for remove_sell_order, whose subject is `order`.
     entity_id  subject = null_entity;
 
-    entity_id     tile      = null_entity;              ///< build / place_road target tile.
+    entity_id     tile      = null_entity;              ///< build / place_road target tile; march_unit's destination tile.
     building_type type      = building_type::none;      ///< build only.
     resource_type target    = resource_type::iron_ore;  ///< build (extraction) AND place_sell_order: what to sell.
     uint16_t      recipe    = no_recipe;                ///< set_recipe (and build seed).

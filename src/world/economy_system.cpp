@@ -3,10 +3,11 @@
 #include "budget_system.hpp"   // compute_building_opex, body_mean_habitability (BL-181 solver)
 #include "building_profit.hpp" // estimate_building_profit (BL-079 corp agency)
 #include "corp_ai.hpp"         // run_corp_strategic_step (BL-202 strategic tier)
-#include "logistics.hpp"       // invalidate_logistics_caches (anchor-set changes)
+#include "logistics.hpp"       // invalidate_logistics_caches, tile_traversal_cost, intra_body_path (BL-470)
 #include "market_clearing.hpp" // market_for_tile (BL-095 construction gate)
 #include "placement_rules.hpp" // stack_output_scalar (BL-193 building stacks)
-#include "unit_roster.hpp"     // resolve_unit_upkeep (BL-454 unit pass)
+#include "stance.hpp"          // is_hostile (BL-470's NR-344: war flips the march queue)
+#include "unit_roster.hpp"     // resolve_unit_upkeep (BL-454 unit pass), unit_roster_table (BL-470)
 #include "workforce.hpp"
 
 #include <algorithm>
@@ -1452,6 +1453,28 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         run_corp_strategic_step(w, reg, report, w.current_day_tick, p);
     }
 
+    // BL-470: the march pass. Runs where BL-467's battle-discovery phase will
+    // sit once it exists — "a unit that marched into a hostile province this
+    // tick fights before it can march out next tick" (the item's own design)
+    // — but there IS no battle-discovery phase yet (MILITARY.md's "what is
+    // absent": no engagement trigger, no battle state on unit_component), so
+    // today marching units simply advance with nothing to precede them here.
+    // Runs BEFORE run_unit_upkeep so a unit that arrives at a new tile THIS
+    // tick is already upkept/reach-checked from its new position, not its
+    // stale one.
+    //
+    // NR-344 ("war flips the queue", resolved 2026-08-19 alongside this
+    // item): peacetime already visits convoys before anything in this
+    // function, because advance_convoys runs in the sim loop BEFORE
+    // run_economy_step is even called (main.cpp/app.cpp) — the pre-existing,
+    // previously-accidental default this rule now states on purpose. What
+    // THIS pass adds is the war-time flip: a corp party to any declared
+    // hostility (either direction) has its OWN units visited first within
+    // the march pass. See run_unit_march's doc comment for why this is
+    // currently a written rule with no observable effect (no shared
+    // logistics-point pool exists yet to contend over).
+    run_unit_march(w, reg);
+
     // BL-454: the unit pass — goods draw, the decay rule, orphan cleanup. LAST,
     // deliberately: the strategic tier above demolishes at tick rate, so running
     // after it means a muster base torn down THIS tick orphans its units in the
@@ -1571,6 +1594,141 @@ unit_upkeep_tick run_unit_upkeep(world& w, const recipe_registry& reg)
         w.units.erase(id);
         ++out.disbanded;
     }
+    return out;
+}
+
+// ---------------------------------------------------------------------------
+// BL-470 — the unit march pass
+// ---------------------------------------------------------------------------
+
+/// True iff `corp` is party to any declared hostility, either direction —
+/// "being attacked mobilises too" (NR-344, BL-470's design). One pass over
+/// the (small, corp-count-sized) set; membership only, so iteration order
+/// over `w.corp_hostile_pairs` (a std::set, already sorted) cannot matter
+/// here. Exposed (not file-local) so the march harness can assert the
+/// mobilisation call directly rather than inferring it from a side effect
+/// that does not exist yet (see run_unit_march's own doc comment).
+bool corp_is_mobilised(const world& w, entity_id corp)
+{
+    for (const auto& [a, b] : w.corp_hostile_pairs)
+        if (a == corp || b == corp)
+            return true;
+    return false;
+}
+
+unit_march_tick run_unit_march(world& w, const recipe_registry& reg)
+{
+    unit_march_tick out;
+    if (w.units.empty())
+        return out;
+
+    // Ascending unit id, same discipline as run_unit_upkeep — a marching
+    // unit's own state is never shared with another unit's, so this is not
+    // load-bearing for correctness the way the upkeep pool draw is, but it
+    // keeps one deterministic, reviewable order.
+    std::vector<entity_id> ids;
+    ids.reserve(w.units.size());
+    for (const auto& kv : w.units)
+        ids.push_back(kv.first);
+    std::sort(ids.begin(), ids.end());
+
+    // NR-344: partition corps into mobilised-first / peaceful-after, computed
+    // ONCE at tick start from the stance table (BL-448) — see this function's
+    // header comment and the call site's comment for why this reorders
+    // visitation only, with no observable effect yet.
+    std::stable_sort(ids.begin(), ids.end(), [&](entity_id a, entity_id b) {
+        const bool a_mob = corp_is_mobilised(w, w.units.at(a).owner);
+        const bool b_mob = corp_is_mobilised(w, w.units.at(b).owner);
+        return a_mob && !b_mob; // mobilised (true) sorts before peaceful (false)
+    });
+
+    const auto& table = unit_roster_table();
+    const military_capability_params& mil = reg.military();
+
+    for (const entity_id id : ids)
+    {
+        unit_component& u = w.units.at(id);
+        if (u.order.dest == null_entity)
+            continue; // halted / never ordered
+
+        ++out.marching;
+
+        // An unknown roster type resolves as unit_class::infantry — the same
+        // "an unknown index is a data problem, not a reason to make a unit
+        // free" tolerance resolve_unit_upkeep already applies (unit_roster.cpp).
+        const unit_class cls = (u.type < table.size()) ? table[u.type].cls : unit_class::infantry;
+        float points = mil.march_points_per_class[static_cast<std::size_t>(cls)];
+        if (points <= 0.0f)
+            continue; // this class cannot march under the authored data
+
+        points += u.order.progress;
+        u.order.progress = 0.0f;
+
+        while (points > 0.0f && u.order.next_index < u.order.path.size())
+        {
+            const auto cur_it  = w.tiles.find(u.position);
+            const entity_id next_id = u.order.path[u.order.next_index];
+            const auto next_it = w.tiles.find(next_id);
+
+            // A step is INVALIDATED when its tile is gone, or (defensive —
+            // tiles/bodies never actually change post-generation in this
+            // engine today, so this cannot fire in play; it is the guard the
+            // design calls for and the determinism harness exercises
+            // directly) the next hop is no longer on the same body as the
+            // unit. Recompute ONCE from the CURRENT position to the SAME
+            // dest — never a per-tick Dijkstra, only on an actual block.
+            const bool blocked = (cur_it == w.tiles.end()) || (next_it == w.tiles.end())
+                                || (next_it->second.body != cur_it->second.body);
+            if (blocked)
+            {
+                if (cur_it == w.tiles.end())
+                {
+                    u.order = movement_order{}; // the unit's own tile is gone — nothing to recompute from
+                    break;
+                }
+                const logistics_path& rp =
+                    intra_body_path(w, cur_it->second.body, u.position, u.order.dest);
+                ++out.recomputed;
+                if (!rp.reachable || rp.tiles.empty())
+                {
+                    u.order = movement_order{}; // no route remains — order dissolves, not a crash
+                    break;
+                }
+                movement_order mo;
+                mo.dest = u.order.dest;
+                mo.path = rp.tiles;
+                if (mo.path.front() != u.position)
+                    std::reverse(mo.path.begin(), mo.path.end());
+                mo.next_index = 1;
+                mo.progress   = 0.0f;
+                u.order = mo;
+                continue; // re-evaluate the loop condition against the fresh path
+            }
+
+            // Same edge-cost convention intra_body_path/body_reach_field use:
+            // the mean of the two nodes' traversal-cost weights.
+            const float step_cost = 0.5f * (tile_traversal_cost(cur_it->second)
+                                            + tile_traversal_cost(next_it->second));
+            if (step_cost <= 0.0f || points + 1e-6f >= step_cost)
+            {
+                points -= step_cost;
+                u.position = next_id;
+                ++u.order.next_index;
+            }
+            else
+            {
+                u.order.progress = points; // bank the remainder for next tick
+                points = 0.0f;
+            }
+        }
+
+        if (u.order.dest != null_entity && u.order.next_index >= u.order.path.size())
+        {
+            u.order = movement_order{}; // arrived — order clears itself
+            ++out.arrived;
+        }
+    }
+
     return out;
 }
 

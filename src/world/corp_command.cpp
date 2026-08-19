@@ -3,7 +3,8 @@
 #include "condition_set.hpp" // BL-350: request_quote's embargo decline condition
 #include "construction.hpp"
 #include "economy_system.hpp" // BL-430: try_switch_recipe, the shared recipe-switch gate
-#include "logistics.hpp" // invalidate_logistics_caches (idle/resume flips the anchor set)
+#include "logistics.hpp" // invalidate_logistics_caches (idle/resume flips the anchor set); intra_body_path (BL-470)
+#include "placement_rules.hpp" // BL-470: is_ocean_tile (march_unit's destination check)
 #include "recipe_registry.hpp"
 #include "stance.hpp" // BL-448: corp stance verbs (declare_hostile / offer_friendship / accept_friendship / return_to_neutral)
 #include "supply_system.hpp" // BL-452: the shared dispatch (price_convoy_leg / commit_convoy)
@@ -816,6 +817,82 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             return (r == stance_result::applied) ? corp_command_result::applied
                  : (r == stance_result::rejected_invalid) ? corp_command_result::rejected_invalid
                                                             : corp_command_result::rejected_state;
+        }
+
+        // --- BL-470: the unit march seam -------------------------------------
+        // Extends THIS seam (BL-470's ruling 2) — no parallel unit_command
+        // type. A rejection mutates nothing (io-standing-rules.md's untrusted-
+        // seam rule): every check below runs before the single `order`/`erase`
+        // write that applies the verb.
+
+        case corp_verb::march_unit:
+        {
+            const auto uit = w.units.find(cmd.subject);
+            if (uit == w.units.end())
+                return corp_command_result::rejected_invalid;
+            if (uit->second.owner != cmd.corp)
+                return corp_command_result::rejected_not_owner;
+
+            // BL-467's engagement trigger (an in-battle flag on unit_component)
+            // does not exist in this codebase yet — MILITARY.md's "what is
+            // absent" list — so the "reject march while in-battle" rule from
+            // BL-470's design has no field to test and is currently
+            // UNREACHABLE. Left as a named gap rather than invented state,
+            // so BL-467 only has to add the flag and one `if`, not this verb.
+
+            const auto dit = w.tiles.find(cmd.tile);
+            if (dit == w.tiles.end())
+                return corp_command_result::rejected_invalid;
+            if (placement_rules::is_ocean_tile(dit->second.composition))
+                return corp_command_result::rejected_invalid;
+
+            const auto sit = w.tiles.find(uit->second.position);
+            if (sit == w.tiles.end())
+                return corp_command_result::rejected_invalid; // unit's own tile is gone
+
+            if (dit->second.body != sit->second.body)
+                return corp_command_result::rejected_invalid; // BL-470's ruling 1: intra-body path march only
+
+            if (cmd.tile == uit->second.position)
+                return corp_command_result::rejected_state; // already there — halt_unit is the stop verb
+
+            const logistics_path& p = intra_body_path(w, sit->second.body, uit->second.position, cmd.tile);
+            if (!p.reachable || p.tiles.empty())
+                return corp_command_result::rejected_invalid;
+
+            movement_order mo;
+            mo.dest = cmd.tile;
+            mo.path = p.tiles; // canonical (lo->hi) order — see world.hpp's logistics_path comment
+            if (mo.path.front() != uit->second.position)
+                std::reverse(mo.path.begin(), mo.path.end());
+            mo.next_index = 1; // path[0] is the tile the unit already occupies
+            mo.progress   = 0.0f;
+            uit->second.order = mo;
+            return corp_command_result::applied;
+        }
+
+        case corp_verb::halt_unit:
+        {
+            const auto uit = w.units.find(cmd.subject);
+            if (uit == w.units.end())
+                return corp_command_result::rejected_invalid;
+            if (uit->second.owner != cmd.corp)
+                return corp_command_result::rejected_not_owner;
+            if (uit->second.order.dest == null_entity)
+                return corp_command_result::rejected_state; // nothing to halt
+            uit->second.order = movement_order{};
+            return corp_command_result::applied;
+        }
+
+        case corp_verb::disband_unit:
+        {
+            const auto uit = w.units.find(cmd.subject);
+            if (uit == w.units.end())
+                return corp_command_result::rejected_invalid;
+            if (uit->second.owner != cmd.corp)
+                return corp_command_result::rejected_not_owner;
+            w.units.erase(uit); // no refund — manpower walks away (BL-470's design)
+            return corp_command_result::applied;
         }
     }
     return corp_command_result::rejected_invalid;

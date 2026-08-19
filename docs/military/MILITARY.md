@@ -3,8 +3,9 @@
 The military layer is **parts, not a system**. Two battle resolvers, a unit roster, a muster
 building, a hire verb, a terrain model, a per-tick upkeep pass and a roster→combat adapter all
 ship compiled in the binary. Corp stance (hostility/friendship, BL-448/BL-449) also ships now, with
-a surface — but what still does not ship is anything that makes force meet stance: no engagement
-trigger, no unit verbs, and nothing in production that calls the adapter.
+a surface, and a unit can now march, halt and disband (BL-470, 2026-08-19) — but what still does not
+ship is anything that makes force meet stance: no engagement trigger, and nothing in production
+that calls the adapter.
 
 This document is the authority for what is built, written 2026-08-17 against the source. It exists
 because the absence of one cost real work: three sprint proposals in a row described the campaign
@@ -231,6 +232,7 @@ last two):
 | `type` | `uint16_t` | Opaque index into the roster table. |
 | `supply_factor_permille` | `int32_t` | How well supplied, 1000 = full. Moved only by the upkeep pass's one decay rule (BL-454, unit upkeep). |
 | `muster_base` | `entity_id` | The `military_base` this unit was raised at, or `null_entity`. The **orphan key** — see § Upkeep, at rate zero. |
+| `order` | `movement_order` | BL-470, unit march seam, landed 2026-08-19. `{dest, path, next_index, progress}`; `dest == null_entity` means halted/unordered. See § Marching below. |
 
 **There is no stored `strength`.** BL-459 (unit strength is a duplicate of count) removed the
 field and made strength derived — `unit_strength(w, u)` in `src/world/unit_roster.hpp` returns
@@ -388,6 +390,60 @@ works use.
 
 ---
 
+## Marching (BL-470, unit march seam, landed 2026-08-19)
+
+A unit no longer stays pinned to its muster tile. Three `corp_verb` rows extend the **same**
+corp-command seam every other action goes through — no parallel `unit_command` type (the item's own
+ruling 2: BL-314's "future unit_command seam" phrasing resolves to this seam, extended):
+
+- **`march_unit {subject: unit, tile: dest}`.** Sets/replaces the unit's `movement_order`. Rejects
+  `rejected_not_owner` (not the caller's unit), `rejected_invalid` (unknown unit/tile, ocean dest,
+  dest off the unit's own body, or unreachable), `rejected_state` (dest already `== position`). The
+  in-battle rejection the design calls for is **currently unreachable** — there is no engagement
+  trigger or battle-state field on `unit_component` yet (BL-467), so the check has nothing to test.
+- **`halt_unit {subject: unit}`.** Clears the order. `rejected_state` on a unit with none.
+- **`disband_unit {subject: unit}`.** Erases the unit outright. No refund — manpower walks away;
+  a confirm step, if any, lives in the UI (BL-471), never in the seam.
+
+**Movement is a path march, not a hop.** `march_unit` computes the path ONCE, via
+`intra_body_path` (`src/world/logistics.hpp`) — the same terrain-weighted A* the convoy system and
+`body_reach_field` already use — and stores it on `unit_component::order`. No per-tick Dijkstra:
+`run_unit_march` (`src/world/economy_system.cpp`) only re-paths when a step is found blocked, which
+cannot currently happen in play (terrain never changes post-generation) but is exercised directly by
+the determinism harness as a defensive guard.
+
+**March points are per-CLASS, authored data.** `economy.military.march_points_per_class`
+(`scripts/economy.lua`), keyed by the roster row's `cls` (`unit_class`: infantry/cavalry/ranged/
+siege/naval). Spent per tick against the per-tile traversal-cost weight
+(`logistics::tile_traversal_cost`, the same plains=1.0/mountain=2.0 table road placement discounts),
+with fractional remainder banked in `order.progress` across ticks. Shipped defaults: infantry 1.0,
+cavalry 1.5, ranged 1.0, siege 0.5, naval 0.0 (no naval movement model exists — combat.hpp's own
+"strategic-only presence" note). A composite unit (BL-472, formations, not this item) will read its
+**slowest** component's class entry; the hook exists, the composite logic does not.
+
+**Visit order — NR-344, "war flips the queue" (resolved alongside this item).** At peace, convoys
+already claim the network first: `advance_convoys` runs in the sim loop *before*
+`run_economy_step` is even called (`main.cpp`/`app.cpp`), which was a fact of phase order before
+this item and is now a **stated rule**. What this item adds: a corp party to **any** declared
+hostility, either direction (`is_hostile` checked both ways against `corp_hostile_pairs` —
+"being attacked mobilises too"), has its own units visited **first** within `run_unit_march`,
+evaluated once per tick from the stance table (BL-448). This changes **nothing observable today** —
+there is no shared logistics-point pool for a march and a convoy to actually contend over until
+BL-464 (Logistic Points) lands one — so it ships the way BL-454's upkeep did: real, written down,
+inert until something exists to contend over.
+
+**The blackboard export now shows a corp its own force** (BL-393's open half, taken over by this
+item). `export_corp_blackboard` (`src/world/corp_ai.cpp`) emits `unit_tile`, `unit_type`,
+`unit_count`, `unit_strength` and `unit_order_state`/`unit_order_dest` facts for the corp's OWN
+units — no BL-068 visibility question, exactly like cash/buildings/pools. Rival units stay
+ungated by this section (it has no rival counterpart); the rival scorer can now legally issue
+`march_unit` (legality only — scoring march *quality* is BL-450's conflict-AI arc, not this item).
+
+**Determinism.** `tools/verify/unit_march_harness.cpp` covers replay determinism with marching
+units in flight and the blocked-path recompute path (see § Verification).
+
+---
+
 ## Upkeep, at rate zero
 
 Added 2026-08-18, describing BL-454 (unit upkeep) as it landed at commit `0936400`.
@@ -535,7 +591,7 @@ This list is the reason this document cannot be read as describing a finished sy
 below is a real gap with a named owner.
 
 - ~~**No hostility model.**~~ — *landed 2026-08-19 (BL-448, BL-449). `src/world/stance.{hpp,cpp}` gives every corp pair a directed hostility state and a symmetric friendship state (`corp_hostile_pairs`, `corp_friend_pairs`, a pending `corp_friend_offers` table), reached through four `corp_command` verbs (`declare_hostile`, `offer_friendship`, `accept_friendship`, `return_to_neutral`) and a Corporation panel Stance column, gated on ordinary BL-068 competitor-visibility (NR-350: a declaration stays silent, discovered on contact rather than announced). Landing the substrate is deliberate and still carries* **no consequence** *— stance gates nothing yet. What hostility permits is BL-315 (armed house conflict spine, still absent, see below); what friendship permits is a later call. No serialiser exists for it either (see `src/world/serialization.cpp` — the file does not exist anywhere in the repo; NR-349), so stance does not yet survive a save.*
-- **No unit-subject verbs.** Every command verb names a tile, a building, a body or an order; none names a unit. So a unit cannot be moved, merged, disbanded, garrisoned or ordered — it is created at its muster tile and stays there for the campaign. BL-393 (units are write-only and inert) and BL-314 (unit verb family) own this.
+- ~~**No unit-subject verbs.**~~ — *landed 2026-08-19 (BL-470, unit march seam). `march_unit`/`halt_unit`/`disband_unit` extend `corp_command`; a unit can now be marched (path, across ticks, on the shared traversal-cost metric), halted, or disbanded. Merge/split and garrison/scout stay absent — BL-472 (formations) owns them.*
 - **No engagement trigger.** Nothing in the world decides that two forces are fighting. `resolve_campaign_battle` has no caller but its harness. *(Amended 2026-08-18: the second half of this bullet — "no code composes an `army_stack_entry` from a `unit_component`" — is no longer true. `unit_to_stack_entry` exists (BL-459) and only the harness calls it. The resolver **could** now be called; nothing wants to.)*
 - **No battle state in the world.** `campaign_battle_state` is a value a caller holds, not a world component. Nothing serialises a fight in progress, and nothing steps one across ticks.
 - **No upkeep *rate*.** *(Rewritten 2026-08-18 — the old bullet said "No upkeep", which BL-454 falsified.)* The upkeep **pass** ships and runs every economy tick, both halves wired: credits through `apply_budget`, goods through `run_unit_upkeep`. What is absent is a **number** — every authored rate is `0.0`, so a standing force still costs credits once, at hire, and nothing thereafter. Turning it on is an `economy.lua` edit, not a code change. See § Upkeep, at rate zero.
@@ -544,15 +600,16 @@ below is a real gap with a named owner.
 - **No fortification.** Siege is uniformly weak in the open field precisely because there is no held position to reduce; `siege_stance` is declared and unread.
 - **No tactical naval.** Naval rows exist in the roster and naval entries are accepted by `resolve_battle`, contributing zero power and zero weight. Naval presence is strategic tagging only.
 - **No unit marker on the canvas.** Units are selectable through the tile click-cycle and have no glyph of their own.
-- **No blackboard export of units.** An agent can raise a unit and cannot read back that it exists. Re-checked 2026-08-18: `export_corp_blackboard` (`src/world/corp_ai.cpp`) emits no unit-subject fact. (BL-393, units are write-only and inert.)
+- ~~**No blackboard export of units.**~~ — *landed 2026-08-19 (BL-470's Rider 1, taking over BL-393's open half). `export_corp_blackboard` now emits `unit_tile`/`unit_type`/`unit_count`/`unit_strength`/`unit_order_state` facts for a corp's own force. Rival units still carry no unit-subject facts — no rider claims that gap.*
 - ~~**No demolish interaction.**~~ — *resolved 2026-08-18 by BL-454 (unit upkeep). The upkeep pass disbands a unit whose owner, tile or `muster_base` has been erased, and runs last in the economy step so the cleanup happens in the same tick as the demolition. It reports the count as `unit_upkeep_tick::disbanded`.*
 
 ---
 
 ## Verification
 
-**Four** headless harnesses cover this layer (a fourth landed with BL-454/BL-459 on 2026-08-17;
-this section said three). Run them with the `verifier-headless` skill.
+**Five** headless harnesses cover this layer (a fifth, `unit_march_harness.cpp`, landed with BL-470
+on 2026-08-19; a fourth landed with BL-454/BL-459 on 2026-08-17). Run them with the
+`verifier-headless` skill.
 
 **`tools/verify/combat_harness.cpp`** — `resolve_battle`. R1: a unit carries a type and armies are
 `(type, count)` stacks. R2: determinism on identical inputs, a hand-picked matchup landing on the
@@ -589,6 +646,17 @@ resolver accepts.
 U5 is the load-bearing row. It is what lets the economy goldens be re-blessed honestly, because it
 asserts the item is inert until someone authors a rate.
 
+**`tools/verify/unit_march_harness.cpp`** — the march seam and pass (BL-470). M1: `march_unit`
+sets a reachable path and rejects not-owner/invalid/ocean-dest/off-body/already-there without
+mutating the world. M2: `run_unit_march` spends per-class march points against the shared
+traversal-cost weight, carries fractional progress across ticks, and clears the order on arrival.
+M3: `halt_unit` clears the order and rejects a unit with none; `disband_unit` erases the unit and
+rejects a non-owned/unknown one. M4: NR-344 — a mobilised corp's units are visited before a
+peaceful corp's within one tick's pass. M5: state-hash replay determinism with marching units in
+flight. M6: a corrupted path (the recompute guard's trigger, since terrain never actually blocks a
+step in this engine) recomputes identically across two independent runs — no iteration-order
+dependence in the recompute path.
+
 Adjacent coverage: `buildings_rework_harness` R6/R7 for `military_base` placement, zero staffing
 and the not-an-anchor property.
 
@@ -618,10 +686,12 @@ Re-verified against the source 2026-08-18.
 - ~~Passive `military_points` accumulation (BL-332)~~ — **removed 2026-08-17** by BL-455 (military points and science are write-only); a base accumulates nothing
 - **Corp stance / hostility, with a surface** (BL-448, BL-449). Directed hostility, symmetric friendship, the Corporation panel Stance column and its three presses — landed 2026-08-19, still inert (no consequence wired, no serialiser)
 - **`campaign_roster_band` derives from the epoch** (BL-461). Was hard-coded to `industrial` against a 0 CE default; now `campaign_roster_band_for(era_band)` off `recipe_registry::era()` — landed 2026-08-19
+- **Unit march seam — march/halt/disband, path-marching on the shared traversal-cost metric** (BL-470). Extends `corp_command`, no parallel type. Per-class march points (`economy.military.march_points_per_class`), fractional carry-over, blocked-step recompute. Riders: the blackboard units export (BL-393's open half) and NR-344 ("war flips the queue") written down in phase order — landed 2026-08-19
 
 **Outstanding:**
 
-- Unit verbs and the unit-command seam (BL-314, unit verb family; BL-393, units are write-only and inert)
+- Merge/split and garrison/scout unit verbs (BL-472, formations)
+- ACTIONS.json transcription of the march/halt/disband verbs (BL-314, unit verb family — now *requires* BL-470)
 - Anything that **calls** the campaign resolver: an engagement trigger, battle state in the world (BL-315). *The `unit_component` → `army_stack_entry` bridge this line used to list is built — see Landed*
 - **Authoring the upkeep numbers.** The pass is inert until someone sets a rate; that tuning has no owning item as of 2026-08-18
 - Hire price on screen (BL-405, hire has no price on screen)

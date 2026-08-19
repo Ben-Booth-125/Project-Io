@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*113 entries — 71 open, 42 resolved.*
+*117 entries — 74 open, 43 resolved.*
 
 ---
 
@@ -771,6 +771,40 @@ BL-466 (province partition) flipped design-owed -> designed with the three-pass 
 
 *Files: `docs/development/backlog.json`*
 
+### NR-349 — BL-448 (corp stance) skipped serialization.cpp — the file does not exist
+*decision taken on your behalf · raised 2026-08-19 · from BL-448, corp stance data model + verbs delivery.*
+
+BL-448's file scope named src/world/serialization.cpp as a wiring target. No such file exists anywhere in the repo (confirmed by search); persistence is done per-subsystem (e.g. procurement.cpp's own write_procurement/read_procurement, never called from a production save path). The item's own design text says the harness must assert in-memory replay only because "no serialiser exists yet in this project; do not invent one." Read together with the empty file, this was taken as licence to land the whole substrate with no persistence path at all, matching the design's explicit framing ("Landing the substrate inert is deliberate").
+
+**Why it matters.** A save made after this lands will silently drop every corp's hostility/friendship/pending-offer state on reload, since nothing writes or reads it. Consistent with the design's stated scope (no consequence yet, substrate only), but worth Ben seeing named rather than discovered later as a save-format gap.
+
+*Files: `src/world/stance.hpp`, `src/world/stance.cpp`, `src/world/world.hpp`*
+
+### NR-351 — BL-384 (Era -1 sim conquers nothing) — hypothesis refuted, real cause is a scorer magnitude mismatch, no fix applied
+*decision taken on your behalf · raised 2026-08-19 · from BL-384 confirm-before-fix instrumentation this session — see backlog.json BL-384 design field, FINDING 2026-08-19 section, for full measurement detail.*
+
+Instrumented history_sim.cpp (temporarily) and measured a full 4000 BCE -> 0 CE run against the real Kepler world. The filed hypothesis (scorer/resolver terrain disagreement causes the sim to pick fights it then loses) is REFUTED: Campaign is never even selected as a polity-year's best_verb (0/1200 selections in the measured run), so no battle is ever fought for a terrain-blind estimate to lose. 372,660 of 524,800 scored campaign candidates clear the Campaign verb's own threshold, but Settle wins the shared-currency comparison in effectively every case (1188/1200), because Settle's score is a near-direct fraction of region value while Campaign's score is run through five multiplicative/subtractive discounts (campaign_gain_q, p_win_q, distance, culture, def_eff/supply cost) before competing on the same axis.
+
+**Why it matters.** I did NOT attempt a fix. Rebalancing a four-verb shared-currency scorer (BL-309) is a different and larger-scoped problem than BL-384 as filed, and the item's own text explicitly warns against blind-tuning combat constants ('that would be guessing'). It also risks moving the B318c/R3/R5/B299 assertions that currently pass against synthetic fixtures. Recommend this becomes its own scoped follow-up item — a shared-currency rebalance pass with its own before/after measurement — rather than a same-session patch riding on this confirmation.
+
+- File a new backlog item for the shared-currency rebalance (Settle vs Campaign scoring magnitude), scoped and measured independently of BL-384
+- Leave BL-384 open as-is and let a future session pick up the rebalance under this same item
+
+> **Recommendation:** File a new item — the rebalance is a distinct, larger-scoped problem (four verbs, five discount terms) from what BL-384 described, and giving it its own before/after measurement keeps BL384a/b honest as the acceptance bar.
+
+*Files: `src/world/history_sim.cpp`, `src/world/combat.cpp`, `tools/verify/history_sim_harness.cpp`*
+
+### NR-352 — BL-470 (unit march seam) — three implementation judgment calls, none blocking
+*decision taken on your behalf · raised 2026-08-19 · from BL-470 implementation this session — the design left three specifics for the implementer to resolve.*
+
+Three calls made while building BL-470 (march/halt/disband): (1) NR-344 (war flips the queue) is implemented as a pure VISITATION reorder inside run_unit_march (mobilised corps first, ascending unit id within each group) — there is no shared logistics-point pool yet (BL-464) for a marching corp to actually contend with a convoy over, so the rule is currently observable only by inspecting corp_is_mobilised/visitation order, not by any different in-game outcome, mirroring how BL-454 shipped upkeep inert at rate zero. (2) The design says the pass runs "after battle discovery", but no battle-discovery phase exists yet (BL-467) — run_unit_march was placed immediately before run_unit_upkeep, with a comment naming the slot it will occupy once BL-467 lands. (3) march_points_per_class was authored with first-cut placeholder constants (infantry 1.0, cavalry 1.5, ranged 1.0, siege 0.5, naval 0.0 tiles/tick against the plains=1.0 traversal weight) — untuned by playtest, same status as BL-394/BL-454s hire/upkeep constants when they landed.
+
+**Why it matters.** None of these block the item — R1-R5 all pass their headless requirement — but (1) means Ben should not expect any visible consequence from declaring hostility yet (it only matters once BL-464 lands a contended resource), and (3) means the march speed numbers are a first guess, not a balance pass.
+
+> **Recommendation:** No action needed now. Revisit (1) when BL-464 (Logistic Points) lands — that is when the reorder gets something to actually contend over. Revisit (3) during a playtest/tuning pass, the same way BL-394s hire costs were.
+
+*Files: `src/world/economy_system.cpp`, `src/world/economy_system.hpp`, `scripts/economy.lua`, `docs/military/MILITARY.md`*
+
 ---
 
 ## Resolved
@@ -1215,4 +1249,20 @@ Filed BL-466 (province partition), BL-467 (battle state in world), BL-468 (battl
 Filed BL-470 (unit march seam), BL-471 (unit marker and command surface), BL-472 (unit formations); amended BL-314 (unit verb family - now transcribes from BL-470) and BL-393 (units write-only - export half carried by BL-470). Delegated calls, all overturnable: (1) march_points per tick as authored data with one speed for all units in the first cut; (2) path computed once at order time, ties by ascending tile id, recomputed only on invalidation; (3) convoys-before-armies stays the DECLARED first-cut claim order pending Ben's NR-344 verdict; (4) the five-template formation wheel (Line > Screen > Wing > Line, Spearhead counter-free, Train siege-purpose) as the preset set, ratios era-invariant over classes; (5) version slots - verbs and surface at v0.1.17 with the battle set, formations at v0.1.18.
 
 *Files: `docs/development/backlog.json`, `docs/military/MILITARY.md`*
+
+### NR-350 — BL-449 (stance surface) — does a hostile declaration announce itself, or is it discovered on contact?
+*question · raised 2026-08-19 · from BL-449 design field, flagged as "a second question for Ben" when BL-448 (corp stance model) landed and unblocked BL-449 this session.*
+
+BL-449 gates the Corporation panel's stance column on BL-068 competitor-visibility: a stance toward a corp the player has not discovered is not shown. That leaves two readings for how a declare_hostile against the player becomes visible to them — (A) it announces itself immediately, e.g. surfaced on the comms dock the moment it is declared, or (B) it stays silent and is only discovered on contact (matching a market/building becoming visible through normal BL-068 discovery). BL-449's own design notes it rides naturally on the comms dock if it announces, but does not settle which.
+
+**Why it matters.** This decides whether an ambush is truly a surprise (reading B — the player learns they are at war only when something happens to them) or a declared-but-silent-delivery state (reading A — always immediately known, just not necessarily acted on). BL-458 (interdiction) leans on the ambush property ("a convoy belonging to a corp that does not yet know it is at war"), so picking A would partially undercut that design intent for player-facing hostility, though rival-on-rival hostility could still use B for AI purposes.
+
+- A — announces immediately (comms dock entry the moment a hostile corp declares against the player, regardless of discovery state)
+- B — silent, discovered on contact (matches ordinary BL-068 visibility; the player learns only when they next interact with or are affected by the hostile corp)
+
+> **Recommendation:** B, to keep the ambush property BL-458 (interdiction) explicitly relies on — a corp "does not yet know it is at war" only works if hostility is not always broadcast on declaration.
+
+> **RESOLVED.** RESOLVED 2026-08-19 (Ben): reading B — hostility toward the player stays silent and is discovered on contact, matching ordinary BL-068 visibility rather than announcing on the comms dock. Preserves the ambush property BL-458 (interdiction) relies on. BL-449 (stance surface) is unblocked to promote: the Corporation panel's stance column shows a hostile row only once the corp is otherwise discovered, same gate as every other BL-068-visible fact.
+
+*Files: `src/ui/corporation_panel.cpp`, `docs/ui/question_log.json`*
 

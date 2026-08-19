@@ -249,6 +249,44 @@ struct unit_upkeep_tick
 /// the reach field is never built from here.
 unit_upkeep_tick run_unit_upkeep(world& w, const recipe_registry& reg);
 
+// ---------------------------------------------------------------------------
+// BL-470 — the unit march pass
+// ---------------------------------------------------------------------------
+
+/// What one run of the march pass did. Pure observability, same shape/intent
+/// as unit_upkeep_tick — nothing reads it to make a decision.
+struct unit_march_tick
+{
+    int marching  = 0; ///< Units that held a live order when the pass started.
+    int arrived   = 0; ///< Orders that reached their destination this tick.
+    int recomputed = 0; ///< Paths recomputed after a blocked step this tick.
+};
+
+/// NR-344's mobilisation test — see run_unit_march's doc comment. Exposed
+/// for the harness (tools/verify/unit_march_harness.cpp).
+bool corp_is_mobilised(const world& w, entity_id corp);
+
+/// BL-470's per-tick movement resolution. Spends each marching unit's
+/// per-CLASS `march_points_per_class` (recipe_registry::military(), keyed off
+/// the roster row's `cls`) against the per-tile traversal cost `intra_body_
+/// path`/`body_reach_field` already compute — never a second cost model —
+/// with fractional carry-over banked in `unit_component::order.progress`.
+///
+/// VISIT ORDER (NR-344, "war flips the queue", resolved 2026-08-19 alongside
+/// this item): a corp party to ANY declared hostility (either direction —
+/// being attacked mobilises too, `is_hostile` checked both ways against
+/// `w.corp_hostile_pairs`) has its units visited FIRST this tick; every other
+/// corp's units follow, in ascending unit id within each group. At peace
+/// this changes nothing observable YET — there is no shared logistics-point
+/// pool for a march and a convoy to actually contend over until BL-464 lands
+/// one — so the rule ships the same way BL-454's upkeep rates did: real,
+/// written down, and inert until something exists to contend over.
+///
+/// Called from run_economy_step in the slot BL-467's (not-yet-built)
+/// battle-discovery phase will occupy — see that call site's comment for why
+/// there is nothing to run after yet.
+unit_march_tick run_unit_march(world& w, const recipe_registry& reg);
+
 /// BL-430: outcome of a PLAYER-grade recipe-switch attempt (try_switch_recipe).
 enum class recipe_switch_result : uint8_t
 {

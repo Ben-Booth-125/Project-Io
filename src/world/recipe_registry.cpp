@@ -340,6 +340,26 @@ void recipe_registry::load_from_lua(lua_state& lua)
             mp.upkeep = up;
         }
 
+        // BL-470: per-class march points (economy.military.march_points_per_class).
+        // Absent table = every class at 0 = no unit can march — the seam still
+        // accepts march_unit and computes/stores the path, it just never
+        // consumes it, mirroring how BL-454's upkeep landed inert at zero.
+        sol::optional<sol::table> march = (*military)["march_points_per_class"];
+        if (march)
+        {
+            auto& mpc = mp.march_points_per_class;
+            mpc[static_cast<std::size_t>(unit_class::infantry)] =
+                march->get_or("infantry", mpc[static_cast<std::size_t>(unit_class::infantry)]);
+            mpc[static_cast<std::size_t>(unit_class::cavalry)] =
+                march->get_or("cavalry", mpc[static_cast<std::size_t>(unit_class::cavalry)]);
+            mpc[static_cast<std::size_t>(unit_class::ranged)] =
+                march->get_or("ranged", mpc[static_cast<std::size_t>(unit_class::ranged)]);
+            mpc[static_cast<std::size_t>(unit_class::siege)] =
+                march->get_or("siege", mpc[static_cast<std::size_t>(unit_class::siege)]);
+            mpc[static_cast<std::size_t>(unit_class::naval)] =
+                march->get_or("naval", mpc[static_cast<std::size_t>(unit_class::naval)]);
+        }
+
         m_military = mp;
     }
 

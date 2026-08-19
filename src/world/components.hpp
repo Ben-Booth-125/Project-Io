@@ -609,12 +609,37 @@ struct population_centre_component
 /// field is gone rather than merely deprecated. `count` stays the honest
 /// headcount; `supply_factor_permille` is the only new state, and it is written
 /// by BL-454's upkeep pass, not by the hire path.
+/// BL-470: a path-march order in flight. `dest == null_entity` means "no
+/// active order" — the unit is halted (or has never been given one), the
+/// only state `halt_unit` needs to restore. The path is computed ONCE, at
+/// order time, from the same cost function `body_reach_field` and the A*
+/// pathfinder use (`intra_body_path`, logistics.hpp) — never re-Dijkstra'd
+/// per tick. `next_index` is the index into `path` of the next tile the unit
+/// has not yet reached (`path[0]` is the tile the unit stood on when the
+/// order was placed, so a fresh order starts at `next_index == 1`).
+/// `progress` banks fractional march points toward the next hop's cost
+/// across tick boundaries — see run_unit_march (economy_system.cpp).
+struct movement_order
+{
+    entity_id               dest       = null_entity;
+    std::vector<entity_id>  path;
+    std::size_t             next_index = 1;
+    float                   progress   = 0.0f;
+};
+
 struct unit_component
 {
     entity_id position;      ///< Tile the unit currently occupies (BL-157: tile-canonical).
     entity_id owner;         ///< Corporation or faction entity that controls this unit.
     int       count;         ///< Number of units in the group.
     uint16_t  type = 0;      ///< Opaque roster-type index; see combat.hpp's army_stack_entry.
+
+    /// BL-470: the unit's standing movement order, if any. `order.dest ==
+    /// null_entity` means unordered/halted — a freshly hired unit starts this
+    /// way, unpinning nothing until march_unit is issued (BL-393's open half:
+    /// units were write-only and inert until this field gave them somewhere
+    /// to go).
+    movement_order order;
 
     /// BL-454. How well this unit is supplied, per-mille (1000 = fully supplied).
     /// Lowered by the ONE decay rule with TWO triggers in the upkeep pass

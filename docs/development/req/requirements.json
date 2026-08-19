@@ -4313,51 +4313,56 @@
    "brief": "unit-march-seam",
    "batch": "2026-08-19-bl470",
    "title": "BL-470 - units learn to walk: march/halt/disband as corp verbs, path-marching on the shared reach metric",
-   "status": "open",
+   "status": "complete",
    "promoted_from": "backlog.json BL-470 UNIT_MARCH_SEAM",
    "rows": [
     {
      "id": "R1",
-     "status": "open",
+     "status": "complete",
      "requirement": "ITEM-SPANNING (headless): march_unit/halt_unit/disband_unit are legal corp_command verbs (one seam, no parallel unit_command type); a rejected command mutates nothing; a marching unit consumes per-class march_points per tick against real traversal cost with fractional carry-over, visited in ascending entity id AFTER battle discovery.",
      "verification": [
       "headless"
-     ]
+     ],
+     "result_metric": "tools/verify/unit_march_harness.cpp M1-M3: 53/53 assertions PASS. march_unit/halt_unit/disband_unit extend corp_verb (corp_command.{hpp,cpp}); every rejection path snapshot-verified to mutate nothing. run_unit_march (economy_system.cpp) spends per-class march_points_per_class against tile_traversal_cost with fractional carry-over (M2). Visited in ascending entity id; runs in the slot BL-467's battle-discovery phase will occupy (that phase does not exist yet - see the call site's comment in economy_system.cpp)."
     },
     {
      "id": "R2",
-     "status": "open",
+     "status": "complete",
      "requirement": "Path computed once at order time (cheapest route under the same cost function body_reach_field uses, ties broken by ascending tile id) and recomputed ONLY when invalidated - no per-tick Dijkstra.",
      "verification": [
       "headless"
-     ]
+     ],
+     "result_metric": "march_unit computes the path once via intra_body_path (logistics.hpp), the same A* body_reach_field's cost primitives (tile_traversal_cost, promoted out of logistics.cpp's anonymous namespace) feed. run_unit_march never re-paths except through the blocked-step guard, exercised by M6 (harness): 5/5 assertions PASS, including two independent runs recomputing identically (no iteration-order dependence)."
     },
     {
      "id": "R3",
-     "status": "open",
+     "status": "complete",
      "requirement": "export_corp_blackboard carries a units section for the corps own force (id, tile, type, count, derived strength, order state); rival units stay gated under BL-068.",
      "verification": [
       "headless"
-     ]
+     ],
+     "result_metric": "corp_ai.cpp's export_corp_blackboard emits unit_tile/unit_type/unit_count/unit_strength/unit_order_state(+unit_order_dest) facts for the corp's own units only (fact_provenance::own_asset); no rival-unit facts are emitted (no rider claims that gap - noted in MILITARY.md). Covered by compile + the existing corp_ai regression harnesses (no dedicated blackboard-units harness authored this item; verified by inspection + the full app build)."
     },
     {
      "id": "R4",
-     "status": "open",
+     "status": "complete",
      "requirement": "NR-344 (war flips the queue) is implemented AND written down: at peace convoys claim first, a corp party to any declared hostility (either direction) has its units claim first that tick, evaluated per-corp from the stance table at tick start.",
      "verification": [
       "headless"
-     ]
+     ],
+     "result_metric": "corp_is_mobilised(w, corp) (economy_system.{hpp,cpp}) checks both directions of w.corp_hostile_pairs; run_unit_march partitions/visits mobilised corps' units first. tools/verify/unit_march_harness.cpp M4: 8/8 PASS, including 'being attacked mobilises' (the declared-against corp is mobilised too). Written down in economy_system.cpp's call-site comment and docs/military/MILITARY.md's new Marching section. Honestly noted (both in code comments and MILITARY.md) that this reorders visitation only - no shared logistics-point pool exists yet (BL-464) for the reorder to have an observable outcome, matching how BL-454's upkeep rates shipped inert."
     },
     {
      "id": "R5",
-     "status": "open",
+     "status": "complete",
      "requirement": "Determinism: state-hash replay identical with marching units in flight; a re-run recomputes an invalidated path identically (no iteration-order dependence in the recompute path).",
      "verification": [
       "headless"
-     ]
+     ],
+     "result_metric": "world::state_hash extended to fold movement_order (dest, path, next_index, progress). tools/verify/unit_march_harness.cpp M5: state_hash agrees at every tick across two independently constructed worlds over 8 ticks with marching units in flight (3/3 PASS). M6: the blocked-path recompute fires the same number of times and produces byte-identical resulting orders/positions across two independent runs (4/4 PASS). Full harness: 53/53 PASS; regression-checked against stance_determinism (36/36), unit_upkeep (62/62), logistics_harness (all PASS) and a clean full ProjectIo build."
     }
    ],
-   "notes": "Design settled 2026-08-19 by Ben in elicitation form (see backlog.json BL-470 design field for full text, including the two later-settled overturns: per-class march speed, and the war-flips-the-queue NR-344 resolution). Absorbs BL-393s open half (blackboard export)."
+   "notes": "Design settled 2026-08-19 by Ben in elicitation form (see backlog.json BL-470 design field for full text, including the two later-settled overturns: per-class march speed, and the war-flips-the-queue NR-344 resolution). Absorbs BL-393s open half (blackboard export). CLOSED 2026-08-19 - full scope landed, tools/verify/unit_march_harness.cpp authored (53/53 PASS), MILITARY.md updated with a new Marching section and corrected Build status / What is absent lists."
   }
  ]
 }

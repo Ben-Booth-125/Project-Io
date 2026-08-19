@@ -1155,7 +1155,7 @@ decomposition exists to prevent: S1, S2 and S3 all code against a verb enum that
 
 ---
 
-## BL-470 — the unit march seam (promoted 2026-08-19)
+## BL-470 — the unit march seam (promoted 2026-08-19) — **COMPLETE** (6/6, 2026-08-19)
 
 Settled 2026-08-19 (Ben, elicitation form). Difficulty 4, priority A, v0.1.17. Absorbs BL-393's
 open half (units are write-only and inert); no longer a separate item. Full design in

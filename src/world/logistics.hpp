@@ -33,6 +33,14 @@ float landform_logistics_cost(terrain_landform lf);
 /// core (roads arrive with BL-146); wired here so the follow-on needs no A* change.
 float road_traversal_multiplier(std::uint8_t road_level);
 
+/// A tile's traversal-cost WEIGHT — ocean or landform cost, discounted by
+/// road_level. The per-node weight A*, body_reach_field's Dijkstra, and (BL-470)
+/// a marching unit all share; an edge/hop cost is the mean of its two nodes.
+/// Exposed (promoted out of logistics.cpp's anonymous namespace) so run_unit_march
+/// (economy_system.cpp) spends march points against the SAME cost function
+/// rather than a second invented model.
+float tile_traversal_cost(const tile_component& tc);
+
 /// Per-body raster index (grid_y*grid_width + grid_x -> tile entity, null_entity for an
 /// absent cell), built and cached in world.body_tile_index on first use. Deterministic —
 /// a pure function of the body's tiles, independent of tiles-map iteration order. Returns

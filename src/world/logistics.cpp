@@ -23,15 +23,6 @@ inline int raster_idx(int col, int row, int gw)
     return ((col % gw) + gw) % gw + row * gw;
 }
 
-/// A tile's traversal cost: ocean = sea leg, land = landform cost, both scaled by the
-/// road discount. The per-node weight; an edge cost is the average of its two nodes.
-float tile_traversal_cost(const tile_component& tc)
-{
-    const float base = (tc.composition == terrain_composition::ocean)
-                           ? sea_leg_cost
-                           : landform_logistics_cost(tc.landform);
-    return base * road_traversal_multiplier(tc.road_level);
-}
 
 /// Lowest-cost-first priority-queue entry (mirrors nation_generation's bfs_entry).
 struct pq_entry
@@ -64,6 +55,23 @@ float road_traversal_multiplier(std::uint8_t road_level)
     // Each tier cuts the traversal cost; tier 0 = 1.0. 1/(1 + 0.5*tier): Track(1) ~0.67,
     // Road(2) 0.50, Highway(3) 0.40 — diminishing returns up the ladder (BL-172).
     return 1.0f / (1.0f + 0.5f * static_cast<float>(road_level));
+}
+
+/// A tile's traversal cost: ocean = sea leg, land = landform cost, both scaled by the
+/// road discount. The per-node weight; an edge cost is the average of its two nodes
+/// (A* and body_reach_field's Dijkstra both do this — see their own comments).
+///
+/// PROMOTED OUT OF the anonymous namespace above for BL-470 (unit march seam):
+/// run_unit_march (economy_system.cpp) spends a marching unit's march points
+/// against this SAME per-tile weight, one hop at a time, rather than inventing
+/// a second traversal-cost model. `sea_leg_cost` stays private to this file —
+/// the only caller outside it reads land tiles a unit can actually stand on.
+float tile_traversal_cost(const tile_component& tc)
+{
+    const float base = (tc.composition == terrain_composition::ocean)
+                           ? sea_leg_cost
+                           : landform_logistics_cost(tc.landform);
+    return base * road_traversal_multiplier(tc.road_level);
 }
 
 const std::vector<entity_id>& body_tile_grid(world& w, entity_id body)

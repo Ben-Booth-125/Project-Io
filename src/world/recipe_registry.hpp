@@ -388,6 +388,18 @@ struct military_capability_params
     /// BL-394's own comment flagged upkeep as "deliberately absent" and pointed
     /// at the contract loop; this is where it actually landed.
     unit_upkeep_params upkeep = {};
+
+    /// BL-470: march points spent per tick against per-tile traversal cost,
+    /// keyed by `unit_class` (combat.hpp — infantry/cavalry/ranged/siege/naval).
+    /// PER-CLASS FROM THE START (overturned the item's own one-speed first
+    /// cut, same elicitation) — a wing outpaces a line, authored as data
+    /// rather than a code branch. Authored under
+    /// `economy.military.march_points_per_class`; a class with a non-positive
+    /// entry cannot march at all (naval defaults to 0 — no naval movement
+    /// model exists yet, combat.hpp's own "strategic-only presence" note).
+    /// A composite unit (BL-472, not built here) reads its SLOWEST member's
+    /// class entry — the hook, not the composite logic.
+    std::array<float, unit_class_count> march_points_per_class = {};
 };
 
 /// BL-350 procurement/contract tunables, authored in scripts/economy.lua under the top-level

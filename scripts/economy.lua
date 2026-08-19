@@ -249,6 +249,23 @@ economy = {
             supply_recovery_permille = 0,   -- regained per tick while supplied
             out_of_supply_reach      = 0.0, -- reach cost past which a unit is out of supply; <= 0 disables
         },
+
+        -- BL-470: march points spent per tick against per-tile traversal cost
+        -- (the SAME cost body_reach_field/the road network already compute —
+        -- see logistics.hpp's tile_traversal_cost, plains=1.0, mountain=2.0,
+        -- discounted by road_level). PER-CLASS from the start (Ben's own
+        -- overturn of the item's one-speed first cut, same elicitation
+        -- session, 2026-08-19): a wing outpaces a line. First-cut authored
+        -- constants — a Levy Spear on Plains (cost 1.0/tile) covers 1 tile/
+        -- tick unescorted; a Rifle Regiment covers 1.5. Naval is 0 —
+        -- strategic-only presence (combat.hpp), no naval movement model yet.
+        march_points_per_class = {
+            infantry = 1.0,
+            cavalry  = 1.5,
+            ranged   = 1.0,
+            siege    = 0.5,
+            naval    = 0.0,
+        },
     },
 
     -- BL-350: the procurement/contract seam — "a build order placed with

@@ -1754,6 +1754,33 @@ corp_blackboard export_corp_blackboard(const world& w, entity_id corp, int tick)
                     add_fact(bb, tick, key.second, res_pred("pool", r),
                              pool.quantities[r], 1.0f, fact_provenance::own_asset);
         }
+
+        // BL-470 Rider 1 — the blackboard export takes over BL-393's open
+        // half (units were write-only and inert, so no scorer could see them
+        // to command them). Own force only: reading the corp's OWN units
+        // engages no BL-068 visibility rule, exactly like the cash/buildings/
+        // pools above. Rivals stay gated as everywhere else in this function
+        // — this section has no rival counterpart.
+        {
+            std::vector<entity_id> own_units;
+            for (const auto& [uid, u] : w.units)
+                if (u.owner == corp)
+                    own_units.push_back(uid);
+            std::sort(own_units.begin(), own_units.end());
+            for (const entity_id uid : own_units)
+            {
+                const unit_component& u = w.units.at(uid);
+                add_fact(bb, tick, uid, "unit_tile", static_cast<double>(u.position), 1.0f, fact_provenance::own_asset);
+                add_fact(bb, tick, uid, "unit_type", static_cast<double>(u.type), 1.0f, fact_provenance::own_asset);
+                add_fact(bb, tick, uid, "unit_count", static_cast<double>(u.count), 1.0f, fact_provenance::own_asset);
+                add_fact(bb, tick, uid, "unit_strength", static_cast<double>(unit_strength(w, u)), 1.0f, fact_provenance::own_asset);
+                // order state: 0 = holding (no order), 1 = marching to unit_order_dest.
+                const bool has_order = u.order.dest != null_entity;
+                add_fact(bb, tick, uid, "unit_order_state", has_order ? 1.0 : 0.0, 1.0f, fact_provenance::own_asset);
+                if (has_order)
+                    add_fact(bb, tick, uid, "unit_order_dest", static_cast<double>(u.order.dest), 1.0f, fact_provenance::own_asset);
+            }
+        }
     }
 
     // Section 1 — markets: prices + supply/demand aggregates. Public (BL-068).

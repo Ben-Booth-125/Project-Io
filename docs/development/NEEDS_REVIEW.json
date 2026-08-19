@@ -1893,6 +1893,33 @@
     "BL-318",
     "BL-320"
    ]
+  },
+  {
+   "id": "NR-352",
+   "title": "BL-470 (unit march seam) — three implementation judgment calls, none blocking",
+   "raised": "2026-08-19",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-470 implementation this session — the design left three specifics for the implementer to resolve.",
+   "what": "Three calls made while building BL-470 (march/halt/disband): (1) NR-344 (war flips the queue) is implemented as a pure VISITATION reorder inside run_unit_march (mobilised corps first, ascending unit id within each group) — there is no shared logistics-point pool yet (BL-464) for a marching corp to actually contend with a convoy over, so the rule is currently observable only by inspecting corp_is_mobilised/visitation order, not by any different in-game outcome, mirroring how BL-454 shipped upkeep inert at rate zero. (2) The design says the pass runs \"after battle discovery\", but no battle-discovery phase exists yet (BL-467) — run_unit_march was placed immediately before run_unit_upkeep, with a comment naming the slot it will occupy once BL-467 lands. (3) march_points_per_class was authored with first-cut placeholder constants (infantry 1.0, cavalry 1.5, ranged 1.0, siege 0.5, naval 0.0 tiles/tick against the plains=1.0 traversal weight) — untuned by playtest, same status as BL-394/BL-454s hire/upkeep constants when they landed.",
+   "why_it_matters": "None of these block the item — R1-R5 all pass their headless requirement — but (1) means Ben should not expect any visible consequence from declaring hostility yet (it only matters once BL-464 lands a contended resource), and (3) means the march speed numbers are a first guess, not a balance pass.",
+   "options": [],
+   "recommendation": "No action needed now. Revisit (1) when BL-464 (Logistic Points) lands — that is when the reorder gets something to actually contend over. Revisit (3) during a playtest/tuning pass, the same way BL-394s hire costs were.",
+   "files": [
+    "src/world/economy_system.cpp",
+    "src/world/economy_system.hpp",
+    "scripts/economy.lua",
+    "docs/military/MILITARY.md"
+   ],
+   "refs": [
+    "BL-470",
+    "BL-464",
+    "BL-467",
+    "BL-454",
+    "BL-394",
+    "NR-344"
+   ],
+   "resolution": null
   }
  ]
 }
