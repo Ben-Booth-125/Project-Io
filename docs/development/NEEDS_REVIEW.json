@@ -1920,6 +1920,26 @@
     "NR-344"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-353",
+   "title": "BL-449 stance column overflows the shell fold-out panel - presses are unreachable",
+   "raised": "2026-08-19",
+   "kind": "observation",
+   "status": "open",
+   "source": "Live visual check of the Corporation panel (Diplomacy nav slot) after BL-449 landed.",
+   "what": "corporation_panel.cpp's table lives inside ui::foldout_begin's shell fold-out column, whose width BL-111 deliberately narrowed to fit exactly 4 columns (Corporation stretch + 3x WidthFixed 62px) after six columns previously collapsed to single-glyph headers. BL-449 added a 5th column, Stance, at WidthFixed 220px, without revisiting that budget. Confirmed live: every row shows a Stance value (Neutral/etc) but the three transition buttons (Declare Hostile / Offer Friendship / Return to Neutral) render past the panel's right edge. The panel is not resizable (dragging the border does nothing - it's part of the fixed shell column) and the table has no horizontal scroll enabled, so the buttons are genuinely unreachable, not just visually tight.",
+   "why_it_matters": "BL-449 shipped a stance UI that cannot actually declare hostility, offer/accept friendship, or return to neutral in the live app - the exact BL-350 failure mode (a complete seam with no reachable press) the item was filed to avoid, just one layer further down (the press exists in code but is not reachable on screen).",
+   "options": [
+    "A - shrink the Stance column (e.g. label only + a single overflow/context-menu button, or icon-only presses) to fit the existing ~4-column budget",
+    "B - widen the shell fold-out column specifically when this panel is open (a per-panel width override), reopening the BL-111 constraint deliberately for this one case",
+    "C - give the Corporation panel its own non-shell window (like the original de-scoped design before BL-122 re-hosted it), decoupling it from the shared shell width entirely"
+   ],
+   "recommendation": "A is cheapest and keeps every panel inside the shell at one shared width, which is presumably the whole point of BL-111/BL-122's constraint; worth Ben's call given it touches a settled layout decision.",
+   "files": [
+    "src/ui/corporation_panel.cpp",
+    "src/ui/foldout_column.cpp"
+   ]
   }
  ]
 }

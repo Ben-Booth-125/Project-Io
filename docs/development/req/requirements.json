@@ -4280,12 +4280,12 @@
    "rows": [
     {
      "id": "R1",
-     "status": "complete",
+     "status": "failed",
      "requirement": "ITEM-SPANNING (visual): the Corporation panel gains a Stance column showing the player-to-rival stance (Hostile / Friend / Neutral / Unknown), gated on ordinary BL-068 competitor-visibility per NR-350 (a hostile declaration stays silent, discovered on contact rather than announced).",
      "verification": [
       "visual"
      ],
-     "result_metric": "Column added in src/ui/corporation_panel.cpp, gated via a corp_is_discovered() helper reading the same per-building survey-visibility check BL-068 uses elsewhere. Not yet visually captured in this batch - open, see notes."
+     "result_metric": "FAILED on live visual check 2026-08-19: the Stance column renders (label visible for every discovered row) but its WidthFixed 220px overflows the shell fold-out panel, which BL-111 had narrowed to fit exactly 4 columns. The three transition buttons render past the panel edge and are unreachable - not a cosmetic issue, the presses cannot be clicked. See NR-353."
     },
     {
      "id": "R2",
