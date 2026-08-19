@@ -597,6 +597,58 @@ void draw_value_bar(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
                 IM_COL32(225, 228, 235, 255), buf);
 }
 
+void draw_stacked_band(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
+                       const band_layer* layers, std::size_t layer_count)
+{
+    if (!layers || layer_count == 0)
+        return;
+
+    std::size_t points = 0;
+    for (std::size_t l = 0; l < layer_count; ++l)
+        points = std::max(points, layers[l].count);
+    if (points == 0)
+        return;
+
+    const float w      = mx.x - mn.x;
+    const float h      = mx.y - mn.y;
+    const float col_w  = w / static_cast<float>(points);
+    // A hairline gap between columns keeps adjacent samples countable; below
+    // ~3 px per column the gap would eat the fill, so it degrades to none.
+    const float gap = (col_w >= 3.0f) ? 1.0f : 0.0f;
+
+    for (std::size_t i = 0; i < points; ++i)
+    {
+        float sum = 0.0f;
+        for (std::size_t l = 0; l < layer_count; ++l)
+        {
+            // Right-align short layers: layer sample j sits at column
+            // (points - count + j), the same "began recording late" convention
+            // as time_series::offset.
+            const std::size_t off = points - layers[l].count;
+            if (i >= off && layers[l].values)
+                sum += std::max(0.0f, layers[l].values[i - off]);
+        }
+        if (sum <= 0.0f)
+            continue; // an honest gap — no decisions this sample
+
+        const float x0 = mn.x + col_w * static_cast<float>(i);
+        const float x1 = x0 + col_w - gap;
+
+        float y = mx.y; // stack upward from the baseline
+        for (std::size_t l = 0; l < layer_count; ++l)
+        {
+            const std::size_t off = points - layers[l].count;
+            const float v = (i >= off && layers[l].values)
+                                ? std::max(0.0f, layers[l].values[i - off]) : 0.0f;
+            if (v <= 0.0f)
+                continue;
+            const float seg = (v / sum) * h;
+            dl->AddRectFilled({x0, y - seg}, {x1, y}, layers[l].colour);
+            y -= seg;
+        }
+    }
+}
+
 void threshold_line(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
                     float value, float ceiling, ImU32 colour, const char* caption,
                     float legend_reserve)

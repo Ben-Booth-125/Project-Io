@@ -532,6 +532,14 @@
   [
    "gameplay.return_to_neutral",
    "Corporation panel, Stance column. Shown whenever the row is currently Hostile or Friend."
+  ],
+  [
+   "ledger.strategy_readout_open",
+   "Navigation rail slot 12, \"Strategy readout\""
+  ],
+  [
+   "ledger.strategy_readout_select_corp",
+   "Strategy readout, corporation selector"
   ]
  ]
 }

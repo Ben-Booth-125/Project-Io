@@ -154,6 +154,35 @@ struct time_series
     bool         right_axis  = false;                     ///< false = left Y axis, true = right Y axis; each axis auto-scales to its own series.
 };
 
+// ---------------------------------------------------------------------------
+// Stacked share band (BL-411)
+//
+// Composition-over-time in a narrow host: each sample's layer values are
+// normalised to their own sum and drawn as one full-height column of stacked
+// segments, so the band reads "what the mix was", never "how much there was".
+// Built for the Strategy readout's bucket-split-by-quarter view, but the
+// primitive is generic — any bounded set of exclusive categories over a capped
+// sample axis fits it.
+// ---------------------------------------------------------------------------
+
+/// One layer of a stacked share band: `count` samples, oldest → newest.
+struct band_layer
+{
+    const float* values = nullptr;
+    std::size_t  count  = 0;
+    ImU32        colour = IM_COL32(150, 160, 190, 255);
+};
+
+/// Draw a stacked share band inside [@p mn, @p mx] (screen space).
+///
+/// Column i spans width/(max layer count); layers stack bottom-up in array
+/// order. A sample whose layers sum to zero draws NOTHING — the gap says
+/// "nothing happened this sample", which is different information from any
+/// possible fill. Layers shorter than the longest are right-aligned (they
+/// began recording late), matching time_series::offset's convention.
+void draw_stacked_band(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
+                       const band_layer* layers, std::size_t layer_count);
+
 /// Draw a dual-axis time-series chart inside [@p mn, @p mx] (screen space).
 ///
 /// Each Y axis auto-scales to the peak of the series bound to it (nice_ceil, or

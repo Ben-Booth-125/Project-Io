@@ -2239,6 +2239,36 @@
    ],
    "expected_output": "Unilateral and asymmetric on hostility: clears ONLY the acting corp's own directed hostility toward counterparty (the reverse direction, if counterparty is separately hostile toward the corp, is untouched — that is counterparty's own row to release). Clears the shared friendship row if one exists (either party may dissolve a friendship) and any pending offer between the two in either direction. A rejected call mutates nothing.",
    "reason_to_select": "The universal de-escalation press — the only one of the four verbs usable from every non-neutral state, and the one that lets a corp exit hostility unilaterally even though it could not enter friendship unilaterally."
+  },
+  {
+   "id": "ledger.strategy_readout_open",
+   "family": "ledger",
+   "surface": "Navigation rail slot 12, \"Strategy readout\"",
+   "press": "Click nav rail slot 12 to open the Strategy readout; click it again to close",
+   "args": [],
+   "preconditions": [
+    "In game (not the menu or the generation screen)"
+   ],
+   "expected_output": "The Strategy readout opens in the shell fold-out column, closing whatever ledger was open (the column holds one occupant). It aggregates each corporation's strategic decisions over a rolling 64-quarter window: with no corp selected, one must-have/should-have/nice-to-have bucket-split bar per corporation; with a corp selected, its bucket split quarter by quarter (a stacked band), its verb mix, and its reason tally. Score and margin figures are deliberately absent (candidates sort by priority bucket before score, so raw margins do not aggregate honestly). Clicking the slot while the readout is already open closes it (standing toggle rule).",
+   "reason_to_select": "To see WHAT STRATEGY IS EMERGING rather than the individual moves - the decision feed lists the moves; this shows the shape of a run. A corp living in must-have is defending its solvency; one living in nice-to-have is expanding unopposed."
+  },
+  {
+   "id": "ledger.strategy_readout_select_corp",
+   "family": "ledger",
+   "surface": "Strategy readout, corporation selector",
+   "press": "Select a corporation from the readout's corp selector, or \"All\"",
+   "args": [
+    {
+     "name": "corp",
+     "type": "entity id or \"all\"",
+     "meaning": "\"all\" shows the per-corp bucket-split comparison; a corporation shows its full profile (bucket band by quarter, verb mix, reason tally)"
+    }
+   ],
+   "preconditions": [
+    "Strategy readout is open"
+   ],
+   "expected_output": "The view switches between the all-corporations comparison and one corporation's full profile. The selection persists across selection changes elsewhere in the game - clicking a tile does not clear it.",
+   "reason_to_select": "The comparison answers 'who is winning the run and how'; the single-corp profile answers 'what is this corp's strategy made of'. Two different questions over the same window."
   }
  ]
 }

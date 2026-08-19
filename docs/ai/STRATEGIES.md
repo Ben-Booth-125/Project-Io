@@ -406,6 +406,17 @@ never *whether it worked*:
 A card that never wins its own favourable scenario is underpowered or fiction; a card that wins
 everywhere flattens the meta — both are reward-gate readings, visible in the existing numbers.
 
+> ⟳ 2026-08-19 (BL-411, emergent-strategy readout — landed): the loop's **measuring instrument
+> now exists in-engine**. The Strategy readout ledger (`src/ui/strategy_readout.{hpp,cpp}`, nav
+> rail slot 12) aggregates the corp_decision stream per corp over a rolling 64-quarter window —
+> verb mix, spend split across the must/should/nice priority buckets, reason-code tally, and the
+> bucket split quarter-by-quarter as a stacked band. Same-seed comparison (step 4's reward gate)
+> can now point at a *distribution shift* rather than asserting "the card worked". Two fences it
+> keeps deliberately: **no score/margin aggregates** (candidates sort by priority bucket before
+> score — NR-226 — so raw margins do not aggregate honestly), and **no strategy labels** — the
+> readout shows the mix and lets the shape speak, preserving this doc's discovered-not-authored
+> position.
+
 **Personas (BL-207)** are weightings over this roster — a persona is a prior over cards plus a
 caution dial, not new strategy content. Distinguishable styles then come from selection bias,
 which the Vox result says is enough (§ 10c.3).

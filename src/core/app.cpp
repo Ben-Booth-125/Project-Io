@@ -1199,6 +1199,11 @@ void app::step_economy()
             m_resource_sample_index };
         session_history::record_histories(m_world, m_registry, m_last_econ_report,
                                           flows, m_ui, h);
+        // Strategy readout (BL-411): consume this tick's new decision-ring
+        // entries and advance the rolling window one quarter. Same recorder
+        // pattern as record_histories — once per econ tick, never per frame —
+        // so the ledger's draw path only ever reads prebuilt aggregates.
+        ui::record_strategy_readout(m_world, m_strategy_readout);
     }
     lap(8); // history recorders
 }
@@ -1781,6 +1786,12 @@ void app::render()
     // carry neither reason nor score. See NR-227.
     // Read-only: const world in, and it writes nothing but its own ui_state filters.
     ui::draw_decision_feed(m_world, m_ui, &m_ui.show_decision_feed);
+    // Strategy readout (BL-411) — the feed's aggregate companion: verb mix,
+    // spend buckets and reason tally per corp over the rolling window kept by
+    // record_strategy_readout (step_economy). Read-only over world and state;
+    // score/margin fields are deliberately absent from it (NR-226 fence).
+    ui::draw_strategy_readout(m_world, m_strategy_readout, m_ui,
+                              &m_ui.show_strategy_readout);
     {
         const ui::player_plot_history phist{m_balance_history, m_income_history, m_expenditure_history};
         ui::draw_economy_panel(m_world, m_registry, m_last_econ_report, phist, m_ui, &m_ui.show_economy_panel);

@@ -16,6 +16,7 @@
 #include "scripting/persona_pack.hpp"
 #include "ui/chat_panel.hpp"
 #include "ui/plot_history.hpp"
+#include "ui/strategy_readout.hpp"
 #include "world/market_clearing.hpp"
 #include "world/planetology.hpp"
 #include "world/standing.hpp"
@@ -409,6 +410,7 @@ private:
     ui::resource_history          m_tile_resource_hist;  ///< Remaining deposit per tile per resource, recorded only for tracked (drilled) tiles.
     std::unordered_set<entity_id> m_tracked_tiles;       ///< Tiles whose per-tile series is being recorded (seeded by card drill-downs).
     std::vector<std::uint64_t>    m_resource_hist_days;  ///< In-game day per resource-history sample; the chart's shared X axis (capped in lockstep).
+    ui::strategy_readout_state    m_strategy_readout;    ///< Rolling per-corp decision aggregation (BL-411) — verb mix / spend buckets / reason tally over the last 64 quarters. Same lifetime rules as the histories above: presentation-only, unserialised, advanced once per econ tick.
     std::uint64_t                 m_resource_sample_index = 0; ///< Monotonic count of resource-history samples taken. Each econ tick is a quarter, so sample i is dated i·econ_tick_days — equal to day_tick in live play (econ ticks are quarterly) but also progressing when the harness steps the economy without the sim clock.
     entity_id   m_prev_selection = null_entity; ///< selected_entity last frame; a change to a new selection closes any open ledger so the Selection element takes the shared fold-out column.
 
