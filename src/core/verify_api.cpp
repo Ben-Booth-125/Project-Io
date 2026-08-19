@@ -301,6 +301,7 @@ void app::reset_verify_transients()
     m_tracked_tiles.clear();
     m_resource_hist_days.clear();
     m_resource_sample_index = 0;
+    m_strategy_readout = {};
     m_prev_selection = null_entity;
     m_last_orbit_days = 0.0;
     m_last_survey_day = 0;
@@ -645,6 +646,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         else if (name == "frame_hud")    m_ui.show_frame_hud = open;    // frame-budget HUD (BL-249)
         else if (name == "tech_tree")    m_ui.show_tech_tree = open;    // F9 mock viewer (BL-087)
         else if (name == "decisions")    m_ui.show_decision_feed = open; // AI decision feed (BL-407)
+        else if (name == "strategy")     m_ui.show_strategy_readout = open; // Strategy readout (BL-411)
     });
 
     // Spectator mode (BL-409). Set BEFORE econ_step: step_economy reads
@@ -681,6 +683,16 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     v.set_function("decision_filter", [this](int reason, sol::optional<int> corp) {
         m_ui.decision_feed_reason = reason;
         m_ui.decision_feed_corp   = static_cast<entity_id>(corp.value_or(0));
+    });
+
+    // Park the Strategy readout's corp selector (BL-411) so a capture can show
+    // the single-corp profile view — the resting state is the all-corporations
+    // comparison. `corp` takes an entity id, 0 for "all", or -1 for the player
+    // corp: a script cannot know a generated corp's id, but the player entity
+    // always exists and (under spectate) always has decisions to show.
+    v.set_function("strategy_filter", [this](int corp) {
+        m_ui.strategy_readout_corp =
+            (corp == -1) ? m_world.player_entity : static_cast<entity_id>(corp);
     });
 
     // Park a fold-out ledger on one of its button-strip views (BL-117 sweep), so a

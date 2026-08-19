@@ -16,7 +16,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*132 entries — 21 gameplay · 24 canvas · 15 lens · 43 ledger · 29 chrome.*
+*134 entries — 21 gameplay · 24 canvas · 15 lens · 45 ledger · 29 chrome.*
 
 ---
 
@@ -1541,6 +1541,32 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Expected output.** The list narrows to decisions taken for that reason, across every corporation unless the corp filter is also set.
 
 **Reason to select.** To ask a specific question of the run rather than scroll it. 'Every solvency-defence idle' and 'every build' are different questions, and the reason code is what separates them.
+
+### `ledger.strategy_readout_open` — Navigation rail slot 12, "Strategy readout"
+
+**Press.** Click nav rail slot 12 to open the Strategy readout; click it again to close
+
+**Valid when:**
+- In game (not the menu or the generation screen)
+
+**Expected output.** The Strategy readout opens in the shell fold-out column, closing whatever ledger was open (the column holds one occupant). It aggregates each corporation's strategic decisions over a rolling 64-quarter window: with no corp selected, one must-have/should-have/nice-to-have bucket-split bar per corporation; with a corp selected, its bucket split quarter by quarter (a stacked band), its verb mix, and its reason tally. Score and margin figures are deliberately absent (candidates sort by priority bucket before score, so raw margins do not aggregate honestly). Clicking the slot while the readout is already open closes it (standing toggle rule).
+
+**Reason to select.** To see WHAT STRATEGY IS EMERGING rather than the individual moves - the decision feed lists the moves; this shows the shape of a run. A corp living in must-have is defending its solvency; one living in nice-to-have is expanding unopposed.
+
+### `ledger.strategy_readout_select_corp` — Strategy readout, corporation selector
+
+**Press.** Select a corporation from the readout's corp selector, or "All"
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `corp` | `entity id or "all"` | "all" shows the per-corp bucket-split comparison; a corporation shows its full profile (bucket band by quarter, verb mix, reason tally) |
+
+**Valid when:**
+- Strategy readout is open
+
+**Expected output.** The view switches between the all-corporations comparison and one corporation's full profile. The selection persists across selection changes elsewhere in the game - clicking a tile does not clear it.
+
+**Reason to select.** The comparison answers 'who is winning the run and how'; the single-corp profile answers 'what is this corp's strategy made of'. Two different questions over the same window.
 
 ---
 

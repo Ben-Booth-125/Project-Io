@@ -49,6 +49,7 @@ void close_all_panels(ui_state& state)
     state.show_economy_panel     = false;
     state.show_build_ledger      = false; // tile build ledger (BL-162) is a column occupant too
     state.show_decision_feed     = false; // AI decision feed (BL-407)
+    state.show_strategy_readout  = false; // Strategy readout (BL-411)
     // BL-310 round 4: the tech-tree era-selector menu is now a real shell-
     // column occupant (draw_tech_tree_menu), so it must yield to every other
     // ledger the same way they yield to it — its canvas takeover closes with it.
@@ -62,7 +63,7 @@ bool any_panel_open(const ui_state& state)
            state.show_market_ledger     || state.show_construction_panel ||
            state.show_tile_ledger       || state.show_economy_panel ||
            state.show_generation_ledger || state.show_tech_tree ||
-           state.show_decision_feed;
+           state.show_decision_feed     || state.show_strategy_readout;
 }
 
 void draw_nav_pane(ui_state& state, float top_offset)
@@ -108,7 +109,11 @@ void draw_nav_pane(ui_state& state, float top_offset)
     // than displacing any of the curated nine. The tail is now where the
     // developer/observability surfaces live, which is a legible rule — keep new
     // ones going there rather than interleaving them.
-    constexpr int tab_count = 11;
+    //
+    // Slot 12 (BL-411, the Strategy readout) is the third tail occupant under
+    // that rule: the feed's aggregate companion — verb mix, spend buckets and
+    // reason tally per corp, the SHAPE of a run where the feed lists the moves.
+    constexpr int tab_count = 12;
 
     // Square slots; Selectable treats a nonzero size as literal, so derive the
     // rail width explicitly rather than passing -1.
@@ -229,7 +234,15 @@ void draw_nav_pane(ui_state& state, float top_offset)
             }
             slot_tooltip("AI decisions", "What the rival corporations decided, and how close the call was.", false);
             break;
-        default: // Unreachable — tab_count is 11 and every slot is handled above.
+        case 12: // Strategy readout (BL-411) — the shape of each corp's run
+            if (ImGui::Selectable(id, state.show_strategy_readout, 0, {slot_size, slot_size})) {
+                const bool was_open = state.show_strategy_readout;
+                close_all_panels(state);
+                state.show_strategy_readout = !was_open;
+            }
+            slot_tooltip("Strategy readout", "What strategy is emerging - each corporation's decision mix, spend priorities and reasons over the recent run.", false);
+            break;
+        default: // Unreachable — tab_count is 12 and every slot is handled above.
             break;
         }
 
@@ -281,6 +294,11 @@ void draw_nav_pane(ui_state& state, float top_offset)
         // subject is exactly the strategic decision that slot is reserved for,
         // read rather than set. Revisit if slot 7 is ever built.
         case 11: icons::strategy(dl, centre, r, lit(state.show_decision_feed));        break;
+        // The readout gets its OWN glyph (the axis-and-tally-bars readout mark)
+        // rather than a third borrow of `strategy` — slot 11 already lights that
+        // pennant, and two lit slots sharing a silhouette is exactly the
+        // collision BL-174 exists to prevent.
+        case 12: icons::readout(dl, centre, r, lit(state.show_strategy_readout));      break;
         default: icons::placeholder(dl, centre, r, dim); break;
         }
     }

@@ -801,6 +801,24 @@ void strategy(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
     dl->AddConvexPolyFilled(v, 3, colour);
 }
 
+void readout(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // Tally chart: a left axis with three left-anchored horizontal bars of
+    // descending length — "counts compared", the readout motif. The axis is
+    // what keeps it distinct from the supply route pair and the resource
+    // strata; the horizontal bars keep it clear of the market lens's vertical
+    // ones.
+    const float x0 = centre.x - r * 0.8f;
+    dl->AddLine({ x0, centre.y - r }, { x0, centre.y + r }, colour, 1.5f);
+
+    const float bar_h   = r * 0.36f;
+    const float ys[3]   = { centre.y - r * 0.60f, centre.y, centre.y + r * 0.60f };
+    const float lens[3] = { 1.60f, 1.05f, 0.55f }; // descending, in units of r
+    for (int i = 0; i < 3; ++i)
+        dl->AddRectFilled({ x0 + 2.0f, ys[i] - bar_h * 0.5f },
+                          { x0 + 2.0f + r * lens[i], ys[i] + bar_h * 0.5f }, colour);
+}
+
 void diplomacy(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
 {
     // Two overlapping circle outlines — two parties meeting. The overlap is the

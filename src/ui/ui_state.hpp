@@ -196,6 +196,19 @@ struct ui_state
     /// value. Held as int so "all" has a home the enum does not have to invent.
     int decision_feed_reason = -1;
 
+    // --- Strategy readout (BL-411) ---
+    // The aggregate companion to the feed above: verb mix, spend split across
+    // the priority buckets, and reason tally per corp over a rolling window.
+    // Score/margin fields are deliberately absent from it (NR-226 fence).
+    // Like every ledger it starts closed. See ui/strategy_readout.hpp.
+
+    bool show_strategy_readout = false; ///< Whether the Strategy readout is open.
+
+    /// Corp selector: null_entity = the all-corporations comparison view,
+    /// otherwise one corp's full profile. Same persistence rationale as
+    /// decision_feed_corp — canvas selection never clears it.
+    entity_id strategy_readout_corp = null_entity;
+
     // --- Building Selection card accordion (supersedes BL-431's three toggles) ---
     // The building card now takes the tile card's 3-column band shape: Profitability /
     // Method / Chain / Depth (whichever apply) each get a PAGE rather than a
