@@ -973,6 +973,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
 
     const body_component& body = body_it->second;
 
+    // BL-408 spectator god view: one draw-time flag for every survey-mask read
+    // in this pass. Only ever true under spectate — the pair is the gate — so a
+    // played session evaluates a single && and renders byte-identical to before.
+    const bool god_view_lift = state.spectating && state.god_view;
+
     float title_h = 0.0f;
     if (draw_title)
     {
@@ -1811,9 +1816,19 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // locked overlay with no lens detail, borders, markers, or hit-testing — the
         // locked fill is drawn, then the per-copy detail is skipped. A fully surveyed
         // body (home, the star, or a completed survey) reveals everything.
-        const bool revealed = survey_tile_visible(body.survey, gw, gh, tile.grid_x, tile.grid_y);
-        if (!revealed)
-            fill = IM_COL32(12, 14, 20, 255);
+        //
+        // BL-408 spectator god view: the mask lifts AT THE DRAW CALL only —
+        // `survey_tile_visible` and the survey store are untouched, so nothing the
+        // sim or the scorer reads moves. An unsurveyed tile is NOT rendered as
+        // ordinary ground: it keeps a heavy wash of the lock colour (the tell), so
+        // where the fog still sits — the corps' own blindness — stays legible even
+        // while the watcher sees through it. The header's UNSURVEYED/Surveying
+        // suffix stays for the same reason.
+        const bool surveyed = survey_tile_visible(body.survey, gw, gh, tile.grid_x, tile.grid_y);
+        const bool revealed = surveyed || god_view_lift;
+        if (!surveyed)
+            fill = god_view_lift ? lerp_colour(fill, IM_COL32(12, 14, 20, 255), 0.62f)
+                                 : IM_COL32(12, 14, 20, 255);
 
         // Intra-body vision fog (BL-151/152/154): dim any *revealed* tile by how little
         // the player sees it. Vision = 1 in permanent vision (building pockets + the
@@ -1824,7 +1839,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // them. Survey mask owns unrevealed tiles, so this skips them. The road pass
         // below reads the same scalar (BL-185) — hence the hoist out of the branch.
         const float vision = tile_vision(id);
-        if (revealed)
+        if (surveyed) // the survey mask (or its god-view tell) owns unsurveyed tiles
             fill = fog_dim(fill, vision);
 
         // Wrap copies inside the canvas: k_min/k_max were computed at the top of
@@ -1925,8 +1940,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     const auto nb_tile_it = w.tiles.find(nb_id);
                     if (nb_tile_it == w.tiles.end() || nb_tile_it->second.road_level == 0)
                         continue;
-                    if (!survey_tile_visible(body.survey, gw, gh, ncol, nrow))
-                        continue;
+                    if (!(survey_tile_visible(body.survey, gw, gh, ncol, nrow) || god_view_lift))
+                        continue; // BL-408: god view draws into the masked region too
 
                     ImVec2 nb_sc = to_screen(hex_local_centre(ncol, nrow, hex_size));
                     nb_sc.x += static_cast<float>(k) * period_px;
@@ -1975,8 +1990,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
 
                     if (tile_at_rc(ncol, nrow) == null_entity)
                         continue;
-                    if (!survey_tile_visible(body.survey, gw, gh, ncol, nrow))
-                        continue;
+                    if (!(survey_tile_visible(body.survey, gw, gh, ncol, nrow) || god_view_lift))
+                        continue; // BL-408: god view draws into the masked region too
 
                     ImVec2 nb_sc = to_screen(hex_local_centre(ncol, nrow, hex_size));
                     nb_sc.x += static_cast<float>(k) * period_px;
@@ -2246,8 +2261,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                         if (nb_tile_it == w.tiles.end()
                             || nb_tile_it->second.landform != tile.landform)
                             continue;
-                        if (!survey_tile_visible(body.survey, gw, gh, ncol, nrow))
-                            continue;
+                        if (!(survey_tile_visible(body.survey, gw, gh, ncol, nrow) || god_view_lift))
+                            continue; // BL-408: god view draws into the masked region too
 
                         ImVec2 nb_sc = to_screen(hex_local_centre(ncol, nrow, hex_size));
                         nb_sc.x += static_cast<float>(k) * period_px;

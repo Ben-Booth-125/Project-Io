@@ -653,6 +653,22 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // ordinary played session while claiming to show a spectated one.
     v.set_function("spectate", [this](bool on) { m_ui.spectating = on; });
 
+    // Spectator god view (BL-408). Pure ui_state, read at the draw call only —
+    // it never feeds the sim, so unlike spectate() there is no before/after
+    // ordering constraint against econ_step. Meaningful only when spectate(true)
+    // is also set: every read-site gates on the PAIR, exactly as the live
+    // system-menu toggle (time_panel.cpp) does.
+    v.set_function("god_view", [this](bool on) { m_ui.god_view = on; });
+
+    // Select a corporation entity, so a capture can show the Selection band's
+    // corp card (BL-408's god-facts readout lives there). Ids come from
+    // verify.buildings()' `corp` field; an unknown id is a no-op, matching
+    // select_building's silent-miss behaviour.
+    v.set_function("select_corp", [this](unsigned id) {
+        if (m_world.corporations.count(static_cast<entity_id>(id)))
+            m_ui.selected_entity = static_cast<entity_id>(id);
+    });
+
     // Park the AI decision feed's filters (BL-407 R2) so a capture can show a
     // FILTERED list — the resting state is "all", and a filter that only ever
     // appears under a live cursor is a filter no check can see.

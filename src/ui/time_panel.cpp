@@ -328,6 +328,22 @@ void draw_system_menu(ui_state& st, sim_loop& sim, int& prev_speed,
                     }
                 }
 
+                // Spectator god view (BL-408): offered ONLY while spectating —
+                // a played session never renders the control, so the BL-068
+                // asymmetry it lifts is unreachable outside spectate by
+                // construction, not by convention. A checkbox is inherently a
+                // toggle (Toggle rule, io-standing-rules.md): its visible
+                // checked state is exactly what re-clicking undoes.
+                if (st.spectating)
+                {
+                    ImGui::Separator();
+                    ImGui::Checkbox("God view", &st.god_view);
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("Spectator only: read every corp's internals and see\n"
+                                          "through the survey mask. Presentation-side - the AI's\n"
+                                          "own view of the world is untouched.");
+                }
+
                 ImGui::Separator();
 
                 if (!st.confirm_exit_pending)

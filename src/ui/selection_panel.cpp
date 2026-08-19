@@ -4,6 +4,7 @@
 
 #include "detail_level.hpp"   // disclosure_controls — the drill-through idiom (BL-214/BL-265)
 #include "foldout_column.hpp" // shell fold-out column host (shared with the ledgers)
+#include "format.hpp"         // fmt::credits — the god-view corp readout (BL-408)
 #include "hex_render.hpp"      // draw_tile_neighbourhood — the card's zoomed tile view
 #include "icons.hpp"
 #include "presentation.hpp"
@@ -13,6 +14,7 @@
 
 #include "world/budget_system.hpp"    // compute_building_opex / body_mean_habitability (BL-162 estimate)
 #include "world/building_profit.hpp" // per-building profitability estimate (BL-074)
+#include "world/corp_ai.hpp"         // corp_reserve_floor / corp_should_have_buffer — god-view corp readout (BL-408)
 #include "world/economy_system.hpp" // economy_report (workforce cap, BL-069)
 #include "world/market_clearing.hpp"
 #include "world/construction.hpp"    // demolish path (the building element's Demolish)
@@ -352,7 +354,14 @@ const char* selection_title(const world& w, selection_kind kind, entity_id id)
 // withheld channels (production, stockpile) as visible 'private' placeholders, so
 // the asymmetry is legible rather than a silent omission. The panel never leaks
 // more than the hover card's facts; markets remain the sanctioned public channel.
-void draw_rival_building_summary(const world& w, entity_id id)
+//
+// BL-408: under spectator god view (@p god_view) the two 'private' rows open into
+// the real values — same rows, real numbers — so the lift reads as exactly the
+// redaction coming off, not as a different panel. Everything shown is plain world
+// state the UI already holds a const ref to; the blackboard export never runs
+// through here.
+void draw_rival_building_summary(const world& w, const recipe_registry& reg,
+                                 entity_id id, bool god_view)
 {
     const auto it = w.buildings.find(id);
     if (it == w.buildings.end())
@@ -363,7 +372,8 @@ void draw_rival_building_summary(const world& w, entity_id id)
     const building_component& b = it->second;
 
     // Owner corporation (public) — the building type already heads the panel.
-    const auto cit = w.corporations.find(owner_corp_of(w, id));
+    const entity_id owner = owner_corp_of(w, id);
+    const auto cit = w.corporations.find(owner);
     if (cit != w.corporations.end())
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
                            "Owner: %s", cit->second.name.c_str());
@@ -373,6 +383,37 @@ void draw_rival_building_summary(const world& w, entity_id id)
     if (tile_it != w.tiles.end())
         ImGui::Text("Tile [%d, %d]  %s", tile_it->second.grid_x, tile_it->second.grid_y,
                     composition_name(tile_it->second.composition));
+
+    if (god_view)
+    {
+        // Production: what it runs and at what staffing.
+        if (b.type == building_type::extraction_site)
+            ImGui::Text("Production:  %s \xc2\xb7 workforce %.0f%%",
+                        resource_name(b.target_resource),
+                        static_cast<double>(b.workforce_assigned) * 100.0);
+        else if (const recipe* r = reg.get_recipe(b.recipe); r != nullptr)
+            ImGui::Text("Production:  %s \xc2\xb7 workforce %.0f%%",
+                        r->display_name.c_str(),
+                        static_cast<double>(b.workforce_assigned) * 100.0);
+        else
+            ImGui::Text("Production:  workforce %.0f%%",
+                        static_cast<double>(b.workforce_assigned) * 100.0);
+
+        // Stockpile: the owner's (corp, body) pool this building feeds — pools
+        // are corp-per-body (world::corp_body_pools), not per building, and the
+        // label says so rather than implying a per-site hoard.
+        if (tile_it != w.tiles.end())
+        {
+            const auto pit = w.corp_body_pools.find({owner, tile_it->second.body});
+            float total = 0.0f;
+            if (pit != w.corp_body_pools.end())
+                for (const float q : pit->second.quantities)
+                    total += q;
+            ImGui::Text("Stockpile:   %.1f pooled on this body", static_cast<double>(total));
+        }
+        ImGui::TextDisabled("Competitor \xe2\x80\x94 god view");
+        return;
+    }
 
     // Withheld channels as explicit 'private' teaching rows: the grey value makes
     // the asymmetry legible rather than a silent omission. Markets stay the
@@ -954,6 +995,96 @@ void draw_production_method_section(world& w, const recipe_registry& reg, entity
     }
 }
 
+// BL-408 spectator god view: the full internals readout for a selected
+// corporation — the readout BL-068 exists to withhold, drawn ONLY when the
+// caller has already checked `ui.spectating && ui.god_view`. Cash, the
+// solvency reserve floor and Should-Have buffer the scorer actually holds
+// itself to, the per-body stockpile pools, and each asset's running
+// production — all plain reads over world state and the same public helpers
+// (corp_reserve_floor / corp_should_have_buffer) the harnesses use. Strictly
+// presentational: the blackboard export and the scorer never route through
+// here, so what the AI knows is untouched by what the watcher sees.
+void draw_corporation_god_facts(const world& w, const recipe_registry& reg,
+                                const economy_report& report, entity_id id)
+{
+    const auto cit = w.corporations.find(id);
+    if (cit == w.corporations.end())
+    {
+        ImGui::TextDisabled("\xe2\x80\x94");
+        return;
+    }
+    const corporation_component& c = cit->second;
+
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "God view");
+
+    ImGui::Text("Cash: %s", fmt::credits(c.balance).c_str());
+    ImGui::Text("Reserve floor: %s", fmt::credits(corp_reserve_floor(w, reg, id)).c_str());
+    ImGui::Text("Should-have buffer: %s",
+                fmt::credits(corp_should_have_buffer(w, reg, report, id)).c_str());
+
+    // Per-body stockpile pools. corp_body_pools is a std::map, so this walk is
+    // deterministic; only bodies actually holding stock get a row.
+    bool any_pool = false;
+    for (const auto& [key, pool] : w.corp_body_pools)
+    {
+        if (key.first != id)
+            continue;
+        float total = 0.0f;
+        std::size_t top = 0;
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            total += pool.quantities[r];
+            if (pool.quantities[r] > pool.quantities[top])
+                top = r;
+        }
+        if (total <= 0.0f)
+            continue;
+        if (!any_pool)
+        {
+            ImGui::Spacing();
+            ImGui::TextDisabled("Pools");
+            any_pool = true;
+        }
+        const auto body_it = w.bodies.find(key.second);
+        ImGui::Text("%s: %.1f (most: %s %.1f)",
+                    body_it != w.bodies.end() ? body_it->second.name.c_str() : "?",
+                    static_cast<double>(total),
+                    resource_name(static_cast<resource_type>(top)),
+                    static_cast<double>(pool.quantities[top]));
+    }
+
+    // Running production: one compact row per asset — what it runs, at what
+    // staffing, and whether the tick-level agency has idled it.
+    bool any_bld = false;
+    for (const entity_id bid : c.assets)
+    {
+        const auto bit = w.buildings.find(bid);
+        if (bit == w.buildings.end())
+            continue;
+        const building_component& b = bit->second;
+        if (!any_bld)
+        {
+            ImGui::Spacing();
+            ImGui::TextDisabled("Buildings");
+            any_bld = true;
+        }
+        const char* what = "";
+        if (b.type == building_type::extraction_site)
+            what = resource_name(b.target_resource);
+        else if (const recipe* r = reg.get_recipe(b.recipe); r != nullptr)
+            what = r->display_name.c_str();
+        const char* state = b.ticks_remaining > 0 ? " \xc2\xb7 constructing"
+                          : b.decommissioned      ? " \xc2\xb7 idled"
+                                                  : "";
+        ImGui::Text("%s%s%s \xc2\xb7 wf %.0f%%%s%s",
+                    building_type_name(b.type),
+                    *what ? " \xc2\xb7 " : "", what,
+                    static_cast<double>(b.workforce_assigned) * 100.0,
+                    b.workforce_auto ? " (auto)" : "",
+                    state);
+    }
+}
+
 // The facts: only what informs the action (BL-093) — slim and muted. Everything
 // encyclopedic (orbit, composition, deposits, prices) lives in the ledgers, one
 // 'go to' away.
@@ -969,6 +1100,13 @@ void draw_selection_facts(world& w, const recipe_registry& reg,
             break;
         // selection_kind::building no longer routes here — see
         // draw_building_selection_body.
+        case selection_kind::corporation:
+            // BL-408: a corp's facts column is empty today (its detail lives in
+            // the ledgers). Under spectator god view it carries the internals
+            // readout BL-068 withholds; with the flag off, empty as ever.
+            if (ui.spectating && ui.god_view)
+                draw_corporation_god_facts(w, reg, report, sel);
+            break;
         default:
             break;
     }
@@ -1161,7 +1299,8 @@ bool tile_icon_button(const char* id, ImVec2 sz, bool enabled, const char* tip,
 // full-canvas takeover read, so they cannot show different pages for the
 // same building.
 std::vector<building_page> building_pages(const world& w, const recipe_registry& reg,
-                                          const economy_report& report, entity_id id)
+                                          const economy_report& report, entity_id id,
+                                          bool god_view)
 {
     std::vector<building_page> pages;
     const auto bit = w.buildings.find(id);
@@ -1170,10 +1309,20 @@ std::vector<building_page> building_pages(const world& w, const recipe_registry&
     const building_component& b = bit->second;
 
     // Rivals: intel only (BL-068) — a single read-only Status page, nothing
-    // that would reveal recipe choice or internals.
+    // that would reveal recipe choice or internals. Under spectator god view
+    // (BL-408) the Status page opens its internals AND the read-only
+    // Profitability page joins it; Method and Workforce stay off the rival
+    // card even then, deliberately — they carry CONTROLS (recipe switch,
+    // workforce slider), and god view grants sight, never hands.
     if (!is_player_owned(w, id))
     {
         pages.push_back({"Status", building_page_kind::status});
+        if (god_view && b.ticks_remaining <= 0)
+        {
+            const building_profit p = estimate_building_profit(w, reg, report, id);
+            if (p.has_data)
+                pages.push_back({"Profitability", building_page_kind::profitability});
+        }
         return pages;
     }
 
@@ -1209,11 +1358,13 @@ std::vector<building_page> building_pages(const world& w, const recipe_registry&
 // A minimal facts/status page: construction progress when still building,
 // or the rival's public-only summary (BL-068) — the fallback content for
 // whichever building has no other page, plus the whole story for a rival.
-void draw_building_status_page(const world& w, const recipe_registry& reg, entity_id id)
+// @p god_view (BL-408): spectator god view — opens the rival summary's rows.
+void draw_building_status_page(const world& w, const recipe_registry& reg, entity_id id,
+                               bool god_view)
 {
     if (!is_player_owned(w, id))
     {
-        draw_rival_building_summary(w, id);
+        draw_rival_building_summary(w, reg, id, god_view);
         return;
     }
     const auto bit = w.buildings.find(id);
@@ -1287,13 +1438,14 @@ void draw_building_workforce_page(building_component& b)
 // the signature — building_page_expanded's caller and the tile-card precedent
 // both pass ui_state& through the dispatch, and a future page may need it.
 void draw_building_page(world& w, const recipe_registry& reg, const economy_report& report,
-                        entity_id id, building_page_kind kind, ui_state& /*ui*/)
+                        entity_id id, building_page_kind kind, ui_state& ui)
 {
     switch (kind)
     {
         case building_page_kind::profitability: draw_building_profit(w, reg, report, id); break;
         case building_page_kind::method:        draw_production_method_section(w, reg, id); break;
-        case building_page_kind::status:        draw_building_status_page(w, reg, id); break;
+        case building_page_kind::status:
+            draw_building_status_page(w, reg, id, ui.spectating && ui.god_view); break;
         case building_page_kind::workforce:
             if (const auto bit = w.buildings.find(id); bit != w.buildings.end())
                 draw_building_workforce_page(bit->second);
@@ -1594,7 +1746,8 @@ void draw_building_selection_body(world& w, const recipe_registry& reg,
 
     // ── Centre half: paged accordion over building_pages() ──
     {
-        const std::vector<building_page> pages = building_pages(w, reg, report, sel);
+        const std::vector<building_page> pages =
+            building_pages(w, reg, report, sel, ui.spectating && ui.god_view);
 
         ImGui::BeginChild("##building_accordion", {center_w, total_h}, true,
                           ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
@@ -1650,6 +1803,9 @@ void draw_building_selection_body(world& w, const recipe_registry& reg,
         const float  bh  = (total_h - 2.0f * spacing) / 3.0f;
         const ImVec2 bsz = {bw, bh};
 
+        // Deliberately NOT lifted by spectator god view (BL-408): god view
+        // grants sight, never hands — a rival's Mothball/Dismantle/Auto stay
+        // disabled under it, so the lift stays strictly presentational.
         const bool owned = is_player_owned(w, sel);
 
         // Manage is GONE (2026-08-15 playtest rework, NR-245's queue-only
@@ -2146,7 +2302,8 @@ void draw_selection_content(world& w, const recipe_registry& reg,
 void draw_building_page_expanded(world& w, const recipe_registry& reg,
                                  const economy_report& report, ui_state& ui)
 {
-    const std::vector<building_page> pages = building_pages(w, reg, report, ui.selected_entity);
+    const std::vector<building_page> pages =
+        building_pages(w, reg, report, ui.selected_entity, ui.spectating && ui.god_view);
     if (pages.empty())
     {
         ImGui::TextDisabled("\xe2\x80\x94");
