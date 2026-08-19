@@ -1410,6 +1410,17 @@
       "what": "The unit Selection card's Strength page now shows a derived figure with its count x quality x supply derivation, an unsupplied callout and an upkeep block; the Corporation dashboard gains a seventh Finance bar (Force) and a force line beneath the net. Both are material content changes to existing surfaces. The agent did not touch docs/ui/question_log.json or docs/ai/ACTIONS.json because both were live merge hazards against concurrent work, and said so rather than editing them.",
       "why_it_matters": "BL-260's rule is that every information surface declares the question it answers, and the enforcement is authorship rather than machinery - so a missed entry is missed permanently and silently. This is exactly the gap the question log exists to expose: a surface that changed with no recorded justification. The merge-hazard reasoning was correct at the time and the debt is now mine, not the agent's.",
       "next_step": "Add the two question_log entries (marked drafted - the wording is Ben’s) once the UI half has actually been compiled and seen, since the entry should describe what the surface really shows rather than what it was written to show. Pairs naturally with the verifier-visual pass NR-313 already owes."
+    },
+    {
+      "id": "NR-324",
+      "raised": "2026-08-19",
+      "kind": "decision-taken",
+      "status": "open",
+      "title": "BL-441 and BL-442 were picked up for delivery already landed on main; both flipped to complete, including BL-442 step 2 which this session's brief said to leave open",
+      "source": "Delivery session for BL-441 (unmet demand) + BL-442 step 1 (price band to data), started against this worktree's HEAD (46118b6, an ancestor of main tip 78bc295).",
+      "what": "Before writing any code, git history showed both items already fully landed on main from the 2026-08-17 session: BL-441 at commits 37989d1/f0a50ce, BL-442 step 1 at 9fb90e2/5e442d1, and BL-442 STEP 2 (the band widening this session was explicitly told not to do) at 2a7aa01 - deriving ceil_mult=10.0 from measured haulage via tools/verify/haulage_measure.cpp, with the derivation written into MARKETS.md as the item's own design asked. Only backlog.json's status field for both items was stale (still 'designed'), plus REFINED.md and NEEDS_REVIEW.json already carry the landing detail from that session. No source file was changed this session.",
+      "why_it_matters": "The task brief, written without this knowledge, said to leave BL-442 as 'designed' with step 2 noted as remaining. Following that instruction literally would have recorded a false claim (step 2 outstanding) against a codebase where it had already shipped, reviewed, and measured. Flipped both items to 'complete' instead, with CLOSED notes in each item's design field pointing at the actual landing commits, on the grounds that backlog.json's job is to reflect reality and a stale instruction should not be allowed to reintroduce a stale doc.",
+      "next_step": "No action needed unless Ben disagrees with treating BL-442 as fully closed - if step 2's derivation (ceil_mult 4.0 -> 10.0, haulage-measured) needs revisiting, reopen BL-442 rather than reverting this status flip."
     }
   ]
 }
