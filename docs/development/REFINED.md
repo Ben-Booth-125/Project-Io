@@ -1276,7 +1276,7 @@ verified. Resume from that branch rather than restarting when this comes back ar
 
 ---
 
-## BL-476 — every corporation starts with an army (promoted 2026-08-19)
+## BL-476 — every corporation starts with an army (promoted 2026-08-19) — **COMPLETE** (4/4, 2026-08-19)
 
 Difficulty 2, priority A. Read the full design in `backlog.json` first. Scope settled directly
 with Ben: player + named rivals, **not** BL-365 background filler firms.

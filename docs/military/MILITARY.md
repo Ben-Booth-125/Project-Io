@@ -250,7 +250,7 @@ the container's iteration order off the determinism seam.
 **Three writers exist**, and no other code creates a unit:
 
 - `src/world/hard_coded_world.cpp` — the Kepler player stub, count 50, type left at 0. **No `muster_base`** (that world has none), so it is deliberately never orphaned.
-- `src/world/corporation_generation.cpp` — the player corp's starting unit beside its starting base (BL-331, starting military presence), count 50, roster row 0. Records that base as its `muster_base`.
+- `src/world/corporation_generation.cpp` — every non-background corp's starting unit beside its starting base (BL-331, starting military presence; extended from player-only to every named rival by BL-476, 2026-08-19 — RIVALS_START_UNARMED), count 50, roster row 0. Records that base as its `muster_base`. BL-365 background firms are excluded on purpose.
 - `src/world/corp_command.cpp` — the `hire_unit` verb, count `hire_batch_manpower` = 50. Records the tile's qualifying base, lowest entity id first.
 
 **The bridge now exists — and nothing in production crosses it (corrected 2026-08-18).** This
@@ -664,7 +664,7 @@ and the not-an-anchor property.
 
 ## Build status
 
-Re-verified against the source 2026-08-18.
+Re-verified against the source 2026-08-19 (BL-476, RIVALS_START_UNARMED).
 
 **Landed:**
 
@@ -676,7 +676,7 @@ Re-verified against the source 2026-08-18.
 - `military_base` as a building, tech-gated behind `E0-ML-01` (BL-325 S1; BL-344)
 - `hire_unit` gated on a completed owned base at the tile, with a credit cost and a resource draw (BL-325 S2; BL-394, hire is free on the seam)
 - Rival hiring through the same verb (BL-324's exception; BL-293's seam widening)
-- The player corp's starting base and unit (BL-331, starting military presence)
+- **Every non-background corp's starting base and unit, not just the player's** (BL-331, starting military presence; BL-476, RIVALS_START_UNARMED — landed 2026-08-19). `seed_starting_military` runs once per player + named rival; BL-365 background firms stay unarmed on purpose
 - **Unit upkeep — the pass, both halves, at rate zero** (BL-454, unit upkeep). Credits via `apply_budget`, goods via `run_unit_upkeep`. **Moved from Outstanding 2026-08-18**; landed at commit `0936400` on 2026-08-17. Every authored rate is `0.0` — see § Upkeep, at rate zero
 - **Out-of-supply decay — the rule, with the trigger disabled** (BL-325 S3). **Moved from Outstanding 2026-08-18**; `out_of_supply_reach` is authored at `0.0`
 - **Orphan cleanup** — demolishing a muster base disbands its units in the same tick (BL-454)

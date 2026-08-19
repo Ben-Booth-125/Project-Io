@@ -2074,6 +2074,25 @@
     "BL-443"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-359",
+   "title": "BL-476 rival military seeding: iteration order and shared-occupancy threading, plus the is_background exclusion mechanism",
+   "raised": "2026-08-19",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Implementing BL-476 (RIVALS_START_UNARMED) in src/world/corporation_generation.cpp.",
+   "what": "Two calls made while extending the player-only military seeding block to every corp: (1) iterated `corp_ids` in its existing generation-order sequence (player + rivals, no BL-365 background firms - they are created by a separate, later pass and never appear in this vector) rather than re-sorting by entity_id first, since corp_ids is already deterministic and re-sorting would add a step with no behavioural difference; (2) threaded ONE shared `occupied_tiles` set across every corp's seed_starting_military call (rebuilt once from w.buildings before the loop, then mutated in place by author_building each iteration) so two corps can never be placed on the same tile - this widens the original player-only rebuild-from-w.buildings pattern to a loop without changing its semantics for the player's own case.",
+   "why_it_matters": "Both calls are load-bearing for determinism: a different iteration order or a per-corp-rebuilt occupancy set could change which tile a given rival lands on, or (worse) let two corps collide on one tile. The is_background exclusion is implicit (corp_ids never contains a background firm) rather than an explicit filter - correct today because generate_background_firms runs strictly after generate_corporations, but a future refactor that reorders those two passes would silently arm background firms again with no compile error.",
+   "options": [],
+   "recommendation": "If the two generation passes are ever reordered or merged, add an explicit `!cc.is_background` guard in the seeding loop rather than relying on the passes' current call order - noted here so that refactor does not quietly reintroduce armed background firms.",
+   "files": [
+    "src/world/corporation_generation.cpp"
+   ],
+   "refs": [
+    "BL-476"
+   ],
+   "resolution": null
   }
  ]
 }

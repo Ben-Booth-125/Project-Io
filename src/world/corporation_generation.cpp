@@ -1119,6 +1119,109 @@ int best_recipe_for_gaps(const recipe_registry& reg,
     return best_i;
 }
 
+/// BL-476 — seed one `military_base` + one starting `unit_component` for
+/// `corp_id`, exactly the logic BL-330 originally scoped to the player only.
+/// Placed on the nearest valid land tile to the corp's HQ (falling back to the
+/// nation's first valid tile if there is no HQ to anchor on); a land-poor
+/// nation with no valid tile is skipped gracefully — no crash, no seeding.
+/// `occupied_tiles` is the live occupancy set, updated in place as buildings
+/// are authored, so callers can invoke this once per corp in a stable order
+/// without re-deriving occupancy each time.
+void seed_starting_military(world& w, entity_id corp_id,
+                             std::unordered_set<entity_id>& occupied_tiles)
+{
+    const corporation_component& cc = w.corporations.at(corp_id);
+    const auto nation_it = w.nations.find(cc.home_nation);
+    if (nation_it == w.nations.end() || nation_it->second.tiles.empty())
+        return;
+
+    entity_id hq_tile = null_entity;
+    const auto hq_bld_it = w.buildings.find(cc.hq_building);
+    if (hq_bld_it != w.buildings.end())
+        hq_tile = hq_bld_it->second.tile;
+
+    // Nearest unoccupied, can_place-valid tile to the HQ (falling back to the
+    // nation's first such tile if there is no HQ to anchor on) — narratively
+    // the muster building sits beside the corp's seat. military_base needs no
+    // deposit, so can_place reduces to "non-ocean land" here
+    // (placement_rules.cpp, military_base case).
+    entity_id best_tid = null_entity;
+    long long best_dist2 = std::numeric_limits<long long>::max();
+
+    long long anchor_x = 0, anchor_y = 0;
+    bool have_anchor = false;
+    if (hq_tile != null_entity)
+    {
+        const auto hq_tile_it = w.tiles.find(hq_tile);
+        if (hq_tile_it != w.tiles.end())
+        {
+            anchor_x = hq_tile_it->second.grid_x;
+            anchor_y = hq_tile_it->second.grid_y;
+            have_anchor = true;
+        }
+    }
+
+    for (entity_id tid : nation_it->second.tiles)
+    {
+        if (occupied_tiles.count(tid))
+            continue;
+        const auto tile_it = w.tiles.find(tid);
+        if (tile_it == w.tiles.end())
+            continue;
+        const tile_component& tc = tile_it->second;
+        bool any = false;
+        const resource_type tgt = placement_rules::richest_extractable(tc, any);
+        if (!placement_rules::can_place(tc, building_type::military_base, tgt))
+            continue;
+
+        if (!have_anchor)
+        {
+            best_tid = tid;
+            break; // no HQ to measure from — first valid tile is fine
+        }
+        const long long dx = tc.grid_x - anchor_x;
+        const long long dy = tc.grid_y - anchor_y;
+        const long long dist2 = dx * dx + dy * dy;
+        if (dist2 < best_dist2 || (dist2 == best_dist2 && tid < best_tid))
+        {
+            best_dist2 = dist2;
+            best_tid = tid;
+        }
+    }
+
+    // A degenerate world (no valid land tile at all) simply skips the seeding
+    // rather than crashing — mirrors place_starting_assets's own
+    // graceful-empty behaviour for a deposit/land-poor nation.
+    if (best_tid == null_entity)
+        return;
+
+    const entity_id base_id =
+        author_building(w, best_tid, building_type::military_base, occupied_tiles);
+    // The base must appear in the corp's own asset list to be treated as
+    // owned by the economy/UI.
+    w.corporations[corp_id].assets.push_back(base_id);
+
+    // One basic unit, seeded on the same tile as the base. Roster index 0 is
+    // the cheapest/first roster row — a deterministic starting choice, not a
+    // tuned one. The manpower-per-batch figure mirrors hire_unit's own
+    // hire_batch_manpower constant (corp_command.cpp) so a starting unit
+    // reads the same size as a player-hired one.
+    constexpr int starting_unit_manpower = 50;
+    const entity_id unit_id = w.create_entity();
+    // BL-459: no `strength` — it was a duplicate of `count` and is derived
+    // now (unit_strength, unit_roster.hpp). BL-454's `muster_base` records
+    // the base this unit was raised at, so demolishing that base disbands it
+    // rather than orphaning it.
+    w.units[unit_id] = unit_component{
+        .position = best_tid,
+        .owner    = corp_id,
+        .count    = starting_unit_manpower,
+        .type     = 0,
+        .supply_factor_permille = 1000,
+        .muster_base = base_id,
+    };
+}
+
 } // namespace
 
 // ---------------------------------------------------------------------------
@@ -1503,118 +1606,47 @@ std::vector<entity_id> generate_corporations(
         if (progress)
             progress->player_slot.store(player_idx, std::memory_order_relaxed);
 
-        // ---------------------------------------------------------------------
-        // Player starting muster building + unit (BL-330) — player only. Rival
-        // corps get no such seeding; this is a player-experience opener, not a
-        // generation-wide asset, so it stays scoped to this one block rather
-        // than folding into place_starting_assets's per-corp pattern.
-        // ---------------------------------------------------------------------
-        {
-            // Every occupied_tiles set built earlier in this function was scoped
-            // to its own corp's placement pass and is long out of scope by now;
-            // rebuild the true current occupancy from the authoritative source
-            // (every building already on the board) rather than threading a
-            // stale set through the whole function.
-            std::unordered_set<entity_id> occupied_tiles;
-            occupied_tiles.reserve(w.buildings.size());
-            for (const auto& [bld_id, bc] : w.buildings)
-                occupied_tiles.insert(bc.tile);
+    }
 
-            const corporation_component& player_cc = w.corporations.at(player_corp_id);
-            const auto nation_it = w.nations.find(player_cc.home_nation);
+    // ---------------------------------------------------------------------
+    // Starting muster building + unit (BL-330; extended to every rival by
+    // BL-476). Every occupied_tiles set built earlier in this function was
+    // scoped to its own corp's placement pass and is long out of scope by
+    // now; rebuild the true current occupancy from the authoritative source
+    // (every building already on the board) rather than threading a stale
+    // set through the whole function. One shared set threaded across every
+    // corp's call below so a rival can never be placed on a tile another
+    // rival (or the player) was just seeded onto.
+    //
+    // PLAYER FIRST, always — this is what keeps the player's own tile pick
+    // byte-identical to the pre-BL-476 behaviour. Before this item, the
+    // player was the ONLY corp seeded, so its candidate tile set was never
+    // narrowed by another corp's military_base. `player_idx` is a seeded
+    // pick that can land anywhere in `corp_ids`, so seeding rivals first (or
+    // in raw corp_ids order) could let a rival claim the exact tile the
+    // player would otherwise have picked — a real behaviour change, not
+    // just a hypothetical one, since several corps can share a home nation.
+    // Seeding the player before any rival reproduces the original
+    // occupied_tiles snapshot for the player's own placement exactly, then
+    // rivals fill in around it afterward, in stable corp_ids order.
+    //
+    // BL-365 background firms are never in `corp_ids` (they are created by
+    // the separate generate_background_firms pass below), so iterating
+    // `corp_ids` in its existing stable order already excludes them without
+    // an explicit is_background check — arming them is a deliberate
+    // non-goal (BL-476 design notes).
+    // ---------------------------------------------------------------------
+    {
+        std::unordered_set<entity_id> military_occupied_tiles;
+        military_occupied_tiles.reserve(w.buildings.size());
+        for (const auto& [bld_id, bc] : w.buildings)
+            military_occupied_tiles.insert(bc.tile);
 
-            entity_id hq_tile = null_entity;
-            const auto hq_bld_it = w.buildings.find(player_cc.hq_building);
-            if (hq_bld_it != w.buildings.end())
-                hq_tile = hq_bld_it->second.tile;
+        seed_starting_military(w, w.player_entity, military_occupied_tiles);
 
-            if (nation_it != w.nations.end() && !nation_it->second.tiles.empty())
-            {
-                // Nearest unoccupied, can_place-valid tile to the HQ (falling back
-                // to the nation's first such tile if there is no HQ to anchor on) —
-                // narratively the muster building sits beside the corp's seat.
-                // military_base needs no deposit, so can_place reduces to
-                // "non-ocean land" here (placement_rules.cpp, military_base case).
-                entity_id best_tid = null_entity;
-                long long best_dist2 = std::numeric_limits<long long>::max();
-
-                long long anchor_x = 0, anchor_y = 0;
-                bool have_anchor = false;
-                if (hq_tile != null_entity)
-                {
-                    const auto hq_tile_it = w.tiles.find(hq_tile);
-                    if (hq_tile_it != w.tiles.end())
-                    {
-                        anchor_x = hq_tile_it->second.grid_x;
-                        anchor_y = hq_tile_it->second.grid_y;
-                        have_anchor = true;
-                    }
-                }
-
-                for (entity_id tid : nation_it->second.tiles)
-                {
-                    if (occupied_tiles.count(tid))
-                        continue;
-                    const auto tile_it = w.tiles.find(tid);
-                    if (tile_it == w.tiles.end())
-                        continue;
-                    const tile_component& tc = tile_it->second;
-                    bool any = false;
-                    const resource_type tgt = placement_rules::richest_extractable(tc, any);
-                    if (!placement_rules::can_place(tc, building_type::military_base, tgt))
-                        continue;
-
-                    if (!have_anchor)
-                    {
-                        best_tid = tid;
-                        break; // no HQ to measure from — first valid tile is fine
-                    }
-                    const long long dx = tc.grid_x - anchor_x;
-                    const long long dy = tc.grid_y - anchor_y;
-                    const long long dist2 = dx * dx + dy * dy;
-                    if (dist2 < best_dist2 || (dist2 == best_dist2 && tid < best_tid))
-                    {
-                        best_dist2 = dist2;
-                        best_tid = tid;
-                    }
-                }
-
-                // A degenerate world (no valid land tile at all) simply skips the
-                // seeding rather than crashing — mirrors place_starting_assets's
-                // own graceful-empty behaviour for a deposit/land-poor nation.
-                if (best_tid != null_entity)
-                {
-                    const entity_id base_id =
-                        author_building(w, best_tid, building_type::military_base, occupied_tiles);
-                    // The base must appear in the corp's own asset list to be
-                    // treated as owned by the economy/UI; `cc` was already moved
-                    // into w.corporations above, so mutate the live map entry
-                    // directly rather than a local copy.
-                    w.corporations[player_corp_id].assets.push_back(base_id);
-
-                    // One basic unit, seeded on the same tile as the base. Roster
-                    // index 0 is the cheapest/first roster row — a deterministic
-                    // starting choice, not a tuned one. The manpower-per-batch
-                    // figure mirrors hire_unit's own hire_batch_manpower constant
-                    // (corp_command.cpp) so a starting unit reads the same size as
-                    // a player-hired one.
-                    constexpr int starting_unit_manpower = 50;
-                    const entity_id unit_id = w.create_entity();
-                    // BL-459: no `strength` — it was a duplicate of `count` and
-                    // is derived now (unit_strength, unit_roster.hpp). BL-454's
-                    // `muster_base` records the base this unit was raised at, so
-                    // demolishing that base disbands it rather than orphaning it.
-                    w.units[unit_id] = unit_component{
-                        .position = best_tid,
-                        .owner    = player_corp_id,
-                        .count    = starting_unit_manpower,
-                        .type     = 0,
-                        .supply_factor_permille = 1000,
-                        .muster_base = base_id,
-                    };
-                }
-            }
-        }
+        for (entity_id corp_id : corp_ids)
+            if (corp_id != w.player_entity)
+                seed_starting_military(w, corp_id, military_occupied_tiles);
     }
 
     return corp_ids;
