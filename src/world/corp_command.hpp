@@ -56,6 +56,13 @@ enum class corp_verb : uint8_t
     // tile, and not one named a convoy.
     dispatch_convoy,  ///< Put a convoy on a lane: `subject` = source market, `counterparty` = destination market, `target` = cargo, `quantity` = units.
     hold_convoy,      ///< Toggle convoy `order` between held and moving. NOT a cancel — see the verb's comment in corp_command.cpp.
+    // --- BL-448: corp stance joins the seam (2026-08-19) ---
+    // Appended AFTER hold_convoy, same append-only rule. Data model + verbs
+    // only — gates nothing yet (BL-315 is the future engagement trigger).
+    declare_hostile,    ///< `corp` declares hostile toward `counterparty`. Unilateral; dissolves any friendship row atomically.
+    offer_friendship,   ///< `corp` offers friendship to `counterparty`. Records a PENDING offer only, not a stance.
+    accept_friendship,  ///< `corp` accepts a pending offer FROM `counterparty`.
+    return_to_neutral,  ///< `corp` clears its own hostility toward, and/or any friendship with, `counterparty`. Unilateral.
 };
 
 /// One past the highest verb — the wire parser's range gate (BL-396: run_serve
@@ -65,7 +72,7 @@ enum class corp_verb : uint8_t
 /// appending a verb means moving this with it — and only this, since existing
 /// values never renumber.
 inline constexpr uint8_t corp_verb_count =
-    static_cast<uint8_t>(corp_verb::hold_convoy) + 1;
+    static_cast<uint8_t>(corp_verb::return_to_neutral) + 1;
 
 /// Ceiling on one corporation's outstanding sell orders. The book is now
 /// reachable by command, so it is reachable by a scorer with a bug in it — this

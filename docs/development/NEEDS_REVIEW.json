@@ -1410,6 +1410,22 @@
       "what": "The unit Selection card's Strength page now shows a derived figure with its count x quality x supply derivation, an unsupplied callout and an upkeep block; the Corporation dashboard gains a seventh Finance bar (Force) and a force line beneath the net. Both are material content changes to existing surfaces. The agent did not touch docs/ui/question_log.json or docs/ai/ACTIONS.json because both were live merge hazards against concurrent work, and said so rather than editing them.",
       "why_it_matters": "BL-260's rule is that every information surface declares the question it answers, and the enforcement is authorship rather than machinery - so a missed entry is missed permanently and silently. This is exactly the gap the question log exists to expose: a surface that changed with no recorded justification. The merge-hazard reasoning was correct at the time and the debt is now mine, not the agent's.",
       "next_step": "Add the two question_log entries (marked drafted - the wording is Ben’s) once the UI half has actually been compiled and seen, since the entry should describe what the surface really shows rather than what it was written to show. Pairs naturally with the verifier-visual pass NR-313 already owes."
+    },
+    {
+      "id": "NR-324",
+      "raised": "2026-08-19",
+      "kind": "decision-taken",
+      "status": "open",
+      "title": "BL-448 (corp stance) skipped serialisation.cpp — the file does not exist",
+      "source": "BL-448, corp stance data model + verbs delivery.",
+      "what": "BL-448's file scope named src/world/serialization.cpp as a wiring target. No such file exists anywhere in the repo (confirmed by search); persistence is done per-subsystem (e.g. procurement.cpp's own write_procurement/read_procurement, never called from a production save path). The item's own design text says the harness must assert in-memory replay only because \"no serialiser exists yet in this project; do not invent one.\" Read together with the empty file, I took this as licence to land the whole substrate with no persistence path at all, matching the design's explicit framing (\"Landing the substrate inert is deliberate\").",
+      "why_it_matters": "A save made after this lands will silently drop every corp's hostility/friendship/pending-offer state on reload, since nothing writes or reads it. That is consistent with the design's stated scope (no consequence yet, substrate only) but is worth Ben seeing named rather than discovered later as a save-format gap.",
+      "next_step": "When BL-315 (or whatever lands the first serialisation seam these tables need) adds persistence, follow procurement.cpp's write_/read_ pattern for corp_hostile_pairs / corp_friend_pairs / corp_friend_offers in world.hpp.",
+      "files": [
+        "src/world/stance.hpp",
+        "src/world/stance.cpp",
+        "src/world/world.hpp"
+      ]
     }
   ]
 }

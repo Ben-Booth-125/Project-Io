@@ -5,6 +5,7 @@
 #include "economy_system.hpp" // BL-430: try_switch_recipe, the shared recipe-switch gate
 #include "logistics.hpp" // invalidate_logistics_caches (idle/resume flips the anchor set)
 #include "recipe_registry.hpp"
+#include "stance.hpp" // BL-448: corp stance verbs (declare_hostile / offer_friendship / accept_friendship / return_to_neutral)
 #include "supply_system.hpp" // BL-452: the shared dispatch (price_convoy_leg / commit_convoy)
 #include "survey_system.hpp"
 #include "unit_roster.hpp"
@@ -770,6 +771,51 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
 
             it->held = !it->held;
             return corp_command_result::applied;
+        }
+
+        // --- BL-448: corp stance -------------------------------------------
+        // Data model + verbs only. `is_hostile`/`are_friends`/etc. and the
+        // mutators themselves live in stance.{hpp,cpp}; the seam here is only
+        // the untrusted-boundary translation from stance_result to
+        // corp_command_result (io-standing-rules.md — reject the whole
+        // command on violation, never partial-apply; stance.cpp's mutators
+        // already guarantee this on their own, so there is nothing more to
+        // validate here beyond passing the right corp on each side).
+
+        case corp_verb::declare_hostile:
+        {
+            const stance_result r = declare_hostile(w, cmd.corp, cmd.counterparty);
+            return (r == stance_result::applied) ? corp_command_result::applied
+                 : (r == stance_result::rejected_invalid) ? corp_command_result::rejected_invalid
+                                                            : corp_command_result::rejected_state;
+        }
+
+        case corp_verb::offer_friendship:
+        {
+            const stance_result r = offer_friendship(w, cmd.corp, cmd.counterparty);
+            return (r == stance_result::applied) ? corp_command_result::applied
+                 : (r == stance_result::rejected_invalid) ? corp_command_result::rejected_invalid
+                                                            : corp_command_result::rejected_state;
+        }
+
+        case corp_verb::accept_friendship:
+        {
+            // cmd.corp is the ACCEPTOR; cmd.counterparty is the corp whose
+            // offer is being accepted — the offer was made counterparty ->
+            // corp, so the underlying call takes (offerer, target) as
+            // (cmd.counterparty, cmd.corp).
+            const stance_result r = accept_friendship(w, cmd.counterparty, cmd.corp);
+            return (r == stance_result::applied) ? corp_command_result::applied
+                 : (r == stance_result::rejected_invalid) ? corp_command_result::rejected_invalid
+                                                            : corp_command_result::rejected_state;
+        }
+
+        case corp_verb::return_to_neutral:
+        {
+            const stance_result r = return_to_neutral(w, cmd.corp, cmd.counterparty);
+            return (r == stance_result::applied) ? corp_command_result::applied
+                 : (r == stance_result::rejected_invalid) ? corp_command_result::rejected_invalid
+                                                            : corp_command_result::rejected_state;
         }
     }
     return corp_command_result::rejected_invalid;
