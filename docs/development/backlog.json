@@ -10395,7 +10395,7 @@
     "docs/ai/ACTIONS.json"
    ],
    "authority_doc": "docs/ui/SELECTION.md",
-   "summary": "Filed 2026-08-17. The companion surface to BL-448 (friend/neutral/hostile stance), filed separately so the model can land without the UI blocking it - and so the UI cannot be quietly dropped the way BL-350 procurement surface was. [COMPLETE 2026-08-19: Corporation panel Stance column + three presses (declare_hostile/offer_friendship/accept_friendship/return_to_neutral), gated on BL-068 discovery per NR-350. ACTIONS.json/question_log.json/MILITARY.md updated. Full ProjectIo build clean. Visual confirmation left open (requirements.json R3) - no interactive session available to screenshot the live app.] [REOPENED 2026-08-19: live visual check found the Stance column overflows the shell fold-out panel (BL-111s pre-existing width budget) - the three transition buttons render off-screen and are unreachable. Data model/verbs/seam all work; the UI surface does not. See NR-353 for options.]",
+   "summary": "Filed 2026-08-17. The companion surface to BL-448 (friend/neutral/hostile stance), filed separately so the model can land without the UI blocking it - and so the UI cannot be quietly dropped the way BL-350 procurement surface was. [COMPLETE 2026-08-19: Corporation panel Stance column + three presses (declare_hostile/offer_friendship/accept_friendship/return_to_neutral), gated on BL-068 discovery per NR-350. ACTIONS.json/question_log.json/MILITARY.md updated. Full ProjectIo build clean. Visual confirmation left open (requirements.json R3) - no interactive session available to screenshot the live app.] [REOPENED 2026-08-19: live visual check found the Stance column overflows the shell fold-out panel (BL-111s pre-existing width budget) - the three transition buttons render off-screen and are unreachable. Data model/verbs/seam all work; the UI surface does not. See NR-353 for options.] [REDIRECTED 2026-08-19 (Ben): the all-corporations table is the wrong shape for this - too much information at once. Superseded by BL-474 (Diplomatic lens, map-surface read) + BL-475 (Selection-panel stance detail + the three presses). The table-column UI this item shipped is to be RETIRED, not fixed, once BL-474/BL-475 land; BL-448s underlying data model and verbs are unaffected and stay correct.]",
    "design": "## Why a separate item\n\nBL-350 (procurement seam) landed a complete seam with no press, and nobody noticed for\nweeks. The lesson is that the surface half must be its own tracked item, not a task inside\nthe model item where it is the first thing cut under pressure.\n\n## Shape\n\nThe Corporation panel gains a stance column and the three presses, gated on visibility.\nA stance toward a corp the player has not discovered is not shown — the BL-068\ncompetitor-visibility rule applies, and *whether someone has declared war on you* is not\nobviously public information. **That is a second question for Ben** and is smaller than the\nsymmetry one: does a declaration announce itself, or is it discovered on contact? It rides\nnaturally on the comms dock if it announces.\n\nPresses issue `corp_command` records. Declaring hostility takes a confirm popup on the\ndemolish precedent — it is not literally irreversible, but under Reading A it is not\nunilaterally reversible either, which is close enough to warrant the friction.\n\n## Owed alongside\n\nA `question_log.json` entry, and `ACTIONS.json` entries for the new verbs — transcribed\nfrom the seam after it exists, never authored ahead of it (BL-270 discipline)."
   },
   {
@@ -11045,6 +11045,58 @@
    "authority_doc": "docs/ui/SELECTION.md",
    "summary": "Ben, 2026-08-19 (review-verdict form): \"let's add an item here about rendering provinces with a selection band when a user clicks on a tile. This should also be rendered in the selection tile preview.\" The province (BL-466, the 3-5 tile locality cell) becomes visible the moment a tile is selected - before any battle exists to draw it.",
    "design": "## Shape\n\n- The tile card gains a province read: the selected tile's province, shown as its member\n  tiles. Provinces are deliberately nameless (purely spatial, the GLOSSARY ruling), so the\n  read is structural - \"one of 4 tiles\" plus the outline - not a name line.\n- **The hex-neighbourhood preview outlines the province**: the member tiles of the selected\n  tile's province get a distinct stroke inside the existing preview widget. One visual\n  vocabulary with the battle card (BL-469 draws the same cell as the engagement envelope),\n  so the player has already met the shape before the first battle draws it.\n\n## Question-log entry (BL-260, required)\n\n\"Which tiles move and fight as one locality with this one?\" - the answer surface a player\nneeds BEFORE committing units, since the envelope decides who is drawn into a fight."
+  },
+  {
+   "id": "BL-474",
+   "short_name": "DIPLOMATIC_LENS",
+   "category": "UI",
+   "title": "A Diplomatic lens shows stance geographically, replacing the all-corporations table as BL-449s surface",
+   "status": "design-owed",
+   "glyph": "~",
+   "priority": "A",
+   "difficulty": 3,
+   "parked": false,
+   "requires": [],
+   "blocked_on": [],
+   "written": "2026-08-19",
+   "files": [
+    "src/ui/ui_state.hpp",
+    "src/ui/lens_bar.cpp",
+    "src/ui/planetary_canvas.cpp",
+    "src/ui/icons.hpp",
+    "src/ui/icons.cpp",
+    "docs/ui/LENSES.md",
+    "docs/ui/ICONS.md"
+   ],
+   "authority_doc": "docs/ui/LENSES.md",
+   "summary": "Ben, 2026-08-19: the all-corporations Stance table (BL-449) is too much information at once and not the shape he pictures for this. Redirect: a Diplomatic overlay_mode joining the corporation/country/resource/etc. roster, tinting tiles or corp markers by the players stance toward the owning corp (Hostile/Friend/Neutral/Unknown per NR-350), so relationships read on the map the way ownership and production already do. Supersedes the table-column approach BL-449 shipped and NR-353 found unreachable - that column is retired, not fixed.",
+   "design": "## Why this instead of the table\n\nBL-449 tried to put four extra facts (Reach/Capital/Share/Stance) plus three presses into the all-corporations table already living in the narrow shell fold-out column. NR-353 found the result unreachable in play - the Stance columns buttons render off the panel edge, and BL-111 had already narrowed that same table once before for the identical reason (six columns collapsed to single-glyph headers).\n\nBen's redirect, 2026-08-19: this is backend-useful information, not player-facing information in that shape. A lens is the existing vocabulary for at-a-glance relational state across many entities at once - Corporation lens already tints tiles by owner, Country lens by nation. Diplomatic stance is the same shape of fact (a per-corp category) and belongs in the same family, not in a giant table.\n\n## Scope (design-owed - settle before promoting)\n\n- Where the tint reads: tile fill (like Corporation lens) vs. a marker/ring on each rivals HQ/buildings (lighter-weight, avoids implying stance is a REGION when it is a relationship between two corps). Lean toward the marker/ring approach given stance is corp-to-corp, not corp-to-territory - but this is the first open question for Ben.\n- Colour/glyph vocabulary for Hostile/Friend/Neutral/Unknown - four states need four legible marks, and Unknown (BL-068 gated, NR-350) must read as distinct from Neutral rather than simply absent.\n- Bar or off-bar placement (LENSES.md \"Bar\" column) - stance is not yet consequential (BL-448 lands the substrate inert), so off-bar (like Scarcity/Industry/Reach) may be the honest placement until BL-315/BL-467 give it a gameplay payoff, matching how those lenses graduated onto the bar only once their consequence landed.\n- Whether the three transition presses (Declare Hostile / Offer Friendship / Return to Neutral) live in the lens itself (a marker click opens a small popup) or move entirely into the Selection panel (see BL-475) - if the latter, this lens is READ-ONLY and simpler to design.\n\n## What it does not carry\n\nNo new data model - BL-448s stance.hpp tables are already correct and load-bearing. This item is purely the map-surface read; BL-475 is the per-corp detail + action surface.",
+   "version_goal": "v0.1.16"
+  },
+  {
+   "id": "BL-475",
+   "short_name": "CORP_LEDGER_STANCE_DETAIL",
+   "category": "UI",
+   "title": "The per-corporation Selection ledger carries stance detail and the three transition presses",
+   "status": "design-owed",
+   "glyph": "~",
+   "priority": "A",
+   "difficulty": 2,
+   "parked": false,
+   "requires": [],
+   "blocked_on": [],
+   "written": "2026-08-19",
+   "files": [
+    "src/ui/selection_panel.cpp",
+    "src/ui/selection_card.hpp",
+    "docs/ui/SELECTION.md",
+    "docs/ui/question_log.json",
+    "docs/ai/ACTIONS.json"
+   ],
+   "authority_doc": "docs/ui/SELECTION.md",
+   "summary": "Ben, 2026-08-19, companion to BL-474: expand the per-corporation Selection ledger to carry stance and any other relevant from-our-perspective detail, replacing the all-corporations tables Stance column as the place the three transition presses (Declare Hostile / Offer Friendship / Return to Neutral) actually live. Selecting a rival corp (from the canvas, a lens marker, or the corporations list) shows the relationship as ONE corps detail, not a row in a giant comparison table.",
+   "design": "## Why the Selection panel, not the table\n\nSELECTION.md already owns the pattern for one-entity detail across the game (Active/Focus/Selection states, shared per-entity content builders the Tile Ledger and hover card also use). Stance-toward-one-corp is exactly that shape of fact - it belongs where a player already looks to learn about ONE thing, not crammed into a table meant to compare MANY things at once (which is what made BL-449s column unreachable, NR-353).\n\n## Scope (design-owed - settle before promoting)\n\n- Where in the Selection cards existing layout the stance block sits, relative to whatever a corp selection already shows (BL-081/BL-214s roll-up cards, per question_log.jsons corporation_dashboard entry).\n- The three presses (Declare Hostile with its confirm popup on the demolish precedent, Offer/Accept Friendship, Return to Neutral) move here from the retired table column - same corp_command verbs from BL-448, same rejection handling, same NR-350 visibility gate (do not show anything for an undiscovered corp beyond Unknown).\n- Whether BL-474s lens markers are clickable to select-and-jump here, or selection only happens via the existing canvas/list paths - affects whether BL-474 needs any interactivity of its own.\n\n## What it does not carry\n\nNo new data model or verbs - BL-448s stance.hpp and its four corp_command verbs are unchanged. This is purely re-hosting an already-correct interaction onto the right surface. ACTIONS.json/question_log.json entries move with it (retitle rather than duplicate - BL-449s existing corporation_panel entries describe the retired surface).",
+   "version_goal": "v0.1.16"
   }
  ]
 }
