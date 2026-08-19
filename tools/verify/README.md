@@ -34,6 +34,13 @@ generated world and prints the `ceil_mult` that follows. Report-only apart from 
 re-run it and re-derive `economy.price_band.ceil_mult` whenever the logistics cost table, the map
 scale, or the `base_price` table changes.
 
+`agent_seam_harness` (BL-412) is CMake-only for a third reason: it links two **`src/core`** TUs
+the world superset deliberately excludes — `agent_protocol.cpp` (the `--serve` line protocol,
+shared with `run_serve`) and `agent_seam.cpp` (the rendered app's loopback listener + tick-boundary
+drain) — plus `ws2_32` on Windows. Still SDL/Lua/ImGui-free; it proves the live agent control
+seam's two contracts headless (socket schedule ≡ in-process schedule by `state_hash`, transcript
+replays to the same hash; out-of-domain commands rejected whole with the hash untouched).
+
 Use that route for anything linking the world superset — `world_audit`, `ai_skill_harness`,
 `history_ladder_harness`, **`settlement_harness`**, `data_creep_harness`, `corp_terrain_matrix`,
 `trade_routes_harness` — and for `font_glyph_harness`, which links ImGui and is hand-declared in

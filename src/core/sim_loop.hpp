@@ -42,6 +42,14 @@ public:
     /// [1, max_speed].
     void set_speed(int speed);
 
+    /// Advance the clock by exactly @p days in-game days, wall clock be
+    /// damned — the counters step through the same on_sim_step path tick()
+    /// uses, so every day/econ boundary fires exactly as if the time had
+    /// elapsed. Works while paused (that is the point): BL-412's live agent
+    /// seam gates the clock, and a TICK request releases one econ tick
+    /// (`advance_days(econ_tick_days)`) without touching the speed dial.
+    void advance_days(int days);
+
     int  speed()  const { return m_speed; }
     bool paused() const { return m_speed == 0; }
 

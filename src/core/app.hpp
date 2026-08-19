@@ -1,6 +1,7 @@
 #pragma once
 
 #include <SDL3/SDL.h>
+#include "agent_seam.hpp"
 #include "sim_loop.hpp"
 #include "scripting/lua_state.hpp"
 #include "ui/ui_state.hpp"
@@ -58,6 +59,13 @@ public:
     enum class autostart_mode : std::uint8_t { none = 0, smoke, play };
 
     int run(autostart_mode autostart = autostart_mode::none);
+
+    /// BL-412: ask run() to host the live agent control seam on
+    /// 127.0.0.1:@p port (0 = don't host, the default). The listener opens
+    /// once a campaign is actually running (in_game); the session actor is
+    /// pinned to the player corp — the seat the agent occupies. Call before
+    /// run().
+    void host_agent(uint16_t port) { m_agent_port = port; }
 
     /// Run a non-interactive visual-verification session: set up a deterministic
     /// world (seeded, sim paused), expose the `verify` Lua API (which drives view
@@ -427,6 +435,12 @@ private:
 
     double m_last_orbit_days = 0.0; ///< elapsed_days at the previous orbit advance; gives the per-frame delta.
     int    m_last_survey_day = 0;   ///< Whole in-game day at the previous survey advance; drives the per-day survey crossing (BL-067).
+
+    // --- Live agent control seam (BL-412) -----------------------------------
+    /// 0 = not hosting (the default — an interactive session grows a network
+    /// listener only when --host-agent asks for one). Set via host_agent().
+    uint16_t   m_agent_port = 0;
+    agent_seam m_agent_seam; ///< The loopback listener + tick-boundary drain.
 };
 
 namespace ui { class frame_stats; }

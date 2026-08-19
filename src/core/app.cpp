@@ -293,6 +293,60 @@ int app::run(autostart_mode autostart)
             continue;
         }
 
+        // BL-412: the live agent control seam. Opens once a campaign exists
+        // (the session actor is the player corp — the seat the agent
+        // occupies), then pumps the loopback socket once per frame. The
+        // agent GATES THE CLOCK: attaching pauses the sim, and each TICK
+        // request releases exactly one econ tick — so the schedule of
+        // boundaries is agent-driven, not wall-clock-driven, and the command
+        // transcript is a replay artifact. The human keeps override: the
+        // speed keys still work, and with the clock running a TICK simply
+        // waits for the next natural boundary. Commands never apply here —
+        // only at the econ boundary drain below.
+        if (m_agent_port != 0)
+        {
+            if (!m_agent_seam.listening())
+            {
+                std::string err;
+                if (m_agent_seam.listen(m_agent_port, m_world.player_entity,
+                                        /*as_any=*/false, &err))
+                {
+                    std::printf("[agent-seam] listening on 127.0.0.1:%u\n",
+                                static_cast<unsigned>(m_agent_seam.port()));
+                    std::fflush(stdout);
+                }
+                else
+                {
+                    std::fprintf(stderr, "[agent-seam] %s — not hosting\n", err.c_str());
+                    m_agent_port = 0; // report once, then stay a normal session
+                }
+            }
+            if (m_agent_seam.listening())
+            {
+                m_agent_seam.set_actor(m_world.player_entity);
+                const agent_seam::pump_events ev =
+                    m_agent_seam.pump(m_world, m_registry,
+                                      static_cast<int>(m_last_econ_tick));
+                if (ev.attached)
+                {
+                    // The agent takes the clock. Remember the speed so the
+                    // pause keys behave as they always have.
+                    if (m_sim_loop.speed() > 0)
+                        m_prev_speed = m_sim_loop.speed();
+                    m_sim_loop.set_speed(0);
+                }
+                if (ev.detached)
+                {
+                    // Stay paused — a world that starts moving the moment its
+                    // player process dies is a surprise, not a convenience.
+                    // Keep the replay artifact next to the exe.
+                    m_agent_seam.write_transcript("agent_transcript.log");
+                }
+                if (ev.tick_requested && m_sim_loop.paused())
+                    m_sim_loop.advance_days(sim_loop::econ_tick_days);
+            }
+        }
+
         m_sim_loop.tick();
 
         // Advance orbital motion by the in-game days elapsed this frame. Freezes
@@ -325,8 +379,17 @@ int app::run(autostart_mode autostart)
         const uint64_t econ = m_sim_loop.econ_tick();
         while (m_last_econ_tick < econ)
         {
+            // BL-412: agent commands land HERE and only here — at the econ
+            // boundary, in arrival order, against the post-step world of the
+            // tick just completed, each stamped with that tick and recorded.
+            // Mid-interval application would tie the outcome to the wall-clock
+            // day the bytes arrived, which is the property the transcript
+            // exists to exclude.
+            m_agent_seam.drain_boundary(m_world, m_registry,
+                                        static_cast<int>(m_last_econ_tick));
             step_economy();
             ++m_last_econ_tick;
+            m_agent_seam.on_tick_stepped(static_cast<int>(m_last_econ_tick));
         }
 
         // Windowed autostart: the impatient-player click. During the seconds
@@ -384,6 +447,12 @@ int app::run(autostart_mode autostart)
     // Persist any free drag-resize captured this session (toggles/presets already
     // saved on change). Fullscreen: keep the last windowed size, don't overwrite it.
     save_settings();
+
+    // BL-412: leave the replay artifact behind before the session ends (also
+    // written on client detach; both writes carry the same full transcript).
+    if (!m_agent_seam.transcript().empty())
+        m_agent_seam.write_transcript("agent_transcript.log");
+    m_agent_seam.shutdown();
     return 0;
 }
 
