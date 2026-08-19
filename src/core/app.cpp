@@ -1994,21 +1994,9 @@ void app::render()
         m_ui.construction.pending_demolish = null_entity; // consume the request
     }
 
-    // Execute a law enact/repeal queued this frame by the Budget ledger (BL-343).
-    // The flip takes effect on the NEXT economy tick, not retroactively on the one
-    // already accounted — apply_budget resolves the enacted set once per tick.
-    if (m_ui.construction.pending_law_toggle >= 0)
-    {
-        const std::size_t idx = static_cast<std::size_t>(m_ui.construction.pending_law_toggle);
-        if (idx < m_world.laws.size())
-        {
-            law& l = m_world.laws[idx];
-            l.enacted = !l.enacted;
-            m_ui.construction.last_message =
-                l.name + (l.enacted ? " enacted." : " repealed.");
-        }
-        m_ui.construction.pending_law_toggle = -1; // consume the request
-    }
+    // (BL-343's law enact/repeal executor lived here until BL-480: a law has an
+    // author, and enactment is the author nation's act — no player surface
+    // enqueues a law flip any more.)
 
     // Execute any survey dispatch queued this frame by the Selection-panel Survey
     // button. Centralised here (like construction) so the const-world UI surfaces

@@ -1157,8 +1157,12 @@ world make_hard_coded_world(world_params params, generation_report* report,
         report->stage_lines.emplace_back(buf);
     }
 
-    // BL-343: the prototype's one law, seeded UN-ENACTED so the shipped economy
-    // is unchanged until the player (or a harness) enacts it. See law.hpp.
+    // BL-343/BL-480: the prototype's one law, seeded ENACTED by its author
+    // nation (the player's home nation — choose_levy_author, deterministic).
+    // Enactment is a governing-body act, not a player control; the levy is a
+    // transfer into the author's treasury, bounded by its jurisdiction. Runs
+    // after generate_nations/generate_corporations, which the author choice
+    // reads. See law.hpp.
     seed_prototype_laws(w);
 
     bump(12);

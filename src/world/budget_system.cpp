@@ -190,25 +190,59 @@ void apply_budget(world& w,
         // deterministic order — and reads only extraction output, because a levy
         // on raw output is what the extraction levy IS. Processing output is
         // downstream of a levy already paid on its inputs.
+        //
+        // BL-480: the levy is a TRANSFER, and jurisdiction bounds it. Each
+        // schedule carries its author nation; only output extracted on tiles
+        // that nation owns (`tile_to_nation`) is charged, and the debit is
+        // credited to that nation's treasury in the SAME float, same tick — so
+        // the sum is conserved by construction, not by reconciliation. A
+        // schedule whose author nation no longer resolves charges NOTHING
+        // (debiting with no treasury to credit is the money destruction this
+        // item removed).
         if (levy_pass)
         {
             const law_effects fx = evaluate_laws(w, corp);
             if (fx.any)
             {
-                float levy = 0.0f;
-                for (const building_report& br : *production)
+                float levy_total = 0.0f;
+                for (const law_effects::levy_schedule& ls : fx.levies)
                 {
-                    if (br.corp != corp || br.type != building_type::extraction_site)
-                        continue;
-                    if (br.output_quantity <= 0.0f)
-                        continue;
-                    levy += fx.extraction_levy[static_cast<std::size_t>(br.target_resource)]
-                          * br.output_quantity;
+                    const auto nat = w.nations.find(ls.enacting_nation);
+                    if (nat == w.nations.end())
+                        continue; // ill-formed author: no charge, no transfer
+
+                    float levy = 0.0f;
+                    for (const building_report& br : *production)
+                    {
+                        if (br.corp != corp || br.type != building_type::extraction_site)
+                            continue;
+                        if (br.output_quantity <= 0.0f)
+                            continue;
+
+                        // Jurisdiction: the tile the extraction stands on must
+                        // belong to the enacting nation. Unclaimed tiles (and
+                        // whole bodies without nations) are outside every
+                        // jurisdiction and pay nothing.
+                        const auto bld = w.buildings.find(br.building);
+                        if (bld == w.buildings.end())
+                            continue;
+                        const auto tn = w.tile_to_nation.find(bld->second.tile);
+                        if (tn == w.tile_to_nation.end() || tn->second != ls.enacting_nation)
+                            continue;
+
+                        levy += ls.extraction_levy[static_cast<std::size_t>(br.target_resource)]
+                              * br.output_quantity;
+                    }
+                    if (levy != 0.0f)
+                    {
+                        levy_total          += levy;
+                        nat->second.treasury += levy; // the credit half of the transfer
+                    }
                 }
-                if (levy != 0.0f)
+                if (levy_total != 0.0f)
                 {
-                    bud.levies = levy;
-                    delta     -= levy;
+                    bud.levies = levy_total;
+                    delta     -= levy_total; // the debit half
                 }
             }
         }

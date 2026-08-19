@@ -65,10 +65,11 @@ struct corp_budget
     float interest    = 0.0f; ///< BL-073: charged only while balance < 0.
 
     /// BL-343: levies charged by enacted laws this tick — today, the extraction
-    /// levy (a per-unit charge on raw output). Zero unless a law is enacted that
-    /// reaches this corp, which is the shipped default. This is the line that
-    /// makes a law OBSERVABLE: a law the player cannot see working is
-    /// indistinguishable from an unimplemented one.
+    /// levy (a per-unit charge on raw output). Since BL-480 the charge is a
+    /// TRANSFER into the enacting nation's treasury, bounded by that nation's
+    /// jurisdiction — zero for a corp whose extraction stands outside it. This
+    /// is the line that makes a law OBSERVABLE: a law the player cannot see
+    /// working is indistinguishable from an unimplemented one.
     float levies      = 0.0f;
 
     /// BL-454: standing-force upkeep — the CREDIT half of what it costs to keep

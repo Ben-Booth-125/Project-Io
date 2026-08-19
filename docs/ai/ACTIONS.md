@@ -16,7 +16,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*133 entries — 21 gameplay · 24 canvas · 15 lens · 44 ledger · 29 chrome.*
+*132 entries — 21 gameplay · 24 canvas · 15 lens · 43 ledger · 29 chrome.*
 
 ---
 
@@ -1225,22 +1225,6 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Expected output.** Switches the view. Re-clicking the currently-active tab closes the whole History ledger (toggle rule); switching tabs is an ordinary view change. Story is about one body (see the Body selector); Chain compares every body side by side and hides the selector. A third tab, Tiles, was retired 2026-08-03 (BL-281) - it was a current-state readout in a ledger about the past; its buildings list is on the canvas and in the Selection element, its market data in the market surfaces.
 
 **Reason to select.** Story answers 'what is this body's biography?'; Chain answers 'how do the bodies compare through the generation stages?' - the two halves of how this world came to be.
-
-### `ledger.law_enact_toggle` — Balance Ledger (Budget), 'Laws' section beneath the two policy-tier stubs
-
-**Press.** Click the checkbox beside a law's name to enact it, or click it again to repeal it (the standing toggle rule)
-
-| Arg | Type | Meaning |
-|---|---|---|
-| `law_index` | `int index into world::laws` | Which law on the books to flip. The prototype ships one: Extraction Levy. |
-
-**Valid when:**
-- Balance Ledger is open
-- At least one law is on the books (seed_prototype_laws appends the Extraction Levy at world setup, un-enacted)
-
-**Expected output.** The law's enacted flag flips on the next mutable pass, and a toast names it ('Extraction Levy enacted.' / '... repealed.'). It takes effect from the NEXT economy tick, never retroactively on the quarter already accounted. While enacted, every unit of RAW output the corporation extracts is charged rate x units and the total appears on the Levies bar of the Corporations dashboard's Finance card. Prices do not move: a law is a modifier over the market, never an override of it, so the levy is a separate accounted cost rather than a worse sale price. Repeal restores the previous arithmetic exactly. Unlike ledger.budget_tax_tier and ledger.budget_wage_tier, this control is NOT a stub.
-
-**Reason to select.** The only law lever that does anything today, and the one press that demonstrates the governing-body seam end to end. For a corporation SUBJECT to the levy it is pure cost, so a corp-side agent has no reason to enact it; it is here because the pivot's legislator needs the instrument to exist and to be observable before it can be negotiated (BL-280) or politicked over (BL-186, BL-345).
 
 ### `ledger.market_body_selector` — Market Ledger, 'Body' combo
 

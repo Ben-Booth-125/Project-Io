@@ -298,10 +298,6 @@
    "History ledger, view tab strip"
   ],
   [
-   "ledger.law_enact_toggle",
-   "Balance Ledger (Budget), 'Laws' section beneath the two policy-tier stubs"
-  ],
-  [
    "ledger.market_body_selector",
    "Market Ledger, 'Body' combo"
   ],

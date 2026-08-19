@@ -923,9 +923,10 @@ enum class economic_focus : uint8_t
 // ---------------------------------------------------------------------------
 
 /// All persistent data describing a single nation at campaign start. Nations
-/// take no autonomous actions in the prototype; this struct is generation output
-/// only. See docs/generation/NATION_GENERATION.md and docs/development/backlog.json
-/// for the deferred behaviour design.
+/// take no autonomous actions in the prototype; every field except `treasury`
+/// is generation output (the treasury is live state, credited each tick by the
+/// levy transfer — BL-480). See docs/generation/NATION_GENERATION.md and
+/// docs/development/backlog.json for the deferred behaviour design.
 struct nation_component
 {
     /// Generated name produced by Pass 5 of the nation generation pipeline.
@@ -952,4 +953,12 @@ struct nation_component
 
     /// Dominant economic activity; drawn from seeded RNG in Pass 4.
     economic_focus focus    = ::economic_focus::extraction;
+
+    /// BL-480: the nation's credit account. A law's levy is a TRANSFER — the
+    /// payer's debit lands here in the same tick, same float, so the sum is
+    /// conserved (asserted by tools/verify/law_author_harness.cpp; the BL-392
+    /// class of silent money destruction is gone from this flow). Written only
+    /// by `apply_budget`'s levy pass today; the spend side is future nation-
+    /// grain work under the 2026-08-18 grant.
+    float treasury = 0.0f;
 };
