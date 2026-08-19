@@ -1867,6 +1867,32 @@
     "BL-458"
    ],
    "resolution": "RESOLVED 2026-08-19 (Ben): reading B — hostility toward the player stays silent and is discovered on contact, matching ordinary BL-068 visibility rather than announcing on the comms dock. Preserves the ambush property BL-458 (interdiction) relies on. BL-449 (stance surface) is unblocked to promote: the Corporation panel's stance column shows a hostile row only once the corp is otherwise discovered, same gate as every other BL-068-visible fact."
+  },
+  {
+   "id": "NR-351",
+   "title": "BL-384 (Era -1 sim conquers nothing) — hypothesis refuted, real cause is a scorer magnitude mismatch, no fix applied",
+   "raised": "2026-08-19",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-384 confirm-before-fix instrumentation this session — see backlog.json BL-384 design field, FINDING 2026-08-19 section, for full measurement detail.",
+   "what": "Instrumented history_sim.cpp (temporarily) and measured a full 4000 BCE -> 0 CE run against the real Kepler world. The filed hypothesis (scorer/resolver terrain disagreement causes the sim to pick fights it then loses) is REFUTED: Campaign is never even selected as a polity-year's best_verb (0/1200 selections in the measured run), so no battle is ever fought for a terrain-blind estimate to lose. 372,660 of 524,800 scored campaign candidates clear the Campaign verb's own threshold, but Settle wins the shared-currency comparison in effectively every case (1188/1200), because Settle's score is a near-direct fraction of region value while Campaign's score is run through five multiplicative/subtractive discounts (campaign_gain_q, p_win_q, distance, culture, def_eff/supply cost) before competing on the same axis.",
+   "why_it_matters": "I did NOT attempt a fix. Rebalancing a four-verb shared-currency scorer (BL-309) is a different and larger-scoped problem than BL-384 as filed, and the item's own text explicitly warns against blind-tuning combat constants ('that would be guessing'). It also risks moving the B318c/R3/R5/B299 assertions that currently pass against synthetic fixtures. Recommend this becomes its own scoped follow-up item — a shared-currency rebalance pass with its own before/after measurement — rather than a same-session patch riding on this confirmation.",
+   "options": [
+    "File a new backlog item for the shared-currency rebalance (Settle vs Campaign scoring magnitude), scoped and measured independently of BL-384",
+    "Leave BL-384 open as-is and let a future session pick up the rebalance under this same item"
+   ],
+   "recommendation": "File a new item — the rebalance is a distinct, larger-scoped problem (four verbs, five discount terms) from what BL-384 described, and giving it its own before/after measurement keeps BL384a/b honest as the acceptance bar.",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/combat.cpp",
+    "tools/verify/history_sim_harness.cpp"
+   ],
+   "refs": [
+    "BL-384",
+    "BL-309",
+    "BL-318",
+    "BL-320"
+   ]
   }
  ]
 }
