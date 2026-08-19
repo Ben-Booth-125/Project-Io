@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*132 entries — 89 open, 43 resolved.*
+*133 entries — 90 open, 43 resolved.*
 
 ---
 
@@ -823,7 +823,7 @@ corporation_panel.cpp's table lives inside ui::foldout_begin's shell fold-out co
 ### NR-354 — Batch Delivery scoped down to BL-460/BL-441/BL-442(step1); BL-439/BL-440(c)/BL-443 deferred
 *decision taken on your behalf · raised 2026-08-19 · from 2026-08-19 Batch Delivery session survey of the v0.1.16 economy-integrity cluster (BL-439 through BL-443, BL-460).*
 
-Surveyed BL-439 (AI never builds processors), BL-440 (mines only target richest), BL-441 (unmet demand never registered), BL-442 (price band is code not data), BL-443 (debt compounds with no floor) and BL-460 (ordnance unproducible at 0 CE) as a candidate batch. Chose to land only BL-460, BL-441, and BL-442's step 1 (behaviour-identical constant relocation) this pass, and deferred BL-439, BL-440's remaining part (c), and BL-443 entirely - no code touched for those three.
+Surveyed BL-439 (AI never builds processors), BL-440 (mines only target richest), BL-441 (unmet demand never registered), BL-442 (price band is code not data), BL-443 (debt compounds with no floor) and BL-460 (ordnance unproducible at 0 CE) as a candidate batch. Chose to land only BL-460, BL-441, and BL-442's step 1 (behaviour-identical constant relocation) this pass, and deferred BL-439, BL-440's remaining part (c), and BL-443 entirely - no code touched for those three. [CORRECTED 2026-08-19 by the N1 audit: the claim "no code touched for BL-439/BL-440(c)/BL-443" is wrong for BL-439 — its tasks A/B/D landed on main at debfa87 on 2026-08-17 (corp_ai.cpp:736-905 + the ai_skill_harness guard). Accurate only about task C (the re-bless). BL-440(c) and BL-443 statements stand.]
 
 **Why it matters.** BL-439 explicitly reshuffles every blessed golden and every ai_skill_harness band as its stated cost ('paid once, deliberately, re-blessed as part of landing it') - not something to fold into a multi-item batch pass without dedicated attention to the re-bless. BL-440(c) needs a design call between two named implementation shapes (a post-registry retarget pass vs a static demand hint) that BL-441's own design notes partially supersedes - clearer to resolve after BL-441 lands and its effect on the coal shortage can be measured, not before. BL-443 explicitly says 'MEASURE BEFORE CHANGING ANYTHING' and requires a game-design call (debt ceiling vs forced liquidation vs restructuring) that shapes the Conflict/Trade arc - not a mechanical fix. Landing all six in one pass risked a sprawling, under-verified batch; scoping down keeps each landed item independently verifiable.
 
@@ -943,6 +943,11 @@ Measured cadence: median sprint closes in 1 day (14 dated sprints across 29 days
 *observation · raised 2026-08-19 · from Version-alignment session 2026-08-19: six-agent research workflow + 27-verdict contradiction audit + Ben's form verdicts.*
 
 Cleanup NOT run this session (deletion is destructive and was not on the form). The rename branch worktree-agent-ac68172a carries a9f1e52, superseded 42 minutes later by main's 70b2470 - eyeball-diff owed before deletion per the stale-base memory. The two unmerged branches: that one, plus the deliberate BL-474/475 paused WIP.
+
+### NR-367 — N1 audit complete: BL-437 flipped; five holds bounded; BL-443 confirmed open but gated on your NR-296 lever pick
+*observation · raised 2026-08-19 · from Read-only N1 audit agent over the seven un-flipped Sprint-26 items, evidence file:line + hashes; item-commits.json regenerated (350 entries — the seven were missing because the generator had not been re-run).*
+
+BL-437 (co-extraction) complete at 2884f6c. Held with bounded remainders: BL-417 (step 2 = your NR-265/268 call), BL-429 (one GUI look), BL-439 (task C re-bless = your NR-269 pick; sequence after the debt lever), BL-440 (task D doc + re-run tier_margin R4b), BL-453 (build + capture + live Hold press; do not re-build). BL-443 genuinely unbuilt; the audit resolved the item's own existing-guard worry (econ_bankruptcy asserts nothing).
 
 ---
 

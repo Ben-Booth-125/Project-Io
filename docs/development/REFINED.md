@@ -41,14 +41,19 @@ owns** the board files (`backlog.json`, `ROADMAP.md`, `SPRINTS.md`, `sprints.jso
   `src/world/budget_system.cpp`, `src/ui/balance_ledger.cpp`, harness. Levy becomes a conserved
   transfer; enactment off the player's ledger; wages lever severable (only if MA's vocabulary
   names `wage_floor` in time).
-- **[2] MC — BL-443 debt floor (rider).** Held pending the N1 audit's verdict that it is
-  genuinely unbuilt; if confirmed, promote into this batch per Fall-arc amendment 5.
+- **[2] MC — BL-443 debt floor (rider).** **AUDIT DONE, NOT PROMOTED.** Confirmed genuinely
+  unbuilt (only the 2% charge exists, budget_system.cpp:218-226), but gated on Ben's NR-296
+  lever pick (audit recommends restructuring over ceiling/liquidation) and colliding with MB
+  on `budget_system.cpp` — build only after MB merges AND NR-296 is answered.
 
 ### Hygiene lane (main session + one read-only audit agent)
 
 - **[1] HA — N1 audit: the seven un-flipped Sprint-26 items** (BL-417, BL-429, BL-437, BL-439,
-  BL-440, BL-443, BL-453). **IN FLIGHT** (read-only sub-agent). Verdict per item: complete
-  (with hash) / held (with reason) / genuinely open.
+  BL-440, BL-443, BL-453). **DONE 2026-08-19** — BL-437 flipped complete (`2884f6c`); five
+  holds bounded in their items' dated notes; BL-443 open-but-gated (see MC). NR-367 carries
+  the summary; NR-354 corrected; item-commits.json regenerated (the seven were missing because
+  the generator had not been re-run). Owed onward: one GUI pass closes BL-429 + BL-453
+  verification together at the integrating build.
 - **[1] HB — board surgery.** **DONE** this session: v0.1.16 split (→ v0.1.19–22 + v0.1.11),
   v0.1.18 defined, four stale re-goals, BL-306/BL-335 un-parked, BL-477–BL-480 filed, design
   amendments (BL-186, BL-410, BL-411, BL-087), ROADMAP/SPRINTS records corrected.
