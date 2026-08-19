@@ -213,8 +213,12 @@ belong here rather than there:
   derivation and the numbers are in RESOURCES.md, and it should be re-derived rather than
   re-guessed if either input's price moves.
 
-There is deliberately **no ancient route**. An `iron_blooms + charcoal` path is a real idea and
-belongs with BL-429's ancient roster, not smuggled in beside an industrial-era recipe.
+There is **no industrial ancient-arc SHORTCUT here** — the deliberate omission stands, and the
+comment explaining it is unchanged. But the `iron_blooms + charcoal` route it named DOES now exist,
+at the **Smithy** (see § The ancient chain below): BL-460 found that the omission had shipped
+without a tracking item, leaving `ordnance` — the good BL-454's unit upkeep draws every tick, in
+either arc — reachable only from an industrial recipe while the shipped default campaign runs the
+ancient band (`epoch_year = 0`). An ancient corp could never make the one good its own army needed.
 
 #### Assembly Plant
 
@@ -461,8 +465,16 @@ sold.
 | Charcoal Burner | 3 timber → 1 charcoal | 1 |
 | Bloomery | 2 iron ore + 1 charcoal → 1 iron blooms | 2 |
 | Smithy | 2 iron blooms + 1 charcoal → 1 steel | 3 |
+| Smithy | 2 iron blooms + 1 charcoal → 1 **ordnance** (BL-460) | 3 |
 | Potter/Weaver | 2 clay + 1 timber → 1 trade goods | 1 |
 | Miller | 2 agricultural produce + 1 stone → 1 food rations | 1 |
+
+**The Smithy's second recipe (BL-460, 2026-08-19) is the ancient arc's route to `ordnance`** — the
+same building, same `iron_blooms + charcoal` basket as its steel recipe, switchable between the two
+(BL-430's alternate-recipe mechanic). It closes the gap the Fabricator's ordnance recipe comment
+named and deliberately left open: without it, an ancient campaign (the shipped default,
+`epoch_year = 0`) could never make the one good BL-454's unit upkeep draws every tick. See
+§ Fabricator above and `RESOURCES.md` § The two terminal goods.
 
 **The load-bearing edit is the retag, not the additions.** The coal-fired `steel` recipe became
 `industrial`, so the ancient arc reaches steel only through timber → charcoal → blooms → steel.
