@@ -1847,7 +1847,7 @@
    "title": "BL-449 (stance surface) — does a hostile declaration announce itself, or is it discovered on contact?",
    "raised": "2026-08-19",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "BL-449 design field, flagged as \"a second question for Ben\" when BL-448 (corp stance model) landed and unblocked BL-449 this session.",
    "what": "BL-449 gates the Corporation panel's stance column on BL-068 competitor-visibility: a stance toward a corp the player has not discovered is not shown. That leaves two readings for how a declare_hostile against the player becomes visible to them — (A) it announces itself immediately, e.g. surfaced on the comms dock the moment it is declared, or (B) it stays silent and is only discovered on contact (matching a market/building becoming visible through normal BL-068 discovery). BL-449's own design notes it rides naturally on the comms dock if it announces, but does not settle which.",
    "why_it_matters": "This decides whether an ambush is truly a surprise (reading B — the player learns they are at war only when something happens to them) or a declared-but-silent-delivery state (reading A — always immediately known, just not necessarily acted on). BL-458 (interdiction) leans on the ambush property (\"a convoy belonging to a corp that does not yet know it is at war\"), so picking A would partially undercut that design intent for player-facing hostility, though rival-on-rival hostility could still use B for AI purposes.",
@@ -1865,7 +1865,8 @@
     "BL-448",
     "BL-068",
     "BL-458"
-   ]
+   ],
+   "resolution": "RESOLVED 2026-08-19 (Ben): reading B — hostility toward the player stays silent and is discovered on contact, matching ordinary BL-068 visibility rather than announcing on the comms dock. Preserves the ambush property BL-458 (interdiction) relies on. BL-449 (stance surface) is unblocked to promote: the Corporation panel's stance column shows a hostile row only once the corp is otherwise discovered, same gate as every other BL-068-visible fact."
   }
  ]
 }
