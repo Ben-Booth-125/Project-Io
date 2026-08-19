@@ -77,56 +77,6 @@ entity_id resolve_command_body(const world& w, const corp_command& cmd)
     }
 }
 
-const char* corp_verb_label(corp_verb v)
-{
-    switch (v)
-    {
-        case corp_verb::build:         return "build";
-        case corp_verb::demolish:      return "demolish";
-        case corp_verb::set_recipe:    return "recipe change";
-        case corp_verb::set_workforce: return "workforce change";
-        case corp_verb::idle:          return "idle";
-        case corp_verb::resume:        return "resume";
-        case corp_verb::place_road:    return "road placement";
-        case corp_verb::survey:        return "survey";
-        case corp_verb::hire_unit:     return "hire unit";
-        case corp_verb::place_sell_order:   return "sell order";
-        case corp_verb::remove_sell_order:  return "sell-order withdrawal";
-        case corp_verb::set_workforce_auto: return "workforce auto";
-        // BL-350's procurement trio. Absent, these fell through to the generic
-        // "action" below, so a contract decision would narrate itself into the
-        // world history log as "Corp 34590 ordered a action". Exhaustive now —
-        // though -Wswitch had been warning about it all along, under -Wall
-        // without -Werror, so the omission was visible on every build.
-        case corp_verb::request_quote:      return "quote request";
-        case corp_verb::accept_quote:       return "quote acceptance";
-        case corp_verb::cancel_contract:    return "contract cancellation";
-        // BL-452's convoy pair. The scorer does not emit either verb (the
-        // auto-dispatcher still runs the AI's logistics), but an agent on the
-        // MCP seam can, and this label is what the world history log narrates
-        // whatever the seam applied.
-        case corp_verb::dispatch_convoy:    return "convoy dispatch";
-        case corp_verb::hold_convoy:        return "convoy hold";
-    }
-    return "action";
-}
-
-const char* corp_decision_reason_label(corp_decision_reason r)
-{
-    switch (r)
-    {
-        case corp_decision_reason::best_build:     return "best available build site";
-        case corp_decision_reason::dial_workforce: return "workforce margin";
-        case corp_decision_reason::dial_recipe:    return "recipe margin";
-        case corp_decision_reason::dial_idle:      return "sustained losses";
-        case corp_decision_reason::dial_resume:    return "now profitable";
-        case corp_decision_reason::survey_expand:  return "discovery within budget";
-        case corp_decision_reason::hire_available: return "roster row available";
-        case corp_decision_reason::trade_surplus:  return "stock piled up past the hold threshold";
-    }
-    return "unspecified";
-}
-
 /// One-line narration of a strategic decision for the log's `event` column.
 std::string narrate_corp_decision(const corp_decision& d)
 {
@@ -280,6 +230,56 @@ float idle_maintenance(const world& w, const recipe_registry& reg, const buildin
 }
 
 } // namespace
+
+const char* corp_verb_label(corp_verb v)
+{
+    switch (v)
+    {
+        case corp_verb::build:         return "build";
+        case corp_verb::demolish:      return "demolish";
+        case corp_verb::set_recipe:    return "recipe change";
+        case corp_verb::set_workforce: return "workforce change";
+        case corp_verb::idle:          return "idle";
+        case corp_verb::resume:        return "resume";
+        case corp_verb::place_road:    return "road placement";
+        case corp_verb::survey:        return "survey";
+        case corp_verb::hire_unit:     return "hire unit";
+        case corp_verb::place_sell_order:   return "sell order";
+        case corp_verb::remove_sell_order:  return "sell-order withdrawal";
+        case corp_verb::set_workforce_auto: return "workforce auto";
+        // BL-350's procurement trio. Absent, these fell through to the generic
+        // "action" below, so a contract decision would narrate itself into the
+        // world history log as "Corp 34590 ordered a action". Exhaustive now —
+        // though -Wswitch had been warning about it all along, under -Wall
+        // without -Werror, so the omission was visible on every build.
+        case corp_verb::request_quote:      return "quote request";
+        case corp_verb::accept_quote:       return "quote acceptance";
+        case corp_verb::cancel_contract:    return "contract cancellation";
+        // BL-452's convoy pair. The scorer does not emit either verb (the
+        // auto-dispatcher still runs the AI's logistics), but an agent on the
+        // MCP seam can, and this label is what the world history log narrates
+        // whatever the seam applied.
+        case corp_verb::dispatch_convoy:    return "convoy dispatch";
+        case corp_verb::hold_convoy:        return "convoy hold";
+    }
+    return "action";
+}
+
+const char* corp_decision_reason_label(corp_decision_reason r)
+{
+    switch (r)
+    {
+        case corp_decision_reason::best_build:     return "best available build site";
+        case corp_decision_reason::dial_workforce: return "workforce margin";
+        case corp_decision_reason::dial_recipe:    return "recipe margin";
+        case corp_decision_reason::dial_idle:      return "sustained losses";
+        case corp_decision_reason::dial_resume:    return "now profitable";
+        case corp_decision_reason::survey_expand:  return "discovery within budget";
+        case corp_decision_reason::hire_available: return "roster row available";
+        case corp_decision_reason::trade_surplus:  return "stock piled up past the hold threshold";
+    }
+    return "unspecified";
+}
 
 float corp_personality_jitter(entity_id corp, uint64_t personality_seed)
 {

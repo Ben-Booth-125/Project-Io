@@ -152,6 +152,17 @@ enum class corp_priority_bucket : uint8_t
 /// The bucket a decision reason belongs to — a pure, deterministic mapping.
 corp_priority_bucket bucket_for_reason(corp_decision_reason reason);
 
+/// Canonical prose label for a corp_command's verb — what the world history
+/// log and the AI Decision Feed both narrate (BL-420: hoisted out of
+/// corp_ai.cpp's anonymous namespace so the feed no longer keeps its own
+/// word-for-word copy). Exhaustive over corp_verb; falls back to "action"
+/// for any verb the switch has not yet been extended to cover.
+const char* corp_verb_label(corp_verb v);
+
+/// Canonical prose label for a corp_decision_reason — companion to
+/// `corp_verb_label` (BL-420). Falls back to "unspecified".
+const char* corp_decision_reason_label(corp_decision_reason r);
+
 /// The cash a corp must reserve, beyond the BL-202 wage/maintenance floor, to
 /// keep feeding its currently-running processing facilities this tick — the
 /// Should-Have buffer that a Nice-to-Have (build/survey) spend may never dip

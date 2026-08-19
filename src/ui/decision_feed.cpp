@@ -5,6 +5,7 @@
 #include "market_ledger.hpp"  // market_city_name (BL-452: dispatch_convoy names two markets)
 #include "presentation.hpp"   // palette, building_type_name, resource_name
 #include "world/components.hpp"
+#include "world/corp_ai.hpp"    // corp_verb_label / corp_decision_reason_label / corp_decision_reason_count (BL-420)
 #include "world/corp_command.hpp"
 #include "world/unit_roster.hpp"
 #include "world/world.hpp"
@@ -25,62 +26,16 @@ namespace {
 // Vocabulary
 // ---------------------------------------------------------------------------
 //
-// corp_ai.cpp already has `corp_verb_label` and `corp_decision_reason_label`,
-// and these two functions are word-for-word the same phrasing. They are
-// duplicated rather than shared because those live in corp_ai.cpp's ANONYMOUS
-// namespace — nothing exports them, and this item does not own that file.
+// `corp_verb_label` / `corp_decision_reason_label` are the canonical labels,
+// hoisted out of corp_ai.cpp's anonymous namespace into corp_ai.hpp (BL-420)
+// so the feed and the world history log narrate every decision identically —
+// no second table to fall out of sync when a verb or reason is added.
 //
-// The duplication is therefore a known cost, not an oversight: if a verb or a
-// reason is added, or its wording is changed, BOTH tables must move or the feed
-// will narrate a decision differently from the world history log that records
-// the same decision. Hoisting the pair into corp_ai.hpp is the fix; it belongs
-// to whoever next has corp_ai.cpp open.
-
-const char* verb_label(corp_verb v)
-{
-    switch (v)
-    {
-        case corp_verb::build:              return "build";
-        case corp_verb::demolish:           return "demolish";
-        case corp_verb::set_recipe:         return "recipe change";
-        case corp_verb::set_workforce:      return "workforce change";
-        case corp_verb::idle:               return "idle";
-        case corp_verb::resume:             return "resume";
-        case corp_verb::place_road:         return "road placement";
-        case corp_verb::survey:             return "survey";
-        case corp_verb::hire_unit:          return "hire unit";
-        case corp_verb::place_sell_order:   return "sell order";
-        case corp_verb::remove_sell_order:  return "sell-order withdrawal";
-        case corp_verb::set_workforce_auto: return "workforce auto";
-        case corp_verb::request_quote:      return "quote request";
-        case corp_verb::accept_quote:       return "quote acceptance";
-        case corp_verb::cancel_contract:    return "contract cancellation";
-        case corp_verb::dispatch_convoy:    return "convoy dispatch";
-        case corp_verb::hold_convoy:        return "convoy hold";
-    }
-    return "action";
-}
-
-const char* reason_label(corp_decision_reason r)
-{
-    switch (r)
-    {
-        case corp_decision_reason::best_build:     return "best available build site";
-        case corp_decision_reason::dial_workforce: return "workforce margin";
-        case corp_decision_reason::dial_recipe:    return "recipe margin";
-        case corp_decision_reason::dial_idle:      return "sustained losses";
-        case corp_decision_reason::dial_resume:    return "now profitable";
-        case corp_decision_reason::survey_expand:  return "discovery within budget";
-        case corp_decision_reason::hire_available: return "roster row available";
-        case corp_decision_reason::trade_surplus:  return "stock past the hold threshold";
-    }
-    return "unspecified";
-}
-
-/// Number of `corp_decision_reason` values, for the filter combo. The enum has
-/// no count sentinel, so this mirrors it by hand and must grow with it — an
-/// out-of-date value silently hides the newest reason from the filter.
-constexpr int k_reason_count = 8;
+// NOTE (BL-420 hoist): the pre-hoist copy here read `trade_surplus` as
+// "stock past the hold threshold"; corp_ai.cpp's copy (now canonical) reads
+// "stock piled up past the hold threshold". The two had already drifted
+// apart before this refactor — logged for Ben's awareness, not fixed here,
+// since a wording change is a design call this pure-dedup item does not own.
 
 // ---------------------------------------------------------------------------
 // Naming the target
@@ -476,9 +431,9 @@ std::vector<feed_row> assemble_rows(const world& w)
         r.winning   = d->winning_score;
         r.runner_up = d->runner_up;
         r.reason    = static_cast<int>(d->reason);
-        r.headline  = std::string(verb_label(d->command.verb)) + " - "
+        r.headline  = std::string(corp_verb_label(d->command.verb)) + " - "
                       + target_label(w, d->command);
-        r.detail    = reason_label(d->reason);
+        r.detail    = corp_decision_reason_label(d->reason);
         rows.push_back(std::move(r));
     }
 
@@ -560,15 +515,15 @@ void draw_decision_feed(const world& w, ui_state& st, bool* open)
     ImGui::SetNextItemWidth(avail * 0.62f);
     if (ImGui::BeginCombo("Reason", st.decision_feed_reason < 0
                                         ? "Any reason"
-                                        : reason_label(static_cast<corp_decision_reason>(
+                                        : corp_decision_reason_label(static_cast<corp_decision_reason>(
                                               st.decision_feed_reason))))
     {
         if (ImGui::Selectable("Any reason", st.decision_feed_reason < 0))
             st.decision_feed_reason = -1;
-        for (int i = 0; i < k_reason_count; ++i)
+        for (int i = 0; i < static_cast<int>(corp_decision_reason_count); ++i)
         {
             const bool sel = (i == st.decision_feed_reason);
-            if (ImGui::Selectable(reason_label(static_cast<corp_decision_reason>(i)), sel))
+            if (ImGui::Selectable(corp_decision_reason_label(static_cast<corp_decision_reason>(i)), sel))
                 st.decision_feed_reason = i;
             if (sel)
                 ImGui::SetItemDefaultFocus();
