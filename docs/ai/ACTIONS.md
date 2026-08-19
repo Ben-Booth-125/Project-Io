@@ -16,7 +16,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*129 entries — 17 gameplay · 24 canvas · 15 lens · 44 ledger · 29 chrome.*
+*133 entries — 21 gameplay · 24 canvas · 15 lens · 44 ledger · 29 chrome.*
 
 ---
 
@@ -356,6 +356,72 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Expected output.** The convoy's `held` flag flips. A held convoy is SKIPPED by advance_convoys — it stops dead on its lane rather than slowing, makes no progress, does not arrive, and costs nothing further, because the haul was paid once at dispatch. Issuing the verb again releases it and it resumes from exactly the progress it stopped at, at its original speed. This is a TOGGLE, and it is deliberately NOT a cancel: the cargo left the source pool at dispatch, so a cancel would have to invent a return leg or mint the goods back at the source. Neither exists and no verb offers one. A rejected command mutates nothing.
 
 **Reason to select.** Stop a delivery that has stopped being the right one — the destination market's price collapsed, the stock turns out to be wanted at the source, a better destination appeared — without losing the cargo. The honest limit, and the thing to weigh before dispatching rather than after: holding does NOT bring the goods back. The stock is out of the pool either way; hold only stops it arriving somewhere you no longer want it, and buys time to decide. Release when the reason passes.
+
+### `gameplay.declare_hostile` — Corporation panel, Stance column. Confirm popup on press (demolish precedent — not literally irreversible, but not unilaterally reversible by the target either).
+
+**Press.** Open the Corporation panel, find the rival's row (only shown once the corp is otherwise BL-068-discovered), click 'Declare Hostile', confirm 'Declare' in the popup ('Cancel' backs out).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `counterparty` | `entity_id` | The corporation being declared hostile. May not be yourself. |
+
+**Valid when:**
+- counterparty names a real, distinct corporation (rejected_invalid otherwise).
+- Not already hostile toward counterparty (rejected_state otherwise).
+
+**Expected output.** A directed row is inserted into world.corp_hostile_pairs (corp -> counterparty only; the reverse direction is unaffected — hostility is unilateral by design, an ambush the target does not have to agree to). Any existing friendship row between the two is dissolved atomically, and any pending friendship offer in either direction is withdrawn. A rejected declaration mutates nothing.
+
+**Reason to select.** The predicate everything military-adjacent waits on (BL-315). Declaring hostile does not itself trigger any engagement — it only makes one legal later — but it also dissolves friendship on contact, so it is the one press that can undo a standing relationship as a side effect.
+
+### `gameplay.offer_friendship` — Corporation panel, Stance column.
+
+**Press.** Open the Corporation panel, find the rival's row, click 'Offer Friendship'. Shows 'Offer sent' afterward until the target accepts, declines, or either party moves to hostile.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `counterparty` | `entity_id` | The corporation being offered friendship. May not be yourself. |
+
+**Valid when:**
+- counterparty names a real, distinct corporation (rejected_invalid otherwise).
+- Not already friends with counterparty (rejected_state otherwise).
+- Not currently hostile toward counterparty — return_to_neutral first (rejected_state otherwise).
+- No offer already pending in this direction (rejected_state otherwise; not a re-send).
+
+**Expected output.** A pending offer (corp -> counterparty) is inserted into world.corp_friend_offers. Friendship is NOT yet in effect — offer_friendship alone changes nothing about is_hostile/are_friends until the target calls accept_friendship. A rejected offer mutates nothing.
+
+**Reason to select.** Friendship is deliberately the one stance that cannot be imposed — it requires both a genuine offer and a genuine accept, so a friendly row is always evidence both corps chose it, unlike hostility which is unilateral.
+
+### `gameplay.accept_friendship` — Corporation panel, Stance column. Shown only on a rival row carrying a pending offer FROM that rival TO the player.
+
+**Press.** Open the Corporation panel; a row with an incoming offer shows 'Accept Friendship' instead of 'Offer Friendship'. Click it.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `counterparty` | `entity_id` | The corporation whose offer is being accepted (the offerer). The acting corp is cmd.corp, the acceptor. |
+
+**Valid when:**
+- counterparty names a real, distinct corporation (rejected_invalid otherwise).
+- A pending offer exists in the direction counterparty -> corp (rejected_state otherwise — there is nothing to accept).
+
+**Expected output.** The pending offer (counterparty -> corp) is erased, and a symmetric row is inserted into world.corp_friend_pairs under the canonicalised (min id, max id) key — both parties now read are_friends() true toward each other. A rejected accept mutates nothing.
+
+**Reason to select.** The only way friendship becomes real. An offer alone (offer_friendship) is not a stance change by itself; this verb is the second half of the two-party handshake the model requires.
+
+### `gameplay.return_to_neutral` — Corporation panel, Stance column. Shown whenever the row is currently Hostile or Friend.
+
+**Press.** Open the Corporation panel, find the rival's row, click 'Return to Neutral'.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `counterparty` | `entity_id` | The corporation being returned to neutral standing. May not be yourself. |
+
+**Valid when:**
+- counterparty names a real, distinct corporation (rejected_invalid otherwise).
+- At least one of: the corp's own directed hostility toward counterparty, a shared friendship row, or a pending offer in either direction currently exists (rejected_state otherwise — nothing to clear).
+
+**Expected output.** Unilateral and asymmetric on hostility: clears ONLY the acting corp's own directed hostility toward counterparty (the reverse direction, if counterparty is separately hostile toward the corp, is untouched — that is counterparty's own row to release). Clears the shared friendship row if one exists (either party may dissolve a friendship) and any pending offer between the two in either direction. A rejected call mutates nothing.
+
+**Reason to select.** The universal de-escalation press — the only one of the four verbs usable from every non-neutral state, and the one that lets a corp exit hostility unilaterally even though it could not enter friendship unilaterally.
 
 ---
 
