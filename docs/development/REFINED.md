@@ -1155,3 +1155,58 @@ decomposition exists to prevent: S1, S2 and S3 all code against a verb enum that
 
 ---
 
+## BL-470 — the unit march seam (promoted 2026-08-19)
+
+Settled 2026-08-19 (Ben, elicitation form). Difficulty 4, priority A, v0.1.17. Absorbs BL-393's
+open half (units are write-only and inert); no longer a separate item. Full design in
+`backlog.json` — read it before starting, this is a condensed task breakdown against it.
+
+**Foundation first — everything else reads this:**
+
+- **[1] Movement order data model.** A `movement_order` (or similar) component/field on
+  `unit_component`: `{dest tile, path, progress}`. Path computed ONCE at order time via the same
+  cost function `body_reach_field` uses, ties broken by ascending tile id; recomputed only when
+  invalidated (a blocked step) — no per-tick Dijkstra.
+  Files: `src/world/components.hpp`.
+- **[2] The three verbs.** `march_unit {unit, dest tile}`, `halt_unit {unit}`, `disband_unit
+  {unit}` as `corp_verb` rows extending the existing `corp_command` enum/seam — NOT a parallel
+  `unit_command` type. Rejections per the design field: not-owner, invalid (nonexistent
+  unit/tile, ocean dest), state (already halted, or in-battle — withdraw first). A rejection
+  mutates nothing (this project's untrusted-seam rule).
+  Files: `src/world/corp_command.hpp`, `src/world/corp_command.cpp`. Depends on [1].
+- **[3] Per-tick movement resolution.** `march_points` per tick is AUTHORED DATA in
+  `economy.lua` § military, per-CLASS (not flat — this was overturned in the same elicitation),
+  keyed off the roster row's `cls`. Spent against per-tile traversal cost with fractional
+  carry-over. Visit marching units in ascending entity id, AFTER battle discovery (a unit that
+  marched into a hostile province this tick fights before it can march out next tick). A
+  composite unit (BL-472, not this item) moves at its slowest component's class speed — leave
+  the hook, don't build the composite logic here.
+  Files: `src/world/economy_system.cpp`, `scripts/economy.lua`. Depends on [1], [2].
+- **[4] Rider — blackboard export.** `export_corp_blackboard` gains a units section: id, tile,
+  type, count, derived strength, order state. Own units only — no BL-068 visibility question
+  for your own force; rivals stay gated as everywhere else.
+  Files: `src/world/corp_ai.cpp`. Depends on [1].
+- **[5] Rider — NR-344 resolved, write it down.** "War flips the queue": at peace, convoys claim
+  the supply network first; once a corp is party to any declared hostility (either direction —
+  being attacked mobilises too), its units claim first that tick. Evaluated per-corp at tick
+  start from the stance table (BL-448, landed). State this explicitly in
+  `economy_system.cpp`'s phase-order comment AND in `MILITARY.md` — this is a written rule now,
+  not an accident of phase order.
+  Files: `src/world/economy_system.cpp`, `docs/military/MILITARY.md`. Depends on [3].
+- **[6] Determinism guard.** State-hash replay with marching units in flight; a harness case
+  where a re-run recomputes an invalidated path identically (the recompute-on-block path is the
+  one place this item could accidentally introduce iteration-order dependence).
+  File: `tools/verify/` — new or extended harness, item-spanning requirement per DELIVERY.md
+  step 0. Depends on [1]–[5].
+
+**Explicitly NOT this item (own follow-ups):** merge/split and garrison/scout (BL-472,
+formations); ACTIONS.json transcription (BL-314, and it now *requires* this item — do not
+transcribe ahead of the seam); rival-scorer march quality (BL-450's arc — legality here only,
+scoring quality is conflict-AI work); the engagement trigger itself (BL-467).
+
+**Collision note.** `corp_command.{hpp,cpp}` and `economy_system.cpp` are both hot files for
+other open work this arc (Lane C's BL-315, Lane D's tech/law items) — worktree-isolate, don't
+assume disjointness.
+
+---
+

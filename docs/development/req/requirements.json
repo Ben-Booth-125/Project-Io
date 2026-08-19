@@ -4308,6 +4308,56 @@
     }
    ],
    "notes": "No automated visual capture (scripts/verify/*.lua) was authored in this batch - the main session confirms the panel by opening the live app instead. R1/R2 marked complete on code inspection + the inherited stance_determinism coverage; visual confirmation is the remaining open item before this group can close."
+  },
+  {
+   "brief": "unit-march-seam",
+   "batch": "2026-08-19-bl470",
+   "title": "BL-470 - units learn to walk: march/halt/disband as corp verbs, path-marching on the shared reach metric",
+   "status": "open",
+   "promoted_from": "backlog.json BL-470 UNIT_MARCH_SEAM",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "open",
+     "requirement": "ITEM-SPANNING (headless): march_unit/halt_unit/disband_unit are legal corp_command verbs (one seam, no parallel unit_command type); a rejected command mutates nothing; a marching unit consumes per-class march_points per tick against real traversal cost with fractional carry-over, visited in ascending entity id AFTER battle discovery.",
+     "verification": [
+      "headless"
+     ]
+    },
+    {
+     "id": "R2",
+     "status": "open",
+     "requirement": "Path computed once at order time (cheapest route under the same cost function body_reach_field uses, ties broken by ascending tile id) and recomputed ONLY when invalidated - no per-tick Dijkstra.",
+     "verification": [
+      "headless"
+     ]
+    },
+    {
+     "id": "R3",
+     "status": "open",
+     "requirement": "export_corp_blackboard carries a units section for the corps own force (id, tile, type, count, derived strength, order state); rival units stay gated under BL-068.",
+     "verification": [
+      "headless"
+     ]
+    },
+    {
+     "id": "R4",
+     "status": "open",
+     "requirement": "NR-344 (war flips the queue) is implemented AND written down: at peace convoys claim first, a corp party to any declared hostility (either direction) has its units claim first that tick, evaluated per-corp from the stance table at tick start.",
+     "verification": [
+      "headless"
+     ]
+    },
+    {
+     "id": "R5",
+     "status": "open",
+     "requirement": "Determinism: state-hash replay identical with marching units in flight; a re-run recomputes an invalidated path identically (no iteration-order dependence in the recompute path).",
+     "verification": [
+      "headless"
+     ]
+    }
+   ],
+   "notes": "Design settled 2026-08-19 by Ben in elicitation form (see backlog.json BL-470 design field for full text, including the two later-settled overturns: per-class march speed, and the war-flips-the-queue NR-344 resolution). Absorbs BL-393s open half (blackboard export)."
   }
  ]
 }
