@@ -577,6 +577,46 @@ int main()
         check(a.conquests > 0, "B318c the Campaign verb is reachable under the shared currency");
     }
 
+    // --- BL-384  the sim conquers nothing -----------------------------------
+    //
+    // THE ASSERTION HALF ONLY (BL-384's own prescribed order: assert before
+    // fix). The observed defect: a full-span run over the real epoch produced
+    // 267 battles against 0 conquests — every battle fought, no ground taken,
+    // so the political map is produced entirely by Settle expanding into empty
+    // space. War contributes nothing to who owns what.
+    //
+    // This is a THRESHOLD assertion, not a direction assertion like the pairs
+    // above — deliberately, because a direction check ("conquests > 0" alone,
+    // as B318c already has) is satisfiable by a single lucky conquest in 1960
+    // years and would not have caught the 267:0 ratio. The bar here is the
+    // ratio itself: conquest must not be vanishingly rare relative to battles
+    // fought, i.e. NOT the near-1000:1 shape the pre-BL-308 comment records.
+    //
+    // EXPECTED RESULT: RED against today's build. That is the deliverable of
+    // this half of the item, not a bug in the harness — do not weaken this
+    // assertion to make it pass; the fix is BL-384's next half (Sprint 28).
+    {
+        settlement_state s = k1->settlement;
+        const history_sim_state a = run_history_sim(s, nullptr, no_terrain, kgw, kgh, params, 9001u);
+
+        std::printf("      BL384: %lld battles / %lld conquests over %lld..%lld\n",
+                    static_cast<long long>(a.battles),
+                    static_cast<long long>(a.conquests),
+                    static_cast<long long>(params.start_year),
+                    static_cast<long long>(params.stop_year));
+
+        check(a.battles > 0,
+              "BL384a the run fights at all (a zero-battle run would make the ratio check vacuous)");
+
+        // The pre-fix shape was "battles outnumbered conquests by up to 1000:1"
+        // (history_sim.cpp's own comment). A working conquest mechanic should
+        // clear a battles:conquests ratio far short of that — pinned here at
+        // 20:1 as a generous, clearly-distinguishing bar between "broken" and
+        // "working", not a calibration target to tune toward.
+        check(a.conquests * 20 >= a.battles,
+              "BL384b conquest is not vanishingly rare relative to battles fought (ratio < 20:1)");
+    }
+
     // --- R5  season is an action axis, not a clock -------------------------
     {
         settlement_state s = k1->settlement;
