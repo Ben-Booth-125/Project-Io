@@ -87,7 +87,8 @@ struct stack_draw
 // (building_profit.cpp) sizes a stack's combined draw from the same figure the tick
 // draws, rather than re-deriving it. The anonymous namespace re-opens below.
 float extraction_nominal(const world& w, const recipe_registry& reg,
-                         const building_component& b, float contention)
+                         const building_component& b, float contention,
+                         entity_id corp)
 {
     const auto tile_it = w.tiles.find(b.tile);
     if (tile_it == w.tiles.end())
@@ -97,11 +98,16 @@ float extraction_nominal(const world& w, const recipe_registry& reg,
     // Apply the player's workforce target (0–200 % of nominal capacity).
     const float wt_scalar = std::clamp(b.workforce_target / 100.0f, 0.0f, 2.0f);
     const building_economics& e = reg.economics(building_type::extraction_site);
-    return e.base_rate
+    const float nominal = e.base_rate
          * richness_rate_scalar(e, tc.resource_deposit[ri])
          * (b.workforce_assigned * contention)
          * wt_scalar
          * (1.0f - tc.hazard_level);
+    // BL-479: fold the owning corp's earned extraction_rate modifiers into the
+    // single definition of the draw. `null_entity` (or a corp with none) hands
+    // back `nominal` untouched — no arithmetic — so a world with no
+    // modify_scalar tech stays bit-identical to the pre-BL-479 build.
+    return w.modified_scalar(corp, modifier_subject::extraction_rate, nominal);
 }
 
 namespace {
@@ -154,7 +160,7 @@ building_report run_extraction(world& w, const recipe_registry& reg,
     // yields 0.8 of the first, the third 0.64, and so on. Stacking therefore pays
     // sub-linearly — and there is no clamp under the curve, because the curve is
     // the economics.
-    const float nominal = extraction_nominal(w, reg, b, contention)
+    const float nominal = extraction_nominal(w, reg, b, contention, corp)
                         * placement_rules::stack_output_scalar(stack != nullptr ? stack->rank : 1);
     if (nominal <= 0.0f)
     {
@@ -1111,8 +1117,12 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                 const entity_id body = building_body(w, b);
                 if (body == null_entity)
                     continue;
+                // BL-479: the member's own owner, so a modified corp's rate
+                // sizes the shared taper at the figure that member will draw.
+                const entity_id member_owner = owner_of(sites[i].id);
                 const float n =
-                    extraction_nominal(w, reg, b, contention_for(owner_of(sites[i].id), body))
+                    extraction_nominal(w, reg, b, contention_for(member_owner, body),
+                                       member_owner)
                     * placement_rules::stack_output_scalar(static_cast<int>(i - first) + 1);
                 if (n > 0.0f)
                     combined += n;

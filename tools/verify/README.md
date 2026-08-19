@@ -36,7 +36,10 @@ scale, or the `base_price` table changes.
 
 Use that route for anything linking the world superset — `world_audit`, `ai_skill_harness`,
 `history_ladder_harness`, **`settlement_harness`**, `data_creep_harness`, `corp_terrain_matrix`,
-`trade_routes_harness` — and for `font_glyph_harness`, which links ImGui and is hand-declared in
+`trade_routes_harness`, `tech_effect_union_harness` (BL-479: the tech effect union — a fixture
+modify_scalar tech moves the named scalar for the earning corp only, the stack-taper pre-pass
+prices the modified rate, and the no-effect real world's `state_hash` marks stay bit-identical
+to the pre-change build) — and for `font_glyph_harness`, which links ImGui and is hand-declared in
 `CMakeLists.txt` above the glob. These have deliberately **no** `cl` recipe below: writing one
 would be inventing a TU list with a short shelf life — which is exactly how `trade_routes_harness`
 stopped linking when BL-170 landed rivers (fixed 2026-08-02 by deleting its hand-declaration, not
