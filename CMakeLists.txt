@@ -728,6 +728,29 @@ target_link_libraries(price_band_harness PRIVATE io_world_obj lua54)
 target_compile_features(price_band_harness PRIVATE cxx_std_20)
 target_compile_options(price_band_harness PRIVATE ${IO_WARNING_FLAGS})
 
+# agent_seam_harness (BL-412) — the live agent control seam. Hand-declared
+# because it links two src/core TUs the world superset deliberately excludes:
+# agent_protocol.cpp (the --serve line protocol, shared with run_serve) and
+# agent_seam.cpp (the loopback listener + tick-boundary drain). Both are
+# SDL/Lua/ImGui-free — the socket layer is Winsock/BSD behind one shim — so
+# the harness stays in the fast headless tier; on Windows that shim needs
+# ws2_32 (the pragma in agent_seam.cpp covers MSVC, the explicit link covers
+# everything else).
+add_executable(agent_seam_harness
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/agent_seam_harness.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/core/agent_protocol.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/core/agent_seam.cpp"
+)
+target_include_directories(agent_seam_harness PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+)
+target_link_libraries(agent_seam_harness PRIVATE io_world_obj)
+if(WIN32)
+    target_link_libraries(agent_seam_harness PRIVATE ws2_32)
+endif()
+target_compile_features(agent_seam_harness PRIVATE cxx_std_20)
+target_compile_options(agent_seam_harness PRIVATE ${IO_WARNING_FLAGS})
+
 file(GLOB IO_VERIFY_HARNESSES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/*.cpp")
 
 # ---------------------------------------------------------------------------

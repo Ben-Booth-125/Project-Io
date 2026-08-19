@@ -60,6 +60,18 @@ void sim_loop::tick()
     }
 }
 
+void sim_loop::advance_days(int days)
+{
+    if (days <= 0)
+        return;
+    // Step the discrete counters through on_sim_step so the day/econ boundary
+    // logic stays single-sourced; move the continuous day counter in lockstep
+    // so orbital motion and the survey clock see the same elapsed time.
+    for (int i = 0; i < days * sim_ticks_per_day; ++i)
+        on_sim_step();
+    m_elapsed_days += static_cast<double>(days);
+}
+
 void sim_loop::on_sim_step()
 {
     ++m_sim_tick;
