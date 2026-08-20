@@ -2566,6 +2566,24 @@
    "status": "open",
    "source": "Pre-compile static review of the integrated four-lane batch, 2026-08-20; blocker fixed at bd238d5.",
    "what": "The CMake GLOB registers tools/verify/*.cpp automatically, so this batch six new harnesses entered the routine gate silently. road_reach_census (3x make_hard_coded_world) and rival_military_seeding_harness (4x) are the exposure. substrate_census own CMake note records ~62s per world in a Debug tree and parked itself in IO_TEST_SWEEP_HARNESSES for exactly this reason; road_reach_census is by name the same category and is not in that list. Expect a Debug-tree Timeout, which NR-259 calls a silent failure. Also: rival_military_seeding_harness has never been named in tools/verify/README.md - it arrived undocumented in an earlier commit, not in this batch."
+  },
+  {
+   "id": "NR-403",
+   "title": "Decision: world_audit now skips the BL-476 seeded military base rather than raising its ceiling",
+   "raised": "2026-08-20",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Full CTest suite over the integrated four-lane batch, 2026-08-20 (96 tests, 1474s).",
+   "what": "B4 R1 failed on the integrated tree and passed in every agent worktree, because BL-476 (ce0e5cc) landed after their common base and seeds a military_base into EVERY corp assets. holdings_range governs ECONOMIC holdings and never counted that base, so the audit was comparing against a ceiling one too low for every corp - it only reds when a draw lands at the top of its range, and this batch settlement-density change made one do so. Two ways to fix: raise every ceiling by 1, or stop counting the base. I took the second, because the first would hide a real +1 and would make the audit assert something holdings_range does not promise. Verified: every corp drops by exactly one and all sit inside the declared ranges. If you would rather the audit tracked TOTAL footprint including military, say so and it inverts. Note the file own comment now records this as the FOURTH drift of a hand-mirrored table - the pattern, not this instance, is the thing worth fixing."
+  },
+  {
+   "id": "NR-404",
+   "title": "Suite state after the batch: 96 tests, 3 real failures, all confirmed pre-existing",
+   "raised": "2026-08-20",
+   "kind": "observation",
+   "status": "open",
+   "source": "Full CTest suite over the integrated four-lane batch, 2026-08-20 (96 tests, 1474s).",
+   "what": "Full CTest on the integrated tree: 95% pass, 5 failures. Two are resolved - world_audit (NR-403) and debt_decomposition, which is a MEASUREMENT-ONLY harness that exits 0 standalone and timed out only under suite load (the NR-402 exposure, now demonstrated rather than predicted). The three that remain are ai_skill_harness (Timeout), spectator_determinism (Failed) and tier_margin (Failed); two independent agents each stashed their work, rebuilt on the untouched base and reproduced all three identically, so none is this batch. spectator_determinism deserves its own attention: its pinned golden 3CBAD1D44EE71EDE is stale, and the two agents measured DIFFERENT clean-base hashes for it (3CC37947C8662F71 and 2ABF4700B2DF9251), which is either two different build configurations or a determinism leak in the thing whose entire job is asserting determinism. Worth one deliberate look before it is re-blessed - and it must not be re-blessed without that look."
   }
  ]
 }
