@@ -10,7 +10,44 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — Sprint 25a: armies get something to eat (BL-457, BL-455, BL-452/453, BL-456, BL-454/459) (2026-08-17 → 08-18, latest)
+## Session — COLLAPSE.md: the Era −1 collapse metagame, decomposed (BL-476–BL-496) (2026-08-20, latest)
+
+Design mode, mobile doc session, no code touched. Ben's brief: *consider high-level strategies /
+metagames for surpassing the Era −1 Collapse* — extended in-session three times, each extension a
+Ben steer answered and recorded the same turn.
+
+**The doc.** `docs/lore/COLLAPSE.md`, new. The framing ruling first: Sprint 30 holds collapse
+inevitable for a major, so "surpassing" decomposes into *when / how / who inherits*. Six polity
+strategies (Tortoise, Pulse, Hydra, Phoenix, Metropole, Temple), seven culminating events
+(fragmentation, devolution, absorption, transformation, exodus, slow fade, systemic cascade), a
+strategy × culmination matrix that doubles as the harness assertion table, and the ideological
+axis — seven real narrative patterns (mandate withdrawn, translation of empire, declinist mirror,
+etc.) transferred as mechanisms, never nouns.
+
+**Ben's rulings, dated in the doc.** All four allegories (Rome arc, British devolution, dynastic
+cycle, Bronze-Age systemic) as **tuned attractors** — one parameter space, sweep-asserted rates,
+never templates. All four chain **sequentially per world over 4000 years**: the shipped 400-year
+band *was a placeholder*, reversing the Sprint 26b doc-truth correction knowingly. The story
+surfaces in the **history tab, quietly** — seeing beats telling; deep-dig optional. The 4000-year
+optimisation is designed in the doc as a five-rung ladder (kill the O(provinces) scans → quiet-
+province fast path → deterministic banded year grain → record-on-change → never parallelise).
+
+**The decomposition.** Nineteen items, BL-476–BL-494, all v0.1.16, on Ben's steer *many specific
+items over a few hard ideas*: the strain accumulator (digestion retires strain, loss does not),
+the fragmentation and Release verbs, the hegemony measure, readable/transferable/reach-fed strain,
+the E4–E7 culminations, creed axes, strategy weightings, the narration bank, the attractor sweep,
+and the perf ladder closing in BL-494 (the 4000-year extension itself).
+
+**Queue close-out.** The review queue's four open *questions* were put to Ben and resolved in one
+pass: NR-356 (reach feeds strain — BL-482 confirmed, per BL-325's one-reach-field ruling), NR-317
+(held convoy cargo stays visible to the price signal, BL-422's convention — filed BL-495), NR-321
+(ordnance rate rides Lane C's engagement trigger — tripwire filed BL-496), NR-343 (LP is a
+per-tick rate, not a stock — BL-464's prose amended in place). NR-357 (run-length tension) was
+raised and resolved inside the same session.
+
+**Runtime:** ~1.5h across mobile turns; design/decomposition, Light ceremony throughout.
+
+## Session — Sprint 25a: armies get something to eat (BL-457, BL-455, BL-452/453, BL-456, BL-454/459) (2026-08-17 → 08-18)
 
 Full mode, Batch Delivery, three worktree sub-agents. Ben's brief was *"what can we build to pad out
 the military and logistics systems?"* — answered by proposing the **seam between them** rather than
