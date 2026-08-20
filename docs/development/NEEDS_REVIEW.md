@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*160 entries — 109 open, 51 resolved.*
+*164 entries — 113 open, 51 resolved.*
 
 ---
 
@@ -1061,6 +1061,26 @@ I promoted Task A1 (author the BL-384 conquest assertion) into the four-lane bat
 *observation · raised 2026-08-20 · from Lane A (Sprint 27, BL-384 assertion half), agent report verified against main by the main session.*
 
 history_sim_harness R7 (a perf budget) fails at 16679 ms on the primary Kepler run. The backlog records this budget as DROPPED in favour of BL-320, but the assertion was never removed from the harness, so it reds every run and adds noise to a harness whose reds are supposed to mean something. Either the drop did not happen and the budget is real, or the assertion should go. Small, but a permanently-red assertion trains everyone to ignore the harness.
+
+### NR-396 — A FOURTH procurement fault, unfiled: the deposit and every instalment left the buyer and arrived nowhere
+*observation · raised 2026-08-20 · from Lane D (BL-392 + Sprint D4 tariff), agent report + main-session diff review, merged at 9b75621.*
+
+BL-392 filed three faults. The agent found a fourth while satisfying the conservation requirement: the deposit and every paced instalment were debited from the buyer and credited to NOBODY - every contract in flight was burning credits out of the economy. The supplier is now credited exactly what the buyer is debited. This is a real behaviour change that no item asked for, admitted because the conservation requirement made it unfixable-around. Worth knowing that the money supply has been quietly shrinking in every session where a contract was live.
+
+### NR-397 — A small cross-body contract still loses to spot, on purpose - two dials if you disagree
+*decision taken on your behalf · raised 2026-08-20 · from Lane D (BL-392 + Sprint D4 tariff), agent report + main-session diff review, merged at 9b75621.*
+
+Re-measured after the BL-392 fix, contracted parcel vs the same parcel at spot (positive = contract wins): 20 units -1.2500, 100 units +6.2500, 500 units +93.7500. The -0.14 break-even-by-construction is gone - the discount is real and monotone in size, and the goods now arrive somewhere usable. But at 20 units the 5% freight still exceeds the 1.7% discount, so a small cross-body order is a bad deal. The agent took the reading that freight is an honest cost and that vs-spot-on-the-suppliers-market is the wrong comparison for goods the buyer cannot reach anyway. If you want small orders to win too, the dials are offbody_freight_fraction (0.05) and volume_discount_half_quantity (100), both in scripts/economy.lua.
+
+### NR-398 — novel-work: a nation now holds and receives money, and conservation is NOT a global property of this economy
+*novel-work · raised 2026-08-20 · from Lane D (BL-392 + Sprint D4 tariff), agent report + main-session diff review, merged at 9b75621.*
+
+Two things earn the flag. First, nation treasury is the first money a non-corporate actor has ever held, and no doc owns what a nations balance is FOR - the tariff credits it, and nothing spends it. Second and more important: money conservation was never a property of this economy and still is not globally - the market is a buyer of last resort that pays sellers with nobody money. The new money_conservation harness asserts conservation across these two items own flows against control worlds, and its header says so at length so nobody later reads it as a global claim. Someone will eventually have to decide whether global conservation is a goal or whether the market is deliberately an infinite counterparty.
+
+### NR-399 — The procurement save seam rejects old saves outright on a version bump - pre-existing, but now exercised
+*observation · raised 2026-08-20 · from Lane D (BL-392 + Sprint D4 tariff), agent report + main-session diff review, merged at 9b75621.*
+
+read_procurement gates on version != procurement_version and returns false, so bumping 1 -> 2 (which this work did, for delivery_body and freight_cost on both records) makes every pre-existing save unreadable rather than upgradable. That strict-equality check is PRE-EXISTING and not introduced here, but this is the first bump to actually exercise it. Related gap the agent flagged and did not introduce: nation_component::treasury and law::author_nation have no serialiser at all - nations and laws are not saved, so a treasury survives nothing. BL-107 is the item that owns picking those up.
 
 ---
 
