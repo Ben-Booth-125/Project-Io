@@ -143,10 +143,32 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed)
             : 1;
     };
 
-    // Determine target centre count: 20–40, scaled by tile count / 1000.
-    // A 180×84 grid (~15 120 tiles) yields ~15 centres before clamping → 20.
-    const int raw_count = static_cast<int>(total) / 1000;
-    const int centre_count = std::clamp(raw_count, 20, 40);
+    // Target centre count — derived from LAND AREA, not grid area (BL-463).
+    //
+    // This read `clamp(gw * gh / 1000, 20, 40)` until 2026-08-20. Grid area is a
+    // compile-time constant (261×121 = 31,581), so the expression evaluated to
+    // exactly 31 on every world ever generated, while the land under it ranged
+    // 8,952–16,074 tiles across an eight-seed sweep. No world could be more or
+    // less settled than any other.
+    //
+    // The divisor is MEASURED, not chosen (BL-463 § Direction, not a chosen
+    // number; BL-224's report-then-tune discipline). Over the eight-seed
+    // baseline sweep run by tools/verify/substrate_census.cpp the shipped
+    // generator placed 248 centres over 101,629 land tiles — 409.8 land tiles
+    // per centre. `k_land_tiles_per_centre` is that figure rounded, so the
+    // CENTRAL density is unchanged and the only thing this line changes is that
+    // the count now VARIES with the land the seed actually produced.
+    //
+    // The bounds are structural, not tuning: at least one centre, and never more
+    // centres than there are tiles able to host one.
+    constexpr int k_land_tiles_per_centre = 410;
+    int land_tiles = 0;
+    for (const auto& [tid, tc] : w.tiles)
+        if (tc.body == body_id && tc.composition != terrain_composition::ocean)
+            ++land_tiles;
+
+    const int centre_count = std::clamp(land_tiles / k_land_tiles_per_centre,
+                                        1, static_cast<int>(candidates.size()));
 
     // Seeded RNG — deterministic, never draws from random_device.
     std::mt19937 rng(seed);
@@ -252,4 +274,126 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed)
         for (entity_id cid : ids)
             w.population_centre_name[cid] = generate_city_name(name_rng, body_speech);
     }
+}
+
+// ---------------------------------------------------------------------------
+// Coverage pass (BL-463) — every nation holds at least one population centre
+// ---------------------------------------------------------------------------
+
+int ensure_national_population_centres(world& w, entity_id body_id, unsigned seed)
+{
+    // Why this is a SECOND pass rather than a bigger number in the first one.
+    //
+    // generate_population_centres runs BEFORE generate_nations (Pass 6's
+    // substrate density reads the centres while territory is assigned), so it
+    // cannot know how many nations there will be, nor where their borders fall.
+    // Raising its target until coverage happened to come out right would be
+    // exactly the clamp-and-move-on this item exists to remove: the count would
+    // still be a guess, and a nation could still draw an empty hand.
+    //
+    // So the nation term in "derive the target from land area AND nation count"
+    // is applied HERE, after the borders exist, as a structural guarantee: one
+    // founding for each nation that holds none. The world's centre count is then
+    // land-derived plus nation-derived, and F1 (`every nation holds at least one
+    // population centre`, tools/verify/substrate_census.cpp) is true by
+    // construction rather than by luck of the draw.
+    //
+    // Deterministic: nations are visited in sorted-id order, the founding tile is
+    // a pure argmax over that nation's own tiles with a first-best tie-break over
+    // a sorted list, and the only RNG draw is the scale — from a stream seeded
+    // here and touched by nothing else.
+    const auto body_it = w.bodies.find(body_id);
+    if (body_it == w.bodies.end())
+        return 0;
+
+    // Which nations already hold a centre, and which tiles are already hosts.
+    std::unordered_set<entity_id> covered;
+    std::unordered_set<entity_id> host_tiles;
+    for (const auto& [cid, tid] : w.population_centre_tile)
+    {
+        host_tiles.insert(tid);
+        const auto nit = w.tile_to_nation.find(tid);
+        if (nit != w.tile_to_nation.end())
+            covered.insert(nit->second);
+    }
+
+    // Nations with territory on this body, in sorted-id order.
+    std::vector<entity_id> nation_ids;
+    nation_ids.reserve(w.nations.size());
+    for (const auto& [nid, nc] : w.nations)
+    {
+        bool on_body = false;
+        for (const entity_id tid : nc.tiles)
+        {
+            const auto tit = w.tiles.find(tid);
+            if (tit != w.tiles.end() && tit->second.body == body_id) { on_body = true; break; }
+        }
+        if (on_body)
+            nation_ids.push_back(nid);
+    }
+    std::sort(nation_ids.begin(), nation_ids.end());
+
+    std::mt19937 rng(seed);
+    int founded = 0;
+
+    for (const entity_id nid : nation_ids)
+    {
+        if (covered.count(nid))
+            continue;
+
+        // Best founding site in this nation: habitable, placeable, unoccupied,
+        // scored on habitability weighted by extractable deposit richness — the
+        // same two quantities the primary pass weights by, so a coverage founding
+        // lands where the primary pass would have wanted to put one.
+        entity_id best_tile  = null_entity;
+        double    best_score = -1.0;
+
+        std::vector<entity_id> tiles = w.nations.at(nid).tiles;
+        std::sort(tiles.begin(), tiles.end());
+
+        for (const entity_id tid : tiles)
+        {
+            if (host_tiles.count(tid))
+                continue;
+            const auto tit = w.tiles.find(tid);
+            if (tit == w.tiles.end() || tit->second.body != body_id)
+                continue;
+            const tile_component& tc = tit->second;
+            if (!placement_rules::can_place_population_centre(tc))
+                continue;
+
+            double richness = 0.0;
+            for (const resource_type er : placement_rules::k_extractable)
+                richness += static_cast<double>(tc.resource_deposit[static_cast<std::size_t>(er)]);
+
+            const double score = static_cast<double>(tc.habitability) * (1.0 + richness);
+            if (score > best_score) { best_score = score; best_tile = tid; }
+        }
+
+        if (best_tile == null_entity)
+            continue; // a nation of pure ice or bare rock genuinely supports nobody
+
+        const auto tit = w.tiles.find(best_tile);
+        const float hab = (tit != w.tiles.end()) ? tit->second.habitability : 1.0f;
+
+        // A coverage founding is a SMALL place. It is the seat a nation was always
+        // implied to have, not a metropolis conjured to hit a number, so it draws
+        // from the bottom of the same weighted distribution (scales 1-3) rather
+        // than the full 1-5 range.
+        const int scale = std::min(draw_scale(rng), 3);
+
+        const entity_id centre_id = w.create_entity();
+        population_centre_component pcc;
+        pcc.scale        = scale;
+        pcc.population   = k_population_for_scale[scale - 1];
+        pcc.habitability = hab;
+        w.population_centres[centre_id] = pcc;
+        w.population_centre_tile[centre_id] = best_tile;
+
+        host_tiles.insert(best_tile);
+        covered.insert(nid);
+        ++founded;
+    }
+
+    return founded;
 }

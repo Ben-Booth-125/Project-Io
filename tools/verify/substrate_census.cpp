@@ -19,8 +19,10 @@
 // world, is there land on it, is anything built at all — and they are stated so
 // loosely that tightening them later is a deliberate act rather than a side
 // effect. A fourth check ("every nation holds at least one population centre")
-// was written, MEASURED, and found not to hold; it is reported as finding F1
-// rather than loosened into a green one. That is the point of the exercise.
+// was written, MEASURED, and found not to hold at 61%; it was reported as
+// finding F1 rather than loosened into a green one. That is the point of the
+// exercise — and on 2026-08-20 BL-463 fixed the generator instead of the test,
+// so F1 is now check S4 and it gates.
 //
 // WHAT IS MEASURED, AND WHEN
 // --------------------------
@@ -641,14 +643,37 @@ int main(int argc, char** argv)
     check(anything_built,
           "S3   every world carries at least one building and one market");
 
-    // --- FINDINGS: measured, deliberately NOT assertions --------------------
+    // S4 — the acceptance test for BL-463, promoted from finding F1 on 2026-08-20.
     //
-    // "Every nation holds at least one population centre" was written here as a
-    // fourth structural check and REMOVED after measuring, because it does not
-    // hold — and it does not hold for a structural reason, not a seed accident.
-    // Turning a false statement into a green test by loosening it is exactly the
-    // move this project refuses, so it is reported instead. This is the sharpest
-    // single answer to Ben's complaint the harness produces.
+    // It was written here on 2026-08-18, MEASURED at 61% of nations failing it,
+    // and left non-gating: a false statement must not be made green by loosening
+    // it. The fix (population_generation.cpp — a land-derived primary target plus
+    // ensure_national_population_centres, a per-nation coverage pass that runs
+    // once borders exist) makes it true by construction, so it gates now.
+    //
+    // A failure here is not a density question. It means a nation exists that the
+    // coverage pass could not seat anybody in — either the pass did not run, or a
+    // whole territory has no tile passing can_place_population_centre. Both are
+    // worth stopping for, and the per-seed count is printed so which one is
+    // visible without a rebuild.
+    {
+        int uncovered = 0;
+        for (const census_row& r : rows)
+            uncovered += r.pop_per_nation.zeros;
+        if (uncovered != 0)
+            for (const census_row& r : rows)
+                if (r.pop_per_nation.zeros > 0)
+                    std::printf("     seed %u: %d of %d nations hold no population centre\n",
+                                r.seed, r.pop_per_nation.zeros, r.nations);
+        check(uncovered == 0,
+              "S4   every nation holds at least one population centre (BL-463)");
+    }
+
+    // --- FINDINGS: measured, mostly NOT assertions --------------------------
+    //
+    // F1 was a finding until 2026-08-20 and is now check S4 above; the figure is
+    // still printed here because "0 of N" is the number the item is judged on and
+    // a bare PASS line does not carry it.
     if (!rows.empty())
     {
         std::printf("\n--- findings (measured, not gated) ---\n");
@@ -667,10 +692,12 @@ int main(int argc, char** argv)
                     total_nations ? 100.0 * total_unsettled / total_nations : 0.0,
                     worst_seed, worst_share);
 
-        // The count is `clamp(tiles / 1000, 20, 40)` in population_generation.cpp
-        // — a function of GRID AREA alone. If every swept seed lands on the same
-        // number, that is the formula showing through, not a coincidence, and it
-        // means settlement density cannot respond to how much land a world has.
+        // Until BL-463 the count was `clamp(gw * gh / 1000, 20, 40)` — a function
+        // of GRID AREA alone, which is a compile-time constant, so every swept
+        // seed landed on the same number and settlement density could not respond
+        // to how much land a world had. It is now land-derived plus one per
+        // otherwise-unsettled nation, so a constant across a multi-seed sweep
+        // would mean the derivation has been short-circuited again.
         bool constant_centres = true;
         int land_lo = rows.front().land,    land_hi = rows.front().land;
         int nat_lo  = rows.front().nations, nat_hi  = rows.front().nations;
@@ -684,9 +711,10 @@ int main(int argc, char** argv)
         }
         if (constant_centres)
             std::printf("F2  POPULATION CENTRES ARE SEED-INVARIANT at %d on all %d worlds, over land\n"
-                        "    areas of %d..%d tiles and %d..%d nations — the count is derived from GRID\n"
-                        "    AREA alone (population_generation.cpp: clamp(tiles / 1000, 20, 40)), so no\n"
-                        "    seed can be more or less settled than any other.\n",
+                        "    areas of %d..%d tiles and %d..%d nations — settlement density is not\n"
+                        "    responding to the world it is placed on. BL-463 removed the grid-area\n"
+                        "    formula that caused this; if it is back, something is short-circuiting\n"
+                        "    the land-area + nation-count derivation in population_generation.cpp.\n",
                         rows.front().pop_centres, static_cast<int>(rows.size()),
                         land_lo, land_hi, nat_lo, nat_hi);
         else
