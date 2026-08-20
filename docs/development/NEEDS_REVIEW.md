@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*123 entries — 80 open, 43 resolved.*
+*123 entries — 79 open, 44 resolved.*
 
 ---
 
@@ -872,21 +872,6 @@ A reach-based hegemon (trade lanes and dependency, few owned provinces) never tr
 
 *Files: `docs/lore/COLLAPSE.md`, `docs/lore/HISTORY.md`, `src/world/history_sim.hpp`*
 
-### NR-357 — Sequential four-allegory chain does not fit the shipped 400-year single-band run
-*observation · raised 2026-08-20 · from COLLAPSE.md design session, 2026-08-20 - Ben ruled all four allegories (Rome arc, devolution, dynastic cycle, systemic cascade) play out sequentially per generated world, as tuned attractors.*
-
-The shipped Era -1 sim runs ~400 years in one band, and the Sprint 26b doc-truth pass just corrected HISTORY.md/ERAS.md DOWN to that figure. Chaining four rise-and-culmination arcs sequentially implies re-extending the year count and/or band ladder.
-
-**Why it matters.** It reopens BL-320 (Era -1 sim perf) - though the restated /O2 figure (1.2-1.8s per world) suggests headroom - and partially reverses a doc correction made two days ago. The extension should be sized deliberately before Sprint 30 pins its inevitability rates, or the rates get pinned against a run length that is about to change.
-
-- A) Extend years (e.g. back toward the multi-band ladder) so arcs chain in real sim time.
-- B) Keep ~400 years but accelerate verb tempo so four arcs fit - cheaper, but compresses the 'long era' feel Ben named.
-- C) Chain probabilistically: worlds average 2-3 completed arcs of the four attractors, all four asserted only across the sweep, not per world.
-
-> **Recommendation:** Size A against the /O2 perf figure first; C is the honest fallback if A blows the generation budget, and still satisfies tuned-attractors.
-
-*Files: `docs/lore/COLLAPSE.md`, `docs/lore/HISTORY.md`, `src/world/history_sim.hpp`*
-
 ---
 
 ## Resolved
@@ -1347,4 +1332,21 @@ BL-449 gates the Corporation panel's stance column on BL-068 competitor-visibili
 > **RESOLVED.** RESOLVED 2026-08-19 (Ben): reading B — hostility toward the player stays silent and is discovered on contact, matching ordinary BL-068 visibility rather than announcing on the comms dock. Preserves the ambush property BL-458 (interdiction) relies on. BL-449 (stance surface) is unblocked to promote: the Corporation panel's stance column shows a hostile row only once the corp is otherwise discovered, same gate as every other BL-068-visible fact.
 
 *Files: `src/ui/corporation_panel.cpp`, `docs/ui/question_log.json`*
+
+### NR-357 — Sequential four-allegory chain does not fit the shipped 400-year single-band run
+*observation · raised 2026-08-20 · from COLLAPSE.md design session, 2026-08-20 - Ben ruled all four allegories (Rome arc, devolution, dynastic cycle, systemic cascade) play out sequentially per generated world, as tuned attractors.*
+
+The shipped Era -1 sim runs ~400 years in one band, and the Sprint 26b doc-truth pass just corrected HISTORY.md/ERAS.md DOWN to that figure. Chaining four rise-and-culmination arcs sequentially implies re-extending the year count and/or band ladder.
+
+**Why it matters.** It reopens BL-320 (Era -1 sim perf) - though the restated /O2 figure (1.2-1.8s per world) suggests headroom - and partially reverses a doc correction made two days ago. The extension should be sized deliberately before Sprint 30 pins its inevitability rates, or the rates get pinned against a run length that is about to change.
+
+- A) Extend years (e.g. back toward the multi-band ladder) so arcs chain in real sim time.
+- B) Keep ~400 years but accelerate verb tempo so four arcs fit - cheaper, but compresses the 'long era' feel Ben named.
+- C) Chain probabilistically: worlds average 2-3 completed arcs of the four attractors, all four asserted only across the sweep, not per world.
+
+> **Recommendation:** Size A against the /O2 perf figure first; C is the honest fallback if A blows the generation budget, and still satisfies tuned-attractors.
+
+> **RESOLVED.** Ben, 2026-08-20: the 400-year band was a placeholder; the aim is the 4000-year ladder (option A). Generating over 4000 years is acknowledged hard - the optimisation task is designed in COLLAPSE.md (section 'The 4000-year problem'): spatial index + incremental aggregates, event-driven quiet provinces, deterministic banded year grain, record-on-change; option C (2-3 arcs per world) retained as the honest fallback if the budget still misses.
+
+*Files: `docs/lore/COLLAPSE.md`, `docs/lore/HISTORY.md`, `src/world/history_sim.hpp`*
 

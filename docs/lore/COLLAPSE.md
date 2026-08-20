@@ -35,12 +35,12 @@ differently in their light.
 - **Tuned attractors, not templates.** One parameter space; the allegories are the outcomes
   the sweep asserts occur at stated, reported rates. Nothing seeds an arc directly; fully
   driven-not-narrated. This makes the § matrix the literal tuning target.
-- **All four play out sequentially per world.** The run is long enough to chain arcs — a
-  fragmentation whose Phoenix later devolves; a systemic cascade as one epoch among them.
-  **Consequence flagged (NR-357):** the shipped sim runs ~400 years in one band (the
-  Sprint 26b doc-truth pass corrected HISTORY.md *down* to that); chaining four arcs implies
-  re-extending the year count and/or the band ladder, which reopens BL-320 (Era −1 sim perf)
-  and the 4000-year framing the doc pass just retired. Needs sizing before Sprint 30 lands.
+- **All four play out sequentially per world, over 4000 years.** The run is long enough to
+  chain arcs — a fragmentation whose Phoenix later devolves; a systemic cascade as one epoch
+  among them. **Ruled 2026-08-20 (resolves NR-357):** the shipped ~400-year band *was a
+  placeholder*; the aim is the 4000-year ladder, and generating over it is acknowledged as a
+  hard problem — the optimisation task is considered **here** (§ The 4000-year problem), not
+  deferred to BL-320 (Era −1 sim perf) alone.
 - **The story surfaces in the history tab, quietly.** Telling the story is secondary to
   *seeing it in the game*; don't overload the player with easy-access information on
   everything the game does. The focus is playing — deep-dig is optional, for the players who
@@ -362,6 +362,52 @@ dead weight; a culmination that never fires is scope to cut.
 6. **A transformation path** — regime reset without map change (E4); cheapest first landing
    after E1.
 7. **(Deferred)** cohesion interdependence — E7's substrate; explicitly later.
+
+## The 4000-year problem — making the run affordable
+
+**The budget.** The sim runs inside world generation; its budget is the generating screen's
+wait (BL-317's constraint). The known numbers: ~2.1s for a 400-year run at ~749 provinces
+(BL-320, harness), 1.2–1.8s per world at /O2 (the 2026-08-18 re-measure) — and the critical
+profile fact from that re-measure: **cost tracks the province table, not the fighting** (a
+seed with fewer battles ran 3× longer). Naive 10× years is therefore not 10× cost — Settle
+keeps growing the table, so late years cost more than early ones. Unoptimised, expect tens
+of seconds of sim plus a recording cost BL-425 (ages lazy sim) already showed can dwarf it.
+
+**The shape of the fix — in priority order.** Each rung is independent; measure after each
+(BL-403's profiling harness is the instrument, per the BL-425/427 block note).
+
+1. **Kill the O(provinces) scans first (BL-320's own direction).** A cell → province
+   spatial index removes Settle's occupancy scan; per-polity holdings and aggregates
+   maintained incrementally on change, never rebuilt per year. This converts per-year cost
+   from O(provinces) toward O(changes) — the prerequisite for everything below.
+2. **Event-driven quiet provinces.** Most of 4000 years, most provinces do nothing. Give
+   stable interior provinces a fast path: they wake on events (border change, strain band
+   crossing, route loss), not per year. Deterministic — wake conditions are state-derived,
+   never time-sliced by wall clock.
+3. **Banded year grain.** The era's own premise (rulings, grain note) is that ages are
+   *long and quiet* punctuated by arcs. Simulate quiet bands at coarse grain (5–10 year
+   steps with scaled verb effects) and drop to yearly grain when any polity's strain, war
+   state, or culmination proximity crosses a band. The grain switch must be a **pure
+   function of sim state** — seeded, replayable, asserted by the determinism case (NEW-1) —
+   or it is a die roll wearing a timestep.
+4. **Record on change, at the reader's grain.** Sprint 31's playback and the history tab
+   scrub decades in practice (BL-425's own observation). Snapshot ownership on
+   `owner_changes` (already exists) and per-decade otherwise; narrated lines are events,
+   not per-year state. The BL-427 world-snapshot cache is the natural home for the memoised
+   record so `--verify` pays nothing.
+5. **Do not parallelise the sim.** Threading the polity loop trades a measured seconds
+   problem for a determinism problem the standing rules forbid. Single-threaded plus
+   algorithmic fixes is the whole toolbox.
+
+**What not to trade away.** BL-320's own rule stands: never fix by capping provinces —
+table growth *is* the history running longer. And BL-462's caution governs every number
+here: measure the shipped sim at /O2, not a harness divergence, before and after each rung.
+
+**Fit check.** Rungs 1–2 target the dominant cost (the table); rung 3 targets year count;
+rung 4 targets the recording half BL-425 measured as the real hang. If all four land and
+4000 years still misses the generation budget, the honest fallback is NR-357's option C —
+2–3 completed arcs per world, all four attractors asserted across the sweep — degrading
+density, never determinism or legibility.
 
 ## Open questions
 
