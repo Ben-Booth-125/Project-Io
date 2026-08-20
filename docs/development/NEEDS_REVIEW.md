@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*148 entries — 99 open, 49 resolved.*
+*153 entries — 102 open, 51 resolved.*
 
 ---
 
@@ -1012,6 +1012,21 @@ Both machines minted BL-476..482 and NR-356..362 independently. Local BL ids are
 
 **Why it matters.** Commit messages on both sides still cite pre-renumber ids (immutable); anything you remember as BL-476-the-strain-accumulator is now BL-504 (STRAIN_ACCUMULATOR), and the COLLAPSE decomposition is BL-483..496 + BL-504..510. next_id.js should now mint from BL-511 / NR-384.
 
+### NR-384 — Lane C could not start: BL-467 (battle state) needs BL-466 (province partition), which is unbuilt
+*observation · raised 2026-08-20 · from Four-lane batch refinement (Sprints 27/B2/B3/C3/D4), REFINED.md 2026-08-20.*
+
+BL-467 rules the PROVINCE as the engagement envelope (your 2026-08-19 elicitation, ruling 1), but src/world/province.{hpp,cpp} does not exist and BL-466 is still designed-not-built. Sprint C3 as written (battle store + trigger + losses) therefore has no envelope to draw. Refined as two sequential tasks, C1 = BL-466 alone as the foundation, C2 = BL-467 after C1 merges. This costs Lane C its parallelism inside the lane but not across lanes.
+
+### NR-387 — Deferred: Sprint D2 (research becomes a currency) wants a design pass, not an implementer
+*observation · raised 2026-08-20 · from Four-lane batch refinement (Sprints 27/B2/B3/C3/D4), REFINED.md 2026-08-20.*
+
+BL-478 (ancient research spend) is design-owed and the debit mechanism has no design. NR-315 records that condition_subject::science shipped as a LEVEL, picked by reading BL-344 shape rather than by choice - so the spend model is an open design question, not a build task. Held out of this batch. It is the natural next design session, and it gates the 92-object ancient_tech_ladder.json becoming reachable.
+
+### NR-388 — Six items are landed-awaiting a live GUI check and none can flip without one session at the app
+*observation · raised 2026-08-20 · from Four-lane batch refinement (Sprints 27/B2/B3/C3/D4), REFINED.md 2026-08-20.*
+
+BL-412 (live agent seam), BL-408 (spectator god view), BL-411 (strategy readout), BL-480 (law author read-only levy line), BL-429 (ancient roster), BL-453 (convoy ledger). The code is in the tree; every held requirement row is a LIVE check. Promoted as Lane M, main session, ahead of the four build lanes - it is the cheapest six flips on the board.
+
 ---
 
 ## Resolved
@@ -1538,4 +1553,18 @@ The shipped Era -1 sim runs ~400 years in one band, and the Sprint 26b doc-truth
 > **RESOLVED.** Ben, 2026-08-20: the 400-year band was a placeholder; the aim is the 4000-year ladder (option A). Generating over 4000 years is acknowledged hard - the optimisation task is designed in COLLAPSE.md (section 'The 4000-year problem'): spatial index + incremental aggregates, event-driven quiet provinces, deterministic banded year grain, record-on-change; option C (2-3 arcs per world) retained as the honest fallback if the budget still misses.
 
 *Files: `docs/lore/COLLAPSE.md`, `docs/lore/HISTORY.md`, `src/world/history_sim.hpp`*
+
+### NR-385 — Decision: BL-392 (procurement destroys value) built BEFORE the D4 tariff, in the same lane
+*decision taken on your behalf · raised 2026-08-20 · from Four-lane batch refinement (Sprints 27/B2/B3/C3/D4), REFINED.md 2026-08-20.*
+
+D4 adversarial finding 9 already says procurement must be fixed before anything else touches it, or not at all. The tariff is a money-flow change through the same budget seam, so I read that as binding here and ordered BL-392 first inside Lane D rather than filing it separately. Effect: Lane D is one agent doing conservation-then-tariff, and the lane-spanning requirement is conservation. If you would rather ship the tariff alone and leave BL-392 for v0.1.11 proper, say so and the lane splits.
+
+> **RESOLVED.** RULED 2026-08-20, Ben: keep BL-392 in Lane D ahead of the tariff, as refined. Noted at ruling time that BL-392 is three economics changes (buyer-body delivery, a contract price that differs from spot, supplier-derived lead time), not a conservation patch - so Lane D is two items and is the largest lane in the batch.
+
+### NR-386 — Decision: BL-463 (settlement count is seed-invariant) folded into Sprint B3 rather than left for v0.1.22
+*decision taken on your behalf · raised 2026-08-20 · from Four-lane batch refinement (Sprints 27/B2/B3/C3/D4), REFINED.md 2026-08-20.*
+
+B3 re-tunes clamp(tiles/1000,20,40) in population_generation.cpp; BL-463 says the resulting count does not vary with seed. Same file, same census harness, and a clamp fixed once for map size and again for seed-invariance is the same edit done twice if they are scheduled apart. Folded. Its v0.1.22 version goal now lands early - flag if that disturbs the version cut.
+
+> **RESOLVED.** RULED 2026-08-20, Ben: fold BL-463 into Lane B as refined. Its v0.1.22 version goal lands early. Basis: BL-463 own design names road_generation.cpp early-return-below-two-centres as a downstream effect of the clamp, which is the same cut Sprint B2 makes - one defect seen from two ends.
 

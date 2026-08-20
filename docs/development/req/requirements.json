@@ -4570,6 +4570,144 @@
      "result_metric": "PARTIAL: checkbox + pending_law_toggle + executor + dictionary entry all removed (verifier-review: no orphan); ledger Laws section browse-only by code. The live look at the read-only levy line is Ben's. NOTE: the seeded 1.0/unit rate is a placeholder now biting — NR-382 holds the rate ruling; ai_skill bands left red-and-attributed, deliberately unblessed."
     }
    ]
+  },
+  {
+   "brief": "era-minus1-conquest-assertion",
+   "batch": "2026-08-20-four-lane",
+   "title": "BL-384 - conquest assertion half (Sprint 27)",
+   "status": "pending",
+   "promoted_from": "backlog.json BL-384 ERA_MINUS1_SIM_CONQUERS_NOTHING",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING (headless): history_sim_harness asserts a nonzero conquest count over the standard seed set, and reports elimination and dominance-share counters alongside it. The assertion is EXPECTED RED against today build - a red result is the requirement met, not failed.",
+     "result_metric": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "The measured conquest, elimination and dominance numbers are recorded verbatim as the Sprint 28 baseline. No constant, seed or scorer term is changed to move them.",
+     "result_metric": null
+    }
+   ]
+  },
+  {
+   "brief": "road-network-cuts",
+   "batch": "2026-08-20-four-lane",
+   "title": "Sprint B2 - the three road_generation cuts",
+   "status": "pending",
+   "promoted_from": "sprints.json B2 (road_generation.cpp:65,:90,:195)",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING (headless): every nation with at least one population centre participates in road generation - the <2-centre early return no longer silently drops nations. Count of road-less nations reported before and after.",
+     "result_metric": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "A road may cross water and cross-water adjacency is honoured, so a coastal or island nation is reachable. Generation stays deterministic: same seed, same road set, verified by state_hash over two runs.",
+     "result_metric": null
+    }
+   ]
+  },
+  {
+   "brief": "settlement-density-clamp",
+   "batch": "2026-08-20-four-lane",
+   "title": "Sprint B3 + BL-463 - density clamp against the current map",
+   "status": "pending",
+   "promoted_from": "sprints.json B3; backlog.json BL-463 SETTLEMENT_COUNT_IS_SEED_INVARIANT",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING (headless): substrate_census reports settlement counts scaled to the 312x145 map rather than the 180x84-era clamp(tiles/1000,20,40). Before/after counts recorded.",
+     "result_metric": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "BL-463: settlement count VARIES with seed across the census seed set - the count is no longer seed-invariant - while remaining deterministic per seed (same seed, same count, two runs).",
+     "result_metric": null
+    }
+   ]
+  },
+  {
+   "brief": "province-partition",
+   "batch": "2026-08-20-four-lane",
+   "title": "BL-466 - province partition (Lane C foundation)",
+   "status": "pending",
+   "promoted_from": "backlog.json BL-466 PROVINCE_PARTITION",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING (headless): every land tile belongs to exactly one province; provinces carry stable sorted ids; the partition is identical across two runs of the same seed.",
+     "result_metric": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "Serialisation seam: the province record is appended, no existing record reordered; a save written before this item still loads, and a round-trip is bit-identical.",
+     "result_metric": null
+    }
+   ]
+  },
+  {
+   "brief": "battle-state-in-world",
+   "batch": "2026-08-20-four-lane",
+   "title": "BL-467 + BL-315 remainder - battle state, trigger, losses",
+   "status": "pending",
+   "promoted_from": "backlog.json BL-467 BATTLE_STATE_IN_WORLD",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING (headless): two corps with units in one province and a directed hostile stance OPEN a battle; rounds resolve; losses land on unit_component. A resolver result is now read by production code.",
+     "result_metric": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "Order independence: battle discovery walks provinces in sorted (province id, corp-pair) order, and a corp pair holds at most one battle per province. Same seed, same battles, same losses over two runs.",
+     "result_metric": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "Nothing crosses a tick boundary but the record itself - the per-round trace is retained for the battle span and discarded at end. No stance is acquired ambiently; hostility stays a declared state.",
+     "result_metric": null
+    }
+   ]
+  },
+  {
+   "brief": "tariff-and-money-conservation",
+   "batch": "2026-08-20-four-lane",
+   "title": "BL-392 then Sprint D4 - procurement conservation + the tariff",
+   "status": "pending",
+   "promoted_from": "backlog.json BL-392 PROCUREMENT_CONTRACTS_DESTROY_VALUE; sprints.json D4",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING (headless): MONEY AND GOODS ARE CONSERVED across procurement. No contract credits goods with no supplier, and no tick debits a buyer without an equal credit somewhere. Asserted over an 8-tick span.",
+     "result_metric": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "A cross-border sale debits the buyer by the tariff and credits the ENACTING NATION treasury by the same amount, to the credit. A same-nation sale is charged nothing.",
+     "result_metric": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "The tariff rate comes from the nation own law (BL-480 author field), not a constant. With no tariff law enacted, the world is bit-identical to a pre-item baseline (state_hash).",
+     "result_metric": null
+    }
+   ]
   }
  ]
 }

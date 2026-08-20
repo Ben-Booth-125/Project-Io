@@ -731,8 +731,8 @@
   {
    "id": "B2",
    "theme": "Roads that reach, ports that mean something",
-   "state": "proposed",
-   "opened_date": null,
+   "state": "open",
+   "opened_date": "2026-08-20",
    "closed_date": null,
    "goal": "The three structural cuts in road_generation.cpp: nations with fewer than two centres, water crossing, and cross-water adjacency. Then BL-188 (coastal ports) un-parked. (Lane B.)",
    "planned": [
@@ -740,13 +740,13 @@
     "water crossing / cross-water adjacency (road_generation.cpp:65,:195)",
     "BL-188 (coastal ports) — sea is currently priced BACKWARDS against its own settled design, and one ocean tile prices the whole route"
    ],
-   "notes": "Proposed, not opened. Part of Lane B — the civilised world, which runs from day one and shares no file with Lane A except settlement.cpp."
+   "notes": "Proposed, not opened. Part of Lane B — the civilised world, which runs from day one and shares no file with Lane A except settlement.cpp. OPENED 2026-08-20 as part of the four-lane batch (REFINED.md)."
   },
   {
    "id": "B3",
    "theme": "Density, and corporations stop all being the same thing",
-   "state": "proposed",
-   "opened_date": null,
+   "state": "open",
+   "opened_date": "2026-08-20",
    "closed_date": null,
    "goal": "The population-centre clamp is still clamp(tiles/1000, 20, 40) from the 180×84 era, against a 312×145 map. (Lane B.)",
    "planned": [
@@ -754,7 +754,7 @@
     "BL-374 (corp density target) unblocked by replacing the per-BODY firm cap with a per-NATION bound",
     "NEW-11: a corporation KIND axis orthogonal to industrial_focus — Ben's 'not every corporation is a militia', currently inverted in code since every rival converges on a military base and only the player is seeded with one"
    ],
-   "notes": "Proposed, not opened. Part of Lane B — the civilised world."
+   "notes": "Proposed, not opened. Part of Lane B — the civilised world. OPENED 2026-08-20 as part of the four-lane batch (REFINED.md)."
   },
   {
    "id": "C2",
@@ -772,15 +772,15 @@
   {
    "id": "C3",
    "theme": "The engagement trigger, and the fight you can watch",
-   "state": "proposed",
-   "opened_date": null,
+   "state": "open",
+   "opened_date": "2026-08-20",
    "closed_date": null,
    "goal": "BL-315 (armed house conflict spine)'s actual remainder — a world-side battle store, the trigger, and losses applied to unit_component. Both resolvers currently return results NOTHING READS.",
    "planned": [
     "BL-315's remainder: world-side battle store, engagement trigger, losses applied to unit_component",
     "Rider: turn the upkeep rates off zero and measure the movement — what BL-458 (supply lines cannot be cut) has been waiting on"
    ],
-   "notes": "Proposed, not opened. Part of Lane C — force and stance."
+   "notes": "Proposed, not opened. Part of Lane C — force and stance. OPENED 2026-08-20 as part of the four-lane batch (REFINED.md)."
   },
   {
    "id": "D1",
@@ -826,8 +826,8 @@
   {
    "id": "D4",
    "theme": "The border costs something (the international half)",
-   "state": "proposed",
-   "opened_date": null,
+   "state": "open",
+   "opened_date": "2026-08-20",
    "closed_date": null,
    "goal": "The clause of Ben's brief nothing else owns. market_component.centre_tile already resolves through w.tile_to_nation to a nation, so the hook exists and is unused. Give a market a nation, give a nation a tariff rate set by its own law, and make a cross-border sale debit the buyer and CREDIT THE ENACTING NATION'S TREASURY. (Lane D.)",
    "planned": [
@@ -835,7 +835,7 @@
     "A tariff rate set by the nation's own law",
     "Cross-border sale debits buyer, credits the enacting nation's treasury"
    ],
-   "notes": "Proposed, not opened. Depends on D3 for the treasury and on Lane B's route work for the lane a good crosses. This is the first flow in the game where money moves between two named actors rather than appearing or vanishing — what makes 'international trade' a mechanic rather than a description. Per adversarial-pass finding 9: if Lane D touches procurement, BL-392 (procurement debits the buyer per tick and credits goods with NO SUPPLIER, minting goods and destroying money) must be added/fixed BEFORE BL-445, or not at all."
+   "notes": "Proposed, not opened. Depends on D3 for the treasury and on Lane B's route work for the lane a good crosses. This is the first flow in the game where money moves between two named actors rather than appearing or vanishing — what makes 'international trade' a mechanic rather than a description. Per adversarial-pass finding 9: if Lane D touches procurement, BL-392 (procurement debits the buyer per tick and credits goods with NO SUPPLIER, minting goods and destroying money) must be added/fixed BEFORE BL-445, or not at all. OPENED 2026-08-20 as part of the four-lane batch (REFINED.md)."
   }
  ],
  "status_table": [
