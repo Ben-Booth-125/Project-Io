@@ -82,12 +82,6 @@ struct law
     std::string     id;      ///< Stable identifier, e.g. "LAW-EXTRACTION-LEVY".
     std::string     name;    ///< Display name for the budget ledger and the laws surface.
 
-    /// WHO ENACTED IT. Null for the prototype's corp-facing laws, which have no
-    /// author because they had nowhere to send their proceeds. An `import_tariff`
-    /// REQUIRES one: the author is both the jurisdiction whose market the duty
-    /// applies in and the treasury it is paid into, so a tariff with a null
-    /// author is inert by construction rather than by a special case.
-    entity_id       author_nation = null_entity;
     condition_set   conditions;                                ///< Empty = always-on once enacted.
     law_effect_kind effect  = law_effect_kind::extraction_levy;
     bool            enacted = false;
@@ -95,6 +89,12 @@ struct law
     /// BL-480: the nation that enacted this law. Never null on a well-formed
     /// record; the levy is a TRANSFER into this nation's treasury, and its
     /// jurisdiction (the tiles it owns) bounds who pays.
+    ///
+    /// An `import_tariff` (D4) reads the SAME field, deliberately: the author is
+    /// both the jurisdiction whose market the duty applies in and the treasury it
+    /// is paid into, so a tariff whose author is null is inert by construction
+    /// rather than by a special case. A second author field was briefly carried
+    /// here by the D4 branch and removed at integration — one law, one author.
     entity_id enacting_nation = null_entity;
 
     /// Effect magnitude, read per family. For `extraction_levy`: credits charged

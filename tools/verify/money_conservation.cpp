@@ -373,7 +373,7 @@ int main()
         world& w = f.w;
         // A tariff law exists but is NOT enacted — the shipped default.
         law l; l.id = "LAW-IMPORT-TARIFF"; l.name = "Import tariff";
-        l.effect = law_effect_kind::import_tariff; l.author_nation = f.supplier_nat;
+        l.effect = law_effect_kind::import_tariff; l.enacting_nation = f.supplier_nat;
         l.rate = 0.10f; l.enacted = false;
         w.laws.push_back(l);
 
@@ -413,7 +413,7 @@ int main()
 
         // The SUPPLIER's nation levies 10% on imports into its own market.
         law l; l.id = "LAW-IMPORT-TARIFF"; l.name = "Import tariff";
-        l.effect = law_effect_kind::import_tariff; l.author_nation = f.supplier_nat;
+        l.effect = law_effect_kind::import_tariff; l.enacting_nation = f.supplier_nat;
         l.rate = 0.10f; l.enacted = true;
         w.laws.push_back(l);
 
@@ -472,7 +472,7 @@ int main()
         {
             recipe_registry creg;
             fixture c = build_fixture(creg);
-            law dl = l; dl.author_nation = c.supplier_nat; c.w.laws.push_back(dl);
+            law dl = l; dl.enacting_nation = c.supplier_nat; c.w.laws.push_back(dl);
             c.w.corporations[c.buyer].home_nation = c.supplier_nat; // now a domestic buyer
             c.w.pool_for(c.supplier, c.supplier_body).quantities[ri(resource_type::iron_ore)] += 200.0f;
             post_pair(c.w, c.supplier, c.buyer, c.supplier_body, resource_type::iron_ore, qty, ask);
@@ -490,7 +490,7 @@ int main()
         fixture f = build_fixture(reg);
         world& w = f.w;
         law l; l.id = "LAW-IMPORT-TARIFF"; l.name = "Import tariff";
-        l.effect = law_effect_kind::import_tariff; l.author_nation = f.supplier_nat;
+        l.effect = law_effect_kind::import_tariff; l.enacting_nation = f.supplier_nat;
         l.rate = 0.10f; l.enacted = true;
         w.laws.push_back(l);
 

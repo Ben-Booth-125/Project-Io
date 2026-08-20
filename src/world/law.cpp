@@ -53,6 +53,14 @@ law_effects evaluate_laws(const world& w, entity_id subject_corp)
                 fx.any = true;
                 break;
             }
+
+            case law_effect_kind::import_tariff:
+                // Jurisdiction-grain, not corp-grain: a tariff is charged in the
+                // clearing tick against the market's nation (nation_tariff_rate),
+                // so it contributes nothing to a per-corp effects bundle. Handled
+                // explicitly rather than by a default, so adding a law family
+                // forces a decision here instead of silently falling through.
+                break;
         }
     }
     return fx;
@@ -142,7 +150,7 @@ float nation_tariff_rate(const world& w, entity_id nation, resource_type resourc
     {
         if (!l.enacted || l.effect != law_effect_kind::import_tariff)
             continue;
-        if (l.author_nation != nation)
+        if (l.enacting_nation != nation)
             continue;
         if (l.scope_resource != law::all_resources &&
             l.scope_resource != static_cast<int>(resource))
