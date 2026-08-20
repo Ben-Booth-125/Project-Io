@@ -2588,6 +2588,24 @@
    "what": "Full CTest on the integrated tree: 95% pass, 5 failures. Two are resolved - world_audit (NR-403) and debt_decomposition, which is a MEASUREMENT-ONLY harness that exits 0 standalone and timed out only under suite load (the NR-402 exposure, now demonstrated rather than predicted). The three that remain are ai_skill_harness (Timeout), spectator_determinism (Failed) and tier_margin (Failed); two independent agents each stashed their work, rebuilt on the untouched base and reproduced all three identically, so none is this batch. spectator_determinism deserves its own attention: its pinned golden 3CBAD1D44EE71EDE is stale, and the two agents measured DIFFERENT clean-base hashes for it (3CC37947C8662F71 and 2ABF4700B2DF9251), which is either two different build configurations or a determinism leak in the thing whose entire job is asserting determinism. Worth one deliberate look before it is re-blessed - and it must not be re-blessed without that look.",
    "resolved": "2026-08-21",
    "resolution": "RESOLVED 2026-08-21 (Lane 0). No determinism leak. spectator_determinism run on the integrated tree: played=344A9FE48306E93A twice, two INDEPENDENTLY BUILT worlds, same seed - the reproducibility row passes. The only failure was the byte-identity row against a golden pinned on 2026-08-14. The two different clean-base hashes the agents reported resolve as each having measured a differently-generated world, not a fault. Re-blessed to 344A9FE48306E93A per the harness own documented convention (bless on a deliberate world change, after confirming the move is intended and reproducible), with a provenance entry naming all four changes responsible: BL-463 settlement density, Sprint B2 road cuts, BL-466 provinces, and the two-level firm budget. ALL PASS (0 failures). The other three suite failures - ai_skill_harness timeout, tier_margin - are untouched by this and remain open."
+  },
+  {
+   "id": "NR-405",
+   "title": "RULING: unit position moves to province grain, overturning the 2026-08-13 tile-token ruling",
+   "raised": "2026-08-21",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-511 design form, Ben 2026-08-21.",
+   "what": "Recorded because it is the third dated position on the same question and the previous two are still quoted in authority docs. 2026-08-13 (BL-315 ruling 2): units are tokens on the TILE map, explicitly not armies at province grain. 2026-08-19 (BL-467): grains SPLIT - command at the tile, engagement at the province. 2026-08-21 (this): units move and are selected at PROVINCE grain, collapsing that split. It is a simplification - BL-467 engagement rule no longer needs a tile-to-province reduction because a unit position IS a province - and the ~4-tile province keeps it modest. Costs, all named in BL-511: march_unit payload changes tile -> province (BL-470 landed that verb 2026-08-19), unit_component is tile-canonical in MILITARY.md, and BL-471/BL-469 should follow the render change rather than precede it. MILITARY.md and BL-315 still assert the OLD ruling and must be corrected as part of landing the work, not ahead of it (authority time-slice)."
+  },
+  {
+   "id": "NR-406",
+   "title": "The province building limit would be the first ceiling in the game that MOVES during play",
+   "raised": "2026-08-21",
+   "kind": "question",
+   "status": "open",
+   "source": "BL-513 design, from Ben four-input heuristic.",
+   "what": "Ben named infrastructure as one of the four inputs to the province building limit (area, infrastructure, habitability, population). Roads and hubs are built during play, so the ceiling would RISE as a player invests - unlike the per-tile deposit cap and every other placement bound, all fixed at generation. That coupling looks intended and desirable (BL-325 ruling 3 makes economic reach and military reach one field, so infrastructure paying off into capacity is consistent), but it is worth an explicit yes: a dynamic ceiling means a building can become legal later, and any UI that shows remaining capacity has to recompute rather than cache. If it should instead be read once at generation, that is a smaller item."
   }
  ]
 }

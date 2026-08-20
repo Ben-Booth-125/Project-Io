@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*169 entries — 116 open, 53 resolved.*
+*171 entries — 118 open, 53 resolved.*
 
 ---
 
@@ -1096,6 +1096,16 @@ The CMake GLOB registers tools/verify/*.cpp automatically, so this batch six new
 *decision taken on your behalf · raised 2026-08-20 · from Full CTest suite over the integrated four-lane batch, 2026-08-20 (96 tests, 1474s).*
 
 B4 R1 failed on the integrated tree and passed in every agent worktree, because BL-476 (ce0e5cc) landed after their common base and seeds a military_base into EVERY corp assets. holdings_range governs ECONOMIC holdings and never counted that base, so the audit was comparing against a ceiling one too low for every corp - it only reds when a draw lands at the top of its range, and this batch settlement-density change made one do so. Two ways to fix: raise every ceiling by 1, or stop counting the base. I took the second, because the first would hide a real +1 and would make the audit assert something holdings_range does not promise. Verified: every corp drops by exactly one and all sit inside the declared ranges. If you would rather the audit tracked TOTAL footprint including military, say so and it inverts. Note the file own comment now records this as the FOURTH drift of a hand-mirrored table - the pattern, not this instance, is the thing worth fixing.
+
+### NR-405 — RULING: unit position moves to province grain, overturning the 2026-08-13 tile-token ruling
+*decision taken on your behalf · raised 2026-08-21 · from BL-511 design form, Ben 2026-08-21.*
+
+Recorded because it is the third dated position on the same question and the previous two are still quoted in authority docs. 2026-08-13 (BL-315 ruling 2): units are tokens on the TILE map, explicitly not armies at province grain. 2026-08-19 (BL-467): grains SPLIT - command at the tile, engagement at the province. 2026-08-21 (this): units move and are selected at PROVINCE grain, collapsing that split. It is a simplification - BL-467 engagement rule no longer needs a tile-to-province reduction because a unit position IS a province - and the ~4-tile province keeps it modest. Costs, all named in BL-511: march_unit payload changes tile -> province (BL-470 landed that verb 2026-08-19), unit_component is tile-canonical in MILITARY.md, and BL-471/BL-469 should follow the render change rather than precede it. MILITARY.md and BL-315 still assert the OLD ruling and must be corrected as part of landing the work, not ahead of it (authority time-slice).
+
+### NR-406 — The province building limit would be the first ceiling in the game that MOVES during play
+*question · raised 2026-08-21 · from BL-513 design, from Ben four-input heuristic.*
+
+Ben named infrastructure as one of the four inputs to the province building limit (area, infrastructure, habitability, population). Roads and hubs are built during play, so the ceiling would RISE as a player invests - unlike the per-tile deposit cap and every other placement bound, all fixed at generation. That coupling looks intended and desirable (BL-325 ruling 3 makes economic reach and military reach one field, so infrastructure paying off into capacity is consistent), but it is worth an explicit yes: a dynamic ceiling means a building can become legal later, and any UI that shows remaining capacity has to recompute rather than cache. If it should instead be read once at generation, that is a smaller item.
 
 ---
 
