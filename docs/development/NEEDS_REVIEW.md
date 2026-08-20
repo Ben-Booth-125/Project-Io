@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*124 entries — 76 open, 48 resolved.*
+*125 entries — 77 open, 48 resolved.*
 
 ---
 
@@ -844,6 +844,17 @@ spacecraft_components, propellant, clean_water, consumer_goods and medical_suppl
 Merge 0677f7a (branch claude/ecstatic-hofstadter-80f1d6, a July-era branch carrying the pre-rollover DEVLOG) re-imported 81 already-archived sessions into DEVLOG.md, splicing headings onto other sessions' bodies - a June 2026 heading carried the BL-429 slice 3 verification tail, and slice 3 itself was truncated. Rebuilt DEVLOG.md as: the last clean pre-merge state (commit 0936400, 66 sessions, slice 3 whole) + the COLLAPSE session on top; the one genuinely new session from the old branch (Lens-cycle fix, 2026-07-31) moved to archive/DEVLOG-2026.md at its chronological slot; index regenerated to 171 rows. A paragraph-level diff against the corrupted file confirmed nothing unique was lost - every dropped paragraph exists in the archive or in the restored (fuller) session bodies.
 
 **Why it matters.** This deleted ~4,200 lines from DEVLOG.md on your behalf. The verification was mechanical (heading-set and paragraph-set containment checks, both scripted in-session), but the rebuild picked commit 0936400 as 'last clean' by heading-count archaeology, and you should know the repair happened in case any session prose you remember reads differently now. The structural cause - a stale long-lived branch merged after the rollover - can recur; the devlog_index tool could cheaply assert 'no live session heading also exists in an archive volume' and turn this failure into a lint.
+
+### NR-360 — Session-delegation roles carved as economy / ui / generation; router left unthinned
+*decision taken on your behalf · raised 2026-08-20 · from BL-497 (session delegation roles), Ben's 2026-08-20 ask to prompt sessions differently as the corpus outgrew one context.*
+
+Carved three implementer roles (economy-dev, ui-dev, generation-dev) matching the repo's natural vertical slices, plus directory CLAUDE.md files for src/world and src/ui only. Chosen on Claude's judgement: military/AI work routes through economy-dev or generation-dev briefs for now rather than owning a fourth role, and the root CLAUDE.md router was left as-is.
+
+**Why it matters.** Role boundaries shape which invariants a cold agent sees. If military/mil-sim work grows (Sprint 26-33 direction), a dedicated military-dev role and a docs/lore scoped file may earn their place. Thinning the root router (its entries have drifted toward design prose) is a separate, larger call left for Ben.
+
+- A) Accept the three-role carve; add roles only when a slice recurs.
+- B) Add military-dev now, ahead of the Lane C engagement work.
+- C) Also schedule a root-router thinning pass (entries become one-liners, prose pushed to the owned docs).
 
 ---
 

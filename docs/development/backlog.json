@@ -11587,6 +11587,32 @@
    "authority_doc": "docs/military/MILITARY.md",
    "summary": "Ben's ruling on NR-321 (2026-08-20): the ordnance (and food_rations) upkeep rates ride Lane C's engagement trigger - the first real draw coincides with combat that spends it, one golden re-bless instead of two. Until then rate 0.0 is a deliberate, dated state, not an oversight; this item is the tripwire so it is not forgotten.",
    "design": "When the engagement trigger lands: pick small nonzero rates, run the BL-454 checks (N units debit exactly N x rate, empty pool decays at the authored scalar), measure how far rival balances move, re-bless the economy goldens. Makes BL-457's admission argument (ordnance has a consumer) true at runtime, which chain_depth's exemption currently asserts only structurally."
+  },
+  {
+   "id": "BL-497",
+   "short_name": "SESSION_DELEGATION_ROLES",
+   "category": "Documentation",
+   "title": "Delegate the corpus: saved agent roles and directory-scoped instruction files",
+   "status": "complete",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 1,
+   "parked": false,
+   "requires": [],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    ".claude/agents/economy-dev.md",
+    ".claude/agents/ui-dev.md",
+    ".claude/agents/generation-dev.md",
+    "src/world/CLAUDE.md",
+    "src/ui/CLAUDE.md",
+    "docs/development/DELIVERY.md"
+   ],
+   "authority_doc": "docs/development/DELIVERY.md",
+   "summary": "Ben's ask (2026-08-20): the corpus (~650K tokens) is too large for one session to consume, so sessions should be prompted differently by role. Saves the recurring worktree sub-agent roles as .claude/agents/ definitions (economy-dev, ui-dev, generation-dev - joining code-reviewer) and adds directory-scoped CLAUDE.md files for src/world and src/ui, each a pointer set into the authority docs plus the always-on invariants for that layer.",
+   "design": "Three principles, all pointer-not-copy: (1) a role definition carries its reading list, invariants and commit discipline so a spawn needs only the task brief; (2) a directory CLAUDE.md loads automatically and carries only what every session in that directory needs - the root CLAUDE.md stays the router; (3) prose never duplicates an authority doc, it cites one, so drift cannot fork the design. Deliberately NOT done: thinning the root router (larger, separate call) and a doc-steward role (bookkeeping stays in the main session per DELIVERY.md). Landed same-session; DELIVERY.md § Sub-agents gained the pointer paragraph."
   }
  ]
 }
