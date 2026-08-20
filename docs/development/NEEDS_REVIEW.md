@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*154 entries — 103 open, 51 resolved.*
+*157 entries — 106 open, 51 resolved.*
 
 ---
 
@@ -1031,6 +1031,21 @@ BL-412 (live agent seam), BL-408 (spectator god view), BL-411 (strategy readout)
 *observation · raised 2026-08-20 · from Lane M live check, four-lane batch. Build ce7e9f7, fresh build_app.bat run.*
 
 The god-view checkbox renders only while corp_ai_params::spectating is set (ACTIONS.json chrome.sysmenu_god_view: "unreachable in a played session"). The ONLY writer of ui_state.spectating in the whole tree is verify_api.cpp:656, the Lua binding verify.spectate(on). There is no menu item, no checkbox, no CLI flag (main.cpp parses --bless, --export-blackboard, --serve, --verify, --verify-all - no --spectate). So BL-408 cannot be live-checked, and more to the point a player or a watcher cannot enter spectate mode at all outside a verify script. This is exactly the gap the 2026-08-19 live-check rule was written for: the code compiles, the harness is green, and the press does not exist. Needs a decision - either an entry point (a CLI flag and/or a main-menu option) is in BL-408 scope and was missed, or spectate is deliberately harness-only for now and BL-408 requirement rows should say so rather than claiming a surface.
+
+### NR-390 — kMaxCrossingTiles = 3 is an unpinned number, and cut 2 REMOVES roads as well as adding them
+*decision taken on your behalf · raised 2026-08-20 · from Lane B1 (Sprint B2, road cuts), agent report + main-session diff review, merged at 530eb87.*
+
+The agent chose kMaxCrossingTiles = 3 with no doc pinning it. It governs two things at once: what counts as a strait worth stamping shore-to-shore, and how wide an unowned gap territorial adjacency tolerates. Consequence worth seeing: cut 2 does not only add reach, it DELETES road that used to generate - an edge whose route crosses open ocean is now not stamped at all, which removed 6 Tracks on the home body (234 -> 228) that were disconnected fragments on distant shores. That is a deliberate reading (fragmented shores are noise, not reach) and it is defensible, but it is a design call taken on your behalf. The larger call NOT taken: making roads bridge straits by stamping the water tiles themselves, so the corridor is continuous for the logistics A*. That would overturn the stated roads-are-a-land-feature invariant and collides with BL-188 (coastal ports).
+
+### NR-391 — The 26-of-43 road-less nation figure did not reproduce - two different definitions were in play
+*observation · raised 2026-08-20 · from Lane B1 (Sprint B2, road cuts), agent report + main-session diff review, merged at 530eb87.*
+
+BL-463 design cites 26 of 43 nations with no road network on seed 0. The new road_reach_census measures 14 road-less of 161 nations across the 8-seed set (8.7%), seed 0 contributing 2. The agent believes the older figure counted nations with no intra-nation road EDGE (which includes every single-centre nation whether or not a border link roads it), where the census counts nations with no roaded TILE in territory. Both are defensible; only one is now instrumented and inspectable. Worth ruling which definition the civilised-world argument should be tracked against, because the two differ by nearly 2x and one of them is quoted in a priority-A item.
+
+### NR-392 — novel-work: a worktree agent had no sanctioned way to build a harness, so it authored build_gen_harness.bat
+*novel-work · raised 2026-08-20 · from Lane B1 (Sprint B2, road cuts), agent report + main-session diff review, merged at 530eb87.*
+
+Nothing in the reading list owns the question how does a worktree agent build a harness. A fresh worktree has no configured build tree and a CMake configure pulls SDL + Lua over FetchContent, which is not worth paying for one harness. The agent wrote build_gen_harness.bat at the repo root: it globs srcworld*.cpp minus the four sol2 TUs exactly as io_world_obj does, so unlike the README hand-written cl recipes it cannot drift stale - which is the standing complaint against those recipes. Merged with the lane. Two things owed and both need your permission: folding this into the verifier-headless skill, and naming road_reach_census there so it becomes a permanent asset rather than a loose tool.
 
 ---
 
