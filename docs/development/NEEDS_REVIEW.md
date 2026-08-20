@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*123 entries — 79 open, 44 resolved.*
+*123 entries — 75 open, 48 resolved.*
 
 ---
 
@@ -657,13 +657,6 @@ Three sub-agents were launched with isolation: worktree AFTER three commits had 
 
 **Why it matters.** This is verbatim the v0.1.9 batch failure the Sprint 17 retro recorded - 'three of five agents branched from a base that had already moved, and worktrees isolate WRITES, not HISTORY' - and the mitigation recorded then (integration reads every hunk) is a cure, not a prevention. The prevention is to state the base explicitly at launch or to have agents merge the working branch as their first act. Neither happened here because the worktree base is chosen by the harness, not by the brief, and nothing in the launch surface reports which commit it picked. Two agents were mid-flight when it was caught; both were told to merge the working branch before continuing.
 
-### NR-317 — A held convoy is free forever - cargo can be parked outside the economy indefinitely
-*question · raised 2026-08-17 · from Sprint 25a, BL-452 (logistics has no verb). Raised by the implementing agent, which could not file it itself.*
-
-hold_convoy stops a convoy advancing and it then costs nothing. Nothing charges upkeep on held cargo, nothing forces resolution, and nothing expires the hold. The goods are in neither a corp pool nor on a market shelf, so they are invisible to the price signal while held. A player can therefore withdraw stock from the market indefinitely at zero cost - and so, once BL-446 lands, can a rival scorer.
-
-**Why it matters.** It is exploit-shaped rather than a bug: every individual behaviour is correct, and the gap is that holding has no price. It also interacts with BL-422 (held sell orders stay visible to the price signal) which settled the OPPOSITE convention for the order book - held stock there remains visible deliberately, so scarcity is not gameable. A held convoy is the same question answered the other way, by omission rather than by decision.
-
 ### NR-318 — hold_convoy names its convoy through cmd.order, not cmd.subject - convoys are not entities
 *decision taken on your behalf · raised 2026-08-17 · from Sprint 25a, BL-452. The brief said subject; the agent deviated and said so.*
 
@@ -677,13 +670,6 @@ The brief specified subject = the convoy. The agent found that convoys are not e
 The R2 byte-identity row fails on the merged branch. The implementing agent reported two candidate causes together - the ordnance resource append, and the golden being MSVC-derived. Building the harness at three points under g++ separates them. At 4f3c4d8 (before any of this work): observed 9744431472DE5755, already FAILING against golden 855E07DE529684EC. At 44166a4 (ordnance only): observed CCF93A83903B6B45. At 9644eaa (ordnance + the military_points deletion): observed CCF93A83903B6B45, UNCHANGED.
 
 **Why it matters.** Three separate facts fall out, and the conflated version supports none of them. (1) The golden cannot pass under g++ at any commit - it is toolchain-specific, so this row is permanently red in any Linux/cloud session and its redness carries no signal there. (2) The ordnance append DID move the hash, so a Windows re-bless is genuinely owed and is not merely a toolchain artefact. (3) Deleting corporation_component::military_points moved it NOT AT ALL, which says state_hash does not walk that field but does walk the per-resource arrays. Without the three-point measurement, (3) would have been assumed either way.
-
-### NR-321 — Ordnance's upkeep rate ships at 0.0, so nothing consumes it at runtime and BL-457's admission argument is not yet true in play
-*question · raised 2026-08-18 · from Sprint 25a, integrating BL-454. The implementing agent flagged the tension rather than resolving it silently.*
-
-BL-454's goods draw ships with every rate at ZERO - my instruction, so the item lands inert and no economy golden moves on landing. The agent followed it and named the consequence: ordnance and food_rations are NAMED in economy.lua's unit_upkeep table at 0.0, so the machinery is wired end to end but nothing actually draws a unit of ordnance until one number changes. chain_depth's R1 exemption says ordnance's consumer is 'BL-454 unit upkeep draw (per-tick, per unit)'. That is true STRUCTURALLY - the pass exists, resolves the vector and would debit - and false at RUNTIME today.
-
-**Why it matters.** BL-457's whole admission argument was that ordnance satisfies PRODUCTION.md's rule because BL-454 consumes it, and NR-257 deleted five resources for failing exactly that test. At rate zero, ordnance is produced-by-a-recipe and consumed-by-nobody-in-practice - the same shape, one layer subtler, and the guard cannot see it because an exemption table is a static string list. It is not a defect to fix by weakening the guard; it is a live number waiting for a decision. Worth stating plainly since I claimed the consumer in BL-457's commit message.
 
 ### NR-322 — Unit quality is DERIVED from the roster row power_mod, not authored as a second column
 *decision taken on your behalf · raised 2026-08-18 · from Sprint 25a, BL-459. Agent judgement call, flagged for overturning.*
@@ -751,11 +737,6 @@ world_determinism's existing digest is world_metrics, a tile-and-count digest. T
 *observation · raised 2026-08-18 · from Sprint B1 substrate census agent, 2026-08-18. Verified, not assumed: seed_sweep_probe prints firms=0.*
 
 CMakeLists' generic glob target for tools/verify/*.cpp links io_world_obj only, which excludes the sol2 translation units. generate_background_firms sizes itself against economy.lua's population_demand and background_demand baskets, and those are all-zero on a default registry with no Lua loaded — so it places zero firms. A census built on the generic target would have described a world nobody plays. The agent added an explicit live-Lua target for substrate_census, mirroring chain_depth, tier_margin and haulage_measure.
-
-### NR-343 — Confirm LP is a per-tick RATE, not a stock - the one load-bearing claim with no file:line
-*question · raised 2026-08-18 · from Research pass 2026-08-18, from Shadow Empire guides rather than from this repo.*
-
-BL-464's settled prose recorded LP as a stock, written from Ben's 'lean heavily on the shadow empire system' ruling. The research says Shadow Empire's LP is a per-turn throughput allowance that is regenerated each turn and then used or wasted - the pipe, not the tank. What carries over is the resource stock it moved.
 
 ### NR-345 — The unit card is unreachable to the verify harness - battle-visual work needs a unit-selection driver first
 *observation · raised 2026-08-18 · from Battle-visual design browse (2026-08-18 session): toured canvases and military surfaces via --verify captures.*
@@ -856,21 +837,6 @@ spacecraft_components, propellant, clean_water, consumer_goods and medical_suppl
 > **Recommendation:** B for now, revisited as A once population centres (POPULATION.md) or the ancient-vs-industrial procurement question comes up on its own - filing five difficulty-2 items today would be scope creep on BL-460, which is a single-good fix. R1b's known-gap table is the durable record either way.
 
 *Files: `tools/verify/chain_depth.cpp`, `src/world/market_clearing.cpp`, `src/world/economy_system.cpp`, `scripts/recipes.lua`*
-
-### NR-356 — The Metropole strategy dodges Sprint 30's 'inevitable' collapse as currently framed
-*question · raised 2026-08-20 · from COLLAPSE.md authoring session (Era -1 strategy roster + culminating-events taxonomy), 2026-08-20.*
-
-A reach-based hegemon (trade lanes and dependency, few owned provinces) never trips a holdings-fed strain accumulator, so a major-by-influence could hold its peak indefinitely - contradicting Sprint 30's ruling that collapse is inevitable for a major.
-
-**Why it matters.** It is the one strategy shape that breaks the arc's central promise, and it is the shape BL-325 ruling 3 (economic reach IS military reach) actively encourages. Left unresolved, the harness's inevitability rate is only asserted over holdings-majors.
-
-- A) Reach feeds a separate, slower strain (over-commitment abroad) - the Metropole is the longest-lived shape and still breaks, usually via the Slow Fade (COLLAPSE.md E6).
-- B) The Metropole gets its own rupture mechanism - HISTORY.md Stage 5 (hegemony fails its final audition) made concrete.
-- C) Redefine 'major' to include reach, so the existing accumulator covers it.
-
-> **Recommendation:** A - one accumulator concept with two inflow rates keeps the mechanic legible; Stage 5 can later be expressed as a parameterisation of it rather than a second system.
-
-*Files: `docs/lore/COLLAPSE.md`, `docs/lore/HISTORY.md`, `src/world/history_sim.hpp`*
 
 ---
 
@@ -1222,12 +1188,30 @@ As first proposed, Sprint 25 shared no dependency with Sprints 21-24 and could h
 
 > **RESOLVED.** ANSWERED 2026-08-17 (Ben): run 25a next - BL-457 (ordnance), BL-454 (upkeep), BL-452/BL-453 (dispatch + ledger), BL-455, BL-456, plus BL-459 (unit strength + adapter) which the same session's rulings added to the phase. Sequence is 25a -> 21 -> 23 -> 25b. The split stands as the decision taken; this entry closes with the sequence confirmed rather than overturned.
 
+### NR-317 — A held convoy is free forever - cargo can be parked outside the economy indefinitely
+*question · raised 2026-08-17 · from Sprint 25a, BL-452 (logistics has no verb). Raised by the implementing agent, which could not file it itself.*
+
+hold_convoy stops a convoy advancing and it then costs nothing. Nothing charges upkeep on held cargo, nothing forces resolution, and nothing expires the hold. The goods are in neither a corp pool nor on a market shelf, so they are invisible to the price signal while held. A player can therefore withdraw stock from the market indefinitely at zero cost - and so, once BL-446 lands, can a rival scorer.
+
+**Why it matters.** It is exploit-shaped rather than a bug: every individual behaviour is correct, and the gap is that holding has no price. It also interacts with BL-422 (held sell orders stay visible to the price signal) which settled the OPPOSITE convention for the order book - held stock there remains visible deliberately, so scarcity is not gameable. A held convoy is the same question answered the other way, by omission rather than by decision.
+
+> **RESOLVED.** Ben, 2026-08-20: held convoy cargo stays VISIBLE to the price signal, aligning with BL-422's held-order convention - one convention everywhere, no new cost machinery. Filed as BL-495 (held convoy visible to price).
+
 ### NR-320 — Two new headless harnesses and one new tool are not discoverable - the skills need your permission
 *question · raised 2026-08-17 · from Sprint 25a. CLAUDE.md: tool creation is skill creation, and modifying a skill requires the user.*
 
 Sprint 25a added three checks that are currently loose. tools/verify/convoy_command.cpp (50 assertions over the dispatch/hold seam, including a full-world-fingerprint rejection check) and, pending the upkeep agent, tools/verify/unit_upkeep.cpp - neither is named in the verifier-headless skill, so neither is discoverable by a future session even though CMake's glob already picks them up as CTest tests. And tools/session/resource_table_check.js, the static join across the four hand-maintained transcriptions of resource_type, is wrapped in no skill at all.
 
 **Why it matters.** The standing rule is explicit that a loose tool is the forgotten kind, and this is three of them in one batch. resource_table_check.js is the one that matters most: it caught a real defect the compiler is structurally unable to see (a short initialiser list for a sized array silently zero-fills), and that defect had already survived six days unnoticed.
+
+### NR-321 — Ordnance's upkeep rate ships at 0.0, so nothing consumes it at runtime and BL-457's admission argument is not yet true in play
+*question · raised 2026-08-18 · from Sprint 25a, integrating BL-454. The implementing agent flagged the tension rather than resolving it silently.*
+
+BL-454's goods draw ships with every rate at ZERO - my instruction, so the item lands inert and no economy golden moves on landing. The agent followed it and named the consequence: ordnance and food_rations are NAMED in economy.lua's unit_upkeep table at 0.0, so the machinery is wired end to end but nothing actually draws a unit of ordnance until one number changes. chain_depth's R1 exemption says ordnance's consumer is 'BL-454 unit upkeep draw (per-tick, per unit)'. That is true STRUCTURALLY - the pass exists, resolves the vector and would debit - and false at RUNTIME today.
+
+**Why it matters.** BL-457's whole admission argument was that ordnance satisfies PRODUCTION.md's rule because BL-454 consumes it, and NR-257 deleted five resources for failing exactly that test. At rate zero, ordnance is produced-by-a-recipe and consumed-by-nobody-in-practice - the same shape, one layer subtler, and the guard cannot see it because an exemption table is a static string list. It is not a defect to fix by weakening the guard; it is a live number waiting for a decision. Worth stating plainly since I claimed the consumer in BL-457's commit message.
+
+> **RESOLVED.** Ben, 2026-08-20: the rate goes live WITH battle consumption - it rides Lane C's engagement trigger so the first real draw coincides with combat spending it (one golden re-bless). Rate 0.0 is a deliberate dated state until then. Tripwire filed as BL-496 (ordnance rate goes live).
 
 ### NR-324 — verify_api's resource-slug mapper is a FIFTH transcription of resource_type, and it is 20 of 37 stale
 *observation · raised 2026-08-18 · from Post-merge run of the Sprint 25a work on a machine that can build SDL/ImGui (2026-08-18).*
@@ -1298,6 +1282,13 @@ BL-464 (Logistic Points) was filed with four materially different readings: per-
 
 Raised as a later-sprint consideration, not a now-instruction, so it is recorded rather than built. The important fact is that provinces ALREADY EXIST: run_settlement generates roughly 82 with real nation ownership, the Era -1 sim moves them between polities, and the campaign handoff discards the mapping. So this is closer to retaining something already generated than to adding a new layer.
 
+### NR-343 — Confirm LP is a per-tick RATE, not a stock - the one load-bearing claim with no file:line
+*question · raised 2026-08-18 · from Research pass 2026-08-18, from Shadow Empire guides rather than from this repo.*
+
+BL-464's settled prose recorded LP as a stock, written from Ben's 'lean heavily on the shadow empire system' ruling. The research says Shadow Empire's LP is a per-turn throughput allowance that is regenerated each turn and then used or wasted - the pipe, not the tank. What carries over is the resource stock it moved.
+
+> **RESOLVED.** Ben, 2026-08-20: LP is a per-tick RATE - regenerated throughput, used or wasted, never banked; the goods it moved are what carry over. BL-464's design-owed prose amended with the dated ruling (item is open, so amended in backlog.json per the time-slice rule).
+
 ### NR-344 — Goods beat armies to the supply network by accident, not by design
 *observation · raised 2026-08-18 · from Research pass 2026-08-18.*
 
@@ -1332,6 +1323,23 @@ BL-449 gates the Corporation panel's stance column on BL-068 competitor-visibili
 > **RESOLVED.** RESOLVED 2026-08-19 (Ben): reading B — hostility toward the player stays silent and is discovered on contact, matching ordinary BL-068 visibility rather than announcing on the comms dock. Preserves the ambush property BL-458 (interdiction) relies on. BL-449 (stance surface) is unblocked to promote: the Corporation panel's stance column shows a hostile row only once the corp is otherwise discovered, same gate as every other BL-068-visible fact.
 
 *Files: `src/ui/corporation_panel.cpp`, `docs/ui/question_log.json`*
+
+### NR-356 — The Metropole strategy dodges Sprint 30's 'inevitable' collapse as currently framed
+*question · raised 2026-08-20 · from COLLAPSE.md authoring session (Era -1 strategy roster + culminating-events taxonomy), 2026-08-20.*
+
+A reach-based hegemon (trade lanes and dependency, few owned provinces) never trips a holdings-fed strain accumulator, so a major-by-influence could hold its peak indefinitely - contradicting Sprint 30's ruling that collapse is inevitable for a major.
+
+**Why it matters.** It is the one strategy shape that breaks the arc's central promise, and it is the shape BL-325 ruling 3 (economic reach IS military reach) actively encourages. Left unresolved, the harness's inevitability rate is only asserted over holdings-majors.
+
+- A) Reach feeds a separate, slower strain (over-commitment abroad) - the Metropole is the longest-lived shape and still breaks, usually via the Slow Fade (COLLAPSE.md E6).
+- B) The Metropole gets its own rupture mechanism - HISTORY.md Stage 5 (hegemony fails its final audition) made concrete.
+- C) Redefine 'major' to include reach, so the existing accumulator covers it.
+
+> **Recommendation:** A - one accumulator concept with two inflow rates keeps the mechanic legible; Stage 5 can later be expressed as a parameterisation of it rather than a second system.
+
+> **RESOLVED.** Ben, 2026-08-20: option A - 'Logistics should be capable of determining reach. By that I mean reach feeds strain.' Coheres with BL-325 ruling 3 (one reach field): the strain inflow reads the logistics network itself. Filed as BL-482 (reach-fed slow strain), which already encodes this.
+
+*Files: `docs/lore/COLLAPSE.md`, `docs/lore/HISTORY.md`, `src/world/history_sim.hpp`*
 
 ### NR-357 — Sequential four-allegory chain does not fit the shipped 400-year single-band run
 *observation · raised 2026-08-20 · from COLLAPSE.md design session, 2026-08-20 - Ben ruled all four allegories (Rome arc, devolution, dynastic cycle, systemic cascade) play out sequentially per generated world, as tuned attractors.*

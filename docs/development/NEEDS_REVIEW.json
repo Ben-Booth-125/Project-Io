@@ -1338,12 +1338,13 @@
    "id": "NR-317",
    "raised": "2026-08-17",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "title": "A held convoy is free forever - cargo can be parked outside the economy indefinitely",
    "source": "Sprint 25a, BL-452 (logistics has no verb). Raised by the implementing agent, which could not file it itself.",
    "what": "hold_convoy stops a convoy advancing and it then costs nothing. Nothing charges upkeep on held cargo, nothing forces resolution, and nothing expires the hold. The goods are in neither a corp pool nor on a market shelf, so they are invisible to the price signal while held. A player can therefore withdraw stock from the market indefinitely at zero cost - and so, once BL-446 lands, can a rival scorer.",
    "why_it_matters": "It is exploit-shaped rather than a bug: every individual behaviour is correct, and the gap is that holding has no price. It also interacts with BL-422 (held sell orders stay visible to the price signal) which settled the OPPOSITE convention for the order book - held stock there remains visible deliberately, so scarcity is not gameable. A held convoy is the same question answered the other way, by omission rather than by decision.",
-   "next_step": "Ben picks a rule. Candidates: a per-tick demurrage on held cargo; a hold cap in ticks after which it auto-releases; or make held cargo visible to the price signal the way BL-422 made held orders visible - which would be the consistent answer. Not filed as work pending the call."
+   "next_step": "Ben picks a rule. Candidates: a per-tick demurrage on held cargo; a hold cap in ticks after which it auto-releases; or make held cargo visible to the price signal the way BL-422 made held orders visible - which would be the consistent answer. Not filed as work pending the call.",
+   "resolution": "Ben, 2026-08-20: held convoy cargo stays VISIBLE to the price signal, aligning with BL-422's held-order convention - one convention everywhere, no new cost machinery. Filed as BL-495 (held convoy visible to price)."
   },
   {
    "id": "NR-318",
@@ -1383,12 +1384,13 @@
    "id": "NR-321",
    "raised": "2026-08-18",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "title": "Ordnance's upkeep rate ships at 0.0, so nothing consumes it at runtime and BL-457's admission argument is not yet true in play",
    "source": "Sprint 25a, integrating BL-454. The implementing agent flagged the tension rather than resolving it silently.",
    "what": "BL-454's goods draw ships with every rate at ZERO - my instruction, so the item lands inert and no economy golden moves on landing. The agent followed it and named the consequence: ordnance and food_rations are NAMED in economy.lua's unit_upkeep table at 0.0, so the machinery is wired end to end but nothing actually draws a unit of ordnance until one number changes. chain_depth's R1 exemption says ordnance's consumer is 'BL-454 unit upkeep draw (per-tick, per unit)'. That is true STRUCTURALLY - the pass exists, resolves the vector and would debit - and false at RUNTIME today.",
    "why_it_matters": "BL-457's whole admission argument was that ordnance satisfies PRODUCTION.md's rule because BL-454 consumes it, and NR-257 deleted five resources for failing exactly that test. At rate zero, ordnance is produced-by-a-recipe and consumed-by-nobody-in-practice - the same shape, one layer subtler, and the guard cannot see it because an exemption table is a static string list. It is not a defect to fix by weakening the guard; it is a live number waiting for a decision. Worth stating plainly since I claimed the consumer in BL-457's commit message.",
-   "next_step": "Ben sets the rate, and it is one line in scripts/economy.lua (economy.military.unit_upkeep.goods_per_head.ordnance). Recommend doing it on the LOCAL build with a measurement rather than blind: turn it on, run a rollout, and read what it costs a corp per quarter against its balance - the same discipline BL-436 used. Until then the goods half of unit upkeep is inert by design, and the economy goldens are unmoved, which is what made landing it safe."
+   "next_step": "Ben sets the rate, and it is one line in scripts/economy.lua (economy.military.unit_upkeep.goods_per_head.ordnance). Recommend doing it on the LOCAL build with a measurement rather than blind: turn it on, run a rollout, and read what it costs a corp per quarter against its balance - the same discipline BL-436 used. Until then the goods half of unit upkeep is inert by design, and the economy goldens are unmoved, which is what made landing it safe.",
+   "resolution": "Ben, 2026-08-20: the rate goes live WITH battle consumption - it rides Lane C's engagement trigger so the first real draw coincides with combat spending it (one golden re-bless). Rate 0.0 is a deliberate dated state until then. Tripwire filed as BL-496 (ordnance rate goes live)."
   },
   {
    "id": "NR-322",
@@ -1721,7 +1723,7 @@
    "id": "NR-343",
    "raised": "2026-08-18",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "title": "Confirm LP is a per-tick RATE, not a stock - the one load-bearing claim with no file:line",
    "source": "Research pass 2026-08-18, from Shadow Empire guides rather than from this repo.",
    "what": "BL-464's settled prose recorded LP as a stock, written from Ben's 'lean heavily on the shadow empire system' ruling. The research says Shadow Empire's LP is a per-turn throughput allowance that is regenerated each turn and then used or wasted - the pipe, not the tank. What carries over is the resource stock it moved.",
@@ -1729,7 +1731,8 @@
    "refs": [
     "BL-464",
     "NR-341"
-   ]
+   ],
+   "resolution": "Ben, 2026-08-20: LP is a per-tick RATE - regenerated throughput, used or wasted, never banked; the goods it moved are what carry over. BL-464's design-owed prose amended with the dated ruling (item is open, so amended in backlog.json per the time-slice rule)."
   },
   {
    "id": "NR-344",
@@ -2004,7 +2007,7 @@
    "title": "The Metropole strategy dodges Sprint 30's 'inevitable' collapse as currently framed",
    "raised": "2026-08-20",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "COLLAPSE.md authoring session (Era -1 strategy roster + culminating-events taxonomy), 2026-08-20.",
    "what": "A reach-based hegemon (trade lanes and dependency, few owned provinces) never trips a holdings-fed strain accumulator, so a major-by-influence could hold its peak indefinitely - contradicting Sprint 30's ruling that collapse is inevitable for a major.",
    "why_it_matters": "It is the one strategy shape that breaks the arc's central promise, and it is the shape BL-325 ruling 3 (economic reach IS military reach) actively encourages. Left unresolved, the harness's inevitability rate is only asserted over holdings-majors.",
@@ -2019,7 +2022,7 @@
     "docs/lore/HISTORY.md",
     "src/world/history_sim.hpp"
    ],
-   "resolution": null
+   "resolution": "Ben, 2026-08-20: option A - 'Logistics should be capable of determining reach. By that I mean reach feeds strain.' Coheres with BL-325 ruling 3 (one reach field): the strain inflow reads the logistics network itself. Filed as BL-482 (reach-fed slow strain), which already encodes this."
   },
   {
    "id": "NR-357",
