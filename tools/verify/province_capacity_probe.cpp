@@ -190,7 +190,7 @@ int main(int argc, char** argv)
         int bodies_at_cap = 0, max_firms = 0;
         for (const auto& [bid, n] : firms_per_body)
         {
-            if (n >= 40) ++bodies_at_cap;
+            if (n >= 200) ++bodies_at_cap;
             max_firms = std::max(max_firms, n);
         }
 
@@ -208,12 +208,12 @@ int main(int argc, char** argv)
             const float ratio = (rit == ratio_by_body.end()) ? -1.0f : rit->second;
             std::printf("       body %-8u firms %2d%s  coverage %.3f  (target 0.900)%s\n",
                         static_cast<unsigned>(bid), n,
-                        n >= 40 ? " AT CAP" : "       ",
+                        n >= 200 ? " AT BOUND" : "         ",
                         ratio,
-                        (n >= 40 && ratio < 0.90f) ? "   <-- STOPPED SHORT" : "");
+                        (ratio < 0.90f) ? "   <-- SHORT OF TARGET" : "");
         }
-        std::printf("       background firms: most on any body = %d%s (cap 40)\n",
-                    max_firms, bodies_at_cap ? "  <-- AT THE CAP" : "");
+        std::printf("       background firms: most on any body = %d%s (anti-runaway bound 200)\n",
+                    max_firms, bodies_at_cap ? "  <-- AT THE BOUND" : "");
         std::fflush(stdout);
 
         tot_at_cap += at_cap;

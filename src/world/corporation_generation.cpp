@@ -1,5 +1,7 @@
 #include "corporation_generation.hpp"
 
+#include "province.hpp"
+
 #include "world/hard_coded_world.hpp" // generation_progress — the BL-305 tap
 
 #include "world/economy_system.hpp"
@@ -7,6 +9,7 @@
 #include "world/settlement.hpp"
 
 #include <algorithm>
+#include <map>
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -1688,8 +1691,41 @@ std::vector<entity_id> generate_background_firms(
     // background production covers most, not all, of demand, leaving room for
     // the player to fill the rest.
     constexpr float target_ratio           = 0.90f;
-    constexpr int   max_firms_per_body     = 40; // hard bound — never infinite-loop
-    constexpr int   max_iterations_per_body = 2 * max_firms_per_body; // slack for placement misses
+    // TWO-LEVEL FIRM BUDGET (Ben, 2026-08-20: "we should have two levels, per
+    // resource caps, and per province caps").
+    //
+    // What this replaces, and why. max_firms_per_body was 40, and its own comment
+    // called it a "hard bound - never infinite-loop": a safety valve, never a
+    // design target. province_capacity_probe measured what it was actually doing.
+    // The cap BINDS on 5 of 8 seeds, and on 3 of those the body stops far below
+    // its own coverage target - 0.271, 0.631 and 0.637 against a target of 0.900.
+    // A market that opens with 27% of demand covered is the thin opening market,
+    // and a safety valve was causing it.
+    //
+    // So the flat body cap stops being the shaping constraint and becomes what it
+    // always claimed to be - an anti-runaway bound set far above any real world.
+    // Shaping moves to two caps that each say something:
+    //
+    //   PER RESOURCE - no single resource may absorb the whole budget. Without it
+    //   one huge absolute gap (biggest_gap_resource picks by absolute shortfall)
+    //   can take every firm, leaving a body that makes one good in quantity and
+    //   nothing else.
+    //
+    //   PER PROVINCE - no single province may absorb the whole budget. Without it
+    //   firms pile into whichever province holds the best anchor tiles, and the
+    //   density arrives as one blot instead of as industry spread over the map.
+    //   The province is the right grain because it is already the partition the
+    //   world is carved into (BL-466).
+    //
+    // BOTH NUMBERS ARE PROVISIONAL AND UNPINNED - a first cut chosen to be
+    // measured, not derived. Shipping an unpinned number quietly is exactly what
+    // BL-463's report-then-tune discipline warns against, so they are called out
+    // here and in the review log, and they belong in economy.lua as tunables once
+    // the shape is agreed.
+    constexpr int   max_firms_per_body      = 200;  // anti-runaway only
+    constexpr int   per_resource_firm_cap   = 8;    // provisional - measure, then pin
+    constexpr int   per_province_firm_cap   = 2;    // provisional - measure, then pin
+    constexpr int   max_iterations_per_body = 3 * max_firms_per_body; // slack for placement misses
 
     // Distinct xor-offset seeds, independent of generate_corporations' own
     // streams (seed_asset etc.) so the two passes cannot collide even though
@@ -1732,6 +1768,11 @@ std::vector<entity_id> generate_background_firms(
 
         int nation_cursor    = 0;
         int firms_this_body  = 0;
+        // The two shaping tallies, per body. Both are keyed by a stable id and
+        // are read and written in the loop's own deterministic order, so neither
+        // introduces an iteration-order dependence.
+        std::array<int, resource_count> firms_by_resource = {};
+        std::map<uint32_t, int>         firms_by_province;
         for (int iter = 0; iter < max_iterations_per_body && firms_this_body < max_firms_per_body; ++iter)
         {
             std::array<float, resource_count> production = {};
@@ -1742,14 +1783,25 @@ std::vector<entity_id> generate_background_firms(
             if (production_ratio(production, demand) >= target_ratio)
                 break;
 
-            const std::size_t gap_r = biggest_gap_resource(production, demand);
+            // PER-RESOURCE CAP. Mask out every resource that has already taken
+            // its share of this body's firms, then ask for the biggest remaining
+            // gap. Masking by lifting the resource's apparent production to its
+            // demand makes it read as 'met' to biggest_gap_resource - the same
+            // language that function already speaks, so there is no second
+            // selection rule to drift out of step with the first.
+            std::array<float, resource_count> selectable = production;
+            for (std::size_t r = 0; r < resource_count; ++r)
+                if (firms_by_resource[r] >= per_resource_firm_cap)
+                    selectable[r] = std::max(selectable[r], demand[r]);
+
+            const std::size_t gap_r = biggest_gap_resource(selectable, demand);
             if (gap_r == resource_count)
                 break; // no resource genuinely short — nothing left worth filling
 
             // Prefer processing when some recipe's output actually relieves the
             // gap resource (a refined good — silicon, machinery, ...);
             // otherwise the firm extracts the gap resource as a raw directly.
-            const int  recipe_i = best_recipe_for_gaps(reg, production, demand);
+            const int  recipe_i = best_recipe_for_gaps(reg, selectable, demand);
             const bool go_processing = (recipe_i >= 0)
                 && (reg.recipe_at(building_type::processing_facility, recipe_i).outputs[gap_r] > 0.0f);
             const industrial_focus focus = go_processing ? industrial_focus::processing
@@ -1766,6 +1818,39 @@ std::vector<entity_id> generate_background_firms(
                 w, nit->second, focus, occupied_tiles, asset_rng);
             if (assets.empty())
                 continue; // this nation had nothing left to anchor on this round; try the next
+
+            // PER-PROVINCE CAP. The firm's province is the one its FIRST asset
+            // stands in - place_starting_assets clusters a corp's holdings around
+            // a single anchor, so the first asset names the operation's home and
+            // the rest sit with it. A province already at its cap gives the firm
+            // back and takes the next nation in the cursor, rather than breaking:
+            // another nation's turn may anchor somewhere with room.
+            uint32_t anchor_province = 0;
+            if (!assets.empty())
+            {
+                const auto abit = w.buildings.find(assets.front());
+                if (abit != w.buildings.end())
+                    anchor_province = w.provinces.province_of(abit->second.tile);
+            }
+            if (anchor_province != 0
+                && firms_by_province[anchor_province] >= per_province_firm_cap)
+            {
+                // Hand the tiles back so a later, better-placed firm can use them -
+                // otherwise a refused placement silently sterilises good ground.
+                for (const entity_id bid : assets)
+                {
+                    const auto bit = w.buildings.find(bid);
+                    if (bit != w.buildings.end())
+                        occupied_tiles.erase(bit->second.tile);
+                    w.buildings.erase(bid);
+                    // author_building writes BOTH w.buildings and w.stockpiles;
+                    // erasing only the first orphans a stockpile keyed to a
+                    // building that no longer exists - the pool-leak shape
+                    // BL-482 already tracks. Undo the whole authoring.
+                    w.stockpiles.erase(bid);
+                }
+                continue;
+            }
 
             // Author a recipe onto every processing facility placed, targeted at
             // the gap this firm exists to fill — generation-time processors
@@ -1809,6 +1894,9 @@ std::vector<entity_id> generate_background_firms(
             w.corporations[corp_id] = std::move(cc);
             firm_ids.push_back(corp_id);
             ++firms_this_body;
+            ++firms_by_resource[gap_r];
+            if (anchor_province != 0)
+                ++firms_by_province[anchor_province];
 
             // Starting stockpile — the same BL-116 generator every generated
             // corp uses, so a background firm opens with materials from turn
