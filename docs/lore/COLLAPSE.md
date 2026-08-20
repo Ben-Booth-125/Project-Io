@@ -15,6 +15,15 @@
 > compress — strategies and culminations are defined at full markdown fidelity here, not as
 > a card schema. If the sim later needs a compact encoding, derive it from this doc.
 >
+> **Promoted 2026-08-20** into nineteen backlog items, all v0.1.16: **BL-476** (strain
+> accumulator) → **BL-477** (fragmentation verb) → **BL-478** (hegemony measure), **BL-479**
+> (Release verb), **BL-480** (readable strain), **BL-481** (strain transfer on conquest),
+> **BL-482** (reach-fed slow strain), **BL-483**–**BL-486** (the E4/E5/E6/E7 culminations),
+> **BL-487** (creed axes), **BL-488** (strategy weightings), **BL-489** (narration bank),
+> **BL-490** (attractor sweep), and the perf ladder **BL-491**–**BL-493** closing in
+> **BL-494** (the 4000-year ladder itself). This doc stays the design conversation's home;
+> the items carry the actionable prose.
+>
 > **Naming rule applies in full.** Every historical name below — Rome, Britain, the Meiji
 > pivot — is a **mechanism reference for the reader**, never content for the game
 > (`.claude/rules/io-standing-rules.md` § Terms). Nothing here enters generation as a proper

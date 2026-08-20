@@ -11097,6 +11097,453 @@
    "summary": "Ben, 2026-08-19, companion to BL-474: expand the per-corporation Selection ledger to carry stance and any other relevant from-our-perspective detail, replacing the all-corporations tables Stance column as the place the three transition presses (Declare Hostile / Offer Friendship / Return to Neutral) actually live. Selecting a rival corp (from the canvas, a lens marker, or the corporations list) shows the relationship as ONE corps detail, not a row in a giant comparison table.",
    "design": "## Why the Selection panel, not the table\n\nSELECTION.md already owns the pattern for one-entity detail across the game (Active/Focus/Selection states, shared per-entity content builders the Tile Ledger and hover card also use). Stance-toward-one-corp is exactly that shape of fact - it belongs where a player already looks to learn about ONE thing, not crammed into a table meant to compare MANY things at once (which is what made BL-449s column unreachable, NR-353).\n\n## Scope (design-owed - settle before promoting)\n\n- Where in the Selection cards existing layout the stance block sits, relative to whatever a corp selection already shows (BL-081/BL-214s roll-up cards, per question_log.jsons corporation_dashboard entry).\n- The three presses (Declare Hostile with its confirm popup on the demolish precedent, Offer/Accept Friendship, Return to Neutral) move here from the retired table column - same corp_command verbs from BL-448, same rejection handling, same NR-350 visibility gate (do not show anything for an undiscovered corp beyond Unknown).\n- Whether BL-474s lens markers are clickable to select-and-jump here, or selection only happens via the existing canvas/list paths - affects whether BL-474 needs any interactivity of its own.\n\n## What it does not carry\n\nNo new data model or verbs - BL-448s stance.hpp and its four corp_command verbs are unchanged. This is purely re-hosting an already-correct interaction onto the right surface. ACTIONS.json/question_log.json entries move with it (retitle rather than duplicate - BL-449s existing corporation_panel entries describe the retired surface).",
    "version_goal": "v0.1.16"
+  },
+  {
+   "id": "BL-476",
+   "short_name": "STRAIN_ACCUMULATOR",
+   "category": "Generation",
+   "title": "A stateful strain accumulator: digestion retires strain, loss does not",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 3,
+   "parked": false,
+   "requires": [],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/history_sim.{hpp,cpp}",
+    "tools/verify/history_sim_harness.cpp"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "Sprint 30's NEW-6, filed. Replace the stateless burden (burden=(held-40)x4, recomputed from current holdings) with an accumulating pressure that can break. The adversarial pass's shape assertion is the acceptance test: the strain term must NOT decrease when holdings decrease - losing provinces must never make an empire logistically stronger.",
+   "design": "Design in COLLAPSE.md section 'What the sim must grow' item 1 and the Pulse strategy: strain accumulates with expansion tempo and breadth-over-knee; Consolidate years retire it at an authored rate; province LOSS retires nothing (the grievance stays). Deterministic scalar per polity, serialised alongside cohesion_q. The Pulse strategy only exists once this lands - alternating Campaign/Consolidate must be arithmetically better than continuous Campaign at equal holdings."
+  },
+  {
+   "id": "BL-477",
+   "short_name": "COLLAPSE_FRAGMENTATION_VERB",
+   "category": "Generation",
+   "title": "The collapse itself: fragmentation into named successor polities",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 3,
+   "parked": false,
+   "requires": [
+    "BL-476"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/history_sim.{hpp,cpp}",
+    "src/world/name_generation.{hpp,cpp}"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "Sprint 30's NEW-7, filed. When strain exceeds cohesion unmanaged, the polity fragments into successor polities along province/culture seams, emitting owner_none where nothing coheres and a real eliminated-polity event where alive=false is currently silent. COLLAPSE.md culmination E1.",
+   "design": "Successors route through the seeded phoneme generator - struct polity has no name field today and the naming rule is absolute (no placeholder). Each successor inherits a restoration-lean creed and a grudge toward whichever neighbour fed on the break (Sprint 29's payload). Break lines are a deterministic function of province adjacency + culture + local cohesion, never a roll."
+  },
+  {
+   "id": "BL-478",
+   "short_name": "HEGEMONY_MEASURE_IN_ENGINE",
+   "category": "Generation",
+   "title": "Promote the hegemony measure from the sweep harness into the engine",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 1,
+   "parked": false,
+   "requires": [],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/history_sim.{hpp,cpp}"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "Sprint 30's NEW-8, filed. The sweep harness has a reporting threshold; the engine has nothing that can name, gate or narrate a great power. Promote it so polity::major means something and culminations/narration can key on it.",
+   "design": "One function over holdings share + reach; the same number the sweep already computes, computed once and stored per polity per year. Consumers: the strain accumulator (BL-476, majors accumulate), the attractor sweep (BL-490), the history-tab narration (BL-489)."
+  },
+  {
+   "id": "BL-479",
+   "short_name": "POLITY_RELEASE_VERB",
+   "category": "Generation",
+   "title": "A Release verb: voluntary devolution into client polities",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 2,
+   "parked": false,
+   "requires": [
+    "BL-477"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/history_sim.{hpp,cpp}"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "The Hydra strategy's verb and culmination E2 (devolution - the managed release, the British-empire mechanism). A fifth scored polity verb: shed peripheral provinces into a client successor BEFORE strain chooses the break line. Second, voluntary trigger on BL-477's fragmentation machinery.",
+   "design": "Scored like the other verbs (ruling: verb, not threshold rule - keeps it inside the nation-behaviour grant's shape). Value rises with strain and falls with cohesion headroom. The asymmetry is the point: released clients carry LOW grudge toward the core (devolution buys goodwill fragmentation never does); the core's creed shifts imperial->mercantile and keeps its reach."
+  },
+  {
+   "id": "BL-480",
+   "short_name": "STRAIN_OBSERVABLE_TO_RIVALS",
+   "category": "Generation",
+   "title": "Strained majors are readable prey: weakness as an observable, not telepathy",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 2,
+   "parked": false,
+   "requires": [
+    "BL-476"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/history_sim.{hpp,cpp}"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "Culmination E3 (absorption) needs rivals to score Campaign against a high-strain target - but no polity may read another's internal scalar. Expose weakness through observables: lost battles, stalled campaigns, supply shortfalls - the same tells the player sees.",
+   "design": "A small derived 'apparent weakness' value per polity computed from public events only (battle outcomes, campaign stalls), consumed by rivals' Campaign scoring. Keeps the no-telepathy discipline STRATEGIES.md set at corp grain."
+  },
+  {
+   "id": "BL-481",
+   "short_name": "STRAIN_TRANSFER_ON_CONQUEST",
+   "category": "Generation",
+   "title": "Conquering a strained polity imports its strain - absorption is never free",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 1,
+   "parked": false,
+   "requires": [
+    "BL-476"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/history_sim.{hpp,cpp}"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "COLLAPSE.md E3: without transfer, eating a strained major is a free lunch and absorption becomes the dominant exit. The conqueror inherits holdings AND a share of the victim's accumulated strain.",
+   "design": "On province transfer from a polity above a strain band, a proportional strain quantum moves with it. One subtraction and one addition on BL-476's scalar; the absorbed culture persists as grudge+creed inside the new borders."
+  },
+  {
+   "id": "BL-482",
+   "short_name": "REACH_FED_SLOW_STRAIN",
+   "category": "Generation",
+   "title": "Reach feeds a second, slower strain inflow - the Metropole also breaks",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 2,
+   "parked": false,
+   "requires": [
+    "BL-476"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/history_sim.{hpp,cpp}"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "NR-356's hole: a reach-hegemon with few holdings never trips a holdings-fed accumulator, dodging Sprint 30's 'inevitable'. Recommended fix (option A): reach feeds the SAME accumulator at a slower rate, so the Metropole is the longest-lived shape and still breaks - usually via the Slow Fade (E6).",
+   "design": "One additional inflow term on BL-476's accumulator scaled by reach-derived exposure (routes/dependencies held abroad). HISTORY.md Stage 5 (hegemony fails its final audition) later becomes a parameterisation of this, not a second system. Pending Ben's NR-356 ruling on A vs B vs C; filed on the recommendation."
+  },
+  {
+   "id": "BL-483",
+   "short_name": "TRANSFORMATION_CULMINATION",
+   "category": "Generation",
+   "title": "Transformation (E4): the mandate resets the regime, the map holds",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 2,
+   "parked": false,
+   "requires": [
+    "BL-476"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/history_sim.{hpp,cpp}"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "The dynastic-cycle allegory's exit: strain > cohesion WITH high works/institutions resolves by re-founding, not fragmentation - same borders, new polity, reset strain, partial capacity regression, legitimist creed. The cheapest culmination (no map change) and the one that keeps region counts stable.",
+   "design": "Exit selection is DETERMINED by the state vector at break (COLLAPSE.md open question 2's lean): the works/cohesion-infrastructure level is the discriminant between E4 and E1. The successor keeps the ancestor's name lineage via the phoneme generator's variation path, not a fresh mint."
+  },
+  {
+   "id": "BL-484",
+   "short_name": "EXODUS_CULMINATION",
+   "category": "Generation",
+   "title": "Exodus (E5): the rump state and the migration",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "C",
+   "difficulty": 2,
+   "parked": false,
+   "requires": [
+    "BL-477"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/history_sim.{hpp,cpp}"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "A breaking or absorbed polity with an open frontier survives displaced - Settle fired as a survival verb. Yields a small, high-cohesion survivor far from home with maximal grudge, and frontier regions gaining unearned population/capacity. The map texture Sprint 29 wants: capitals in strange places, with reasons.",
+   "design": "Trigger: E1/E3 resolution where a frontier region within reach is unheld. The chosen-remnant creed locks legitimist + max grudge (COLLAPSE.md pattern library)."
+  },
+  {
+   "id": "BL-485",
+   "short_name": "SLOW_FADE_CULMINATION",
+   "category": "Generation",
+   "title": "The Slow Fade (E6): senescence below a relevance threshold",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "C",
+   "difficulty": 2,
+   "parked": false,
+   "requires": [
+    "BL-476",
+    "BL-478"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/history_sim.{hpp,cpp}"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "No rupture: a major chronically NEAR the break, never over it, erodes - piecemeal border recession and a demotion below the hegemony measure. The Metropole's default ending and the sim's best source of interesting small nations at 0 CE: proud creed, high grudges, disproportionate reach.",
+   "design": "Detection: N consecutive years in the top strain band without a break event. Effect: periphery provinces detach singly (to neighbours or owner_none) at a deterministic trickle; the polity survives as a minor."
+  },
+  {
+   "id": "BL-486",
+   "short_name": "COHESION_INTERDEPENDENCE",
+   "category": "Generation",
+   "title": "Cohesion reads interdependence: the substrate for systemic collapse (E7)",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "C",
+   "difficulty": 3,
+   "parked": false,
+   "requires": [
+    "BL-477",
+    "BL-483"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/history_sim.{hpp,cpp}"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "The Bronze-Age allegory: one break cascades because neighbours' cohesion rested on the broken polity's trade and tribute. Needs cohesion to carry an interdependence input - a real design decision, deliberately sequenced AFTER E1-E4 land and are measured (COLLAPSE.md's own caution).",
+   "design": "A per-polity term derived from routes/works shared with neighbours; an E1/E3 event that severs them debits the survivors' cohesion. Candidate for a RARE outcome band asserted by sweep, never scripted. The most expensive culmination; hold until the others are measured."
+  },
+  {
+   "id": "BL-487",
+   "short_name": "POLITY_CREED_AXES",
+   "category": "Generation",
+   "title": "Seeded polity creeds from the pattern library, biasing the culmination",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 2,
+   "parked": false,
+   "requires": [
+    "BL-476"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/history_sim.{hpp,cpp}"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "COLLAPSE.md's ideological axis made mechanical: creed is seeded data per polity (mandate / remnant / stewardship / restoration leans from the pattern library), and the state vector that determines the exit includes it - same strain, different story, different ending, deterministically.",
+   "design": "A small enum-weighted axis set written at polity creation and mutated only by culminations. Consumed by: exit determination (E4 vs E1 vs E5), Release scoring (stewardship-lean raises it), and Sprint 29's nation-character payload. This is where 'the story IS the character payload' becomes code."
+  },
+  {
+   "id": "BL-488",
+   "short_name": "POLITY_STRATEGY_WEIGHTINGS",
+   "category": "AI",
+   "title": "The six-strategy roster as seeded weighting profiles over polity verbs",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 2,
+   "parked": false,
+   "requires": [
+    "BL-476",
+    "BL-479"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/history_sim.{hpp,cpp}"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "Tortoise / Pulse / Hydra / Phoenix / Metropole / Temple as data: per-polity verb-weighting profiles assigned at seed, deterministic, replayable. The tuned-attractors ruling means these are the diversity source the sweep asserts distinctness over - not templates that script outcomes.",
+   "design": "Each profile is a weight vector over {Campaign, Settle, Invest, Consolidate, Release} plus thresholds (Pulse's strain switch, Hydra's release band, Phoenix's neighbour-collapse gate). Profiles live in history params so tuning is a data change. Distinctness asserted by BL-490."
+  },
+  {
+   "id": "BL-489",
+   "short_name": "CULMINATION_NARRATION_BANK",
+   "category": "UI",
+   "title": "History-tab narration per culmination and narrative pattern - quiet by design",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "C",
+   "difficulty": 2,
+   "parked": false,
+   "requires": [
+    "BL-477",
+    "BL-487"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/ui/history_panel.cpp",
+    "src/world/history_sim.cpp"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "Each culmination emits its narrated line(s) in the history log, minted from the pattern library (the declinist mirror precedes the break; the mandate withdrawn explains E4; the garden given away recasts E2). Ruling 2026-08-20: surfaces in the history tab only - seeing beats telling, deep-dig optional, never chrome pushed at the player.",
+   "design": "Template lines keyed by (culmination, creed) filled with phoneme-generated names. Driven, not narrated: every line is emitted BY an event that occurred. Sibling to BL-300 (myth/theology), which owns the authored bank's voice; a devolution that plays back as silence looks like a bug (COLLAPSE.md open question 4)."
+  },
+  {
+   "id": "BL-490",
+   "short_name": "ATTRACTOR_SWEEP_HARNESS",
+   "category": "Testing",
+   "title": "The attractor sweep: four allegory arcs at reported rates, strategies distinct",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 2,
+   "parked": false,
+   "requires": [
+    "BL-477",
+    "BL-488"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "tools/verify/history_sweep.cpp"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "The tuned-attractors ruling's enforcement: across N seeds, assert each allegory arc (fragmentation, devolution, transformation, cascade) occurs at a stated, REPORTED rate - never clamped - and each strategy profile is observably distinct in lifespan, fragment count and successor share. Two indistinguishable strategies mean one is dead weight; a culmination that never fires is scope to cut.",
+   "design": "Extends the existing sweep harness. Rates pinned BEFORE tuning (the adversarial pass's discipline: the number must not be chosen to match the result). The strategy x culmination matrix in COLLAPSE.md is the literal assertion table."
+  },
+  {
+   "id": "BL-491",
+   "short_name": "QUIET_PROVINCE_FAST_PATH",
+   "category": "Performance",
+   "title": "Event-driven quiet provinces: stable interiors wake on events, not per year",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 3,
+   "parked": false,
+   "requires": [
+    "BL-320"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/history_sim.{hpp,cpp}"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "Perf rung 2 of COLLAPSE.md's 4000-year ladder. Most of 4000 years, most provinces do nothing; give stable interior provinces a fast path that wakes on border change, strain band crossing, or route loss - never a per-year evaluation.",
+   "design": "Wake conditions are pure functions of sim state (deterministic; asserted by the prehistory-on determinism case). Converts per-year cost from O(provinces) toward O(changes). Depends on BL-320's spatial index + incremental aggregates landing first (rung 1)."
+  },
+  {
+   "id": "BL-492",
+   "short_name": "BANDED_YEAR_GRAIN",
+   "category": "Performance",
+   "title": "Deterministic banded year grain: quiet ages step coarse, crises step yearly",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 3,
+   "parked": false,
+   "requires": [
+    "BL-491"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/history_sim.{hpp,cpp}"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "Perf rung 3. Simulate quiet bands at 5-10 year steps with scaled verb effects; drop to yearly grain when any polity's strain, war state, or culmination proximity crosses a band. Targets the year count directly - the rung that makes 4000 years affordable.",
+   "design": "The grain switch MUST be a pure function of sim state - seeded, replayable, asserted by the determinism case - or it is a die roll wearing a timestep (COLLAPSE.md's own words). Verb effect scaling at coarse grain must be exact-integer so no drift separates a watched run from a skipped one."
+  },
+  {
+   "id": "BL-493",
+   "short_name": "RECORD_ON_CHANGE",
+   "category": "Performance",
+   "title": "Record the run on change, at the reader's grain",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 2,
+   "parked": false,
+   "requires": [
+    "BL-425",
+    "BL-427"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/ui/history_panel.cpp"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "Perf rung 4 - the recording half, which BL-425 measured as the real hang (>8 min Debug for the per-year time-lapse). Snapshot ownership on owner_changes (already exists) plus per-decade otherwise; narrated lines are events, not per-year state. The history tab scrubs decades in practice.",
+   "design": "Memoise the record at generation time in BL-427's world-snapshot cache so --verify pays nothing. Un-parks scripts/verify/parked/history_ages.lua as part of landing (BL-425's own close-out)."
+  },
+  {
+   "id": "BL-494",
+   "short_name": "FOUR_THOUSAND_YEAR_LADDER",
+   "category": "Generation",
+   "title": "Extend the Era -1 run to the 4000-year ladder and re-pin the bands",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 3,
+   "parked": false,
+   "requires": [
+    "BL-320",
+    "BL-491",
+    "BL-492",
+    "BL-493"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/history_sim.{hpp,cpp}",
+    "docs/lore/HISTORY.md"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "The ruling itself (Ben, 2026-08-20): the 400-year band was a placeholder; the aim is 4000 years so the four allegory arcs chain sequentially per world. Extends prehistory_years and the band ladder; re-pins every generation golden and the BL-224 non-hegemony bands by measurement.",
+   "design": "Lands LAST in the perf ladder - after BL-320 (rung 1), BL-491 (rung 2), BL-492 (rung 3), BL-493 (rung 4) - and only if the /O2 measurement fits the generation budget; the honest fallback (2-3 completed arcs per world, all four attractors asserted across the sweep) degrades density, never determinism. Reverses the Sprint 26b doc-truth correction knowingly: HISTORY.md's 400-year note gains a dated supersession pointing here."
   }
  ]
 }
