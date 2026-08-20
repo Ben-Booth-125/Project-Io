@@ -3,6 +3,7 @@
 #include "recipe_registry.hpp"
 #include "world.hpp"
 
+#include <array>
 #include <cstdint>
 #include <vector>
 
@@ -162,3 +163,24 @@ std::vector<entity_id> generate_background_firms(
 /// Call it after the registry is loaded and after every generation pass that can
 /// author a processor (`generate_corporations`, `generate_background_firms`).
 void assign_default_recipes(world& w, const recipe_registry& reg);
+
+/// Measurement seam (2026-08-20) — the SHIPPED background-firm stop condition,
+/// readable from outside. `generate_background_firms` stops when the basket-
+/// weighted production/demand ratio reaches its target (0.90) OR when it hits
+/// `max_firms_per_body`; which one fires decides whether a body's markets open
+/// stocked or thin, and nothing outside that file could previously ask.
+///
+/// Exported rather than re-derived on purpose: a harness that re-implements a
+/// generation rule drifts from it, which has now cost this project four wrong
+/// confident measurements (world_audit.cpp B4 is the latest).
+///
+/// All three are pure reads over @p w and @p reg. A body with no measurable
+/// demand reads as fully met (ratio 1.0) — there is nothing to fill.
+std::array<float, resource_count> measure_body_demand(const world& w,
+                                                     const recipe_registry& reg,
+                                                     entity_id body_id);
+std::array<float, resource_count> measure_body_production(const world& w,
+                                                          const recipe_registry& reg,
+                                                          entity_id body_id);
+float measure_production_ratio(const world& w, const recipe_registry& reg,
+                               entity_id body_id);

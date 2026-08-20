@@ -1836,3 +1836,40 @@ void assign_default_recipes(world& w, const recipe_registry& reg)
         if (b.type == building_type::processing_facility && b.recipe == no_recipe)
             b.recipe = default_recipe;
 }
+
+// ---------------------------------------------------------------------------
+// Measurement seam (2026-08-20)
+// ---------------------------------------------------------------------------
+// `generate_background_firms` stops on a MEASURED condition — basket-weighted
+// production/demand >= target_ratio — or on `max_firms_per_body`, whichever comes
+// first. Which of those two actually fires is the whole question behind "do
+// markets open with the goods they need", and until now nothing outside this file
+// could ask it: the three helpers are file-private.
+//
+// These wrappers expose the shipped arithmetic rather than inviting a harness to
+// re-implement it. That re-implementation is the hand-mirrored-table drift this
+// project has now hit four times (world_audit.cpp B4 carries the latest). Pure
+// reads over world + registry; they allocate nothing and change nothing.
+
+std::array<float, resource_count> measure_body_demand(const world& w,
+                                                     const recipe_registry& reg,
+                                                     entity_id body_id)
+{
+    return body_demand(w, reg, body_id);
+}
+
+std::array<float, resource_count> measure_body_production(const world& w,
+                                                          const recipe_registry& reg,
+                                                          entity_id body_id)
+{
+    std::array<float, resource_count> production = {};
+    accumulate_body_production(w, reg, body_id, production);
+    return production;
+}
+
+float measure_production_ratio(const world& w, const recipe_registry& reg,
+                               entity_id body_id)
+{
+    return production_ratio(measure_body_production(w, reg, body_id),
+                            measure_body_demand(w, reg, body_id));
+}

@@ -178,6 +178,15 @@ int main(int argc, char** argv)
             }
             ++firms_per_body[home];
         }
+        // Q5 - THE COVERAGE QUESTION (Ben, 2026-08-20: measure the coverage
+        // first, then raise the cap). The generator's own target is target_ratio
+        // 0.90; measure_production_ratio is the SHIPPED arithmetic, not a copy.
+        // A body that stops at 40 firms below 0.90 ran out of permission, not out
+        // of work to do.
+        std::map<entity_id, float> ratio_by_body;
+        for (const auto& [bid, b] : w.bodies)
+            ratio_by_body[bid] = measure_production_ratio(w, reg, bid);
+
         int bodies_at_cap = 0, max_firms = 0;
         for (const auto& [bid, n] : firms_per_body)
         {
@@ -191,6 +200,18 @@ int main(int argc, char** argv)
                     at_cap, land ? 100.0 * at_cap / land : 0.0,
                     used_sum, cap_sum, cap_sum ? 100.0 * double(used_sum) / double(cap_sum) : 0.0,
                     fullest_id, fullest_used, fullest_cap);
+        for (const auto& [bid, n] : firms_per_body)
+        {
+            if (bid == null_entity)
+                continue;
+            const auto rit = ratio_by_body.find(bid);
+            const float ratio = (rit == ratio_by_body.end()) ? -1.0f : rit->second;
+            std::printf("       body %-8u firms %2d%s  coverage %.3f  (target 0.900)%s\n",
+                        static_cast<unsigned>(bid), n,
+                        n >= 40 ? " AT CAP" : "       ",
+                        ratio,
+                        (n >= 40 && ratio < 0.90f) ? "   <-- STOPPED SHORT" : "");
+        }
         std::printf("       background firms: most on any body = %d%s (cap 40)\n",
                     max_firms, bodies_at_cap ? "  <-- AT THE CAP" : "");
         std::fflush(stdout);
