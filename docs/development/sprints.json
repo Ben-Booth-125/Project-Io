@@ -633,7 +633,7 @@
     "Riders: BL-413 (disable player presses under spectate); BL-306 un-parked (structured local-model client loop, design refresh only this sprint); BL-335 one-off token-cost measurement against --serve; local model runtime setup (Ollama-class, outside the engine)."
    ],
    "risk": "BL-412 touches the frame loop and adds a listening socket — determinism is preserved only if command application is tick-boundary, arrival-ordered and recorded; assert with a transcript-replay case. BL-408/BL-411 are surfaces: the 2026-08-19 rule applies — a visual requirement on an interactive surface needs a live check before completion, not just a harness capture.",
-   "notes": "Opened from the 2026-08-19 version-alignment session (research workflow + Ben's form verdicts). Sits beside Lane C, not inside it: C1 (stance) is closed-complete on BL-448; the watch is its own lane serving the observe-AI aim."
+   "notes": "Opened from the 2026-08-19 version-alignment session (research workflow + Ben's form verdicts). Sits beside Lane C, not inside it: C1 (stance) is closed-complete on BL-448; the watch is its own lane serving the observe-AI aim. STATUS (2026-08-19): all three build items LANDED (BL-412 e88636b, BL-408 57e596f, BL-411 d3d9e6e); BL-335 COMPLETE (the 60x input finding -> BL-481 filed, designed, A); the FIRST WATCH SESSION ran — Ollama qwen2.5:3b-instruct attached to the rendered app through the seam, gated clock released per round, and the actor gate refused a wrong-corp read live. Open on: the three live-check rows (Ben at the keyboard; app left open), BL-481 (compact encoding) and the BL-306 client loop."
   },
   {
    "id": "26-33",
@@ -785,15 +785,15 @@
   {
    "id": "D1",
    "theme": "A tech can express a buff",
-   "state": "open",
+   "state": "closed",
    "opened_date": "2026-08-19",
-   "closed_date": null,
+   "closed_date": "2026-08-19",
    "goal": "Widen tech_gate's one-field effect into a closed tagged union: unlock_structure (existing) plus modify_scalar. Then author the closed modifier-subject vocabulary — every scalar a tech OR A LAW may move. (Lane D — unblocked by rulings 4 and 5, both taken 2026-08-18.)",
    "planned": [
     "Closed tagged union effect type on tech_gate",
     "The modifier-subject vocabulary, shared between tech and law — the reason tech and law belong in one lane"
    ],
-   "notes": "Proposed, not opened. Before rulings 4/5 this lane was illegal twice over: every item was parked:true under a ROADMAP line saying 'do not build against them while parked', and nations were forbidden actors under BL-054. Sprint 26 clears both. Direct answer to Ben's 'how each tech maps to a direct unlock or existing system buff' — today the unlock is the only expressible half. OPENED 2026-08-19 (Ben, version-alignment form): D1 and D3 run as one batch, D1's vocabulary first. Build item: BL-479 (tech effect union) — the union plus the shared modifier-subject vocabulary in src/world/modifier_set.hpp; Lane D owns the one-appender-per-batch rule for serialised enums. Rider per Fall-arc amendment 5: BL-443 (debt floor), pending the N1 audit's confirmation it is genuinely unbuilt."
+   "notes": "Proposed, not opened. Before rulings 4/5 this lane was illegal twice over: every item was parked:true under a ROADMAP line saying 'do not build against them while parked', and nations were forbidden actors under BL-054. Sprint 26 clears both. Direct answer to Ben's 'how each tech maps to a direct unlock or existing system buff' — today the unlock is the only expressible half. OPENED 2026-08-19 (Ben, version-alignment form): D1 and D3 run as one batch, D1's vocabulary first. Build item: BL-479 (tech effect union) — the union plus the shared modifier-subject vocabulary in src/world/modifier_set.hpp; Lane D owns the one-appender-per-batch rule for serialised enums. Rider per Fall-arc amendment 5: BL-443 (debt floor), pending the N1 audit's confirmation it is genuinely unbuilt. RETRO (2026-08-19): goal met same-day. BL-479 complete — the union, the shared vocabulary (modifier_set.hpp, collapse_strain included for BL-477), extraction_rate wired end-to-end; 35/35 new harness, tech_gate 33/33 unmodified, cross-build bit-identity measured against a genuine pre-change build. The BL-443 rider was deliberately NOT taken: the N1 audit confirmed it unbuilt but gated on NR-296 (the lever is Ben's) and colliding with D3 on budget_system.cpp. Slipped: nothing. Feedback: the one-appender rule worked — D3 never touched the vocabulary header."
   },
   {
    "id": "D2",
@@ -821,7 +821,7 @@
     "Wages as a lever above a legal floor",
     "Enactment moved off the player's ledger — replacing a debug checkbox that currently lets a corporation flip world law, the exact inversion of the settled ruling that the player is a law SUBJECT"
    ],
-   "notes": "Proposed, not opened. Per adversarial-pass finding 7, condition_subject is entirely corp-scoped and self-measuring — BL-155's own worked examples (a wartime tax, a levy past a density threshold) are inexpressible until the CONDITION side is widened (nation, body, hostility subjects) alongside the modifier side. Per amendment 5, BL-443 (debt floor) should ride inside this sprint rather than waiting for its own — interest is 98.8% of every benchmark deficit. OPENED 2026-08-19, same batch as D1 (Ben's verdict: \"D1 then D3 in one batch\"). Build item: BL-480 (law has an author) — enacting-nation id + scope, nation treasury, levy becomes a conserved transfer, enactment off the player's ledger. Wages lever severable, taken only if BL-479's vocabulary names wage_floor in time."
+   "notes": "Proposed, not opened. Per adversarial-pass finding 7, condition_subject is entirely corp-scoped and self-measuring — BL-155's own worked examples (a wartime tax, a levy past a density threshold) are inexpressible until the CONDITION side is widened (nation, body, hostility subjects) alongside the modifier side. Per amendment 5, BL-443 (debt floor) should ride inside this sprint rather than waiting for its own — interest is 98.8% of every benchmark deficit. OPENED 2026-08-19, same batch as D1 (Ben's verdict: \"D1 then D3 in one batch\"). Build item: BL-480 (law has an author) — enacting-nation id + scope, nation treasury, levy becomes a conserved transfer, enactment off the player's ledger. Wages lever severable, taken only if BL-479's vocabulary names wage_floor in time. STATUS (2026-08-19): BL-480 LANDED (merge c00bba8) — author+scope+treasury+conserved transfer all green (14/14, 24/24), checkbox and its dictionary entry gone. Sprint stays OPEN on two Ben calls: the NR-382 levy-rate ruling (the placeholder 1.0/unit rate, biting now the law ships enacted, drives every rival insolvent — bands left red-and-attributed, unblessed, the NR-269 precedent honoured) and the R3 live look at the read-only levy line."
   },
   {
    "id": "D4",
@@ -967,7 +967,7 @@
   {
    "id": "D3",
    "theme": "A law has an author, and a tax is a transfer",
-   "state": "Open 2026-08-19 — BL-480 LANDED, harnesses green; open on the NR-375 rate ruling + the live levy-line look"
+   "state": "Open 2026-08-19 — BL-480 LANDED, harnesses green; open on the NR-382 rate ruling + the live levy-line look"
   }
  ]
 }

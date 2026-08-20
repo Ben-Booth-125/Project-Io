@@ -10,7 +10,63 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — the corpus gets delegated: saved roles and scoped instructions (BL-497) (2026-08-20, latest)
+## Session — The watch + meta open: an AI plays the rendered game (BL-412, BL-408, BL-411, BL-479, BL-480, BL-335; Sprints W1/D1/D3) (2026-08-19 → 08-20, latest)
+
+Full mode, Batch Delivery: a six-agent research workflow, five worktree build agents, an audit
+agent, a static reviewer and a harness runner. Ben's brief: map sprints onto versioned releases,
+align versions with his real aim — *"developing meta, and finding a way to observe AI playing
+the game — even if that means downloading a local model"* — then batch-deliver in parallel.
+
+**The version map realigned first** (form verdicts → `0303800`): the 36-item v0.1.16 holding
+pen split five ways — v0.1.16 re-themed **The watch**, v0.1.19 ancient conflict & seams,
+v0.1.20 stance & force, v0.1.21 the credible rival, v0.1.22 harness truth; v0.1.18 defined as
+economy truth; four stale version goals re-homed; BL-306/BL-335 un-parked; BL-477 (era collapse
+defines meta — Ben's paradigm verbatim), BL-478 (ancient research spend, extracted from parked
+BL-087), BL-479 and BL-480 filed; Sprints W1/D1/D3 opened.
+
+**The batch: five slices, all landed same-day.** BL-412 (live agent control seam — the rendered
+app gains a loopback *listen* socket drained at tick boundaries into `apply_corp_command`;
+transcript = replay artifact; 22/22), BL-408 (god view — sight never hands; 7 captures),
+BL-411 (strategy readout — counts not credits, the NR-226 fence held), BL-479 (tech effect
+union + the shared modifier vocabulary, `collapse_strain` included; 35/35; no-effect world
+bit-identical vs a genuine pre-change build), BL-480 (a law has an author; the levy became a
+conserved transfer into the author nation's treasury; the enact checkbox and its dictionary
+entry removed; 14/14 + 24/24). verifier-review: **GO COMPILE, zero criticals**, 13 findings
+applied or filed. Integrating build BUILD_OK; 9/10 harness families green.
+
+**The first watch session happened.** Ollama + `qwen2.5:3b-instruct` (installed this session)
+attached to the rendered app through the seam: the gated clock released ticks 1–8; the actor
+gate refused a wrong-corp read live; and on the corrected fact filter the model issued a
+grounded command — **march unit 46816 toward tile 41647**, both ids read from its own
+blackboard slice. BL-335's measurement closed the loop's economics: the ~300-token *output*
+assumption holds 5×, the *input* premise fails 60× (18.5K tokens per raw blackboard read) —
+BL-481 (compact encoding) filed as the fix.
+
+**The one red, left red on purpose:** the levy's placeholder rate (1.0 cr/unit, all resources)
+never bit while the law shipped un-enacted; enacted, it drives every rival insolvent
+(−3.6M…−5.2M, 30/30 below zero). Blessing that would record bankruptcy as expected — the
+NR-269 shape — so `ai_skill`'s bands stay red-and-attributed pending the NR-382 rate ruling.
+Also this session: the N1 audit (BL-437 flipped complete on evidence; five holds bounded;
+BL-443 confirmed unbuilt but gated on NR-296), four stale IN FLIGHT markers flipped with
+hashes, BL-482 (pools leak) filed from a BL-408 side-finding.
+
+**The session ended inside a two-machine merge.** The mobile design session (entry below) and
+this one both minted BL-476..482 and NR-356..362 from opposite sides of origin; Ben's merge
+`97c12bb` renumbered origin's BL ids (→ BL-504..510) and local's committed NR ids
+(→ NR-373..379), with this session's late entries landing as NR-377..382 — the full record is
+NR-383. Board verified post-merge: zero duplicate ids, lint clean, every cross-reference
+reconciled.
+
+**Open at close:** four live-check rows (Ben at the keyboard — relaunch:
+`build/ProjectIo.exe --autostart-play --host-agent`); Ben's calls NR-380 (aggregate
+visibility), NR-382 (levy rate), NR-296 (debt lever), NR-269 (BL-439 bands); verifier-skill
+listings for three new harnesses + two scripts (permission owed); BL-481/BL-306 as the watch
+minor's remainder.
+
+**Runtime:** ~6 h wall, largely autonomous; research → board surgery → five-lane batch →
+review → integrating build → first live demo → merge reconciliation.
+
+## Session — the corpus gets delegated: saved roles and scoped instructions (BL-497) (2026-08-20)
 
 Light/doc-config mode, remote session, no `src/` logic touched. Ben's brief: the folder is too
 large for a session to consume cheaply — *let's have different sessions be prompted differently*.
