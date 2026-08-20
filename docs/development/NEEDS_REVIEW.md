@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*117 entries — 74 open, 43 resolved.*
+*122 entries — 79 open, 43 resolved.*
 
 ---
 
@@ -804,6 +804,73 @@ Three calls made while building BL-470 (march/halt/disband): (1) NR-344 (war fli
 > **Recommendation:** No action needed now. Revisit (1) when BL-464 (Logistic Points) lands — that is when the reorder gets something to actually contend over. Revisit (3) during a playtest/tuning pass, the same way BL-394s hire costs were.
 
 *Files: `src/world/economy_system.cpp`, `src/world/economy_system.hpp`, `scripts/economy.lua`, `docs/military/MILITARY.md`*
+
+### NR-353 — BL-449 stance column overflows the shell fold-out panel - presses are unreachable
+*observation · raised 2026-08-19 · from Live visual check of the Corporation panel (Diplomacy nav slot) after BL-449 landed.*
+
+corporation_panel.cpp's table lives inside ui::foldout_begin's shell fold-out column, whose width BL-111 deliberately narrowed to fit exactly 4 columns (Corporation stretch + 3x WidthFixed 62px) after six columns previously collapsed to single-glyph headers. BL-449 added a 5th column, Stance, at WidthFixed 220px, without revisiting that budget. Confirmed live: every row shows a Stance value (Neutral/etc) but the three transition buttons (Declare Hostile / Offer Friendship / Return to Neutral) render past the panel's right edge. The panel is not resizable (dragging the border does nothing - it's part of the fixed shell column) and the table has no horizontal scroll enabled, so the buttons are genuinely unreachable, not just visually tight.
+
+**Why it matters.** BL-449 shipped a stance UI that cannot actually declare hostility, offer/accept friendship, or return to neutral in the live app - the exact BL-350 failure mode (a complete seam with no reachable press) the item was filed to avoid, just one layer further down (the press exists in code but is not reachable on screen).
+
+- A - shrink the Stance column (e.g. label only + a single overflow/context-menu button, or icon-only presses) to fit the existing ~4-column budget
+- B - widen the shell fold-out column specifically when this panel is open (a per-panel width override), reopening the BL-111 constraint deliberately for this one case
+- C - give the Corporation panel its own non-shell window (like the original de-scoped design before BL-122 re-hosted it), decoupling it from the shared shell width entirely
+
+> **Recommendation:** A is cheapest and keeps every panel inside the shell at one shared width, which is presumably the whole point of BL-111/BL-122's constraint; worth Ben's call given it touches a settled layout decision.
+
+*Files: `src/ui/corporation_panel.cpp`, `src/ui/foldout_column.cpp`*
+
+### NR-354 — Batch Delivery scoped down to BL-460/BL-441/BL-442(step1); BL-439/BL-440(c)/BL-443 deferred
+*decision taken on your behalf · raised 2026-08-19 · from 2026-08-19 Batch Delivery session survey of the v0.1.16 economy-integrity cluster (BL-439 through BL-443, BL-460).*
+
+Surveyed BL-439 (AI never builds processors), BL-440 (mines only target richest), BL-441 (unmet demand never registered), BL-442 (price band is code not data), BL-443 (debt compounds with no floor) and BL-460 (ordnance unproducible at 0 CE) as a candidate batch. Chose to land only BL-460, BL-441, and BL-442's step 1 (behaviour-identical constant relocation) this pass, and deferred BL-439, BL-440's remaining part (c), and BL-443 entirely - no code touched for those three.
+
+**Why it matters.** BL-439 explicitly reshuffles every blessed golden and every ai_skill_harness band as its stated cost ('paid once, deliberately, re-blessed as part of landing it') - not something to fold into a multi-item batch pass without dedicated attention to the re-bless. BL-440(c) needs a design call between two named implementation shapes (a post-registry retarget pass vs a static demand hint) that BL-441's own design notes partially supersedes - clearer to resolve after BL-441 lands and its effect on the coal shortage can be measured, not before. BL-443 explicitly says 'MEASURE BEFORE CHANGING ANYTHING' and requires a game-design call (debt ceiling vs forced liquidation vs restructuring) that shapes the Conflict/Trade arc - not a mechanical fix. Landing all six in one pass risked a sprawling, under-verified batch; scoping down keeps each landed item independently verifiable.
+
+- A - next session: re-run tier_margin/ai_skill_harness against the BL-441+BL-442(step1) landing to see whether the coal shortage measurably improves before deciding BL-440(c)'s shape
+- B - bring BL-443's measure-first step (decompose a benchmark corp's balance into operating flows vs accrued interest) to Ben as its own small session before choosing (a)/(b)/(c)
+- C - treat BL-439 as its own dedicated Batch Delivery pass specifically because of the golden re-bless cost, rather than bundling it with anything else
+
+> **Recommendation:** A, then C, then B in that order - BL-440(c) may partly resolve itself once BL-441's price signal is live, which is worth checking before spending more design effort on it; BL-439's golden re-bless deserves an isolated pass; BL-443's measurement step is cheap and can happen any time.
+
+*Files: `docs/development/backlog.json`*
+
+### NR-324 — BL-441 and BL-442 were picked up for delivery already landed on main; both flipped to complete, including BL-442 step 2 which this session's brief said to leave open
+*decision taken on your behalf · raised 2026-08-19 · from Delivery session for BL-441 (unmet demand) + BL-442 step 1 (price band to data), started against this worktree's HEAD (46118b6, an ancestor of main tip 78bc295).*
+
+Before writing any code, git history showed both items already fully landed on main from the 2026-08-17 session: BL-441 at commits 37989d1/f0a50ce, BL-442 step 1 at 9fb90e2/5e442d1, and BL-442 STEP 2 (the band widening this session was explicitly told not to do) at 2a7aa01 - deriving ceil_mult=10.0 from measured haulage via tools/verify/haulage_measure.cpp, with the derivation written into MARKETS.md as the item's own design asked. Only backlog.json's status field for both items was stale (still 'designed'), plus REFINED.md and NEEDS_REVIEW.json already carry the landing detail from that session. No source file was changed this session.
+
+**Why it matters.** The task brief, written without this knowledge, said to leave BL-442 as 'designed' with step 2 noted as remaining. Following that instruction literally would have recorded a false claim (step 2 outstanding) against a codebase where it had already shipped, reviewed, and measured. Flipped both items to 'complete' instead, with CLOSED notes in each item's design field pointing at the actual landing commits, on the grounds that backlog.json's job is to reflect reality and a stale instruction should not be allowed to reintroduce a stale doc.
+
+### NR-355 — chain_depth's new era-aware R1b row finds five more goods with the same ordnance-era-strand shape
+*observation · raised 2026-08-19 · from BL-460 (ORDNANCE_UNPRODUCIBLE_AT_0CE) implementation this session - the new R1b row in tools/verify/chain_depth.cpp checks, per concrete campaign band, that every WANTED resource has a producer REACHABLE in that same band.*
+
+spacecraft_components, propellant, clean_water, consumer_goods and medical_supplies are all industrial-only-produced (recipes.lua, era = "industrial", no ancient route) yet drawn by consumers that are NOT era-gated in the C++: BL-350 procurement (economy_system.cpp:798-829), the propellant dispatch draw, and inject_population_demand (market_clearing.cpp:233, called unconditionally at market_clearing.cpp:545). So an ancient campaign (epoch_year < 1700, the shipped default) can in principle starve on all five exactly as it starved on ordnance before this item's fix - R1b would fail on all five if they were not exempted. They are exempted in R1b's k_known_gaps table (each with this note as its tracking reference) so the row stays green and honest rather than silently ignoring or silently fixing five goods outside BL-460's stated scope (a single-good, difficulty-2 item).
+
+**Why it matters.** This is the SAME defect class BL-460 fixed for ordnance, found by the guard BL-460 built specifically to catch it. Whether each of these five is a live bug depends on whether population centres / procurement contracts / propellant dispatch are actually reachable in an ancient (0 CE) campaign today - PRODUCTION.md and POPULATION.md suggest population centres are still largely prototype-deferred, and procurement/propellant read as Era 1 (space) mechanics that may simply never fire for an ancient corp - but nothing in the code enforces that as a fact, only as an assumption, which is exactly the shape NR-257 and this item both exist to catch.
+
+- A - one item per good (or one batched item) auditing whether each consumer actually fires in an ancient campaign; if any does, either give the good an ancient route (BL-460's pattern) or make the consumer era-gated
+- B - leave the five in R1b's known-gap table indefinitely as a documented, accepted limitation of the ancient arc (these goods/mechanics are implicitly industrial-only)
+- C - do nothing until a future item independently trips over one of these five in play, at which point R1b's known-gap table already names the fix location
+
+> **Recommendation:** B for now, revisited as A once population centres (POPULATION.md) or the ancient-vs-industrial procurement question comes up on its own - filing five difficulty-2 items today would be scope creep on BL-460, which is a single-good fix. R1b's known-gap table is the durable record either way.
+
+*Files: `tools/verify/chain_depth.cpp`, `src/world/market_clearing.cpp`, `src/world/economy_system.cpp`, `scripts/recipes.lua`*
+
+### NR-356 — The Metropole strategy dodges Sprint 30's 'inevitable' collapse as currently framed
+*question · raised 2026-08-20 · from COLLAPSE.md authoring session (Era -1 strategy roster + culminating-events taxonomy), 2026-08-20.*
+
+A reach-based hegemon (trade lanes and dependency, few owned provinces) never trips a holdings-fed strain accumulator, so a major-by-influence could hold its peak indefinitely - contradicting Sprint 30's ruling that collapse is inevitable for a major.
+
+**Why it matters.** It is the one strategy shape that breaks the arc's central promise, and it is the shape BL-325 ruling 3 (economic reach IS military reach) actively encourages. Left unresolved, the harness's inevitability rate is only asserted over holdings-majors.
+
+- A) Reach feeds a separate, slower strain (over-commitment abroad) - the Metropole is the longest-lived shape and still breaks, usually via the Slow Fade (COLLAPSE.md E6).
+- B) The Metropole gets its own rupture mechanism - HISTORY.md Stage 5 (hegemony fails its final audition) made concrete.
+- C) Redefine 'major' to include reach, so the existing accumulator covers it.
+
+> **Recommendation:** A - one accumulator concept with two inflow rates keeps the mechanic legible; Stage 5 can later be expressed as a parameterisation of it rather than a second system.
+
+*Files: `docs/lore/COLLAPSE.md`, `docs/lore/HISTORY.md`, `src/world/history_sim.hpp`*
 
 ---
 

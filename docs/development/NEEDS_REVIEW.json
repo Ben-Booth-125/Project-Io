@@ -1998,6 +1998,28 @@
     "BL-454"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-356",
+   "title": "The Metropole strategy dodges Sprint 30's 'inevitable' collapse as currently framed",
+   "raised": "2026-08-20",
+   "kind": "question",
+   "status": "open",
+   "source": "COLLAPSE.md authoring session (Era -1 strategy roster + culminating-events taxonomy), 2026-08-20.",
+   "what": "A reach-based hegemon (trade lanes and dependency, few owned provinces) never trips a holdings-fed strain accumulator, so a major-by-influence could hold its peak indefinitely - contradicting Sprint 30's ruling that collapse is inevitable for a major.",
+   "why_it_matters": "It is the one strategy shape that breaks the arc's central promise, and it is the shape BL-325 ruling 3 (economic reach IS military reach) actively encourages. Left unresolved, the harness's inevitability rate is only asserted over holdings-majors.",
+   "options": [
+    "A) Reach feeds a separate, slower strain (over-commitment abroad) - the Metropole is the longest-lived shape and still breaks, usually via the Slow Fade (COLLAPSE.md E6).",
+    "B) The Metropole gets its own rupture mechanism - HISTORY.md Stage 5 (hegemony fails its final audition) made concrete.",
+    "C) Redefine 'major' to include reach, so the existing accumulator covers it."
+   ],
+   "recommendation": "A - one accumulator concept with two inflow rates keeps the mechanic legible; Stage 5 can later be expressed as a parameterisation of it rather than a second system.",
+   "files": [
+    "docs/lore/COLLAPSE.md",
+    "docs/lore/HISTORY.md",
+    "src/world/history_sim.hpp"
+   ],
+   "resolution": null
   }
  ]
 }
