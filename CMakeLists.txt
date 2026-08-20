@@ -689,6 +689,26 @@ target_link_libraries(substrate_census PRIVATE io_world_obj lua54)
 target_compile_features(substrate_census PRIVATE cxx_std_20)
 target_compile_options(substrate_census PRIVATE ${IO_WARNING_FLAGS})
 
+# province_capacity_probe (2026-08-20) — live-Lua for exactly substrate_census's
+# reason above: it measures the world AFTER generate_background_firms, so every
+# authored input must be the real one or it reports a world the game never builds.
+# It asks whether the per-tile building cap is BINDING, ahead of any decision to
+# replace it with a province-pooled budget. Reports only; gates nothing.
+add_executable(province_capacity_probe
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/province_capacity_probe.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/works_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(province_capacity_probe PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(province_capacity_probe PRIVATE io_world_obj lua54)
+target_compile_features(province_capacity_probe PRIVATE cxx_std_20)
+target_compile_options(province_capacity_probe PRIVATE ${IO_WARNING_FLAGS})
+
 # font_glyph_harness (BL-234) is the one harness that links ImGui rather than
 # ${IO_WORLD_SOURCES}: the defect it guards is the ImFontConfig handed to
 # AddFontFromFileTTF, which lives in src/ui/fonts.cpp, not in world/*. It still
@@ -884,6 +904,10 @@ set(IO_TEST_SWEEP_HARNESSES
     # Timeout is a silent failure, so a harness that cannot reliably fit the gate
     # must not be registered as though it could).
     substrate_census
+
+    # Same cost, same reason, added 2026-08-20: province_capacity_probe also
+    # generates a full world per seed with the shipped 400-year pre-epoch era.
+    province_capacity_probe
 
     # PARKED FOR A DIFFERENT REASON (2026-08-12), and the distinction matters.
     #

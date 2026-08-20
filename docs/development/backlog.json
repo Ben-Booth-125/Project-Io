@@ -11911,6 +11911,26 @@
    "authority_doc": "docs/lore/COLLAPSE.md",
    "summary": "NR-356's hole: a reach-hegemon with few holdings never trips a holdings-fed accumulator, dodging Sprint 30's 'inevitable'. Recommended fix (option A): reach feeds the SAME accumulator at a slower rate, so the Metropole is the longest-lived shape and still breaks - usually via the Slow Fade (E6). CONFIRMED by Ben 2026-08-20 (NR-356 resolved, option A): 'logistics should be capable of determining reach... reach feeds strain' - the inflow reads the same logistics/reach substrate as everything else, per BL-325 ruling 3 (one reach field).",
    "design": "One additional inflow term on BL-504's accumulator scaled by reach-derived exposure (routes/dependencies held abroad). HISTORY.md Stage 5 (hegemony fails its final audition) later becomes a parameterisation of this, not a second system. RULED 2026-08-20 (Ben, NR-356 resolved, option A): reach feeds strain, and the inflow reads the same logistics/reach substrate as everything else per BL-325 ruling 3 (one reach field) - no longer pending; the filed shape stands as ruled."
+  },
+  {
+   "id": "BL-511",
+   "short_name": "PROVINCE_AS_RENDER_UNIT",
+   "title": "Render the province, not the hex: province-grain canvas with softened borders",
+   "status": "design-owed",
+   "priority": "B",
+   "difficulty": "L",
+   "version_goal": "v0.1.20",
+   "category": "UI",
+   "raised": "2026-08-20",
+   "files": [
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/selection_panel.cpp",
+    "src/ui/icons.cpp",
+    "docs/ui/PLANETARY.md",
+    "docs/ui/CANVASES.md",
+    "docs/ui/SELECTION.md"
+   ],
+   "design": "## Ben's framing (2026-08-20)\n\nDecouple play from tiles: rather than rendering hexes, render the PROVINCE as a\nunit, with graphics that blend neighbouring tiles into each other, softening the\nborders.\n\nFiled as the presentation half of that session's idea. The MECHANICAL half — a\nderived per-province building limit, so productivity packs into a smaller space —\nis separable, does not depend on this, and was taken first (Ben's call, same\nsession: \"B for the limit, and file rendering into backlog\").\n\n## Why this is design-owed and not ready to build\n\nIt is a THIRD position on a grain question that already has two dated rulings, and\nonly Ben can move it:\n\n1. **2026-08-13, BL-315 ruling 2** — units are tokens on the TILE map, explicitly\n   \"not armies at province grain\".\n2. **2026-08-19, BL-467** — reconciled by SPLITTING the grains: command stays the\n   tile, the province supplies the ENGAGEMENT envelope. Both rulings are Ben's,\n   five days apart, and compatible.\n\nRendering the province as the play unit is neither of those. It moves the grain the\nplayer SEES and CLICKS, which is the grain the tile-token ruling was about. Landing\nthis without a ruling would overturn 2026-08-13 silently.\n\n## What it reaches\n\nWider than it first reads, because the tile is the current key everywhere:\n\n- `body_surface_canvas.cpp` — the hex raster itself, plus the blend between\n  neighbouring compositions. The softening is the actual graphics work and has no\n  precedent in the codebase: every current surface draws crisp hexes.\n- **Every lens.** All eleven overlay modes key on tile fields (LENSES.md). A\n  province-grain canvas needs a per-province reduction of each — a mean, a\n  dominant class, or a deliberate refusal — decided lens by lens.\n- **Selection.** SELECTION.md's single-click-selects / double-click-navigates model\n  is tile-addressed; a province becomes a new selectable entity kind with its own\n  polymorphic content builder.\n- `icons.cpp` — building markers currently sit at tile centres.\n- The **Generation Ledger** (GENERATION_LEDGER.md) explains a TILE's derivation.\n  Its per-tile breadcrumb is the strongest argument for keeping tiles visible\n  somewhere, even if the play grain moves.\n\n## Open questions for the design session\n\n- Does the tile survive as an inspection grain (zoom-in, or the ledger only), or\n  does it become internal entirely?\n- What does a province's terrain READ as, when its tiles differ? A dominant\n  composition loses the mixture that TILES.md's two-axis model exists to express.\n- Do buildings still sit at tile positions inside the rendered province, or float\n  at province grain? BL-467 keeps units tile-canonical; buildings diverging from\n  that would be a second grain split.\n- What happens to the 2x2 block structure the partition already uses (BL-466 ids\n  are body_rank | block_raster_index | component)? Provinces average ~4 tiles on\n  the reference world (32,044 land tiles to 8,294 provinces), so a rendered\n  province is SMALL — is that the unit Ben pictures, or does this item also want a\n  coarser partition?\n\n## Dependency\n\nBL-466 (province partition) is landed, so the data exists. Nothing else blocks the\ndesign; the grain ruling blocks the build.\n"
   }
  ]
 }
