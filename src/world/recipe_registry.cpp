@@ -317,6 +317,10 @@ void recipe_registry::load_from_lua(lua_state& lua)
         pp.reputation_floor        = procurement->get_or("reputation_floor",        pp.reputation_floor);
         pp.reputation_on_complete  = procurement->get_or("reputation_on_complete",  pp.reputation_on_complete);
         pp.reputation_on_cancel    = procurement->get_or("reputation_on_cancel",    pp.reputation_on_cancel);
+        // BL-392 commitment terms.
+        pp.volume_discount_max            = procurement->get_or("volume_discount_max",            pp.volume_discount_max);
+        pp.volume_discount_half_quantity  = procurement->get_or("volume_discount_half_quantity",  pp.volume_discount_half_quantity);
+        pp.offbody_freight_fraction       = procurement->get_or("offbody_freight_fraction",       pp.offbody_freight_fraction);
         m_procurement = pp;
     }
 

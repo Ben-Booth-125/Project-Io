@@ -538,10 +538,21 @@ struct procurement_quote
     entity_id     buyer        = null_entity;
     entity_id     supplier     = null_entity;
     entity_id     body         = null_entity;    ///< Where the supplier fulfils from.
+    /// BL-392: where the goods LAND — the buyer's own body, not the supplier's.
+    /// Delivery used to credit `body`, so the stock arrived on a body the buyer
+    /// had no processor reservation on and the auto-surplus path liquidated it
+    /// in the same tick. Null only if the buyer owns nothing anywhere, in which
+    /// case it degrades to `body` (the pre-BL-392 behaviour, and the only case
+    /// where there is nowhere better to put it).
+    entity_id     delivery_body = null_entity;
     resource_type resource     = resource_type::iron_ore;
     float         quantity     = 0.0f;
-    float         unit_price   = 0.0f;           ///< Quoted at request time; locked in on accept.
-    int32_t       lead_time_ticks = 0;            ///< `base_ticks x ceil(quantity / throughput)`.
+    float         unit_price   = 0.0f;           ///< Quoted at request time; locked in on accept. BL-392: spot LESS the volume discount.
+    int32_t       lead_time_ticks = 0;            ///< BL-392: `base_ticks x ceil(quantity / the SUPPLIER's throughput for this good)`.
+    /// BL-392: carriage to `delivery_body`, in credits, for the WHOLE order.
+    /// Zero when the delivery body is the fulfilment body. Paid to the supplier,
+    /// who arranges the shipping — so it is a transfer, never a burn.
+    float         freight_cost = 0.0f;
 };
 
 /// An accepted procurement contract (BL-350) — "a build order placed with
@@ -555,15 +566,17 @@ struct procurement_contract
     entity_id     supplier        = null_entity;
     entity_id     body            = null_entity;
     resource_type resource        = resource_type::iron_ore;
+    entity_id     delivery_body   = null_entity; ///< BL-392: where the goods land — see procurement_quote.
     float         quantity        = 0.0f;
     float         unit_price      = 0.0f;
     int32_t       lead_time_ticks = 0;
     int32_t       ticks_elapsed   = 0;
     float         deposit_paid    = 0.0f; ///< Already debited at accept_quote (economy.procurement.deposit_fraction).
+    float         freight_cost    = 0.0f; ///< BL-392: carriage for the whole order; paid to the supplier.
 };
 
-static_assert(sizeof(procurement_quote)    == 32, "procurement_quote is a save-format record — see procurement.hpp");
-static_assert(sizeof(procurement_contract) == 40, "procurement_contract is a save-format record — see procurement.hpp");
+static_assert(sizeof(procurement_quote)    == 40, "procurement_quote is a save-format record — see procurement.hpp");
+static_assert(sizeof(procurement_contract) == 48, "procurement_contract is a save-format record — see procurement.hpp");
 
 /// Land-use classification of a tile or zone. Drives the trade-off between
 /// residential, industrial, agricultural, and undeveloped land.
@@ -958,8 +971,11 @@ struct nation_component
     /// payer's debit lands here in the same tick, same float, so the sum is
     /// conserved (asserted by tools/verify/law_author_harness.cpp; the BL-392
     /// class of silent money destruction is gone from this flow). Written only
-    /// by `apply_budget`'s levy pass today; the spend side is future nation-
-    /// grain work under the 2026-08-18 grant.
+    /// by `apply_budget`'s levy pass and by the D4 import tariff, which credits
+    /// here exactly what the buying corporation is debited — also a transfer,
+    /// never a mint. Zero at generation; nothing spends it yet, and a treasury
+    /// that started full would be a balance change smuggled in as a field. The
+    /// spend side is future nation-grain work under the 2026-08-18 grant.
     /// NOT yet serialised and NOT covered by state_hash (nations are hashed
     /// nowhere) — BL-107 must pick this field up; until then a treasury
     /// divergence is only detectable through the debit half on corp balances

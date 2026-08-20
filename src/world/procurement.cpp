@@ -75,10 +75,12 @@ void write_procurement(const world& w, std::ostream& out)
         write_u32(out, q.buyer);
         write_u32(out, q.supplier);
         write_u32(out, q.body);
+        write_u32(out, q.delivery_body);
         write_u8(out, static_cast<uint8_t>(q.resource));
         write_f32(out, q.quantity);
         write_f32(out, q.unit_price);
         write_i32(out, q.lead_time_ticks);
+        write_f32(out, q.freight_cost);
     }
 
     write_u32(out, static_cast<uint32_t>(w.procurement_contracts.size()));
@@ -88,12 +90,14 @@ void write_procurement(const world& w, std::ostream& out)
         write_u32(out, c.buyer);
         write_u32(out, c.supplier);
         write_u32(out, c.body);
+        write_u32(out, c.delivery_body);
         write_u8(out, static_cast<uint8_t>(c.resource));
         write_f32(out, c.quantity);
         write_f32(out, c.unit_price);
         write_i32(out, c.lead_time_ticks);
         write_i32(out, c.ticks_elapsed);
         write_f32(out, c.deposit_paid);
+        write_f32(out, c.freight_cost);
     }
 
     write_u32(out, static_cast<uint32_t>(w.corp_reputation.size()));
@@ -130,13 +134,13 @@ bool read_procurement(world& w, std::istream& in)
         procurement_quote q;
         uint8_t           res = 0;
         if (!read_u32(in, q.id) || !read_u32(in, q.buyer) || !read_u32(in, q.supplier) ||
-            !read_u32(in, q.body))
+            !read_u32(in, q.body) || !read_u32(in, q.delivery_body))
             return false;
         if (!read_u8(in, res) || !valid_resource_id(res))
             return false;
         q.resource = static_cast<resource_type>(res);
         if (!read_f32(in, q.quantity) || !read_f32(in, q.unit_price) ||
-            !read_i32(in, q.lead_time_ticks))
+            !read_i32(in, q.lead_time_ticks) || !read_f32(in, q.freight_cost))
             return false;
         quotes.push_back(q);
     }
@@ -152,14 +156,14 @@ bool read_procurement(world& w, std::istream& in)
         procurement_contract c;
         uint8_t              res = 0;
         if (!read_u32(in, c.id) || !read_u32(in, c.buyer) || !read_u32(in, c.supplier) ||
-            !read_u32(in, c.body))
+            !read_u32(in, c.body) || !read_u32(in, c.delivery_body))
             return false;
         if (!read_u8(in, res) || !valid_resource_id(res))
             return false;
         c.resource = static_cast<resource_type>(res);
         if (!read_f32(in, c.quantity) || !read_f32(in, c.unit_price) ||
             !read_i32(in, c.lead_time_ticks) || !read_i32(in, c.ticks_elapsed) ||
-            !read_f32(in, c.deposit_paid))
+            !read_f32(in, c.deposit_paid) || !read_f32(in, c.freight_cost))
             return false;
         contracts.push_back(c);
     }

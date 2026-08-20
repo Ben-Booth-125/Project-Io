@@ -1,5 +1,7 @@
 #include "market_clearing.hpp"
 
+#include "law.hpp" // the D4 import tariff: any_import_tariff_enacted / nation_tariff_rate
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -890,6 +892,68 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         }
         flows[t.seller].income     += t.qty * t.price;
         flows[t.buyer].expenditure += t.qty * t.price;
+    }
+
+    // --- Import tariff (Sprint D4) ------------------------------------------
+    // A market already resolves to a jurisdiction: `market_component::centre_tile`
+    // through `world::tile_to_nation`. That hook existed and was unused — no
+    // sale in this economy had ever been a CROSS-BORDER sale, only a sale.
+    //
+    // The rule, in one line: a matched trade whose BUYER is domiciled outside the
+    // market's own nation pays that nation's enacted duty, and the duty is
+    // credited to that nation's treasury. A same-nation sale is charged nothing —
+    // a tariff that taxed domestic trade would be a sales tax wearing the wrong
+    // name.
+    //
+    // It is charged ONLY on matched explicit trades, and that is a principled
+    // limit rather than an oversight: a matched trade is the only clearing path
+    // with a real counterparty on both sides. The auto-surplus and buyer-of-
+    // last-resort paths trade against the market itself, and taxing an import
+    // from nobody would invent the second party the flow does not have.
+    //
+    // CONSERVATION. The buyer's expenditure rises by exactly the amount the
+    // treasury rises by, in the same statement — a transfer, never a mint and
+    // never a burn. `apply_budget` charges expenditure unconditionally (a corp's
+    // balance may go negative), so the two sides cannot drift apart on a
+    // solvency edge.
+    //
+    // Gated on `any_import_tariff_enacted`, so with no tariff law enacted — the
+    // shipped default — not one line below runs and the tick is bit-identical to
+    // the pre-tariff arithmetic.
+    if (any_import_tariff_enacted(w))
+    {
+        // `trades` is built in the deterministic book order above, so this float
+        // accumulation into each treasury is the same number every run.
+        for (const matched_trade& t : trades)
+        {
+            const market_component& mc = w.markets.at(t.market);
+            if (mc.centre_tile == null_entity)
+                continue; // an unanchored market sits in no jurisdiction
+
+            const auto nit = w.tile_to_nation.find(mc.centre_tile);
+            if (nit == w.tile_to_nation.end())
+                continue;
+            const entity_id market_nation = nit->second;
+
+            const auto bcit = w.corporations.find(t.buyer);
+            if (bcit == w.corporations.end())
+                continue;
+            if (bcit->second.home_nation == market_nation)
+                continue; // domestic buyer: not an import
+
+            const float rate = nation_tariff_rate(w, market_nation,
+                                                  static_cast<resource_type>(t.r));
+            if (rate <= 0.0f)
+                continue;
+
+            const auto tnit = w.nations.find(market_nation);
+            if (tnit == w.nations.end())
+                continue; // no treasury to pay into: charge nothing
+
+            const float duty = t.qty * t.price * rate;
+            flows[t.buyer].expenditure += duty;
+            tnit->second.treasury      += duty;
+        }
     }
 
     // --- Auto-clear unmatched player sell supply ---
