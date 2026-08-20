@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*157 entries — 106 open, 51 resolved.*
+*160 entries — 109 open, 51 resolved.*
 
 ---
 
@@ -1046,6 +1046,21 @@ BL-463 design cites 26 of 43 nations with no road network on seed 0. The new roa
 *novel-work · raised 2026-08-20 · from Lane B1 (Sprint B2, road cuts), agent report + main-session diff review, merged at 530eb87.*
 
 Nothing in the reading list owns the question how does a worktree agent build a harness. A fresh worktree has no configured build tree and a CMake configure pulls SDL + Lua over FetchContent, which is not worth paying for one harness. The agent wrote build_gen_harness.bat at the repo root: it globs srcworld*.cpp minus the four sol2 TUs exactly as io_world_obj does, so unlike the README hand-written cl recipes it cannot drift stale - which is the standing complaint against those recipes. Merged with the lane. Two things owed and both need your permission: folding this into the verifier-headless skill, and naming road_reach_census there so it becomes a permanent asset rather than a loose tool.
+
+### NR-393 — MAJOR: the Era -1 sim now conquers on half the seed set - the filed 267-battles/0-conquests premise is gone, and Sprint 28 framing is wrong
+*observation · raised 2026-08-20 · from Lane A (Sprint 27, BL-384 assertion half), agent report verified against main by the main session.*
+
+Fresh 8-world sweep on real terrain, measured today against the current build: 4 of 8 seeds fight AND take ground, at a near-1:1 conquest:battle ratio (144/137, 272/272, 272/272, 27/27). The other 4 seeds see zero battles. So Campaign is not universally unreachable - it is SEED-DEPENDENT and bimodal. Sprint 28 plans its fix on the premise that Settle always outscores Campaign under the shared currency; that premise does not hold on half the set, and a fix tuned against it would be tuning away a behaviour that already works on seeds 1, 2, 4 and 6. Sprint 27 own risk clause named exactly this outcome and instructed that it be reported rather than absorbed. Also unchanged and still red: 0 polities eliminated and 0 hegemonies anywhere in the set - BL-308 spiral still does not end.
+
+### NR-394 — Refinement error: Sprint 27 assertion half was already delivered before I promoted it
+*decision taken on your behalf · raised 2026-08-20 · from Lane A (Sprint 27, BL-384 assertion half), agent report verified against main by the main session.*
+
+I promoted Task A1 (author the BL-384 conquest assertion) into the four-lane batch. It was already committed on main at 610e276 and f4a0c18 - the BL384a/BL384b assertions, the elimination counter and the dominance-share counter all exist, reusing history_sweep hegemony_threshold_q verbatim. I checked BL-384 status (designed) but not whether the assertion HALF specifically had landed, and the item stays open because the FIX half is outstanding. The agent correctly authored nothing, changed nothing, and made no commit; the lane still paid for itself by re-measuring (NR-393). Method note worth taking: a half-delivered item reads as designed in the backlog index, so status alone does not answer has this part shipped - the item dated notes or git log do.
+
+### NR-395 — The R7 perf assertion is still live and failing although the backlog says it was dropped
+*observation · raised 2026-08-20 · from Lane A (Sprint 27, BL-384 assertion half), agent report verified against main by the main session.*
+
+history_sim_harness R7 (a perf budget) fails at 16679 ms on the primary Kepler run. The backlog records this budget as DROPPED in favour of BL-320, but the assertion was never removed from the harness, so it reds every run and adds noise to a harness whose reds are supposed to mean something. Either the drop did not happen and the budget is real, or the assertion should go. Small, but a permanently-red assertion trains everyone to ignore the harness.
 
 ---
 

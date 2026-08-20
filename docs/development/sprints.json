@@ -573,9 +573,9 @@
   {
    "id": "27",
    "theme": "The run is retained, and its failure is falsifiable",
-   "state": "open",
+   "state": "closed",
    "opened_date": "2026-08-18",
-   "closed_date": null,
+   "closed_date": "2026-08-20",
    "goal": "Lane A opens. Make 'the sim conquers nothing' a red assertion rather than a remembered observation — and stop discarding the history the world was generated from.",
    "planned": [
     "BL-384 (Era −1 sim conquers nothing) — THE ASSERTION HALF ONLY. A conquest-count assertion, plus elimination and dominance-share counters the harness lacks, reusing history_sweep.cpp's existing hegemony_threshold_q shape. Sub-agent, worktree-isolated. Expected outcome is a RED assertion committed against today's build.",
@@ -584,7 +584,8 @@
    ],
    "done_when": "history_sim_harness fails on conquest count against today's build, with the measured conquest, elimination and dominance numbers recorded as the baseline Sprint 28 moves.",
    "risk": "If the assertion unexpectedly PASSES, the 267-battles/0-conquests measurement is stale and Sprint 28's premise changes. Agent instructed to report that as a major finding rather than adjust the seed set.",
-   "notes": "Open 2026-08-18 — Lane A; BL-384 assertion half only, expected RED (per status table). Explicitly out: the fix. No constant is tuned, no scorer term is changed, and the instrumentation is committed as evidence first — BL-384's own ordering discipline."
+   "notes": "Open 2026-08-18 — Lane A; BL-384 assertion half only, expected RED (per status table). Explicitly out: the fix. No constant is tuned, no scorer term is changed, and the instrumentation is committed as evidence first — BL-384's own ordering discipline.",
+   "retro": "Closed 2026-08-20 WITHOUT new code - the assertion half was already delivered at 610e276 and f4a0c18 before the sprint was promoted (NR-394, a refinement error). The lane paid for itself by RE-MEASURING against the current build, and the measurement overturns the sprint own baseline. Recorded baseline, 8-world sweep on real terrain: 4 of 8 seeds fight and take ground at a near-1:1 conquest:battle ratio (144/137, 272/272, 272/272, 27/27); the other 4 see zero battles; 0 eliminations and 0 hegemonies anywhere. The filed 267-battles/0-conquests shape is GONE and so is the 2026-08-19 zero-battles-everywhere shape. Sprint 27 risk clause fired exactly as written: the premise is stale, and Sprint 28 must be re-planned against a BIMODAL Campaign reachability rather than a uniform one (NR-393)."
   },
   {
    "id": "B1",
