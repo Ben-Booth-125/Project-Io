@@ -4,8 +4,79 @@
 #include "world.hpp"
 
 #include <cstddef>
+#include <cstdint>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
+
+// ---------------------------------------------------------------------------
+// Interdiction (BL-458 — supply lines can be cut)
+// ---------------------------------------------------------------------------
+// Until this, nothing in the game could stop a convoy: cargo moved from dispatch
+// to arrival with no interaction with units, stance or force of any kind, so the
+// logistics layer and the military layer shared a world and touched nowhere.
+//
+// The predicate is STANCE and only stance. Hostility is a declared state a corp
+// opts into (Ben, 2026-08-17, the BL-448 ruling) and it is DIRECTED, so a corp
+// can be at war and not know it yet — the ambush property. Nothing here makes a
+// corp hostile; interdiction only reads `is_hostile`. There is no incidental
+// interception by neutrals, no terrain blockade and no ambient banditry, which
+// is also what stops this being a random tax on trade.
+//
+// The outcome is CAPTURE (Ben, 2026-08-17, on NR-310), with destruction as the
+// fallback when the cargo cannot be credited anywhere. Cargo already left the
+// source pool at dispatch, so both answers conserve; capture is chosen because
+// destroy-only would give the scored-utility rival a payoff of zero and it would
+// correctly never rank interdiction, shipping a capability only the player ever
+// fires.
+
+/// What became of an intercepted convoy's cargo.
+enum class interception_outcome : std::uint8_t
+{
+    captured  = 0, ///< Credited whole to the interceptor's pool at the interception body.
+    destroyed = 1, ///< Nothing credited anywhere — the fallback, never a mint.
+};
+
+/// One interception, as it happened. Returned by `intercept_convoys` for the
+/// surfaces to narrate; deliberately NOT stored on `world` — see that function.
+struct interception_record
+{
+    std::uint32_t        convoy_id        = 0;
+    entity_id            victim_corp      = null_entity;
+    entity_id            interceptor_corp = null_entity;
+    entity_id            interceptor_unit = null_entity;
+    entity_id            tile             = null_entity; ///< Where the convoy's head stood.
+    entity_id            body             = null_entity;
+    resource_type        cargo_resource   = resource_type::iron_ore;
+    float                cargo_qty        = 0.0f;
+    interception_outcome outcome          = interception_outcome::captured;
+    int                  tick             = 0;
+};
+
+/// Cut every convoy standing on a tile held by a unit whose owner has declared
+/// hostility toward the convoy's corp. The cargo credits the interceptor's
+/// `(corp, body)` pool at the interception body, or — if the interceptor is not
+/// a corporation, or the tile resolves to no body — is destroyed. The convoy is
+/// then erased: it never arrives and never credits its destination.
+///
+/// **Conservation is the load-bearing property.** Captured quantity in equals
+/// quantity credited, exactly; the destroyed path credits nothing and mints
+/// nothing. No path creates goods.
+///
+/// **Deterministic.** Convoys are walked in `w.convoys` order (dispatch already
+/// builds that from sorted corp/market ids); the tile occupancy index is built
+/// from a SORTED unit-id walk, so the interceptor chosen on a contested tile is
+/// always the lowest-id hostile unit, never whichever the hash landed on. No RNG
+/// anywhere — detection and outcome are both total functions of world state.
+///
+/// Runs at the top of `credit_arrived_convoys`, which is the ONLY seam between
+/// `advance_convoys` and crediting that every caller (app, main, every harness)
+/// already shares. Exposed separately so a harness can fire it directly.
+///
+/// @return one record per cut convoy, in the order they were cut. Nothing is
+///         stored on `world`: the comms message, the Convoys-tab cause and the
+///         canvas mark BL-458 asks for all need a store this lane did not open.
+std::vector<interception_record> intercept_convoys(world& w, int tick);
 
 /// Advance every in-flight convoy by its speed increment. Convoys whose progress
 /// reaches >= 1.0 have their `arrived` flag set; they are not yet retired here —

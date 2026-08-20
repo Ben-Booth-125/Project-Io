@@ -3,6 +3,7 @@
 #include "components.hpp"
 #include "world.hpp"
 
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 
@@ -196,3 +197,51 @@ inline constexpr int econ_tick_days_world = 90;
 /// a short one takes a single quarter, where previously every haul took exactly
 /// one regardless of length.
 int convoy_travel_ticks(const world& w, entity_id body, const logistics_path& path);
+
+// ---------------------------------------------------------------------------
+// Convoy position (BL-458 — a convoy already HAS a position)
+// ---------------------------------------------------------------------------
+// `convoy_component` stores no path and no tile, which reads at first like
+// interdiction needing new state. It does not. The full tile path is derivable
+// from the two market endpoints, and `progress` interpolates a head along it.
+// body_surface_canvas.cpp has derived exactly that since BL-152 to draw the
+// vision beam; this is that derivation MOVED out of the renderer, so the world
+// and the picture cannot disagree about where a convoy is.
+//
+// THE ORIENTATION RULE LIVES HERE, and that is the point of the move.
+// `intra_body_path` caches on a canonicalised (lo, hi) endpoint key and
+// canonicalises its reconstructed tile sequence to lo->hi to match — so the
+// cached path runs source->destination only when the source tile happens to be
+// the numerically lower id. Every reader therefore owes a conditional reverse.
+// A reader that forgets it puts the head at the WRONG END of the lane roughly
+// half the time, and on screen the beam looks fine either way, so nothing
+// catches it. One owner of the rule, asserted in both directions by
+// tools/verify/interdiction.cpp.
+
+/// A convoy's lane as tiles. `body` is the body both endpoints sit on, or
+/// `null_entity` for an inter-body (space) lane, which has no tile path at all.
+/// `tiles` runs SOURCE -> DESTINATION and is empty when the lane is inter-body,
+/// when either endpoint market / centre tile is unresolved, or when no path
+/// exists.
+struct convoy_route
+{
+    entity_id              body = null_entity;
+    std::vector<entity_id> tiles;
+};
+
+/// Derive @p cv's lane, oriented source->destination. Non-const `w` because
+/// `intra_body_path` populates the A* cache; nothing else is mutated and no
+/// game state is created. (BL-458's design writes this as taking a
+/// `const world&`; that is not achievable without a second, uncached A*.)
+convoy_route convoy_route_tiles(world& w, const convoy_component& cv);
+
+/// Index of the head along a lane of @p tile_count tiles at @p progress (0..1).
+/// Factored out so the renderer's glide — which offsets progress by the
+/// fraction through the current econ tick — and the sim's discrete read share
+/// ONE rounding rule. Returns -1 for an empty lane.
+int convoy_head_index(std::size_t tile_count, float progress);
+
+/// The tile @p cv's head occupies right now, or `null_entity` when it has none:
+/// an inter-body leg in transit, an unresolved endpoint, or an unreachable
+/// lane. The interdiction trigger's single question.
+entity_id convoy_tile_at(world& w, const convoy_component& cv);

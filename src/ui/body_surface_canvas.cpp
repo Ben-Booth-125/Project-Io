@@ -929,19 +929,15 @@ void update_body_vision(world& w, ui_state& state, double now_days)
     for (const auto& cv : w.convoys)
     {
         if (cv.corp != w.player_entity) continue;
-        const auto sm = w.markets.find(cv.source_market);
-        const auto dm = w.markets.find(cv.dest_market);
-        if (sm == w.markets.end() || dm == w.markets.end()) continue;
-        if (sm->second.body != body || dm->second.body != body) continue;
-        const entity_id st = sm->second.centre_tile;
-        const entity_id dt = dm->second.centre_tile;
-        if (st == null_entity || dt == null_entity) continue;
-        const logistics_path& lp = intra_body_path(w, body, st, dt);
-        if (!lp.reachable || lp.tiles.empty()) continue;
-        std::vector<entity_id> path = lp.tiles; // copied: reversed below, cache stays canonical
-        if (st != std::min(st, dt)) std::reverse(path.begin(), path.end());
+        // BL-458: the endpoint resolution, the A* lookup and the lo->hi orientation
+        // flip used to live inline here. They are now convoy_route_tiles
+        // (world/logistics.hpp), because interdiction has to ask the SAME question
+        // ("which tile is this convoy on?") and a second private copy of the
+        // orientation rule would be a silent, unrenderable divergence.
+        convoy_route route = convoy_route_tiles(w, cv);
+        if (route.body != body || route.tiles.empty()) continue;
         state.convoy_beams.push_back(
-            { std::move(path), std::clamp(cv.progress, 0.0f, 1.0f), std::max(cv.speed, 0.0f) });
+            { std::move(route.tiles), std::clamp(cv.progress, 0.0f, 1.0f), std::max(cv.speed, 0.0f) });
     }
 }
 

@@ -2,6 +2,7 @@
 
 #include "logistics.hpp"
 #include "orbital_system.hpp"
+#include "stance.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -31,8 +32,131 @@ void advance_convoys(world& w)
     }
 }
 
+std::vector<interception_record> intercept_convoys(world& w, int tick)
+{
+    std::vector<interception_record> cuts;
+    if (w.convoys.empty() || w.units.empty() || w.corp_hostile_pairs.empty())
+        return cuts; // nothing declared, nothing standing, or nothing in flight
+
+    // Tile -> units standing on it, built from a SORTED unit-id walk so the
+    // per-tile candidate order is a property of the ids and never of the
+    // unordered_map's layout. The lowest-id hostile unit on a contested tile is
+    // therefore always the interceptor, on every replay of the same seed.
+    std::vector<entity_id> unit_ids;
+    unit_ids.reserve(w.units.size());
+    for (const auto& [uid, uc] : w.units)
+        unit_ids.push_back(uid);
+    std::sort(unit_ids.begin(), unit_ids.end());
+
+    std::unordered_map<entity_id, std::vector<entity_id>> units_on_tile;
+    for (const entity_id uid : unit_ids)
+    {
+        const unit_component& uc = w.units.at(uid);
+        if (uc.position == null_entity || uc.owner == null_entity || uc.count <= 0)
+            continue;
+        units_on_tile[uc.position].push_back(uid);
+    }
+    if (units_on_tile.empty())
+        return cuts;
+
+    // Walk convoys in w.convoys order. dispatch_convoys builds that order from
+    // sorted corp and market id walks, and the player's verb appends, so it is
+    // already replay-stable; nothing here re-sorts it and risks disagreeing with
+    // credit_arrived_convoys about which convoy is which.
+    std::vector<std::uint32_t> cut_ids;
+    for (const convoy_component& cv : w.convoys)
+    {
+        const entity_id tile = convoy_tile_at(w, cv);
+        if (tile == null_entity)
+            continue; // inter-body leg in transit, or an unresolvable lane
+
+        const auto occ = units_on_tile.find(tile);
+        if (occ == units_on_tile.end())
+            continue;
+
+        entity_id interceptor_unit = null_entity;
+        entity_id interceptor_corp = null_entity;
+        for (const entity_id uid : occ->second)
+        {
+            const unit_component& uc = w.units.at(uid);
+            if (uc.owner == cv.corp)
+                continue; // your own escort is not your ambusher
+            // DIRECTED, and only this direction: the tile's holder must have
+            // DECLARED hostility toward the cargo's owner. A corp that has been
+            // declared against but has not answered is a victim, not a raider.
+            if (!is_hostile(w, uc.owner, cv.corp))
+                continue;
+            interceptor_unit = uid;
+            interceptor_corp = uc.owner;
+            break; // sorted order: first hit is the lowest-id hostile unit
+        }
+        if (interceptor_unit == null_entity)
+            continue;
+
+        interception_record rec;
+        rec.convoy_id        = cv.id;
+        rec.victim_corp      = cv.corp;
+        rec.interceptor_corp = interceptor_corp;
+        rec.interceptor_unit = interceptor_unit;
+        rec.tile             = tile;
+        rec.cargo_resource   = cv.cargo_resource;
+        rec.cargo_qty        = cv.cargo_qty;
+        rec.tick             = tick;
+
+        const auto tit = w.tiles.find(tile);
+        rec.body = (tit != w.tiles.end()) ? tit->second.body : null_entity;
+
+        // CAPTURE, with destruction as the fallback. The cargo is credited whole
+        // to the interceptor's pool at the interception body — the same pool a
+        // delivery would have credited, so quantity in == quantity credited by
+        // construction. It is destroyed only when there is nowhere to put it: no
+        // body under the tile, or an interceptor that is not a corporation and
+        // therefore holds no pools. An interceptor sitting on goods it has no
+        // market for is a legitimate outcome and is NOT special-cased away.
+        const bool creditable = rec.body != null_entity &&
+                                w.corporations.find(interceptor_corp) != w.corporations.end() &&
+                                std::isfinite(cv.cargo_qty);
+        if (creditable)
+        {
+            w.pool_for(interceptor_corp, rec.body).quantities[
+                static_cast<std::size_t>(cv.cargo_resource)] += cv.cargo_qty;
+            rec.outcome = interception_outcome::captured;
+        }
+        else
+        {
+            rec.outcome = interception_outcome::destroyed;
+        }
+
+        cuts.push_back(rec);
+        cut_ids.push_back(cv.id);
+    }
+
+    if (!cut_ids.empty())
+    {
+        // Erase the cut convoys. They never arrive, so credit_arrived_convoys
+        // below never sees them and the destination pool is never credited —
+        // which is the whole mechanic: the lane was cut.
+        w.convoys.erase(
+            std::remove_if(w.convoys.begin(), w.convoys.end(),
+                           [&cut_ids](const convoy_component& c) {
+                               return std::find(cut_ids.begin(), cut_ids.end(), c.id)
+                                      != cut_ids.end();
+                           }),
+            w.convoys.end());
+    }
+
+    return cuts;
+}
+
 void credit_arrived_convoys(world& w, int tick)
 {
+    // BL-458: interdiction runs FIRST, before anything is credited. This is the
+    // ordering the item specifies — after advance_convoys, before crediting —
+    // and it is placed here rather than at the four call sites because this is
+    // the one seam app.cpp, main.cpp and every harness already share. A convoy
+    // cut here never reaches the loop below, so it never credits its destination.
+    (void)intercept_convoys(w, tick);
+
     // Credit in insertion order, then erase in one sweep.
     for (const auto& convoy : w.convoys)
     {
