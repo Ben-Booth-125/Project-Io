@@ -105,6 +105,33 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\procurement_harness.cpp ^
    /Fo:build_gen\verify\procurement_harness\ /Fe:build_gen\verify\procurement_harness.exe
 .\build_gen\verify\procurement_harness.exe
 
+:: BL-392 (procurement contracts destroy value) + the Sprint D4 import tariff.
+:: Money and goods conservation across BOTH flows: every credit a contract
+:: debits from the buyer arrives at the supplier (deposit, instalments and
+:: freight alike), and every credit the tariff debits arrives in the enacting
+:: nation's treasury. Also re-measures the round-trip economics the item was
+:: filed on (the -0.14-credit 20-unit iron round trip), asserts the lead time
+:: now tracks the SUPPLIER's throughput, and asserts that with no tariff law
+:: enacted the world is bit-identical to a control carrying no law record.
+::
+:: NOTE ON WHAT IT DOES *NOT* CLAIM: the wider economy is not a closed system —
+:: the market is a buyer of last resort and pays sellers with nobody's money —
+:: so the conservation spans are run against the seam in isolation, or against a
+:: law-free control world. See the harness's own header comment.
+::
+:: A batch wrapper lives at build_money_conservation.bat (repo root) for the
+:: same reason run_harness.bat does.
+cl /nologo /std:c++20 /EHsc /I src tools\verify\money_conservation.cpp ^
+   src\world\world.cpp src\world\economy_system.cpp ^
+   src\world\market_clearing.cpp src\world\budget_system.cpp ^
+   src\world\corp_command.cpp src\world\construction.cpp src\world\placement_rules.cpp ^
+   src\world\condition_set.cpp src\world\survey_system.cpp src\world\logistics.cpp ^
+   src\world\unit_roster.cpp src\world\law.cpp src\world\building_profit.cpp ^
+   src\world\corp_ai.cpp src\world\stance.cpp src\world\supply_system.cpp ^
+   src\world\tech_gate.cpp src\world\river_generation.cpp ^
+   /Fo:build_gen\verify\money_conservation\ /Fe:build_gen\verify\money_conservation.exe
+.\build_gen\verify\money_conservation.exe
+
 :: Corp stance (BL-448) — the directed hostility map + canonicalised friendship
 :: map + pending-offer table, and the four corp_command verbs that mutate them
 :: (declare_hostile / offer_friendship / accept_friendship / return_to_neutral).

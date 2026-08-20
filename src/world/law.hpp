@@ -53,6 +53,16 @@ struct world; // forward-declared; law.cpp reads it.
 enum class law_effect_kind : uint8_t
 {
     extraction_levy = 0, ///< Family (a): a per-unit levy on raw extraction output.
+
+    /// Family (a) again, but with a SECOND PARTY: an ad-valorem duty on a sale
+    /// made in the enacting nation's own market to a buyer domiciled elsewhere.
+    /// It is the first law effect whose proceeds go somewhere — the extraction
+    /// levy debits a corp and credits nobody, because in 1960 there was no
+    /// nation treasury to credit. There is now (nation_component::treasury), and
+    /// the tariff is a TRANSFER: the buyer is debited exactly what the enacting
+    /// nation is credited, never a credit more or less. `law::rate` is the
+    /// FRACTION of the trade's value, not a per-unit charge.
+    import_tariff = 1,
 };
 
 /// One law. `conditions` is empty for the common case — BL-155: "most laws are
@@ -62,6 +72,13 @@ struct law
 {
     std::string     id;      ///< Stable identifier, e.g. "LAW-EXTRACTION-LEVY".
     std::string     name;    ///< Display name for the budget ledger and the laws surface.
+
+    /// WHO ENACTED IT. Null for the prototype's corp-facing laws, which have no
+    /// author because they had nowhere to send their proceeds. An `import_tariff`
+    /// REQUIRES one: the author is both the jurisdiction whose market the duty
+    /// applies in and the treasury it is paid into, so a tariff with a null
+    /// author is inert by construction rather than by a special case.
+    entity_id       author_nation = null_entity;
     condition_set   conditions;                                ///< Empty = always-on once enacted.
     law_effect_kind effect  = law_effect_kind::extraction_levy;
     bool            enacted = false;
@@ -100,6 +117,28 @@ struct law_effects
 /// @param subject_corp Corporation the laws are being resolved for.
 /// @return             The effects in force on that corp this tick.
 law_effects evaluate_laws(const world& w, entity_id subject_corp);
+
+/// True iff ANY enacted law in @p w is an import tariff. The whole tariff pass
+/// in the clearing tick hangs off this: when it is false — the shipped default,
+/// since no tariff is enacted at world setup — not one line of tariff arithmetic
+/// runs and the world is bit-identical to the pre-tariff build.
+bool any_import_tariff_enacted(const world& w);
+
+/// The import-duty rate levied by @p nation on a sale of @p resource in its own
+/// market to a foreign buyer, as a fraction of the trade's value. Rates from
+/// several enacted laws STACK ADDITIVELY, matching the extraction levy's own
+/// rule, and the total is clamped to [0, 1] so a stack of laws can never charge
+/// a buyer more than the goods are worth.
+///
+/// Pure and deterministic: it walks `w.laws` in the world's authored order and
+/// reads nothing else. Zero for a null nation, an unauthored law, or a resource
+/// no enacted tariff reaches.
+///
+/// This is a RATE SET BY LAW, and deliberately not a nation deciding anything:
+/// the standing grant for nation behaviour (io-standing-rules § Determinism &
+/// data model, 2026-08-18) admits a tariff rate and excludes a nation planner,
+/// and nothing here chooses, scores or schedules.
+float nation_tariff_rate(const world& w, entity_id nation, resource_type resource);
 
 /// The one-law seed for the prototype (BL-343): an extraction levy on all raw
 /// output, UN-ENACTED. Appended to `world::laws` at world setup so the surface

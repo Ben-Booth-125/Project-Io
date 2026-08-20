@@ -454,6 +454,47 @@ placed with someone else means).
 
 Verified by `tools/verify/money_conservation.cpp`.
 
+
+
+
+## Tariffs — the first flow that pays a nation (Sprint D4, 2026-08-20)
+
+A market has always resolved to a jurisdiction: `market_component::centre_tile` through
+`world::tile_to_nation`. The hook existed and nothing read it, because no sale in this economy had
+ever been a **cross-border** sale — only a sale.
+
+**The rule, in one line:** a matched trade whose buyer is domiciled outside the market's own
+nation pays that nation's enacted import duty, and the duty is credited to that nation's treasury.
+
+- **The rate is set by law, and only by law.** `law_effect_kind::import_tariff` is family (a)
+  again, but ad-valorem (`law::rate` is a fraction of the trade's value, not a per-unit charge)
+  and with a second party. `law` gains an **`author_nation`**: the author is both the jurisdiction
+  the duty applies in and the treasury it is paid into, so a tariff with a null author is inert by
+  construction rather than by a special case. Rates from several enacted laws stack additively,
+  clamped to `[0, 1]` — a stack of laws cannot charge a buyer more than the goods are worth.
+- **`nation_component` gains a `treasury`.** A nation had no balance at all until a law of its own
+  could collect one. It is zero at generation: nothing else spends it yet, and a treasury that
+  started full would be a balance change smuggled in as a field.
+- **A same-nation sale is charged nothing.** A tariff that taxed domestic trade would be a sales
+  tax wearing the wrong name.
+- **Only matched explicit trades are charged**, and that is a principled limit rather than an
+  oversight: a matched trade is the only clearing path with a real counterparty on both sides. The
+  auto-surplus and buyer-of-last-resort paths trade against the market itself, and taxing an
+  import from nobody would invent the second party the flow does not have.
+- **It is a transfer.** The buyer's expenditure rises by exactly what the treasury rises by, in
+  the same statement. `apply_budget` charges expenditure unconditionally (a balance may go
+  negative), so the two sides cannot drift apart on a solvency edge.
+- **Off by default, and provably so.** The whole pass is gated on `any_import_tariff_enacted`; with
+  no tariff enacted, not one line of tariff arithmetic runs and the world is bit-identical to the
+  pre-tariff build — asserted by `money_conservation.cpp` as a state hash against a control world
+  carrying no law record at all.
+
+**This is a rate, not a planner.** The standing grant for nation behaviour
+(`.claude/rules/io-standing-rules.md` § Determinism & data model, 2026-08-18) admits a nation
+holding a treasury and setting a tariff rate by law, and excludes a nation planner. Nothing here
+chooses, scores or schedules: `nation_tariff_rate` walks the authored law list and returns a
+number.
+
 ## Price resolution
 
 `resolve_price`, per (market, resource):
