@@ -11613,6 +11613,140 @@
    "authority_doc": "docs/development/DELIVERY.md",
    "summary": "Ben's ask (2026-08-20): the corpus (~650K tokens) is too large for one session to consume, so sessions should be prompted differently by role. Saves the recurring worktree sub-agent roles as .claude/agents/ definitions (economy-dev, ui-dev, generation-dev - joining code-reviewer) and adds directory-scoped CLAUDE.md files for src/world and src/ui, each a pointer set into the authority docs plus the always-on invariants for that layer.",
    "design": "Three principles, all pointer-not-copy: (1) a role definition carries its reading list, invariants and commit discipline so a spawn needs only the task brief; (2) a directory CLAUDE.md loads automatically and carries only what every session in that directory needs - the root CLAUDE.md stays the router; (3) prose never duplicates an authority doc, it cites one, so drift cannot fork the design. Deliberately NOT done: thinning the root router (larger, separate call) and a doc-steward role (bookkeeping stays in the main session per DELIVERY.md). Landed same-session; DELIVERY.md § Sub-agents gained the pointer paragraph."
+  },
+  {
+   "id": "BL-498",
+   "short_name": "SHARED_HIRE_GATE_TABLE",
+   "category": "Military",
+   "title": "One shared axis-to-candidates resource table behind the hire gate and the hire debit",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 1,
+   "parked": false,
+   "requires": [],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/unit_roster.{hpp,cpp}",
+    "src/world/corp_command.cpp"
+   ],
+   "authority_doc": "docs/military/MILITARY.md",
+   "summary": "Code-review audit finding (2026-08-20): debit_hire_cost (corp_command.cpp:92-105) hand-mirrors unit_roster.cpp:143-154's campaign_gate_input preference lists, guarded only by a comment saying they must match. The BL-394 free-hire bug class recurs the day one side gains ordnance (BL-454/BL-457 work) and the other does not.",
+   "design": "Lift the three axis preference lists into one table in unit_roster.hpp; both the gate and the debit consume it. Land BEFORE the military-milestone roster work touches either site. Assert with the existing hire harness: gate pass implies a matching debit for every axis."
+  },
+  {
+   "id": "BL-499",
+   "short_name": "VERB_WIRE_COVERAGE_HARNESS",
+   "category": "AI",
+   "title": "Harness round-trips every corp_verb through the wire parser",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 1,
+   "parked": false,
+   "requires": [],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "tools/verify/verb_wire_harness.cpp",
+    "src/world/corp_command.hpp"
+   ],
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "summary": "Code-review audit finding (2026-08-20): a new verb touches four surfaces (enum, apply_corp_command, corp_ai scorer, ACTIONS.json) and the pattern has already failed three times (main.cpp:391-401 - BL-324/BL-293/BL-350 each left verbs unreachable over the wire). Nothing machine-checks parser coverage; the AI-opponent milestone multiplies external callers.",
+   "design": "Headless harness: enumerate corp_verb, serialise each through the wire encoding, parse back, assert a non-default verb and no silent degradation. Wire it into the standard verifier-headless set so a grown enum fails the same day."
+  },
+  {
+   "id": "BL-500",
+   "short_name": "SEED_SWEEP_DETERMINISM",
+   "category": "Generation",
+   "title": "Determinism harness widens from seed 0 to a real seed sweep",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 1,
+   "parked": false,
+   "requires": [],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "tools/verify/determinism_harness.cpp"
+   ],
+   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+   "summary": "Code-review audit finding (2026-08-20): determinism_harness.cpp:12-17 still says world-gen is not seedable and checks only the zero-seed world - but the seed IS threaded now (hard_coded_world.hpp:27-33). Nonzero-seed determinism, exactly what the Era -1 extension (BL-494) and nation behaviour lean on, has no guard.",
+   "design": "Sweep a small fixed seed set (e.g. 5 seeds), assert byte-identical regeneration per seed and distinct state hashes across seeds. Update the stale header comment. Land before further history-sim work."
+  },
+  {
+   "id": "BL-501",
+   "short_name": "LENS_DESCRIPTOR_EXTRACTION",
+   "category": "UI",
+   "title": "Lenses become a descriptor table instead of three inlined regions of the planetary canvas",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 2,
+   "parked": false,
+   "requires": [],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/lenses.{hpp,cpp}"
+   ],
+   "authority_doc": "docs/ui/LENSES.md",
+   "summary": "Code-review audit finding (2026-08-20): body_surface_canvas.cpp (2,906 lines) inlines the lens system across three non-adjacent regions - 12 draw_*_key functions (136-760), per-lens precompute (1162-1409), per-tile colour chain (1655-1736). Every new lens is a 3-4-touchpoint edit; nothing ties a lens's key legend to its colour rule, so they can drift invisibly.",
+   "design": "Mechanical move, not redesign: a lens descriptor {key-draw fn, tile-colour fn, optional precompute} in a new lenses.cpp; the canvas iterates the table. Behaviour-identical - verify with the existing lens goldens at 0.0000%. Pays back on the next lens the roadmap adds."
+  },
+  {
+   "id": "BL-502",
+   "short_name": "GLYPHS_JOIN_THE_CATALOGUE",
+   "category": "UI",
+   "title": "Selection panel's ten private glyphs move into the icons catalogue",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "C",
+   "difficulty": 1,
+   "parked": false,
+   "requires": [],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/ui/selection_panel.cpp",
+    "src/ui/icons.{hpp,cpp}",
+    "docs/ui/ICONS.md"
+   ],
+   "authority_doc": "docs/ui/ICONS.md",
+   "summary": "Code-review audit finding (2026-08-20): ten glyph_* functions (selection_panel.cpp:985-1102) follow the (dl, centre, r, colour) contract but live outside icons.{hpp,cpp}, invisible to the catalogue - glyph_swap already exists twice in the same file. Violates the standing glyph invariant in src/ui/CLAUDE.md.",
+   "design": "Move the ten into ui::icons, dedupe glyph_swap, catalogue each in ICONS.md per its recipe. Behaviour-identical; verify with the selection-panel goldens."
+  },
+  {
+   "id": "BL-503",
+   "short_name": "ENTITY_BUILDERS_CONVERGE",
+   "category": "UI",
+   "title": "Selection panel, hover card and tile ledger converge on the shared per-entity builders",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 2,
+   "parked": false,
+   "requires": [],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/ui/entity_summary.{hpp,cpp}",
+    "src/ui/selection_panel.cpp",
+    "src/ui/hover_content.cpp",
+    "src/ui/tile_inspector.cpp"
+   ],
+   "authority_doc": "docs/ui/SELECTION.md",
+   "summary": "Code-review audit finding (2026-08-20): SELECTION.md claims the Tile Ledger and hover card share the per-entity content builders, but entity_summary.cpp has effectively one consumer - selection_panel, hover_content and tile_inspector each build their own rendering of the same facts, three drifting paths. The cost triples when military/political entity kinds arrive.",
+   "design": "Convergence onto the existing seam (entity_summary / selection_card), not new architecture: per entity kind, one builder both surfaces call, surface-specific framing kept at the call site. Verify with the selection and hover goldens; note any legitimate rendering differences in SELECTION.md as they surface."
   }
  ]
 }

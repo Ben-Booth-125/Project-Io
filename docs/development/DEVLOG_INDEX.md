@@ -10,7 +10,7 @@ the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
-| 2026-08-20 | [the corpus gets delegated: saved roles and scoped instructions (BL-497)](DEVLOG.md) | BL-497 | DEVLOG.md |
+| 2026-08-20 | [the corpus gets delegated: saved roles and scoped instructions (BL-497)](DEVLOG.md) | BL-497 BL-498 BL-503 | DEVLOG.md |
 | 2026-08-20 | [COLLAPSE.md: the Era −1 collapse metagame, decomposed (BL-476–BL-496)](DEVLOG.md) | BL-325 BL-422 BL-464 BL-476 BL-482 BL-494 BL-495 BL-496 | DEVLOG.md |
 | 2026-08-17 | [Sprint 25a: armies get something to eat (BL-457, BL-455, BL-452/453, BL-456, BL-454/459)](DEVLOG.md) | BL-325 BL-340 BL-350 BL-444 BL-452 BL-454 BL-455 BL-456 BL-457 BL-458 | DEVLOG.md |
 | 2026-08-17 | [the score was never the reason (BL-417 step 1, BL-439)](DEVLOG.md) | BL-388 BL-406 BL-417 BL-422 BL-428 BL-435 BL-436 BL-439 | DEVLOG.md |

@@ -43,7 +43,18 @@ prototype. Both now frame four strands — economy loop (shipped), generated Era
 military layer (partial), AI direction — with the governing-body pivot as the destination.
 The framing carve is Claude's wording, recorded as NR-361 for Ben to overturn.
 
-**Runtime:** ~0.75h, Light (doc/config), remote.
+**Third wave: the roles tested on a real audit.** Two cold `code-reviewer` spawns swept
+`src/world` and `src/ui` for rework-worthiness. Both said **no broad rework** — the core's
+determinism discipline and the UI's shared chrome are assets — and surfaced six scoped items,
+filed as **BL-498** (shared hire-gate table) through **BL-503** (entity builders converge),
+plus **NR-362** (snapshot-serialiser timing, the one rework-scale call, Ben's).
+
+The findings stayed out of the role files (state, not method); what was saved is the **brief
+shape** — `code-reviewer.md` gained a codebase-audit mode section (payback bar, measure-don't-
+gesture, mandatory leave-alone list). `run_economy_step`'s inline-block accretion was noted
+as extract-as-you-touch hygiene, deliberately not filed.
+
+**Runtime:** ~1.25h, Light (doc/config + audit), remote.
 
 ---
 

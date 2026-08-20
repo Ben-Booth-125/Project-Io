@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*126 entries — 78 open, 48 resolved.*
+*127 entries — 79 open, 48 resolved.*
 
 ---
 
@@ -866,6 +866,17 @@ Both intros now drop the bare '4X' label and frame the project as: economy loop 
 - A) Accept the four-strand framing.
 - B) Reword - supply the framing Ben would use.
 - C) Keep README player-facing and move the strand breakdown to CLAUDE.md only.
+
+### NR-362 — World-snapshot serialiser timing: reshape world.hpp now, or declare it final-enough?
+*question · raised 2026-08-20 · from Code-review audit of src/world (2026-08-20). Only the three side-streams (history_log, order_book, procurement) have flat-binary IO; BL-107 (save-format version header) is blocked on the world snapshot existing.*
+
+Data-model restructuring is free today and expensive the day the snapshot serialiser lands. world.hpp (571 lines) carries ~17 component maps plus parallel side-tables (population_centre_tile/name, corp_body_pools, embargo conditions, mutable caches) that the serialiser will have to enumerate as-is.
+
+**Why it matters.** This is the one finding with rework-scale consequences, and it is a timing decision, not a refactor: taken now it costs nothing; deferred past the snapshot it makes the 'seam travels with the change' invariant expensive to honour retroactively.
+
+- A) Declare the struct final-enough and land the snapshot serialiser EARLY in the military milestone (unblocks BL-107).
+- B) Do one deliberate reshaping pass (fold parallel side-tables into their components) first, then serialise.
+- C) Defer both - accept that later reshaping pays the serialiser tax.
 
 ---
 
