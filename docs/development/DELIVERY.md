@@ -322,6 +322,14 @@ Consequences:
   with a heredoc for git commits; PowerShell is blocked by the allow rule."*
 - **Hotspot/integration wiring stays in the main session.** The seam every slice eventually
   touches is integrated centrally, after the agent slices land.
+- **The recurring roles are saved as agent definitions** (BL-497, 2026-08-20):
+  `.claude/agents/economy-dev.md`, `ui-dev.md`, `generation-dev.md` (implementer slices) and
+  `code-reviewer.md` (the cold review pass). Each definition carries its role's reading list,
+  invariants and commit discipline, so a spawn needs only the task-specific brief — prefer
+  spawning a saved role over re-improvising its prompt. Directory-scoped instruction files
+  (`src/world/CLAUDE.md`, `src/ui/CLAUDE.md`) load automatically for any session working in
+  those directories and carry the always-on invariants; keep role definitions and scoped
+  files as **pointers into the authority docs**, never copies of their prose.
 - **Fan-out is a discretionary call made *after* the tasks and collision map.** Fan out when
   there is a substantial wave of slice-able work a cold agent can execute from its brief alone;
   stay in the main session when the win is marginal (a short serial chain, co-evolving

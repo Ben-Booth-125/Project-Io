@@ -152,6 +152,12 @@ rule has a fuller authority, it is cited — this file does not redefine it.
   `visual` requirement on an interactive surface `complete`, open the built app, click the thing,
   and look — a clean compile and a green harness are not sufficient on their own (see DELIVERY.md
   § The Delivery lifecycle, step 4).
+- **Raise the novelty flag (Ben, 2026-08-20).** If the task in hand feels **novel** — no
+  authority doc owns it, no saved role or established pattern fits, or it would quietly grow
+  the project's scope — file a `kind: "novel-work"` entry in
+  `docs/development/NEEDS_REVIEW.json` *at the moment the feeling arises*, then continue
+  (pause first if the scope growth is large). Sub-agents flag it in their report; the main
+  session files it. Novelty should be chosen, not accreted.
 - **Save the tool.** When you build a check or helper, push it to a reusable skill or committed
   script (`CLAUDE.md` § Tool creation is skill creation), not a one-off — the saved check keeps
   paying; the loose one is forgotten.

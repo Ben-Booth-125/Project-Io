@@ -98,7 +98,7 @@ worktrees mergeable.
   under the ancient arc, themed on *who enacts*. **DONE.**
   Files: `backlog.json`, `ROADMAP.md`.
 - **[2] C — NEW-1 the prehistory-on determinism case.** **DONE** (merged `0fa76ce`, 8/8 green;
-  marker flipped 2026-08-19 — it sat stale a day after the merge, NR-361).
+  marker flipped 2026-08-19 — it sat stale a day after the merge, NR-378).
   File: `tools/verify/world_determinism.cpp`. Three cases: same-seed replay, different-seed
   divergence, and prehistory-on ≠ prehistory-off (proving the pass is not a silent no-op).
   **A red result is a finding and must be reported, not softened.**

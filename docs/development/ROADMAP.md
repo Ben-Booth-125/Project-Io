@@ -70,7 +70,7 @@ async loading screen, and the startup-hang fix. SPRINTS.md § Sprint 15 is the r
   done-definition owed at the cut, per NR-103.
 - **v0.1.18 — The economy tells the truth.** *(Defined 2026-08-19 — Ben chose define over
   dissolve; the version had existed in the backlog since the Sprint 25a era while the Sprint-26
-  split that owed its ROADMAP entry was dropped, NR-360.)* *Theme: the measured economy
+  split that owed its ROADMAP entry was dropped, NR-377.)* *Theme: the measured economy
   pathologies, fixed.* Sprint 19 closed goal-not-met; these four are its remainder as diagnoses:
   processing underearns extraction (**BL-436**), the economy mines one resource (**BL-437**),
   co-extraction is invisible (**BL-438**), and intra-catchment distance is free (**BL-465**).

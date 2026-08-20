@@ -9523,7 +9523,7 @@
    ],
    "authority_doc": "docs/economy/RESOURCES.md",
    "summary": "Filed from NR-175 (2026-08-14 housekeeping). Root cause of the 2026-08-12 startup crash (`fatal error: Unknown resource 'medical_supplies' in world_gen.kepler_market.base_price`): resource_type name lookup exists as three independent hand-maintained tables in three anonymous namespaces, and no two agree against the 42-value enum. The crash was patched around; the desync generator itself is unfixed.",
-   "design": "Consolidate to one canonical name table (RESOURCES.md already owns the canonical list) with the other two call sites reading through it, plus a loud failure (not a silent fallback) on lookup miss so a future gap fails at the point it is introduced rather than three tables later, unpredictably, at runtime.\n\nLANDED 2026-08-19 (Batch Delivery). Consolidated recipe_registry.cpp and world_gen_config.cpp's independent resource_from_name tables into one shared src/world/resource_names.{hpp,cpp}. Both old tables were already complete (all 38 resource_type values covered), so this is a pure structural fix with zero behavior change today - it closes the DESYNC RISK the item was filed over, not a live desync. presentation.cpp's separate enum->display-name table (src/ui, a different concern - UI display strings, not a Lua-name parser) was left as-is per layering (world/ must not depend on ui/); it has three still-unauthored rows (charcoal, iron_blooms, trade_goods_misc) noted as a content gap, not fixed here - see NR-357."
+   "design": "Consolidate to one canonical name table (RESOURCES.md already owns the canonical list) with the other two call sites reading through it, plus a loud failure (not a silent fallback) on lookup miss so a future gap fails at the point it is introduced rather than three tables later, unpredictably, at runtime.\n\nLANDED 2026-08-19 (Batch Delivery). Consolidated recipe_registry.cpp and world_gen_config.cpp's independent resource_from_name tables into one shared src/world/resource_names.{hpp,cpp}. Both old tables were already complete (all 38 resource_type values covered), so this is a pure structural fix with zero behavior change today - it closes the DESYNC RISK the item was filed over, not a live desync. presentation.cpp's separate enum->display-name table (src/ui, a different concern - UI display strings, not a Lua-name parser) was left as-is per layering (world/ must not depend on ui/); it has three still-unauthored rows (charcoal, iron_blooms, trade_goods_misc) noted as a content gap, not fixed here - see NR-374."
   },
   {
    "status": "complete",
@@ -10271,7 +10271,7 @@
    ],
    "authority_doc": "docs/ai/AI_OPPONENT.md",
    "summary": "Filed 2026-08-17 from the Sprint 22 audit. The seam has 15 verbs. The dictionary covers 15, a UI press covers 12, the rival scorer emits 8. Nothing measures that, so the gap was found by hand and will go stale by hand. WIDENED 2026-08-17 (Ben, on NR-308): the tool also carries an authored subsystem column, so a subsystem owning no verb at all is visible rather than inferred - the convoy layer being the case that proves it. Reported, never failed; difficulty 2 -> 3.",
-   "design": "## What the audit measured\n\nThree artefacts already carry the answer, and no tool joins them.\n\n- `src/world/corp_command.hpp` is the authoritative verb list (15, append-only).\n- `docs/ai/ACTIONS.json` gameplay family transcribes it (15 entries, complete today).\n- Each dictionary entry carries a `surface` field naming its UI press, or saying SEAM-ONLY.\n- `src/world/corp_ai.cpp` assigns `cmd.verb` at exactly ten sites, covering eight distinct verbs.\n\nThe join is mechanical and cheap. It is not written.\n\n## Shape\n\nA node tool, `tools/session/verb_coverage.js`, emitting one row per verb with four columns:\nseam / dictionary / UI press / AI candidate. Sources, in order of authority:\n\n1. Parse the `corp_verb` enum out of `corp_command.hpp` — the seam wins over everything.\n2. Read `ACTIONS.json` gameplay entries; a missing verb is a dictionary defect, and per\n   BL-270 the dictionary is the wrong one when they disagree.\n3. Read each entry `surface` field; a `SEAM-ONLY` marker means no human press. This is the\n   one axis read from prose rather than code, and it is deliberate — the prose is the\n   maintained record, and a grep of `src/ui` for a verb name finds nothing useful because\n   the UI calls seam functions, not verbs.\n4. Grep `corp_ai.cpp` for `cmd.verb = corp_verb::X` assignments.\n\nExit non-zero on a **dictionary** gap only. UI and AI gaps are reported, not failed — they\nare legitimate design states (`set_workforce_auto` may well be correctly AI-absent), and a\ntool that fails on them would be muted within a week.\n\n## Why it is priority A for its size\n\nIt is the instrument the reachability argument rests on. Sprint 22 proposes closing gaps;\nwithout this the closing is unverified and the reopening is unnoticed. Per CLAUDE.md\n§ Tool creation is skill creation, it should be wrapped or invoked from an existing skill\nrather than left loose.\n\n## WIDENED 2026-08-17 (Ben, on NR-308): add a subsystem column\n\nThe four-column join above answers *\"is each verb that exists reachable\"*. It cannot answer\n*\"does each subsystem own a verb at all\"*, because a join over existing verbs is structurally\nblind to the absent one. The Sprint 25 audit found the gap that proves it: the convoy layer —\n`supply_system.cpp` plus the whole of `logistics.cpp` plus four rendering paths, and the\nonly coupling between two markets' prices — owns **zero** of the fifteen verbs, and this\ntool as first scoped would have reported a clean sheet over it.\n\n**Shape.** A second table: one row per world subsystem, listing the verbs whose subject\nbelongs to it and a count. The subsystem list is **authored, not derived** — a hand-kept\nlist in the tool naming each `src/world` subsystem and its verbs, reviewed when a\nsubsystem is added. Deriving it from filenames would be clever and wrong: it would silently\ngrow a row for every new file and mean nothing.\n\n**Reported, never failed.** A subsystem legitimately owning no verb is a real design state —\n`market_clearing` should not take player commands. The row exists so the absence is\n*visible and deliberate* rather than inferred, which is the same reasoning BL-451 uses for\nprinting a per-verb histogram it never asserts on.\n\n**Difficulty 2 → 3.** Still small, but it is a second data source and a maintained list.\n\nLANDED 2026-08-19 (Batch Delivery). Built tools/session/verb_coverage.js: Table 1 joins corp_command.hpp's 24-verb seam, ACTIONS.json's dictionary, each entry's surface field (UI press), and corp_ai.cpp's grep-derived AI-candidate set; exits non-zero only on a dictionary gap. Table 2 is an authored per-subsystem verb-ownership map, reported never failed. First real run found a genuine dictionary gap - march_unit/halt_unit/disband_unit (BL-470, appended 2026-08-19) are missing from ACTIONS.json, exit code 1 - logged as NR-356, left open as a follow-up (not this item's scope to close)."
+   "design": "## What the audit measured\n\nThree artefacts already carry the answer, and no tool joins them.\n\n- `src/world/corp_command.hpp` is the authoritative verb list (15, append-only).\n- `docs/ai/ACTIONS.json` gameplay family transcribes it (15 entries, complete today).\n- Each dictionary entry carries a `surface` field naming its UI press, or saying SEAM-ONLY.\n- `src/world/corp_ai.cpp` assigns `cmd.verb` at exactly ten sites, covering eight distinct verbs.\n\nThe join is mechanical and cheap. It is not written.\n\n## Shape\n\nA node tool, `tools/session/verb_coverage.js`, emitting one row per verb with four columns:\nseam / dictionary / UI press / AI candidate. Sources, in order of authority:\n\n1. Parse the `corp_verb` enum out of `corp_command.hpp` — the seam wins over everything.\n2. Read `ACTIONS.json` gameplay entries; a missing verb is a dictionary defect, and per\n   BL-270 the dictionary is the wrong one when they disagree.\n3. Read each entry `surface` field; a `SEAM-ONLY` marker means no human press. This is the\n   one axis read from prose rather than code, and it is deliberate — the prose is the\n   maintained record, and a grep of `src/ui` for a verb name finds nothing useful because\n   the UI calls seam functions, not verbs.\n4. Grep `corp_ai.cpp` for `cmd.verb = corp_verb::X` assignments.\n\nExit non-zero on a **dictionary** gap only. UI and AI gaps are reported, not failed — they\nare legitimate design states (`set_workforce_auto` may well be correctly AI-absent), and a\ntool that fails on them would be muted within a week.\n\n## Why it is priority A for its size\n\nIt is the instrument the reachability argument rests on. Sprint 22 proposes closing gaps;\nwithout this the closing is unverified and the reopening is unnoticed. Per CLAUDE.md\n§ Tool creation is skill creation, it should be wrapped or invoked from an existing skill\nrather than left loose.\n\n## WIDENED 2026-08-17 (Ben, on NR-308): add a subsystem column\n\nThe four-column join above answers *\"is each verb that exists reachable\"*. It cannot answer\n*\"does each subsystem own a verb at all\"*, because a join over existing verbs is structurally\nblind to the absent one. The Sprint 25 audit found the gap that proves it: the convoy layer —\n`supply_system.cpp` plus the whole of `logistics.cpp` plus four rendering paths, and the\nonly coupling between two markets' prices — owns **zero** of the fifteen verbs, and this\ntool as first scoped would have reported a clean sheet over it.\n\n**Shape.** A second table: one row per world subsystem, listing the verbs whose subject\nbelongs to it and a count. The subsystem list is **authored, not derived** — a hand-kept\nlist in the tool naming each `src/world` subsystem and its verbs, reviewed when a\nsubsystem is added. Deriving it from filenames would be clever and wrong: it would silently\ngrow a row for every new file and mean nothing.\n\n**Reported, never failed.** A subsystem legitimately owning no verb is a real design state —\n`market_clearing` should not take player commands. The row exists so the absence is\n*visible and deliberate* rather than inferred, which is the same reasoning BL-451 uses for\nprinting a per-verb histogram it never asserts on.\n\n**Difficulty 2 → 3.** Still small, but it is a second data source and a maintained list.\n\nLANDED 2026-08-19 (Batch Delivery). Built tools/session/verb_coverage.js: Table 1 joins corp_command.hpp's 24-verb seam, ACTIONS.json's dictionary, each entry's surface field (UI press), and corp_ai.cpp's grep-derived AI-candidate set; exits non-zero only on a dictionary gap. Table 2 is an authored per-subsystem verb-ownership map, reported never failed. First real run found a genuine dictionary gap - march_unit/halt_unit/disband_unit (BL-470, appended 2026-08-19) are missing from ACTIONS.json, exit code 1 - logged as NR-373, left open as a follow-up (not this item's scope to close)."
   },
   {
    "status": "designed",
@@ -10798,8 +10798,8 @@
     "docs/military/MILITARY.md"
    ],
    "authority_doc": "docs/economy/SUPPLY.md",
-   "summary": "Ben, 2026-08-18: \"Let's begin codifying Logistic Points in this sprint. It's an important layer for military and goods transport.\" The concept does not exist anywhere in Io today - no doc, no code, no prior item. This item opens it as DESIGN work inside Lane C1 rather than a build, because its shape has four materially different readings and picking one silently would be the expensive mistake.",
-   "design": "## What this overturns, stated rather than hidden\n\n`docs/economy/SUPPLY.md` § Infrastructure gates lists **per-node throughput capacity** as *out of prototype scope*, and Sprint 25's block re-affirmed it in its own exclusion list (NR-312). Ben's 2026-08-18 instruction overturns that. Under DELIVERY.md's newest-dated-wins rule this is legitimate; it is recorded here so the reversal is traceable and SUPPLY.md is corrected as part of landing the work, not before it.\n\n## Why the shape is right, independent of the details\n\n**BL-325 ruling 3: one reach field — economic reach IS military reach.** Logistic Points make that ruling *quantitative* rather than merely topological. Today the network answers \"can this be reached\"; LP would let it answer \"how much can move, and what else does that displace\". That is the same single network serving goods and force, which is the ruling exactly.\n\nIt also gives four already-shipped systems a consumer they lack: road tiers currently only discount cost (`1/(1+0.5*tier)`), ports have no throughput meaning, the Reach lens shows a binary field, and convoys queue without contention.\n\n## The trap this item exists to avoid\n\n**`military_points` was deleted on 2026-08-17 (BL-455) for being a write-only accumulator**, and NR-257 deleted five resources for the same reason a day earlier. A Logistic Point that is generated and never spent — or spent and never felt — is the identical defect with a new name.\n\n**Non-negotiable: LP lands with its consumer in the same batch.** No accrual-only first cut.\n\n## The four readings, which are NOT interchangeable\n\n| | Reading | Generated by | Spent by | Grain |\n|---|---|---|---|---|\n| a | **Per-node capacity** | a node's tier/size | convoys passing through it | node |\n| b | **Per-nation budget pool** | the nation's infrastructure | every movement inside it | nation |\n| c | **Per-corp allowance** | the corp's own assets | that corp's convoys and units | corp |\n| d | **Shadow-Empire style** | infrastructure, as a stock | supply *and* unit upkeep, with distance as the multiplier | mixed |\n\n(d) is the reference Ben's other generation steers point at (PLANETOLOGY.md models the planet pass on Shadow Empire explicitly), and it is the reading in which LP most directly couples military to goods — which is the stated reason for wanting it. It is also the largest.\n\n**Open, and owed to Ben before any code:** which reading; whether LP is a *stock* that accumulates or a *rate* refreshed each tick; whether an over-subscribed network fails, queues, or degrades; and whether the player sees LP as a number, a lens, or only as a refusal.\n\n## Determinism\n\nWhatever the reading, allocation under contention must be **order-independent** — a deterministic priority rule over a sorted set, never first-come by iteration order. `world::state_hash` and the convoy determinism check (`convoy_command.cpp` R5) are the guards.\n\n## Sequencing note\n\nFiled `requires: BL-448` (stance) only because it is promoted inside Lane C1 and shares that sprint's design attention — **not** a code dependency. If interdiction (BL-458) later reads LP, that coupling is filed there, not here.\n\n---\n\n## SETTLED 2026-08-18 (Ben): reading (d) — the Shadow Empire model\n\n*\"I'm thinking we can lean heavily on the shadow empire system, and change things if a strong need arrives.\"*\n\nThat closes the four-way fork above. LP is a **stock** generated by infrastructure and spent by both goods movement and unit supply, with **distance as the multiplier** — the reading in which military and economic transport draw on one pool, which is the whole reason Ben asked for it.\n\n**\"Change things if a strong need arrives\"** is the licence, and it is narrower than it sounds: adapt where Io lacks a Shadow Empire prerequisite, not where the mechanic is merely inconvenient. Every substitution gets written down with the reason, so a later reader can tell an adaptation from a drift.\n\n**The naming rule still binds.** Shadow Empire is a *mechanism* reference exactly as Rome is in HISTORY.md — no term, label or proper noun crosses into Io. \"Logistic Points\" is Ben's own phrasing and is fine; nothing else transfers by default.\n\n**What this does NOT settle**, and is owed before code: what generates LP and at what rate, the exact consumer that lands in the same batch, the order-independent allocation rule under contention, whether LP enters `world::state_hash` (convoys deliberately do not), and the smallest honest first cut.\n\n---\n\n## CORRECTION 2026-08-18: LP is a RATE, not a stock\n\nThe ruling above records LP as *\"a **stock** generated by infrastructure\"*. **That is wrong about Shadow Empire, and the correction is fidelity to Ben's instruction rather than a departure from it.**\n\nIn Shadow Empire, LP is a **per-turn throughput allowance**. Capacity is regenerated each turn by the network and is then used or wasted; what carries over is the resource *stock* it moved, never the points. LP is the pipe; the tanks are separate.\n\nThree consequences, all in Io's favour:\n\n- A rate **crosses no tick boundary**, so it needs no `state_hash` entry and no serialisation — and Io has no save/load layer to add one to.\n- A stock that accumulates while never binding is the `military_points` failure with extra steps.\n- It removes the largest open question about where LP lives between ticks, because it does not live between ticks.\n\n**Caveat, flagged rather than buried:** this claim comes from Shadow Empire guides, not from anything in this repo. It is the one load-bearing assertion here with no `file:line`, and Ben should confirm it before it hardens.\n\n## Io already owns Shadow Empire's OTHER half, twice over\n\nSE runs **two** currencies: LP (*how much*) from nodes, and Logistical AP (*how far*) from links, where infrastructure quality buys **distance, never capacity**.\n\nIo has the AP half already. `road_traversal_multiplier` = `1/(1+0.5*tier)` is AP-per-hex under another name (`logistics.cpp:62-66`), and `body_reach_field` is SE's free-AP envelope expressed as a cost field.\n\n**So adopt SE's node half and refuse its link half.** Importing AP would be a second parallel distance budget, which BL-325 ruling 3 (one reach field) forbids outright.\n\n## LP is a CAP, not a price\n\nIo's convoy **already charges distance, in credits** — `unit_cost * dist * qty * (1 - node_discount)` (`supply_system.cpp:371`) — and Shadow Empire charges no money for haulage at all.\n\nAdding LP as a second *price* would double-charge distance and move every economy golden. **Credits stay the price; LP decides whether the leg is admissible at all.**\n\n## THE FIRST CUT AS DRAFTED IS REJECTED — two adversarial passes, both structural\n\nRecorded so the next attempt does not re-run into them:\n\n1. **The inertness proof is unachievable as sequenced.** Two-pass allocation reorders float subtractions on a hashed field (`corp.balance -= leg.cost`, `supply_system.cpp:399`), so a \"rate-zero, byte-identical\" commit cannot pass *at any rate*. The proof pattern BL-409 and BL-454 used does not transfer here, and pretending it does is how a golden gets blessed dishonestly.\n2. **LP as drafted has no spatial locus.** § 1 justifies it as *\"how much can move through HERE\"* — a node — then pools generation per `(corp, body)`. That is not throughput; it is a per-corp haul allowance, which is the exact abstraction `military_points` was deleted for.\n3. **The LP cost formula is never specified**, yet the allocation sort key is a function of it. If cost is proportional to distance, LP *is* haulage cost again; if flat, the sort degenerates to tiebreaks.\n4. **The base allowance would be the whole mechanic.** No corp is seeded an `inland_logistics_hub`, so *\"your own nodes decide how much you may move\"* is fictional at the shipped generator — nearly every corp would sit at exactly the base allowance.\n5. **The AI pays LP and cannot build the generator.** `corp_ai.cpp` has no `port` and no `inland_logistics_hub` build candidate, so the rate would be an asymmetric tax on rivals.\n6. **A reserved military share deletes the coupling it exists to create.** Two budgets means guns and butter stop competing, which was the whole point.\n7. **`supply_decay_permille` would ship a one-way ratchet** — `supply_recovery_permille` is *also* 0.0, so a unit short for one tick is permanently degraded.\n\n**What survives and should lead the next attempt:** LP as a cap rather than a price; the node half only; the rate reading; two consumers (`commit_convoy` and `run_unit_upkeep`) that both already exist; and the finding that goods-vs-force priority is currently decided **invisibly by tick phase order** — convoys claim before armies on every code path, so \"the army goes unsupplied\" is an inherited default nobody chose."
+   "summary": "Ben, 2026-08-18: \"Let's begin codifying Logistic Points in this sprint. It's an important layer for military and goods transport.\" The concept does not exist anywhere in Io today - no doc, no code, no prior item. This item opens it as DESIGN work inside Lane C1 rather than a build, because its shape has four materially different readings and picking one silently would be the expensive mistake. RULED 2026-08-20 (NR-343): LP is a per-tick RATE - a regenerated throughput allowance, used or wasted each tick, never banked; only the goods it moved carry over. The earlier settled prose recording LP as a stock is superseded by this dated ruling.",
+   "design": "## What this overturns, stated rather than hidden\n\n`docs/economy/SUPPLY.md` § Infrastructure gates lists **per-node throughput capacity** as *out of prototype scope*, and Sprint 25's block re-affirmed it in its own exclusion list (NR-312). Ben's 2026-08-18 instruction overturns that. Under DELIVERY.md's newest-dated-wins rule this is legitimate; it is recorded here so the reversal is traceable and SUPPLY.md is corrected as part of landing the work, not before it.\n\n## Why the shape is right, independent of the details\n\n**BL-325 ruling 3: one reach field — economic reach IS military reach.** Logistic Points make that ruling *quantitative* rather than merely topological. Today the network answers \"can this be reached\"; LP would let it answer \"how much can move, and what else does that displace\". That is the same single network serving goods and force, which is the ruling exactly.\n\nIt also gives four already-shipped systems a consumer they lack: road tiers currently only discount cost (`1/(1+0.5*tier)`), ports have no throughput meaning, the Reach lens shows a binary field, and convoys queue without contention.\n\n## The trap this item exists to avoid\n\n**`military_points` was deleted on 2026-08-17 (BL-455) for being a write-only accumulator**, and NR-257 deleted five resources for the same reason a day earlier. A Logistic Point that is generated and never spent — or spent and never felt — is the identical defect with a new name.\n\n**Non-negotiable: LP lands with its consumer in the same batch.** No accrual-only first cut.\n\n## The four readings, which are NOT interchangeable\n\n| | Reading | Generated by | Spent by | Grain |\n|---|---|---|---|---|\n| a | **Per-node capacity** | a node's tier/size | convoys passing through it | node |\n| b | **Per-nation budget pool** | the nation's infrastructure | every movement inside it | nation |\n| c | **Per-corp allowance** | the corp's own assets | that corp's convoys and units | corp |\n| d | **Shadow-Empire style** | infrastructure, as a stock | supply *and* unit upkeep, with distance as the multiplier | mixed |\n\n(d) is the reference Ben's other generation steers point at (PLANETOLOGY.md models the planet pass on Shadow Empire explicitly), and it is the reading in which LP most directly couples military to goods — which is the stated reason for wanting it. It is also the largest.\n\n**Open, and owed to Ben before any code:** which reading; whether LP is a *stock* that accumulates or a *rate* refreshed each tick; whether an over-subscribed network fails, queues, or degrades; and whether the player sees LP as a number, a lens, or only as a refusal.\n\n## Determinism\n\nWhatever the reading, allocation under contention must be **order-independent** — a deterministic priority rule over a sorted set, never first-come by iteration order. `world::state_hash` and the convoy determinism check (`convoy_command.cpp` R5) are the guards.\n\n## Sequencing note\n\nFiled `requires: BL-448` (stance) only because it is promoted inside Lane C1 and shares that sprint's design attention — **not** a code dependency. If interdiction (BL-458) later reads LP, that coupling is filed there, not here.\n\n---\n\n## SETTLED 2026-08-18 (Ben): reading (d) — the Shadow Empire model\n\n*\"I'm thinking we can lean heavily on the shadow empire system, and change things if a strong need arrives.\"*\n\nThat closes the four-way fork above. LP is a **stock** generated by infrastructure and spent by both goods movement and unit supply, with **distance as the multiplier** — the reading in which military and economic transport draw on one pool, which is the whole reason Ben asked for it.\n\n**\"Change things if a strong need arrives\"** is the licence, and it is narrower than it sounds: adapt where Io lacks a Shadow Empire prerequisite, not where the mechanic is merely inconvenient. Every substitution gets written down with the reason, so a later reader can tell an adaptation from a drift.\n\n**The naming rule still binds.** Shadow Empire is a *mechanism* reference exactly as Rome is in HISTORY.md — no term, label or proper noun crosses into Io. \"Logistic Points\" is Ben's own phrasing and is fine; nothing else transfers by default.\n\n**What this does NOT settle**, and is owed before code: what generates LP and at what rate, the exact consumer that lands in the same batch, the order-independent allocation rule under contention, whether LP enters `world::state_hash` (convoys deliberately do not), and the smallest honest first cut.\n\n---\n\n## CORRECTION 2026-08-18: LP is a RATE, not a stock\n\nThe ruling above records LP as *\"a **stock** generated by infrastructure\"*. **That is wrong about Shadow Empire, and the correction is fidelity to Ben's instruction rather than a departure from it.**\n\nIn Shadow Empire, LP is a **per-turn throughput allowance**. Capacity is regenerated each turn by the network and is then used or wasted; what carries over is the resource *stock* it moved, never the points. LP is the pipe; the tanks are separate.\n\nThree consequences, all in Io's favour:\n\n- A rate **crosses no tick boundary**, so it needs no `state_hash` entry and no serialisation — and Io has no save/load layer to add one to.\n- A stock that accumulates while never binding is the `military_points` failure with extra steps.\n- It removes the largest open question about where LP lives between ticks, because it does not live between ticks.\n\n**Caveat, flagged rather than buried:** this claim comes from Shadow Empire guides, not from anything in this repo. It is the one load-bearing assertion here with no `file:line`, and Ben should confirm it before it hardens.\n\n**CONFIRMED 2026-08-20 (Ben, NR-343 resolved):** LP is a per-tick RATE - regenerated throughput, used or wasted, never banked; the goods it moved are what carry over. The caveat above is discharged; the rate reading is settled.\n\n## Io already owns Shadow Empire's OTHER half, twice over\n\nSE runs **two** currencies: LP (*how much*) from nodes, and Logistical AP (*how far*) from links, where infrastructure quality buys **distance, never capacity**.\n\nIo has the AP half already. `road_traversal_multiplier` = `1/(1+0.5*tier)` is AP-per-hex under another name (`logistics.cpp:62-66`), and `body_reach_field` is SE's free-AP envelope expressed as a cost field.\n\n**So adopt SE's node half and refuse its link half.** Importing AP would be a second parallel distance budget, which BL-325 ruling 3 (one reach field) forbids outright.\n\n## LP is a CAP, not a price\n\nIo's convoy **already charges distance, in credits** — `unit_cost * dist * qty * (1 - node_discount)` (`supply_system.cpp:371`) — and Shadow Empire charges no money for haulage at all.\n\nAdding LP as a second *price* would double-charge distance and move every economy golden. **Credits stay the price; LP decides whether the leg is admissible at all.**\n\n## THE FIRST CUT AS DRAFTED IS REJECTED — two adversarial passes, both structural\n\nRecorded so the next attempt does not re-run into them:\n\n1. **The inertness proof is unachievable as sequenced.** Two-pass allocation reorders float subtractions on a hashed field (`corp.balance -= leg.cost`, `supply_system.cpp:399`), so a \"rate-zero, byte-identical\" commit cannot pass *at any rate*. The proof pattern BL-409 and BL-454 used does not transfer here, and pretending it does is how a golden gets blessed dishonestly.\n2. **LP as drafted has no spatial locus.** § 1 justifies it as *\"how much can move through HERE\"* — a node — then pools generation per `(corp, body)`. That is not throughput; it is a per-corp haul allowance, which is the exact abstraction `military_points` was deleted for.\n3. **The LP cost formula is never specified**, yet the allocation sort key is a function of it. If cost is proportional to distance, LP *is* haulage cost again; if flat, the sort degenerates to tiebreaks.\n4. **The base allowance would be the whole mechanic.** No corp is seeded an `inland_logistics_hub`, so *\"your own nodes decide how much you may move\"* is fictional at the shipped generator — nearly every corp would sit at exactly the base allowance.\n5. **The AI pays LP and cannot build the generator.** `corp_ai.cpp` has no `port` and no `inland_logistics_hub` build candidate, so the rate would be an asymmetric tax on rivals.\n6. **A reserved military share deletes the coupling it exists to create.** Two budgets means guns and butter stop competing, which was the whole point.\n7. **`supply_decay_permille` would ship a one-way ratchet** — `supply_recovery_permille` is *also* 0.0, so a unit short for one tick is permanently degraded.\n\n**What survives and should lead the next attempt:** LP as a cap rather than a price; the node half only; the rate reading; two consumers (`commit_convoy` and `run_unit_upkeep`) that both already exist; and the finding that goods-vs-force priority is currently decided **invisibly by tick phase order** — convoys claim before armies on every code path, so \"the army goes unsupplied\" is an inherited default nobody chose."
   },
   {
    "id": "BL-465",
@@ -11261,6 +11261,656 @@
    "summary": "Found in passing by the BL-408 god-view build (2026-08-19): economy_panel.cpp draw_pools lists EVERY corp's (corp, body) pool quantities to an ordinary played session — a straight violation of the BL-068 competitor-visibility rule (rival buildings visible, internals private), predating the god-view work entirely. God view now makes this information legitimately visible under spectate; the played-session path must redact rival pools to the same standard the Selection/hover surfaces already meet.",
    "design": "Gate draw_pools rows on ownership: the player's own pools render as today; rival rows redact quantities (or drop) unless spectating && god_view. Follow the exact test BL-408 planted at its read-sites so the two paths cannot drift. One file, one gate; verify with a played-session capture beside the existing spectator_god_view.lua ON/OFF legs.",
    "version_goal": "v0.1.7"
+  },
+  {
+   "id": "BL-483",
+   "short_name": "TRANSFORMATION_CULMINATION",
+   "category": "Generation",
+   "title": "Transformation (E4): the mandate resets the regime, the map holds",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 2,
+   "parked": false,
+   "requires": [
+    "BL-504"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/history_sim.{hpp,cpp}"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "The dynastic-cycle allegory's exit: strain > cohesion WITH high works/institutions resolves by re-founding, not fragmentation - same borders, new polity, reset strain, partial capacity regression, legitimist creed. The cheapest culmination (no map change) and the one that keeps region counts stable.",
+   "design": "Exit selection is DETERMINED by the state vector at break (COLLAPSE.md open question 2's lean): the works/cohesion-infrastructure level is the discriminant between E4 and E1. The successor keeps the ancestor's name lineage via the phoneme generator's variation path, not a fresh mint."
+  },
+  {
+   "id": "BL-484",
+   "short_name": "EXODUS_CULMINATION",
+   "category": "Generation",
+   "title": "Exodus (E5): the rump state and the migration",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "C",
+   "difficulty": 2,
+   "parked": false,
+   "requires": [
+    "BL-505"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/history_sim.{hpp,cpp}"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "A breaking or absorbed polity with an open frontier survives displaced - Settle fired as a survival verb. Yields a small, high-cohesion survivor far from home with maximal grudge, and frontier regions gaining unearned population/capacity. The map texture Sprint 29 wants: capitals in strange places, with reasons.",
+   "design": "Trigger: E1/E3 resolution where a frontier region within reach is unheld. The chosen-remnant creed locks legitimist + max grudge (COLLAPSE.md pattern library)."
+  },
+  {
+   "id": "BL-485",
+   "short_name": "SLOW_FADE_CULMINATION",
+   "category": "Generation",
+   "title": "The Slow Fade (E6): senescence below a relevance threshold",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "C",
+   "difficulty": 2,
+   "parked": false,
+   "requires": [
+    "BL-504",
+    "BL-506"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/history_sim.{hpp,cpp}"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "No rupture: a major chronically NEAR the break, never over it, erodes - piecemeal border recession and a demotion below the hegemony measure. The Metropole's default ending and the sim's best source of interesting small nations at 0 CE: proud creed, high grudges, disproportionate reach.",
+   "design": "Detection: N consecutive years in the top strain band without a break event. Effect: periphery provinces detach singly (to neighbours or owner_none) at a deterministic trickle; the polity survives as a minor."
+  },
+  {
+   "id": "BL-486",
+   "short_name": "COHESION_INTERDEPENDENCE",
+   "category": "Generation",
+   "title": "Cohesion reads interdependence: the substrate for systemic collapse (E7)",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "C",
+   "difficulty": 3,
+   "parked": false,
+   "requires": [
+    "BL-505",
+    "BL-483"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/history_sim.{hpp,cpp}"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "The Bronze-Age allegory: one break cascades because neighbours' cohesion rested on the broken polity's trade and tribute. Needs cohesion to carry an interdependence input - a real design decision, deliberately sequenced AFTER E1-E4 land and are measured (COLLAPSE.md's own caution).",
+   "design": "A per-polity term derived from routes/works shared with neighbours; an E1/E3 event that severs them debits the survivors' cohesion. Candidate for a RARE outcome band asserted by sweep, never scripted. The most expensive culmination; hold until the others are measured."
+  },
+  {
+   "id": "BL-487",
+   "short_name": "POLITY_CREED_AXES",
+   "category": "Generation",
+   "title": "Seeded polity creeds from the pattern library, biasing the culmination",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 2,
+   "parked": false,
+   "requires": [
+    "BL-504"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/history_sim.{hpp,cpp}"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "COLLAPSE.md's ideological axis made mechanical: creed is seeded data per polity (mandate / remnant / stewardship / restoration leans from the pattern library), and the state vector that determines the exit includes it - same strain, different story, different ending, deterministically.",
+   "design": "A small enum-weighted axis set written at polity creation and mutated only by culminations. Consumed by: exit determination (E4 vs E1 vs E5), Release scoring (stewardship-lean raises it), and Sprint 29's nation-character payload. This is where 'the story IS the character payload' becomes code."
+  },
+  {
+   "id": "BL-488",
+   "short_name": "POLITY_STRATEGY_WEIGHTINGS",
+   "category": "AI",
+   "title": "The six-strategy roster as seeded weighting profiles over polity verbs",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 2,
+   "parked": false,
+   "requires": [
+    "BL-504",
+    "BL-507"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/history_sim.{hpp,cpp}"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "Tortoise / Pulse / Hydra / Phoenix / Metropole / Temple as data: per-polity verb-weighting profiles assigned at seed, deterministic, replayable. The tuned-attractors ruling means these are the diversity source the sweep asserts distinctness over - not templates that script outcomes.",
+   "design": "Each profile is a weight vector over {Campaign, Settle, Invest, Consolidate, Release} plus thresholds (Pulse's strain switch, Hydra's release band, Phoenix's neighbour-collapse gate). Profiles live in history params so tuning is a data change. Distinctness asserted by BL-490."
+  },
+  {
+   "id": "BL-489",
+   "short_name": "CULMINATION_NARRATION_BANK",
+   "category": "UI",
+   "title": "History-tab narration per culmination and narrative pattern - quiet by design",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "C",
+   "difficulty": 2,
+   "parked": false,
+   "requires": [
+    "BL-505",
+    "BL-487"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/ui/history_panel.cpp",
+    "src/world/history_sim.cpp"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "Each culmination emits its narrated line(s) in the history log, minted from the pattern library (the declinist mirror precedes the break; the mandate withdrawn explains E4; the garden given away recasts E2). Ruling 2026-08-20: surfaces in the history tab only - seeing beats telling, deep-dig optional, never chrome pushed at the player.",
+   "design": "Template lines keyed by (culmination, creed) filled with phoneme-generated names. Driven, not narrated: every line is emitted BY an event that occurred. Sibling to BL-300 (myth/theology), which owns the authored bank's voice; a devolution that plays back as silence looks like a bug (COLLAPSE.md open question 4)."
+  },
+  {
+   "id": "BL-490",
+   "short_name": "ATTRACTOR_SWEEP_HARNESS",
+   "category": "Testing",
+   "title": "The attractor sweep: four allegory arcs at reported rates, strategies distinct",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 2,
+   "parked": false,
+   "requires": [
+    "BL-505",
+    "BL-488"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "tools/verify/history_sweep.cpp"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "The tuned-attractors ruling's enforcement: across N seeds, assert each allegory arc (fragmentation, devolution, transformation, cascade) occurs at a stated, REPORTED rate - never clamped - and each strategy profile is observably distinct in lifespan, fragment count and successor share. Two indistinguishable strategies mean one is dead weight; a culmination that never fires is scope to cut.",
+   "design": "Extends the existing sweep harness. Rates pinned BEFORE tuning (the adversarial pass's discipline: the number must not be chosen to match the result). The strategy x culmination matrix in COLLAPSE.md is the literal assertion table."
+  },
+  {
+   "id": "BL-491",
+   "short_name": "QUIET_PROVINCE_FAST_PATH",
+   "category": "Performance",
+   "title": "Event-driven quiet provinces: stable interiors wake on events, not per year",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 3,
+   "parked": false,
+   "requires": [
+    "BL-320"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/history_sim.{hpp,cpp}"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "Perf rung 2 of COLLAPSE.md's 4000-year ladder. Most of 4000 years, most provinces do nothing; give stable interior provinces a fast path that wakes on border change, strain band crossing, or route loss - never a per-year evaluation.",
+   "design": "Wake conditions are pure functions of sim state (deterministic; asserted by the prehistory-on determinism case). Converts per-year cost from O(provinces) toward O(changes). Depends on BL-320's spatial index + incremental aggregates landing first (rung 1)."
+  },
+  {
+   "id": "BL-492",
+   "short_name": "BANDED_YEAR_GRAIN",
+   "category": "Performance",
+   "title": "Deterministic banded year grain: quiet ages step coarse, crises step yearly",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 3,
+   "parked": false,
+   "requires": [
+    "BL-491"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/history_sim.{hpp,cpp}"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "Perf rung 3. Simulate quiet bands at 5-10 year steps with scaled verb effects; drop to yearly grain when any polity's strain, war state, or culmination proximity crosses a band. Targets the year count directly - the rung that makes 4000 years affordable.",
+   "design": "The grain switch MUST be a pure function of sim state - seeded, replayable, asserted by the determinism case - or it is a die roll wearing a timestep (COLLAPSE.md's own words). Verb effect scaling at coarse grain must be exact-integer so no drift separates a watched run from a skipped one."
+  },
+  {
+   "id": "BL-493",
+   "short_name": "RECORD_ON_CHANGE",
+   "category": "Performance",
+   "title": "Record the run on change, at the reader's grain",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 2,
+   "parked": false,
+   "requires": [
+    "BL-425",
+    "BL-427"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/ui/history_panel.cpp"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "Perf rung 4 - the recording half, which BL-425 measured as the real hang (>8 min Debug for the per-year time-lapse). Snapshot ownership on owner_changes (already exists) plus per-decade otherwise; narrated lines are events, not per-year state. The history tab scrubs decades in practice.",
+   "design": "Memoise the record at generation time in BL-427's world-snapshot cache so --verify pays nothing. Un-parks scripts/verify/parked/history_ages.lua as part of landing (BL-425's own close-out)."
+  },
+  {
+   "id": "BL-494",
+   "short_name": "FOUR_THOUSAND_YEAR_LADDER",
+   "category": "Generation",
+   "title": "Extend the Era -1 run to the 4000-year ladder and re-pin the bands",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 3,
+   "parked": false,
+   "requires": [
+    "BL-320",
+    "BL-491",
+    "BL-492",
+    "BL-493"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/history_sim.{hpp,cpp}",
+    "docs/lore/HISTORY.md"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "The ruling itself (Ben, 2026-08-20): the 400-year band was a placeholder; the aim is 4000 years so the four allegory arcs chain sequentially per world. Extends prehistory_years and the band ladder; re-pins every generation golden and the BL-224 non-hegemony bands by measurement.",
+   "design": "Lands LAST in the perf ladder - after BL-320 (rung 1), BL-491 (rung 2), BL-492 (rung 3), BL-493 (rung 4) - and only if the /O2 measurement fits the generation budget; the honest fallback (2-3 completed arcs per world, all four attractors asserted across the sweep) degrades density, never determinism. Reverses the Sprint 26b doc-truth correction knowingly: HISTORY.md's 400-year note gains a dated supersession pointing here."
+  },
+  {
+   "id": "BL-495",
+   "short_name": "HELD_CONVOY_VISIBLE_TO_PRICE",
+   "category": "Economy",
+   "title": "Held convoy cargo stays visible to the price signal",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 1,
+   "parked": false,
+   "requires": [],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/market_clearing.cpp",
+    "src/world/logistics.cpp"
+   ],
+   "authority_doc": "docs/economy/MARKETS.md",
+   "summary": "Ben's ruling on NR-317 (2026-08-20): a held convoy's cargo counts in the scarcity/price calculation, aligning with BL-422's convention for held sell orders (held stock stays visible so scarcity is not gameable). Closes the parked-outside-the-economy exploit shape without new cost machinery - one convention everywhere.",
+   "design": "Wherever resolve_price / the rarity input aggregates available stock, include cargo aboard held convoys at the destination market's scope, exactly as BL-422 includes held orders. No upkeep charge, no expiry - the hold stays a legitimate strategic pause; only its invisibility goes. Assert with a headless case: holding a convoy moves no price."
+  },
+  {
+   "id": "BL-496",
+   "short_name": "ORDNANCE_RATE_GOES_LIVE",
+   "category": "Military",
+   "title": "Ordnance upkeep rate leaves zero when battle consumption lands",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "C",
+   "difficulty": 1,
+   "parked": false,
+   "requires": [],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "scripts/economy.lua"
+   ],
+   "authority_doc": "docs/military/MILITARY.md",
+   "summary": "Ben's ruling on NR-321 (2026-08-20): the ordnance (and food_rations) upkeep rates ride Lane C's engagement trigger - the first real draw coincides with combat that spends it, one golden re-bless instead of two. Until then rate 0.0 is a deliberate, dated state, not an oversight; this item is the tripwire so it is not forgotten.",
+   "design": "When the engagement trigger lands: pick small nonzero rates, run the BL-454 checks (N units debit exactly N x rate, empty pool decays at the authored scalar), measure how far rival balances move, re-bless the economy goldens. Makes BL-457's admission argument (ordnance has a consumer) true at runtime, which chain_depth's exemption currently asserts only structurally."
+  },
+  {
+   "id": "BL-497",
+   "short_name": "SESSION_DELEGATION_ROLES",
+   "category": "Documentation",
+   "title": "Delegate the corpus: saved agent roles and directory-scoped instruction files",
+   "status": "complete",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 1,
+   "parked": false,
+   "requires": [],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    ".claude/agents/economy-dev.md",
+    ".claude/agents/ui-dev.md",
+    ".claude/agents/generation-dev.md",
+    "src/world/CLAUDE.md",
+    "src/ui/CLAUDE.md",
+    "docs/development/DELIVERY.md"
+   ],
+   "authority_doc": "docs/development/DELIVERY.md",
+   "summary": "Ben's ask (2026-08-20): the corpus (~650K tokens) is too large for one session to consume, so sessions should be prompted differently by role. Saves the recurring worktree sub-agent roles as .claude/agents/ definitions (economy-dev, ui-dev, generation-dev - joining code-reviewer) and adds directory-scoped CLAUDE.md files for src/world and src/ui, each a pointer set into the authority docs plus the always-on invariants for that layer.",
+   "design": "Three principles, all pointer-not-copy: (1) a role definition carries its reading list, invariants and commit discipline so a spawn needs only the task brief; (2) a directory CLAUDE.md loads automatically and carries only what every session in that directory needs - the root CLAUDE.md stays the router; (3) prose never duplicates an authority doc, it cites one, so drift cannot fork the design. Deliberately NOT done: thinning the root router (larger, separate call) and a doc-steward role (bookkeeping stays in the main session per DELIVERY.md). Landed same-session; DELIVERY.md § Sub-agents gained the pointer paragraph."
+  },
+  {
+   "id": "BL-498",
+   "short_name": "SHARED_HIRE_GATE_TABLE",
+   "category": "Military",
+   "title": "One shared axis-to-candidates resource table behind the hire gate and the hire debit",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 1,
+   "parked": false,
+   "requires": [],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/unit_roster.{hpp,cpp}",
+    "src/world/corp_command.cpp"
+   ],
+   "authority_doc": "docs/military/MILITARY.md",
+   "summary": "Code-review audit finding (2026-08-20): debit_hire_cost (corp_command.cpp:92-105) hand-mirrors unit_roster.cpp:143-154's campaign_gate_input preference lists, guarded only by a comment saying they must match. The BL-394 free-hire bug class recurs the day one side gains ordnance (BL-454/BL-457 work) and the other does not.",
+   "design": "Lift the three axis preference lists into one table in unit_roster.hpp; both the gate and the debit consume it. Land BEFORE the military-milestone roster work touches either site. Assert with the existing hire harness: gate pass implies a matching debit for every axis."
+  },
+  {
+   "id": "BL-499",
+   "short_name": "VERB_WIRE_COVERAGE_HARNESS",
+   "category": "AI",
+   "title": "Harness round-trips every corp_verb through the wire parser",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 1,
+   "parked": false,
+   "requires": [],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "tools/verify/verb_wire_harness.cpp",
+    "src/world/corp_command.hpp"
+   ],
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "summary": "Code-review audit finding (2026-08-20): a new verb touches four surfaces (enum, apply_corp_command, corp_ai scorer, ACTIONS.json) and the pattern has already failed three times (main.cpp:391-401 - BL-324/BL-293/BL-350 each left verbs unreachable over the wire). Nothing machine-checks parser coverage; the AI-opponent milestone multiplies external callers.",
+   "design": "Headless harness: enumerate corp_verb, serialise each through the wire encoding, parse back, assert a non-default verb and no silent degradation. Wire it into the standard verifier-headless set so a grown enum fails the same day."
+  },
+  {
+   "id": "BL-500",
+   "short_name": "SEED_SWEEP_DETERMINISM",
+   "category": "Generation",
+   "title": "Determinism harness widens from seed 0 to a real seed sweep",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 1,
+   "parked": false,
+   "requires": [],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "tools/verify/determinism_harness.cpp"
+   ],
+   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+   "summary": "Code-review audit finding (2026-08-20): determinism_harness.cpp:12-17 still says world-gen is not seedable and checks only the zero-seed world - but the seed IS threaded now (hard_coded_world.hpp:27-33). Nonzero-seed determinism, exactly what the Era -1 extension (BL-494) and nation behaviour lean on, has no guard.",
+   "design": "Sweep a small fixed seed set (e.g. 5 seeds), assert byte-identical regeneration per seed and distinct state hashes across seeds. Update the stale header comment. Land before further history-sim work."
+  },
+  {
+   "id": "BL-501",
+   "short_name": "LENS_DESCRIPTOR_EXTRACTION",
+   "category": "UI",
+   "title": "Lenses become a descriptor table instead of three inlined regions of the planetary canvas",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 2,
+   "parked": false,
+   "requires": [],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/lenses.{hpp,cpp}"
+   ],
+   "authority_doc": "docs/ui/LENSES.md",
+   "summary": "Code-review audit finding (2026-08-20): body_surface_canvas.cpp (2,906 lines) inlines the lens system across three non-adjacent regions - 12 draw_*_key functions (136-760), per-lens precompute (1162-1409), per-tile colour chain (1655-1736). Every new lens is a 3-4-touchpoint edit; nothing ties a lens's key legend to its colour rule, so they can drift invisibly.",
+   "design": "Mechanical move, not redesign: a lens descriptor {key-draw fn, tile-colour fn, optional precompute} in a new lenses.cpp; the canvas iterates the table. Behaviour-identical - verify with the existing lens goldens at 0.0000%. Pays back on the next lens the roadmap adds."
+  },
+  {
+   "id": "BL-502",
+   "short_name": "GLYPHS_JOIN_THE_CATALOGUE",
+   "category": "UI",
+   "title": "Selection panel's ten private glyphs move into the icons catalogue",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "C",
+   "difficulty": 1,
+   "parked": false,
+   "requires": [],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/ui/selection_panel.cpp",
+    "src/ui/icons.{hpp,cpp}",
+    "docs/ui/ICONS.md"
+   ],
+   "authority_doc": "docs/ui/ICONS.md",
+   "summary": "Code-review audit finding (2026-08-20): ten glyph_* functions (selection_panel.cpp:985-1102) follow the (dl, centre, r, colour) contract but live outside icons.{hpp,cpp}, invisible to the catalogue - glyph_swap already exists twice in the same file. Violates the standing glyph invariant in src/ui/CLAUDE.md.",
+   "design": "Move the ten into ui::icons, dedupe glyph_swap, catalogue each in ICONS.md per its recipe. Behaviour-identical; verify with the selection-panel goldens."
+  },
+  {
+   "id": "BL-503",
+   "short_name": "ENTITY_BUILDERS_CONVERGE",
+   "category": "UI",
+   "title": "Selection panel, hover card and tile ledger converge on the shared per-entity builders",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 2,
+   "parked": false,
+   "requires": [],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/ui/entity_summary.{hpp,cpp}",
+    "src/ui/selection_panel.cpp",
+    "src/ui/hover_content.cpp",
+    "src/ui/tile_inspector.cpp"
+   ],
+   "authority_doc": "docs/ui/SELECTION.md",
+   "summary": "Code-review audit finding (2026-08-20): SELECTION.md claims the Tile Ledger and hover card share the per-entity content builders, but entity_summary.cpp has effectively one consumer - selection_panel, hover_content and tile_inspector each build their own rendering of the same facts, three drifting paths. The cost triples when military/political entity kinds arrive.",
+   "design": "Convergence onto the existing seam (entity_summary / selection_card), not new architecture: per entity kind, one builder both surfaces call, surface-specific framing kept at the call site. Verify with the selection and hover goldens; note any legitimate rendering differences in SELECTION.md as they surface."
+  },
+  {
+   "id": "BL-504",
+   "short_name": "STRAIN_ACCUMULATOR",
+   "category": "Generation",
+   "title": "A stateful strain accumulator: digestion retires strain, loss does not",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 3,
+   "parked": false,
+   "requires": [],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/history_sim.{hpp,cpp}",
+    "tools/verify/history_sim_harness.cpp"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "Sprint 30's NEW-6, filed. Replace the stateless burden (burden=(held-40)x4, recomputed from current holdings) with an accumulating pressure that can break. The adversarial pass's shape assertion is the acceptance test: the strain term must NOT decrease when holdings decrease - losing provinces must never make an empire logistically stronger.",
+   "design": "Design in COLLAPSE.md section 'What the sim must grow' item 1 and the Pulse strategy: strain accumulates with expansion tempo and breadth-over-knee; Consolidate years retire it at an authored rate; province LOSS retires nothing (the grievance stays). Deterministic scalar per polity, serialised alongside cohesion_q. The Pulse strategy only exists once this lands - alternating Campaign/Consolidate must be arithmetically better than continuous Campaign at equal holdings."
+  },
+  {
+   "id": "BL-505",
+   "short_name": "COLLAPSE_FRAGMENTATION_VERB",
+   "category": "Generation",
+   "title": "The collapse itself: fragmentation into named successor polities",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 3,
+   "parked": false,
+   "requires": [
+    "BL-504"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/history_sim.{hpp,cpp}",
+    "src/world/name_generation.{hpp,cpp}"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "Sprint 30's NEW-7, filed. When strain exceeds cohesion unmanaged, the polity fragments into successor polities along province/culture seams, emitting owner_none where nothing coheres and a real eliminated-polity event where alive=false is currently silent. COLLAPSE.md culmination E1.",
+   "design": "Successors route through the seeded phoneme generator - struct polity has no name field today and the naming rule is absolute (no placeholder). Each successor inherits a restoration-lean creed and a grudge toward whichever neighbour fed on the break (Sprint 29's payload). Break lines are a deterministic function of province adjacency + culture + local cohesion, never a roll."
+  },
+  {
+   "id": "BL-506",
+   "short_name": "HEGEMONY_MEASURE_IN_ENGINE",
+   "category": "Generation",
+   "title": "Promote the hegemony measure from the sweep harness into the engine",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 1,
+   "parked": false,
+   "requires": [],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/history_sim.{hpp,cpp}"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "Sprint 30's NEW-8, filed. The sweep harness has a reporting threshold; the engine has nothing that can name, gate or narrate a great power. Promote it so polity::major means something and culminations/narration can key on it.",
+   "design": "One function over holdings share + reach; the same number the sweep already computes, computed once and stored per polity per year. Consumers: the strain accumulator (BL-504, majors accumulate), the attractor sweep (BL-490), the history-tab narration (BL-489)."
+  },
+  {
+   "id": "BL-507",
+   "short_name": "POLITY_RELEASE_VERB",
+   "category": "Generation",
+   "title": "A Release verb: voluntary devolution into client polities",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "A",
+   "difficulty": 2,
+   "parked": false,
+   "requires": [
+    "BL-505"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/history_sim.{hpp,cpp}"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "The Hydra strategy's verb and culmination E2 (devolution - the managed release, the British-empire mechanism). A fifth scored polity verb: shed peripheral provinces into a client successor BEFORE strain chooses the break line. Second, voluntary trigger on BL-505's fragmentation machinery.",
+   "design": "Scored like the other verbs (ruling: verb, not threshold rule - keeps it inside the nation-behaviour grant's shape). Value rises with strain and falls with cohesion headroom. The asymmetry is the point: released clients carry LOW grudge toward the core (devolution buys goodwill fragmentation never does); the core's creed shifts imperial->mercantile and keeps its reach."
+  },
+  {
+   "id": "BL-508",
+   "short_name": "STRAIN_OBSERVABLE_TO_RIVALS",
+   "category": "Generation",
+   "title": "Strained majors are readable prey: weakness as an observable, not telepathy",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 2,
+   "parked": false,
+   "requires": [
+    "BL-504"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/history_sim.{hpp,cpp}"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "Culmination E3 (absorption) needs rivals to score Campaign against a high-strain target - but no polity may read another's internal scalar. Expose weakness through observables: lost battles, stalled campaigns, supply shortfalls - the same tells the player sees.",
+   "design": "A small derived 'apparent weakness' value per polity computed from public events only (battle outcomes, campaign stalls), consumed by rivals' Campaign scoring. Keeps the no-telepathy discipline STRATEGIES.md set at corp grain."
+  },
+  {
+   "id": "BL-509",
+   "short_name": "STRAIN_TRANSFER_ON_CONQUEST",
+   "category": "Generation",
+   "title": "Conquering a strained polity imports its strain - absorption is never free",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 1,
+   "parked": false,
+   "requires": [
+    "BL-504"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/history_sim.{hpp,cpp}"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "COLLAPSE.md E3: without transfer, eating a strained major is a free lunch and absorption becomes the dominant exit. The conqueror inherits holdings AND a share of the victim's accumulated strain.",
+   "design": "On province transfer from a polity above a strain band, a proportional strain quantum moves with it. One subtraction and one addition on BL-504's scalar; the absorbed culture persists as grudge+creed inside the new borders."
+  },
+  {
+   "id": "BL-510",
+   "short_name": "REACH_FED_SLOW_STRAIN",
+   "category": "Generation",
+   "title": "Reach feeds a second, slower strain inflow - the Metropole also breaks",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "B",
+   "difficulty": 2,
+   "parked": false,
+   "requires": [
+    "BL-504"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-20",
+   "version_goal": "v0.1.16",
+   "files": [
+    "src/world/history_sim.{hpp,cpp}"
+   ],
+   "authority_doc": "docs/lore/COLLAPSE.md",
+   "summary": "NR-356's hole: a reach-hegemon with few holdings never trips a holdings-fed accumulator, dodging Sprint 30's 'inevitable'. Recommended fix (option A): reach feeds the SAME accumulator at a slower rate, so the Metropole is the longest-lived shape and still breaks - usually via the Slow Fade (E6). CONFIRMED by Ben 2026-08-20 (NR-356 resolved, option A): 'logistics should be capable of determining reach... reach feeds strain' - the inflow reads the same logistics/reach substrate as everything else, per BL-325 ruling 3 (one reach field).",
+   "design": "One additional inflow term on BL-504's accumulator scaled by reach-derived exposure (routes/dependencies held abroad). HISTORY.md Stage 5 (hegemony fails its final audition) later becomes a parameterisation of this, not a second system. RULED 2026-08-20 (Ben, NR-356 resolved, option A): reach feeds strain, and the inflow reads the same logistics/reach substrate as everything else per BL-325 ruling 3 (one reach field) - no longer pending; the filed shape stands as ruled."
   }
  ]
 }

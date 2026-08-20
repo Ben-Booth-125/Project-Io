@@ -14,6 +14,13 @@
   "                        from a decision Ben made.",
   "  - 'observation'     — something noticed in passing that is too small or too",
   "                        cross-cutting to file, but which a human should see.",
+  "  - 'novel-work'      — raised by a SESSION about its own task (Ben, 2026-08-20):",
+  "                        the work in hand feels NOVEL — no owning authority doc, no",
+  "                        saved role or established pattern fits, or it quietly grows",
+  "                        the project's scope. Raise it AT THE MOMENT the feeling",
+  "                        arises, then continue (or pause, if scope growth is large).",
+  "                        Gives Ben a drift detector: novelty should be chosen, not",
+  "                        accreted.",
   "",
   "HOW IT DIFFERS FROM review.json: review.json is a BLOCKER list — items blocked",
   "on a visual artifact only Ben can produce (a mockup, an annotated screenshot).",
@@ -1338,12 +1345,13 @@
    "id": "NR-317",
    "raised": "2026-08-17",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "title": "A held convoy is free forever - cargo can be parked outside the economy indefinitely",
    "source": "Sprint 25a, BL-452 (logistics has no verb). Raised by the implementing agent, which could not file it itself.",
    "what": "hold_convoy stops a convoy advancing and it then costs nothing. Nothing charges upkeep on held cargo, nothing forces resolution, and nothing expires the hold. The goods are in neither a corp pool nor on a market shelf, so they are invisible to the price signal while held. A player can therefore withdraw stock from the market indefinitely at zero cost - and so, once BL-446 lands, can a rival scorer.",
    "why_it_matters": "It is exploit-shaped rather than a bug: every individual behaviour is correct, and the gap is that holding has no price. It also interacts with BL-422 (held sell orders stay visible to the price signal) which settled the OPPOSITE convention for the order book - held stock there remains visible deliberately, so scarcity is not gameable. A held convoy is the same question answered the other way, by omission rather than by decision.",
-   "next_step": "Ben picks a rule. Candidates: a per-tick demurrage on held cargo; a hold cap in ticks after which it auto-releases; or make held cargo visible to the price signal the way BL-422 made held orders visible - which would be the consistent answer. Not filed as work pending the call."
+   "next_step": "Ben picks a rule. Candidates: a per-tick demurrage on held cargo; a hold cap in ticks after which it auto-releases; or make held cargo visible to the price signal the way BL-422 made held orders visible - which would be the consistent answer. Not filed as work pending the call.",
+   "resolution": "Ben, 2026-08-20: held convoy cargo stays VISIBLE to the price signal, aligning with BL-422's held-order convention - one convention everywhere, no new cost machinery. Filed as BL-495 (held convoy visible to price)."
   },
   {
    "id": "NR-318",
@@ -1383,12 +1391,13 @@
    "id": "NR-321",
    "raised": "2026-08-18",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "title": "Ordnance's upkeep rate ships at 0.0, so nothing consumes it at runtime and BL-457's admission argument is not yet true in play",
    "source": "Sprint 25a, integrating BL-454. The implementing agent flagged the tension rather than resolving it silently.",
    "what": "BL-454's goods draw ships with every rate at ZERO - my instruction, so the item lands inert and no economy golden moves on landing. The agent followed it and named the consequence: ordnance and food_rations are NAMED in economy.lua's unit_upkeep table at 0.0, so the machinery is wired end to end but nothing actually draws a unit of ordnance until one number changes. chain_depth's R1 exemption says ordnance's consumer is 'BL-454 unit upkeep draw (per-tick, per unit)'. That is true STRUCTURALLY - the pass exists, resolves the vector and would debit - and false at RUNTIME today.",
    "why_it_matters": "BL-457's whole admission argument was that ordnance satisfies PRODUCTION.md's rule because BL-454 consumes it, and NR-257 deleted five resources for failing exactly that test. At rate zero, ordnance is produced-by-a-recipe and consumed-by-nobody-in-practice - the same shape, one layer subtler, and the guard cannot see it because an exemption table is a static string list. It is not a defect to fix by weakening the guard; it is a live number waiting for a decision. Worth stating plainly since I claimed the consumer in BL-457's commit message.",
-   "next_step": "Ben sets the rate, and it is one line in scripts/economy.lua (economy.military.unit_upkeep.goods_per_head.ordnance). Recommend doing it on the LOCAL build with a measurement rather than blind: turn it on, run a rollout, and read what it costs a corp per quarter against its balance - the same discipline BL-436 used. Until then the goods half of unit upkeep is inert by design, and the economy goldens are unmoved, which is what made landing it safe."
+   "next_step": "Ben sets the rate, and it is one line in scripts/economy.lua (economy.military.unit_upkeep.goods_per_head.ordnance). Recommend doing it on the LOCAL build with a measurement rather than blind: turn it on, run a rollout, and read what it costs a corp per quarter against its balance - the same discipline BL-436 used. Until then the goods half of unit upkeep is inert by design, and the economy goldens are unmoved, which is what made landing it safe.",
+   "resolution": "Ben, 2026-08-20: the rate goes live WITH battle consumption - it rides Lane C's engagement trigger so the first real draw coincides with combat spending it (one golden re-bless). Rate 0.0 is a deliberate dated state until then. Tripwire filed as BL-496 (ordnance rate goes live)."
   },
   {
    "id": "NR-322",
@@ -1721,7 +1730,7 @@
    "id": "NR-343",
    "raised": "2026-08-18",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "title": "Confirm LP is a per-tick RATE, not a stock - the one load-bearing claim with no file:line",
    "source": "Research pass 2026-08-18, from Shadow Empire guides rather than from this repo.",
    "what": "BL-464's settled prose recorded LP as a stock, written from Ben's 'lean heavily on the shadow empire system' ruling. The research says Shadow Empire's LP is a per-turn throughput allowance that is regenerated each turn and then used or wasted - the pipe, not the tank. What carries over is the resource stock it moved.",
@@ -1729,7 +1738,8 @@
    "refs": [
     "BL-464",
     "NR-341"
-   ]
+   ],
+   "resolution": "Ben, 2026-08-20: LP is a per-tick RATE - regenerated throughput, used or wasted, never banked; the goods it moved are what carry over. BL-464's design-owed prose amended with the dated ruling (item is open, so amended in backlog.json per the time-slice rule)."
   },
   {
    "id": "NR-344",
@@ -1961,7 +1971,7 @@
    ]
   },
   {
-   "id": "NR-324",
+   "id": "NR-358",
    "raised": "2026-08-19",
    "kind": "decision-taken",
    "status": "open",
@@ -2000,7 +2010,7 @@
    "resolution": null
   },
   {
-   "id": "NR-356",
+   "id": "NR-373",
    "title": "verb_coverage.js's first real run finds march_unit/halt_unit/disband_unit missing from the dictionary",
    "raised": "2026-08-19",
    "kind": "observation",
@@ -2028,7 +2038,7 @@
    "resolution": null
   },
   {
-   "id": "NR-357",
+   "id": "NR-374",
    "title": "presentation.cpp still carries three unauthored resource rows (charcoal, iron_blooms, trade_goods_misc) after BL-414",
    "raised": "2026-08-19",
    "kind": "observation",
@@ -2052,7 +2062,7 @@
    "resolution": null
   },
   {
-   "id": "NR-358",
+   "id": "NR-375",
    "title": "Batch Delivery this session built a fresh low-collision batch (BL-414/420/444) rather than resuming NR-354's deferred economy cluster",
    "raised": "2026-08-19",
    "kind": "decision-taken",
@@ -2076,7 +2086,7 @@
    "resolution": null
   },
   {
-   "id": "NR-359",
+   "id": "NR-376",
    "title": "BL-476 rival military seeding: iteration order and shared-occupancy threading, plus the is_background exclusion mechanism",
    "raised": "2026-08-19",
    "kind": "decision-taken",
@@ -2095,7 +2105,7 @@
    "resolution": null
   },
   {
-   "id": "NR-360",
+   "id": "NR-377",
    "title": "The v0.1.16 split executed: destination mapping chosen on Ben's behalf",
    "raised": "2026-08-19",
    "kind": "decision-taken",
@@ -2106,7 +2116,7 @@
    "how_to_apply": "Object to any single destination and it moves; the split is data-only (version_goal fields + ROADMAP bullets)."
   },
   {
-   "id": "NR-361",
+   "id": "NR-378",
    "title": "Stale-goal re-homing destinations chosen (BL-372/375/391/392, BL-264)",
    "raised": "2026-08-19",
    "kind": "decision-taken",
@@ -2117,7 +2127,7 @@
    "how_to_apply": "Any of the five is a one-field move if you prefer a different home."
   },
   {
-   "id": "NR-362",
+   "id": "NR-379",
    "title": "BL-087 piece 2 extracted as BL-478 rather than un-parking the whole item",
    "raised": "2026-08-19",
    "kind": "decision-taken",
@@ -2236,6 +2246,106 @@
    "what": "Six calls: (1) attach PAUSES the sim and TICK releases one econ tick (agent gates the clock per the REFINED brief); human speed keys still override, and even free-running, commands land only at tick boundaries — the transcript stays a replay artifact either way. (2) Commands drain at the boundary BEFORE the next step, stamped with the completed tick — run_serve's exact tick-tag contract. (3) SHUTDOWN on the live seam closes the CONNECTION, never the app. (4) Detach discards never-answered commands and leaves the world paused. (5) One client at a time; a second connection is refused outright. (6) The MCP --attach transport sends COMMAND+TICK as one exchange so a lockstep client cannot deadlock against the gated clock. Also observed: server.js's hand-maintained VERBS array is stale (missing stance + unit-march) — noted on BL-306, whose loop should derive verbs from ACTIONS_INDEX.json.",
    "why": "Clock ownership and detach semantics are the calls a future spectator/agent session will feel first; they are now stated rather than implicit in code.",
    "how_to_apply": "Any of the six is a contained change if you want different semantics (e.g. attach without pausing); say which and it becomes a small follow-on."
+  },
+  {
+   "id": "NR-356",
+   "title": "The Metropole strategy dodges Sprint 30's 'inevitable' collapse as currently framed",
+   "raised": "2026-08-20",
+   "kind": "question",
+   "status": "resolved",
+   "source": "COLLAPSE.md authoring session (Era -1 strategy roster + culminating-events taxonomy), 2026-08-20.",
+   "what": "A reach-based hegemon (trade lanes and dependency, few owned provinces) never trips a holdings-fed strain accumulator, so a major-by-influence could hold its peak indefinitely - contradicting Sprint 30's ruling that collapse is inevitable for a major.",
+   "why_it_matters": "It is the one strategy shape that breaks the arc's central promise, and it is the shape BL-325 ruling 3 (economic reach IS military reach) actively encourages. Left unresolved, the harness's inevitability rate is only asserted over holdings-majors.",
+   "options": [
+    "A) Reach feeds a separate, slower strain (over-commitment abroad) - the Metropole is the longest-lived shape and still breaks, usually via the Slow Fade (COLLAPSE.md E6).",
+    "B) The Metropole gets its own rupture mechanism - HISTORY.md Stage 5 (hegemony fails its final audition) made concrete.",
+    "C) Redefine 'major' to include reach, so the existing accumulator covers it."
+   ],
+   "recommendation": "A - one accumulator concept with two inflow rates keeps the mechanic legible; Stage 5 can later be expressed as a parameterisation of it rather than a second system.",
+   "files": [
+    "docs/lore/COLLAPSE.md",
+    "docs/lore/HISTORY.md",
+    "src/world/history_sim.hpp"
+   ],
+   "resolution": "Ben, 2026-08-20: option A - 'Logistics should be capable of determining reach. By that I mean reach feeds strain.' Coheres with BL-325 ruling 3 (one reach field): the strain inflow reads the logistics network itself. Filed as BL-510 (reach-fed slow strain), which already encodes this."
+  },
+  {
+   "id": "NR-357",
+   "title": "Sequential four-allegory chain does not fit the shipped 400-year single-band run",
+   "raised": "2026-08-20",
+   "kind": "observation",
+   "status": "resolved",
+   "source": "COLLAPSE.md design session, 2026-08-20 - Ben ruled all four allegories (Rome arc, devolution, dynastic cycle, systemic cascade) play out sequentially per generated world, as tuned attractors.",
+   "what": "The shipped Era -1 sim runs ~400 years in one band, and the Sprint 26b doc-truth pass just corrected HISTORY.md/ERAS.md DOWN to that figure. Chaining four rise-and-culmination arcs sequentially implies re-extending the year count and/or band ladder.",
+   "why_it_matters": "It reopens BL-320 (Era -1 sim perf) - though the restated /O2 figure (1.2-1.8s per world) suggests headroom - and partially reverses a doc correction made two days ago. The extension should be sized deliberately before Sprint 30 pins its inevitability rates, or the rates get pinned against a run length that is about to change.",
+   "options": [
+    "A) Extend years (e.g. back toward the multi-band ladder) so arcs chain in real sim time.",
+    "B) Keep ~400 years but accelerate verb tempo so four arcs fit - cheaper, but compresses the 'long era' feel Ben named.",
+    "C) Chain probabilistically: worlds average 2-3 completed arcs of the four attractors, all four asserted only across the sweep, not per world."
+   ],
+   "recommendation": "Size A against the /O2 perf figure first; C is the honest fallback if A blows the generation budget, and still satisfies tuned-attractors.",
+   "files": [
+    "docs/lore/COLLAPSE.md",
+    "docs/lore/HISTORY.md",
+    "src/world/history_sim.hpp"
+   ],
+   "resolution": "Ben, 2026-08-20: the 400-year band was a placeholder; the aim is the 4000-year ladder (option A). Generating over 4000 years is acknowledged hard - the optimisation task is designed in COLLAPSE.md (section 'The 4000-year problem'): spatial index + incremental aggregates, event-driven quiet provinces, deterministic banded year grain, record-on-change; option C (2-3 arcs per world) retained as the honest fallback if the budget still misses."
+  },
+  {
+   "id": "NR-359",
+   "raised": "2026-08-20",
+   "kind": "decision-taken",
+   "status": "open",
+   "title": "DEVLOG.md rebuilt from its last clean commit - merge 0677f7a had re-imported 81 pre-rollover sessions in chimeric form",
+   "source": "PR-45 review session, 2026-08-20. The COLLAPSE session's index regen exposed it (168 -> 251 rows, mass duplicates).",
+   "what": "Merge 0677f7a (branch claude/ecstatic-hofstadter-80f1d6, a July-era branch carrying the pre-rollover DEVLOG) re-imported 81 already-archived sessions into DEVLOG.md, splicing headings onto other sessions' bodies - a June 2026 heading carried the BL-429 slice 3 verification tail, and slice 3 itself was truncated. Rebuilt DEVLOG.md as: the last clean pre-merge state (commit 0936400, 66 sessions, slice 3 whole) + the COLLAPSE session on top; the one genuinely new session from the old branch (Lens-cycle fix, 2026-07-31) moved to archive/DEVLOG-2026.md at its chronological slot; index regenerated to 171 rows. A paragraph-level diff against the corrupted file confirmed nothing unique was lost - every dropped paragraph exists in the archive or in the restored (fuller) session bodies.",
+   "why_it_matters": "This deleted ~4,200 lines from DEVLOG.md on your behalf. The verification was mechanical (heading-set and paragraph-set containment checks, both scripted in-session), but the rebuild picked commit 0936400 as 'last clean' by heading-count archaeology, and you should know the repair happened in case any session prose you remember reads differently now. The structural cause - a stale long-lived branch merged after the rollover - can recur; the devlog_index tool could cheaply assert 'no live session heading also exists in an archive volume' and turn this failure into a lint.",
+   "next_step": "No action needed unless a DEVLOG entry reads wrong. Optional hardening: a duplicate-heading check in devlog_index.js (would have caught this at the index regen instead of at review)."
+  },
+  {
+   "id": "NR-360",
+   "title": "Session-delegation roles carved as economy / ui / generation; router left unthinned",
+   "raised": "2026-08-20",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-497 (session delegation roles), Ben's 2026-08-20 ask to prompt sessions differently as the corpus outgrew one context.",
+   "what": "Carved three implementer roles (economy-dev, ui-dev, generation-dev) matching the repo's natural vertical slices, plus directory CLAUDE.md files for src/world and src/ui only. Chosen on Claude's judgement: military/AI work routes through economy-dev or generation-dev briefs for now rather than owning a fourth role, and the root CLAUDE.md router was left as-is.",
+   "why_it_matters": "Role boundaries shape which invariants a cold agent sees. If military/mil-sim work grows (Sprint 26-33 direction), a dedicated military-dev role and a docs/lore scoped file may earn their place. Thinning the root router (its entries have drifted toward design prose) is a separate, larger call left for Ben.",
+   "options": [
+    "A) Accept the three-role carve; add roles only when a slice recurs.",
+    "B) Add military-dev now, ahead of the Lane C engagement work.",
+    "C) Also schedule a root-router thinning pass (entries become one-liners, prose pushed to the owned docs)."
+   ]
+  },
+  {
+   "id": "NR-361",
+   "title": "Scope-drift rewording: intro framing chosen as four strands; novel-work flag mechanics",
+   "raised": "2026-08-20",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Ben's 2026-08-20 mid-session asks: raise a novelty flag, and reword README.md / CLAUDE.md for the drifted scope.",
+   "what": "Both intros now drop the bare '4X' label and frame the project as: economy loop (shipped) + generated pre-campaign history (Era -1) + military layer (partial) + AI direction (scored-utility now, local-model at v0.2.0), with the governing-body pivot as the arc's destination. The novelty flag landed as a fourth NEEDS_REVIEW kind ('novel-work') plus a standing rule; sub-agents flag it in their report, the main session files it.",
+   "why_it_matters": "The four-strand framing is Claude's carve of the drift, not Ben's wording - it will anchor how new contributors and fresh sessions read the project. Cheap to reword if Ben would frame it differently (e.g. keeping '4X', or leading with the collapse metagame).",
+   "options": [
+    "A) Accept the four-strand framing.",
+    "B) Reword - supply the framing Ben would use.",
+    "C) Keep README player-facing and move the strand breakdown to CLAUDE.md only."
+   ]
+  },
+  {
+   "id": "NR-362",
+   "title": "World-snapshot serialiser timing: reshape world.hpp now, or declare it final-enough?",
+   "raised": "2026-08-20",
+   "kind": "question",
+   "status": "open",
+   "source": "Code-review audit of src/world (2026-08-20). Only the three side-streams (history_log, order_book, procurement) have flat-binary IO; BL-107 (save-format version header) is blocked on the world snapshot existing.",
+   "what": "Data-model restructuring is free today and expensive the day the snapshot serialiser lands. world.hpp (571 lines) carries ~17 component maps plus parallel side-tables (population_centre_tile/name, corp_body_pools, embargo conditions, mutable caches) that the serialiser will have to enumerate as-is.",
+   "why_it_matters": "This is the one finding with rework-scale consequences, and it is a timing decision, not a refactor: taken now it costs nothing; deferred past the snapshot it makes the 'seam travels with the change' invariant expensive to honour retroactively.",
+   "options": [
+    "A) Declare the struct final-enough and land the snapshot serialiser EARLY in the military milestone (unblocks BL-107).",
+    "B) Do one deliberate reshaping pass (fold parallel side-tables into their components) first, then serialise.",
+    "C) Defer both - accept that later reshaping pays the serialiser tax."
+   ]
   }
  ]
 }

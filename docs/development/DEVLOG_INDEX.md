@@ -3,13 +3,16 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 168 entries across 2 volume(s).
+One line per session, newest first — 172 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
+| 2026-08-20 | [the corpus gets delegated: saved roles and scoped instructions (BL-497)](DEVLOG.md) | BL-497 BL-498 BL-503 | DEVLOG.md |
+| 2026-08-20 | [COLLAPSE.md: the Era −1 collapse metagame, decomposed (BL-483–BL-496, BL-504–BL-510)](DEVLOG.md) | BL-325 BL-422 BL-464 BL-504 BL-510 BL-494 BL-495 BL-496 | DEVLOG.md |
+| 2026-08-17 | [Sprint 25a: armies get something to eat (BL-457, BL-455, BL-452/453, BL-456, BL-454/459)](DEVLOG.md) | BL-325 BL-340 BL-350 BL-444 BL-452 BL-454 BL-455 BL-456 BL-457 BL-458 | DEVLOG.md |
 | 2026-08-17 | [the score was never the reason (BL-417 step 1, BL-439)](DEVLOG.md) | BL-388 BL-406 BL-417 BL-422 BL-428 BL-435 BL-436 BL-439 | DEVLOG.md |
 | 2026-08-16 | [the shelf stops carrying goods nobody sold (BL-422)](DEVLOG.md) | BL-160 BL-351 BL-386 BL-409 BL-422 BL-436 | DEVLOG.md |
 | 2026-08-16 | [the roster invariants land, and the roster shrinks (BL-432, NR-243, NR-257)](DEVLOG.md) | BL-409 BL-428 BL-430 BL-432 | DEVLOG.md |
@@ -75,6 +78,7 @@ the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 | 2026-08-02 | [the design-owed sweep: thirty items settled, and three recovered from a merge](DEVLOG.md) | BL-054 BL-087 BL-094 BL-098 BL-131 BL-155 BL-157 BL-158 BL-171 BL-189 BL-210 BL-217 BL-218 BL-223 BL-225 BL-229 BL-262 BL-263 | DEVLOG.md |
 | 2026-08-01 | [the disclosure spine: one fold idiom, and the surfaces stop inventing their own](DEVLOG.md) | BL-214 BL-215 BL-233 BL-247 BL-248 BL-252 BL-254 BL-259 | DEVLOG.md |
 | 2026-08-01 | [the last four v0.1.0 items, and the goldens finally have one truth value](DEVLOG.md) | BL-162 BL-203 BL-221 BL-233 BL-252 BL-254 BL-255 BL-256 BL-257 BL-258 | DEVLOG.md |
+| 2026-07-31 | [Lens-cycle fix: supply_routes was unreachable](archive/DEVLOG-2026.md) | BL-011 BL-014 BL-093 BL-226 BL-233 | DEVLOG-2026.md |
 | 2026-07-31 | [closing the v0.1.0 cut set: terrain combat, font glyphs, and the three audit instruments](archive/DEVLOG-2026.md) | BL-162 BL-210 BL-226 BL-230 BL-233 BL-234 BL-249 BL-252 BL-253 BL-254 BL-255 | DEVLOG-2026.md |
 | 2026-07-31 | [BL-214/BL-247/BL-248 (drill-through UI): narrow-by-default disclosure design, and a mid-session tree wipe](archive/DEVLOG-2026.md) | BL-196 BL-214 BL-247 BL-248 | DEVLOG-2026.md |
 | 2026-07-31 | [BL-190 (food demand): population demand was erased before pricing — ordering fix](archive/DEVLOG-2026.md) | BL-078 BL-096 BL-166 BL-168 BL-190 | DEVLOG-2026.md |

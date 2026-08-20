@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*138 entries — 95 open, 43 resolved.*
+*144 entries — 96 open, 48 resolved.*
 
 ---
 
@@ -657,13 +657,6 @@ Three sub-agents were launched with isolation: worktree AFTER three commits had 
 
 **Why it matters.** This is verbatim the v0.1.9 batch failure the Sprint 17 retro recorded - 'three of five agents branched from a base that had already moved, and worktrees isolate WRITES, not HISTORY' - and the mitigation recorded then (integration reads every hunk) is a cure, not a prevention. The prevention is to state the base explicitly at launch or to have agents merge the working branch as their first act. Neither happened here because the worktree base is chosen by the harness, not by the brief, and nothing in the launch surface reports which commit it picked. Two agents were mid-flight when it was caught; both were told to merge the working branch before continuing.
 
-### NR-317 — A held convoy is free forever - cargo can be parked outside the economy indefinitely
-*question · raised 2026-08-17 · from Sprint 25a, BL-452 (logistics has no verb). Raised by the implementing agent, which could not file it itself.*
-
-hold_convoy stops a convoy advancing and it then costs nothing. Nothing charges upkeep on held cargo, nothing forces resolution, and nothing expires the hold. The goods are in neither a corp pool nor on a market shelf, so they are invisible to the price signal while held. A player can therefore withdraw stock from the market indefinitely at zero cost - and so, once BL-446 lands, can a rival scorer.
-
-**Why it matters.** It is exploit-shaped rather than a bug: every individual behaviour is correct, and the gap is that holding has no price. It also interacts with BL-422 (held sell orders stay visible to the price signal) which settled the OPPOSITE convention for the order book - held stock there remains visible deliberately, so scarcity is not gameable. A held convoy is the same question answered the other way, by omission rather than by decision.
-
 ### NR-318 — hold_convoy names its convoy through cmd.order, not cmd.subject - convoys are not entities
 *decision taken on your behalf · raised 2026-08-17 · from Sprint 25a, BL-452. The brief said subject; the agent deviated and said so.*
 
@@ -677,13 +670,6 @@ The brief specified subject = the convoy. The agent found that convoys are not e
 The R2 byte-identity row fails on the merged branch. The implementing agent reported two candidate causes together - the ordnance resource append, and the golden being MSVC-derived. Building the harness at three points under g++ separates them. At 4f3c4d8 (before any of this work): observed 9744431472DE5755, already FAILING against golden 855E07DE529684EC. At 44166a4 (ordnance only): observed CCF93A83903B6B45. At 9644eaa (ordnance + the military_points deletion): observed CCF93A83903B6B45, UNCHANGED.
 
 **Why it matters.** Three separate facts fall out, and the conflated version supports none of them. (1) The golden cannot pass under g++ at any commit - it is toolchain-specific, so this row is permanently red in any Linux/cloud session and its redness carries no signal there. (2) The ordnance append DID move the hash, so a Windows re-bless is genuinely owed and is not merely a toolchain artefact. (3) Deleting corporation_component::military_points moved it NOT AT ALL, which says state_hash does not walk that field but does walk the per-resource arrays. Without the three-point measurement, (3) would have been assumed either way.
-
-### NR-321 — Ordnance's upkeep rate ships at 0.0, so nothing consumes it at runtime and BL-457's admission argument is not yet true in play
-*question · raised 2026-08-18 · from Sprint 25a, integrating BL-454. The implementing agent flagged the tension rather than resolving it silently.*
-
-BL-454's goods draw ships with every rate at ZERO - my instruction, so the item lands inert and no economy golden moves on landing. The agent followed it and named the consequence: ordnance and food_rations are NAMED in economy.lua's unit_upkeep table at 0.0, so the machinery is wired end to end but nothing actually draws a unit of ordnance until one number changes. chain_depth's R1 exemption says ordnance's consumer is 'BL-454 unit upkeep draw (per-tick, per unit)'. That is true STRUCTURALLY - the pass exists, resolves the vector and would debit - and false at RUNTIME today.
-
-**Why it matters.** BL-457's whole admission argument was that ordnance satisfies PRODUCTION.md's rule because BL-454 consumes it, and NR-257 deleted five resources for failing exactly that test. At rate zero, ordnance is produced-by-a-recipe and consumed-by-nobody-in-practice - the same shape, one layer subtler, and the guard cannot see it because an exemption table is a static string list. It is not a defect to fix by weakening the guard; it is a live number waiting for a decision. Worth stating plainly since I claimed the consumer in BL-457's commit message.
 
 ### NR-322 — Unit quality is DERIVED from the roster row power_mod, not authored as a second column
 *decision taken on your behalf · raised 2026-08-18 · from Sprint 25a, BL-459. Agent judgement call, flagged for overturning.*
@@ -751,11 +737,6 @@ world_determinism's existing digest is world_metrics, a tile-and-count digest. T
 *observation · raised 2026-08-18 · from Sprint B1 substrate census agent, 2026-08-18. Verified, not assumed: seed_sweep_probe prints firms=0.*
 
 CMakeLists' generic glob target for tools/verify/*.cpp links io_world_obj only, which excludes the sol2 translation units. generate_background_firms sizes itself against economy.lua's population_demand and background_demand baskets, and those are all-zero on a default registry with no Lua loaded — so it places zero firms. A census built on the generic target would have described a world nobody plays. The agent added an explicit live-Lua target for substrate_census, mirroring chain_depth, tier_margin and haulage_measure.
-
-### NR-343 — Confirm LP is a per-tick RATE, not a stock - the one load-bearing claim with no file:line
-*question · raised 2026-08-18 · from Research pass 2026-08-18, from Shadow Empire guides rather than from this repo.*
-
-BL-464's settled prose recorded LP as a stock, written from Ben's 'lean heavily on the shadow empire system' ruling. The research says Shadow Empire's LP is a per-turn throughput allowance that is regenerated each turn and then used or wasted - the pipe, not the tank. What carries over is the resource stock it moved.
 
 ### NR-345 — The unit card is unreachable to the verify harness - battle-visual work needs a unit-selection driver first
 *observation · raised 2026-08-18 · from Battle-visual design browse (2026-08-18 session): toured canvases and military surfaces via --verify captures.*
@@ -835,7 +816,7 @@ Surveyed BL-439 (AI never builds processors), BL-440 (mines only target richest)
 
 *Files: `docs/development/backlog.json`*
 
-### NR-324 — BL-441 and BL-442 were picked up for delivery already landed on main; both flipped to complete, including BL-442 step 2 which this session's brief said to leave open
+### NR-358 — BL-441 and BL-442 were picked up for delivery already landed on main; both flipped to complete, including BL-442 step 2 which this session's brief said to leave open
 *decision taken on your behalf · raised 2026-08-19 · from Delivery session for BL-441 (unmet demand) + BL-442 step 1 (price band to data), started against this worktree's HEAD (46118b6, an ancestor of main tip 78bc295).*
 
 Before writing any code, git history showed both items already fully landed on main from the 2026-08-17 session: BL-441 at commits 37989d1/f0a50ce, BL-442 step 1 at 9fb90e2/5e442d1, and BL-442 STEP 2 (the band widening this session was explicitly told not to do) at 2a7aa01 - deriving ceil_mult=10.0 from measured haulage via tools/verify/haulage_measure.cpp, with the derivation written into MARKETS.md as the item's own design asked. Only backlog.json's status field for both items was stale (still 'designed'), plus REFINED.md and NEEDS_REVIEW.json already carry the landing detail from that session. No source file was changed this session.
@@ -857,7 +838,7 @@ spacecraft_components, propellant, clean_water, consumer_goods and medical_suppl
 
 *Files: `tools/verify/chain_depth.cpp`, `src/world/market_clearing.cpp`, `src/world/economy_system.cpp`, `scripts/recipes.lua`*
 
-### NR-356 — verb_coverage.js's first real run finds march_unit/halt_unit/disband_unit missing from the dictionary
+### NR-373 — verb_coverage.js's first real run finds march_unit/halt_unit/disband_unit missing from the dictionary
 *observation · raised 2026-08-19 · from BL-444 (VERB_REACHABILITY_COVERAGE_TOOL) implementation - tools/session/verb_coverage.js, run for real against src/world/corp_command.hpp, docs/ai/ACTIONS.json and src/world/corp_ai.cpp.*
 
 The corp_verb enum carries 24 verbs; the ACTIONS.json gameplay family only has 21 gameplay.* entries. The three missing are march_unit, halt_unit and disband_unit - BL-470's unit march seam, appended to the enum 2026-08-19 (corp_command.hpp: 'Appended AFTER return_to_neutral, same append-only rule'). ACTIONS.md's own convention (CLAUDE.md: 'Any change to a control, binding, lens, ledger or panel must update its entry') was not followed for this landing, so the tool's exit code is currently 1 in an otherwise clean tree.
@@ -872,7 +853,7 @@ The corp_verb enum carries 24 verbs; the ACTIONS.json gameplay family only has 2
 
 *Files: `tools/session/verb_coverage.js`, `docs/ai/ACTIONS.json`, `docs/ai/ACTIONS.md`, `src/world/corp_command.hpp`*
 
-### NR-357 — presentation.cpp still carries three unauthored resource rows (charcoal, iron_blooms, trade_goods_misc) after BL-414
+### NR-374 — presentation.cpp still carries three unauthored resource rows (charcoal, iron_blooms, trade_goods_misc) after BL-414
 *observation · raised 2026-08-19 · from BL-414 (RESOURCE_NAME_TABLE_TRIPLE_DESYNC) implementation this session - consolidating the world-layer Lua-name lookup tables in recipe_registry.cpp and world_gen_config.cpp into src/world/resource_names.{hpp,cpp}.*
 
 src/ui/presentation.cpp's resource_table (enum -> display name/abbreviation/colour, a separate concern from the Lua-name parser BL-414 consolidated) still carries three explicit { nullptr, nullptr, 0 } rows for charcoal, iron_blooms and trade_goods_misc (BL-286 logistics goods). presentation_of() falls back to "(unnamed resource)" for these. Left untouched by BL-414 deliberately - it is content authoring (picking a name/abbreviation/colour), not the structural desync BL-414 was scoped to fix, and src/world/ must not depend on src/ui/ so the two tables cannot simply merge.
@@ -887,7 +868,7 @@ src/ui/presentation.cpp's resource_table (enum -> display name/abbreviation/colo
 
 *Files: `src/ui/presentation.cpp`*
 
-### NR-358 — Batch Delivery this session built a fresh low-collision batch (BL-414/420/444) rather than resuming NR-354's deferred economy cluster
+### NR-375 — Batch Delivery this session built a fresh low-collision batch (BL-414/420/444) rather than resuming NR-354's deferred economy cluster
 *decision taken on your behalf · raised 2026-08-19 · from Survey step of this Batch Delivery session, reading NR-354 (previous session's scoping decision) before picking a batch.*
 
 The session brief suggested resuming BL-439/440/443 (deferred by the immediately-prior session per NR-354, for reasons specific to each - BL-439's golden re-bless cost, BL-440(c)'s design call, BL-443's measure-first requirement). Re-surveyed the open v0.1.16 set instead and picked three independent, low-risk, non-economy items: BL-414 (resource name table dedup), BL-420 (decision-feed label dedup), BL-444 (verb reachability coverage tool) - all designed, priority A, small (d1-d3), no shared files. Ran each in an isolated worktree agent, merged cleanly (no conflicts, stale-base checked against merge-base), independently re-verified (rebuilt, re-ran corp_ai_harness/econ_harness myself rather than trusting agent self-reports, confirmed econ_harness's one failure - WF.R4 - is pre-existing on main and unrelated), and did the live UI check for BL-420 (the only one touching src/ui) myself since the sub-agent had no GUI access in its sandbox.
@@ -898,7 +879,7 @@ The session brief suggested resuming BL-439/440/443 (deferred by the immediately
 
 *Files: `docs/development/backlog.json`*
 
-### NR-359 — BL-476 rival military seeding: iteration order and shared-occupancy threading, plus the is_background exclusion mechanism
+### NR-376 — BL-476 rival military seeding: iteration order and shared-occupancy threading, plus the is_background exclusion mechanism
 *decision taken on your behalf · raised 2026-08-19 · from Implementing BL-476 (RIVALS_START_UNARMED) in src/world/corporation_generation.cpp.*
 
 Two calls made while extending the player-only military seeding block to every corp: (1) iterated `corp_ids` in its existing generation-order sequence (player + rivals, no BL-365 background firms - they are created by a separate, later pass and never appear in this vector) rather than re-sorting by entity_id first, since corp_ids is already deterministic and re-sorting would add a step with no behavioural difference; (2) threaded ONE shared `occupied_tiles` set across every corp's seed_starting_military call (rebuilt once from w.buildings before the loop, then mutated in place by author_building each iteration) so two corps can never be placed on the same tile - this widens the original player-only rebuild-from-w.buildings pattern to a loop without changing its semantics for the player's own case.
@@ -909,17 +890,17 @@ Two calls made while extending the player-only military seeding block to every c
 
 *Files: `src/world/corporation_generation.cpp`*
 
-### NR-360 — The v0.1.16 split executed: destination mapping chosen on Ben's behalf
+### NR-377 — The v0.1.16 split executed: destination mapping chosen on Ben's behalf
 *decision taken on your behalf · raised 2026-08-19 · from Version-alignment session 2026-08-19: six-agent research workflow + 27-verdict contradiction audit + Ben's form verdicts.*
 
 Ben ruled "split the 36-item v0.1.16 holding pen now" but not the destinations. Mapping chosen: v0.1.16 keeps The watch (BL-408/410/411/412/413/418/451 + un-parked BL-306/BL-335); v0.1.19 Ancient conflict & seams (BL-274/277/297/298/299/300/320/337); v0.1.20 Stance & force (BL-314/399/449/450/464/474/475 + BL-472 from v0.1.18); v0.1.21 The credible rival (BL-417/419/439/440/445/446/447); v0.1.22 Harness truth (BL-425/426/427/462/463); BL-296 + BL-443 to v0.1.11 (meta). Rationale: theme coherence per the roadmap grain; the watch keeps the number because its items were already there and Sprint W1 cuts it.
 
-### NR-361 — Stale-goal re-homing destinations chosen (BL-372/375/391/392, BL-264)
+### NR-378 — Stale-goal re-homing destinations chosen (BL-372/375/391/392, BL-264)
 *decision taken on your behalf · raised 2026-08-19 · from Version-alignment session 2026-08-19: six-agent research workflow + 27-verdict contradiction audit + Ben's form verdicts.*
 
 BL-372 (lens-keyed selection) -> v0.1.7 (UI alignment); BL-375 (time-to-space pacing, parked) -> v0.2.0; BL-391 (reputation floor deadlock) -> v0.1.15 (the contract/pay loop owns reputation); BL-392 (procurement destroys value) -> v0.1.11 (Lane D guard: D4 says fix before BL-445); BL-264 (wizard layout, orphaned by the v0.1.11 supersession) -> v0.1.7. BL-341 found complete, untouched.
 
-### NR-362 — BL-087 piece 2 extracted as BL-478 rather than un-parking the whole item
+### NR-379 — BL-087 piece 2 extracted as BL-478 rather than un-parking the whole item
 *decision taken on your behalf · raised 2026-08-19 · from Version-alignment session 2026-08-19: six-agent research workflow + 27-verdict contradiction audit + Ben's form verdicts.*
 
 Ben's verdict said "Un-park BL-087 piece 2 into the live arc". Executed as an EXTRACTION: new item BL-478 (ancient research spend, v0.1.11, design-owed) carries the research-state + spend mechanism; BL-087 itself stays parked with the space arc, its design noting the extraction.
@@ -973,6 +954,46 @@ Five calls: (1) unlocks_structure kept as a mirror field maintained solely by ad
 *decision taken on your behalf · raised 2026-08-19 · from BL-412 build agent report (branch worktree-agent-a51c6af46393ea9de @ 8d092a7); filed by the main session per Rule 0c.*
 
 Six calls: (1) attach PAUSES the sim and TICK releases one econ tick (agent gates the clock per the REFINED brief); human speed keys still override, and even free-running, commands land only at tick boundaries — the transcript stays a replay artifact either way. (2) Commands drain at the boundary BEFORE the next step, stamped with the completed tick — run_serve's exact tick-tag contract. (3) SHUTDOWN on the live seam closes the CONNECTION, never the app. (4) Detach discards never-answered commands and leaves the world paused. (5) One client at a time; a second connection is refused outright. (6) The MCP --attach transport sends COMMAND+TICK as one exchange so a lockstep client cannot deadlock against the gated clock. Also observed: server.js's hand-maintained VERBS array is stale (missing stance + unit-march) — noted on BL-306, whose loop should derive verbs from ACTIONS_INDEX.json.
+
+### NR-359 — DEVLOG.md rebuilt from its last clean commit - merge 0677f7a had re-imported 81 pre-rollover sessions in chimeric form
+*decision taken on your behalf · raised 2026-08-20 · from PR-45 review session, 2026-08-20. The COLLAPSE session's index regen exposed it (168 -> 251 rows, mass duplicates).*
+
+Merge 0677f7a (branch claude/ecstatic-hofstadter-80f1d6, a July-era branch carrying the pre-rollover DEVLOG) re-imported 81 already-archived sessions into DEVLOG.md, splicing headings onto other sessions' bodies - a June 2026 heading carried the BL-429 slice 3 verification tail, and slice 3 itself was truncated. Rebuilt DEVLOG.md as: the last clean pre-merge state (commit 0936400, 66 sessions, slice 3 whole) + the COLLAPSE session on top; the one genuinely new session from the old branch (Lens-cycle fix, 2026-07-31) moved to archive/DEVLOG-2026.md at its chronological slot; index regenerated to 171 rows. A paragraph-level diff against the corrupted file confirmed nothing unique was lost - every dropped paragraph exists in the archive or in the restored (fuller) session bodies.
+
+**Why it matters.** This deleted ~4,200 lines from DEVLOG.md on your behalf. The verification was mechanical (heading-set and paragraph-set containment checks, both scripted in-session), but the rebuild picked commit 0936400 as 'last clean' by heading-count archaeology, and you should know the repair happened in case any session prose you remember reads differently now. The structural cause - a stale long-lived branch merged after the rollover - can recur; the devlog_index tool could cheaply assert 'no live session heading also exists in an archive volume' and turn this failure into a lint.
+
+### NR-360 — Session-delegation roles carved as economy / ui / generation; router left unthinned
+*decision taken on your behalf · raised 2026-08-20 · from BL-497 (session delegation roles), Ben's 2026-08-20 ask to prompt sessions differently as the corpus outgrew one context.*
+
+Carved three implementer roles (economy-dev, ui-dev, generation-dev) matching the repo's natural vertical slices, plus directory CLAUDE.md files for src/world and src/ui only. Chosen on Claude's judgement: military/AI work routes through economy-dev or generation-dev briefs for now rather than owning a fourth role, and the root CLAUDE.md router was left as-is.
+
+**Why it matters.** Role boundaries shape which invariants a cold agent sees. If military/mil-sim work grows (Sprint 26-33 direction), a dedicated military-dev role and a docs/lore scoped file may earn their place. Thinning the root router (its entries have drifted toward design prose) is a separate, larger call left for Ben.
+
+- A) Accept the three-role carve; add roles only when a slice recurs.
+- B) Add military-dev now, ahead of the Lane C engagement work.
+- C) Also schedule a root-router thinning pass (entries become one-liners, prose pushed to the owned docs).
+
+### NR-361 — Scope-drift rewording: intro framing chosen as four strands; novel-work flag mechanics
+*decision taken on your behalf · raised 2026-08-20 · from Ben's 2026-08-20 mid-session asks: raise a novelty flag, and reword README.md / CLAUDE.md for the drifted scope.*
+
+Both intros now drop the bare '4X' label and frame the project as: economy loop (shipped) + generated pre-campaign history (Era -1) + military layer (partial) + AI direction (scored-utility now, local-model at v0.2.0), with the governing-body pivot as the arc's destination. The novelty flag landed as a fourth NEEDS_REVIEW kind ('novel-work') plus a standing rule; sub-agents flag it in their report, the main session files it.
+
+**Why it matters.** The four-strand framing is Claude's carve of the drift, not Ben's wording - it will anchor how new contributors and fresh sessions read the project. Cheap to reword if Ben would frame it differently (e.g. keeping '4X', or leading with the collapse metagame).
+
+- A) Accept the four-strand framing.
+- B) Reword - supply the framing Ben would use.
+- C) Keep README player-facing and move the strand breakdown to CLAUDE.md only.
+
+### NR-362 — World-snapshot serialiser timing: reshape world.hpp now, or declare it final-enough?
+*question · raised 2026-08-20 · from Code-review audit of src/world (2026-08-20). Only the three side-streams (history_log, order_book, procurement) have flat-binary IO; BL-107 (save-format version header) is blocked on the world snapshot existing.*
+
+Data-model restructuring is free today and expensive the day the snapshot serialiser lands. world.hpp (571 lines) carries ~17 component maps plus parallel side-tables (population_centre_tile/name, corp_body_pools, embargo conditions, mutable caches) that the serialiser will have to enumerate as-is.
+
+**Why it matters.** This is the one finding with rework-scale consequences, and it is a timing decision, not a refactor: taken now it costs nothing; deferred past the snapshot it makes the 'seam travels with the change' invariant expensive to honour retroactively.
+
+- A) Declare the struct final-enough and land the snapshot serialiser EARLY in the military milestone (unblocks BL-107).
+- B) Do one deliberate reshaping pass (fold parallel side-tables into their components) first, then serialise.
+- C) Defer both - accept that later reshaping pays the serialiser tax.
 
 ---
 
@@ -1324,12 +1345,30 @@ As first proposed, Sprint 25 shared no dependency with Sprints 21-24 and could h
 
 > **RESOLVED.** ANSWERED 2026-08-17 (Ben): run 25a next - BL-457 (ordnance), BL-454 (upkeep), BL-452/BL-453 (dispatch + ledger), BL-455, BL-456, plus BL-459 (unit strength + adapter) which the same session's rulings added to the phase. Sequence is 25a -> 21 -> 23 -> 25b. The split stands as the decision taken; this entry closes with the sequence confirmed rather than overturned.
 
+### NR-317 — A held convoy is free forever - cargo can be parked outside the economy indefinitely
+*question · raised 2026-08-17 · from Sprint 25a, BL-452 (logistics has no verb). Raised by the implementing agent, which could not file it itself.*
+
+hold_convoy stops a convoy advancing and it then costs nothing. Nothing charges upkeep on held cargo, nothing forces resolution, and nothing expires the hold. The goods are in neither a corp pool nor on a market shelf, so they are invisible to the price signal while held. A player can therefore withdraw stock from the market indefinitely at zero cost - and so, once BL-446 lands, can a rival scorer.
+
+**Why it matters.** It is exploit-shaped rather than a bug: every individual behaviour is correct, and the gap is that holding has no price. It also interacts with BL-422 (held sell orders stay visible to the price signal) which settled the OPPOSITE convention for the order book - held stock there remains visible deliberately, so scarcity is not gameable. A held convoy is the same question answered the other way, by omission rather than by decision.
+
+> **RESOLVED.** Ben, 2026-08-20: held convoy cargo stays VISIBLE to the price signal, aligning with BL-422's held-order convention - one convention everywhere, no new cost machinery. Filed as BL-495 (held convoy visible to price).
+
 ### NR-320 — Two new headless harnesses and one new tool are not discoverable - the skills need your permission
 *question · raised 2026-08-17 · from Sprint 25a. CLAUDE.md: tool creation is skill creation, and modifying a skill requires the user.*
 
 Sprint 25a added three checks that are currently loose. tools/verify/convoy_command.cpp (50 assertions over the dispatch/hold seam, including a full-world-fingerprint rejection check) and, pending the upkeep agent, tools/verify/unit_upkeep.cpp - neither is named in the verifier-headless skill, so neither is discoverable by a future session even though CMake's glob already picks them up as CTest tests. And tools/session/resource_table_check.js, the static join across the four hand-maintained transcriptions of resource_type, is wrapped in no skill at all.
 
 **Why it matters.** The standing rule is explicit that a loose tool is the forgotten kind, and this is three of them in one batch. resource_table_check.js is the one that matters most: it caught a real defect the compiler is structurally unable to see (a short initialiser list for a sized array silently zero-fills), and that defect had already survived six days unnoticed.
+
+### NR-321 — Ordnance's upkeep rate ships at 0.0, so nothing consumes it at runtime and BL-457's admission argument is not yet true in play
+*question · raised 2026-08-18 · from Sprint 25a, integrating BL-454. The implementing agent flagged the tension rather than resolving it silently.*
+
+BL-454's goods draw ships with every rate at ZERO - my instruction, so the item lands inert and no economy golden moves on landing. The agent followed it and named the consequence: ordnance and food_rations are NAMED in economy.lua's unit_upkeep table at 0.0, so the machinery is wired end to end but nothing actually draws a unit of ordnance until one number changes. chain_depth's R1 exemption says ordnance's consumer is 'BL-454 unit upkeep draw (per-tick, per unit)'. That is true STRUCTURALLY - the pass exists, resolves the vector and would debit - and false at RUNTIME today.
+
+**Why it matters.** BL-457's whole admission argument was that ordnance satisfies PRODUCTION.md's rule because BL-454 consumes it, and NR-257 deleted five resources for failing exactly that test. At rate zero, ordnance is produced-by-a-recipe and consumed-by-nobody-in-practice - the same shape, one layer subtler, and the guard cannot see it because an exemption table is a static string list. It is not a defect to fix by weakening the guard; it is a live number waiting for a decision. Worth stating plainly since I claimed the consumer in BL-457's commit message.
+
+> **RESOLVED.** Ben, 2026-08-20: the rate goes live WITH battle consumption - it rides Lane C's engagement trigger so the first real draw coincides with combat spending it (one golden re-bless). Rate 0.0 is a deliberate dated state until then. Tripwire filed as BL-496 (ordnance rate goes live).
 
 ### NR-324 — verify_api's resource-slug mapper is a FIFTH transcription of resource_type, and it is 20 of 37 stale
 *observation · raised 2026-08-18 · from Post-merge run of the Sprint 25a work on a machine that can build SDL/ImGui (2026-08-18).*
@@ -1400,6 +1439,13 @@ BL-464 (Logistic Points) was filed with four materially different readings: per-
 
 Raised as a later-sprint consideration, not a now-instruction, so it is recorded rather than built. The important fact is that provinces ALREADY EXIST: run_settlement generates roughly 82 with real nation ownership, the Era -1 sim moves them between polities, and the campaign handoff discards the mapping. So this is closer to retaining something already generated than to adding a new layer.
 
+### NR-343 — Confirm LP is a per-tick RATE, not a stock - the one load-bearing claim with no file:line
+*question · raised 2026-08-18 · from Research pass 2026-08-18, from Shadow Empire guides rather than from this repo.*
+
+BL-464's settled prose recorded LP as a stock, written from Ben's 'lean heavily on the shadow empire system' ruling. The research says Shadow Empire's LP is a per-turn throughput allowance that is regenerated each turn and then used or wasted - the pipe, not the tank. What carries over is the resource stock it moved.
+
+> **RESOLVED.** Ben, 2026-08-20: LP is a per-tick RATE - regenerated throughput, used or wasted, never banked; the goods it moved are what carry over. BL-464's design-owed prose amended with the dated ruling (item is open, so amended in backlog.json per the time-slice rule).
+
 ### NR-344 — Goods beat armies to the supply network by accident, not by design
 *observation · raised 2026-08-18 · from Research pass 2026-08-18.*
 
@@ -1434,4 +1480,38 @@ BL-449 gates the Corporation panel's stance column on BL-068 competitor-visibili
 > **RESOLVED.** RESOLVED 2026-08-19 (Ben): reading B — hostility toward the player stays silent and is discovered on contact, matching ordinary BL-068 visibility rather than announcing on the comms dock. Preserves the ambush property BL-458 (interdiction) relies on. BL-449 (stance surface) is unblocked to promote: the Corporation panel's stance column shows a hostile row only once the corp is otherwise discovered, same gate as every other BL-068-visible fact.
 
 *Files: `src/ui/corporation_panel.cpp`, `docs/ui/question_log.json`*
+
+### NR-356 — The Metropole strategy dodges Sprint 30's 'inevitable' collapse as currently framed
+*question · raised 2026-08-20 · from COLLAPSE.md authoring session (Era -1 strategy roster + culminating-events taxonomy), 2026-08-20.*
+
+A reach-based hegemon (trade lanes and dependency, few owned provinces) never trips a holdings-fed strain accumulator, so a major-by-influence could hold its peak indefinitely - contradicting Sprint 30's ruling that collapse is inevitable for a major.
+
+**Why it matters.** It is the one strategy shape that breaks the arc's central promise, and it is the shape BL-325 ruling 3 (economic reach IS military reach) actively encourages. Left unresolved, the harness's inevitability rate is only asserted over holdings-majors.
+
+- A) Reach feeds a separate, slower strain (over-commitment abroad) - the Metropole is the longest-lived shape and still breaks, usually via the Slow Fade (COLLAPSE.md E6).
+- B) The Metropole gets its own rupture mechanism - HISTORY.md Stage 5 (hegemony fails its final audition) made concrete.
+- C) Redefine 'major' to include reach, so the existing accumulator covers it.
+
+> **Recommendation:** A - one accumulator concept with two inflow rates keeps the mechanic legible; Stage 5 can later be expressed as a parameterisation of it rather than a second system.
+
+> **RESOLVED.** Ben, 2026-08-20: option A - 'Logistics should be capable of determining reach. By that I mean reach feeds strain.' Coheres with BL-325 ruling 3 (one reach field): the strain inflow reads the logistics network itself. Filed as BL-510 (reach-fed slow strain), which already encodes this.
+
+*Files: `docs/lore/COLLAPSE.md`, `docs/lore/HISTORY.md`, `src/world/history_sim.hpp`*
+
+### NR-357 — Sequential four-allegory chain does not fit the shipped 400-year single-band run
+*observation · raised 2026-08-20 · from COLLAPSE.md design session, 2026-08-20 - Ben ruled all four allegories (Rome arc, devolution, dynastic cycle, systemic cascade) play out sequentially per generated world, as tuned attractors.*
+
+The shipped Era -1 sim runs ~400 years in one band, and the Sprint 26b doc-truth pass just corrected HISTORY.md/ERAS.md DOWN to that figure. Chaining four rise-and-culmination arcs sequentially implies re-extending the year count and/or band ladder.
+
+**Why it matters.** It reopens BL-320 (Era -1 sim perf) - though the restated /O2 figure (1.2-1.8s per world) suggests headroom - and partially reverses a doc correction made two days ago. The extension should be sized deliberately before Sprint 30 pins its inevitability rates, or the rates get pinned against a run length that is about to change.
+
+- A) Extend years (e.g. back toward the multi-band ladder) so arcs chain in real sim time.
+- B) Keep ~400 years but accelerate verb tempo so four arcs fit - cheaper, but compresses the 'long era' feel Ben named.
+- C) Chain probabilistically: worlds average 2-3 completed arcs of the four attractors, all four asserted only across the sweep, not per world.
+
+> **Recommendation:** Size A against the /O2 perf figure first; C is the honest fallback if A blows the generation budget, and still satisfies tuned-attractors.
+
+> **RESOLVED.** Ben, 2026-08-20: the 400-year band was a placeholder; the aim is the 4000-year ladder (option A). Generating over 4000 years is acknowledged hard - the optimisation task is designed in COLLAPSE.md (section 'The 4000-year problem'): spatial index + incremental aggregates, event-driven quiet provinces, deterministic banded year grain, record-on-change; option C (2-3 arcs per world) retained as the honest fallback if the budget still misses.
+
+*Files: `docs/lore/COLLAPSE.md`, `docs/lore/HISTORY.md`, `src/world/history_sim.hpp`*
 

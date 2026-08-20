@@ -4425,7 +4425,7 @@
      "id": "R1",
      "status": "complete",
      "requirement": "ITEM-SPANNING (headless): every non-background corp (player + named rivals) ends generation owning exactly one military_base and one unit_component (roster index 0, 50 manpower), placed on the nearest valid land tile to its HQ. A BL-365 background firm owns neither.",
-     "result_metric": "tools/verify/rival_military_seeding_harness.cpp R1, canonical world (Kepler, no_prehistory): 8/8 non-background corps seeded exactly 1 military_base + 1 generation-seeded unit each (seeded=8/8, land-poor-skips=0), 0 background firms present in this world so the exclusion is vacuously satisfied here but covered structurally (corp_ids never includes a background firm - see NR-359). Counting excludes hard_coded_world.cpp's separate pre-existing 'Kepler player stub' unit (no muster_base, predates BL-476). corp_terrain_matrix re-run clean: 8 corps, 4 assets each (was 3 pre-BL-476), tier-1 FAILs=0."
+     "result_metric": "tools/verify/rival_military_seeding_harness.cpp R1, canonical world (Kepler, no_prehistory): 8/8 non-background corps seeded exactly 1 military_base + 1 generation-seeded unit each (seeded=8/8, land-poor-skips=0), 0 background firms present in this world so the exclusion is vacuously satisfied here but covered structurally (corp_ids never includes a background firm - see NR-376). Counting excludes hard_coded_world.cpp's separate pre-existing 'Kepler player stub' unit (no muster_base, predates BL-476). corp_terrain_matrix re-run clean: 8 corps, 4 assets each (was 3 pre-BL-476), tier-1 FAILs=0."
     },
     {
      "id": "R2",
@@ -4440,7 +4440,7 @@
      "result_metric": "tools/verify/rival_military_seeding_harness.cpp R3: synthetic single-corp world with one nation whose only tile is ocean, run through the real generate_corporations entry point. No throw/crash; the corp is still created; 0 military_base and 0 units authored."
     }
    ],
-   "notes": "Scope settled directly with Ben, 2026-08-19: player + named rivals only, not background filler firms. No UI surface, so the live-UI-check rule does not apply here - a headless harness is sufficient for this item. Player's own tile pick verified byte-identical: seed_starting_military is now called for the player FIRST (before any rival), against the same w.buildings-derived occupied_tiles snapshot the pre-BL-476 code used, so no rival can claim the tile the player would previously have picked - see the code comment in corporation_generation.cpp and NR-359."
+   "notes": "Scope settled directly with Ben, 2026-08-19: player + named rivals only, not background filler firms. No UI surface, so the live-UI-check rule does not apply here - a headless harness is sufficient for this item. Player's own tile pick verified byte-identical: seed_starting_military is now called for the player FIRST (before any rival), against the same w.buildings-derived occupied_tiles snapshot the pre-BL-476 code used, so no rival can claim the tile the player would previously have picked - see the code comment in corporation_generation.cpp and NR-376."
   },
   {
    "brief": "live-agent-control-seam",
