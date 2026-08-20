@@ -50,6 +50,11 @@ differently in their light.
   placeholder*; the aim is the 4000-year ladder, and generating over it is acknowledged as a
   hard problem — the optimisation task is considered **here** (§ The 4000-year problem), not
   deferred to BL-320 (Era −1 sim perf) alone.
+- **Reach feeds strain (resolves NR-356).** *"Logistics should be capable of determining
+  reach. By that I mean reach feeds strain."* The Metropole's inevitability hole (§ 5) is
+  closed by option A — a second, slower inflow on the same accumulator, reading the same
+  logistics/reach substrate per BL-325 ruling 3 (one reach field). Filed as **BL-482**
+  (reach-fed slow strain).
 - **The story surfaces in the history tab, quietly.** Telling the story is secondary to
   *seeing it in the game*; don't overload the player with easy-access information on
   everything the game does. The focus is playing — deep-dig is optional, for the players who
@@ -156,11 +161,13 @@ holdings, so reach-based power carries no strain — and economic reach *is* mil
 - **Weighting:** Invest + road/route verbs (Lane B/D vocabulary) ≫ Campaign; Settle for
   entrepôts, not depth.
 - **Needs:** nation-grain trade/tariff verbs (Lane D) before it is expressible at all.
-- **The hole (⚠ NR-flagged):** as stated, the Metropole **dodges inevitability** — a
-  major-by-influence with 30 holdings never trips a holdings-fed accumulator. Either reach
-  feeds a *separate, slower* strain (over-commitment abroad), or the Metropole gets its own
-  rupture — which is exactly HISTORY.md Stage 5 (hegemony fails its final audition). Lean:
-  the separate slow strain, so the Metropole is the longest-lived shape and still breaks.
+- **The hole (ruled closed — NR-356, 2026-08-20):** as first stated, the Metropole
+  **dodged inevitability** — a major-by-influence with 30 holdings never trips a
+  holdings-fed accumulator. Ben ruled the lean: reach feeds a *separate, slower* strain
+  inflow on the same accumulator (over-commitment abroad), read from the logistics network
+  itself per BL-325 ruling 3 — so the Metropole is the longest-lived shape and still
+  breaks. Filed as BL-482 (reach-fed slow strain); HISTORY.md Stage 5 becomes a
+  parameterisation of it, not a second system.
 - **Culmination:** Devolution (§ E2) or the Slow Fade (§ E6).
 
 ### 6. The Temple — raise the ceiling

@@ -816,7 +816,7 @@ Surveyed BL-439 (AI never builds processors), BL-440 (mines only target richest)
 
 *Files: `docs/development/backlog.json`*
 
-### NR-324 — BL-441 and BL-442 were picked up for delivery already landed on main; both flipped to complete, including BL-442 step 2 which this session's brief said to leave open
+### NR-358 — BL-441 and BL-442 were picked up for delivery already landed on main; both flipped to complete, including BL-442 step 2 which this session's brief said to leave open
 *decision taken on your behalf · raised 2026-08-19 · from Delivery session for BL-441 (unmet demand) + BL-442 step 1 (price band to data), started against this worktree's HEAD (46118b6, an ancestor of main tip 78bc295).*
 
 Before writing any code, git history showed both items already fully landed on main from the 2026-08-17 session: BL-441 at commits 37989d1/f0a50ce, BL-442 step 1 at 9fb90e2/5e442d1, and BL-442 STEP 2 (the band widening this session was explicitly told not to do) at 2a7aa01 - deriving ceil_mult=10.0 from measured haulage via tools/verify/haulage_measure.cpp, with the derivation written into MARKETS.md as the item's own design asked. Only backlog.json's status field for both items was stale (still 'designed'), plus REFINED.md and NEEDS_REVIEW.json already carry the landing detail from that session. No source file was changed this session.
