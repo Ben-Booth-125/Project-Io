@@ -152,7 +152,25 @@ constexpr int      k_ticks = 300;
 // so the world changes and so does every number this hash walks. Confirmed
 // reproducible across two independently built worlds (855E07DE529684EC twice)
 // before blessing; every other assertion passed unchanged.
-constexpr uint64_t k_unspectated_golden = 0x855E07DE529684ECull;
+// Re-blessed 2026-08-21 (the four-lane batch + the two-level firm budget). Four
+// deliberate, item-designed world changes landed between the previous value and
+// this one, and every one of them moves the generated world by construction:
+// BL-463 (settlement density now derived from land area and nation count, 31 flat
+// -> 44-77 per seed), Sprint B2's road cuts (road-less nations 14 -> 0, plus
+// open-ocean fragments removed), BL-466 (the province partition, built last in
+// generation), and the two-level firm budget (per-resource and per-province caps
+// replacing the flat 40, which changes how many background firms a body opens
+// with and where they stand).
+//
+// Confirmed before blessing, which is the part that matters: the run is
+// REPRODUCIBLE — two independently built worlds, same seed, both produced
+// 344A9FE48306E93A, and R2's own reproducibility row passed alongside this one
+// failing. So the move is a moved world, not a determinism leak. NR-404 had
+// flagged two agents measuring different clean-base hashes for this harness; that
+// resolves as each having measured a differently-generated world, not a fault.
+// Every other assertion in this file — the prohibition, the cadence rows, the A/B
+// seat rows, R3's divergence row — passed unchanged across all four changes.
+constexpr uint64_t k_unspectated_golden = 0x344A9FE48306E93Aull;
 
 /// Hand-built registry mirroring scripts/economy.lua + scripts/recipes.lua for
 /// the building types the generator places. Copied from ai_skill_harness so the

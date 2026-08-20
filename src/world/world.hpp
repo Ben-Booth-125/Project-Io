@@ -246,6 +246,18 @@ struct world
     /// implementation detail (see province.hpp). It joins the flat-binary
     /// serialisation seam as the TRAILING section of the history-log stream, so
     /// a stream written before BL-466 is still a valid prefix.
+    /// NOT folded into `state_hash`, and that is deliberate rather than an
+    /// oversight (the omission corp_modifiers documents, documented here too
+    /// after NR-401 asked). `state_hash` folds the fields a TICK may mutate, so a
+    /// divergence in it means the simulation diverged; the partition is
+    /// generation output and never moves once built, so including it would make
+    /// every tick hash carry a constant. Its determinism is checked where it
+    /// belongs — `determinism_harness` compares the partition field-for-field
+    /// across two generations of the same seed, and
+    /// `province_partition_harness` P6/P7 recompute it from the stored seed.
+    /// This matters more than it reads: BL-467 folds a province id into a
+    /// battle seed, so a silent partition regression would move battle
+    /// outcomes.
     province_partition provinces;
 
     /// Proximity-glimpse stamps (BL-099) — the sim day tick at which a player convoy

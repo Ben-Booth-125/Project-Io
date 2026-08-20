@@ -18,6 +18,7 @@
 // Exits 0 on PASS, non-zero on any divergence (naming it). Kept outside src/ so
 // the CMake game glob does not pull it into the build.
 
+#include "world/province.hpp"
 #include "world/world.hpp"
 #include "world/hard_coded_world.hpp"
 #include "harness_params.hpp"
@@ -160,6 +161,37 @@ int main()
         std::sort(ka.begin(), ka.end());
         std::sort(kb.begin(), kb.end());
         check(ka == kb, "corp-body pool keys identical");
+    }
+
+    // The province partition (BL-466). NOT covered by world::state_hash, and that
+    // exclusion is correct rather than an oversight: state_hash folds the fields a
+    // TICK may mutate, and the partition is generation output that never moves
+    // after it is built. But "not tick state" is not "not checkable" — NR-401
+    // flagged that a determinism regression in build_province_partition would be
+    // invisible to every replay check the project has, which matters now that
+    // BL-467 is about to fold a province id into a battle seed. This is the
+    // generation-determinism harness, so this is the partition's proper home.
+    {
+        check(a.provinces.provinces.size() == b.provinces.provinces.size(),
+              "province count identical across two generations");
+        bool same = a.provinces.provinces.size() == b.provinces.provinces.size();
+        if (same)
+        {
+            for (std::size_t i = 0; i < a.provinces.provinces.size(); ++i)
+            {
+                const auto& pa = a.provinces.provinces[i];
+                const auto& pb = b.provinces.provinces[i];
+                if (pa.id != pb.id || pa.body != pb.body || pa.tiles != pb.tiles)
+                {
+                    same = false;
+                    break;
+                }
+            }
+        }
+        check(same, "province partition is field-identical, in ascending-id order, "
+                    "province-for-province and tile-for-tile");
+        check(a.provinces.tile_province.size() == b.provinces.tile_province.size(),
+              "tile->province index covers the same tile count");
     }
 
     if (g_failures == 0)

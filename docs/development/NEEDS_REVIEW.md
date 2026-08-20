@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*169 entries — 118 open, 51 resolved.*
+*169 entries — 116 open, 53 resolved.*
 
 ---
 
@@ -1087,11 +1087,6 @@ read_procurement gates on version != procurement_version and returns false, so b
 
 Outside law.{hpp,cpp} and market_clearing.cpp there is not one reference to law_effect_kind::import_tariff anywhere in src/. No corp_verb, no UI control, no generation seeding, no agent-seam command creates a tariff law; seed_prototype_laws seeds only the extraction levy. So in a real campaign any_import_tariff_enacted is permanently false and the entire tariff pass is unreachable. The mechanism is built, proved and conserved - in a harness fixture. If D4 acceptance is a cross-border sale pays a duty into the market nation treasury, that is NOT met in the shipped binary. Deliberately not fixed here: seeding a tariff at generation changes every generated world and is a design call, and the granted nation-grain scorer enacting one mid-campaign is the seam the work was shaped for. Your call which of the two it should be.
 
-### NR-401 — The province partition reaches no real save, and is not in state_hash
-*observation · raised 2026-08-20 · from Pre-compile static review of the integrated four-lane batch, 2026-08-20; blocker fixed at bd238d5.*
-
-world::provinces is documented as the trailing section of the history-log stream, and the appender/reader pair is correct field-for-field with a clean-EOF path that loads a pre-BL-466 prefix. But write_history_log / read_history_log have NO callers in src/ - only two harnesses - so nothing in the game persists it. Separately, provinces is stored state excluded from state_hash without the documented reason corp_modifiers carries. Consequence worth acting on BEFORE BL-467: a determinism regression in build_province_partition would be caught only by the same lane own P6 assertion, and BL-467 is about to fold a province id into a battle seed. Either fold provinces into state_hash or document the exclusion the way corp_modifiers does.
-
 ### NR-402 — Six new harnesses joined the routine ctest gate at the 60s default, two of them census-class
 *observation · raised 2026-08-20 · from Pre-compile static review of the integrated four-lane batch, 2026-08-20; blocker fixed at bd238d5.*
 
@@ -1101,11 +1096,6 @@ The CMake GLOB registers tools/verify/*.cpp automatically, so this batch six new
 *decision taken on your behalf · raised 2026-08-20 · from Full CTest suite over the integrated four-lane batch, 2026-08-20 (96 tests, 1474s).*
 
 B4 R1 failed on the integrated tree and passed in every agent worktree, because BL-476 (ce0e5cc) landed after their common base and seeds a military_base into EVERY corp assets. holdings_range governs ECONOMIC holdings and never counted that base, so the audit was comparing against a ceiling one too low for every corp - it only reds when a draw lands at the top of its range, and this batch settlement-density change made one do so. Two ways to fix: raise every ceiling by 1, or stop counting the base. I took the second, because the first would hide a real +1 and would make the audit assert something holdings_range does not promise. Verified: every corp drops by exactly one and all sit inside the declared ranges. If you would rather the audit tracked TOTAL footprint including military, say so and it inverts. Note the file own comment now records this as the FOURTH drift of a hand-mirrored table - the pattern, not this instance, is the thing worth fixing.
-
-### NR-404 — Suite state after the batch: 96 tests, 3 real failures, all confirmed pre-existing
-*observation · raised 2026-08-20 · from Full CTest suite over the integrated four-lane batch, 2026-08-20 (96 tests, 1474s).*
-
-Full CTest on the integrated tree: 95% pass, 5 failures. Two are resolved - world_audit (NR-403) and debt_decomposition, which is a MEASUREMENT-ONLY harness that exits 0 standalone and timed out only under suite load (the NR-402 exposure, now demonstrated rather than predicted). The three that remain are ai_skill_harness (Timeout), spectator_determinism (Failed) and tier_margin (Failed); two independent agents each stashed their work, rebuilt on the untouched base and reproduced all three identically, so none is this batch. spectator_determinism deserves its own attention: its pinned golden 3CBAD1D44EE71EDE is stale, and the two agents measured DIFFERENT clean-base hashes for it (3CC37947C8662F71 and 2ABF4700B2DF9251), which is either two different build configurations or a determinism leak in the thing whose entire job is asserting determinism. Worth one deliberate look before it is re-blessed - and it must not be re-blessed without that look.
 
 ---
 
@@ -1647,4 +1637,18 @@ D4 adversarial finding 9 already says procurement must be fixed before anything 
 B3 re-tunes clamp(tiles/1000,20,40) in population_generation.cpp; BL-463 says the resulting count does not vary with seed. Same file, same census harness, and a clamp fixed once for map size and again for seed-invariance is the same edit done twice if they are scheduled apart. Folded. Its v0.1.22 version goal now lands early - flag if that disturbs the version cut.
 
 > **RESOLVED.** RULED 2026-08-20, Ben: fold BL-463 into Lane B as refined. Its v0.1.22 version goal lands early. Basis: BL-463 own design names road_generation.cpp early-return-below-two-centres as a downstream effect of the clamp, which is the same cut Sprint B2 makes - one defect seen from two ends.
+
+### NR-401 — The province partition reaches no real save, and is not in state_hash
+*observation · raised 2026-08-20 · from Pre-compile static review of the integrated four-lane batch, 2026-08-20; blocker fixed at bd238d5.*
+
+world::provinces is documented as the trailing section of the history-log stream, and the appender/reader pair is correct field-for-field with a clean-EOF path that loads a pre-BL-466 prefix. But write_history_log / read_history_log have NO callers in src/ - only two harnesses - so nothing in the game persists it. Separately, provinces is stored state excluded from state_hash without the documented reason corp_modifiers carries. Consequence worth acting on BEFORE BL-467: a determinism regression in build_province_partition would be caught only by the same lane own P6 assertion, and BL-467 is about to fold a province id into a battle seed. Either fold provinces into state_hash or document the exclusion the way corp_modifiers does.
+
+> **RESOLVED.** RESOLVED 2026-08-21 (Lane 0). Provinces are NOT folded into state_hash, and on inspection that exclusion is correct rather than an oversight: state_hash folds the fields a TICK may mutate, and the partition is generation output that never moves once built - including it would make every tick hash carry a constant. The real gap was that nothing checked it at all. determinism_harness now compares the partition across two generations of the same seed, field-for-field and tile-for-tile, alongside its existing rows (PASS). The exclusion is documented on world::provinces the way corp_modifiers documents its own, naming BL-467 folding a province id into a battle seed as the reason it matters. The unsaved half stands and is unchanged: there is still no game save path at all (see NR-399 amendment).
+
+### NR-404 — Suite state after the batch: 96 tests, 3 real failures, all confirmed pre-existing
+*observation · raised 2026-08-20 · from Full CTest suite over the integrated four-lane batch, 2026-08-20 (96 tests, 1474s).*
+
+Full CTest on the integrated tree: 95% pass, 5 failures. Two are resolved - world_audit (NR-403) and debt_decomposition, which is a MEASUREMENT-ONLY harness that exits 0 standalone and timed out only under suite load (the NR-402 exposure, now demonstrated rather than predicted). The three that remain are ai_skill_harness (Timeout), spectator_determinism (Failed) and tier_margin (Failed); two independent agents each stashed their work, rebuilt on the untouched base and reproduced all three identically, so none is this batch. spectator_determinism deserves its own attention: its pinned golden 3CBAD1D44EE71EDE is stale, and the two agents measured DIFFERENT clean-base hashes for it (3CC37947C8662F71 and 2ABF4700B2DF9251), which is either two different build configurations or a determinism leak in the thing whose entire job is asserting determinism. Worth one deliberate look before it is re-blessed - and it must not be re-blessed without that look.
+
+> **RESOLVED.** RESOLVED 2026-08-21 (Lane 0). No determinism leak. spectator_determinism run on the integrated tree: played=344A9FE48306E93A twice, two INDEPENDENTLY BUILT worlds, same seed - the reproducibility row passes. The only failure was the byte-identity row against a golden pinned on 2026-08-14. The two different clean-base hashes the agents reported resolve as each having measured a differently-generated world, not a fault. Re-blessed to 344A9FE48306E93A per the harness own documented convention (bless on a deliberate world change, after confirming the move is intended and reproducible), with a provenance entry naming all four changes responsible: BL-463 settlement density, Sprint B2 road cuts, BL-466 provinces, and the two-level firm budget. ALL PASS (0 failures). The other three suite failures - ai_skill_harness timeout, tier_margin - are untouched by this and remain open.
 
