@@ -1,83 +1,70 @@
 # Project Io — REFINED (active worklist)
 
-## Sprints A/B/C/D — the four-lane parallel batch (promoted 2026-08-20)
+## The province-grain batch (promoted 2026-08-21)
 
-Requirements: requirements.json § `province-partition`, § `battle-state-in-world`,
-§ `road-network-cuts`, § `settlement-density-clamp`, § `tariff-and-money-conservation`,
-§ `era-minus1-conquest-assertion`.
+Requirements: requirements.json § `province-render-and-selection`,
+§ `unit-position-province-grain`, § `province-building-limit`, § `supply-interdiction`.
 
-Follows the watch + meta batch (`18849f9`). Four lanes chosen for file disjointness: Lane A is
-harness-only, Lane B is generation-only, Lane C is `src/world` military, Lane D is `src/world`
-money. Only C and D share a file (`economy_system.cpp`) — worktree-isolated, C merges first.
+Follows Lane 0 (`10993ca`), which closed the determinism question: no leak, the
+golden re-blessed with provenance, and the partition now compared field-for-field
+across two generations. Ben's grain ruling is BL-511's design; NR-405 records what
+it overturns.
 
-**Main session owns** the board files (`backlog.json`, `sprints.json`, `SPRINTS.md`, `ROADMAP.md`,
-`NEEDS_REVIEW.json`, `requirements.json`, this file) plus `question_log.json` at merge — **no agent
-touches them**.
+**Main session owns** the board files and `question_log.json` — no agent touches them.
 
-### Lane M — the owed live check (main session, runs first)
+### Lane R — BL-511, the province as the rendered and selected unit
 
-- **[1] M1 — GUI verification pass for the six landed-awaiting items.** BL-412 (live agent
-  seam), BL-408 (spectator god view), BL-411 (strategy readout), BL-480 (law author — the
-  read-only levy line), BL-429 (ancient building roster), BL-453 (convoy ledger). Build, open the
-  app, press the thing, look. Per the standing rule a scripted capture does not prove a press is
-  reachable. Flips six items complete, or files what is actually broken. No code expected.
+- **[5] R1 — blended province rendering + province selection.** Sub-agent, worktree.
+  Files: `src/ui/body_surface_canvas.cpp`, `src/ui/ui_state.hpp`,
+  `src/ui/selection_panel.cpp`, `docs/ui/PLANETARY.md`, `docs/ui/SELECTION.md`.
+  Province becomes the click target and the drawn unit, with borders softened by a
+  blend across the province's real tile mixture. The tile does **not** retire — it
+  stays the data grain and appears in the Selection panel as the detail of what was
+  clicked. **The blend has no precedent in this codebase**; expect a visual pass
+  with Ben rather than a spec that closes it.
 
-### Lane A — Sprint 27: the run's failure becomes falsifiable
+### Lane U — unit position at province grain (BL-511's seam half)
 
-- **[2] A1 — BL-384 (Era −1 sim conquers nothing), ASSERTION HALF ONLY.** Sub-agent, worktree.
-  Files: `tools/verify/history_sim_harness.cpp`, `tools/verify/history_sweep.cpp` (read-only on
-  `src/world/history_sim.*`). Add a conquest-count assertion plus elimination and dominance-share
-  counters, reusing `history_sweep.cpp`'s `hegemony_threshold_q` shape. **Expected outcome is a
-  RED assertion committed against today's build** — the fix is explicitly out of scope, no constant
-  tuned, no scorer term changed. If it unexpectedly PASSES, that is a major finding to report, not
-  a seed set to adjust (Sprint 27 § risk).
+- **[4] U1 — `march_unit` retargets from tile to province.** Sub-agent, worktree.
+  Files: `src/world/corp_command.{hpp,cpp}`, `src/world/components.hpp`,
+  the unit movement step, `docs/ai/ACTIONS.json`, harness.
+  The verb enum is serialised and append-only, so the VERB stays and the field it
+  reads changes. Recommendation in BL-511: unit stores a tile and derives a
+  province — cheaper, and every existing reader keeps working. **Untrusted input
+  boundary**: a province id arriving over `--serve` is validated as the value that
+  lands, whole-command rejection, rejection mutates nothing.
 
-### Lane B — Sprints B2 + B3: the world looks physically civilised
+### Lane B — BL-513, the province building limit
 
-- **[3] B1 — Sprint B2, the three road-network cuts.** Sub-agent, worktree.
-  Files: `src/world/road_generation.cpp` (+ its header). The `<2 centres` early return at :90;
-  water crossing and cross-water adjacency at :65 and :195. BL-188 (coastal ports) is **out** of
-  this task — sea being priced backwards is its own item and its own merge.
-- **[2] B2 — Sprint B3, the density clamp.** Sub-agent, worktree.
-  Files: `src/world/population_generation.cpp`, `src/world/settlement.cpp`,
-  `tools/verify/substrate_census.cpp`. `clamp(tiles/1000, 20, 40)` is a 180×84 constant against a
-  312×145 map. Lands **BL-463 (settlement count is seed-invariant)** with it — same file, same
-  census harness, and a re-tuned clamp that is still seed-invariant is a fixed clamp twice.
-  BL-374 (corp density) and the corporation-KIND axis are **out** — BL-374 is `design-owed`.
+- **[3] B1 — total-buildings ceiling per province.** Sub-agent, worktree.
+  Files: `src/world/placement_rules.{hpp,cpp}`, `src/world/province.{hpp,cpp}`,
+  `tools/verify/province_capacity_probe.cpp`, `docs/economy/PRODUCTION.md`.
+  Type-agnostic by ruling, from area + infrastructure + habitability + population,
+  alongside (never replacing) the per-tile deposit cap. Pin any coefficient by
+  measurement against the probe's spread — never pick one. **It will refuse nothing
+  today** (0.13% of capacity used); that is expected and is not a reason to inflate it.
 
-### Lane C — Sprint C3: the engagement envelope, then the fight
+### Lane M — military, grain-independent
 
-- **[4] C1 — BL-466 (province partition).** Sub-agent, worktree. **Foundation — blocks C2.**
-  Files: new `src/world/province.{hpp,cpp}`, `src/world/world.hpp`, `src/world/serialisation.cpp`,
-  harness. A deterministic tile→province partition with a stable sorted id order. Serialisation
-  seam: one appender, no reordering of an existing record.
-- **[4] C2 — BL-467 (battle state in world) + BL-315's remainder.** Sub-agent, worktree,
-  **after C1 merges.** Files: `src/world/campaign_battle.{hpp,cpp}`, `src/world/world.hpp`,
-  `src/world/corp_command.{hpp,cpp}`, `src/world/economy_system.cpp`, `docs/military/MILITARY.md`.
-  The world-held battle record {province, attacker, defender, unit ids, rounds_fought, trace};
-  discovery each tick in sorted (province id, corp-pair) order; the trigger on directed hostility
-  (BL-448 is complete, so the predicate exists); losses applied to `unit_component`. Both resolvers
-  currently return results nothing reads — this gives `unit_to_stack_entry` its production caller.
-  The upkeep-rates-off-zero rider is **out** (BL-458's own item).
+- **[4] M1 — BL-458, supply lines cannot be cut.** Sub-agent, worktree.
+  Files: `src/world/logistics.{hpp,cpp}`, `src/world/supply_system.cpp`,
+  `src/world/components.hpp`, `src/ui/body_surface_canvas.cpp` (consume-only),
+  `src/ui/market_ledger.cpp`.
+  Lift `convoy_tile_at` out of the renderer into `logistics.hpp` — the canvas
+  already derives the full convoy path and the shared function must own the
+  orientation rule, or a convoy's head lands at the wrong end half the time and
+  looks fine either way. Then interdiction: the act that finally earns BL-315's
+  third reading, **pirate**, which has had no mechanic since 2026-08-07.
+  Chosen for this batch because it is entirely tile-pathed and so untouched by
+  the grain ruling.
 
-### Lane D — Sprint D4: money moves between two named actors
+### Held, with reasons
 
-- **[4] D1 — BL-392 (procurement contracts destroy value) then the tariff.** Sub-agent, worktree.
-  Files: `src/world/procurement.cpp`, `src/world/budget_system.cpp`,
-  `src/world/economy_system.cpp`, `src/world/market.{hpp,cpp}`, `src/world/law.{hpp,cpp}`, harness.
-  **Ordering is not optional** — per D4's adversarial finding 9, procurement minting goods with no
-  supplier and destroying money must be fixed *before* anything else touches procurement. Then:
-  a nation on `market_component` (the `centre_tile` → `tile_to_nation` hook already resolves and is
-  unused), a tariff rate set by the enacting nation's own law, and a cross-border sale that debits
-  the buyer and **credits the enacting nation's treasury** (landed with BL-480). The binding
-  requirement is conservation: no flow in this lane may mint or destroy a credit.
-
-### Deferred this batch, with reasons
-
-- **Sprint D2 (research becomes a currency).** BL-478 (ancient research spend) is `design-owed` —
-  the debit mechanism does not exist as a design, and NR-315 records that `condition_subject::science`
-  is a *level*, picked by reading rather than by choice. Wants a design pass, not an implementer.
-- **BL-188 (coastal ports), BL-374 (corp density), the corporation-KIND axis.** Riders on B2/B3
-  that are separately-scoped items; two of the three are `design-owed`.
-- **BL-443 (debt floor).** Still gated on Ben's NR-296 lever pick, and now collides with Lane D on
-  `budget_system.cpp`. Unchanged from the previous batch's MC.
+- **BL-471 (unit marker + command surface), BL-469 (battle card), BL-449 (stance
+  surface).** All draw on the canvas Lane R rewrites, or collide with it on
+  `selection_panel.cpp`. They follow Lane R rather than run beside it.
+- **BL-467 (battle state).** Its engagement rule gets simpler once Lane U lands —
+  a unit's position becomes a province, so no tile-to-province reduction is needed.
+  Sequence it after U1.
+- **BL-512 (firm cap tunables).** Pin together with BL-513's coefficient against one
+  sweep, or the two get tuned against each other by accident.

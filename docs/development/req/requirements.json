@@ -4708,6 +4708,114 @@
      "result_metric": null
     }
    ]
+  },
+  {
+   "brief": "province-render-and-selection",
+   "batch": "2026-08-21-province-grain",
+   "title": "BL-511 - province as rendered and selected unit (Lane R)",
+   "status": "pending",
+   "promoted_from": "backlog.json BL-511 PROVINCE_AS_RENDER_UNIT",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING (visual + LIVE): the Planetary canvas draws provinces, not bare hexes, with borders softened by a blend across each province real tile mixture. A click selects the PROVINCE. LIVE CHECK REQUIRED - open the app and click, a capture does not prove a press is reachable.",
+     "result_metric": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "The tile is not retired: selecting a province shows its tiles in the Selection panel, and deposits/terrain/buildings still read per tile.",
+     "result_metric": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "Every lens still renders. Each of the eleven overlay modes has a stated per-province reduction (mean, dominant, or a deliberate refusal) rather than silently showing one tile value for the whole province.",
+     "result_metric": null
+    }
+   ]
+  },
+  {
+   "brief": "unit-position-province-grain",
+   "batch": "2026-08-21-province-grain",
+   "title": "BL-511 seam half - march_unit retargets to province (Lane U)",
+   "status": "pending",
+   "promoted_from": "backlog.json BL-511; NR-405",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING (headless): march_unit takes a PROVINCE and a unit marches to it across ticks. The corp_verb enum is unchanged in value and order (append-only rule); only the field read changes.",
+     "result_metric": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "UNTRUSTED INPUT BOUNDARY: a province id arriving over --serve is range-checked against the real domain before any narrowing cast; an invalid one rejects the WHOLE command and mutates nothing.",
+     "result_metric": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "ACTIONS.json march_unit entry matches the seam exactly - the dictionary is transcribed from corp_command.hpp, so a disagreement means the dictionary is wrong.",
+     "result_metric": null
+    }
+   ]
+  },
+  {
+   "brief": "province-building-limit",
+   "batch": "2026-08-21-province-grain",
+   "title": "BL-513 - province building limit (Lane B)",
+   "status": "pending",
+   "promoted_from": "backlog.json BL-513 PROVINCE_BUILDING_LIMIT",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING (headless): a province has a total-buildings ceiling derived from area, infrastructure, habitability and population; placement refuses at the ceiling with a stated reason, and the per-tile deposit cap still applies independently.",
+     "result_metric": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "TYPE-AGNOSTIC by ruling: the ceiling bounds the total only. Sixty buildings may be any mix of types.",
+     "result_metric": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "Any coefficient is PINNED BY MEASUREMENT against province_capacity_probe across the seed set, and the measured spread is recorded in the item. No number is picked. Generation output is unchanged where the ceiling does not bind (state_hash).",
+     "result_metric": null
+    }
+   ]
+  },
+  {
+   "brief": "supply-interdiction",
+   "batch": "2026-08-21-province-grain",
+   "title": "BL-458 - supply lines can be cut (Lane M)",
+   "status": "pending",
+   "promoted_from": "backlog.json BL-458 SUPPLY_LINES_CANNOT_BE_CUT",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING (headless): a hostile unit standing on a convoy route interdicts it - the convoy is stopped or taken, deterministically and identically across two runs of the same seed.",
+     "result_metric": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "convoy_tile_at lives in logistics.hpp and the canvas CONSUMES it rather than owning a private copy. The shared function owns the path-orientation rule (intra_body_path caches on a canonicalised key), proven by a harness that a convoy head is at the correct end for both route directions.",
+     "result_metric": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "BL-315 third reading is earned: there is now an act that makes pirate the honest description of a company.",
+     "result_metric": null
+    }
+   ]
   }
  ]
 }
