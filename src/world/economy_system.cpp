@@ -800,10 +800,28 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // the remainder from the BUYER's balance (a simplification of BL-095's own
     // market-gated stretch/pause rate: a contract paces on a fixed schedule
     // rather than the supplier's live throughput, a known first-cut cut — see
-    // BL-350's item resolution). On completion the full quantity is credited
-    // to the buyer's (buyer, body) pool and reputation moves up. Ascending
-    // contract id (insertion order — the vector is appended-to, never
-    // reordered) keeps this deterministic without an extra sort.
+    // BL-350's item resolution). Ascending contract id (insertion order — the
+    // vector is appended-to, never reordered) keeps this deterministic without
+    // an extra sort.
+    //
+    // BL-392 changed two things about what that instalment IS and where the
+    // goods go:
+    //
+    //   MONEY IS A TRANSFER. Each instalment now leaves the buyer AND ARRIVES
+    //   AT THE SUPPLIER, the same magnitude in the same statement. Before this,
+    //   the buyer's balance was debited and no balance anywhere was credited:
+    //   every contract in flight was quietly burning credits out of the economy.
+    //   The freight rides in the same total — the supplier arranges the
+    //   carriage, so paying them for it keeps the flow closed.
+    //
+    //   GOODS LAND ON `delivery_body`, the buyer's own body, not on the
+    //   supplier's. Crediting the supplier's body put the stock where the buyer
+    //   held no processor reservation, and the auto-surplus path liquidated it
+    //   in the tick it landed — a player ran twenty contracts and never saw a
+    //   single pool fact. Where the supplier holds the good in stock at the
+    //   fulfilment body it is DRAWN from their pool (a real move, not a copy);
+    //   any shortfall is built to order, which is what a build order placed with
+    //   someone else means.
     {
         const auto& pp = reg.procurement();
         std::vector<std::size_t> completed;
@@ -813,13 +831,30 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
             const auto bit = w.corporations.find(c.buyer);
             if (bit == w.corporations.end())
                 continue; // buyer no longer exists — leave the contract inert
-            const float remaining_total = c.quantity * c.unit_price * (1.0f - pp.deposit_fraction);
+            const auto sit = w.corporations.find(c.supplier);
+            if (sit == w.corporations.end())
+                continue; // supplier gone — there is nobody to pay, so charge nothing
+
+            const float contract_total  = c.quantity * c.unit_price + c.freight_cost;
+            const float remaining_total = contract_total * (1.0f - pp.deposit_fraction);
             const float per_tick = (c.lead_time_ticks > 0) ? remaining_total / static_cast<float>(c.lead_time_ticks) : remaining_total;
             bit->second.balance -= per_tick;
+            sit->second.balance += per_tick;
             ++c.ticks_elapsed;
             if (c.ticks_elapsed >= c.lead_time_ticks)
             {
-                w.pool_for(c.buyer, c.body).quantities[static_cast<std::size_t>(c.resource)] += c.quantity;
+                const std::size_t ri = static_cast<std::size_t>(c.resource);
+                // Draw what the supplier actually holds at the fulfilment body
+                // before building the rest to order, so a contract served out of
+                // existing stock moves goods rather than inventing them.
+                const auto skit = w.corp_body_pools.find(std::make_pair(c.supplier, c.body));
+                if (skit != w.corp_body_pools.end())
+                {
+                    float& sq = skit->second.quantities[ri];
+                    sq -= std::min(sq, c.quantity); // a pool never goes negative
+                }
+                const entity_id land_on = (c.delivery_body != null_entity) ? c.delivery_body : c.body;
+                w.pool_for(c.buyer, land_on).quantities[ri] += c.quantity;
                 w.corp_reputation[{c.buyer, c.supplier}] += pp.reputation_on_complete;
                 completed.push_back(i);
             }

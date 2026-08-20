@@ -177,6 +177,90 @@ bool supplier_has_capacity(const world& w, const recipe_registry& reg, entity_id
     return false;
 }
 
+/// BL-392: the body a contract's goods should LAND on — the buyer's own centre
+/// of gravity, taken as the body carrying the lowest-id building the buyer owns.
+/// Lowest id rather than "first in `assets`" because `assets` is an append order
+/// that a demolish can permute; the id is stable, so the same world quotes the
+/// same delivery body every time (the determinism invariant).
+///
+/// Returns null_entity when the buyer owns nothing anywhere — request_quote then
+/// falls back to the supplier's fulfilment body, which is the pre-BL-392
+/// behaviour and the only case with nowhere better to put the goods.
+entity_id buyer_delivery_body(const world& w, entity_id buyer)
+{
+    const auto cit = w.corporations.find(buyer);
+    if (cit == w.corporations.end())
+        return null_entity;
+    entity_id best_building = null_entity;
+    entity_id best_body     = null_entity;
+    for (const entity_id bid : cit->second.assets)
+    {
+        const auto bit = w.buildings.find(bid);
+        if (bit == w.buildings.end())
+            continue;
+        const auto tit = w.tiles.find(bit->second.tile);
+        if (tit == w.tiles.end() || tit->second.body == null_entity)
+            continue;
+        if (best_building == null_entity || bid < best_building)
+        {
+            best_building = bid;
+            best_body     = tit->second.body;
+        }
+    }
+    return best_body;
+}
+
+/// BL-392: the supplier's ACTUAL per-tick throughput of `resource`, summed over
+/// every completed, active building they own that makes it — extraction sites
+/// targeting it at their own base rate, processing facilities at their recipe's
+/// yield of it times theirs.
+///
+/// The lead time used to be `base_lead_ticks * ceil(quantity / a GLOBAL
+/// processing constant)`, so a supplier with ten facilities quoted exactly the
+/// same term as one with a single stalled site. Reading their real capacity is
+/// what makes the number mean anything — and what makes shopping on lead time
+/// possible once BL-390 puts the term on screen.
+///
+/// Zero is possible in principle (a corp whose only producing site was
+/// decommissioned between the capacity check and here); the caller floors it.
+float supplier_throughput(const world& w, const recipe_registry& reg, entity_id supplier,
+                          resource_type resource)
+{
+    const auto cit = w.corporations.find(supplier);
+    if (cit == w.corporations.end())
+        return 0.0f;
+    const std::size_t ri = static_cast<std::size_t>(resource);
+
+    // Ascending building id: this is a float sum over the corp's assets, and
+    // float addition is not associative, so the ORDER has to be fixed by
+    // something stable rather than by `assets`' append history.
+    std::vector<entity_id> owned(cit->second.assets.begin(), cit->second.assets.end());
+    std::sort(owned.begin(), owned.end());
+
+    float total = 0.0f;
+    for (const entity_id bid : owned)
+    {
+        const auto bit = w.buildings.find(bid);
+        if (bit == w.buildings.end())
+            continue;
+        const building_component& b = bit->second;
+        if (b.ticks_remaining > 0 || b.decommissioned)
+            continue;
+        const float rate = reg.economics(b.type).base_rate;
+        if (b.type == building_type::extraction_site && b.target_resource == resource)
+        {
+            total += rate;
+        }
+        else if (b.type == building_type::processing_facility)
+        {
+            const recipe* r = reg.get_recipe(b.recipe);
+            if (r != nullptr && r->outputs[ri] > 0.0f)
+                total += rate * r->outputs[ri];
+        }
+    }
+    return total;
+}
+
 /// BL-350 Q2, decline condition 2 ("no input access"): for a PROCESSED good
 /// (the recipe found by supplier_has_capacity), can the supplier's own local
 /// market actually be bought from for every non-zero input? Extraction has no
@@ -591,16 +675,52 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
 
             // Price: the supplier's local market price (or base_price with no
             // live resolution yet), same "what the good actually costs here"
-            // reading run_construction's auto-buy uses. Lead time: derived, not
-            // authored (BL-350's own framing) — a bigger order takes longer, a
-            // supplier with real capacity is faster.
+            // reading run_construction's auto-buy uses — LESS the commitment
+            // discount (BL-392). Spot with a forfeitable deposit on top is
+            // strictly worse than buying on the market, which is why the
+            // measured 20-unit iron round trip settled at -0.14 credits and no
+            // rational agent ever contracted. Lead time: derived, not authored
+            // (BL-350's own framing) — a bigger order takes longer, a supplier
+            // with real capacity is faster.
             const entity_id mid = any_market_on_body(w, body);
-            const float unit_price = (mid != null_entity)
+            const float spot_price = (mid != null_entity)
                 ? (w.markets.at(mid).price[static_cast<std::size_t>(cmd.target)] > 0.0f
                        ? w.markets.at(mid).price[static_cast<std::size_t>(cmd.target)]
                        : w.markets.at(mid).base_price[static_cast<std::size_t>(cmd.target)])
                 : 0.0f;
-            const float throughput = std::max(1.0f, reg.economics(building_type::processing_facility).base_rate);
+
+            const procurement_params& pp = reg.procurement();
+
+            // Asymptotic in the order size, so no order however large drives the
+            // price to zero, and the half-quantity is where the curve's knee sits.
+            const float half_q    = std::max(1.0f, pp.volume_discount_half_quantity);
+            const float discount  = pp.volume_discount_max *
+                                    (cmd.quantity / (cmd.quantity + half_q));
+            const float unit_price = spot_price * (1.0f - std::clamp(discount, 0.0f, 0.95f));
+
+            // BL-392 fault 1: deliver to the BUYER's body. Crediting the
+            // supplier's body left the stock somewhere the buyer had no
+            // processor reservation, and the auto-surplus path liquidated it in
+            // the tick it landed — twenty completed contracts, not one
+            // detectable delivery.
+            const entity_id delivery = [&]{
+                const entity_id d = buyer_delivery_body(w, cmd.corp);
+                return d != null_entity ? d : body;
+            }();
+
+            // Carriage, when the goods actually cross bodies. Paid to the
+            // supplier at delivery, so it is a transfer between two balances and
+            // conserves credits exactly.
+            const float freight = (delivery != body)
+                ? spot_price * cmd.quantity * pp.offbody_freight_fraction
+                : 0.0f;
+
+            // BL-392 fault 3: the SUPPLIER's throughput for this good, not a
+            // global processing constant. Floored at a token rate so a supplier
+            // whose last producing site vanished between the capacity check and
+            // here still quotes a finite term rather than dividing by zero.
+            const float throughput =
+                std::max(0.01f, supplier_throughput(w, reg, cmd.counterparty, cmd.target));
             // Clamp before narrowing. A float-to-int conversion whose value does
             // not fit the destination is undefined, not saturating, and
             // `quantity` is caller-supplied — the only guard above is
@@ -609,20 +729,25 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             // of the campaign. The ceiling is a century of quarters: far past any
             // real contract, and finite.
             constexpr double max_lead_ticks = 400.0;
-            const double raw_lead = static_cast<double>(reg.procurement().base_lead_ticks) *
+            const double raw_lead = static_cast<double>(pp.base_lead_ticks) *
                                     std::ceil(static_cast<double>(cmd.quantity) / throughput);
+            // Floored at 1: a contract that completes in zero ticks would pay
+            // its whole remainder in a single tick and deliver instantly, which
+            // is a spot purchase wearing a contract's name.
             const int lead_time =
-                static_cast<int>(std::clamp(raw_lead, 0.0, max_lead_ticks));
+                static_cast<int>(std::clamp(raw_lead, 1.0, max_lead_ticks));
 
             procurement_quote q;
             q.id              = w.allocate_procurement_id();
             q.buyer           = cmd.corp;
             q.supplier        = cmd.counterparty;
             q.body            = body;
+            q.delivery_body   = delivery;
             q.resource        = cmd.target;
             q.quantity        = cmd.quantity;
             q.unit_price      = unit_price;
             q.lead_time_ticks = lead_time;
+            q.freight_cost    = freight;
             w.procurement_quotes.push_back(q);
             return corp_command_result::applied;
         }
@@ -638,25 +763,40 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             if (it->buyer != cmd.corp)
                 return corp_command_result::rejected_not_owner;
 
-            const float total   = it->quantity * it->unit_price;
+            // BL-392: the contract's total is goods PLUS carriage — the buyer is
+            // paying for delivery to their own body, and the freight is the
+            // honest price of that distance.
+            const float total   = it->quantity * it->unit_price + it->freight_cost;
             const float deposit = total * reg.procurement().deposit_fraction;
             corporation_component& buyer = w.corporations.at(cmd.corp);
             if (buyer.balance < deposit)
                 return corp_command_result::rejected_funds;
+            // The supplier must still exist to be paid. Every credit this seam
+            // moves is a TRANSFER; there is no counterparty-less debit here.
+            const auto sit = w.corporations.find(it->supplier);
+            if (sit == w.corporations.end())
+                return corp_command_result::rejected_invalid;
 
             procurement_contract c;
             c.id              = w.allocate_procurement_id();
             c.buyer           = it->buyer;
             c.supplier        = it->supplier;
             c.body            = it->body;
+            c.delivery_body   = it->delivery_body;
             c.resource        = it->resource;
             c.quantity        = it->quantity;
             c.unit_price      = it->unit_price;
             c.lead_time_ticks = it->lead_time_ticks;
             c.ticks_elapsed   = 0;
             c.deposit_paid    = deposit;
+            c.freight_cost    = it->freight_cost;
 
-            buyer.balance -= deposit;
+            // Debit and credit in the same breath, same magnitude: the deposit
+            // moves from the buyer to the supplier. It used to leave the buyer's
+            // balance and reach nobody, so accepting a quote destroyed credits
+            // outright.
+            buyer.balance       -= deposit;
+            sit->second.balance += deposit;
             w.procurement_contracts.push_back(c);
             w.procurement_quotes.erase(it); // consumed: cannot accept twice
             return corp_command_result::applied;

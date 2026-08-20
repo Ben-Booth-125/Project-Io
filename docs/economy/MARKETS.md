@@ -410,6 +410,50 @@ AI's command are one implementation.
   a militia's contracts are its only buyer, which is what makes the BL-340/BL-350 coupling real
   rather than thematic.
 
+### What a contract is actually worth (BL-392, 2026-08-20)
+
+Everything above described the seam correctly and the **deal** wrongly. A player ran twenty
+contracts, took delivery of 200 units of iron ore, and could not detect a single delivery. Three
+faults compounded, and all three are now fixed:
+
+1. **Goods land on the BUYER's body.** Delivery credited `pool_for(buyer, contract.body)` — and
+   `contract.body` is where the **supplier** fulfils from. On a body the buyer holds no processor
+   reservation on, the auto-surplus path liquidated the whole delivery in the tick it landed, so
+   every completed contract was invisible by construction. A contract now carries a
+   **`delivery_body`** — the buyer's own body, taken as the body of the lowest-id building they
+   own (lowest id, not first-in-`assets`, because a demolish permutes that list and the quote must
+   be reproducible). It degrades to the supplier's body only when the buyer owns nothing anywhere.
+2. **A commitment buys a discount.** `unit_price` was the supplier's live spot price and the
+   liquidation happened at that same spot price, so a measured 20-unit iron round trip settled at
+   exactly **−0.14 credits**: break-even minus friction, by construction, and strictly worse than
+   simply buying on the market. The quote is now spot less a **volume discount**, asymptotic in
+   the order size — `volume_discount_max × q / (q + volume_discount_half_quantity)`, authored in
+   `scripts/economy.lua` under `economy.procurement` — so no order however large drives the price
+   to zero, and the terms improve monotonically with the size of the commitment.
+3. **Lead time reads the SUPPLIER.** The divisor was `processing_facility.base_rate`, a **global
+   constant**: a supplier with ten facilities quoted the same term as one with a single stalled
+   site. It is now that supplier's real per-tick throughput of that good — extraction sites
+   targeting it at their own rate, processing facilities at their recipe's yield of it times
+   theirs, summed in ascending building id (a float sum needs a fixed order). Floored at 1 tick:
+   a contract completing in zero ticks is a spot purchase wearing a contract's name.
+
+**Freight is the price of the distance.** Delivering across bodies costs
+`offbody_freight_fraction` of the order's pre-discount goods value, carried on the contract as
+`freight_cost` and included in the total the deposit and the instalments are computed from. It is
+set **below** `volume_discount_max` on purpose, so a genuine volume order still beats spot after
+carriage; a same-body delivery pays nothing.
+
+**Every credit this seam moves is a TRANSFER.** This is the fix nobody asked for and the one that
+mattered most: the deposit and every paced instalment used to leave the buyer's balance and
+**arrive nowhere**. Every contract in flight was quietly burning credits out of the economy. The
+supplier is now credited exactly what the buyer is debited, in the same statement, deposit,
+instalments and freight alike — the supplier arranges the carriage, so paying them for it keeps
+the flow closed. On completion the goods are **drawn from the supplier's pool** at the fulfilment
+body as far as their stock goes, with any shortfall built to order (which is what a build order
+placed with someone else means).
+
+Verified by `tools/verify/money_conservation.cpp`.
+
 ## Price resolution
 
 `resolve_price`, per (market, resource):

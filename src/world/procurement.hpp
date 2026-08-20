@@ -31,7 +31,9 @@ inline constexpr uint32_t procurement_magic =
 /// Format version. Bump on any layout change to `procurement_quote` /
 /// `procurement_contract` / the reputation record — the `static_assert`s on
 /// both record sizes (components.hpp) are the tripwire.
-inline constexpr uint32_t procurement_version = 1;
+/// Bumped to 2 by BL-392, which added `delivery_body` and `freight_cost` to
+/// both records — a v1 stream carries neither and cannot be reinterpreted as v2.
+inline constexpr uint32_t procurement_version = 2;
 
 /// Sanity ceiling on each declared count, same reasoning as
 /// `order_book_max_orders`: guards the eager reserve against a corrupt or

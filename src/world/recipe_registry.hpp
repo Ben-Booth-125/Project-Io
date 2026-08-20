@@ -424,6 +424,29 @@ struct procurement_params
     /// Reputation delta on a contract's completion (+) / cancellation (-).
     float reputation_on_complete = 1.0f;
     float reputation_on_cancel   = -2.0f;
+
+    // --- BL-392: a commitment has to BUY something --------------------------
+    // Before this, unit_price was spot and the goods liquidated at spot, so a
+    // measured 20-unit iron round trip settled at -0.14 credits: break-even
+    // minus friction, by construction, and a rational agent never contracts.
+    // The discount is what the buyer gets for committing volume ahead of time;
+    // the freight is what the distance costs. Both are data.
+
+    /// Ceiling on the commitment discount off spot, as a fraction. The realised
+    /// discount is `max * q / (q + half_quantity)` — asymptotic, so no order can
+    /// drive the price to zero however large it is.
+    float volume_discount_max = 0.15f;
+
+    /// Order quantity at which HALF the ceiling discount is reached. Larger =
+    /// the discount is reserved for bigger commitments.
+    float volume_discount_half_quantity = 100.0f;
+
+    /// Carriage when the goods land on a body other than the one the supplier
+    /// fulfils from, as a fraction of the order's pre-discount goods value.
+    /// Paid TO THE SUPPLIER, who arranges the shipping — a transfer, not a burn.
+    /// Below `volume_discount_max`, so a volume order still beats spot after
+    /// carriage; a same-body delivery pays nothing.
+    float offbody_freight_fraction = 0.05f;
 };
 
 /// Player road-placement cost for a single tier (BL-147 core, BL-172 ladder), authored in
