@@ -33,7 +33,17 @@ DELIVERY.md § Sub-agents & worktrees, which gained the pointer paragraph.
 routes through economy/generation briefs until the slice recurs; and the root CLAUDE.md router
 was left unthinned, though its entries have drifted toward design prose. Both are Ben's call.
 
-**Runtime:** ~0.5h, Light (doc/config), remote.
+**Second wave (Ben, mid-session).** The **novel-work flag**: a fourth NEEDS_REVIEW kind,
+`novel-work`, raised by a session about its own task when no authority doc, role, or pattern
+fits — a drift detector, so novelty is chosen, not accreted. Standing rule added; the three
+role files tell sub-agents to flag it in their reports.
+
+And the **scope-drift reword**: README.md and CLAUDE.md intros no longer describe a bare 4X
+prototype. Both now frame four strands — economy loop (shipped), generated Era −1 history,
+military layer (partial), AI direction — with the governing-body pivot as the destination.
+The framing carve is Claude's wording, recorded as NR-361 for Ben to overturn.
+
+**Runtime:** ~0.75h, Light (doc/config), remote.
 
 ---
 

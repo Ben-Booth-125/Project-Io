@@ -14,6 +14,13 @@
   "                        from a decision Ben made.",
   "  - 'observation'     — something noticed in passing that is too small or too",
   "                        cross-cutting to file, but which a human should see.",
+  "  - 'novel-work'      — raised by a SESSION about its own task (Ben, 2026-08-20):",
+  "                        the work in hand feels NOVEL — no owning authority doc, no",
+  "                        saved role or established pattern fits, or it quietly grows",
+  "                        the project's scope. Raise it AT THE MOMENT the feeling",
+  "                        arises, then continue (or pause, if scope growth is large).",
+  "                        Gives Ben a drift detector: novelty should be chosen, not",
+  "                        accreted.",
   "",
   "HOW IT DIFFERS FROM review.json: review.json is a BLOCKER list — items blocked",
   "on a visual artifact only Ben can produce (a mockup, an annotated screenshot).",
@@ -2070,6 +2077,21 @@
     "A) Accept the three-role carve; add roles only when a slice recurs.",
     "B) Add military-dev now, ahead of the Lane C engagement work.",
     "C) Also schedule a root-router thinning pass (entries become one-liners, prose pushed to the owned docs)."
+   ]
+  },
+  {
+   "id": "NR-361",
+   "title": "Scope-drift rewording: intro framing chosen as four strands; novel-work flag mechanics",
+   "raised": "2026-08-20",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Ben's 2026-08-20 mid-session asks: raise a novelty flag, and reword README.md / CLAUDE.md for the drifted scope.",
+   "what": "Both intros now drop the bare '4X' label and frame the project as: economy loop (shipped) + generated pre-campaign history (Era -1) + military layer (partial) + AI direction (scored-utility now, local-model at v0.2.0), with the governing-body pivot as the arc's destination. The novelty flag landed as a fourth NEEDS_REVIEW kind ('novel-work') plus a standing rule; sub-agents flag it in their report, the main session files it.",
+   "why_it_matters": "The four-strand framing is Claude's carve of the drift, not Ben's wording - it will anchor how new contributors and fresh sessions read the project. Cheap to reword if Ben would frame it differently (e.g. keeping '4X', or leading with the collapse metagame).",
+   "options": [
+    "A) Accept the four-strand framing.",
+    "B) Reword - supply the framing Ben would use.",
+    "C) Keep README player-facing and move the strand breakdown to CLAUDE.md only."
    ]
   }
  ]

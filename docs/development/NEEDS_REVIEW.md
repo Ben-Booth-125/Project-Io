@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*125 entries — 77 open, 48 resolved.*
+*126 entries — 78 open, 48 resolved.*
 
 ---
 
@@ -855,6 +855,17 @@ Carved three implementer roles (economy-dev, ui-dev, generation-dev) matching th
 - A) Accept the three-role carve; add roles only when a slice recurs.
 - B) Add military-dev now, ahead of the Lane C engagement work.
 - C) Also schedule a root-router thinning pass (entries become one-liners, prose pushed to the owned docs).
+
+### NR-361 — Scope-drift rewording: intro framing chosen as four strands; novel-work flag mechanics
+*decision taken on your behalf · raised 2026-08-20 · from Ben's 2026-08-20 mid-session asks: raise a novelty flag, and reword README.md / CLAUDE.md for the drifted scope.*
+
+Both intros now drop the bare '4X' label and frame the project as: economy loop (shipped) + generated pre-campaign history (Era -1) + military layer (partial) + AI direction (scored-utility now, local-model at v0.2.0), with the governing-body pivot as the arc's destination. The novelty flag landed as a fourth NEEDS_REVIEW kind ('novel-work') plus a standing rule; sub-agents flag it in their report, the main session files it.
+
+**Why it matters.** The four-strand framing is Claude's carve of the drift, not Ben's wording - it will anchor how new contributors and fresh sessions read the project. Cheap to reword if Ben would frame it differently (e.g. keeping '4X', or leading with the collapse metagame).
+
+- A) Accept the four-strand framing.
+- B) Reword - supply the framing Ben would use.
+- C) Keep README player-facing and move the strand breakdown to CLAUDE.md only.
 
 ---
 

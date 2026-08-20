@@ -42,4 +42,6 @@ say exactly which harness rows moved and why that movement is the intended one.
 
 Build clean, then commit on your worktree branch. **Use the Bash tool with a heredoc for git
 commits** — PowerShell is blocked by the allow rule. One commit, message = the task title.
-Report: what changed, what you verified, what you assumed, what you owe.
+Report: what changed, what you verified, what you assumed, what you owe. If the task felt
+**novel** — nothing in your reading list owned it, or it grew scope — say so explicitly; the
+main session files it as a `novel-work` review entry.
