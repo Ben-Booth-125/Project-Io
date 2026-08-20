@@ -1,5 +1,7 @@
 #include "hard_coded_world.hpp"
 
+#include "province.hpp"
+
 #include "body_names.hpp"
 #include "city_names.hpp"
 #include "continents.hpp"
@@ -1160,6 +1162,13 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // BL-343: the prototype's one law, seeded UN-ENACTED so the shipped economy
     // is unchanged until the player (or a harness) enacts it. See law.hpp.
     seed_prototype_laws(w);
+
+    // BL-466: the province partition — every body's land carved into 3-5 tile
+    // locality cells. LAST, so it reads the finished tile map (rivers, roads,
+    // urban transforms all applied). Its own XOR offset keeps the fold
+    // uncorrelated with the tile/nation/corp streams, and it consumes no RNG
+    // stream at all, so adding it perturbs nothing above it. See province.hpp.
+    build_province_partition(w, params.seed ^ 0x50524F56u);
 
     bump(12);
     return w;

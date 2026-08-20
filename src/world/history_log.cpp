@@ -1,5 +1,7 @@
 #include "history_log.hpp"
 
+#include "province.hpp"
+
 #include <algorithm>
 #include <istream>
 #include <ostream>
@@ -201,6 +203,11 @@ void write_history_log(const world& w, std::ostream& out)
         write_str(out, e.event);
         write_str(out, e.consequence);
     }
+
+    // BL-466: the province section, APPENDED after the last history record and
+    // nowhere else. The single appender on this stream — no record above moves,
+    // so a stream written before BL-466 is a byte-exact PREFIX of this one.
+    write_province_section(w.provinces, out);
 }
 
 bool read_history_log(world& w, std::istream& in)
@@ -253,6 +260,14 @@ bool read_history_log(world& w, std::istream& in)
         entries.push_back(std::move(e));
     }
 
+    // BL-466's trailing province section. A stream written before this item
+    // simply ends here, which read_province_section reports as success with an
+    // empty partition — an old save still loads.
+    province_partition partition;
+    if (!read_province_section(partition, in))
+        return false;
+
     w.history_log = std::move(entries); // replace only on full success
+    w.provinces   = std::move(partition);
     return true;
 }
