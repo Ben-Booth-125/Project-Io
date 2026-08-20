@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*153 entries — 102 open, 51 resolved.*
+*154 entries — 103 open, 51 resolved.*
 
 ---
 
@@ -1026,6 +1026,11 @@ BL-478 (ancient research spend) is design-owed and the debit mechanism has no de
 *observation · raised 2026-08-20 · from Four-lane batch refinement (Sprints 27/B2/B3/C3/D4), REFINED.md 2026-08-20.*
 
 BL-412 (live agent seam), BL-408 (spectator god view), BL-411 (strategy readout), BL-480 (law author read-only levy line), BL-429 (ancient roster), BL-453 (convoy ledger). The code is in the tree; every held requirement row is a LIVE check. Promoted as Lane M, main session, ahead of the four build lanes - it is the cheapest six flips on the board.
+
+### NR-389 — BL-408 spectator god view has NO reachable entry in a played session - only a verify script can turn spectate on
+*observation · raised 2026-08-20 · from Lane M live check, four-lane batch. Build ce7e9f7, fresh build_app.bat run.*
+
+The god-view checkbox renders only while corp_ai_params::spectating is set (ACTIONS.json chrome.sysmenu_god_view: "unreachable in a played session"). The ONLY writer of ui_state.spectating in the whole tree is verify_api.cpp:656, the Lua binding verify.spectate(on). There is no menu item, no checkbox, no CLI flag (main.cpp parses --bless, --export-blackboard, --serve, --verify, --verify-all - no --spectate). So BL-408 cannot be live-checked, and more to the point a player or a watcher cannot enter spectate mode at all outside a verify script. This is exactly the gap the 2026-08-19 live-check rule was written for: the code compiles, the harness is green, and the press does not exist. Needs a decision - either an entry point (a CLI flag and/or a main-menu option) is in BL-408 scope and was missed, or spectate is deliberately harness-only for now and BL-408 requirement rows should say so rather than claiming a surface.
 
 ---
 
