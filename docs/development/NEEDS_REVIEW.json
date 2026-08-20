@@ -2020,6 +2020,28 @@
     "src/world/history_sim.hpp"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-357",
+   "title": "Sequential four-allegory chain does not fit the shipped 400-year single-band run",
+   "raised": "2026-08-20",
+   "kind": "observation",
+   "status": "open",
+   "source": "COLLAPSE.md design session, 2026-08-20 - Ben ruled all four allegories (Rome arc, devolution, dynastic cycle, systemic cascade) play out sequentially per generated world, as tuned attractors.",
+   "what": "The shipped Era -1 sim runs ~400 years in one band, and the Sprint 26b doc-truth pass just corrected HISTORY.md/ERAS.md DOWN to that figure. Chaining four rise-and-culmination arcs sequentially implies re-extending the year count and/or band ladder.",
+   "why_it_matters": "It reopens BL-320 (Era -1 sim perf) - though the restated /O2 figure (1.2-1.8s per world) suggests headroom - and partially reverses a doc correction made two days ago. The extension should be sized deliberately before Sprint 30 pins its inevitability rates, or the rates get pinned against a run length that is about to change.",
+   "options": [
+    "A) Extend years (e.g. back toward the multi-band ladder) so arcs chain in real sim time.",
+    "B) Keep ~400 years but accelerate verb tempo so four arcs fit - cheaper, but compresses the 'long era' feel Ben named.",
+    "C) Chain probabilistically: worlds average 2-3 completed arcs of the four attractors, all four asserted only across the sweep, not per world."
+   ],
+   "recommendation": "Size A against the /O2 perf figure first; C is the honest fallback if A blows the generation budget, and still satisfies tuned-attractors.",
+   "files": [
+    "docs/lore/COLLAPSE.md",
+    "docs/lore/HISTORY.md",
+    "src/world/history_sim.hpp"
+   ],
+   "resolution": null
   }
  ]
 }

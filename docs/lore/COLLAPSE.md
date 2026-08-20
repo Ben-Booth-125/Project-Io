@@ -22,6 +22,31 @@
 
 ---
 
+## Rulings — design session (2026-08-20)
+
+Ben's answers to the shaping questions, recorded first because the sections below read
+differently in their light.
+
+- **Four allegories, not two or three.** The pre-game generation hones in on all four
+  mechanism-references: the **Rome arc** (rise → overextension → fragmentation; Pulse/E1),
+  **British devolution** (managed release; Hydra/E2), the **dynastic cycle** (mandate reset;
+  Temple/E4), and the **Bronze-Age systemic collapse** (the cascade; E7). E7's
+  defer-until-E1–E4-land caution stands as *sequencing*, not scope — it is in.
+- **Tuned attractors, not templates.** One parameter space; the allegories are the outcomes
+  the sweep asserts occur at stated, reported rates. Nothing seeds an arc directly; fully
+  driven-not-narrated. This makes the § matrix the literal tuning target.
+- **All four play out sequentially per world.** The run is long enough to chain arcs — a
+  fragmentation whose Phoenix later devolves; a systemic cascade as one epoch among them.
+  **Consequence flagged (NR-357):** the shipped sim runs ~400 years in one band (the
+  Sprint 26b doc-truth pass corrected HISTORY.md *down* to that); chaining four arcs implies
+  re-extending the year count and/or the band ladder, which reopens BL-320 (Era −1 sim perf)
+  and the 4000-year framing the doc pass just retired. Needs sizing before Sprint 30 lands.
+- **The story surfaces in the history tab, quietly.** Telling the story is secondary to
+  *seeing it in the game*; don't overload the player with easy-access information on
+  everything the game does. The focus is playing — deep-dig is optional, for the players who
+  want it. So: creed data and culmination bias land as sim substance; narration is a
+  history-tab layer (and the Sprint 31 playback), never chrome pushed at the player.
+
 ## The framing ruling
 
 Sprint 30 holds collapse **inevitable for a major** — a deterministic consequence of upstream
