@@ -244,6 +244,72 @@ each break severs the trade and tribute its neighbours' cohesion rested on.
 
 ---
 
+## Telling the story — the ideological axis
+
+**The dual-focus rule (Ben, 2026-08-20):** when these stories are told, focus dually on the
+**material** necessities and warfare, *and* on **the way real cultures told their own story** —
+the ideologies preserved in real history — and how those map onto our fictional parallel
+worlds. A collapse the player only sees as border changes is half a collapse.
+
+The naming rule already gives the transfer principle: the **mechanism** crosses, the **noun**
+never does. That holds for ideology exactly as for institutions — *how a culture narrates its
+doom* is a mechanism; the specific gods and dynasties are nouns. The seeded template banks
+that name polities should also mint their **self-stories**, from the pattern library below.
+
+### The pattern library — how real cultures narrated the doom
+
+Each pattern names the real narrative move, then its fictional-world seat (what generation
+writes it onto, what the sim reads back from it).
+
+- **The mandate withdrawn.** Legitimacy is a grant from heaven/the cosmos; disaster is
+  evidence the grant has moved. Makes regime change *thinkable without cultural death* —
+  the ideological substrate of Transformation (E4). *Seat:* a creed axis
+  (mandate-holds ↔ mandate-forfeit); high works + this creed biases the break toward E4.
+- **Translation of empire.** The centre is not destroyed, it *moves* — successors claim to
+  BE the continuation, not the replacement. Every E1 fragment claiming the whole. *Seat:*
+  successor creeds after Fragmentation; the restoration grudge ("we are the true heir")
+  aimed at sibling successors, not just predators.
+- **The declinist mirror.** The culture narrates its own fall in advance — moral corruption,
+  lost virtue of the ancestors — often for generations before any material break. *Seat:*
+  a narrated-history line that *precedes* the culmination (Sprint 31): strain past a band
+  emits "their own chroniclers wrote of decay" years before the break. The player should be
+  able to read the doom coming the way the culture's own writers did.
+- **The apocalypse reframed as test.** Imminent doom read as trial or purification — the
+  millenarian response. Fuels last stands and Exodus (E5): a people who expect the end can
+  march *through* it. *Seat:* a creed that raises cohesion under extreme strain (a
+  deathbed rally term) at the price of never choosing Release — the anti-Hydra.
+- **The garden given away.** Devolution (E2) needs its own story or it reads as defeat: the
+  real mechanism is recasting release as *maturity* — empire retold as stewardship completed,
+  ties of kinship replacing ties of rule. *Seat:* the low-grudge asymmetry E2 already
+  writes, now with its narrative cause; the core's creed shifts imperial → mercantile.
+- **The golden age behind us.** Post-collapse cultures curate an idealised memory of the
+  peak — the material regression is real, the *story* of greatness is preserved losslessly.
+  This is the ideological twin of the tech ladder's regression rule: capacity burns,
+  **awareness never** — and neither does the myth. *Seat:* the restoration creed of E1/E5
+  survivors; the Phoenix's legitimising claim when it gathers fragments.
+- **The chosen remnant.** Exodus (E5) survivors narrate displacement as election — smallness
+  as proof of purity. *Seat:* the rump polity's high-cohesion term IS this story; creed
+  locks legitimist + maximal grudge, and the myth outlives any realistic hope of return.
+
+### Why the sim should read the story back
+
+These are not flavour. Two mechanical returns:
+
+1. **Ideology biases the culmination.** The state vector that determines the exit
+   (§ Open questions, Q2) should include the creed: mandate-creeds fall toward E4,
+   remnant/test-creeds toward E5, stewardship-creeds toward E2. Same strain, different
+   story, different ending — which is precisely how the real cases diverged. Deterministic
+   throughout: creed is seeded data, the bias a scored term.
+2. **The story is the Sprint 29 payload.** Posture, creed and grudge are exactly "the way
+   the culture tells its story" carried to 0 CE. The pattern library gives the phoneme/
+   template banks a second vocabulary to mint from — so a generated nation doesn't just
+   have a name, it has an account of itself, traceable to a culmination the player can
+   find in the history log.
+
+BL-300 (myth/theology) is the natural home for the authored bank; Sprint 31 (watch it fall)
+is where the narration surfaces. The discipline stays HISTORY.md's: **driven, not
+narrated** — the story is emitted by what happened, never scripted over it.
+
 ## The matrix — strategy × culmination
 
 | strategy | natural culmination | failure culmination |
