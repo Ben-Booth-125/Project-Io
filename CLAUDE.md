@@ -1,6 +1,8 @@
 # Project Io — Claude Reference
 
-Project Io is a near-future space-based 4X grand strategy game. The player controls a corporate entity competing through resource extraction, trade, and military conflict across an earth-like solar system — pivoting to a **governing body**, so that law, policy and science reach military as well as economic outcomes (BL-094, governing-body pivot, priority A; not yet landed). The project is in prototype phase, solo-developed in C++ with Lua scripting.
+Project Io is a near-future space-based grand strategy game. The player starts as a corporate entity competing through resource extraction, trade, and military conflict across an earth-like solar system — and pivots to a **governing body**, so that law, policy and science reach military as well as economic outcomes (BL-094, governing-body pivot, priority A; not yet landed).
+
+The scope has grown past the original 4X-economy prototype and now spans four load-bearing strands: the **economy loop** (shipped, playable end-to-end); **world generation with a simulated pre-campaign history** (the Era −1 institutional ladder and collapse metagame — `docs/lore/`, `docs/generation/`); a **military layer** (units, muster, two battle resolvers — partially built, `docs/military/MILITARY.md`); and the **AI direction** (deterministic scored-utility rivals today, a local-model opponent through the word interface as the v0.2.0 goal — `docs/ai/`). Nations act too, under the 2026-08-18 grant, in the same deterministic shape. The project is in prototype phase, solo-developed in C++ with Lua scripting.
 
 The documents below are the authoritative source for all design and technical decisions. Read the
 ones your request touches — **not all of them**: the set is now ~650K tokens (measure it with

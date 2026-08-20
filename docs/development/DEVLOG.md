@@ -10,7 +10,55 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — COLLAPSE.md: the Era −1 collapse metagame, decomposed (BL-476–BL-496) (2026-08-20, latest)
+## Session — the corpus gets delegated: saved roles and scoped instructions (BL-497) (2026-08-20, latest)
+
+Light/doc-config mode, remote session, no `src/` logic touched. Ben's brief: the folder is too
+large for a session to consume cheaply — *let's have different sessions be prompted differently*.
+
+**What landed (BL-497, session delegation roles).** Three saved agent roles in
+`.claude/agents/` — `economy-dev`, `ui-dev`, `generation-dev` — joining the existing
+`code-reviewer`. Each carries its slice's reading list, hard invariants, verify path and
+commit discipline; a spawn now needs only the task-specific brief.
+
+Two directory-scoped instruction files: `src/world/CLAUDE.md` (determinism, the serialisation
+seam, the AI-agency exception map, a subject→authority table) and `src/ui/CLAUDE.md` (ImGui,
+the toggle rule, the question-log and ACTIONS.json duties, the visual-verify path). These load
+automatically for any session working in those directories.
+
+**The binding principle: pointer, not copy.** Every line in a role or scoped file cites an
+authority doc rather than restating it, so drift cannot fork the design. Recorded in
+DELIVERY.md § Sub-agents & worktrees, which gained the pointer paragraph.
+
+**Deliberately not done** (NR-360, decision-taken): no `military-dev` role yet — military work
+routes through economy/generation briefs until the slice recurs; and the root CLAUDE.md router
+was left unthinned, though its entries have drifted toward design prose. Both are Ben's call.
+
+**Second wave (Ben, mid-session).** The **novel-work flag**: a fourth NEEDS_REVIEW kind,
+`novel-work`, raised by a session about its own task when no authority doc, role, or pattern
+fits — a drift detector, so novelty is chosen, not accreted. Standing rule added; the three
+role files tell sub-agents to flag it in their reports.
+
+And the **scope-drift reword**: README.md and CLAUDE.md intros no longer describe a bare 4X
+prototype. Both now frame four strands — economy loop (shipped), generated Era −1 history,
+military layer (partial), AI direction — with the governing-body pivot as the destination.
+The framing carve is Claude's wording, recorded as NR-361 for Ben to overturn.
+
+**Third wave: the roles tested on a real audit.** Two cold `code-reviewer` spawns swept
+`src/world` and `src/ui` for rework-worthiness. Both said **no broad rework** — the core's
+determinism discipline and the UI's shared chrome are assets — and surfaced six scoped items,
+filed as **BL-498** (shared hire-gate table) through **BL-503** (entity builders converge),
+plus **NR-362** (snapshot-serialiser timing, the one rework-scale call, Ben's).
+
+The findings stayed out of the role files (state, not method); what was saved is the **brief
+shape** — `code-reviewer.md` gained a codebase-audit mode section (payback bar, measure-don't-
+gesture, mandatory leave-alone list). `run_economy_step`'s inline-block accretion was noted
+as extract-as-you-touch hygiene, deliberately not filed.
+
+**Runtime:** ~1.25h, Light (doc/config + audit), remote.
+
+---
+
+## Session — COLLAPSE.md: the Era −1 collapse metagame, decomposed (BL-476–BL-496) (2026-08-20)
 
 Design mode, mobile doc session, no code touched. Ben's brief: *consider high-level strategies /
 metagames for surpassing the Era −1 Collapse* — extended in-session three times, each extension a

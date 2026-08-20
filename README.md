@@ -1,19 +1,31 @@
 # Project Io
 
-Project Io is a near-future, space-based 4X grand strategy game. You control a **corporation**
-— not a nation — competing across an Earth-like solar system through resource extraction, trade,
-and military conflict. Unlike a nation-state, a corporation begins with no territory and no
-standing force: every asset must justify itself through economic or strategic return, and the
-corporation persists only as long as it holds at least one asset.
+Project Io is a near-future, space-based grand strategy game. You begin as a **corporation**
+— not a nation — competing across an Earth-like solar system through resource extraction,
+trade, and military conflict. Unlike a nation-state, a corporation starts with no territory
+and no standing force: every asset must justify itself through economic or strategic return.
+The design arc points beyond that start: the corporation is the on-ramp to a **governing
+body**, where law, policy, and science reach military as well as economic outcomes.
 
-The game progresses through **Eras** — beginning on the home planet (Era 0, Terrestrial) and
-opening up the solar system once the gate to Era 1 (Early Space) is met. Play is structured
-around three nested **canvases** (Solar → Circumplanetary → Planetary) and a tick-based economy
-where supply, demand, and prices resolve per body.
+The campaign world is **generated, history included**. A pre-campaign simulation (Era −1)
+plays out an institutional ladder — polities rising, fragmenting, and collapsing — to produce
+the saturated, market-based, non-hegemonic 1960 the campaign opens on; its nations, cultures,
+names, and background corporations all fall out of that seeded run. In play, the game
+progresses through **Eras** — the home planet first (Era 0, Terrestrial), the solar system
+once the gate to Era 1 (Early Space) is met — across three nested **canvases** (Solar →
+Circumplanetary → Planetary) and a tick-based economy where prices resolve per body.
+
+You are not alone in it. Rival corporations build, trade, hire, and take stances through a
+**deterministic scored-utility AI** over the same command seam the player uses; the longer
+arc sockets a **local language-model opponent** through the game's word interface (blackboard
+export + action dictionary + MCP server), with a hard invariant that the engine ships no
+cloud dependency.
 
 The project is in **prototype phase**, solo-developed in C++ with Lua scripting. Design and
 technical documentation lives under [`docs/`](docs/) — start with
-[`docs/CONCEPT.md`](docs/CONCEPT.md) and [`docs/SYSTEMS.md`](docs/SYSTEMS.md).
+[`docs/CONCEPT.md`](docs/CONCEPT.md) and [`docs/SYSTEMS.md`](docs/SYSTEMS.md); the milestone
+arc (v0.2.0 AI opponent → v0.3.0 governing-body pivot → v0.4.0 political layer → v1.0.0
+playable cut) lives in [`docs/development/ROADMAP.md`](docs/development/ROADMAP.md).
 
 ## Building & running
 

@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*124 entries — 76 open, 48 resolved.*
+*127 entries — 79 open, 48 resolved.*
 
 ---
 
@@ -844,6 +844,39 @@ spacecraft_components, propellant, clean_water, consumer_goods and medical_suppl
 Merge 0677f7a (branch claude/ecstatic-hofstadter-80f1d6, a July-era branch carrying the pre-rollover DEVLOG) re-imported 81 already-archived sessions into DEVLOG.md, splicing headings onto other sessions' bodies - a June 2026 heading carried the BL-429 slice 3 verification tail, and slice 3 itself was truncated. Rebuilt DEVLOG.md as: the last clean pre-merge state (commit 0936400, 66 sessions, slice 3 whole) + the COLLAPSE session on top; the one genuinely new session from the old branch (Lens-cycle fix, 2026-07-31) moved to archive/DEVLOG-2026.md at its chronological slot; index regenerated to 171 rows. A paragraph-level diff against the corrupted file confirmed nothing unique was lost - every dropped paragraph exists in the archive or in the restored (fuller) session bodies.
 
 **Why it matters.** This deleted ~4,200 lines from DEVLOG.md on your behalf. The verification was mechanical (heading-set and paragraph-set containment checks, both scripted in-session), but the rebuild picked commit 0936400 as 'last clean' by heading-count archaeology, and you should know the repair happened in case any session prose you remember reads differently now. The structural cause - a stale long-lived branch merged after the rollover - can recur; the devlog_index tool could cheaply assert 'no live session heading also exists in an archive volume' and turn this failure into a lint.
+
+### NR-360 — Session-delegation roles carved as economy / ui / generation; router left unthinned
+*decision taken on your behalf · raised 2026-08-20 · from BL-497 (session delegation roles), Ben's 2026-08-20 ask to prompt sessions differently as the corpus outgrew one context.*
+
+Carved three implementer roles (economy-dev, ui-dev, generation-dev) matching the repo's natural vertical slices, plus directory CLAUDE.md files for src/world and src/ui only. Chosen on Claude's judgement: military/AI work routes through economy-dev or generation-dev briefs for now rather than owning a fourth role, and the root CLAUDE.md router was left as-is.
+
+**Why it matters.** Role boundaries shape which invariants a cold agent sees. If military/mil-sim work grows (Sprint 26-33 direction), a dedicated military-dev role and a docs/lore scoped file may earn their place. Thinning the root router (its entries have drifted toward design prose) is a separate, larger call left for Ben.
+
+- A) Accept the three-role carve; add roles only when a slice recurs.
+- B) Add military-dev now, ahead of the Lane C engagement work.
+- C) Also schedule a root-router thinning pass (entries become one-liners, prose pushed to the owned docs).
+
+### NR-361 — Scope-drift rewording: intro framing chosen as four strands; novel-work flag mechanics
+*decision taken on your behalf · raised 2026-08-20 · from Ben's 2026-08-20 mid-session asks: raise a novelty flag, and reword README.md / CLAUDE.md for the drifted scope.*
+
+Both intros now drop the bare '4X' label and frame the project as: economy loop (shipped) + generated pre-campaign history (Era -1) + military layer (partial) + AI direction (scored-utility now, local-model at v0.2.0), with the governing-body pivot as the arc's destination. The novelty flag landed as a fourth NEEDS_REVIEW kind ('novel-work') plus a standing rule; sub-agents flag it in their report, the main session files it.
+
+**Why it matters.** The four-strand framing is Claude's carve of the drift, not Ben's wording - it will anchor how new contributors and fresh sessions read the project. Cheap to reword if Ben would frame it differently (e.g. keeping '4X', or leading with the collapse metagame).
+
+- A) Accept the four-strand framing.
+- B) Reword - supply the framing Ben would use.
+- C) Keep README player-facing and move the strand breakdown to CLAUDE.md only.
+
+### NR-362 — World-snapshot serialiser timing: reshape world.hpp now, or declare it final-enough?
+*question · raised 2026-08-20 · from Code-review audit of src/world (2026-08-20). Only the three side-streams (history_log, order_book, procurement) have flat-binary IO; BL-107 (save-format version header) is blocked on the world snapshot existing.*
+
+Data-model restructuring is free today and expensive the day the snapshot serialiser lands. world.hpp (571 lines) carries ~17 component maps plus parallel side-tables (population_centre_tile/name, corp_body_pools, embargo conditions, mutable caches) that the serialiser will have to enumerate as-is.
+
+**Why it matters.** This is the one finding with rework-scale consequences, and it is a timing decision, not a refactor: taken now it costs nothing; deferred past the snapshot it makes the 'seam travels with the change' invariant expensive to honour retroactively.
+
+- A) Declare the struct final-enough and land the snapshot serialiser EARLY in the military milestone (unblocks BL-107).
+- B) Do one deliberate reshaping pass (fold parallel side-tables into their components) first, then serialise.
+- C) Defer both - accept that later reshaping pays the serialiser tax.
 
 ---
 
