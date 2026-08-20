@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*123 entries — 75 open, 48 resolved.*
+*124 entries — 76 open, 48 resolved.*
 
 ---
 
@@ -837,6 +837,13 @@ spacecraft_components, propellant, clean_water, consumer_goods and medical_suppl
 > **Recommendation:** B for now, revisited as A once population centres (POPULATION.md) or the ancient-vs-industrial procurement question comes up on its own - filing five difficulty-2 items today would be scope creep on BL-460, which is a single-good fix. R1b's known-gap table is the durable record either way.
 
 *Files: `tools/verify/chain_depth.cpp`, `src/world/market_clearing.cpp`, `src/world/economy_system.cpp`, `scripts/recipes.lua`*
+
+### NR-359 — DEVLOG.md rebuilt from its last clean commit - merge 0677f7a had re-imported 81 pre-rollover sessions in chimeric form
+*decision taken on your behalf · raised 2026-08-20 · from PR-45 review session, 2026-08-20. The COLLAPSE session's index regen exposed it (168 -> 251 rows, mass duplicates).*
+
+Merge 0677f7a (branch claude/ecstatic-hofstadter-80f1d6, a July-era branch carrying the pre-rollover DEVLOG) re-imported 81 already-archived sessions into DEVLOG.md, splicing headings onto other sessions' bodies - a June 2026 heading carried the BL-429 slice 3 verification tail, and slice 3 itself was truncated. Rebuilt DEVLOG.md as: the last clean pre-merge state (commit 0936400, 66 sessions, slice 3 whole) + the COLLAPSE session on top; the one genuinely new session from the old branch (Lens-cycle fix, 2026-07-31) moved to archive/DEVLOG-2026.md at its chronological slot; index regenerated to 171 rows. A paragraph-level diff against the corrupted file confirmed nothing unique was lost - every dropped paragraph exists in the archive or in the restored (fuller) session bodies.
+
+**Why it matters.** This deleted ~4,200 lines from DEVLOG.md on your behalf. The verification was mechanical (heading-set and paragraph-set containment checks, both scripted in-session), but the rebuild picked commit 0936400 as 'last clean' by heading-count archaeology, and you should know the repair happened in case any session prose you remember reads differently now. The structural cause - a stale long-lived branch merged after the rollover - can recur; the devlog_index tool could cheaply assert 'no live session heading also exists in an archive volume' and turn this failure into a lint.
 
 ---
 

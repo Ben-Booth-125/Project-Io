@@ -2045,6 +2045,17 @@
     "src/world/history_sim.hpp"
    ],
    "resolution": "Ben, 2026-08-20: the 400-year band was a placeholder; the aim is the 4000-year ladder (option A). Generating over 4000 years is acknowledged hard - the optimisation task is designed in COLLAPSE.md (section 'The 4000-year problem'): spatial index + incremental aggregates, event-driven quiet provinces, deterministic banded year grain, record-on-change; option C (2-3 arcs per world) retained as the honest fallback if the budget still misses."
+  },
+  {
+   "id": "NR-359",
+   "raised": "2026-08-20",
+   "kind": "decision-taken",
+   "status": "open",
+   "title": "DEVLOG.md rebuilt from its last clean commit - merge 0677f7a had re-imported 81 pre-rollover sessions in chimeric form",
+   "source": "PR-45 review session, 2026-08-20. The COLLAPSE session's index regen exposed it (168 -> 251 rows, mass duplicates).",
+   "what": "Merge 0677f7a (branch claude/ecstatic-hofstadter-80f1d6, a July-era branch carrying the pre-rollover DEVLOG) re-imported 81 already-archived sessions into DEVLOG.md, splicing headings onto other sessions' bodies - a June 2026 heading carried the BL-429 slice 3 verification tail, and slice 3 itself was truncated. Rebuilt DEVLOG.md as: the last clean pre-merge state (commit 0936400, 66 sessions, slice 3 whole) + the COLLAPSE session on top; the one genuinely new session from the old branch (Lens-cycle fix, 2026-07-31) moved to archive/DEVLOG-2026.md at its chronological slot; index regenerated to 171 rows. A paragraph-level diff against the corrupted file confirmed nothing unique was lost - every dropped paragraph exists in the archive or in the restored (fuller) session bodies.",
+   "why_it_matters": "This deleted ~4,200 lines from DEVLOG.md on your behalf. The verification was mechanical (heading-set and paragraph-set containment checks, both scripted in-session), but the rebuild picked commit 0936400 as 'last clean' by heading-count archaeology, and you should know the repair happened in case any session prose you remember reads differently now. The structural cause - a stale long-lived branch merged after the rollover - can recur; the devlog_index tool could cheaply assert 'no live session heading also exists in an archive volume' and turn this failure into a lint.",
+   "next_step": "No action needed unless a DEVLOG entry reads wrong. Optional hardening: a duplicate-heading check in devlog_index.js (would have caught this at the index regen instead of at review)."
   }
  ]
 }
