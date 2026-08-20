@@ -2142,11 +2142,12 @@
    "title": "BL-477 filed: \"each era has a collapse state to avoid - that defines meta\" - wording is yours to confirm",
    "raised": "2026-08-19",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "Version-alignment session 2026-08-19: six-agent research workflow + 27-verdict contradiction audit + Ben's form verdicts.",
    "what": "Your form note is now BL-477 (design-owed, A, v0.1.11), quoted verbatim, with the reading: ancient era's collapse state = imperial collapse (Fall arc Sprint 30 strain machinery); industrial/space = nuclear rupture (BL-333, parked); meta systems must couple levers to the era's collapse pressure. Open question filed in the item: is the collapse state always avoidable at a price, or genuinely reachable in campaign play as it is in generation?",
    "why": "A paradigm statement deserves an item Ben has actually read, not a paraphrase buried in a session log.",
-   "how_to_apply": "Read BL-477's design field; correct the reading or answer the avoidability question and it graduates to designed."
+   "how_to_apply": "Read BL-477's design field; correct the reading or answer the avoidability question and it graduates to designed.",
+   "resolution": "Ben, 2026-08-20: \"genuinely reachable\" — the collapse state is a real campaign fail-state, never fully buyable-off. Recorded in BL-477's design with its two binding consequences (shared Era −1/campaign machinery; meta moves the brink but cannot wall it off)."
   },
   {
    "id": "NR-364",

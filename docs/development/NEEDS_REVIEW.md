@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*148 entries — 100 open, 48 resolved.*
+*148 entries — 99 open, 49 resolved.*
 
 ---
 
@@ -905,11 +905,6 @@ BL-372 (lens-keyed selection) -> v0.1.7 (UI alignment); BL-375 (time-to-space pa
 
 Ben's verdict said "Un-park BL-087 piece 2 into the live arc". Executed as an EXTRACTION: new item BL-478 (ancient research spend, v0.1.11, design-owed) carries the research-state + spend mechanism; BL-087 itself stays parked with the space arc, its design noting the extraction.
 
-### NR-363 — BL-477 filed: "each era has a collapse state to avoid - that defines meta" - wording is yours to confirm
-*question · raised 2026-08-19 · from Version-alignment session 2026-08-19: six-agent research workflow + 27-verdict contradiction audit + Ben's form verdicts.*
-
-Your form note is now BL-477 (design-owed, A, v0.1.11), quoted verbatim, with the reading: ancient era's collapse state = imperial collapse (Fall arc Sprint 30 strain machinery); industrial/space = nuclear rupture (BL-333, parked); meta systems must couple levers to the era's collapse pressure. Open question filed in the item: is the collapse state always avoidable at a price, or genuinely reachable in campaign play as it is in generation?
-
 ### NR-364 — BL-186 laws-ledger design amended to the who-enacts model without a fresh ask
 *decision taken on your behalf · raised 2026-08-19 · from Version-alignment session 2026-08-19: six-agent research workflow + 27-verdict contradiction audit + Ben's form verdicts.*
 
@@ -1502,6 +1497,13 @@ BL-449 gates the Corporation panel's stance column on BL-068 competitor-visibili
 > **RESOLVED.** RESOLVED 2026-08-19 (Ben): reading B â€” hostility toward the player stays silent and is discovered on contact, matching ordinary BL-068 visibility rather than announcing on the comms dock. Preserves the ambush property BL-458 (interdiction) relies on. BL-449 (stance surface) is unblocked to promote: the Corporation panel's stance column shows a hostile row only once the corp is otherwise discovered, same gate as every other BL-068-visible fact.
 
 *Files: `src/ui/corporation_panel.cpp`, `docs/ui/question_log.json`*
+
+### NR-363 — BL-477 filed: "each era has a collapse state to avoid - that defines meta" - wording is yours to confirm
+*question · raised 2026-08-19 · from Version-alignment session 2026-08-19: six-agent research workflow + 27-verdict contradiction audit + Ben's form verdicts.*
+
+Your form note is now BL-477 (design-owed, A, v0.1.11), quoted verbatim, with the reading: ancient era's collapse state = imperial collapse (Fall arc Sprint 30 strain machinery); industrial/space = nuclear rupture (BL-333, parked); meta systems must couple levers to the era's collapse pressure. Open question filed in the item: is the collapse state always avoidable at a price, or genuinely reachable in campaign play as it is in generation?
+
+> **RESOLVED.** Ben, 2026-08-20: "genuinely reachable" — the collapse state is a real campaign fail-state, never fully buyable-off. Recorded in BL-477's design with its two binding consequences (shared Era −1/campaign machinery; meta moves the brink but cannot wall it off).
 
 ### NR-356 — The Metropole strategy dodges Sprint 30's 'inevitable' collapse as currently framed
 *question · raised 2026-08-20 · from COLLAPSE.md authoring session (Era -1 strategy roster + culminating-events taxonomy), 2026-08-20.*
