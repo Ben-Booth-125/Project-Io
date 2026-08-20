@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*164 entries — 113 open, 51 resolved.*
+*167 entries — 116 open, 51 resolved.*
 
 ---
 
@@ -1081,6 +1081,21 @@ Two things earn the flag. First, nation treasury is the first money a non-corpor
 *observation · raised 2026-08-20 · from Lane D (BL-392 + Sprint D4 tariff), agent report + main-session diff review, merged at 9b75621.*
 
 read_procurement gates on version != procurement_version and returns false, so bumping 1 -> 2 (which this work did, for delivery_body and freight_cost on both records) makes every pre-existing save unreadable rather than upgradable. That strict-equality check is PRE-EXISTING and not introduced here, but this is the first bump to actually exercise it. Related gap the agent flagged and did not introduce: nation_component::treasury and law::author_nation have no serialiser at all - nations and laws are not saved, so a treasury survives nothing. BL-107 is the item that owns picking those up.
+
+### NR-400 — The D4 import tariff has NO authoring path - nothing in src/ can enact one
+*observation · raised 2026-08-20 · from Pre-compile static review of the integrated four-lane batch, 2026-08-20; blocker fixed at bd238d5.*
+
+Outside law.{hpp,cpp} and market_clearing.cpp there is not one reference to law_effect_kind::import_tariff anywhere in src/. No corp_verb, no UI control, no generation seeding, no agent-seam command creates a tariff law; seed_prototype_laws seeds only the extraction levy. So in a real campaign any_import_tariff_enacted is permanently false and the entire tariff pass is unreachable. The mechanism is built, proved and conserved - in a harness fixture. If D4 acceptance is a cross-border sale pays a duty into the market nation treasury, that is NOT met in the shipped binary. Deliberately not fixed here: seeding a tariff at generation changes every generated world and is a design call, and the granted nation-grain scorer enacting one mid-campaign is the seam the work was shaped for. Your call which of the two it should be.
+
+### NR-401 — The province partition reaches no real save, and is not in state_hash
+*observation · raised 2026-08-20 · from Pre-compile static review of the integrated four-lane batch, 2026-08-20; blocker fixed at bd238d5.*
+
+world::provinces is documented as the trailing section of the history-log stream, and the appender/reader pair is correct field-for-field with a clean-EOF path that loads a pre-BL-466 prefix. But write_history_log / read_history_log have NO callers in src/ - only two harnesses - so nothing in the game persists it. Separately, provinces is stored state excluded from state_hash without the documented reason corp_modifiers carries. Consequence worth acting on BEFORE BL-467: a determinism regression in build_province_partition would be caught only by the same lane own P6 assertion, and BL-467 is about to fold a province id into a battle seed. Either fold provinces into state_hash or document the exclusion the way corp_modifiers does.
+
+### NR-402 — Six new harnesses joined the routine ctest gate at the 60s default, two of them census-class
+*observation · raised 2026-08-20 · from Pre-compile static review of the integrated four-lane batch, 2026-08-20; blocker fixed at bd238d5.*
+
+The CMake GLOB registers tools/verify/*.cpp automatically, so this batch six new harnesses entered the routine gate silently. road_reach_census (3x make_hard_coded_world) and rival_military_seeding_harness (4x) are the exposure. substrate_census own CMake note records ~62s per world in a Debug tree and parked itself in IO_TEST_SWEEP_HARNESSES for exactly this reason; road_reach_census is by name the same category and is not in that list. Expect a Debug-tree Timeout, which NR-259 calls a silent failure. Also: rival_military_seeding_harness has never been named in tools/verify/README.md - it arrived undocumented in an earlier commit, not in this batch.
 
 ---
 
