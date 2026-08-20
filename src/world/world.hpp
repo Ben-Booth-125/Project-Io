@@ -4,6 +4,7 @@
 #include "corp_command.hpp" // corp_decision_ring (BL-202 strategic decision log)
 #include "law.hpp"          // law (BL-343 enacted-law list, below)
 #include "modifier_set.hpp" // scalar_modifier (BL-479 per-corp tech effects, below)
+#include "province.hpp"     // province_partition (BL-466 province partition, below)
 
 #include <cstdint>
 #include <map>
@@ -235,6 +236,17 @@ struct world
     /// simulation runs. Never erased or evicted — unlike `ai_decisions`'s 256-cap
     /// ring, this is meant to grow for the life of a campaign.
     std::vector<world_history_entry> history_log;
+
+    /// The province partition (BL-466) — every body's land tiles carved into
+    /// small, contiguous, purely spatial cells. Built once at the end of
+    /// `make_hard_coded_world` from the world seed and the finished tile map;
+    /// derived, but STORED, because BL-467 folds a province id into a battle's
+    /// seed stream and a battle must not be re-identified by a lazy rebuild.
+    /// Walk it in ascending `province::id` — that order is the contract, not an
+    /// implementation detail (see province.hpp). It joins the flat-binary
+    /// serialisation seam as the TRAILING section of the history-log stream, so
+    /// a stream written before BL-466 is still a valid prefix.
+    province_partition provinces;
 
     /// Proximity-glimpse stamps (BL-099) — the sim day tick at which a player convoy
     /// last passed within `glimpse_radius_au_default` (AU) of this body while completing

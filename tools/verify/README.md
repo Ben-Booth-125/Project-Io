@@ -62,6 +62,9 @@ Use that route for anything linking the world superset — `world_audit`, `ai_sk
 modify_scalar tech moves the named scalar for the earning corp only, the stack-taper pre-pass
 prices the modified rate, and the no-effect real world's `state_hash` marks stay bit-identical
 to the pre-change build) — and for `font_glyph_harness`, which links ImGui and is hand-declared in
+`trade_routes_harness`, **`province_partition_harness`** (BL-466 — the province partition's
+invariants plus the three serialisation-seam properties: the pre-BL-466 stream is a byte-exact
+prefix, an old save still loads, and the round trip is bit-identical) — and for `font_glyph_harness`, which links ImGui and is hand-declared in
 `CMakeLists.txt` above the glob. These have deliberately **no** `cl` recipe below: writing one
 would be inventing a TU list with a short shelf life — which is exactly how `trade_routes_harness`
 stopped linking when BL-170 landed rivers (fixed 2026-08-02 by deleting its hand-declaration, not
