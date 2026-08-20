@@ -41,6 +41,21 @@ drain) — plus `ws2_32` on Windows. Still SDL/Lua/ImGui-free; it proves the liv
 seam's two contracts headless (socket schedule ≡ in-process schedule by `state_hash`, transcript
 replays to the same hash; out-of-domain commands rejected whole with the hash untouched).
 
+**`build_gen_harness.bat <name>`** (repo root) is the CMake-free route for any world-superset
+harness: it derives its TU list by globbing `src\world\*.cpp` minus the four sol2/Lua TUs, exactly
+as `io_world_obj` does, so unlike the hand-written `cl` recipes below it **cannot drift stale**.
+Output lands in `build_gen\verify\<name>.exe` with the compiler log beside it. Use it when a
+worktree has no configured `build\` tree and a full CMake configure (SDL + Lua FetchContent) is not
+worth paying for one harness.
+
+`road_reach_census` (Sprint B2) is the road-network reach instrument: it counts, over the 8-seed
+census set, how many nations end generation with **no roaded tile in their territory**, splits that
+count by whether the nation has a single population centre, and asserts the no-ocean-roads
+invariant plus determinism (identical `road_level` field *and* `state_hash` across two generations
+of one seed). Report-first — the road-less count is a number to watch, not a pinned band. Re-run it
+after any change to `road_generation.cpp`, to nation/population placement, or to the logistics
+traversal costs the road MST is laid out against.
+
 Use that route for anything linking the world superset — `world_audit`, `ai_skill_harness`,
 `history_ladder_harness`, **`settlement_harness`**, `data_creep_harness`, `corp_terrain_matrix`,
 `trade_routes_harness`, `tech_effect_union_harness` (BL-479: the tech effect union — a fixture

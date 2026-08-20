@@ -25,6 +25,15 @@ constexpr std::uint8_t kHighway = 3;
 constexpr int          kMajorScale = 3;
 constexpr int          kMidScale   = 2;
 
+// Water crossing (Sprint B2). Roads stay a LAND feature — no ocean tile is ever stamped, so a
+// crossing always leaves a gap in the raster; what a port does with that gap is BL-188's, not
+// this pass's. What this constant decides is which crossings the pass will lay a road TOWARD.
+// A run of up to kMaxCrossingTiles water is a strait: both shores are stamped, so a coastal or
+// island nation joins the lattice and the corridor resumes on the far side. A longer run is
+// open ocean — a sea route, not a road — and stamping it would scatter disconnected road
+// fragments across distant shores, which reads as a broken network rather than a crossing.
+constexpr int          kMaxCrossingTiles = 3;
+
 // Tier for an edge between two centres of the given scales (BL-172).
 std::uint8_t edge_tier(int scale_a, int scale_b)
 {
@@ -52,12 +61,35 @@ entity_id nation_of(const world& w, entity_id tile)
     return (it != w.tile_to_nation.end()) ? it->second : null_entity;
 }
 
+/// True if every contiguous ocean run along @p p is a strait (<= kMaxCrossingTiles), i.e. the
+/// route is one a road can plausibly follow shore-to-shore rather than an open-sea crossing.
+bool crossings_are_straits(const world& w, const logistics_path& p)
+{
+    int run = 0;
+    for (const entity_id t : p.tiles)
+    {
+        const auto it = w.tiles.find(t);
+        const bool ocean = (it != w.tiles.end() && it->second.composition == terrain_composition::ocean);
+        if (!ocean)
+        {
+            run = 0;
+            continue;
+        }
+        if (++run > kMaxCrossingTiles)
+            return false;
+    }
+    return true;
+}
+
 /// Stamp a road of @p level along the A* path between two tiles, taking the max on
-/// overlap and skipping ocean (roads are a land feature). No-op if unreachable.
+/// overlap and skipping ocean (roads are a land feature). No-op if unreachable, or if
+/// the route crosses open ocean rather than a strait (see kMaxCrossingTiles).
 void stamp_edge(world& w, entity_id body, entity_id ta, entity_id tb, std::uint8_t level)
 {
     const logistics_path& p = intra_body_path(w, body, ta, tb);
     if (!p.reachable)
+        return;
+    if (p.crosses_ocean && !crossings_are_straits(w, p))
         return;
     for (const entity_id t : p.tiles)
     {
@@ -87,8 +119,24 @@ void generate_roads(world& w, entity_id body)
     }
     std::sort(nodes.begin(), nodes.end(),
               [](const road_node& a, const road_node& b) { return a.tile < b.tile; });
-    if (nodes.size() < 2)
+    if (nodes.empty())
         return;
+
+    // 1b. Every centre's own tile carries at least a Track (Sprint B2 cut 1). Previously a
+    //     nation with a single centre on this body fell straight through the `n < 2` guard
+    //     below and ended generation with no roaded tile anywhere in its territory — the
+    //     census measured that as the ONLY cause of a road-less nation. A settlement has
+    //     streets whether or not it has a neighbour to drive to, and this puts the nation on
+    //     the lattice, gives the cross-nation border link below a roaded endpoint to reach,
+    //     and gives the player's place_road something to extend from. Uniform (no
+    //     single-centre special case) and order-independent: std::max means a centre that
+    //     later sits on a Highway keeps the higher tier.
+    for (const road_node& node : nodes)
+    {
+        const auto it = w.tiles.find(node.tile);
+        if (it != w.tiles.end() && it->second.composition != terrain_composition::ocean)
+            it->second.road_level = std::max(it->second.road_level, kTrack);
+    }
 
     // Group node indices by nation (std::map → nation ids ascending, deterministic).
     std::map<entity_id, std::vector<int>> by_nation;
@@ -196,18 +244,42 @@ void generate_roads(world& w, entity_id body)
             return;
         adjacency.insert({ std::min(na, nb), std::max(na, nb) });
     };
-    for (int r = 0; r < gh; ++r)
-        for (int cc = 0; cc < gw; ++cc)
+    //
+    // Cross-water adjacency (Sprint B2 cut 3): the scan used to look only at the immediate
+    // 4-cardinal neighbour, so two nations facing each other across a single strait tile were
+    // never "adjacent" and no border link was ever attempted — the shape that leaves a coastal
+    // or island nation off the continental lattice entirely. The walk below instead scans each
+    // row and column for the NEXT owned tile, tolerating a gap of up to kMaxCrossingTiles
+    // unowned tiles (water, or unclaimed land) between them. A gap of 0 is the old direct-
+    // neighbour case, so this strictly widens the relation rather than replacing it. The
+    // stamp_edge strait bound then decides whether a road can actually follow the crossing.
+    //
+    // Deterministic: fixed row-major scan order, and `adjacency` is a std::set of sorted pairs,
+    // so neither the discovery order nor the number of times a pair is found can vary the
+    // result.
+    auto scan_line = [&](auto at, int len, bool wraps) {
+        for (int i = 0; i < len; ++i)
         {
-            const entity_id t = grid[static_cast<std::size_t>(r) * gw + cc];
-            if (t == null_entity)
+            const entity_id na = nation_of(w, at(i));
+            if (na == null_entity)
                 continue;
-            const entity_id na = nation_of(w, t);
-            const int rc = (cc + 1) % gw; // east neighbour, wrapped
-            note_adjacent(na, nation_of(w, grid[static_cast<std::size_t>(r) * gw + rc]));
-            if (r + 1 < gh) // south neighbour (no vertical wrap)
-                note_adjacent(na, nation_of(w, grid[static_cast<std::size_t>(r + 1) * gw + cc]));
+            for (int step = 1; step <= kMaxCrossingTiles + 1; ++step)
+            {
+                const int j = i + step;
+                if (j >= len && !wraps)
+                    break;
+                const entity_id nb = nation_of(w, at(wraps ? (j % len) : j));
+                if (nb == null_entity)
+                    continue;
+                note_adjacent(na, nb);
+                break; // the first owned tile past the gap is the neighbour; stop there
+            }
         }
+    };
+    for (int r = 0; r < gh; ++r)
+        scan_line([&](int c) { return grid[static_cast<std::size_t>(r) * gw + c]; }, gw, true);
+    for (int cc = 0; cc < gw; ++cc)
+        scan_line([&](int r) { return grid[static_cast<std::size_t>(r) * gw + cc]; }, gh, false);
 
     for (const auto& [na, nb] : adjacency)
     {
