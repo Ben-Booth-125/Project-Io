@@ -677,7 +677,25 @@ int main()
     int holdings_bad = 0;
     for (const auto& [cid, corp] : w.corporations)
     {
-        const int count = static_cast<int>(corp.assets.size());
+        // BL-476 seeds one `military_base` into EVERY corp's assets (it was the
+        // player's alone under BL-330). `holdings_range` governs the corp's
+        // ECONOMIC holdings and never counted that base, so counting raw
+        // assets.size() here compares against a ceiling one too low for every
+        // corp — it only reds when a draw happens to land at the top of its
+        // range, which is why it survived until a world-density change made one
+        // do so. Count economic holdings only; the seeded base is audited by
+        // rival_military_seeding_harness, which owns that promise.
+        //
+        // (This is the FOURTH drift of a hand-mirrored table noted in this file.
+        //  The count is now derived from the world rather than mirrored.)
+        int count = 0;
+        for (const entity_id aid : corp.assets)
+        {
+            const auto bit = w.buildings.find(aid);
+            if (bit != w.buildings.end() && bit->second.type == building_type::military_base)
+                continue;
+            ++count;
+        }
         const auto [lo, hi] = focus_bounds(corp.focus);
         const bool over  = count > hi;
         const bool empty = count < 1;
