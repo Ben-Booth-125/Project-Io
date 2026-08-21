@@ -199,6 +199,30 @@ inline constexpr int k_province_road_bind_divisor = 4;
 /// read from.
 inline constexpr int k_province_edge_jitter = 5;
 
+/// What pass 3 (singleton absorption) did, so the pass is measurable rather
+/// than merely asserted. Filled on request by `build_province_partition`;
+/// gathering it changes nothing about the partition that is built.
+struct province_absorption_stats
+{
+    /// Size-1 regions present when pass 3 started — the population of the
+    /// problem Ben's ruling names.
+    int singletons_before = 0;
+
+    /// How many of those were absorbed into a neighbour.
+    int absorbed = 0;
+
+    /// How many remain because they have NO LAND NEIGHBOUR: true islands, kept
+    /// by ruling. `singletons_before == absorbed + true_islands` always.
+    int true_islands = 0;
+
+    /// Fixpoint iterations run (>= 1 whenever any singleton existed).
+    int passes = 0;
+
+    /// Absorptions that pushed a survivor PAST `k_province_max_tiles`. Reported,
+    /// never prevented — see the pass-3 note on build_province_partition.
+    int over_ceiling_created = 0;
+};
+
 /// One province — a contiguous run of land tiles on a single body.
 struct province
 {
@@ -305,8 +329,35 @@ struct province_partition
 ///      afterwards. That is where a genuinely tiny province comes from, and it
 ///      is KEPT.
 ///
-/// There is NO third repair pass, by ruling: nothing is merged away to satisfy
-/// a floor, and a province that ran out of land small ships small.
+///   3. SINGLETON ABSORPTION (Ben, 2026-08-21, a NARROW retraction of "don't
+///      reject tiny provinces", made on seeing the organic borders rendered:
+///      "We can add a pass to capture all the 1 tile provinces. I suppose I was
+///      wrong when I said 'don't reject'."). A province of EXACTLY ONE tile is
+///      absorbed into the neighbour reached by the CHEAPEST edge under the same
+///      cost model, so absorption follows the same terrain logic as growth.
+///
+///      THE SCOPE IS ONE TILE, NOT THE FLOOR. This is not the merge-to-floor
+///      pass BL-515 deliberately removed — that pass produced a de-facto clamp
+///      and is the thing the organic redesign exists to escape. A two-tile
+///      province is still kept; only the hex-with-a-border-round-it is not.
+///
+///      Ties break on the candidate's province id (its lowest member tile),
+///      never on container order. It runs to a FIXPOINT in ascending
+///      singleton-tile order, because absorbing one can expose another.
+///
+///      A size-1 province with NO LAND NEIGHBOUR is a TRUE ISLAND and cannot be
+///      absorbed. It is KEPT, and `province_absorption_stats` reports how many
+///      remain — nothing reaches across water to place them.
+///
+///      IT CAN BREACH THE CEILING. A survivor already holding
+///      `k_province_max_tiles` that absorbs a singleton ships at 13. That is
+///      reported (`over_ceiling_created`), never silently clamped: clamping
+///      would mean choosing a costlier neighbour, which is exactly the
+///      "boundaries win" logic the cheapest-edge rule exists to express.
+///
+/// There is still NO merge-to-floor repair pass, by ruling: nothing else is
+/// merged away to satisfy a floor, and a province that ran out of land at two
+/// or three tiles ships at two or three tiles.
 ///
 /// Columns wrap east-west (the cylinder every other body-grid consumer uses);
 /// rows do not.
@@ -317,10 +368,13 @@ struct province_partition
 /// on (cost, seed tile, tile), a total order over unique keys. No container
 /// order reaches any decision.
 ///
-/// @param w    World whose tiles are read and whose `provinces` is replaced.
-/// @param seed Partition seed. Callers derive this from the world seed with
-///             their own XOR offset so the stream stays uncorrelated.
-void build_province_partition(world& w, uint32_t seed);
+/// @param w     World whose tiles are read and whose `provinces` is replaced.
+/// @param seed  Partition seed. Callers derive this from the world seed with
+///              their own XOR offset so the stream stays uncorrelated.
+/// @param stats Optional: filled with the singleton-absorption tally. Purely an
+///              instrument — it does not change what is built, so passing it or
+///              not passing it produces byte-identical partitions.
+void build_province_partition(world& w, uint32_t seed, province_absorption_stats* stats = nullptr);
 
 /// The cost of stepping between two hex-adjacent LAND tiles, exposed so the
 /// harness can measure the cost model rather than re-implement it (a border
@@ -486,9 +540,10 @@ inline constexpr uint32_t province_section_version = 1;
 /// against a corrupt or malicious length prefix.
 inline constexpr uint32_t province_section_max_provinces = 1u << 24;
 
-/// Sanity ceiling on one province's declared tile count. A built province is
-/// 1-12 tiles — `k_province_max_tiles` is a hard clamp on growth, and the floor
-/// is whatever land was there — so this is orders of magnitude clear. It stays
+/// Sanity ceiling on one province's declared tile count. A built province is a
+/// handful of tiles — `k_province_max_tiles` clamps GROWTH, the floor is
+/// whatever land was there, and singleton absorption can carry a survivor a few
+/// tiles past the ceiling — so this is orders of magnitude clear. It stays
 /// generous rather than tight to `k_province_max_tiles` so a future algorithm
 /// change is a format-compatible one.
 inline constexpr uint32_t province_section_max_tiles = 1u << 16;

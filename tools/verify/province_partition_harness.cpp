@@ -299,9 +299,38 @@ int main()
         }
         std::printf("\n");
 
-        // P5a — THE HARD CEILING. The single size rule that is a clamp: growth
-        // stops at k_province_max_tiles whatever the next edge costs.
-        check(over == 0, "P5a no province exceeds the hard ceiling of 12 tiles");
+        // P5a — THE HARD CEILING, as it stands after singleton absorption.
+        //
+        // GROWTH's clamp is untouched: pass 1 and pass 2 still stop dead at
+        // k_province_max_tiles. But pass 3 (Ben, 2026-08-21) absorbs a one-tile
+        // province into its CHEAPEST neighbour, and that neighbour may already
+        // be full — so a survivor can ship at 13, 14 or more. The alternative
+        // would be to pick a costlier neighbour instead, which contradicts the
+        // one rule absorption is defined by, so it is REPORTED, not clamped.
+        //
+        // The row therefore asserts the exact identity rather than a weakened
+        // inequality: EVERY tile a province holds above the ceiling arrived by
+        // absorption, and the count of such absorptions accounts for all of it.
+        // If growth ever leaks past 12 on its own, the two sides diverge.
+        {
+            std::size_t excess = 0;
+            for (const auto& [size, count] : hist)
+                if (size > k_province_max_tiles)
+                    excess += (size - k_province_max_tiles) * static_cast<std::size_t>(count);
+
+            world                     w5 = w;
+            province_absorption_stats st5;
+            build_province_partition(w5, part.seed, &st5);
+
+            std::printf("        %zu provinces over the 12-tile ceiling, %zu tiles of excess;"
+                        " absorption made %d of them (%d singletons: %d absorbed, %d true"
+                        " islands, %d fixpoint passes)\n",
+                        over, excess, st5.over_ceiling_created, st5.singletons_before,
+                        st5.absorbed, st5.true_islands, st5.passes);
+            check(excess == static_cast<std::size_t>(st5.over_ceiling_created),
+                  "P5a every tile above the 12-tile ceiling arrived by absorption (growth's"
+                  " clamp still holds)");
+        }
 
         // P5b — REPORTED, NOT ASSERTED, and deliberately so. Ben, 2026-08-21:
         // "Don't reject tiny provinces." The pre-BL-515 harness asserted here
@@ -325,6 +354,51 @@ int main()
             if (p.tiles.empty())
                 nonempty = false;
         check(nonempty, "P5c every province holds at least one tile (id is always defined)");
+
+        // P5d — THE ABSORPTION RULING, asserted on the shipped partition rather
+        // than on the pass's own bookkeeping. Ben, 2026-08-21: "We can add a
+        // pass to capture all the 1 tile provinces." So a surviving one-tile
+        // province must have had NOWHERE TO GO — no land neighbour at all. That
+        // is a TRUE ISLAND, and reaching across water to place it is exactly the
+        // rule the ruling does not ask for.
+        {
+            std::size_t singles = 0, not_islands = 0;
+            for (const province& p : part.provinces)
+            {
+                if (p.tiles.size() != 1)
+                    continue;
+                ++singles;
+                const auto& grid = grids.at(p.body);
+                const int   gw   = dims.at(p.body).first;
+                const int   gh   = dims.at(p.body).second;
+                const auto  tit  = w.tiles.find(p.tiles.front());
+                if (tit == w.tiles.end())
+                    continue;
+                for (int s = 0; s < 6; ++s)
+                {
+                    const auto c =
+                        hex_neighbors::neighbour(tit->second.grid_x, tit->second.grid_y, s);
+                    if (c.gy < 0 || c.gy >= gh)
+                        continue;
+                    int nx = c.gx % gw;
+                    if (nx < 0)
+                        nx += gw;
+                    const entity_id n = grid[static_cast<std::size_t>(c.gy) * gw + nx];
+                    if (n == null_entity)
+                        continue;
+                    const auto nit = w.tiles.find(n);
+                    if (nit == w.tiles.end()
+                        || nit->second.composition == terrain_composition::ocean)
+                        continue;
+                    ++not_islands;
+                    break;
+                }
+            }
+            std::printf("        %zu one-tile provinces survive, all true islands: %s\n", singles,
+                        not_islands == 0 ? "yes" : "NO");
+            check(not_islands == 0,
+                  "P5d every surviving one-tile province is a TRUE ISLAND (no land neighbour)");
+        }
     }
 
     // P6 — determinism: recomputing from the stored seed reproduces the
@@ -599,12 +673,25 @@ int main()
         std::size_t   worst_ceiling = 0;
         bool          floor_seen = false;
 
-        std::printf("  seed | provinces |  min  max   mean | <7  <3  >12 | %% in 7-12\n");
+        // A — SINGLETON ABSORPTION (Ben, 2026-08-21). Gathered in the same sweep
+        // rather than a second one, because a seed's world costs more to build
+        // than everything measured off it. The partition is RECOMPUTED from its
+        // own stored seed purely to read the tally out; P6 asserts that
+        // recompute reproduces the partition exactly, so the numbers below
+        // describe the shipped partition and not a second, different one.
+        std::size_t all_singles = 0, all_absorbed = 0, all_islands = 0, all_breach = 0;
+        bool        sums_ok = true;
+
+        std::printf("  seed | provinces |  min  max   mean | <7  <3  >12 | %% in 7-12 |"
+                    " 1-tile absorbed islands breach\n");
         for (int sd = 0; sd < k_seeds; ++sd)
         {
             world_params wp;
             wp.seed = static_cast<uint32_t>(sd);
             world sw = make_hard_coded_world(no_prehistory(wp));
+
+            province_absorption_stats st;
+            build_province_partition(sw, sw.provinces.seed, &st);
 
             std::size_t n = 0, tiles = 0, lo = 0, hi = 0, us = 0, uh = 0, over = 0, in_band = 0;
             bool        lo_seen = false;
@@ -620,10 +707,19 @@ int main()
                 if (sz > k_province_max_tiles)       ++over;
                 if (sz >= k_province_min_tiles && sz <= k_province_max_tiles) ++in_band;
             }
-            std::printf("  %4d | %9zu | %4zu %4zu %6.2f | %3zu %3zu %4zu | %6.2f%%\n", sd, n, lo,
-                        hi, n ? double(tiles) / double(n) : 0.0, us, uh, over,
-                        n ? 100.0 * double(in_band) / double(n) : 0.0);
+            std::printf("  %4d | %9zu | %4zu %4zu %6.2f | %3zu %3zu %4zu | %6.2f%% |"
+                        " %6d %8d %7d %6d\n",
+                        sd, n, lo, hi, n ? double(tiles) / double(n) : 0.0, us, uh, over,
+                        n ? 100.0 * double(in_band) / double(n) : 0.0, st.singletons_before,
+                        st.absorbed, st.true_islands, st.over_ceiling_created);
             std::fflush(stdout);
+
+            all_singles  += static_cast<std::size_t>(st.singletons_before);
+            all_absorbed += static_cast<std::size_t>(st.absorbed);
+            all_islands  += static_cast<std::size_t>(st.true_islands);
+            all_breach   += static_cast<std::size_t>(st.over_ceiling_created);
+            if (st.singletons_before != st.absorbed + st.true_islands)
+                sums_ok = false;
 
             all_total      += n;
             all_tiles      += tiles;
@@ -635,15 +731,33 @@ int main()
             if (hi > worst_ceiling) worst_ceiling = hi;
         }
 
-        std::printf("  ALL  | %9zu | %4zu %4zu %6.2f | %3zu %3zu %4zu | %6.2f%%\n", all_total,
-                    worst_floor, worst_ceiling,
+        std::printf("  ALL  | %9zu | %4zu %4zu %6.2f | %3zu %3zu %4zu | %6.2f%% |"
+                    " %6zu %8zu %7zu %6zu\n",
+                    all_total, worst_floor, worst_ceiling,
                     all_total ? double(all_tiles) / double(all_total) : 0.0, all_under_soft,
                     all_under_hard, all_over,
-                    all_total ? 100.0 * double(all_in_band) / double(all_total) : 0.0);
-        std::printf("  3x3 BASELINE (superseded) |    1   18   9.11 | 109   -  336 |  97.90%%\n");
+                    all_total ? 100.0 * double(all_in_band) / double(all_total) : 0.0, all_singles,
+                    all_absorbed, all_islands, all_breach);
+        std::printf("  3x3 BASELINE (superseded)    |    1   18   9.11 | 109   -  336 |  97.90%%\n");
+        std::printf("  BL-515 PRE-ABSORPTION        |    1   12   7.87 |6195 3008    0 |  74.71%%\n");
 
-        // D1 — the hard ceiling, across every seed. The one clamp.
-        check(all_over == 0, "D1  no province on any seed exceeds the 12-tile hard ceiling");
+        // D1 — the hard ceiling, across every seed. Growth's one clamp — and
+        // absorption's ONE licensed exception to it: a survivor already at 12
+        // that takes in a singleton ships at 13, because the alternative is to
+        // choose a costlier neighbour, which contradicts the cheapest-edge rule
+        // absorption is defined by. The row therefore asserts what is actually
+        // true: nothing exceeds the ceiling EXCEPT by absorption, and the breach
+        // count in the table is the whole account of it.
+        check(all_over <= all_breach,
+              "D1  the 12-tile ceiling holds except where absorption breached it");
+
+        // A1 — the absorption ledger balances. Every size-1 province that
+        // existed is accounted for exactly once: absorbed, or kept as a true
+        // island (no land neighbour, so nothing to absorb into).
+        check(sums_ok, "A1  every size-1 province was absorbed or is a true island");
+        // A2 — the pass finished. No singleton survives that had somewhere to go.
+        check(all_singles == 0 || all_absorbed > 0,
+              "A2  the absorption pass ran and absorbed (the ruling had an effect)");
         // D2 — the partition covers every seed's land, so the mean is a real
         // statistic and not an artefact of a body that failed to partition.
         check(all_total > 0 && all_tiles > 0, "D2  every seed produced a non-empty partition");
