@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*192 entries — 191 open, 1 resolved.*
+*202 entries — 193 open, 9 resolved.*
 
 ---
 
@@ -1758,6 +1758,36 @@ So today no content anywhere is gated on a war HAPPENING. The dependency is real
 
 *Files: `scripts/tech_tree.lua`, `src/world/tech_gate.cpp`, `docs/development/req/requirements.json`*
 
+### NR-499 — Control changing hands mid-campaign — what happens at the moment a majority flips
+*question · raised 2026-08-21 · from Raised BY Ben's NR-491 ruling. The "never confers control" design had no such moment; a threshold design necessarily does.*
+
+Crossing > 50% turns a corporation the scorer was running into one the player drives, and dropping below hands it back. Four things are undefined: (1) whether reversion is immediate or lagged; (2) what happens to a build order already in flight at the moment control flips; (3) whether the corp_ai scorer, on regaining a corporation, resumes cleanly or needs its state rebuilt; (4) whether a rival syndicate can take control OF A CORPORATION THE PLAYER CONTROLS by buying past them.
+
+**Why it matters.** Item (4) is the one that needs a ruling rather than a design. It is a relational action by a rival against a corp a human owns — the same threshold BL-450 (rivals score stance) needed its own dated grant to cross, and the standing rules treat that class of widening as requiring an explicit, dated grant rather than an inference. The other three are ordinary state-transition design, but they are the kind that is cheap now and expensive after BL-525 fixes the data model. All four are downstream of a ruling that only landed today, so none of them is a gap in the original design.
+
+- Rule now, before BL-525 is written.
+- Defer to BL-529 (rival syndicate behaviour), where the acquisition-contest question naturally lands.
+- Rule (4) now — it is a standing-rule grant — and defer (1)-(3) to BL-529.
+
+> **Recommendation:** Option 3. The three mechanical questions are genuinely BL-529's to answer with the scorer in front of it. But a rival taking control of the player's corporation is a grant, not a mechanism, and the standing rules are explicit that such widenings are dated and scoped rather than inferred — so it should not arrive as an implementation detail inside a scoring item.
+
+*Files: `docs/development/backlog.json`, `.claude/rules/io-standing-rules.md`*
+
+### NR-500 — BL-523 (corp kind axis) and BL-529 (control gate) both add a filter to corp_ai's candidate loop
+*question · raised 2026-08-21 · from Found while resolving the merge conflict between this session's branch and main. The two items were authored in parallel branches on the same day and neither references the other.*
+
+BL-523 makes `corp_ai.cpp` read a corporation KIND (today the file contains no reference to `is_background` at all, so a background filler firm evaluates military_base and hire_unit exactly like a named rival). BL-529 makes it read CONTROL (skip any corporation the player's syndicate majority-holds, per Ben's NR-491 ruling). They are orthogonal axes rather than duplicates, but they gate the same loop. Separately, BL-526's carve splits named corps into operating corporations and does not say whether a carved corporation is background or named — which is precisely the input BL-523's axis needs.
+
+**Why it matters.** Two independently-added filters on one candidate loop is how that loop stops being explainable — the same argument BL-219 won when it retired a second mechanism deciding one field. Cheap to reconcile now, while both are unbuilt and BL-523 is still design-owed; expensive once one has shipped and the other is written around it. The carve ambiguity is the sharper half: BL-523 cannot be specified against a kind axis whose value for carved corporations is undefined.
+
+- Reconcile now: one gating mechanism reading both axes, specified across BL-523 and BL-529.
+- Build BL-523 first (it is v0.1.22, ahead of v0.1.23) and have BL-529 extend its gate rather than add one.
+- Keep them independent and accept two filters.
+
+> **Recommendation:** Option 2. BL-523 is already the earlier minor and is design-owed, so it can absorb the requirement cheaply; BL-529 then extends a gate that exists rather than inventing a parallel one. Either way BL-526 owes an answer on whether a carved corporation is background or named — that is a gap in my item, not in BL-523.
+
+*Files: `src/world/corp_ai.cpp`, `docs/development/backlog.json`*
+
 ---
 
 ## Resolved
@@ -1785,4 +1815,145 @@ R2 is amended: the band's FLOOR is set by what war-gated content needs to be rea
 ACCURACY NOTE, recorded so nobody goes looking for a gate that is not built yet: the dependency Ben names is DESIGNED, not yet live. Checked today - the campaign tech tree has 150 nodes and exactly ONE earnable gate (E0-ML-01 Standing Garrison Doctrine, whose predicate lives in tech_gate.cpp); the other 149 are authored stubs the F9 viewer draws. Nothing currently gates on battles or conquest, and the Era -1 works roster gates on capacity BAND (materials), not on war. So the ruling is forward-looking, and that is an argument FOR fixing the war rate now rather than against it: the tech design is being built on top of a war rate that is zero in a quarter of worlds.
 
 *Files: `src/world/history_sim.cpp`, `tools/verify/history_conquest_gap.cpp`, `docs/development/REFINED.md`*
+
+### NR-491 — Equity confers NO operating control, at any fraction — including 100%
+*decision taken on your behalf · raised 2026-08-21 · from BL-524 (ownership tier) — Ben's 2026-08-21 framing idea. The standing rule "the player's own corp is never auto-acted on strategically" needed a subject, because the whole proposal is that companies the player owns keep running themselves.*
+
+TAKEN: equity is a claim on profit, never a control seam. The player's CORPORATION (the holding actor) is never auto-acted on — unchanged and absolute. The COMPANIES it holds equity in always self-run on their own corp_ai scorer, at any ownership fraction up to and including 100%. The holder's levers are which companies to hold and (pending BL-528) the payout ratio — never the build order.
+
+**Why it matters.** This qualifies a standing rule, which is why it is recorded rather than assumed. The precedent shape is BL-409 (spectator mode): the prohibition protects a corp BECAUSE a human owns it, so a changed ownership relation changes the precondition rather than carving an exception. The rejected alternative — a control threshold above which the holder inherits the build queue — was turned down on three grounds: it reintroduces the ~80-build-queue micromanagement the economic premise exists to prevent; it forks corp_ai.cpp's uniform iteration, which is the property making the whole design affordable; and it makes the prohibition's subject ambiguous again, which is what BL-409 spent a ruling to fix.
+
+- Keep: equity is purely financial, no control at any fraction.
+- Add a control threshold (e.g. >50% grants operating control of that company).
+
+> **Recommendation:** Keep it. The threshold version buys thematic realism and costs the economic premise, the uniform scorer, and a settled rule's clarity. BL-528's payout dial is the cheaper way to make majority ownership mean something.
+
+> **RESOLVED.** RULED BY BEN, 2026-08-21: "Above a majority threshold" — OVERTURNING the call taken on his behalf that equity never confers operating control. A corporation's CONTROLLING HOLDER is the syndicate above > 50%; a corporation controlled by the player's syndicate is the player's corp for the standing rule and is never auto-acted on. Below the threshold a holding stays purely financial, so both readings survive, split by the line rather than one replacing the other. The three costs the "never" position defended against do not vanish and are now designed against in BL-524 § The three costs: micromanagement is BOUNDED BY MAJORITIES HELD rather than corporations in the world (and that bound is the mechanic's central trade-off — control costs attention); corp_ai's uniform iteration genuinely forks on a control gate, owned by BL-529, which must not shift any other corp's cadence slot per BL-409 and has no subject under spectate; and the prohibition's subject is kept crisp by deriving control from the equity relation (BL-525) rather than storing a flag, with the threshold a single named constant. BL-528's open payout question is answered as a side effect — majority takes financial policy too. One new question raised BY the ruling: NR-499, control changing hands mid-campaign.
+
+*Files: `docs/development/backlog.json`, `.claude/rules/io-standing-rules.md`*
+
+### NR-492 — Terminology fork — "corporation" currently means the OPERATING firm, not the holder
+*question · raised 2026-08-21 · from BL-524 (ownership tier). Ben's framing uses corporation = the ~7 decision-making bodies and company = the ~80 self-running operators. Today corporation_component means the OPERATOR.*
+
+The new design was written in Ben's own words (corporation = holder, company = operator) because he stated them. But "corporation" is the most-used term in the project: corporation_component, generate_corporations, the Corporation lens, corp_ai, corp_command, GLOSSARY § Corporation, and 483 backlog items all use it to mean the operating firm. Adopting the new sense inverts it.
+
+**Why it matters.** Rule: use the canonical GLOSSARY terms consistently; if a term is defined there, do not substitute an alternative. Two live senses of "corporation" would break exactly that. The three ways out are not equal in cost, and none is mine to pick.
+
+- Adopt Ben's sense — rename the operating tier to "company" across code and docs. Highest churn, ends with the clearest words.
+- Keep "corporation" = operator, and name the new holding tier something else (house, syndicate, trust, concern). Lowest churn, departs from Ben's phrasing.
+- Keep both, disambiguated only in GLOSSARY. Cheapest now, and the option most likely to rot.
+
+> **Recommendation:** Option 2 — a new word for the new thing. The holding tier is genuinely new and has no incumbent term; the operating tier has ~483 items of incumbency. Renaming the thing that already has a name to free it up for the thing that does not is the expensive direction. But Ben said "corporation" and it is his vocabulary.
+
+> **RESOLVED.** RULED BY BEN, 2026-08-21: option 2 — "Keep corporation as the operator, name the holding tier something else." The operating sense of `corporation` is unchanged across code and docs, so no migration is owed. Ben delegated the actual word; it is SYNDICATE, taken on his behalf and recorded separately as NR-497 so the word stays overturnable independently of the fork he settled. BL-524..BL-530 rewritten to the settled terms.
+
+*Files: `docs/GLOSSARY.md`, `docs/development/backlog.json`*
+
+### NR-493 — "7 corporations" against today's corporation_count = 8 — which slot is the player?
+*question · raised 2026-08-21 · from BL-524 (ownership tier). Ben proposed "7 corporations"; corporation_generation.hpp:26 sets corporation_count = 8.*
+
+Today: 8 named corps = the player plus 7 rivals, and separately ~80 background firms placed on a MEASURED stop condition (~90% of demand), bounded at 200/body — not the "roughly 40" the proposal assumed. So "7 corporations" may mean (a) 7 AI holders plus the player as an 8th of the same type, which is exactly today's 8; or (b) 7 holders total including the player; or (c) 7 AI holders plus the player as a DIFFERENT type — the mercenary company of the live ancient arc, which is BL-094's shape.
+
+**Why it matters.** Reading (a) means the tier count needs no change at all and the item is purely additive. Readings (b) and (c) change generation. Worth settling before BL-525 lands, because the equity items were written assuming (a) — the cheapest reading, and the one that matches the running code.
+
+- (a) 7 AI holders + player as the 8th, same type — no generation change.
+- (b) 7 holders total including the player.
+- (c) 7 AI holders + the player as a mercenary company (a different entity type), per BL-094 / the ancient arc.
+
+> **Recommendation:** (a) for now — it is what the code already does, and it keeps this cluster additive. (c) is where the arc is heading, but it belongs to BL-094 (player-identity pivot), not to the ownership tier.
+
+> **RESOLVED.** RULED BY BEN, 2026-08-21: option (b) — SEVEN syndicates in total, the player one of them. Taken literally from his original "instead we have 7 corporations", against the recommendation to keep 8 as the no-generation-change option. Consequence: `corporation_count` drops 8 → 7 and BL-526's carve runs over seven named corps, not eight. Propagated through BL-524, BL-526, GLOSSARY, CLAUDE.md, README and the ROADMAP entry.
+
+*Files: `src/world/corporation_generation.hpp`*
+
+### NR-494 — The equity cluster carries a proposed v0.1.23 that ROADMAP does not name
+*decision taken on your behalf · raised 2026-08-21 · from BL-524..BL-530 needed a version goal. ROADMAP's ancient arc names v0.1.15 through v0.1.22; v0.1.22 is the last.*
+
+TAKEN: filed all seven items with version_goal v0.1.23 and did NOT edit ROADMAP.md. Naming a new minor and stating its theme is a scope decision that belongs to Ben and to the roadmap's own authority, and the time-slice says a design lives in the item until the work lands.
+
+**Why it matters.** It leaves a small incoherence on purpose: seven items point at a minor the roadmap has never heard of. The alternative was to invent a minor and its theme unilaterally, which is worse. If Ben would rather these sit inside an existing minor — v0.1.17 (economy breadth) is the nearest fit — it is a field edit, not a rewrite.
+
+- Name v0.1.23 in ROADMAP with a theme (e.g. "who owns the world").
+- Re-home the cluster into v0.1.17 (economy breadth).
+- Park the cluster until the mercenary slice settles.
+
+> **Recommendation:** Name v0.1.23. The cluster is coherent enough to be a minor in its own right, and folding seven items into v0.1.17 would bury the framing change inside an economy-breadth theme it is much bigger than.
+
+> **RESOLVED.** RULED BY BEN, 2026-08-21: name it. ROADMAP.md now carries v0.1.23 - Who owns whom, themed "ownership separates from identity, and profit becomes a position rather than a payroll", carrying BL-524 through BL-530. The entry also records why the minor is affordable (BL-365 already shipped the self-running layer) and carries the NR-495 sequencing caution forward, so a reader of the roadmap alone sees both the theme and the hold recommendation.
+
+*Files: `docs/development/ROADMAP.md`, `docs/development/backlog.json`*
+
+### NR-495 — Novelty flag — the ownership tier is a framing change, and it is the fourth on player identity
+*novel-work · raised 2026-08-21 · from BL-524 (ownership tier), raised per io-standing-rules § "Raise the novelty flag".*
+
+Flagging that this session settled a framing change no authority doc owned. It reads as the fourth identity framing in seven weeks: corporation, then governing body (2026-08-03), then national private militia (2026-08-10), now an ownership tier. I argued in BL-524 that it is NOT a fourth pivot — BL-094 already made companies arm's-length counterparties, and explicitly left "the exact shape of the militia's non-mandate revenue" open, which equity income answers. That argument is honest but it is mine, and Ben should test it rather than inherit it.
+
+**Why it matters.** Ben was told the recommendation was to save the idea to the backlog rather than work it, precisely because BL-094 is parked and unlanded and a fourth framing settled on paper is how churn compounds. He chose to work it, which is his call and was carried out in full. The flag records that the concern was real and was overridden deliberately, not forgotten. The scope growth is bounded — seven items, all doc-only so far, none started.
+
+- Accept: the ownership tier funds the militia/mercenary identity rather than replacing it.
+- Treat it as a genuine fourth pivot and re-open BL-094 before building any of BL-525..BL-530.
+- Park the cluster with the space arc until the mercenary slice proves the current identity.
+
+> **Recommendation:** Accept, but do not start BL-525 until the mercenary vertical slice (v0.1.15) is cut. The design costs nothing sitting in the backlog; building it before the current identity is proven in play is what the concern was actually about.
+
+> **RESOLVED.** RULED BY BEN, 2026-08-21: hold BL-525 (equity data model) until the mercenary vertical slice (v0.1.15) is cut. The design is settled ahead of the build, which the time-slice permits; the build waits until the third identity framing is proved in play before the fourth is built on top of it. Recorded in the ROADMAP v0.1.23 entry as a ruling rather than a recommendation — the minor is designed and deliberately not started.
+
+*Files: `docs/development/backlog.json`, `docs/CONCEPT.md`*
+
+### NR-496 — CLAUDE.md and README.md both still carried the superseded "governing body" framing
+*observation · raised 2026-08-21 · from Found while updating both files for BL-524 (ownership tier).*
+
+BL-094's 2026-08-10 rewrite replaced "governing body" with "national private militia" outright, and ROADMAP's 2026-08-12 two-arcs split then parked that whole arc for DLC and put a MERCENARY COMPANY in the live seat. CONCEPT.md and GLOSSARY.md were both updated. CLAUDE.md's opening paragraph and README.md's opening still described the pivot as being to a governing body — nine days and two supersessions stale. Corrected in this session's edits.
+
+**Why it matters.** These two files are the first thing a fresh session and a fresh reader see. A stale framing there propagates into every session that starts from it, which is more costly than the same staleness in a subject doc that only gets read on traversal. Worth a habit: when an identity or framing item lands, CLAUDE.md and README.md are part of its propagation set, not an afterthought.
+
+> **Recommendation:** No action needed beyond the correction already made — recorded so the pattern is visible if it recurs.
+
+> **RESOLVED.** No action was owed beyond the correction already made in-session: CLAUDE.md and README.md were updated off the superseded governing-body framing, and README's pre-NR-177 1960 epoch was corrected to 0 CE. Closed as an observation. The habit it argues for — that an identity or framing item's propagation set INCLUDES CLAUDE.md and README.md, because they are what a fresh session and a fresh reader start from — stands on the record without needing a rule built around it.
+
+*Files: `CLAUDE.md`, `README.md`*
+
+### NR-497 — The holding tier is named SYNDICATE — the word, chosen on Ben's behalf
+*decision taken on your behalf · raised 2026-08-21 · from Ben resolved NR-492 ("keep corporation as the operator, name the holding tier something else") but delegated the word itself.*
+
+TAKEN: the holding tier is a SYNDICATE — `syndicate_component`, `generate_syndicates`, GLOSSARY § Syndicate. A syndicate holds equity in operating corporations, allocates capital and decides; it owns no buildings and runs no recipes.
+
+**Why it matters.** It is a new canonical term, and the standing rule requires canonical terms be used consistently — so the word propagates into seven backlog items, GLOSSARY, CLAUDE.md and README the moment it is chosen. Cheap to overturn NOW (a rename across doc prose); expensive once `syndicate_component` is on the serialisation seam.
+
+Candidates were scored on three axes: semantic fit (does it mean an OWNER rather than an operator), grep-cleanliness, and whether it reads in BOTH arcs — the live ancient one at 0 CE and the parked near-future space one. Syndicate wins all three: it means a body of pooled interests that owns rather than operates; it has zero hits in `src/` and zero real hits in `docs/` (the only two are NR-492 itself); and a merchant syndicate at 0 CE and a corporate syndicate in near-future space are both natural.
+
+Runners-up and why they lost:
+  - HOUSE — reads best in both eras, but loses on grep noise (`greenhouse` in planetology, `warehouse` as a building type in CORPORATION_GENERATION Pass 2, `household`) and on promising a noble-family politics the game does not model.
+  - TRUST — the historically exact word for a holding entity, but collides head-on with the standing rules' own untrusted-input-boundary language (23 hits in `src/`, 92 in `docs/`).
+  - CHARTER — already taken twice: HISTORY.md's Charter Age and BL-094's chartered corp.
+  - CONSORTIUM — semantically right, but stiff, awkward in the plural, and reads poorly at 0 CE.
+  - ESTATE — implies land, which the game already means something else by.
+  - DYNASTY — promises inheritance and succession the game does not model.
+
+- Keep SYNDICATE.
+- Pick another word — HOUSE and CONSORTIUM are the live runners-up.
+- Defer the word and use a placeholder until the tier is built.
+
+> **Recommendation:** Keep it, but treat it as cheap to change until BL-525 (equity data model) puts `syndicate_component` on the serialisation seam. That is the point at which the rename stops being a doc edit.
+
+> **RESOLVED.** CONFIRMED BY BEN, 2026-08-21: keep SYNDICATE. The term is now canonical — GLOSSARY § Syndicate, seven backlog items, CLAUDE.md, README and the ROADMAP v0.1.23 entry. Still cheap to change until BL-525 puts `syndicate_component` on the serialisation seam, which under NR-495's ruling does not happen until v0.1.15 is cut.
+
+*Files: `docs/GLOSSARY.md`, `docs/development/backlog.json`, `CLAUDE.md`, `README.md`*
+
+### NR-498 — apply_session_close.js reformats backlog.json and requirements.json wholesale (indent 2 vs stored 1)
+*observation · raised 2026-08-21 · from Checked at session close whether the tool applied to this session. It did not (design session — nothing delivered, no requirements closed), but reading it surfaced the mismatch.*
+
+`apply_session_close.js` writes all three of its targets with `JSON.stringify(obj, null, 2)` (lines 40, 61, 81). Measured stored indents: `backlog.json` = 1, `requirements.json` = 1, `golden_log.json` = 2. So two of the three are reformatted end-to-end on every run. `backlog.json` is ~700 KB and ~490 items; a run that ships three items would produce a diff touching every line of it.
+
+**Why it matters.** It buries the real change. The point of a session-close commit is to show what shipped, and a whole-file reformat makes the three status flips unreviewable — and makes any accidental edit inside that diff invisible. It also fights the ordinary tooling: `backlog_query.js`, `backlog_lint.js` and the hand-append path all round-trip at indent 1, so the next tool to touch the file flips it back and the churn alternates. Not urgent — the tool appears not to have been run recently (the file is still at indent 1) — but it is a trap for whoever runs it next, which is why it is recorded rather than left to be rediscovered.
+
+- Fix the tool: write indent 1 for backlog.json and requirements.json, keep 2 for golden_log.json.
+- Have the tool detect and preserve each file's existing indent.
+- Normalise all three stores to one indent and update every writer.
+
+> **Recommendation:** Option 2 — detect and preserve. It is a three-line change, it cannot drift again when a store is reformatted for another reason, and it does not require auditing every other writer. Option 1 works but re-encodes the same assumption that just broke.
+
+> **RESOLVED.** Filed as work: BL-531 (session-close indent preservation), version goal v0.1.22 (Harness truth — the tooling-truth minor). Recommendation carried into the item: detect and preserve each store's existing indent rather than hardcoding the other number, so it cannot drift again when a store is reformatted for an unrelated reason.
+
+*Files: `tools/session/apply_session_close.js`*
 
