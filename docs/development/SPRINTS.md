@@ -70,16 +70,34 @@ commit timestamps rather than reviving an unstarted timer.)
 | W1 | The watch — an agent plays, a human watches | **Open 2026-08-19** — all three items LANDED same day; first watch session ran (local model attached); open on the live-check rows + BL-481/BL-306 |
 | D1 | A tech can express a buff | **Closed 2026-08-19** — BL-479 complete same-day; 35/35; BL-443 rider deliberately not taken (NR-296 is Ben's) |
 | D3 | A law has an author, and a tax is a transfer | **Open 2026-08-19** — BL-480 LANDED, harnesses green; open on the NR-382 rate ruling + the live levy-line look |
+| B2 | Roads that reach, ports that mean something | **Open 2026-08-20** — Lane B; the three road_generation cuts, then BL-188 un-parked |
+| B3 | Density, and corporations stop all being the same thing | **Open 2026-08-20** — Lane B; the density clamp is still sized for the 180×84 map |
+| C3 | The engagement trigger, and the fight you can watch | **Open 2026-08-20** — BL-467; both resolvers still return results NOTHING READS. Unblocked 2026-08-21 by NR-439 |
+| D4 | The border costs something (the international half) | **Open 2026-08-20** — depends on D3's treasury and Lane B's routes |
+| P1 | The province becomes a thing you can see, and then a thing worth seeing | **Closed 2026-08-21** — done_when met by BL-515, then overshot by five: the NR-438/439 ceiling ruling, BL-519 axis split, BL-520 texturing, BL-516 water kinds, BL-521 click injection. **Owed: nothing was rendered** |
 
 Every other sprint number that has ever appeared in this file (3–5's original theming, 17–18,
 20–24, 25b, and the full Lane A/B/C/D breakdown of the 26–33 arc — 28, 29, 30, 31, B2, B3, C2,
 C3, D1–D4) is recorded in `sprints.json` with its full goal/planned/risk/notes prose, whether it
 closed, was superseded, or is still a live proposal awaiting Ben's pick.
 
-**Next up.** As of 2026-08-19 the open work is Sprint W1 (the watch — BL-412 agent seam, BL-408
-god view, BL-411 strategy readout, toward v0.1.16), Sprints D1+D3 as one Lane D batch (BL-479
-tech effect union, BL-480 law author + treasury, toward v0.1.11), plus the still-open Fall gate
-sprints (26a remainder, 26b remainder, 27, B1) and C1's BL-464 design half. The 2026-08-19
-version-alignment session also executed Sprint 26's dropped board-surgery half — see entry 26's
-amendment and ROADMAP § the ancient arc for the v0.1.16 split (v0.1.19–v0.1.22 named). Sprint
-20's three candidates remain Ben's call, unopened.
+**Next up.** As of **2026-08-21**, Sprint **P1 is closed** — its own done_when was met by BL-515 and
+the sprint then absorbed Ben's whole tile/province brief of that date (six items, PR #49). The lane it
+hands off to is **C3 — the engagement trigger**, and it is now unblocked: BL-448 (stance), BL-459 (the
+unit→stack bridge) and BL-515 (provinces) have all landed, and NR-439 — *is a 13–16 tile province an
+acceptable battle envelope?* — was settled on 2026-08-21, which BL-467's own design named as wanting
+settlement **before** it rather than after. The gap C3 closes is the sharpest one on the board: both
+battle resolvers are compiled, harnessed, and have **no production caller**, so the military layer can
+compute a fight but cannot have one.
+
+Also open: W1 (the watch), D3 and D4 as the Lane D pair, B1/B2/B3 (Lane B), C1's BL-464 design half,
+and the still-open Fall gate sprints (26a remainder, 26b remainder, 27). Sprint 20's three candidates
+remain Ben's call, unopened. **BL-518** (the Era −1 sim redrawing borders as its wars resolve) is
+carried out of P1 still design-owed, with three genuinely undecided questions; **BL-514** (blend all
+tiles) stays HELD, and BL-520 has now given it a second reason to be decided, since texture and the
+blend are in direct tension.
+
+**The standing debt out of P1**, worth repeating here because it spans four items: nothing built in
+that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI
+half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a
+sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
