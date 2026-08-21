@@ -124,7 +124,7 @@ int main(int argc, char** argv)
         long long cap_total = 0;
         for (const auto& [tid, tc] : w.tiles)
         {
-            if (tc.substrate == terrain_substrate::ocean)
+            if (is_water(tc.substrate))
                 continue;
             ++land;
             const int cap = placement_rules::non_extraction_stack_cap(tc.substrate, tc.cover);

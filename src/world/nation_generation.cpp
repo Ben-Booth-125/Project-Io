@@ -679,7 +679,7 @@ std::vector<entity_id> generate_nations(
             continue;
         sub[static_cast<std::size_t>(idx)] = it->second.substrate;
         cov[static_cast<std::size_t>(idx)] = it->second.cover;
-        if (it->second.substrate == terrain_substrate::ocean)
+        if (is_water(it->second.substrate)) // BL-516
             is_ocean[static_cast<std::size_t>(idx)] = true;
     }
 

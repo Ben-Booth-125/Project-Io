@@ -527,9 +527,57 @@ retained Pass 1 heightmap — not the seven landform classes, whose numeric orde
 means nothing. That field graduated out of the disposable-intermediate set
 precisely for this consumer (`GENERATION_LEDGER.md` § Data lifetime).
 
-**Ocean is out of scope**; provinces over water are BL-516. Until then the
-land-only invariant stands as written, narrowed to land provinces rather than
-deleted (NR-428).
+### Provinces over water (BL-516, landed 2026-08-21)
+
+Ben: *"We can also draw provinces over the ocean, using 3-12 size coastal tile
+provinces. Ocean provinces should be much larger, but not larger than say 80
+tiles."* The partition now runs **the same algorithm three times**, over three
+exclusive tile sets, and a province never spans two of them:
+
+| Domain | Tiles | Growth clamp | Hard cap | Seed spacing | Seeded by |
+|---|---|---|---|---|---|
+| Land | everything not water | 12 (preferred) | 20 | 3 | population centres, then hinterland |
+| Coastal water | `coast` + `lake` | 12 (preferred) | 20 | 3 | hinterland only |
+| Open ocean | `ocean` | **80** | — (see below) | 7 | hinterland only |
+
+**The land-only invariant is narrowed, not deleted** (NR-428). Land provinces are
+still hex-connected land that never spans water; the general claim that survives —
+and that the harness now asserts as P2b — is that **a province holds exactly one
+domain**, which is strictly stronger, since it also forbids a lake joining the sea.
+
+**Open ocean has no separate hard cap, deliberately.** Land needed one because Ben
+ruled a preference (12) and a bound (20) as two different numbers; for the sea he
+named one number. Inventing a second would invent a threshold nobody chose, so
+what carries the 80 instead is the exact identity the harness asserts: *every tile
+above it arrived by singleton absorption, never by growth.*
+
+**The sea spacing is measurement-pinned, and the pin rule is "the cap must stay a
+guard, not a clamp."** Seeds at separation *d* tile a plane in cells of area
+(√3/2)·*d*², so the lattice predicts a mean size; where growth is running into the
+ceiling instead of meeting its neighbours, the measured mean falls away from that
+prediction and provinces pile up on the clamp exactly:
+
+| d | ideal cell | measured mean | max | exactly on the 80 | provinces |
+|---|---|---|---|---|---|
+| 6 | 31.2 | 32.17 | 75 | 0 (0.0%) | 2,901 |
+| **7** | **42.4** | **41.07** | **82** | **26 (1.1%)** | **2,272** |
+| 8 | 55.4 | 49.29 | 83 | 207 (10.9%) | 1,893 |
+| 9 | 70.1 | 55.25 | 83 | 507 (30.0%) | 1,689 |
+
+At *d* = 8 one province in nine sits exactly on 80 — the clamp is drawing the size
+rather than guarding it. At *d* = 7 the measured mean still matches its lattice
+prediction, which is the evidence that terrain and spacing set the size. 41 tiles
+against land's 8.6 is also "much larger" by nearly five times.
+
+**Nothing can be in a sea province yet**, and that is expected rather than a gap:
+units are land-bound (`march_unit` refuses a water destination outright), buildings
+refuse water, and a sea province sustains zero buildings. They are addressable
+empty space — built without inventing a naval model to justify them.
+
+**Open question for Ben:** a **lake** is currently partitioned on the coastal band,
+as its own province. Ben named lakes as a tile kind but did not rule what province a
+lake belongs to (its own, the surrounding land province, or a coastal one). Its own
+was chosen because it invents no new size rule and keeps the one-domain invariant.
 
 **The measured distribution, 6 seeds** (`tools/verify/province_partition_harness.cpp`,
 sections C and D — which is also the re-pinning instrument for the two

@@ -244,7 +244,7 @@ census_row measure(const world& w, uint32_t seed)
         const int vi = static_cast<int>(tc.cover);
         if (vi >= 0 && vi < kNumCover) ++r.cover[static_cast<std::size_t>(vi)];
 
-        const bool ocean = (tc.substrate == terrain_substrate::ocean);
+        const bool ocean = (is_water(tc.substrate));
         if (ocean) { ++r.ocean; }
         else
         {

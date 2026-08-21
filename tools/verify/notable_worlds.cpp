@@ -124,7 +124,7 @@ world_score score_seed(uint32_t campaign_seed, bool keep_map)
             tile_seed, 1.0f, &st, nullptr, &cs.height_bias, &cs.convergent);
         std::vector<char> po(probe.size(), 0);
         for (std::size_t i = 0; i < probe.size(); ++i)
-            if (scratch.tiles.at(probe[i]).substrate == terrain_substrate::ocean) po[i] = 1;
+            if (is_water(scratch.tiles.at(probe[i]).substrate)) po[i] = 1;
         std::vector<int> psz;
         label(po, psz);
         int pmain = -1, pmain_sz = 0;
@@ -162,7 +162,7 @@ world_score score_seed(uint32_t campaign_seed, bool keep_map)
     for (int i = 0; i < static_cast<int>(ids.size()); ++i)
     {
         const auto& t = w.tiles.at(ids[static_cast<std::size_t>(i)]);
-        if (t.substrate == terrain_substrate::ocean) ocean[static_cast<std::size_t>(i)] = 1;
+        if (is_water(t.substrate)) ocean[static_cast<std::size_t>(i)] = 1;
         else                                             land[static_cast<std::size_t>(i)]  = 1;
     }
 

@@ -131,6 +131,8 @@ const char* substrate_name(terrain_substrate s)
         case terrain_substrate::regolith:    return "regolith";
         case terrain_substrate::icy:         return "icy";
         case terrain_substrate::ocean:       return "ocean";
+        case terrain_substrate::lake:        return "lake";  // BL-516
+        case terrain_substrate::coast:       return "coast";
     }
     return "?";
 }
@@ -306,7 +308,7 @@ int main()
             if (id == null_entity) continue;
             const tile_component& t = g.w.tiles.at(id);
             if (t.substrate == terrain_substrate::sedimentary
-                || t.substrate == terrain_substrate::ocean)
+                || is_water(t.substrate)) // BL-516: every water kind, not just open sea
                 continue;
             if (!is_biotic_cover(t.cover)) continue;
             ++composite;
@@ -363,7 +365,7 @@ int main()
             {
                 if (id == null_entity) continue;
                 const tile_component& t = gs.w.tiles.at(id);
-                if (t.substrate == terrain_substrate::ocean) continue;
+                if (is_water(t.substrate)) continue; // BL-516
                 ++land;
                 ++cover_hist[static_cast<int>(t.cover)];
                 if (t.cover != terrain_cover::none) ++dressed;

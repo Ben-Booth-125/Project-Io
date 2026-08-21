@@ -109,7 +109,7 @@ cradle_land survey_land(const world& w, const std::vector<entity_id>& tile_ids,
             const int col = ((c.col + dc) % gw + gw) % gw;
             const tile_component* t = tile_at(w, tile_ids, static_cast<std::size_t>(col + r * gw));
             if (!t) continue;
-            if (t->substrate != terrain_substrate::ocean) ++out.land;
+            if (!is_water(t->substrate)) ++out.land; // BL-516: land is not-water, every kind
             // Both are COVER questions (BL-519) — what grows here, not what the
             // ground is made of. The old names were compositions only because
             // cover had nowhere else to live.

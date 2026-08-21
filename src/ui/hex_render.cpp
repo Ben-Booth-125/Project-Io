@@ -81,7 +81,12 @@ ImU32 substrate_colour(terrain_substrate sub)
         case terrain_substrate::rocky:    return IM_COL32(112, 105,  95, 255);
         case terrain_substrate::volcanic: return IM_COL32(135,  55,  28, 255);
         case terrain_substrate::icy:      return IM_COL32(200, 224, 236, 255);
-        case terrain_substrate::ocean:    return IM_COL32( 40,  80, 160, 255);
+        // BL-516 water kinds. The three read as ONE FAMILY at a glance — the same
+        // blue, lightened toward the shore — so the map still says "water" before
+        // it says which; the depth cue is what tells a strait from open sea.
+        case terrain_substrate::ocean:    return IM_COL32( 40,  80, 160, 255); // open sea (unchanged)
+        case terrain_substrate::coast:    return IM_COL32( 78, 128, 194, 255); // the shallows
+        case terrain_substrate::lake:     return IM_COL32( 62, 122, 172, 255); // inland water
         case terrain_substrate::regolith: return IM_COL32(138, 130, 120, 255);
         case terrain_substrate::metallic: return IM_COL32(158, 150, 140, 255);
         // BARE SOIL — a tan that no pre-split composition had, because the old
@@ -255,7 +260,11 @@ grain_spec substrate_grain(terrain_substrate s)
         case terrain_substrate::metallic:    return { grain_kind::chip, 3, k_tex_pale, 0.26f };
         case terrain_substrate::regolith:    return { grain_kind::dot,  5, k_tex_dark, 0.15f };
         case terrain_substrate::icy:         return { grain_kind::bed,  2, k_tex_pale, 0.30f };
-        case terrain_substrate::ocean:       return { grain_kind::none, 0, k_tex_dark, 0.00f };
+        // BL-516: no grain on water, of any kind — BL-520's texture describes
+        // ground, and none of the three water kinds is ground.
+        case terrain_substrate::ocean:
+        case terrain_substrate::coast:
+        case terrain_substrate::lake:        return { grain_kind::none, 0, k_tex_dark, 0.00f };
     }
     return { grain_kind::none, 0, k_tex_dark, 0.00f };
 }

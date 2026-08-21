@@ -187,7 +187,8 @@ void draw_tile_derivation(const world& w, const generation_record& rec,
     const float  height    = rec.height[idx];
     const float  moisture  = rec.moisture[idx];
     const std::uint8_t bnd = rec.band[idx];
-    const bool   is_ocean  = (t.substrate == terrain_substrate::ocean);
+    const bool   is_ocean  = is_water(t.substrate); // BL-516: the ledger's fork is
+                                                   // land-or-water, not which water.
 
     ImGui::Text("Tile %d, %d", t.grid_x, t.grid_y);
     ImGui::Separator();
@@ -532,7 +533,7 @@ void draw_generation_ledger(const world& w, ui_state& s,
     const std::vector<entity_id> tiles = raster_index(w, subject, rec->gw, rec->gh);
     // BL-519: two histograms where there was one. Collapsing them back into a
     // single 12-row table is exactly the overloading the axis split undid.
-    std::array<int, 8>  sub_counts{};
+    std::array<int, 10> sub_counts{}; // BL-516: 8 -> 10, lake and coast appended
     std::array<int, 10> cov_counts{};
     std::array<int, 7>  land_counts{};
     int counted = 0;

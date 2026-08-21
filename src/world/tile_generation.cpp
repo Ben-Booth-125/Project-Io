@@ -199,6 +199,110 @@ void hex_neighbours(int col, int row, int gw, int gh,
 }
 
 // ---------------------------------------------------------------------------
+// Pass 4e (BL-516) — WATER KINDS. Lake, coast and ocean, decided structurally
+// ---------------------------------------------------------------------------
+// Runs on the finished water mask and NOTHING ELSE: no RNG stream is touched,
+// no threshold is invented, and the answer is a pure function of which tiles
+// are water and how they are joined. Three rules, in order:
+//
+//   1. Flood-fill the water into connected components on the same odd-r hex
+//      adjacency (columns wrap) every other body-grid pass walks.
+//   2. THE SEA is the LARGEST component; ties break on the lowest tile index,
+//      so no container or scan order reaches the decision. Every other
+//      component is a LAKE — "does not reach the sea" is the whole definition,
+//      and it needs no size cut-off.
+//   3. Within the sea: a tile with at least one LAND neighbour is COAST (the
+//      shoreline ring); a tile with none is OPEN OCEAN.
+//
+// A body with no water leaves the output untouched. A body that is ALL water
+// has one component, no land neighbours anywhere, and is therefore all ocean —
+// which is the right answer rather than a special case.
+//
+// IT SITS AFTER PASS 4D, and it holds 4c/4d's own contract: no RNG stream is
+// touched, so every downstream draw is the draw it was before. It goes further
+// and writes to a SEPARATE array (`reported_sub`) rather than refining `sub[]`
+// in place, so Passes 5 and 6 — clusters, deposits, derived environment — are
+// still handed the coarse `ocean` they were written against. Only what the tile
+// REPORTS about its water changed, which is what makes the generated surface
+// bit-identical to the pre-BL-516 build rather than merely intended to be.
+void classify_water_kinds(const std::vector<bool>& is_ocean, int gw, int gh,
+                          std::vector<terrain_substrate>& reported_sub)
+{
+    const int total = gw * gh;
+    if (total <= 0)
+        return;
+
+    std::vector<int> component(static_cast<std::size_t>(total), -1);
+    std::vector<int> sizes;
+    std::vector<int> stack;
+
+    for (int start = 0; start < total; ++start)
+    {
+        if (!is_ocean[static_cast<std::size_t>(start)]
+            || component[static_cast<std::size_t>(start)] >= 0)
+            continue;
+
+        const int id = static_cast<int>(sizes.size());
+        int       n  = 0;
+        stack.clear();
+        stack.push_back(start);
+        component[static_cast<std::size_t>(start)] = id;
+        while (!stack.empty())
+        {
+            const int cur = stack.back();
+            stack.pop_back();
+            ++n;
+            const int col = cur % gw;
+            const int row = cur / gw;
+            std::pair<int, int> nbrs[6];
+            int                 cnt = 0;
+            hex_neighbours(col, row, gw, gh, nbrs, cnt);
+            for (int k = 0; k < cnt; ++k)
+            {
+                const int nidx = nbrs[k].first + nbrs[k].second * gw;
+                if (!is_ocean[static_cast<std::size_t>(nidx)]
+                    || component[static_cast<std::size_t>(nidx)] >= 0)
+                    continue;
+                component[static_cast<std::size_t>(nidx)] = id;
+                stack.push_back(nidx);
+            }
+        }
+        sizes.push_back(n);
+    }
+
+    if (sizes.empty())
+        return; // a dry body
+
+    // The sea: largest component, lowest id on a tie. Component ids are handed
+    // out in ascending start-tile order, so "lowest id" IS "lowest tile index".
+    int sea = 0;
+    for (int i = 1; i < static_cast<int>(sizes.size()); ++i)
+        if (sizes[static_cast<std::size_t>(i)] > sizes[static_cast<std::size_t>(sea)])
+            sea = i;
+
+    for (int idx = 0; idx < total; ++idx)
+    {
+        if (!is_ocean[static_cast<std::size_t>(idx)])
+            continue;
+        if (component[static_cast<std::size_t>(idx)] != sea)
+        {
+            reported_sub[static_cast<std::size_t>(idx)] = terrain_substrate::lake;
+            continue;
+        }
+        const int col = idx % gw;
+        const int row = idx / gw;
+        std::pair<int, int> nbrs[6];
+        int                 cnt = 0;
+        hex_neighbours(col, row, gw, gh, nbrs, cnt);
+        bool touches_land = false;
+        for (int k = 0; k < cnt && !touches_land; ++k)
+            touches_land = !is_ocean[static_cast<std::size_t>(nbrs[k].first + nbrs[k].second * gw)];
+        reported_sub[static_cast<std::size_t>(idx)] =
+            touches_land ? terrain_substrate::coast : terrain_substrate::ocean;
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Pass 3 — latitude bands
 // ---------------------------------------------------------------------------
 
@@ -1203,6 +1307,8 @@ void generate_deposits(terrain_substrate sub, terrain_cover cov, std::uint8_t de
             }
             break;
         case su::ocean:
+        case su::coast: // BL-516: unreachable — Pass 4e refines the water kinds
+        case su::lake:  // into `reported_sub` after this pass reads `sub`.
             break;
     }
 
@@ -1274,7 +1380,10 @@ void derive_environment(terrain_substrate sub, terrain_cover cov, terrain_landfo
         case su::regolith:    base_haz = 0.30f; base_hab = 0.20f; break;
         case su::metallic:    base_haz = 0.30f; base_hab = 0.10f; break;
         case su::volcanic:    base_haz = 0.70f; base_hab = 0.10f; break;
-        case su::ocean:       base_haz = 0.10f; base_hab = 0.50f; break;
+        case su::ocean:
+        case su::coast:       // BL-516: unreachable here — Pass 4e refines the water
+        case su::lake:        base_haz = 0.10f; base_hab = 0.50f; break;
+                              // kinds into `reported_sub` AFTER this pass reads `sub`.
     }
 
     // The cover's own contribution. On sedimentary ground these reproduce the old
@@ -1613,6 +1722,14 @@ std::vector<entity_id> generate_body_tiles(
         dens[idx] = a.density;
     }
 
+    // --- Pass 4e: water kinds — lake, coast and ocean (BL-516) ---
+    //
+    // `sub` itself is left alone, deliberately: Passes 5 and 6 below still see
+    // the coarse `ocean`, so no cluster, deposit or environment draw moves.
+    // `reported_sub` is what the tile carries. See classify_water_kinds.
+    std::vector<terrain_substrate> reported_sub = sub;
+    classify_water_kinds(is_ocean, gw, gh, reported_sub);
+
     // --- Pass 5: landform clusters ---
     std::mt19937 cluster_rng(seed_cluster);
     std::vector<bool> claimed(total, false);
@@ -1818,7 +1935,7 @@ std::vector<entity_id> generate_body_tiles(
                 .body               = body_id,
                 .grid_x             = col,
                 .grid_y             = row,
-                .substrate          = sub[idx],
+                .substrate          = reported_sub[idx], // BL-516 water kind; == sub[idx] on land
                 .cover              = cov[idx],
                 .cover_density      = dens[idx],
                 .landform           = land[idx],
@@ -1863,7 +1980,7 @@ std::vector<entity_id> first_land_tiles(const std::vector<entity_id>& tile_ids,
         for (int col = 0; col < gw && static_cast<int>(result.size()) < n; ++col)
         {
             const entity_id id = tile_ids[col + row * gw];
-            if (id != null_entity && w.tiles.at(id).substrate != terrain_substrate::ocean)
+            if (id != null_entity && !is_water(w.tiles.at(id).substrate))
                 result.push_back(id);
         }
     return result;

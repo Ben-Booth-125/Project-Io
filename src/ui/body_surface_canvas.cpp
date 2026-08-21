@@ -2002,7 +2002,18 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         const bool ct_built = built_tiles.find(cid) != built_tiles.end();
         const bool ct_seen  = survey_tile_visible(body.survey, gw, gh, ct.grid_x, ct.grid_y)
                               || god_view_lift;
-        sh.blend = lens_blends && !ct_built && ct_seen && sh.province != 0;
+        //
+        // WATER IS EXCLUDED EXPLICITLY (BL-516). It used to fall out of
+        // `province != 0` for free, because the partition covered land only —
+        // and that accident is what has been keeping the coastline crisp. Sea
+        // tiles carry provinces now, so the exclusion has to be stated. It is
+        // stated rather than dropped deliberately: a province never spans land
+        // and water, so blending water WOULD still leave the shoreline hard, but
+        // it would change how the sea reads, and that is a look nobody has seen
+        // yet. This change ships the pre-BL-516 rendering unchanged; softening
+        // the sea is a separate, visually-reviewed call.
+        sh.blend = lens_blends && !ct_built && ct_seen && sh.province != 0
+                   && !is_water(ct.substrate);
     }
 
     for (int t_row = row_lo; t_row <= row_hi; ++t_row)
@@ -2626,7 +2637,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // tiles (suppressed above).
             if ((state.overlay == overlay_mode::population ||
                  state.overlay == overlay_mode::opportunity) &&
-                !placement_rules::is_ocean_tile(tile.substrate))
+                !placement_rules::is_water_tile(tile.substrate))
             {
                 float t = 0.0f; // body-relative rank, [0, 1], red(low) -> green(high)
                 if (state.overlay == overlay_mode::population)

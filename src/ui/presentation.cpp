@@ -146,6 +146,8 @@ const char* substrate_name(terrain_substrate s)
         case terrain_substrate::regolith:    return "Regolith";
         case terrain_substrate::icy:         return "Ice";
         case terrain_substrate::ocean:       return "Ocean";
+        case terrain_substrate::lake:        return "Lake";  // BL-516
+        case terrain_substrate::coast:       return "Coast";
     }
     return "?";
 }
@@ -206,7 +208,11 @@ std::string terrain_name(terrain_substrate sub, terrain_cover cov, std::uint8_t 
     // Water and paving are answers on their own — neither wants a qualifier, and
     // urban deliberately says nothing about the ground it stands on even though
     // (since BL-519) the ground is still there underneath.
+    // BL-516: each water kind names itself. They are three answers, not one with
+    // a qualifier — a lake is not a kind of ocean.
     if (sub == terrain_substrate::ocean) return "Ocean";
+    if (sub == terrain_substrate::coast) return "Coast";
+    if (sub == terrain_substrate::lake)  return "Lake";
     if (cov == terrain_cover::urban)     return "Urban";
 
     // THE FAMILIAR NAMES. Every one of these is the exact word the pre-split

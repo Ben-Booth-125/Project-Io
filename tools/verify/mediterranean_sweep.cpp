@@ -124,7 +124,7 @@ seed_result sweep_one(uint32_t campaign_seed, bool keep_map)
             tile_seed, 1.0f, &st, nullptr, &cs.height_bias, &cs.convergent);
         std::vector<char> pocean(probe.size(), 0);
         for (std::size_t i = 0; i < probe.size(); ++i)
-            if (scratch.tiles.at(probe[i]).substrate == terrain_substrate::ocean) pocean[i] = 1;
+            if (is_water(scratch.tiles.at(probe[i]).substrate)) pocean[i] = 1;
         std::vector<int> psizes;
         label(pocean, psizes);
         int pmain = -1, pmain_sz = 0;
@@ -161,7 +161,7 @@ seed_result sweep_one(uint32_t campaign_seed, bool keep_map)
     for (int i = 0; i < static_cast<int>(ids.size()); ++i)
     {
         const auto& tc = w.tiles.at(ids[static_cast<std::size_t>(i)]);
-        if (tc.substrate == terrain_substrate::ocean) { ocean[static_cast<std::size_t>(i)] = 1; ++ocean_n; }
+        if (is_water(tc.substrate)) { ocean[static_cast<std::size_t>(i)] = 1; ++ocean_n; }
     }
 
     seed_result out;

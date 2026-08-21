@@ -357,7 +357,7 @@ void paint_homeworld(ImDrawList* dl, ImVec2 c, float R, const planetology_state&
                 const uint8_t packed = vote(tr);
                 const terrain_substrate vs = preview_substrate(packed);
                 fill    = terrain_colour(vs, preview_cover(packed), k_preview_cover_density);
-                on_land = vs != terrain_substrate::ocean;
+                on_land = !is_water(vs); // BL-516
             }
             else if (frozen)                         fill = ic;
             else if (std::fabs(lat_n) > ice_lat && st.profile.hydrology
