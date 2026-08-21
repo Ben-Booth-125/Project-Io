@@ -2,6 +2,7 @@
 
 #include "components.hpp"
 #include "recipe_registry.hpp"
+#include "battle_system.hpp" // battle_dispatch (BL-467/BL-468)
 #include "world.hpp"
 
 #include <array>
@@ -142,6 +143,21 @@ struct economy_report
     /// Background-corp agency actions taken this tick (BL-079), in the
     /// deterministic order they were applied. See agency_event.
     std::vector<agency_event> agency_events;
+
+    /// Battles that did something this tick (BL-467/BL-468), in the same sorted
+    /// (province, attacker, defender) order the battle record is walked in.
+    ///
+    /// THE WORLD REPORTS; THE PRESENTATION LAYER VOICES. This is the same seam
+    /// `agency_events` established and the one NR-407 said BL-458's silent
+    /// interdiction was waiting for: a world event needs somewhere to be recorded
+    /// that is not `src/ui`, because the world layer must not depend on the UI.
+    /// `session_history` turns these into comms lines; the battle card reads the
+    /// live record instead, since it wants the trace rather than a summary.
+    ///
+    /// It includes battles that CONCLUDED this tick, which `world::battles` no
+    /// longer holds — the aftermath is the line a player most needs and it
+    /// describes something already erased.
+    std::vector<battle_dispatch> battle_dispatches;
 
     /// Per (corporation, body): the input quantities a consumer could not cover
     /// from its own pool and auto-bought from the market this tick — the FILL.

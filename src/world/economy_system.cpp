@@ -1523,7 +1523,13 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // not exist NOW EXISTS, and it runs immediately before this line — which is
     // what makes the sentence "a unit in contact this tick fights before it can
     // march out next tick" true rather than aspirational.
-    run_battles(w, reg, w.current_day_tick);
+    {
+        const battle_tick bt = run_battles(w, reg, w.current_day_tick);
+        // Carried out on the report, not dropped: a concluded battle is erased
+        // inside the pass, so this is the only chance the aftermath has to reach
+        // a surface. See economy_report::battle_dispatches.
+        report.battle_dispatches = std::move(bt.dispatches);
+    }
 
     run_unit_march(w, reg);
 

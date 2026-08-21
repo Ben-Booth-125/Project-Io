@@ -224,6 +224,68 @@ bool candidate_less(const candidate& a, const candidate& b)
 
 } // namespace
 
+battle_phase read_battle_phase(const active_battle& b, int attacker_swing, int defender_swing,
+                               const campaign_battle_params& params)
+{
+    // Order matters: the later readings are the more urgent ones, so they win.
+    if (b.state.end != campaign_battle_end::in_progress)
+    {
+        if (b.state.end == campaign_battle_end::attacker_withdrew
+         || b.state.end == campaign_battle_end::defender_withdrew)
+            return battle_phase::broke_off;
+        return battle_phase::concluded;
+    }
+
+    // WAVERING is read against the rout threshold rather than a fixed number, so
+    // the word stays true if the threshold is ever tuned. Within a quarter of the
+    // threshold is "about to break" — near enough that leaving is the live
+    // question, which is the whole reason the phase exists.
+    const int near_rout = params.rout_threshold + params.rout_threshold / 4;
+    if (b.state.attacker_strength_permille <= near_rout
+     || b.state.defender_strength_permille <= near_rout)
+        return battle_phase::wavering;
+
+    // CRISIS is a big swing across this tick's batch on either side. Quoted
+    // against the batch, not the round, because a surface speaks once per batch.
+    const int worst = std::max(-attacker_swing, -defender_swing);
+    if (worst >= 150)
+        return battle_phase::crisis;
+
+    // The opening is the first batch. After that both sides are committed —
+    // which is a statement about the withdrawal price, not a mood: by round 4 the
+    // per-round term alone has tripled.
+    return (b.state.rounds_fought <= std::max(1, params.rounds_per_tick))
+               ? battle_phase::opening
+               : battle_phase::committed;
+}
+
+withdrawal_price quote_withdrawal(const active_battle& b, withdrawing_side side,
+                                  const campaign_battle_params& params)
+{
+    withdrawal_price q;
+    if (side == withdrawing_side::none)
+        return q;
+
+    // The SAME arithmetic withdraw_campaign_battle applies, separated into its
+    // three terms. Kept beside the resolver's own copy deliberately rather than
+    // in the card: a second copy in a surface is a second place for the quoted
+    // price to drift from the price actually charged, and a player who is shown
+    // one number and charged another has been lied to about the only decision
+    // the fight contains.
+    const bool attacker_leaving = (side == withdrawing_side::attacker);
+    const int own   = attacker_leaving ? b.state.attacker_strength_permille
+                                       : b.state.defender_strength_permille;
+    const int enemy = attacker_leaving ? b.state.defender_strength_permille
+                                       : b.state.attacker_strength_permille;
+    const int behind = std::max(0, enemy - own);
+
+    q.base      = params.withdraw_base_permille;
+    q.per_round = b.state.rounds_fought * params.withdraw_per_round_permille;
+    q.pursuit   = behind * params.withdraw_pursuit_scale / 1000;
+    q.total     = std::clamp(q.base + q.per_round + q.pursuit, 0, 1000);
+    return q;
+}
+
 bool battle_ground(const world& w, const std::vector<entity_id>& defender_units,
                    terrain_substrate& sub, terrain_cover& cov, std::uint8_t& density,
                    terrain_landform& lf)
@@ -500,18 +562,69 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
         // what makes a mid-fight withdrawal a real decision.
         auto apply_side = [&](const std::vector<entity_id>& units, int before, int after) {
             const int drop = before - after;
-            if (drop <= 0) return;
+            if (drop <= 0) return 0;
             const int standing = side_count(w, units);
-            if (standing <= 0) return;
+            if (standing <= 0) return 0;
             const int want = static_cast<int>(
                 (static_cast<long long>(standing) * drop) / std::max(1, before));
-            out.losses += distribute_losses(w, units, want);
+            const int removed = distribute_losses(w, units, want);
+            out.losses += removed;
+            return removed;
         };
-        apply_side(b.attacker_units, before_a, b.state.attacker_strength_permille);
-        apply_side(b.defender_units, before_d, b.state.defender_strength_permille);
+        const int lost_a = apply_side(b.attacker_units, before_a, b.state.attacker_strength_permille);
+        const int lost_d = apply_side(b.defender_units, before_d, b.state.defender_strength_permille);
 
         if (b.state.end != campaign_battle_end::in_progress)
             ++out.concluded;
+
+        // -------------------------------------------------------------------
+        // 3b. THE DISPATCH RECORD (BL-468 / BL-469)
+        // -------------------------------------------------------------------
+        // Emitted HERE, before the retire pass below erases a concluded battle.
+        // That ordering is the whole reason this is a report rather than a read:
+        // the aftermath line — who held the field and what it cost — is the one a
+        // player most needs, and it describes a record that no longer exists by
+        // the time any surface runs.
+        //
+        // Nothing here consumes a draw or touches world state. The text is a pure
+        // function of this record plus the battle's own stream seed, so the
+        // dispatch layer cannot move the simulation however it is written.
+        if (fought > 0 || b.state.end != campaign_battle_end::in_progress || lost_a || lost_d)
+        {
+            const int swing_a = b.state.attacker_strength_permille - before_a;
+            const int swing_d = b.state.defender_strength_permille - before_d;
+
+            battle_dispatch d;
+            d.province = b.province;
+            d.attacker = b.attacker;
+            d.defender = b.defender;
+            d.phase    = read_battle_phase(b, swing_a, swing_d, params);
+            d.rounds_fought    = b.state.rounds_fought;
+            d.rounds_this_tick = fought;
+            d.max_rounds       = params.max_rounds;
+            d.attacker_strength_permille = b.state.attacker_strength_permille;
+            d.defender_strength_permille = b.state.defender_strength_permille;
+            d.attacker_swing_permille = swing_a;
+            d.defender_swing_permille = swing_d;
+            d.attacker_men_lost = lost_a;
+            d.defender_men_lost = lost_d;
+            d.end               = b.state.end;
+            d.stream_seed       = b.state.stream_seed;
+            if (b.state.end == campaign_battle_end::attacker_withdrew)
+                d.withdrew = withdrawing_side::attacker;
+            else if (b.state.end == campaign_battle_end::defender_withdrew)
+                d.withdrew = withdrawing_side::defender;
+            // WHO HOLDS THE FIELD: the side that stayed, defender on ties — both
+            // the resolver's own rules, restated here rather than re-derived so
+            // the dispatch and the resolver cannot disagree about who won.
+            if (b.state.end != campaign_battle_end::in_progress)
+                d.field_held_by = (d.withdrew == withdrawing_side::attacker) ? b.defender
+                                : (d.withdrew == withdrawing_side::defender) ? b.attacker
+                                : (b.state.attacker_strength_permille
+                                       > b.state.defender_strength_permille ? b.attacker
+                                                                            : b.defender);
+            out.dispatches.push_back(d);
+        }
     }
 
     // -----------------------------------------------------------------------

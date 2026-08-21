@@ -50,6 +50,95 @@
 struct world;
 class recipe_registry;
 
+/// THE PHASE VOCABULARY (BL-468/BL-469), and the reason it lives in the WORLD
+/// layer rather than in either surface that reads it.
+///
+/// Rounds are mechanically uniform — every one is the same two draws against the
+/// same scoring. The phase is a READING of a round, not a property of it: the
+/// opening reads as a skirmish, the middle as commitment, a large swing as a
+/// crisis, an approach to the rout threshold as wavering. It exists so a player
+/// can tell at a glance whether a fight is worth staying in.
+///
+/// It is derived HERE, once, because two surfaces consume it — the dispatch
+/// stream (BL-468) and the card's phase readout (BL-469) — and BL-468's design
+/// says in as many words that they must never disagree. Deriving it twice, once
+/// per surface, is exactly how they would come to.
+enum class battle_phase : uint8_t
+{
+    opening,    ///< First rounds. Contact made, nothing decided.
+    committed,  ///< The middle. Both sides are in it now.
+    crisis,     ///< A large swing this round — the fight turned.
+    wavering,   ///< A side is near the rout threshold.
+    broke_off,  ///< A withdrawal was honoured this tick, with its price paid.
+    concluded,  ///< The fight ended. Who holds the field, and what it cost.
+};
+
+/// What ONE battle did in ONE tick — the material a surface needs to say it, and
+/// nothing more.
+///
+/// PURE DATA, AND DELIBERATELY. The world layer must not depend on `src/ui`, and
+/// the text is a pure function of this record plus the battle identity, so the
+/// dispatch layer can never move the simulation — no draw, no state, no ordering
+/// effect. BL-468 states that as a requirement; this struct is what makes it
+/// structurally true rather than a discipline someone has to keep.
+///
+/// It is REPORTED rather than stored because a concluded battle is erased at the
+/// end of the tick it ends. Without this the aftermath — who held the field and
+/// what it cost, which is the one line a player most needs — would be gone before
+/// any surface could read it.
+struct battle_dispatch
+{
+    uint32_t  province = 0;
+    entity_id attacker = null_entity;
+    entity_id defender = null_entity;
+
+    battle_phase phase = battle_phase::opening;
+
+    int rounds_fought = 0;   ///< Total, not this tick's batch.
+    int rounds_this_tick = 0;
+    int max_rounds = 0;      ///< So a surface can print "round 4 / 6" without knowing params.
+
+    int attacker_strength_permille = 0; ///< After this tick's rounds.
+    int defender_strength_permille = 0;
+    int attacker_swing_permille = 0;    ///< Change across this tick's batch; negative is loss.
+    int defender_swing_permille = 0;
+
+    int attacker_men_lost = 0;          ///< Actual men, this tick.
+    int defender_men_lost = 0;
+
+    /// Set only when `phase` is `broke_off` or `concluded`.
+    withdrawing_side withdrew = withdrawing_side::none;
+    campaign_battle_end end = campaign_battle_end::in_progress;
+    entity_id field_held_by = null_entity; ///< Concluded only: the side that stayed.
+
+    /// The seed of the battle's own stream. A surface folds this with the round
+    /// index to pick a phrase, so wording is stable for a given fight and varies
+    /// between fights — WITHOUT consuming a draw (the BL-290 tongue-bank idiom).
+    uint64_t stream_seed = 0;
+};
+
+/// The phase a battle reads as, given its state and what just happened. Pure.
+battle_phase read_battle_phase(const active_battle& b, int attacker_swing, int defender_swing,
+                               const campaign_battle_params& params);
+
+/// The CURRENT price of breaking off, per-mille of remaining strength, with its
+/// three terms separated so a surface can show them (BL-469 asks for exactly
+/// this: "the three terms legible ... updating as rounds pass").
+///
+/// Exposed rather than recomputed in the UI: the resolver already owns this
+/// arithmetic, and a second copy in a card is a second place for it to drift from
+/// what withdrawing actually costs.
+struct withdrawal_price
+{
+    int base = 0;      ///< The flat price of turning your back at all.
+    int per_round = 0; ///< Every round already fought adds to it.
+    int pursuit = 0;   ///< Scaled by how far BEHIND the withdrawing side is.
+    int total = 0;     ///< base + per_round + pursuit, clamped as the resolver clamps it.
+};
+
+withdrawal_price quote_withdrawal(const active_battle& b, withdrawing_side side,
+                                  const campaign_battle_params& params = {});
+
 /// What one tick's battle pass did. Reported rather than asserted — the counts
 /// are what a harness reads to know the pass is not silently inert, which is the
 /// failure mode an engagement trigger actually has.
@@ -61,6 +150,11 @@ struct battle_tick
     int concluded  = 0; ///< Battles that ended this tick (any end reason).
     int withdrew   = 0; ///< Battles ended by an honoured withdrawal request.
     int losses     = 0; ///< Total men removed from unit_component::count.
+
+    /// One record per battle that did something this tick — the material the
+    /// dispatch stream (BL-468) and the card (BL-469) read. Includes battles that
+    /// CONCLUDED this tick, which the record itself no longer holds.
+    std::vector<battle_dispatch> dispatches;
 };
 
 /// Discover new battles, then step every live one. Called from `run_economy_step`

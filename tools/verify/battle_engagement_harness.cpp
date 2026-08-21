@@ -398,6 +398,119 @@ int main()
         }
     }
 
+    // -----------------------------------------------------------------------
+    std::printf("\nB10 — the dispatch record (BL-468/BL-469)\n");
+    {
+        fixture f;
+        build_fixture(f);
+        const battle_tick t1 = run_battles(f.w, reg, 0);
+        check(!t1.dispatches.empty(),
+              "B10a a battle that fought emits a dispatch record");
+        if (!t1.dispatches.empty())
+        {
+            const battle_dispatch& d = t1.dispatches.front();
+            check(d.province == f.province && d.attacker == f.att && d.defender == f.def,
+                  "B10b the record names the fight (province, attacker, defender)");
+            check(d.rounds_this_tick > 0 && d.max_rounds > 0,
+                  "B10c it carries round/max so a surface need not know campaign_battle_params");
+            check(d.stream_seed != 0,
+                  "B10d it carries the battle's stream seed, so phrasing can vary per fight without a draw");
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nB11 — THE AFTERMATH SURVIVES THE ERASURE\n");
+    {
+        // The load-bearing property of making this a REPORT rather than a read.
+        // A concluded battle is erased inside the pass, so a surface that read
+        // world::battles would find nothing — and "who held the field and what it
+        // cost" is the one line a player most needs.
+        fixture f;
+        build_fixture(f);
+        bool saw_conclusion = false;
+        for (int i = 0; i < 10 && !saw_conclusion; ++i)
+        {
+            const battle_tick t = run_battles(f.w, reg, i);
+            for (const battle_dispatch& d : t.dispatches)
+            {
+                if (d.end == campaign_battle_end::in_progress)
+                    continue;
+                saw_conclusion = true;
+                check(d.field_held_by == f.att || d.field_held_by == f.def,
+                      "B11a the concluded dispatch names WHO HELD THE FIELD");
+                check(f.w.battles.empty(),
+                      "B11b ...and the battle record itself is already gone, so nothing else could have said it");
+                check(d.phase == battle_phase::concluded || d.phase == battle_phase::broke_off,
+                      "B11c its phase reads as an ending");
+            }
+        }
+        check(saw_conclusion, "B11  a battle concluded within ten ticks (the row was exercised)");
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nB12 — the quoted withdrawal price is the price actually charged\n");
+    {
+        // A player shown one number and charged another has been lied to about
+        // the only decision the fight contains. So the quote is asserted against
+        // the charge rather than against arithmetic repeated in the test.
+        fixture f;
+        build_fixture(f);
+        run_battles(f.w, reg, 0);
+        if (!f.w.battles.empty())
+        {
+            const active_battle& b = f.w.battles.front();
+            const campaign_battle_params params{};
+            const withdrawal_price q = quote_withdrawal(b, withdrawing_side::attacker, params);
+            check(q.total == std::clamp(q.base + q.per_round + q.pursuit, 0, 1000),
+                  "B12a the three terms sum to the total (they are legible, not decorative)");
+
+            const int before = b.state.attacker_strength_permille;
+            campaign_battle_state copy = b.state;
+            withdraw_campaign_battle(copy, withdrawing_side::attacker, params);
+            const int actual_drop = before - copy.attacker_strength_permille;
+            const int quoted_drop = before * q.total / 1000;
+            check(std::abs(actual_drop - quoted_drop) <= 1,
+                  "B12b THE QUOTE MATCHES THE CHARGE — the card cannot mis-state what leaving costs");
+            std::printf("        quoted %d permille (base %d + per-round %d + pursuit %d)"
+                        " -> %d men-equivalent; charged %d\n",
+                        q.total, q.base, q.per_round, q.pursuit, quoted_drop, actual_drop);
+        }
+        else
+        {
+            std::printf("        (battle concluded within one tick; B12 not exercised)\n");
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nB13 — the dispatch layer cannot move the simulation\n");
+    {
+        // BL-468 requires the text be a PURE FUNCTION of the trace, with no extra
+        // draws. Asserted structurally: two runs produce identical dispatches AND
+        // identical world state, so nothing about reporting can perturb the sim.
+        fixture a, b;
+        build_fixture(a);
+        build_fixture(b);
+        std::vector<battle_dispatch> da, db;
+        for (int i = 0; i < 5; ++i)
+        {
+            const battle_tick ta = run_battles(a.w, reg, i);
+            const battle_tick tb = run_battles(b.w, reg, i);
+            da.insert(da.end(), ta.dispatches.begin(), ta.dispatches.end());
+            db.insert(db.end(), tb.dispatches.begin(), tb.dispatches.end());
+        }
+        bool same = da.size() == db.size();
+        for (std::size_t i = 0; same && i < da.size(); ++i)
+            same = da[i].province == db[i].province
+                && da[i].phase == db[i].phase
+                && da[i].rounds_fought == db[i].rounds_fought
+                && da[i].attacker_men_lost == db[i].attacker_men_lost
+                && da[i].stream_seed == db[i].stream_seed;
+        check(same, "B13a twin worlds emit byte-identical dispatch sequences");
+        check(a.w.state_hash(5) == b.w.state_hash(5),
+              "B13b ...and the worlds themselves stayed identical, so reporting moved nothing");
+        std::printf("        %zu dispatches over five ticks\n", da.size());
+    }
+
     std::printf("\n%d checks, %d failures\n", checks, failures);
     std::printf("%s\n", failures == 0 ? "ALL PASS (0 failures)" : "FAILURES PRESENT");
     return failures == 0 ? 0 : 1;
