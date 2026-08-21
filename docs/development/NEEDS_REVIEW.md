@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*178 entries — 178 open, 0 resolved.*
+*182 entries — 182 open, 0 resolved.*
 
 ---
 
@@ -1552,6 +1552,50 @@ TAKEN: sequenced Lane A independently of Lane C rather than behind it. The two r
 > **Recommendation:** Keep them separate. They answer different questions and BL-467 has just shown the campaign one working. But the fact that BL-321's defence works are inert in practice (NR-475) means the sim's half is less real than it looks, which may be what prompted the read.
 
 *Files: `src/world/history_sim.cpp`, `src/world/combat.hpp`, `src/world/battle_system.hpp`*
+
+### NR-477 — The sea haulage rate contradicts BL-188's own ruling, and must NOT be flipped on its own
+*decision taken on your behalf · raised 2026-08-21 · from Sprint B2 (Lane B). tools/verify/sea_leg_census.cpp, 16 seeds, 1230 routes.*
+
+`scripts/economy.lua` has `land = 0.02, sea = 0.05` — sea is 2.5x DEARER than land, contradicting BL-188's settled ruling 1 that 'sea's advantage is a lower per-unit RATE'. TAKEN: left it alone. `path.cost` does double duty — it is the A* routing weight (`sea_leg_cost = 2.5` deliberately prices water above any landform so routes prefer land) AND the haul price. Flipping the rate in that one number sends every convoy to sea.
+
+**Why it matters.** It is a visible contradiction with a tempting one-line fix, and the one-line fix is wrong. Recorded so the next reader does not reach for it. Untangling the routing weight from the price is part of BL-522 (the per-leg split), not a tune that can precede it — and the resulting calibration constant is Ben's call, not an agent's.
+
+> **Recommendation:** Settle the rate as part of BL-522, once price and routing weight are separate numbers.
+
+*Files: `scripts/economy.lua`, `src/world/logistics.cpp`, `docs/economy/SUPPLY.md`*
+
+### NR-478 — 85.8% of nations are single-centre, but only 3.4% end stranded — so no new mechanism was built
+*decision taken on your behalf · raised 2026-08-21 · from Sprint B2 (Lane B). tools/verify/road_reach_census.cpp row C5, 8 seeds, 386 nations.*
+
+Sprint B2's plan floated giving single-centre nations 'a short local network'. The measurement says don't. 331 of 386 nations (85.8%) are single-centre — the number the sprint asked for and which the landed fix never reported — but after the per-centre Track plus the cross-strait border links, only 13 (3.4%) end STRANDED, meaning roaded with no roaded neighbour anywhere. TAKEN: added the measurement as harness row C5 and built no new generation mechanism.
+
+**Why it matters.** A new generation mechanism aimed at a 3.4% residue is the thing to avoid, and the 85.8% figure is exactly the kind of number that makes a problem look enormous when the actual failure is small. Flagged because the sprint plan said to do it and I did not.
+
+> **Recommendation:** Leave it. If the 13 stranded nations turn out to matter visually, they are a targeted fix, not a mechanism.
+
+*Files: `tools/verify/road_reach_census.cpp`, `src/world/road_generation.cpp`*
+
+### NR-479 — BL-188 stays parked, and the reason moved: the blocker is in the logistics leg, not the road raster
+*decision taken on your behalf · raised 2026-08-21 · from Sprint B2 (Lane B).*
+
+Sprint B2's plan was 'the three structural cuts, then BL-188 un-parked'. The cuts had already landed (commit 5305d25, then adapted by BL-516's water kinds), and they do NOT unblock BL-188 — not marginally. They change the road raster; BL-188's blocker is in `logistics.cpp` / `supply_system.cpp`, where `crosses_ocean` is a route-wide boolean. TAKEN: left BL-188 parked, appended the finding to its design field, and filed the real blocker as BL-522 (whole-route mispricing) at priority A.
+
+**Why it matters.** BL-188 has now been parked twice for reasons that turned out to be elsewhere. Naming the actual blocker as its own item is what stops that happening a third time — and BL-522 is worth doing on its own merits, since it mispricess 64.5% of hauls today whether or not a port is ever built.
+
+> **Recommendation:** Keep BL-188 parked until BL-522 lands, then re-read it against a per-leg cost model.
+
+*Files: `docs/development/backlog.json`*
+
+### NR-480 — Concurrent agents get worktrees at the SESSION base again — B2 was five commits behind
+*observation · raised 2026-08-21 · from Sprint B2 (Lane B), which caught it because the brief told it to check.*
+
+The B2 worktree was created at 4a504d7, FIVE commits behind the branch tip, and the agent fast-forwarded itself before reading any code. This is NR-459 recurring. It mattered concretely: at the stale base the three road cuts looked unlanded and BL-516's water kinds were absent, so the agent would have rebuilt work that already existed against an enum that had changed.
+
+**Why it matters.** NR-459 recorded this once and the mechanism has not changed. What DID work is the mitigation: briefing every agent to verify its base and fast-forward before reading anything, as its first action. That is now worth making standing practice rather than a per-brief habit — three agents launched today, and the one that was told to check, caught it.
+
+> **Recommendation:** Add the base-check to DELIVERY.md's sub-agent section so it is not a thing each brief has to remember.
+
+*Files: `docs/development/DELIVERY.md`*
 
 ---
 

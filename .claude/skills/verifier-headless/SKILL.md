@@ -415,6 +415,18 @@ in `tools/verify/README.md`.
   rather than degenerate — wording actually varying across one fight (10 dispatches, 6 distinct
   lines).
 
+- **`sea_leg_census`** — what `crosses_ocean` actually selects (Sprint B2, 2026-08-21). Report-only,
+  over market-pair routes; takes an optional seed count (`sea_leg_census 16`), default 8. It exists
+  because a mode flag nobody had counted turned out to be firing on **64.5% of routes** and
+  mispricing them by **1.59×** — `logistics_path::crosses_ocean` is one bit over a whole route, so a
+  single water tile bills every land tile at the sea rate (BL-522).
+
+  Run it after ANY change to `logistics.cpp`, `supply_system.cpp` or the `land`/`sea` rates in
+  `scripts/economy.lua`. **Its `kLandRate`/`kSeaRate` restate those Lua values as constants** — the
+  harness is deliberately Lua-free — so if the Lua moves, these must move with it or the census
+  silently measures the old economy. S4 asserts the census is identical across two generations of one
+  seed; S0–S3 report and assert nothing about the finding.
+
 - **`history_conquest_gap`** — WHY the Era −1 sim fights and never conquers (BL-384, 2026-08-21).
   **Report-only by design**, and the model to copy when a harness's job is to EXPLAIN a red rather
   than to add another one: `history_sim_harness`'s B384a/B384b already assert that a region changes
