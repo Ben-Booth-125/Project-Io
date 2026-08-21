@@ -194,12 +194,69 @@ enum class terrain_substrate : uint8_t
     icy         = 6, ///< Ice-dominated ground; water ice. A SUBSTRATE, not a cover —
                      ///< an ice cap is what the ground is, whereas `cover::snow` is
                      ///< what fell on it and could melt.
-    ocean       = 7, ///< Open water. Carries no land deposits and no buildings.
-                     ///< INTERIM: BL-516 splits water into lake / coast / ocean
-                     ///< kinds. It lives on this axis meanwhile because every
-                     ///< existing consumer asks "is this water?" of the ground,
-                     ///< and `is_ocean_tile` stays a one-line substrate test.
+    ocean       = 7, ///< OPEN water: the sea, out of sight of land. Carries no land
+                     ///< deposits and no buildings. NARROWED by BL-516 — it used to
+                     ///< mean every water tile; the shallows and the inland waters
+                     ///< are now `coast` and `lake` below.
+
+    // BL-516 (Ben, 2026-08-21): "We can have lakes, coasts, and oceans." Water
+    // stops being one value, and it stays on THIS axis because BL-519's interim
+    // note was right about why: every existing consumer asks "is this water?" of
+    // the ground. APPENDED, NEVER RENUMBERED — `ocean` keeps id 7, so no wire
+    // value, golden or fixture shifts meaning.
+    //
+    // The three kinds are EXCLUSIVE and STRUCTURAL — no threshold picks between
+    // them (tile_generation.cpp § classify_water_kinds):
+    //   * `lake`  — a water component that does not reach the body's sea.
+    //   * `coast` — a sea tile with at least one land neighbour: the shoreline ring.
+    //   * `ocean` — a sea tile with none: open water.
+    //
+    // ASK THE QUESTION YOU MEAN. Almost every existing consumer asks "is this
+    // water?", and must keep asking exactly that — use `is_water()`. Only the
+    // consumers that genuinely care WHICH water (the road pass's strait rule, the
+    // province partition's size band, the lenses) name a kind.
+    //
+    // A WATER TILE STILL CARRIES `terrain_cover::none`, whichever kind it is. The
+    // cover axis describes what grew on ground; water has no ground.
+    lake        = 8, ///< Inland water with no path to the sea. Buildings refuse it as ocean does.
+    coast       = 9, ///< Shallow sea adjacent to land — the shoreline ring. Not buildable.
 };
+
+// ---------------------------------------------------------------------------
+// Water predicates (BL-516) — the choke point every water test goes through
+// ---------------------------------------------------------------------------
+// These live HERE, beside the axis, rather than in placement_rules.hpp, because
+// half the callers (logistics, rivers, roads, provinces, terrain combat) ask the
+// question about TERRAIN and have no business depending on the placement layer.
+// `placement_rules::is_water_tile` delegates to `is_water` so there is one
+// implementation and one truth.
+
+/// Is this ground water OF ANY KIND? The question nearly every consumer means:
+/// nothing is built here, nothing is farmed here, and a land walker stops here.
+constexpr bool is_water(terrain_substrate s)
+{
+    return s == terrain_substrate::ocean || s == terrain_substrate::coast
+           || s == terrain_substrate::lake;
+}
+
+/// Open sea, out of sight of land — the water a road never crosses and a large
+/// sea province is drawn over.
+constexpr bool is_open_ocean(terrain_substrate s) { return s == terrain_substrate::ocean; }
+
+/// The shoreline ring: sea with land on at least one side. A strait is made of
+/// these and only these, which is what lets the road pass tell a crossing from
+/// an open-sea route out of the DATA rather than out of a run length.
+constexpr bool is_coastal_water(terrain_substrate s) { return s == terrain_substrate::coast; }
+
+/// Inland water with no path to the sea.
+constexpr bool is_lake(terrain_substrate s) { return s == terrain_substrate::lake; }
+
+/// Sea of either kind — water that is part of the body's connected ocean, as
+/// opposed to a lake. What "coastal" means for a port: a lakeshore is not a coast.
+constexpr bool is_sea(terrain_substrate s)
+{
+    return s == terrain_substrate::ocean || s == terrain_substrate::coast;
+}
 
 /// What SITS ON the substrate — and it may be absent. `none` is a FIRST-CLASS
 /// value, and that absence is the whole point of the axis: "a mountain with no

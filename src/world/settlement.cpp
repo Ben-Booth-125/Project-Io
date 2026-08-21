@@ -142,7 +142,7 @@ bool touches_ocean(const world& w, const std::vector<entity_id>& ids,
         const int nr = row + dr[i];
         if (nr < 0 || nr >= gh) continue;
         const tile_component* t = tile_at(w, ids, raster(col + dc[i], nr, gw));
-        if (t && t->substrate == terrain_substrate::ocean) return true;
+        if (t && is_water(t->substrate)) return true; // BL-516
     }
     return false;
 }
@@ -177,7 +177,7 @@ endowment survey_endowment(const world& w, const std::vector<entity_id>& ids,
             const tile_component* t = tile_at(w, ids, raster(col + dc, r, gw));
             if (!t) continue;
             ++cells;
-            if (t->substrate == terrain_substrate::ocean) { ++water; continue; }
+            if (is_water(t->substrate)) { ++water; continue; } // BL-516
 
             const auto& d = t->resource_deposit;
             farm   += d[static_cast<std::size_t>(resource_type::agricultural_produce)];
@@ -337,7 +337,7 @@ settlement_state run_settlement(const planetology_state& pl,
     for (int idx = 0; idx < total; ++idx)
     {
         const tile_component* t = tile_at(w, tile_ids, idx);
-        if (!t || t->substrate == terrain_substrate::ocean) continue;
+        if (!t || is_water(t->substrate)) continue; // BL-516
         const int col = idx % gw, row = idx / gw;
         score[static_cast<std::size_t>(idx)] =
             settle_score(*t, touches_ocean(w, tile_ids, col, row, gw, gh));

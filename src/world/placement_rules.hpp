@@ -108,10 +108,16 @@ inline constexpr resource_type k_extractable[] = {
     resource_type::peat,
 };
 
-/// True if the given substrate is ocean — buildings are never placed on water.
-/// A one-line SUBSTRATE test since BL-519: water is a property of the ground, and
-/// BL-516 will split it into lake / coast / ocean kinds on this same axis.
-bool is_ocean_tile(terrain_substrate sub);
+/// True if the given substrate is WATER OF ANY KIND — ocean, coast or lake.
+/// Buildings are never placed on water, whichever kind it is.
+///
+/// A one-line SUBSTRATE test since BL-519: water is a property of the ground.
+/// BL-516 split it into the three kinds on that same axis, and renamed this
+/// from `is_ocean_tile` in the same change — the question every caller was
+/// asking is "is this water", and the old name stopped being true of the
+/// answer. It delegates to `is_water` (components.hpp), the single definition;
+/// this spelling exists because most callers are already in placement.
+bool is_water_tile(terrain_substrate sub);
 
 /// True if `r` is one of the prototype-extractable resources.
 bool is_extractable(resource_type r);
@@ -166,12 +172,18 @@ bool can_place_population_centre(const tile_component& tc);
 ///                Converts to bool (true iff ok) for the existing boolean call sites.
 placement_result can_place(const tile_component& tc, building_type type, resource_type target);
 
-/// True if the tile at `tile_id` is coastal — has at least one ocean neighbour
-/// in the hex grid. Used to enforce Port placement rules (BL-043).
+/// True if the tile at `tile_id` is coastal — has at least one SEA neighbour in
+/// the hex grid. Used to enforce Port placement rules (BL-043).
+///
+/// BL-516 NARROWED this from "any water neighbour" to "any sea neighbour"
+/// (`coast` or `ocean`, never `lake`). A port, a Fishing Wharf and a
+/// coastal-only extraction target all mean the sea; before water had kinds the
+/// code could not tell a lakeshore from a shoreline and counted both. This is
+/// the only water test in the file whose ANSWER changes.
 ///
 /// @param w       The world (reads tile components).
 /// @param tile_id The tile to test.
-/// @return        True if any of the 6 hex neighbours is an ocean tile.
+/// @return        True if any of the 6 hex neighbours is sea (coast or ocean).
 bool is_coastal(const world& w, entity_id tile_id);
 
 /// Full placement check including world-level constraints (BL-043):
@@ -282,6 +294,9 @@ int stack_capacity(const tile_component& tc, building_type type, resource_type t
 /// harder to build on than the rock beneath it and a paved tile is easier than
 /// either. The pre-split per-composition numbers are reproduced exactly; see the
 /// calibration table in the .cpp.
+///
+/// EVERY WATER KIND returns 0 (BL-516) — no buildings there at all, and
+/// `can_place` already refuses them.
 ///
 /// @param sub     The tile's terrain_substrate.
 /// @param cov     The tile's terrain_cover.

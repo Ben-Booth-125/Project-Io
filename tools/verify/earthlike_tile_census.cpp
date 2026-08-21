@@ -158,7 +158,7 @@ seed_metrics census_one(uint32_t campaign_seed)
             tile_seed, 1.0f, &st, nullptr, &cs.height_bias, &cs.convergent);
         std::vector<char> pocean(probe.size(), 0);
         for (std::size_t i = 0; i < probe.size(); ++i)
-            if (scratch.tiles.at(probe[i]).substrate == terrain_substrate::ocean) pocean[i] = 1;
+            if (is_water(scratch.tiles.at(probe[i]).substrate)) pocean[i] = 1;
         std::vector<int> psizes;
         label(pocean, psizes);
         int pmain = -1, pmain_sz = 0;
@@ -210,7 +210,7 @@ seed_metrics census_one(uint32_t campaign_seed)
     for (int i = 0; i < static_cast<int>(ids.size()); ++i)
     {
         const auto& t = w.tiles.at(ids[static_cast<std::size_t>(i)]);
-        if (t.substrate == terrain_substrate::ocean) continue;
+        if (is_water(t.substrate)) continue;
 
         land[static_cast<std::size_t>(i)] = 1;
         ++n_land;

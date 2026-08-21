@@ -199,7 +199,7 @@ history_ladder_state run_history_ladder(const planetology_state& pl,
         const tile_component* t = tile_at(w, tile_ids, i);
         if (!t) continue;
 
-        if (t->substrate == terrain_substrate::ocean)
+        if (is_water(t->substrate)) // BL-516
         {
             ++ocean_tiles;
         }
@@ -259,7 +259,7 @@ history_ladder_state run_history_ladder(const planetology_state& pl,
                 taken[j] = 1;                              // Claim the neighbourhood.
                 if (score[j] >= 60) ++basin;
                 const tile_component* t = tile_at(w, tile_ids, j);
-                if (t && t->substrate == terrain_substrate::ocean) coastal = 1;
+                if (t && is_water(t->substrate)) coastal = 1; // BL-516
             }
         }
 

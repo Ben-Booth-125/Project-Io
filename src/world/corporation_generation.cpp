@@ -351,7 +351,9 @@ float dryness_lean(terrain_substrate sub, terrain_cover cov)
         case terrain_substrate::sedimentary: ground = 1.0f;   break;
         case terrain_substrate::volcanic:    ground = 0.7f;   break;
         case terrain_substrate::icy:         ground = 0.6f;   break;
-        case terrain_substrate::ocean:       return 0.001f; // can_place rejects these anyway
+        case terrain_substrate::ocean:       // BL-516: every water kind is the same non-answer here.
+        case terrain_substrate::coast:
+        case terrain_substrate::lake:        return 0.001f; // can_place rejects these anyway
     }
 
     float on_top = 1.0f;
@@ -583,7 +585,7 @@ std::vector<entity_id> place_starting_assets(world& w,
         const auto it = w.tiles.find(tid);
         if (it == w.tiles.end())
             continue;
-        if (placement_rules::is_ocean_tile(it->second.substrate))
+        if (placement_rules::is_water_tile(it->second.substrate))
             continue;
         const long long dx = it->second.grid_x - anchor_x;
         const long long dy = it->second.grid_y - anchor_y;

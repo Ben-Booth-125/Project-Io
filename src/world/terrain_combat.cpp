@@ -84,7 +84,9 @@ int defence_substrate(terrain_substrate s)
         case terrain_substrate::sedimentary: return   0;
         case terrain_substrate::regolith:    return   0;
         case terrain_substrate::metallic:    return   0;
-        case terrain_substrate::ocean:       return   0; // mode change, not a value
+        case terrain_substrate::ocean:       // BL-516: mode change, not a value — and a
+        case terrain_substrate::coast:       // lake or a shoreline is no more a place to
+        case terrain_substrate::lake:        return   0; // stand and fight than open sea is.
     }
     return 0;
 }
@@ -110,7 +112,9 @@ int attrition_substrate(terrain_substrate s)
         // fixture sees rather than one the map does.
         case terrain_substrate::sedimentary: return 600;
         case terrain_substrate::rocky:       return 400;
-        case terrain_substrate::ocean:       return   0;
+        case terrain_substrate::ocean:       // BL-516: no army forages on water, of any kind.
+        case terrain_substrate::coast:
+        case terrain_substrate::lake:        return   0;
     }
     return 0;
 }
@@ -196,7 +200,7 @@ int attrition_landform(terrain_landform lf)
 int terrain_defence(terrain_substrate sub, terrain_cover cov, std::uint8_t density,
                     terrain_landform lf)
 {
-    if (sub == terrain_substrate::ocean)
+    if (is_water(sub)) // BL-516: every water kind, not just the open sea
         return 0;
     return clamp1000(defence_landform(lf) + defence_substrate(sub)
                      + defence_cover(cov, density));
@@ -205,7 +209,7 @@ int terrain_defence(terrain_substrate sub, terrain_cover cov, std::uint8_t densi
 int terrain_attrition(terrain_substrate sub, terrain_cover cov, std::uint8_t density,
                       terrain_landform lf)
 {
-    if (sub == terrain_substrate::ocean)
+    if (is_water(sub)) // BL-516: every water kind, not just the open sea
         return 0;
     return clamp1000(attrition_substrate(sub) - attrition_cover_relief(cov, density)
                      + attrition_landform(lf));
@@ -214,7 +218,7 @@ int terrain_attrition(terrain_substrate sub, terrain_cover cov, std::uint8_t den
 int terrain_resistance(terrain_substrate sub, terrain_cover cov, std::uint8_t density,
                        terrain_landform lf)
 {
-    if (sub == terrain_substrate::ocean)
+    if (is_water(sub)) // BL-516: every water kind, not just the open sea
         return 0;
     // 60/40 toward defence. Defensible ground shapes a border more strongly than
     // merely expensive ground — a frontier sits on a ridge, not on a moor — but

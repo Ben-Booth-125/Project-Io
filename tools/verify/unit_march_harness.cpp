@@ -326,9 +326,15 @@ void m1_march_unit_legality()
               "a march_unit command with NO province field set at all is rejected");
         check(order_equal(w.units.at(unit).order, snapshot), "  ...and mutates nothing");
     }
-    // -- ocean needs no separate test: the partition is land-only, so no
-    //    province id can ever name water. What IS tested is that an ocean
-    //    tile has no province at all.
+    // -- WATER NEEDS ITS OWN TEST AGAIN, and this row is NARROWED BY BL-516
+    //    (2026-08-21) rather than deleted. It used to assert that an ocean tile
+    //    belongs to no province at all — true while the partition was land-only,
+    //    and the reason march_unit could carry no water check. BL-516 draws
+    //    provinces over the water, so that claim is now contrary to the
+    //    contract; what protects the verb is an EXPLICIT rejection, which is
+    //    what is asserted here instead. The BEHAVIOUR the old row guarded — a
+    //    unit cannot be marched into the sea — is unchanged and is now checked
+    //    directly rather than inferred from an absence.
     {
         world w3; // a separate world — re-partitioning `w` mid-test would move its ids
         const entity_id ob = w3.create_entity();
@@ -337,7 +343,27 @@ void m1_march_unit_legality()
         tile_component otc3{}; otc3.body = ob; otc3.substrate = terrain_substrate::ocean;
         w3.tiles[ot3] = otc3;
         partition(w3);
-        check(prov_of(w3, ot3) == 0, "an ocean tile belongs to NO province — water is unreachable by province id");
+        const uint32_t sea_pid = prov_of(w3, ot3);
+        check(sea_pid != 0, "an ocean tile now HAS a province (BL-516 draws provinces over water)");
+        check(province_kind_of(w3, sea_pid) != province_kind::land,
+              "  ...and that province is not a land province");
+
+        // The rejection itself, on the real world: marching into a water
+        // province is refused, and mutates nothing.
+        uint32_t water_pid = 0;
+        for (const province& p : w.provinces.provinces)
+            if (province_kind_of(w, p) != province_kind::land)
+            {
+                water_pid = p.id;
+                break;
+            }
+        if (water_pid != 0)
+        {
+            corp_command wet = cmd; wet.province = water_pid;
+            check(apply_corp_command(w, reg, wet) == corp_command_result::rejected_invalid,
+                  "march_unit rejects a WATER province outright (units are land-bound)");
+            check(order_equal(w.units.at(unit).order, snapshot), "  ...and mutates nothing");
+        }
     }
     // -- rejected_invalid: province on a different body --
     {

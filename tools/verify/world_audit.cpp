@@ -88,7 +88,7 @@ static frag_stats measure_fragmentation(const world& w, const generation_report&
     for (const auto& [tid, tc] : w.tiles)
     {
         if (tc.body != body) continue;
-        if (tc.substrate == terrain_substrate::ocean) continue;
+        if (is_water(tc.substrate)) continue;
         const int idx = tc.grid_y * gw + tc.grid_x;
         if (idx < 0 || idx >= total) continue;
         is_land[static_cast<std::size_t>(idx)] = 1;
@@ -260,7 +260,7 @@ int main()
             continue;
         ++total;
         ++hist[static_cast<int>(tc.substrate) * 16 + static_cast<int>(tc.cover)];
-        if (tc.substrate != terrain_substrate::ocean)
+        if (!is_water(tc.substrate))
             ++land;
         if (tc.cover == terrain_cover::forest)  ++forest;
         if (tc.cover == terrain_cover::marsh) ++wetland;
@@ -294,7 +294,7 @@ int main()
     int system_land = 0;
     for (const auto& [tid, tc] : w.tiles)
     {
-        if (tc.substrate == terrain_substrate::ocean)
+        if (is_water(tc.substrate))
             continue;
         const int lf = static_cast<int>(tc.landform);
         if (lf < 0 || lf >= kNumLandform)
@@ -370,7 +370,7 @@ int main()
         {
             if (tc.body != bid)
                 continue;
-            const bool ocean = (tc.substrate == terrain_substrate::ocean);
+            const bool ocean = (is_water(tc.substrate));
 
             // Replicate the ladder's is_barrier exactly (history_ladder.cpp § is_barrier).
             const bool bin = ocean
@@ -440,7 +440,7 @@ int main()
     for (const auto& [tid, tc] : w.tiles)
     {
         const auto bit = body_lf.find(tc.body);
-        if (bit == body_lf.end() || tc.substrate == terrain_substrate::ocean)
+        if (bit == body_lf.end() || is_water(tc.substrate))
             continue;
         const auto bc = w.bodies.find(tc.body);
         if (bc == w.bodies.end())
@@ -539,7 +539,7 @@ int main()
                 ++bad; std::printf("  BAD: extraction asset on missing tile\n"); continue;
             }
             const tile_component& tc = tit->second;
-            bool ocean = (tc.substrate == terrain_substrate::ocean);
+            bool ocean = (is_water(tc.substrate));
             float dep = 0.0f;
             for (resource_type r : extractable) dep += tc.resource_deposit[ri(r)];
             const float tgt = tc.resource_deposit[ri(bit->second.target_resource)];
@@ -637,7 +637,7 @@ int main()
     int kepler_land = 0, unclaimed_land = 0;
     for (const auto& [tid, tc] : w.tiles)
     {
-        if (tc.body != kepler || tc.substrate == terrain_substrate::ocean)
+        if (tc.body != kepler || is_water(tc.substrate))
             continue;
         ++kepler_land;
         if (w.tile_to_nation.find(tid) == w.tile_to_nation.end())

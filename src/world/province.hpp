@@ -19,11 +19,29 @@
 // downstream of it (BL-511 rendering, BL-513's ceiling, march_unit's payload),
 // is unchanged; only the shapes are drawn differently.
 //
-// A deterministic, seeded partition of every body's LAND tiles into small,
-// contiguous, purely spatial cells. Ocean is excluded outright: water is a
-// movement mode, not a locality, and a sea battle is not this object's job.
-// (Provinces over ocean are BL-516 and are NOT in this file yet — so the
-// land-only invariant below is NARROWED to land provinces, never deleted.)
+// A deterministic, seeded partition of every body's tiles into small,
+// contiguous, purely spatial cells.
+//
+// BL-516 (Ben, 2026-08-21): "We can also draw provinces over the ocean, using
+// 3-12 size coastal tile provinces. Ocean provinces should be much larger, but
+// not larger than say 80 tiles." So the partition now covers WATER as well, in
+// three DOMAINS that are partitioned separately and never mix:
+//
+//   * LAND          — passes 1-3 below, the 7-12 band, unchanged in every respect.
+//   * COASTAL WATER — the shoreline ring and the lakes, on the SAME 3-12 band as
+//                     land. No population centre seeds one; it is hinterland only.
+//   * OPEN OCEAN    — the sea out of sight of land, on its own much larger band.
+//
+// A PROVINCE NEVER SPANS TWO DOMAINS. The land-only invariant is NARROWED, not
+// deleted (NR-428): every LAND province is still hex-connected land, and no
+// province anywhere mixes land with water or a lake with the sea. The domains
+// are exclusive by construction — a tile's substrate names exactly one — so the
+// claim is structural rather than checked.
+//
+// NOTHING CAN BE IN A SEA PROVINCE YET, and that is expected: units are
+// land-bound (march_unit refuses a water destination outright), buildings refuse
+// water, and a sea province sustains zero of them. They are addressable empty
+// space, built without inventing the naval model that will eventually fill them.
 //
 // The province is deliberately NOT the region: no name, no owner, no culture,
 // no economy. It exists because BL-467 (battle state) needs an engagement
@@ -126,6 +144,57 @@ inline constexpr std::size_t k_province_hard_min_tiles = 3;
 /// against the ideal 7.79 — near enough that the lattice argument is the real
 /// explanation of the size, which is the point of pinning it structurally.
 inline constexpr int k_province_seed_spacing = 3;
+
+// ---------------------------------------------------------------------------
+// The SEA size band (BL-516) — the same shape of rule, at the sea's scale
+// ---------------------------------------------------------------------------
+// Ben gave ONE number: "not larger than say 80 tiles". Everything else here is
+// derived from it by the same lattice argument that pins the land spacing, so
+// no second threshold is invented and none is chosen for feel.
+//
+// COASTAL WATER TAKES THE LAND BAND EXACTLY — 7-12 soft, 12 preferred, 20 hard
+// cap — because Ben named that band for it ("3-12 size coastal tile
+// provinces"). It therefore has no constants of its own; it reuses the ones
+// above, hard cap included.
+
+/// PREFERRED ceiling on an OPEN-OCEAN province, and the clamp GROWTH obeys —
+/// the exact counterpart of `k_province_max_tiles` on land, and the number Ben
+/// chose. Growth stops here outright.
+///
+/// THERE IS DELIBERATELY NO SEPARATE SEA HARD CAP. Land needed one because Ben
+/// ruled a preference (12) and a bound (20) as two different numbers; for the
+/// sea he named one number, and inventing a second would be exactly the
+/// threshold-nobody-chose this file keeps refusing to invent. What the harness
+/// asserts instead is the EXACT IDENTITY — every tile above 80 arrived by
+/// singleton absorption, never by growth — which needs no second constant and
+/// is a stronger claim than a headroom bound. Section W reports the spread.
+inline constexpr std::size_t k_sea_province_max_tiles = 80;
+
+/// Minimum hex spacing between OPEN-OCEAN seeds, over open ocean. THIS, not the
+/// budget, is what sets open-ocean province size — the same relation the land
+/// spacing has to the land band.
+///
+/// PINNED BY MEASUREMENT, 2026-08-21, against the cap above.
+///
+/// THE PIN RULE: the LARGEST spacing at which the cap is still a GUARD rather
+/// than a CLAMP. "Guard, not clamp" is not a matter of taste here — it has an
+/// instrument. Seeds at minimum separation d tile a plane in cells of area
+/// (sqrt(3)/2) * d^2, so the lattice PREDICTS a mean size; where growth is
+/// running into the ceiling instead of meeting its neighbours, the measured mean
+/// falls away from that prediction and provinces pile up on the cap exactly.
+/// The sweep (6 seeds, `province_partition_harness` section W) is in
+/// docs/generation/TILE_GENERATION.md § Provinces over water; at d = 8 one
+/// province in nine sits exactly on 80 and the mean has already broken from its
+/// prediction, while at d = 7 the measured mean still MATCHES the lattice —
+/// which is the evidence that terrain and spacing set the size, not the cap.
+inline constexpr int k_sea_province_seed_spacing = 7;
+
+/// Soft growth budget for an open-ocean province: the ideal lattice cell of the
+/// spacing above ((sqrt(3)/2) * 49 = 42.4), rounded. STRUCTURAL, and the exact
+/// analogue of the land band's `k_province_min_tiles` (7) sitting at its own
+/// ideal cell (7.79) — past this, a region annexes only water no harder to reach
+/// than the water it already holds, exactly as on land.
+inline constexpr std::size_t k_sea_province_soft_target = 42;
 
 // ---------------------------------------------------------------------------
 // The cost model — what makes an edge a border (BL-515)
@@ -246,13 +315,40 @@ struct province_absorption_stats
     int passes = 0;
 
     /// Absorptions that pushed a survivor PAST the PREFERRED ceiling
-    /// `k_province_max_tiles`. Reported, never prevented — permitted by ruling
-    /// (Ben, 2026-08-21) up to `k_province_hard_cap_tiles`, which IS asserted.
+    /// `k_province_max_tiles` (or `k_sea_province_max_tiles` on the open ocean).
+    /// Reported, never prevented — permitted by ruling (Ben, 2026-08-21) up to
+    /// `k_province_hard_cap_tiles`, which IS asserted.
     /// See the pass-3 note on build_province_partition.
     int over_ceiling_created = 0;
+
+    /// The same count SPLIT BY DOMAIN, indexed by `province_kind` (BL-516).
+    /// Sums to `over_ceiling_created`.
+    ///
+    /// It exists so each domain's ceiling can be asserted as the exact identity
+    /// "every tile over the ceiling arrived by absorption" rather than as a
+    /// weaker inequality that a breach in one domain could hide behind another's
+    /// headroom. Ben's 80-tile sea ceiling is the one number he chose for the
+    /// water, and it carries no separate hard cap, so it needs a check that
+    /// cannot be satisfied by accident.
+    int over_ceiling_by_domain[3] = { 0, 0, 0 };
 };
 
 /// One province — a contiguous run of land tiles on a single body.
+/// Which DOMAIN a province was drawn over (BL-516). Exclusive: a province holds
+/// tiles of exactly one domain, because the three substrate predicates are
+/// exclusive and each domain is partitioned on its own.
+///
+/// NOT SERIALISED, and deliberately not a field on `province`: it is DERIVED
+/// from the substrate of any member tile, so it cannot desynchronise from the
+/// tiles it describes, and the flat-binary province section keeps its v1 layout
+/// (no version bump, so every stream written before this item still loads).
+enum class province_kind : uint8_t
+{
+    land          = 0, ///< Dry ground. The only domain anything can currently stand in.
+    coastal_water = 1, ///< The shoreline ring and the lakes. Land's band, hard cap included.
+    open_ocean    = 2, ///< Open sea. `k_sea_province_*` band, growth capped at 80 tiles.
+};
+
 struct province
 {
     /// Stable derived identity: THE LOWEST ENTITY ID AMONG `tiles`.
@@ -282,9 +378,10 @@ struct province
     uint32_t id = 0;
 
     /// The body every tile in this province sits on. A LAND province never
-    /// spans bodies, and never spans water. (Ocean provinces are BL-516; when
-    /// they land, this claim narrows to land provinces rather than vanishing —
-    /// NR-428.)
+    /// spans bodies, and never spans water. (BL-516 landed the sea provinces
+    /// that claim anticipated: it is now NARROWED to land provinces rather than
+    /// gone — NR-428 — and the matching claim for a sea province is that it
+    /// never spans bodies and never touches land.)
     entity_id body = null_entity;
 
     /// Member land tiles, ASCENDING entity id. Non-empty for every province in
@@ -307,8 +404,11 @@ struct province_partition
     /// read, never serialised separately) — every land tile appears exactly once.
     std::unordered_map<entity_id, uint32_t> tile_province;
 
-    /// Owning province id for @p tile, or 0 when the tile is ocean, off-body, or
-    /// otherwise unpartitioned. Since BL-515 derived ids from the lowest member
+    /// Owning province id for @p tile, or 0 when the tile is off-body or
+    /// otherwise unpartitioned. WATER IS NO LONGER ONE OF THOSE CASES (BL-516):
+    /// a sea tile has a province like any other, and a caller that wants land
+    /// must ask `province_kind_of`, not this function's 0.
+    /// Since BL-515 derived ids from the lowest member
     /// tile, 0 is STRUCTURALLY unreachable as a real id (no tile carries
     /// `null_entity`), so this accessor's 0 is an unambiguous "no province".
     uint32_t province_of(entity_id tile) const
@@ -321,6 +421,18 @@ struct province_partition
     /// `provinces` vector.
     const province* find(uint32_t id) const;
 };
+
+/// The domain @p pr was drawn over, read off the substrate of its first tile
+/// (BL-516). O(1), and exact: a province holds one domain by construction.
+///
+/// A province with no tiles, or whose first tile is missing from @p w, reads as
+/// `land` — the conservative answer, since land is the domain every pre-BL-516
+/// caller assumed and the one that gates nothing away.
+province_kind province_kind_of(const world& w, const province& pr);
+
+/// The domain of the province with id @p id, or `land` when there is no such
+/// province (the same conservative default as above).
+province_kind province_kind_of(const world& w, uint32_t id);
 
 /// Build @p w's province partition from its tiles, REPLACING `w.provinces`.
 ///
@@ -529,7 +641,7 @@ struct province_sustain
     float infrastructure_gain = 0.0f; ///< SUM of habitability * road_level / 3.
     float population_factor   = 1.0f; ///< 1 + SUM(centre scale) / 5.
     float units               = 0.0f; ///< (habitability_area + infrastructure_gain) * population_factor.
-    int   ceiling             = 0;    ///< max(1, round(k * units)).
+    int   ceiling             = 0;    ///< max(1, round(k * units)) on land; 0 for a sea province.
 };
 
 /// Measure @p pr's sustain terms and ceiling against @p w.
@@ -537,6 +649,10 @@ struct province_sustain
 /// Deterministic: the tile sum walks `province::tiles`, which is ascending
 /// entity id by contract, and the population term is gathered through an ordered
 /// index so no unordered_map iteration order can reach the arithmetic.
+///
+/// BL-516: a province of WATER measures as ALL ZEROES, ceiling included. It does
+/// not fall through the one-building floor — nothing stands on water, and the
+/// floor is a claim about habitable land that a sea province does not make.
 ///
 /// @param w  Read-only world state (tiles, population centres).
 /// @param pr The province to measure.

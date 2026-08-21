@@ -52,15 +52,64 @@ bool wrapped_neighbour(int gx, int gy, int side, int gw, int gh, int& out_x, int
     return true;
 }
 
-/// Per-body working state for the fill. Everything is keyed by tile entity id
-/// or by an index into `land` (ascending tile id), never by container order.
+// ---------------------------------------------------------------------------
+// The three DOMAINS (BL-516)
+// ---------------------------------------------------------------------------
+// The partition runs the SAME algorithm three times over three exclusive tile
+// sets. Everything that used to be a file-level constant of the growth rule —
+// the ceiling, the budget, the seed spacing — is a field here instead, so the
+// land pass is the pre-BL-516 pass with its own numbers rather than a special
+// case of a new one.
+
+/// Does substrate @p sub belong to domain @p k? The three predicates PARTITION
+/// the substrates: every tile lands in exactly one, which is what makes "a
+/// province never spans two domains" structural rather than checked.
+bool in_domain(terrain_substrate sub, province_kind k)
+{
+    switch (k)
+    {
+        case province_kind::land:          return !is_water(sub);
+        case province_kind::coastal_water: return is_coastal_water(sub) || is_lake(sub);
+        case province_kind::open_ocean:    return is_open_ocean(sub);
+    }
+    return false;
+}
+
+struct domain_spec
+{
+    province_kind kind        = province_kind::land;
+    std::size_t   soft_target = k_province_min_tiles;      ///< Default growth budget.
+    std::size_t   max_tiles   = k_province_max_tiles;      ///< The clamp growth obeys.
+    std::size_t   hard_min    = k_province_hard_min_tiles; ///< Taken whatever it costs.
+    int           spacing     = k_province_seed_spacing;   ///< Minimum seed separation.
+    bool          settled     = true;                      ///< Population centres seed it (land only).
+};
+
+/// The domains IN THE ORDER THEY ARE PARTITIONED, land first. The order is not
+/// load-bearing — the sets are disjoint, so no domain can take a tile another
+/// wanted — but it is fixed anyway so a reader never has to prove that.
+const domain_spec k_domains[3] = {
+    // Land: the pre-BL-516 band and rules, unchanged.
+    { province_kind::land, k_province_min_tiles, k_province_max_tiles,
+      k_province_hard_min_tiles, k_province_seed_spacing, true },
+    // Coastal water: Ben named the land band for it, and nothing settles it.
+    { province_kind::coastal_water, k_province_min_tiles, k_province_max_tiles,
+      k_province_hard_min_tiles, k_province_seed_spacing, false },
+    // Open ocean: much larger, growth capped at 80.
+    { province_kind::open_ocean, k_sea_province_soft_target, k_sea_province_max_tiles,
+      k_province_hard_min_tiles, k_sea_province_seed_spacing, false },
+};
+
+/// Per-body, per-domain working state for the fill. Everything is keyed by tile
+/// entity id or by an index into `members` (ascending tile id), never by
+/// container order.
 struct body_work
 {
     int gw = 0;
     int gh = 0;
 
-    std::vector<entity_id> land; ///< Land tiles, ascending entity id.
-    std::vector<entity_id> grid; ///< gy*gw + gx -> tile, null_entity if absent.
+    std::vector<entity_id> members; ///< This domain's tiles, ascending entity id.
+    std::vector<entity_id> grid;    ///< gy*gw + gx -> tile, null_entity if absent.
     std::unordered_map<entity_id, uint32_t> owner; ///< tile -> region index (+1; 0 = unclaimed).
 };
 
@@ -139,8 +188,8 @@ int edge_cost_impl(uint32_t seed, entity_id a_id, const tile_component& a, entit
 /// Grow every region named in @p active SIMULTANEOUSLY as one cost-weighted
 /// multi-source fill, claiming into @p bw.owner. Neighbouring seeds therefore
 /// meet on the terrain between them rather than in the order they were listed.
-void grow_regions(body_work& bw, const world& w, uint32_t seed, std::vector<region>& regions,
-                  const std::vector<std::size_t>& active)
+void grow_regions(body_work& bw, const world& w, uint32_t seed, const domain_spec& dom,
+                  std::vector<region>& regions, const std::vector<std::size_t>& active)
 {
     std::priority_queue<frontier_entry, std::vector<frontier_entry>, frontier_worse> pq;
 
@@ -165,8 +214,9 @@ void grow_regions(body_work& bw, const world& w, uint32_t seed, std::vector<regi
 
         region& r = regions[f.region_index];
 
-        // The one hard clamp in the file.
-        if (r.tiles.size() >= k_province_max_tiles)
+        // The one hard clamp in the file. Per DOMAIN since BL-516: 12 on land
+        // and in the shallows, 80 on the open ocean.
+        if (r.tiles.size() >= dom.max_tiles)
             continue;
 
         // THE HARD FLOOR (3-12 hard target). A region takes its first three
@@ -181,7 +231,7 @@ void grow_regions(body_work& bw, const world& w, uint32_t seed, std::vector<regi
         // gentle and broken country alike, and it is exactly "boundaries win
         // ties": a region on a plain keeps spreading, a region ringed by rivers
         // and slopes stops the moment its budget is met.
-        if (r.tiles.size() >= k_province_hard_min_tiles && r.tiles.size() >= r.target
+        if (r.tiles.size() >= dom.hard_min && r.tiles.size() >= r.target
             && r.step_count > 0
             && static_cast<long long>(f.step) * static_cast<long long>(r.step_count)
                    > r.step_cost_sum)
@@ -194,7 +244,7 @@ void grow_regions(body_work& bw, const world& w, uint32_t seed, std::vector<regi
             r.step_cost_sum += f.step;
             ++r.step_count;
         }
-        if (r.tiles.size() >= k_province_max_tiles)
+        if (r.tiles.size() >= dom.max_tiles)
             continue; // full — do not extend its frontier any further
 
         const tile_component& tc = w.tiles.at(f.tile);
@@ -207,7 +257,10 @@ void grow_regions(body_work& bw, const world& w, uint32_t seed, std::vector<regi
             if (n == null_entity)
                 continue;
             const auto nit = w.tiles.find(n);
-            if (nit == w.tiles.end() || nit->second.substrate == terrain_substrate::ocean)
+            // BL-516: growth never leaves its domain. On land this is the old
+            // "not ocean" test verbatim; on water it is what stops a sea
+            // province reaching ashore or a lake joining the sea.
+            if (nit == w.tiles.end() || !in_domain(nit->second.substrate, dom.kind))
                 continue;
             if (bw.owner.find(n) != bw.owner.end())
                 continue;
@@ -224,6 +277,27 @@ void grow_regions(body_work& bw, const world& w, uint32_t seed, std::vector<regi
 }
 
 } // namespace
+
+province_kind province_kind_of(const world& w, const province& pr)
+{
+    if (pr.tiles.empty())
+        return province_kind::land;
+    const auto it = w.tiles.find(pr.tiles.front());
+    if (it == w.tiles.end())
+        return province_kind::land;
+    const terrain_substrate sub = it->second.substrate;
+    if (is_open_ocean(sub))
+        return province_kind::open_ocean;
+    if (is_water(sub))
+        return province_kind::coastal_water;
+    return province_kind::land;
+}
+
+province_kind province_kind_of(const world& w, uint32_t id)
+{
+    const province* pr = w.provinces.find(id);
+    return (pr == nullptr) ? province_kind::land : province_kind_of(w, *pr);
+}
 
 int province_edge_cost(const world& w, uint32_t seed, entity_id a, entity_id b, int side)
 {
@@ -282,12 +356,25 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
         if (gw <= 0 || gh <= 0)
             continue;
 
+        // The raster is built ONCE and shared by all three domain passes below —
+        // they read the same grid and disagree only about which of its tiles they
+        // are allowed to claim.
+        const std::vector<entity_id> grid = body_tile_grid(w, body_id); // cache stays intact
+
+        // BL-516: LAND, then COASTAL WATER, then OPEN OCEAN. The three passes are
+        // the same algorithm with different numbers, over disjoint tile sets, so
+        // no pass can take a tile another wanted and the order is not
+        // load-bearing. Everything from here to the emit is per-domain.
+        for (const domain_spec& dom : k_domains)
+        {
         body_work bw;
         bw.gw   = gw;
         bw.gh   = gh;
-        bw.grid = body_tile_grid(w, body_id); // raster copy; the cache stays intact
+        bw.grid = grid;
 
-        // Land mask, ascending tile id. Ocean is excluded outright (BL-516).
+        // Domain mask, ascending tile id. Every tile not of this domain is
+        // excluded outright — on land that is the pre-BL-516 "ocean is excluded"
+        // rule, spelled generally.
         for (const entity_id t : bw.grid)
         {
             if (t == null_entity)
@@ -295,13 +382,13 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
             const auto tit = w.tiles.find(t);
             if (tit == w.tiles.end())
                 continue;
-            if (tit->second.substrate == terrain_substrate::ocean)
+            if (!in_domain(tit->second.substrate, dom.kind))
                 continue;
-            bw.land.push_back(t);
+            bw.members.push_back(t);
         }
-        if (bw.land.empty())
+        if (bw.members.empty())
             continue;
-        std::sort(bw.land.begin(), bw.land.end());
+        std::sort(bw.members.begin(), bw.members.end());
 
         std::vector<region>    regions;
         std::vector<entity_id> centre_seeds; ///< Ascending; pass 2 spaces itself off these.
@@ -317,6 +404,7 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
         //
         // All seeds grow SIMULTANEOUSLY, as one multi-source fill, so two
         // centres meet on the terrain between them rather than in list order.
+        if (dom.settled) // BL-516: only land is settled; water is all hinterland.
         {
             std::vector<std::size_t> active;
             for (const auto& [tile_id, scale] : centre_scale_by_tile) // ascending tile id
@@ -324,7 +412,7 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
                 const auto tit = w.tiles.find(tile_id);
                 if (tit == w.tiles.end() || tit->second.body != body_id)
                     continue;
-                if (tit->second.substrate == terrain_substrate::ocean)
+                if (!in_domain(tit->second.substrate, dom.kind))
                     continue;
 
                 const int clamped = scale < 1 ? 1 : (scale > 5 ? 5 : scale);
@@ -337,7 +425,7 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
                 active.push_back(regions.size());
                 regions.push_back(std::move(r));
             }
-            grow_regions(bw, w, seed, regions, active);
+            grow_regions(bw, w, seed, dom, regions, active);
         }
 
         // --- Pass 2: HINTERLAND.
@@ -345,8 +433,9 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
         // Land no centre reached is partitioned under the SAME cost rules,
         // seeded one region at a time from the LEAST-ACCESSIBLE unclaimed tile.
         // Inaccessibility is the sum of the six sides' edge costs, with a side
-        // that has no land across it counted as a border at least as strong as
-        // a river — a tile ringed by ocean is the most walled-in thing there is.
+        // that has no tile OF THIS DOMAIN across it counted as a border at least
+        // as strong as a river — a tile ringed by ocean is the most walled-in
+        // thing there is, and so is a patch of sea ringed by shore.
         //
         // The order is computed ONCE over the whole land mask, before any
         // hinterland claim, so it is a property of the terrain rather than of
@@ -357,8 +446,8 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
                 k_province_edge_base_cost + k_province_river_edge_cost;
 
             std::vector<std::pair<int, entity_id>> ranked; // (-inaccessibility, tile)
-            ranked.reserve(bw.land.size());
-            for (const entity_id t : bw.land)
+            ranked.reserve(bw.members.size());
+            for (const entity_id t : bw.members)
             {
                 const tile_component& tc = w.tiles.at(t);
                 int                   walls = 0;
@@ -373,7 +462,7 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
                     const entity_id n = bw.grid[static_cast<std::size_t>(ny) * gw + nx];
                     const auto      nit = (n == null_entity) ? w.tiles.end() : w.tiles.find(n);
                     if (nit == w.tiles.end()
-                        || nit->second.substrate == terrain_substrate::ocean)
+                        || !in_domain(nit->second.substrate, dom.kind))
                     {
                         walls += k_no_land_side_cost;
                         continue;
@@ -404,7 +493,7 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
                 std::vector<entity_id> open{ from };
                 std::vector<entity_id> next;
                 seed_blocked[from] = true;
-                for (int depth = 1; depth < k_province_seed_spacing; ++depth)
+                for (int depth = 1; depth < dom.spacing; ++depth)
                 {
                     next.clear();
                     for (const entity_id cur : open)
@@ -423,7 +512,7 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
                                 continue;
                             const auto nit = w.tiles.find(n);
                             if (nit == w.tiles.end()
-                                || nit->second.substrate == terrain_substrate::ocean)
+                                || !in_domain(nit->second.substrate, dom.kind))
                                 continue;
                             if (seed_blocked.find(n) != seed_blocked.end())
                                 continue;
@@ -448,12 +537,12 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
                     continue;
                 region r;
                 r.seed   = t;
-                r.target = k_province_min_tiles;
+                r.target = dom.soft_target;
                 active.push_back(regions.size());
                 regions.push_back(std::move(r));
                 block_around(t);
             }
-            grow_regions(bw, w, seed, regions, active);
+            grow_regions(bw, w, seed, dom, regions, active);
 
             // --- Leftovers. Land the spaced fill could not reach — enclosed by
             // regions that hit the hard ceiling, or cut off behind a border too
@@ -468,10 +557,10 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
                     continue;
                 region r;
                 r.seed   = t;
-                r.target = k_province_min_tiles;
+                r.target = dom.soft_target;
                 const std::size_t ri = regions.size();
                 regions.push_back(std::move(r));
-                grow_regions(bw, w, seed, regions, { ri });
+                grow_regions(bw, w, seed, dom, regions, { ri });
             }
         }
 
@@ -552,7 +641,7 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
                             continue;
                         const auto nit = w.tiles.find(n);
                         if (nit == w.tiles.end()
-                            || nit->second.substrate == terrain_substrate::ocean)
+                            || !in_domain(nit->second.substrate, dom.kind))
                             continue;
                         const auto oit = bw.owner.find(n);
                         if (oit == bw.owner.end())
@@ -590,8 +679,11 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
                     bw.owner[t] = static_cast<uint32_t>(best_index) + 1u;
                     ++absorbed_here;
                     ++tally.absorbed;
-                    if (regions[best_index].tiles.size() > k_province_max_tiles)
+                    if (regions[best_index].tiles.size() > dom.max_tiles)
+                    {
                         ++tally.over_ceiling_created;
+                        ++tally.over_ceiling_by_domain[static_cast<std::size_t>(dom.kind)];
+                    }
                 }
 
                 if (absorbed_here == 0)
@@ -618,6 +710,8 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
             p.tiles = std::move(r.tiles);
             out.provinces.push_back(std::move(p));
         }
+        } // domain — BL-516; ids stay unique across domains for the same reason
+          // they are unique within one: a tile belongs to exactly one province.
     }
 
     // Ascending id — the iteration contract. Ids are lowest-member-tile ids and
@@ -770,9 +864,21 @@ std::map<entity_id, int> population_scale_by_tile(const world& w)
 
 province_sustain measure_province_sustain(const world& w, const province& pr)
 {
+    province_sustain s;
+
+    // BL-516: A SEA PROVINCE SUSTAINS NOTHING, and says so with a zero rather
+    // than by arithmetic accident. Left to the terms below it would report a
+    // healthy ceiling — open water carries habitability 0.50 in
+    // derive_environment — which would be a lie about a place no building can
+    // stand. The ONE-BUILDING FLOOR further down is land's floor specifically,
+    // and this is the case that made it need saying: it exists because the
+    // partition's own claim is that a land province is habitable ground, and a
+    // sea province makes no such claim.
+    if (province_kind_of(w, pr) != province_kind::land)
+        return s; // every term zero, ceiling 0
+
     const std::map<entity_id, int> pop_by_tile = population_scale_by_tile(w);
 
-    province_sustain s;
     int pop_scale_total = 0;
 
     for (const entity_id tile_id : pr.tiles) // ascending, by the partition contract
@@ -796,10 +902,13 @@ province_sustain measure_province_sustain(const world& w, const province& pr)
         1.0f + static_cast<float>(pop_scale_total) / k_population_scale_max;
     s.units = (s.habitability_area + s.infrastructure_gain) * s.population_factor;
 
-    // A province that exists at all sustains at least one building. That floor is
-    // the partition's own claim that this is habitable land, not a tuning clamp:
-    // the partition never emits an ocean province, so "some land, room for
-    // nothing" would be a contradiction rather than a constraint.
+    // A LAND province that exists at all sustains at least one building. That
+    // floor is the partition's own claim that this is habitable land, not a
+    // tuning clamp: "some land, room for nothing" would be a contradiction
+    // rather than a constraint. Since BL-516 the partition DOES emit sea
+    // provinces, and they never reach here — the guard at the top returns a zero
+    // sustain for them, because the claim this floor rests on is one only a land
+    // province makes.
     const int scaled =
         static_cast<int>(s.units * k_province_buildings_per_sustain_unit + 0.5f);
     s.ceiling = scaled < 1 ? 1 : scaled;

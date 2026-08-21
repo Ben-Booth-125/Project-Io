@@ -511,7 +511,7 @@ int main()
             int on = 0, land = 0;
             for (const auto& [tid, tc] : wr.tiles)
             {
-                if (tc.substrate == terrain_substrate::ocean) continue;
+                if (is_water(tc.substrate)) continue;
                 ++land;
                 if (tc.resource_deposit[ri] > 0.0f) ++on;
             }

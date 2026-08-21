@@ -33,9 +33,13 @@ const char* placement_reason_text(placement_reason r)
     return "Cannot build here";
 }
 
-bool is_ocean_tile(terrain_substrate sub)
+bool is_water_tile(terrain_substrate sub)
 {
-    return sub == terrain_substrate::ocean;
+    // BL-516: delegates to the terrain-level predicate so there is ONE
+    // definition of "is this water". Renamed from `is_ocean_tile` in the same
+    // change: since water gained kinds, a function called `is_ocean_tile` that
+    // answers true for a lake is a lie waiting to be believed.
+    return is_water(sub);
 }
 
 bool is_extractable(resource_type r)
@@ -75,7 +79,7 @@ resource_type richest_extractable(const tile_component& tc, bool& any)
 bool can_place_population_centre(const tile_component& tc)
 {
     // Ocean tiles never host population centres.
-    if (is_ocean_tile(tc.substrate))
+    if (is_water_tile(tc.substrate))
         return false;
     // Uninhabitable tiles (hazard-dominated, airless, etc.) are also excluded.
     return tc.habitability > 0.0f;
@@ -84,7 +88,7 @@ bool can_place_population_centre(const tile_component& tc)
 placement_result can_place_road(const tile_component& tc, std::uint8_t tier)
 {
     // No road on water — roads are land infrastructure.
-    if (is_ocean_tile(tc.substrate))
+    if (is_water_tile(tc.substrate))
         return placement_reason::ocean;
     // Upgrade-in-place (BL-172): a tile already carrying an equal-or-better road is a no-op — you
     // can raise a Track to a Road/Highway, but not re-lay the same or a lower tier. Reject rather
@@ -97,7 +101,7 @@ placement_result can_place_road(const tile_component& tc, std::uint8_t tier)
 placement_result can_place(const tile_component& tc, building_type type, resource_type target)
 {
     // No building ever sits on water.
-    if (is_ocean_tile(tc.substrate))
+    if (is_water_tile(tc.substrate))
         return placement_reason::ocean;
 
     switch (type)
@@ -193,7 +197,12 @@ bool is_coastal(const world& w, entity_id tile_id)
             if (nid == null_entity)
                 continue;
             const auto nit = w.tiles.find(nid);
-            if (nit != w.tiles.end() && is_ocean_tile(nit->second.substrate))
+            // BL-516: SEA, not merely water. `is_coastal` gates ports, the
+            // Fishing Wharf and coastal-only extraction — a lakeshore is not a
+            // coast, and now the data can say so. This is the one place the
+            // narrowing changes an answer the old code gave; every other water
+            // test here is widened to `is_water` and answers exactly as before.
+            if (nit != w.tiles.end() && is_sea(nit->second.substrate))
                 return true;
             continue;
         }
@@ -203,7 +212,7 @@ bool is_coastal(const world& w, entity_id tile_id)
         {
             if (ntc.body == body && ntc.grid_x == ncol && ntc.grid_y == nrow)
             {
-                if (is_ocean_tile(ntc.substrate))
+                if (is_sea(ntc.substrate)) // BL-516: sea, not lake — see above
                     return true;
                 break;
             }
@@ -388,7 +397,7 @@ int non_extraction_stack_cap(terrain_substrate sub, terrain_cover cov)
     // since Ben made urban a COVER (2026-08-21) it now sits on top of a substrate
     // that survives it — so the cap must come from the paving, not from the
     // geology the city happens to stand on.
-    if (sub == terrain_substrate::ocean)
+    if (is_water(sub)) // BL-516: every water kind takes nothing
         return 0;
     if (cov == terrain_cover::urban)
         return 12; // Soft-bounded in practice by workforce contention, not this number.
@@ -403,7 +412,9 @@ int non_extraction_stack_cap(terrain_substrate sub, terrain_cover cov)
         case terrain_substrate::metallic:    base = 4; break;
         case terrain_substrate::volcanic:
         case terrain_substrate::icy:         base = 2; break;
-        case terrain_substrate::ocean:       return 0;
+        case terrain_substrate::ocean: // BL-516: unreachable — the is_water guard
+        case terrain_substrate::coast: // above returns first; listed so the
+        case terrain_substrate::lake:        return 0; // switch stays total.
     }
 
     // The cover's own contribution. Scrub costs 3 on soil because that pair IS the
@@ -445,7 +456,7 @@ bool maybe_transform_to_urban(world& w, entity_id tile_id)
     if (it == w.tiles.end())
         return false;
     tile_component& tc = it->second;
-    if (tc.cover == terrain_cover::urban || tc.substrate == terrain_substrate::ocean)
+    if (tc.cover == terrain_cover::urban || is_water(tc.substrate)) // BL-516
         return false;
     if (non_extraction_buildings_on_tile(w, tile_id) >= non_extraction_stack_cap(tc.substrate, tc.cover))
     {

@@ -45,16 +45,51 @@ habitability ceiling, and the terrain colour the lenses tint.
 | Metallic | High metal content; asteroid or ancient impact surface | Very low | Iron-nickel ore, platinum group metals, regolith |
 | Regolith | Loose surface material on airless bodies | Very low | Regolith, stone |
 | Icy | Ice-dominated ground; frozen subsurface | Low | Water ice (only — see deposit tables) |
-| Ocean | Open deep water | — (no buildings) | Marine goods (deferred) |
+| Ocean | Open water, out of sight of land | — (no buildings) | Marine goods (deferred) |
+| Coast | Shallow sea with land alongside — the shoreline ring (BL-516) | — (no buildings) | Marine goods (deferred) |
+| Lake | Inland water with no path to the sea (BL-516) | — (no buildings) | Marine goods (deferred) |
 
 **Sedimentary is the axis's new value**, and the finding the item turned on: grassland, forest,
 wetland and tundra were never four kinds of *ground*. They were **one** kind of ground under four
 kinds of cover, and spending the slot on the cover is what made "a rocky mountain that happens to
 be forested" inexpressible.
 
-**Ocean is interim.** BL-516 splits water into lake / coast / ocean kinds. It lives on this axis
-meanwhile because every existing consumer asks "is this water?" of the ground, and `is_ocean_tile`
-stays a one-line substrate test.
+### Water kinds: lake, coast and ocean (BL-516, landed 2026-08-21)
+
+Ben, 2026-08-21: *"We can also draw provinces over the ocean, using 3-12 size coastal tile
+provinces. That creates another tile type, which is ok. We can have lakes, coasts, and oceans.
+Ocean provinces should be much larger, but not larger than say 80 tiles."*
+
+BL-519 left `ocean` on this axis as an interim value, on the reasoning that every consumer asks
+"is this water?" of the ground. **That reasoning held**, so the split landed here rather than
+anywhere else: `ocean` keeps its id and narrows to mean open water, and `lake` and `coast` are
+appended at the tail. A water tile carries `cover::none` whatever its kind — the cover axis
+describes what grew on ground, and water has no ground.
+
+The three kinds are **structural** — no threshold picks between them
+(`tile_generation.cpp` § Pass 4e, `classify_water_kinds`):
+
+1. Flood-fill the water into connected components on the body's hex grid (columns wrap).
+2. **The sea** is the largest component; every other component is a **lake**. "Does not reach
+   the sea" is the whole definition of a lake, so no size cut-off is needed or wanted.
+3. Within the sea, a tile with at least one land neighbour is **coast** — the shoreline ring —
+   and a tile with none is **ocean**.
+
+**Almost every consumer asks "is this water?" and must keep asking exactly that.** That question
+is `is_water()` in `components.hpp`, and it is the choke point: placement, the urban transform,
+logistics traversal, river termination, terrain defence and attrition, nation and settlement land
+counts all went through it unchanged, so the generated world is bit-identical. Two consumers
+genuinely care *which* water, and both got a better answer than they had:
+
+- **The road pass.** A crossing is a strait when it is short **and made of shore**. Before the
+  split, "is this a strait" could only be inferred from the length of the contiguous water run;
+  a three-tile clip across the corner of an ocean and a three-tile channel between two shores
+  were indistinguishable. They are now, and only the second gets a road.
+- **`is_coastal`** (ports, the Fishing Wharf, coastal-only extraction) now means the **sea**
+  specifically. A lakeshore is not a coast, and before the split the code could not tell.
+
+Water carries no deposits, no buildings, no cover and no population on any of the three kinds —
+the distinction is about connectivity and locality, not about resources.
 
 ### Terrain cover
 
@@ -127,7 +162,7 @@ the cover says how much what grows on it gets in the way:
 | Sedimentary | 6 | Habitable; the settlement-favoured ground (POPULATION.md) |
 | Barren, Rocky, Regolith, Metallic | 4 | Industrial-friendly, low habitability ceiling |
 | Volcanic, Icy | 2 | Hostile; already carry the lowest habitability ceiling |
-| Ocean | 0 (pinned, exempt) | No buildings at all — `can_place` already refuses it |
+| Ocean, Coast, Lake | 0 (pinned, exempt) | No buildings at all, on any water kind — `can_place` already refuses them |
 
 | Cover | Modifier | Rationale |
 |---|---|---|

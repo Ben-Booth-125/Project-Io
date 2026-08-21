@@ -4,10 +4,12 @@
 #include "construction.hpp"
 #include "economy_system.hpp" // BL-430: try_switch_recipe, the shared recipe-switch gate
 #include "logistics.hpp" // invalidate_logistics_caches (idle/resume flips the anchor set); intra_body_path (BL-470)
-// BL-470 included placement_rules.hpp here for is_ocean_tile, march_unit's old
-// destination check. BL-511 retargeted the verb to a province, and the province
-// partition is LAND-ONLY by construction, so the water test — and the include —
-// have no remaining caller in this file.
+// BL-470 included placement_rules.hpp here for is_water_tile, march_unit's old
+// destination check. BL-511 retargeted the verb to a province, and while the
+// partition was LAND-ONLY the water test had no remaining caller. BL-516 draws
+// provinces over the water, so the check is back — but it asks the PROVINCE its
+// domain (`province_kind_of`, province.hpp) rather than asking a tile its
+// substrate, so placement_rules is still not a dependency of this file.
 #include "province.hpp"       // BL-511: march_unit's destination is a province
 #include "recipe_registry.hpp"
 #include "stance.hpp" // BL-448: corp stance verbs (declare_hostile / offer_friendship / accept_friendship / return_to_neutral)
@@ -989,11 +991,19 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             // wire range gate cannot stand in for: `find` binary-searches the
             // built partition, so an id that merely FITS a uint32 — including
             // the 0 default of an omitted field — is refused here rather than
-            // being coerced into some nearby province. Ocean needs no separate
-            // test any more: the partition covers LAND ONLY by construction
-            // (province.hpp), so a province id can never name water.
+            // being coerced into some nearby province.
             const province* dp = w.provinces.find(cmd.province);
             if (dp == nullptr || dp->tiles.empty())
+                return corp_command_result::rejected_invalid;
+
+            // BL-516 RESTORED A TEST THIS VERB HAD BEEN ABLE TO DROP. Until
+            // water gained provinces, "the partition covers land only by
+            // construction" meant a province id could never name water and no
+            // check was needed. Sea provinces exist now, they are addressable,
+            // and units are land-bound — so marching into one is refused HERE,
+            // explicitly, rather than left to fail obscurely in the path solve.
+            // Rejection mutates nothing, as every path above and below does.
+            if (province_kind_of(w, *dp) != province_kind::land)
                 return corp_command_result::rejected_invalid;
 
             const auto sit = w.tiles.find(uit->second.position);
