@@ -10,7 +10,90 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — The watch + meta open: an AI plays the rendered game (BL-412, BL-408, BL-411, BL-479, BL-480, BL-335; Sprints W1/D1/D3) (2026-08-19 → 08-20, latest)
+## Session — The province becomes a thing you can see (BL-458, BL-513, BL-511, BL-466, BL-515, BL-517, BL-392, BL-463; Sprints 27/B2/B3/C3/D4 + P1) (2026-08-20 → 08-21, latest)
+
+Full mode, two Batch Deliveries and a design arc: nine worktree build agents, one cold
+static reviewer, and a long tail of rulings made against renders rather than specs.
+Ben's brief opened as *"deliver a few sprints in parallel"* and ended as a tile-model
+redesign, by way of the province being drawn for the first time.
+
+**Batch one — four lanes, one blocker caught by the gate.** BL-458 (supply lines can be
+cut: `convoy_tile_at` lifted out of the renderer, interdiction on a declared hostile
+stance — the act that finally earns *pirate* its first mechanic since 2026-08-07),
+BL-513 (the province building ceiling, k=12.6468 pinned by measurement), BL-511's seam
+half (`march_unit` retargets tile → province), and the sprint-B2/B3 generation cuts
+(road-less nations 14 → 0; settlements 31-flat → 44-77, derived from land area and
+nation count rather than a 180x84-era constant). The pre-compile static review caught a
+**blocker of my own making**: my hand-resolution of a `law.hpp` conflict kept BOTH
+sides' author fields, and only `nation_tariff_rate` read the dead one — so in the
+shipped binary every tariff resolved to zero and the whole clearing-tick tariff pass was
+a no-op. The harness passed 25/25 because it built laws in the shape only the harness
+used. Fixed at `bd238d5`; the lesson is that a green harness can be evidence of nothing.
+
+**Batch two — the province gets rendered, and the rulings start reversing.** BL-511
+landed the blend, province selection, the `march_unit` payload change and a per-lens
+reduction decided for all thirteen overlay modes. Then Ben looked at it. Three rulings
+followed, each superseding the last and each made against a picture: **~4 tiles** (from
+a design form, before any render) → **7-12** (after seeing it drawn) → **the packed
+lattice ruled out entirely** (after seeing THAT drawn) — *"packing each province
+perfectly looks nice, but it is scarcely how borders were defined in history."*
+
+**BL-515, the third partition of the day.** Provinces grown from population centres by
+cost-weighted fill: river edges and elevation gradients expensive, a road link cheap
+because a road BINDS. Both coefficients pinned by measurement rather than picked — the
+height cost against the p90 of adjacent-land steepness over 653,910 edges, the road
+divisor by a published sweep whose lift the agent honestly described as concave with no
+knee. Prerequisite BL-517 landed first (height retained; `sizeof(tile_component)` 336 →
+340, no RNG stream perturbed). Ben then retracted *"don't reject tiny provinces"* on
+seeing the result, and a singleton-absorption pass took sub-3 provinces from 3,008 to
+911 — leaving 51 true islands, each verified to have zero land neighbours rather than
+assumed.
+
+**Identity moved twice and landed better than it started.** Allocated-and-serialised →
+**derived from the lowest member tile**, which removes the determinism hazard instead of
+guarding it (an id that is never handed out cannot be handed out in the wrong order) and
+serialises nothing new. Safe only because Ben ruled borders move during **generation
+only** — so ids churn while the Era -1 sim redraws them and are frozen before anything
+outside generation can hold one.
+
+**Lane 0 settled the determinism question that was blocking trust.** No leak:
+`spectator_determinism` reproduces across two independently built worlds; the single
+failure was byte-identity against a golden pinned before four deliberate world changes.
+Re-blessed with provenance. Provinces stay OUT of `state_hash` — that hash folds what a
+*tick* mutates and the partition never moves after generation — and the real gap, that
+nothing checked it at all, closed in `determinism_harness` instead.
+
+**Design work, unbuilt:** BL-514 (blend all tiles — HELD at Ben's instruction until he
+sees the organic borders; the A/B capture exists), BL-516 (lake/coast/ocean tile kinds
+and sea provinces, ocean capped at 80 tiles), BL-518 (the Era -1 sim redrawing borders as
+its wars resolve), BL-519 (the tile axis split) and BL-520 (texturing).
+
+**The axis-split finding.** A mountain WITH a forest is already expressible
+(`composition=forest` x `landform=mountain`); what cannot be said is a *rocky* mountain
+that happens to be forested, because the composition slot is spent on the forest.
+`terrain_composition` is doing three jobs — substrate, cover, state — and `urban` is the
+proof rather than the exception: it is a one-way transform that OVERWRITES the
+composition, so paving a metallic tile destroys the fact that it was metallic (NR-442,
+filed separately as live data loss). The split un-mixes an overload rather than adding a
+concept, and it costs 330 call sites across 49 files with no save migration, because
+there is no save format at all.
+
+**Corrections I made to my own reports, recorded rather than quietly fixed:** my
+"81/81" verification of `unit_march_harness` was hollow — M6 indexed an empty path on a
+refused order and segfaulted mid-M5, so M6 and M7 never ran and the process exited 139
+while I read the printed pass count (NR-425). My claim that a one-row body always
+collapses to one province was false above 19 tiles (NR-426). My BL-517 brief asserted a
+tile serialisation seam that does not exist (NR-430). And two `tools/verify/README.md`
+conflict resolutions spliced a sentence into the middle of another one, which a later
+agent spotted and correctly declined to guess at (NR-432).
+
+**Runtime:** ~12 h wall across two days, largely autonomous; refinement → four-lane
+batch → design forms → province redesign → tile design. Nine build agents, one review
+agent, ~40 commits, NR-384 through NR-444 filed.
+
+---
+
+## Session — The watch + meta open: an AI plays the rendered game (BL-412, BL-408, BL-411, BL-479, BL-480, BL-335; Sprints W1/D1/D3) (2026-08-19 → 08-20)
 
 Full mode, Batch Delivery: a six-agent research workflow, five worktree build agents, an audit
 agent, a static reviewer and a harness runner. Ben's brief: map sprints onto versioned releases,
