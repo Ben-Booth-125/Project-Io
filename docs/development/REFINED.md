@@ -1,46 +1,54 @@
 # Project Io — REFINED (active worklist)
 
-**Empty between work blocks.** Sprint P1 closed its build tasks on 2026-08-21; what
-remains from it is judgement, not work, and lives in `NEEDS_REVIEW.json`.
+**Empty between work blocks.** Sprint P1 closed its build tasks on 2026-08-21.
 
-## What the last block left owed
+## Next session takes these three (Ben, 2026-08-21)
 
-Not promoted tasks — these are the honest remainders, each with its review entry.
+- **BL-519 — the tile axis split.** `terrain_composition` split into substrate ×
+  cover, with `landform` unchanged and `none` a first-class cover value. 330 call
+  sites across 49 files, no save migration (there is no save format). Open
+  questions live in the item: graded vs binary cover, whether `tundra` survives as
+  a cover, whether `urban` is a state or a cover, and whether the derived
+  `composition()` accessor is permanent or deleted last (NR-444).
+- **BL-520 — basic texturing.** Sequenced behind BL-519: 84 hand-authored
+  combinations against ~16 that compose. Decide **BL-514** (blend all tiles)
+  alongside it — texture and the blend are in direct tension, and each changes what
+  the other is for (NR-443).
+- **NR-438 / NR-439 — the raised ceiling**, now ruled. 12 tiles is a PREFERENCE,
+  20 a hard cap, larger-than-12 permitted in rare cases. **Check before coding: the
+  shipped behaviour already satisfies this** — max is 16 across 6 seeds. The work is
+  likely saying it (`province.hpp` still calls 12 a clamp), asserting it (a hard-cap
+  row at 20), deleting the now-unneeded `IO_ABSORB_PREFER_ROOM` variant, and
+  REPORTING the over-12 share (currently 4.9%) rather than asserting a rareness
+  threshold nobody has chosen.
 
-- **The live click.** BL-511's requirement R1 has a LIVE half nobody has taken: two
-  agents in a row could not (no click injection in the verify API, no granted
-  applications in a non-interactive session). The hit-test resolution path is
-  proven; the press is not. NR-416, NR-424 — and NR-424 proposes the permanent fix,
-  a click-injection hook, which would close the whole class.
-- **Six items landed-awaiting a live check.** BL-412, BL-408, BL-411, BL-480,
-  BL-429, BL-453. Code in the tree, every held row a live check. NR-388.
-- **BL-408 cannot be entered at all.** `ui_state.spectating` has exactly one writer
-  in the whole tree — the Lua binding `verify.spectate`. No menu item, no CLI flag.
-  NR-389 — it needs a ruling, not a task.
-- **BL-458 shipped silent.** The mechanic is proved; the comms message, the
-  Convoys-tab cause and the canvas mark are absent, because they need a field on
-  `world` that other lanes were holding. NR-407.
+## Also ready, unqueued
 
-## Rulings owed before the next build block
+- **BL-521 — click injection in the verify API.** Designed this session at Ben's
+  instruction, deliberately unbuilt. This is the item that closes the live-check
+  class permanently: a non-interactive agent currently CANNOT satisfy a live check,
+  so every interactive surface it builds arrives with its live half owed by
+  construction. Two agents in a row hit this on BL-511 alone.
+- **BL-516** (lake/coast/ocean tile kinds, sea provinces capped at 80 tiles) and
+  **BL-518** (the Era −1 sim redrawing borders as its wars resolve) — both unblocked
+  now that BL-515 is settled.
 
-- **NR-438 / NR-439 — the 12-tile ceiling no longer holds.** 4.9% of provinces
-  exceed it, max 16. The prefer-room alternative is costed (241 over, max 14,
-  80.63% in band) and compiled out behind a flag. BL-467's battle envelope reads
-  province size, so this wants settling BEFORE that lands.
-- **NR-406** — should the building ceiling move during play, since infrastructure
-  is one of its inputs?
-- **NR-444** — is the `composition()` accessor permanent or deleted last?
-- **NR-421** — the per-province firm cap is inert by orders of magnitude. Drop,
-  keep, or move the constraint to a grain where firms actually compete.
+## Still owed, each with its review entry
+
+- **The live click** on a province (BL-511 R1) — NR-416, NR-424. BL-521 is the fix.
+- **Six items landed-awaiting a live check**: BL-412, BL-408, BL-411, BL-480,
+  BL-429, BL-453 — NR-388.
+- **BL-408 has no entry point at all.** `ui_state.spectating` has one writer in the
+  tree, the Lua binding. Needs a ruling, not a task — NR-389.
+- **BL-458 shipped silent.** Comms message, Convoys-tab cause and canvas mark all
+  absent; they need a field on `world` that other lanes were holding — NR-407.
+
+## Rulings still open
+
+- **NR-406** — should the building ceiling move during play, since infrastructure is
+  an input?
+- **NR-421** — the per-province firm cap is inert by orders of magnitude (296 firms
+  across 295 distinct provinces). Drop it, keep it for later density, or move the
+  constraint to a grain where firms actually compete.
 - **NR-415** — where does the per-lens reduction table live, and does every future
   lens inherit the obligation?
-
-## Held deliberately
-
-- **BL-514** (blend all tiles) — held until Ben sees the organic borders. The A/B
-  capture exists.
-- **BL-516** (water kinds + sea provinces), **BL-518** (war redraws borders) — both
-  want BL-515 settled first, which it now is.
-- **BL-519** (tile axis split) / **BL-520** (texturing) — designed today, unstarted.
-  BL-520 is sequenced behind BL-519: 84 hand-authored combinations versus ~16 that
-  compose.
