@@ -1441,6 +1441,12 @@ std::vector<entity_id> generate_body_tiles(
                 .resource_remaining = remaining,
                 .hazard_level       = hazard,
                 .habitability       = habitability,
+                // BL-517: retain Pass 1's heightmap value. A pure CAPTURE of the float
+                // this function already computed — the same element that goes on to fill
+                // generation_record::height below. It reads no RNG, derives nothing, and
+                // changes no terrain, deposit or placement rule, so the generated surface
+                // is bit-identical to the pre-BL-517 build.
+                .height             = height[static_cast<std::size_t>(idx)],
             };
             tile_ids[idx] = tile_id;
         }
