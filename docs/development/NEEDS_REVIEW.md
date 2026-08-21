@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*191 entries — 191 open, 0 resolved.*
+*192 entries — 191 open, 1 resolved.*
 
 ---
 
@@ -1745,6 +1745,26 @@ The first mutation probe written for the shared hire table PASSED — it had no 
 
 *Files: `tools/verify/corp_ai_harness.cpp`, `docs/development/DELIVERY.md`*
 
+### NR-490 — War-gated progression is designed but not yet live — one earnable gate in 150 tech nodes
+*observation · raised 2026-08-21 · from Checking Ben's stated reason for the 2026-08-21 zero-war ruling.*
+
+Ben ruled a world that never fights is a bug because 'many ancient tech quests would not be unlockable'. Checking what exists: `scripts/tech_tree.lua` holds 150 nodes and the file says in its own comment that E0-ML-01 is 'THE ONE LIVE GATE... Every other node in this file is authored data the F9 viewer draws'. Its predicate is in tech_gate.cpp, and it reads corp military_units/military_strength - not battles and not conquest. The Era -1 works roster gates on capacity band (materials), also not on war.
+
+So today no content anywhere is gated on a war HAPPENING. The dependency is real as design intent and absent as mechanism.
+
+**Why it matters.** Two things follow, pointing the same way. First, the ruling is sound but its stated justification cannot yet be verified by running anything - worth knowing before someone tries. Second, and more useful: the tech design is being drawn on top of a war rate that is ZERO in a quarter of worlds. Fixing the rate before the gates are authored is much cheaper than discovering, once 149 stubs become live gates, that a quarter of campaigns start with a dead branch.
+
+> **Recommendation:** No action beyond noting it. But when the ancient tech quests are authored (BL-478 and the tech-effect work), the war-rate band from Sprint 28's R2 should be the number their reachability is checked against - otherwise the two are designed independently and meet only in a bug report.
+
+*Files: `scripts/tech_tree.lua`, `src/world/tech_gate.cpp`, `docs/development/req/requirements.json`*
+
+---
+
+## Resolved
+
+Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
+answer has landed in an authority doc.
+
 ### NR-489 — Sprint 28's real subject is verb competition — the scorer discards ~10M campaign candidates to reach zero wars
 *observation · raised 2026-08-21 · from Sprint 28 decomposition. history_conquest_gap campaign funnel, 8 worlds.*
 
@@ -1758,12 +1778,11 @@ A second observation with no obvious reading yet: CONTACTS DO NOT PREDICT WAR, a
 
 > **Recommendation:** Worth your eye on one thing before T3: whether a world that never fights is a BUG at all. A polity with room to expand preferring Settle to Campaign is defensible behaviour, and BL-224 wants some worlds multipolar. The target should be a rate inside a stated band, reported and never clamped.
 
+> **RESOLVED.** RULED 2026-08-21 (Ben): A WORLD THAT DOES NOT FIGHT IS A BUG. His reason, and it is the part that shapes the requirement rather than merely answering the question: 'many ancient tech quests would not be unlockable'. So the floor on the war rate is not aesthetic and not about the Era -1 premise reading well - it is CONTENT REACHABILITY. A world where war never happens is a world where war-gated progression is dead, and that is a different and harder failure than a quiet era.
+
+R2 is amended: the band's FLOOR is set by what war-gated content needs to be reachable, not chosen for distribution shape. The ceiling stays governed by BL-224's non-hegemony invariant, so the requirement is now bounded from both ends by a stated reason rather than one.
+
+ACCURACY NOTE, recorded so nobody goes looking for a gate that is not built yet: the dependency Ben names is DESIGNED, not yet live. Checked today - the campaign tech tree has 150 nodes and exactly ONE earnable gate (E0-ML-01 Standing Garrison Doctrine, whose predicate lives in tech_gate.cpp); the other 149 are authored stubs the F9 viewer draws. Nothing currently gates on battles or conquest, and the Era -1 works roster gates on capacity BAND (materials), not on war. So the ruling is forward-looking, and that is an argument FOR fixing the war rate now rather than against it: the tech design is being built on top of a war rate that is zero in a quarter of worlds.
+
 *Files: `src/world/history_sim.cpp`, `tools/verify/history_conquest_gap.cpp`, `docs/development/REFINED.md`*
-
----
-
-## Resolved
-
-Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
-answer has landed in an authority doc.
 

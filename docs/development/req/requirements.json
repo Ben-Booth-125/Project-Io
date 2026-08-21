@@ -5110,7 +5110,7 @@
     {
      "id": "R1",
      "status": "pending",
-     "requirement": "ITEM-SPANNING (headless): NO WORLD IN THE SWEEP FIGHTS ZERO WARS. Across N seeds at the shipped tuning, every world produces at least one battle. This is the row that fails today - 2 of 8 - and it is deliberately stated as 'at least one', not as a rate: the rate is R2's job, and a single row asserting both would fail for two different reasons with one message.",
+     "requirement": "ITEM-SPANNING (headless): NO WORLD IN THE SWEEP FIGHTS ZERO WARS. Across N seeds at the shipped tuning, every world produces at least one battle. RULED A BUG by Ben 2026-08-21, and the reason is content reachability rather than flavour: 'many ancient tech quests would not be unlockable'. A world where war never happens is a world where war-gated progression is dead. This is the row that fails today - 2 of 8 - and it is deliberately 'at least one', not a rate: the rate is R2's job, and one row asserting both would fail for two different reasons with one message.",
      "result_metric": null,
      "verification": "headless - tools/verify/history_conquest_gap.cpp",
      "notes": "FAILS TODAY: seeds 0 and 4 produce 0 battles across a full 0->1960 run. Note the shape of the failure - it is binary, not thin. A world fights hundreds of times or not at all."
@@ -5118,10 +5118,10 @@
     {
      "id": "R2",
      "status": "pending",
-     "requirement": "THE WAR RATE IS REPORTED AND BANDED, NEVER CLAMPED. The sweep reports battles and conquests per world and asserts the spread sits inside a STATED band. BL-224's non-hegemony invariant wants some worlds to stay multipolar, so 'every world fights the same amount' is a failure too, not the goal. Sprint 30's done-when uses this exact shape.",
+     "requirement": "THE WAR RATE IS REPORTED AND BANDED, NEVER CLAMPED - AND THE BAND IS BOUNDED AT BOTH ENDS BY A STATED REASON. The sweep reports battles and conquests per world and asserts the spread sits inside a stated band. FLOOR: what war-gated content needs to be reachable (Ben's 2026-08-21 ruling) - not chosen for distribution shape. CEILING: BL-224's non-hegemony invariant, so 'every world fights the same amount' is a failure too. Sprint 30's done-when uses this exact shape.",
      "result_metric": null,
      "verification": "headless - tools/verify/history_conquest_gap.cpp",
-     "notes": "The band must be pinned against a measured multi-seed distribution, the way the province partition and the sea-province spacing already are - not chosen. Today's spread is 0, 0, 44, 163, 164, 184, 236, 435."
+     "notes": "The band must be pinned against a measured multi-seed distribution, the way the province partition and the sea-province spacing already are - not chosen. Today's spread is 0, 0, 44, 163, 164, 184, 236, 435.\n\nCAVEAT ON THE FLOOR, per NR-490: the war-gated content the floor is meant to serve is DESIGNED, not live. 150 tech nodes, exactly one earnable gate (E0-ML-01), and it reads corp military strength rather than battles. So the floor cannot yet be derived from a real gate and must be stated as a judgement until the ancient tech quests are authored - at which point their reachability should be checked against THIS band rather than designed independently of it."
     },
     {
      "id": "R3",

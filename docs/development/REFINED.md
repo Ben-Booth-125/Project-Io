@@ -65,12 +65,23 @@ Foundation first; each scoped to its files.
   **Depends on T1.**
 
 - **T3 — the fix, whichever T1/T2 names.** Deliberately unspecified here: writing it now
-  would be committing to a mechanism before the measurement that chooses it. One
-  constraint holds whatever it turns out to be — **the peaceful worlds must not be tuned
-  away wholesale**. `BL-224`'s non-hegemony invariant wants some worlds to stay
-  multipolar, so the target is a *rate inside a stated band across seeds*, reported and
-  never clamped (Sprint 30's done-when says exactly this). Files: `src/world/history_sim.cpp`,
-  `scripts/` tuning if the answer is a constant. **Depends on T2.**
+  would be committing to a mechanism before the measurement that chooses it. Two
+  constraints hold whatever it turns out to be, and they bound it from opposite ends:
+
+  **A zero-war world is a BUG** — Ben's ruling, 2026-08-21, and his reason is what makes it
+  a floor rather than a preference: *"many ancient tech quests would not be unlockable."*
+  The failure is content reachability, not atmosphere. But **the peaceful worlds must not
+  be tuned away wholesale** either: `BL-224`'s non-hegemony invariant wants some worlds to
+  stay multipolar. So the target is a *rate inside a stated band across seeds*, reported
+  and never clamped (Sprint 30's done-when says exactly this).
+
+  Worth knowing while building it (NR-490): the war-gated content the floor serves is
+  **designed, not live**. `scripts/tech_tree.lua` holds 150 nodes and says in its own
+  comment that E0-ML-01 is "THE ONE LIVE GATE"; the other 149 are authored stubs, and even
+  that one reads corp military strength rather than battles. This is an argument *for*
+  fixing the rate now — the tech design is being drawn on top of a war rate that is zero
+  in a quarter of worlds. Files: `src/world/history_sim.cpp`, `scripts/` tuning if the
+  answer is a constant. **Depends on T2.**
 
 - **T4 — BL-321's defence works are inert in practice, and it is a separate defect.**
   `work_defence_mod` is non-zero in **zero** of 1226 traced battles. Both sides of the
