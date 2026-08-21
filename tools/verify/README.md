@@ -56,6 +56,15 @@ of one seed). Report-first — the road-less count is a number to watch, not a p
 after any change to `road_generation.cpp`, to nation/population placement, or to the logistics
 traversal costs the road MST is laid out against.
 
+`tile_height_retention` (BL-517) guards the retained per-tile heightmap. Its assertions are shaped
+around the item's negative scope — height must be **captured**, never recomputed: H1 asserts every
+`tile_component::height` is bit-identical to `generation_record::height`, H3 that the value is the
+same when generation is asked for **no** record (the shipped path passes none), H4 that composition,
+landform and deposits stay byte-identical across two same-seed runs (the capture perturbed no RNG
+draw order), and H5 that landform is still **not** a function of height. It also prints the measured
+`sizeof(tile_component)` and the field's real byte cost. Re-run it after any change to Pass 1 or to
+the tile assembly block in `tile_generation.cpp`.
+
 Use that route for anything linking the world superset — `world_audit`, `ai_skill_harness`,
 `history_ladder_harness`, **`settlement_harness`**, `data_creep_harness`, `corp_terrain_matrix`,
 `trade_routes_harness`, `tech_effect_union_harness` (BL-479: the tech effect union — a fixture

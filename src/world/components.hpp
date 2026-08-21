@@ -277,6 +277,31 @@ struct tile_component
     /// river_edges. See river_edge_discount (src/world/river_generation.hpp) for how this feeds
     /// the intra-body logistics cost.
     std::uint8_t river_downstream = 0;
+
+    /// Normalised generation heightmap value for this tile, [0, 1] (BL-517).
+    ///
+    /// **Captured, never recomputed.** This is the exact float tile generation Pass 1
+    /// produced for this tile — the continent-biased, normalised heightmap the whole
+    /// pipeline was then derived from (`generate_body_tiles`, src/world/tile_generation.cpp).
+    /// It is copied out of the pass's own `height` vector at tile assembly; nothing
+    /// re-derives it, and it is the same number `generation_record::height` reports.
+    ///
+    /// **Why it is world state and not a ledger breadcrumb.** Every other Pass 1/2
+    /// intermediate (moisture, band, ocean_score) stays disposable and regenerates on
+    /// demand — `docs/generation/GENERATION_LEDGER.md` § Data lifetime. Height graduated
+    /// out of that set on 2026-08-21 because BL-515 grows province borders against
+    /// elevation DIFFERENCE, making it an input to a live partition rather than a
+    /// breadcrumb explaining a past decision. The rule that keeps this from becoming a
+    /// loophole is in that doc: an intermediate graduates only when a system outside the
+    /// ledger reads it, and it graduates by being named there. Do not delete this field
+    /// to restore the symmetry.
+    ///
+    /// **Not a terrain input.** `landform` and `composition` are NOT derived from this
+    /// field — they were decided inside the pass by rules this capture does not touch.
+    /// Reading it is legitimate; re-deriving terrain from it is a different item.
+    ///
+    /// 0.0 on any tile not produced by `generate_body_tiles` (hand-built harness fixtures).
+    float height = 0.0f;
 };
 
 /// Survey lifecycle of a body (BL-067, docs/ui/SOLAR.md § Survey badge).
