@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*174 entries — 121 open, 53 resolved.*
+*179 entries — 126 open, 53 resolved.*
 
 ---
 
@@ -1121,6 +1121,21 @@ intercept_convoys is called from the top of credit_arrived_convoys rather than f
 *observation · raised 2026-08-21 · from Lane M (BL-458 supply interdiction), agent report + main-session verification, merged and MSVC-confirmed.*
 
 The item specified entity_id convoy_tile_at(const world&, const convoy_component&). It shipped as world& because intra_body_path POPULATES the A* cache, so const is unreachable without paying for a second uncached path solve. Documented at the declaration. Minor, but recorded because the item text will otherwise read as unimplemented, and because a non-const read-shaped function is the kind of thing a later reviewer flags as a mistake when it was a measured trade.
+
+### NR-410 — The province ceiling coefficient has a 28% spread across seeds, and that is reported not hidden
+*Lane B (BL-513 province building ceiling), merged and verified 2026-08-21. · raised 2026-08-21 · from k = 12.6468 is pinned as the aggregate of pooled-per-tile-capacity / sustain-units across 8 seeds, so the ceiling REDISTRIBUTES the capacity the world already grants onto Ben four inputs rather than inventing a new regime. The per-seed ratios run 11.4694 .. 15.2588 - a 28.36% spread of the mean, because seeds genuinely differ in habitable-land share. Consequence: a low-habitability seed gets a ceiling slightly above the capacity it already had, a high one slightly below. Neither binds today (0.115% used, zero provinces at ceiling), so nothing is affected yet - but if the ceiling ever binds, it will bind unevenly across seeds. Worth knowing before density rises. The agent first draft used an invented k of 2.213 and the probe caught it immediately (15-26 provinces already over ceiling); the pinning discipline worked exactly as BL-463 intended.*
+
+### NR-411 — Perf: province_buildings_standing is an O(all buildings) scan inside can_place_in_world
+*Lane B (BL-513 province building ceiling), merged and verified 2026-08-21. · raised 2026-08-21 · from The ceiling gate runs last and only for otherwise-valid tiles, and spectator_determinism still completes in 14s, so it is not a problem today. But it is a linear scan over every building in the world on a placement path that the AI scorer hits every tick. If placement checks get hotter - more corps, more density, or a scorer that evaluates more candidates - this wants a per-province building index rather than a scan. Recorded now so it is a known cost rather than a future mystery.*
+
+### NR-412 — Province id 0 is a REAL province, so the march seam needed a different sentinel
+*Lane U (BL-511 seam half, march_unit to province), merged and verified 2026-08-21. · raised 2026-08-21 · from Measured, not assumed: body rank 0 | block 0 | component 0 is a reachable id, so 0 cannot mean absent. corp_command::province and the wire province= field default to no_province (0xFFFFFFFF), which is structurally unreachable because it would need component index 7 and a 2x2 block yields at most 4. This matters more than it reads: a 0 default would have given an OMITTED wire field a real destination and answered applied - a silent order substitution, exactly what the untrusted-input-boundary rule forbids. The rejection sweep covers 123 in-range-but-absent ids including every single-bit flip of a valid one, against a unit carrying a LIVE order so that mutates nothing cannot pass vacuously. 81/81.*
+
+### NR-413 — BL-470 never added its three verbs to ACTIONS.json - the dictionary has been misrepresenting the seam since 2026-08-19
+*Lane U (BL-511 seam half, march_unit to province), merged and verified 2026-08-21. · raised 2026-08-21 · from march_unit, halt_unit and disband_unit were ALL absent from the action dictionary the AI player reads, from the day BL-470 landed them. The standing rule is that any change to a control or binding updates its entry, and ACTIONS.json is transcribed FROM corp_command.hpp - so the dictionary was simply two days stale on three verbs. The Lane U agent authored all three rather than only the march_unit entry its task named, which was the right call: leaving two absent would keep the dictionary lying about the seam it had just been asked to correct. Flagged because it is the second dictionary-drift finding this week and the enforcement model here is authorship, not machinery (Ben, 2026-08-01) - which only works if it is noticed.*
+
+### NR-414 — Scope taken in Lane U: blackboard facts for unit province and order destination
+*Lane U (BL-511 seam half, march_unit to province), merged and verified 2026-08-21. · raised 2026-08-21 · from The agent added unit_province and unit_order_dest_province to corp_ai.cpp blackboard export, beyond the literal task. Reason given, and it holds: without them an agent over the wire reads its unit position as a TILE but must name its destination as a PROVINCE, so the word interface would be unusable - it could not describe the move it is being asked to make. Small, in the spirit of the ruling, and stated rather than slipped in. Confirm or revert.*
 
 ---
 

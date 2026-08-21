@@ -71,7 +71,10 @@ rule has a fuller authority, it is cited — this file does not redefine it.
   degrading to a camera/ledger anchor with no ownership meaning. Two properties keep
   this honest, both asserted by `tools/verify/spectator_determinism.cpp`: the flag
   **defaults false**, so an ordinary played session is byte-identical (verified against
-  the genuine pre-BL-409 build, `state_hash 3CBAD1D44EE71EDE`), and admitting one more
+  the genuine pre-BL-409 build, `state_hash 3CBAD1D44EE71EDE` — that was the value AT
+  THE TIME; the golden has since been re-blessed as the world legitimately changed, and
+  `spectator_determinism` carries the dated provenance log, so read the harness for the
+  current constant and this line as the historical claim it is), and admitting one more
   corp **shifts no rival's cadence slot**, since the index is over the sorted corp set.
   Outside spectate the prohibition is unchanged and absolute.
   **Nation and polity behaviour is GRANTED (Ben, 2026-08-18, ruling 4 of NR-331), in the
