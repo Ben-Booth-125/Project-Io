@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*218 entries — 160 open, 58 resolved.*
+*238 entries — 180 open, 58 resolved.*
 
 ---
 
@@ -1282,6 +1282,8 @@ settle_score and agrarian_score were single-slot tables that had to choose betwe
 
 ai_skill_harness prints its own banner: 'bands blessed: 2026-08-09 (GCC - STALE since 2026-08-14/BL-386; re-bless from the Linux build)'. history_sim_harness carries no such banner but fails the same way. I did not take either on trust: I built BOTH at the pre-BL-519 commit (2c17e96) in a separate worktree and ran them. ai_skill_harness: 28 failures each side, PASS/FAIL pattern byte-identical. history_sim_harness: 8 failures each side, PASS/FAIL pattern byte-identical. So BL-519 neither caused nor worsened either. Both want re-blessing, and BL-519 is a reason to do it AFTER this lands rather than before, since deposits and the settlement map both moved. NOT re-blessed here - re-blessing a golden without authorisation is exactly what src/world/CLAUDE.md forbids. The 8 history_sim rows are about whether the Era -1 sim fights and takes ground at all (B384a, B384c, BL384a), which is a BL-384-shaped problem and probably wants an item rather than a re-bless.
 
+RE-CONFIRMED at session close, after BL-467 as well as BL-519. Full sweep: 83 of 100 harnesses pass, 14 cannot build in this container (sol2 / ImGui / non-world TUs), and these same 3 fail. Both patterns are STILL byte-identical to the pre-session baseline, so neither BL-519 nor BL-467 touched them. history_sim's 8 rows are about whether the Era -1 sim fights and takes ground at all, which is BL-384-shaped and probably wants an item rather than a re-bless.
+
 ### NR-449 — BL-521's design field in backlog.json is CORRUPTED — it holds the JavaScript that filed the item, not the design
 *observation · raised 2026-08-21 · from Reading BL-521 at the start of the BL-519/BL-520 session.*
 
@@ -1297,15 +1299,248 @@ Not mine and not BL-519's: `git log` puts the line in c49c2fa. MSVC pulls <algor
 
 SDL3 and ImGui come from CMake FetchContent and the session proxy blocks those downloads; there is also no display. So ProjectIo could not be built or run, and no scripts/verify/*.lua check could be executed. What I DID do: cloned ImGui's headers and ran `g++ -fsyntax-only` over every file in src/ui, which is clean. That covers type errors and my migration; it does NOT cover linkage, runtime behaviour, or how anything LOOKS. Specifically unverified: the terrain colour blend (calibrated so all four canonical covers reproduce their pre-split RGB exactly, and arithmetically checked - but never rendered), the generation ledger's new two-histogram layout, and the wizard preview globe's packed-axes sampling. Worth a look on your machine before this is treated as done.
 
-### NR-452 — BL-520: texture SURVIVES the lenses at 0.45 rather than being replaced by them — a decision taken on your behalf
+### NR-452 — The pre-BL-409 state_hash golden in the STANDING RULES is stale — it was already failing before BL-519, and BL-519 has moved the hash again
+*question · raised 2026-08-21 · from Full 99-harness sweep during BL-519; spectator_determinism R2.*
+
+`.claude/rules/io-standing-rules.md` cites `state_hash 3CBAD1D44EE71EDE` by value as the proof that BL-409's spectator mode leaves an ordinary played session byte-identical, and spectator_determinism R2 asserts it. THAT ROW FAILS, and it failed BEFORE this session: built at the previous commit (2c17e96) in a separate worktree, the unspectated hash is B7E6F60D6AFE78C0, not the golden. So something between BL-409 and today already moved world generation without the golden being re-pinned. BL-519 has now moved it again, to B4D09255AF346008 — expected, since deposits and the settlement map both changed, and the item's own resolution says so.
+
+WHAT STILL HOLDS, and it is the part that matters: every load-bearing property in that harness passes on both sides. The prohibition binds (the player corp issues ZERO decisions unspectated), an unspectated run is reproducible, admitting the player shifts no rival's cadence slot, and a spectated run is reproducible tick for tick. The failing row is byte-identity against a FROZEN NUMBER, not a property.
+
+NOT re-blessed. src/world/CLAUDE.md: 'Goldens and pinned bands (state hashes, generation sweeps) are contracts: report movement, never re-bless without authorisation.' And this one is quoted in the standing rules, so re-pinning it edits a rule file — squarely your call, not mine.
+
+Two things need deciding: (1) re-pin to B4D09255AF346008 and update the standing-rules citation; (2) worth a moment's thought on whether a hash pinned to one generation build can survive as a contract at all, given generation legitimately changes — the OTHER three rows prove BL-409's property without any frozen number, which suggests the byte-identity row has done its job and could become a reported hash rather than an asserted one.
+
+RE-CHECKED after BL-467, which folds a new `battles` list into state_hash. The fold is guarded by `if (!battles.empty())`, and the guard WORKS: the hashes are byte-identical before and after BL-467 (played B4D09255AF346008, spectated BB2D94F63FC165E5). So a world that never fights hashes exactly as it did, and BL-467 did not move this golden further. It is still stale for the earlier reason.
+
+### NR-453 — BL-521 was built with NO design to build against — the whole API shape was chosen by the agent, because the item's design prose is the corrupted one
+*novel-work · raised 2026-08-21 · from BL-521 (verify-API click injection), built 2026-08-21.*
+
+Flagged as novel by the agent, and it is right. The CAPABILITY is not scope growth — DEVELOPMENT_PRACTICES.md owns headless verification and BL-521 is a designed A-priority item. But its design field holds the filing script instead of the design (NR-449), so there was nothing to build against: the six Lua binding names, the pan-to-click trade-off and the double-click forcing were all chosen by the agent, not derived from an authority. That is worth knowing before the API is treated as settled, because a verify binding is a seam other checks will be written against and renaming one later invalidates every script that used it.
+
+### NR-454 — BL-521 closes the live-check class for CANVASES but not for PANELS — clicking a nav-rail button or a ledger tab by name needs a target registry nobody owns
+*question · raised 2026-08-21 · from BL-521, reported by the implementing agent.*
+
+What shipped: a script can click a POSITION or a TILE. What it still cannot do is `verify.click('nav.market')`. Nav-rail buttons, ledger tabs, Selection-band rows and the resource graph publish no screen rect, so clicking them by name needs every clickable surface declaring `{name, rect}` into ui_state. That is a design decision, not an implementation detail — who owns the registry, does every widget owe an entry, and does it duplicate ACTIONS.json, which already names every control? Genuine scope growth if pursued. Needs a ruling before the live-check class is FULLY closed, and it is the half that covers most of the surfaces NR-388's six landed-awaiting-a-live-check items are about.
+
+### NR-455 — BL-521's click_tile PANS the view as a side effect, and verify.mouse was deliberately left in place beside the new verify.hover
+*decision taken on your behalf · raised 2026-08-21 · from BL-521, two calls taken by the implementing agent.*
+
+(1) `verify.click_tile(col,row)` and `verify.tile_screen(col,row)` ask the canvas where a tile is, which CENTRES it — so clicking a tile moves the camera. Accepted because the alternative is a second copy of the canvas transform living in the verify API, which would drift. The fix, if you want one, is the canvas publishing tile screen rects without moving. (2) `verify.mouse` moves only the canvases' cursor; the new `verify.hover` moves ImGui's too. Unifying them would be cleaner but would re-bless every existing hover golden, so `mouse` was left untouched. Both are reasonable; both are the agent's calls rather than yours.
+
+### NR-456 — BL-520: texture SURVIVES the lenses at 0.45 rather than being replaced by them — a decision taken on your behalf
 *decision taken on your behalf · raised 2026-08-21 · from BL-520 (basic tile texturing), open question 1. src/ui/body_surface_canvas.cpp.*
 
 The item asked whether texture survives the map lenses or whether lenses replace it — 'a texture underneath a Country-lens fill either reads as depth or as dirt'. I picked SURVIVES, at 0.45 strength, and implemented it. Reasons: (1) the precedent is one channel over — BL-231's landform relief is composited AFTER the lens tint on the argument that terrain facts stay true under an overlay, and 'this is closed-canopy forest' is the same class of fact as 'this is a mountain'; (2) replacing it would make each lens a different MAP rather than the same map read differently, which is what the lens bar depends on. The thing that actually keeps it from reading as dirt is not the 0.45 — it is that every mark's ink is derived from the tile's OWN drawn fill (pushed 55% toward a per-cover target), so under Country a mark is that nation's colour darkened, i.e. shading on the block rather than a second competing colour. Same derivation makes the fog and survey dim free. THE FRAME THAT FALSIFIES IT is texture_lens_country in scripts/verify/tile_texture.lua — if the marks read as unrelated speckle there, the answer was 'replace' and the fix is one constant (k_texture_lens_strength -> 0) plus deleting the attenuation branch.
 
-### NR-453 — BL-520's texture pass is COMPILE-CHECKED ONLY — never rendered, and its verify script has never been run
+[ID NOTE: filed by the BL-520 agent as NR-452 while a concurrent lane was filing entries in the same range; renumbered on merge. The BL-520 commit message and any doc comment written by that agent cite the OLD id.]
+
+### NR-457 — BL-520's texture pass is COMPILE-CHECKED ONLY — never rendered, and its verify script has never been run
 *observation · raised 2026-08-21 · from BL-520, src/ui/hex_render.cpp + src/ui/body_surface_canvas.cpp.*
 
 Same container limitation as NR-451: SDL3/ImGui come from FetchContent, the proxy blocks the downloads, and there is no display, so ProjectIo could not be built or run and no scripts/verify/*.lua could execute. What IS verified: `g++ -std=c++20 -fsyntax-only` is clean on both changed files, and every number quoted in the code comments and in PLANETARY.md was computed independently (LOD ramp 0/0.25/0.5/1 at r=14/16/18/22; density 75/150/205/255 -> 2/3/4/5 marks at alpha 123/157/182/204 of 255; grain alphas 36-76 of 255 at full strength, 16-34 under a lens). What is NOT verified: how ANY of it looks — whether the grain is too loud to let the province blend read as one shape, whether the cover marks are distinguishable from each other, and whether the lens attenuation in NR-452 is right. scripts/verify/tile_texture.lua was written and named in the verifier-visual skill for you to run; it is deliberately capture-only with NO golden blessed, since blessing an unseen frame pins whatever got built.
+
+[ID NOTE: filed by the BL-520 agent as NR-453 while a concurrent lane was filing entries in the same range; renumbered on merge. The BL-520 commit message and any doc comment written by that agent cite the OLD id.]
+
+### NR-458 — BL-520 created a NEW VISUAL VOCABULARY that no authority owns - thirteen mark kinds deliberately not icons, and a third always-on render channel
+*novel-work · raised 2026-08-21 · from BL-520 (basic tile texturing), merged 2026-08-21. Flagged by the implementing agent.*
+
+Two parts, and the agent was right to raise both.
+
+(1) THE MARK VOCABULARY. Nine cover patterns and four substrate grain kinds, none of which existed before. ICONS.md owns the `ui::icons` glyph namespace under a `(dl, centre, r, colour)` contract; these marks are in NEITHER that namespace NOR on that contract. The agent put them in hex_render and documented them in PLANETARY.md, arguing that a hashed FIELD of marks is not an icon. That reads right - an icon is a symbol you look up, a grain is a texture you look through - but it is a boundary judgement that leaves two visual vocabularies where there was one, and ICONS.md currently says nothing about it.
+
+(2) A THIRD RENDER CHANNEL. Texture now composites on every tile forever, alongside hue (substrate x cover) and BL-231's landform relief. Small in code, permanent in consequence: every future overlay, lens and capture inherits it, and the LOD gate makes it the first channel that appears and disappears with zoom.
+
+### NR-459 — Fanned-out agents get worktrees at the SESSION's base commit, not at HEAD — one built an entire item against an enum that had already been deleted
+*observation · raised 2026-08-21 · from BL-516, BL-520 and BL-521 run concurrently on 2026-08-21 while BL-519 landed in the main session.*
+
+All three agents were briefed 'off the current HEAD' and all three got worktrees at 21d4834, the commit this SESSION started from — two behind by the time they launched. The BL-520 agent noticed and fast-forwarded itself before starting. The BL-516 agent did not: it concluded from its own `git log` that 'BL-519 has not landed in code', which was true of its base and false of the repo, and then widened `terrain_composition` — the exact enum BL-519 had just deleted. Roughly an hour of good work (structural water classification, a measurement-pinned seed spacing, per-domain cap assertions) landed on an axis that no longer exists. It is being ported rather than redone, and the port is cheap ONLY because that agent had routed every water test through one choke-point predicate.
+
+TWO THINGS WORTH KEEPING, because DELIVERY.md's worktree model assumes agents start from where the main session is:
+
+1. A brief that says 'off the current HEAD' is not enough. It should name the COMMIT HASH, and tell the agent to verify it and fast-forward if it is behind. Cheap, and it would have caught this in one command.
+2. The sharper rule, which is the one I gave that agent: when a brief's stated base and the repo disagree ABOUT THE THING YOU ARE CHANGING, that is a stop, not something to reconcile. The BL-516 agent reconciled — reasonably, in isolation — and the reconciliation is what cost the hour.
+
+Also worth noting: two agents independently allocated the SAME review ids (NR-452, NR-453) while this lane was using them, because NEEDS_REVIEW.json has no equivalent of next_id.js. Resolved by renumbering on merge, but next_id.js exists for backlog ids precisely because minting off a local file collides, and the review log has the same shape and no such tool.
+
+### NR-460 — Sea provinces reach 82 tiles against your stated 80 — the SAME shape as the 12-vs-13 case you ruled on this morning, and it wants the same kind of answer
+*question · raised 2026-08-21 · from BL-516 (water kinds and sea provinces), merged 2026-08-21.*
+
+You said open-ocean provinces should be 'much larger, but not larger than say 80 tiles'. Growth clamps at 80 and holds. But singleton absorption picks a singleton's CHEAPEST neighbour, and that neighbour may already be full — so a survivor ships at 81 or 82, exactly as a land province shipped at 13. Measured over 6 seeds: 2,272 open-ocean provinces, mean 41.07, max 82; 11 over the clamp totalling 12 excess tiles, and absorption accounts for all 12. 26 sit exactly ON 80.
+
+The agent did NOT invent a second number, which was right — it asserted the accounting identity instead (every tile above 80 arrived by absorption). But that leaves 80 as a clamp the shipped partition exceeds, which is the precise situation NR-438 existed to resolve on land. Your land answer was: 12 becomes a PREFERENCE, 20 becomes an asserted hard cap, and the over-share is reported not asserted. The parallel answer here would be 80-as-preference plus a sea hard cap — but 'say 80' may equally have meant an absolute you want enforced, in which case absorption needs a different rule at the sea boundary. Your call; the numbers are in province_partition_harness section W.
+
+Coastal water is a separate band and is fine: 4,213 provinces, mean 4.57, max 14, inside the 20-tile hard cap it inherits from land (asserted as W2b).
+
+### NR-461 — A lakeshore is no longer a coast — 22% of coastal land tiles lost port and wharf eligibility, taken on your behalf
+*decision taken on your behalf · raised 2026-08-21 · from BL-516, is_coastal narrowed to sea.*
+
+`is_coastal` used to mean 'next to any water'. Now that lake, coast and open ocean are distinct, it means 'next to the SEA', so a tile on a lakeshore stops qualifying. That is the correct reading of the words and it is also a real gameplay change: a Port and a Fishing Wharf both gate on it.
+
+MEASURED, re-taken against the current base: 401 of 1,801 tiles lose eligibility on seed 0 (22.3%), 486/1,713 on seed 1 (28.4%), 432/2,391 on seed 2 (18.1%). So roughly a fifth to a quarter of what used to be buildable coast is not any more.
+
+Defensible either way. A lake genuinely should not support an ocean-going port; but a large lake plausibly should support a fishing wharf, and the current rule denies both. If you want that split, the natural shape is Port gating on sea and Wharf gating on any water — one line each, and it needs your ruling rather than mine.
+
+### NR-462 — Lakes were given their own provinces because your water ruling never said where they belong
+*question · raised 2026-08-21 · from BL-516, the open question the item itself names.*
+
+You named three water kinds — lakes, coasts, oceans — and gave province rules for coastal (3-12) and open ocean (much larger, ~80). Lakes got neither. The agent put a lake on the COASTAL band as its own province: it invents no new size rule and keeps the invariant that a province never spans two domains. Measured on seed 0: 1,433 lake tiles.
+
+The alternatives it did not take, for when you rule: a lake could belong to the LAND province that surrounds it (which makes a lake a feature of a place rather than a place of its own, and would suit a small pond), or lakes could be excluded from the partition entirely the way ocean was before this item. The current choice is the most consistent one; it is not necessarily the one you want.
+
+### NR-463 — An adversarial scout found FOUR real defects in BL-467 an hour after I wrote it — including a withdrawal that cost no men
+*observation · raised 2026-08-21 · from BL-467, verified by a 15-agent scout workflow run against the working tree.*
+
+Recording this because the finding rate is the point, not the fixes. I read the seam myself, wrote the item, and had it compiling and passing 26 harness checks. A scout that read the same code adversarially found four things wrong with it:
+
+1. WITHDRAWAL COST NO MEN. I captured each side's strength AFTER applying the withdrawal, so the parting cost - the resolver's three-term price, the whole reason disengaging is a decision - was invisible to the loss distribution. Breaking off was free in men and expensive only in a number that was erased at the end of the tick. My own harness row passed anyway, because it asserted the REQUEST was accepted rather than that it cost anything.
+
+2. THE MUTUAL-HOSTILITY DEDUP WAS A NO-OP. std::unique only collapses ADJACENT equals, and with a third corp C where A < C < B the sort puts (P,A,B), (P,A,C), (P,B,A) - the mutual pair is not adjacent, so the dedup did nothing in exactly the case it was written for. Correct by accident via a different guard, with a comment claiming a mechanism that did not work. Removed.
+
+3. THE ALL-NAVAL CASE WAS UNSCREENED. resolve_battle scores naval at exactly zero and rejects nothing, and its victory test is a strict '>', so a 0-vs-0 fight resolves as a DEFENDER VICTORY with 400/200 per-mille losses on forces that could not have fought. Discovery never inspects unit class. Unreachable today (land-only roster) and now guarded.
+
+4. ZERO-COUNT UNITS WERE NEVER REAPED - see the next entry.
+
+What made it work: the scout was told to REFUTE each claim and to default to holds=false when it could not confirm from what it read. Several verifications came back refuting the reader that produced them, and the plan it wrote carried the corrections rather than the original claims.
+
+### NR-464 — BL-467's aftermath ruling was FALSE about the code - nothing reaped a zero-count unit, so I extended the existing cleanup rather than adding a second one
+*decision taken on your behalf · raised 2026-08-21 · from BL-467; the defect the scout's Q1 named.*
+
+BL-467's design says 'zero-count units are disbanded by the upkeep pass's EXISTING cleanup, which runs last in the economy step', and I wrote requirement R9 repeating it. Both were wrong about what the code does: run_unit_upkeep's orphan cleanup tests for a missing owner, a missing muster base and a missing tile, and has NO count<=0 test anywhere. Before this item nothing could reduce a count to zero, so the case had never arisen.
+
+Left alone, a unit ground to zero in a battle would have persisted forever - holding a tile, pinning its province, drawing upkeep, and folded into state_hash as a force that no longer exists.
+
+TAKEN ON YOUR BEHALF: I added 'count <= 0' as one more condition on the EXISTING orphan cleanup rather than disbanding inside the battle pass. That keeps the ruling's actual intent - the battle pass removes MEN, the upkeep pass removes UNITS, and there is exactly one disband site - while making the sentence true. The alternative reading, that a zero-count unit is a legitimate world object, seems clearly wrong but is yours to overturn.
+
+### NR-465 — Four things in BL-467 are stubs that nothing in the code, the item or the requirements admits are stubs
+*question · raised 2026-08-21 · from BL-467, from the scout's 'what this plan is not sure of'.*
+
+All four are live in every production battle, and none was written down anywhere as a known gap. Naming them because a stub nobody recorded becomes a bug somebody diagnoses later.
+
+1. DOCTRINE IS ALL ZEROS. Both sides are passed doctrine_row{}. No per-corp doctrine field exists on corporation_component, so resolve_battle's whole doctrine machinery - frontal bonus, flank fragility, the mountain penalty - contributes NOTHING to any battle the game plays. Reasonable as a first cut; it wants an item.
+
+2. SEASON IS HARDCODED TO SUMMER. The world carries no season at all, so the resolver's winter penalty is dead code in production. Forced rather than chosen.
+
+3. MEMBERSHIP IS SNAPSHOTTED AT OPEN. A unit marching into a province where a battle already runs never joins it, because discovery skips a pair already fighting there. Reinforcement is impossible, and whether it SHOULD be is not settled anywhere - ruling 1 says units keep their tiles and never pool, which does not answer it.
+
+4. 'THE FIELD IS HELD BY THE SIDE THAT STAYED' HAS NO CONSEQUENCE. It is in the item and in R9, but no territorial-control concept exists for a battle to affect, so holding the field means nothing happens. R9 is marked PARTIAL for this reason rather than complete.
+
+### NR-466 — Two smaller BL-467 calls you may want to overturn: disband-under-fire is legal, and the battle seed reads a tick the code says is not authoritative
+*question · raised 2026-08-21 · from BL-467, the scout's Q4 and its determinism caveat.*
+
+1. DISBAND-UNDER-FIRE IS LEGAL. march_unit is refused for a unit in contact, on the reasoning that walking away is a priced withdrawal. disband_unit is NOT guarded - a corp can dissolve its army mid-battle. I left it legal rather than blocking it for consistency, on the grounds that it is not actually an escape: disbanding forfeits the WHOLE remaining unit with no refund, where withdrawing costs a fraction, so it is strictly worse than the priced option and reads as a rout rather than an exploit. But the asymmetry with march_unit is real and it was my call.
+
+2. THE BATTLE SEED FOLDS world::current_day_tick, whose own comment says it is 'not authoritative sim state and not serialised'. Every tick driver sets it, so it is correct in practice - but it is now load-bearing for a random stream while the field disclaims exactly that role. Either the comment is too modest or the seed should fold something else.
+
+3. Related, smaller: campaign_battle_params is constructed fresh each tick and NOT stored on the battle, so a tuning change between ticks would silently re-tune a fight in flight - and setting swing_permille to 0 would change the DRAW COUNT mid-stream, which breaks replay. Impossible today (hardcoded defaults); a real hazard the moment params become data, which the item's own 'authored data' framing invites.
+
+### NR-467 — Sprint C3's rider, measured: a flat per-head upkeep is BRUTALLY REGRESSIVE — at 'light' rates a 700-man army costs a small corp 155% of its entire income and a large one 7.8%
+*question · raised 2026-08-21 · from Sprint C3 rider; tools/verify/unit_upkeep_rates.cpp, built and run 2026-08-21.*
+
+The rider was 'turn the upkeep rates off zero and measure the movement'. I measured and did NOT turn them on: scripts/economy.lua says in as many words that the pricing is to be 'tuned by playtest against a MEASURED BASELINE rather than guessed here', so the numbers are yours to pick. New harness `unit_upkeep_rates` prints them; it asserts only invariants (shipped rates still zero, zero still costs nothing, the draw is linear in heads).
+
+THE FORCE: 500 Levy Spear + 200 Rifle Regiment — 700 men, a mid-sized standing army.
+
+  rate set   credits/tick   ordnance/tick   ticks to collapse unsupplied   ticks to recover
+  shipped            0.00           0.000   never                          never
+  token             15.52           1.400   200                            100
+  light             77.60           7.000   50                             40
+  real             310.40          28.000   20                             25
+  heavy            776.00          70.000   9                              17
+
+THE FINDING, and it is not the one I expected. As a SHARE of corp income the same rate lands completely differently by corp size:
+
+  rate set    vs 50/tick corp   vs 200/tick   vs 1000/tick
+  token              31.0%          7.8%          1.6%
+  light             155.2%         38.8%          7.8%
+  real              620.8%        155.2%         31.0%
+  heavy            1552.0%        388.0%         77.6%
+
+So 'light' — a rate that reads as modest and costs a large corp 7.8% — is INSTANTLY FATAL to a small one, at 155% of everything it earns. A flat per-head rate does not scale a cost, it selects which corps may have armies at all. That may be exactly what you want (a militia is a rich corp's privilege) or exactly what you don't (only one corp can ever field a force, so there is no conflict). Either way it is a design choice the number hides, and it wants deciding before a rate is picked rather than after a playtest reads oddly.
+
+FOR BL-458 (supply lines cannot be cut), which this rider exists to unblock: the column that matters is ticks-to-collapse. At 'token' an unsupplied army takes 200 ticks to degrade — cutting a lane is a gesture nobody would notice. At 'real' it is 20 ticks, and at 'heavy' 9. Interdiction only becomes a mechanic somewhere around 'real'. Note also that an unsupplied unit is not dead but WEAK: supply_factor_permille feeds unit_to_stack_entry, so it is measurably worse in the resolver — which is now a live consequence rather than a theoretical one, since BL-467 landed the same day.
+
+One more thing the sweep surfaces: `out_of_supply_reach` at 0 disables the reach trigger entirely, and its own comment notes the reach field is therefore never built from the upkeep pass — 'the Dijkstra cost is opt-in'. Turning it on has a PERFORMANCE cost nobody has measured. I did not measure it either, because it needs a real generated world rather than this fixture; flagging it so it is not discovered as a frame-time regression.
+
+### NR-468 — Which battle a click selects when several stand in one province
+*decision taken on your behalf · raised 2026-08-21 · from BL-469 (battle card) — adversarial scout pass over the surfaces.*
+
+A third corp arriving in a province opens its OWN battles against each existing participant rather than joining theirs, so one province can hold several live battles. A click on the province is one press but has several possible targets. TAKEN: `first_battle_in()` returns the player's own fight first, falling back to sorted (province, attacker, defender) order when none of them is the player's.
+
+**Why it matters.** The rule is invisible in the UI — the card shows one fight with no indication that others stand on the same ground. A player watching a three-way could reasonably think the other two fights do not exist.
+
+- Keep the current rule (own fight first, then sorted).
+- Cycle through the province's battles on repeated clicks, as the 5-rung selection cycle already does for other kinds.
+- Show a chooser when more than one battle stands in the province.
+
+> **Recommendation:** Keep it for now; revisit if three-way fights turn out to be common in play. The cycle option is the cheapest upgrade and reuses machinery that already exists.
+
+*Files: `src/world/battle_system.cpp`, `src/ui/selection_panel.cpp`, `src/ui/body_surface_canvas.cpp`*
+
+### NR-469 — A rival-vs-rival battle card still shows both sides' aggregate strength
+*question · raised 2026-08-21 · from BL-469 (battle card) — adversarial scout pass over the surfaces.*
+
+The card DOES redact per-unit composition on a fight that is not the player's — each side reads 'Composition unknown - a rival's forces are not yours to count', and the Withdraw press is disabled with 'Not your fight' rather than hidden, so the rule reads as a rule. What is NOT redacted is the AGGREGATE: the strength bar, the '% of what marched in' figure, the phase word and the round count are shown for any battle. (Spectator god view lifts the redaction in the UI only, BL-408's existing pair-test.)
+
+**Why it matters.** Aggregate strength is arguably still an internal under BL-068 — knowing a rival is at 30% is most of what you would pay a survey for. And it is the OPPOSITE call to the one the dispatch stream makes (NR-470: rival fights are skipped entirely), so the two surfaces on the same data currently disagree about what the player may see.
+
+- Keep the aggregate visible — a fight's momentum is a public fact, its order of battle is not.
+- Redact the aggregate too: phase word and province only, no numbers.
+- Gate BOTH surfaces on the body's activity-fog tier (BL-089), so a war where you trade reads clearly and one elsewhere does not.
+
+> **Recommendation:** Option 3 makes the two surfaces agree by construction and reuses fog machinery that already exists. Settle it with NR-470 — one question, two surfaces.
+
+*Files: `src/ui/selection_panel.cpp`, `docs/ui/DISCOVERY.md`*
+
+### NR-470 — Field-channel dispatches are restricted to the player's own fights
+*decision taken on your behalf · raised 2026-08-21 · from BL-468 (battle dispatches) — adversarial scout pass over the surfaces.*
+
+`post_battle_dispatches` posts a line ONLY when the player's corp is the attacker or the defender; rival-vs-rival dispatches are skipped. TAKEN on the BL-212 precedent — corporations are kept out of Public precisely so a rival's internals do not leak through comms, and a dispatch naming two rivals' strengths would be that leak by another route. A rival war is visible on the canvas as a battle marker, which says WHERE without saying how it is going.
+
+**Why it matters.** It is the OPPOSITE call to the one the battle card currently makes (NR-469: the card shows a rival-vs-rival fight in full). Two surfaces on the same data disagreeing about what the player may see is the state worth settling, whichever way it goes — either the card should redact, or the dispatches should not.
+
+- Keep as-is and redact the card to match (the conservative pairing).
+- Post rival fights as a one-line neutral notice and open the card up to match.
+- Gate BOTH on the body's activity-fog tier (BL-089), so a war where you trade reads clearly and one elsewhere does not.
+
+> **Recommendation:** Option 3 composes with the fog already built and makes the two surfaces agree by construction. Settle it together with NR-469 — one question, two surfaces.
+
+*Files: `src/core/session_history.cpp`, `src/core/battle_dispatch_text.cpp`*
+
+### NR-471 — The Field channel has no mute, and battle traffic is the loudest stream yet
+*observation · raised 2026-08-21 · from BL-468 (battle dispatches).*
+
+`chat_panel`'s channels are a fixed pair (Public, Field) with no per-channel mute flag. A dispatch posts per battle per tick, so a busy war is several lines a tick — an order of magnitude more traffic than the nation-voiced or counsel posters that channel model was built for.
+
+**Why it matters.** Not a defect today (the Field channel is separate, so it does not bury Public), but the first stream in the game whose volume is driven by simulation intensity rather than by scripted events.
+
+> **Recommendation:** File a small backlog item for a per-channel mute if play shows it is needed. Not worth building on speculation.
+
+*Files: `src/ui/chat_panel.hpp`, `src/core/session_history.cpp`*
+
+### NR-472 — verify_api gained a GENERIC corp_command binding, not a narrow one
+*decision taken on your behalf · raised 2026-08-21 · from BL-469 — the visual-check class was blocked; the scout found verify_api could only issue place_sell_order, so no battle could be made to exist inside a verify run at all.*
+
+TAKEN: added `verify.corp_command{...}`, a generic binding over the whole corp_verb seam, rather than a narrow `verify.hire_unit`. It is range-gated against `corp_verb_count` and range-checks the workforce value BEFORE the narrowing cast, per the untrusted-boundary rule; an out-of-range command is rejected whole and mutates nothing.
+
+**Why it matters.** This is a widening of the verify seam's reach from one verb to all of them. It is the right shape (every future verb is testable without another binding) but it deserves a look, because the verify seam is a scripted input boundary and the standing rule treats those as untrusted.
+
+- Keep the generic binding.
+- Replace it with per-verb narrow bindings, added as each is needed.
+
+> **Recommendation:** Keep it. The alternative is a binding per verb forever, and the validation is at the boundary either way.
+
+*Files: `src/core/verify_api.cpp`*
+
+### NR-473 — BL-469 touched two files outside its declared scope
+*decision taken on your behalf · raised 2026-08-21 · from BL-469 (battle card) implementation.*
+
+BL-469's declared file scope is the UI surfaces. Delivering it also required `src/world/battle_system.{hpp,cpp}` (for `first_battle_in`, `quote_withdrawal` and `read_battle_phase` — the card must not recompute the withdrawal price, or it drifts from what withdrawing actually charges) and `src/core/verify_api.cpp` (see NR-472). TAKEN: made the changes and recorded them here rather than stopping.
+
+**Why it matters.** The declared scope is what the collision map is built from. Two items in one batch both silently widening is how a batch loses its isolation guarantee — even though here the widening was small and additive.
+
+> **Recommendation:** Update BL-469's `files` in backlog.json to match what it actually touched, so the record is honest.
+
+*Files: `docs/development/backlog.json`, `src/world/battle_system.hpp`, `src/core/verify_api.cpp`*
 
 ---
 

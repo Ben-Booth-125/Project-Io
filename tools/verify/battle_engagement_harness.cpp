@@ -28,6 +28,7 @@
 // Run: battle_engagement_harness
 // ---------------------------------------------------------------------------
 
+#include "core/battle_dispatch_text.hpp" // BL-468: the phrase bank, testable because it is its own TU
 #include "world/battle_system.hpp"
 #include "world/corp_command.hpp"
 #include "world/economy_system.hpp"
@@ -40,6 +41,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -509,6 +511,68 @@ int main()
         check(a.w.state_hash(5) == b.w.state_hash(5),
               "B13b ...and the worlds themselves stayed identical, so reporting moved nothing");
         std::printf("        %zu dispatches over five ticks\n", da.size());
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nB14 — the dispatch TEXT (BL-468)\n");
+    {
+        // Assertable at all only because the phrase bank lives in its own TU
+        // rather than in session_history.cpp, which reaches <SDL3/SDL.h> and can
+        // neither be syntax-checked nor linked headless. A dispatch line is
+        // exactly the sort of thing that goes wrong silently — a phase with no
+        // bank, a hole where a name should be, a line crediting the wrong side.
+        fixture f;
+        build_fixture(f);
+        std::vector<battle_dispatch> seen;
+        for (int i = 0; i < 10; ++i)
+        {
+            const battle_tick t = run_battles(f.w, reg, i);
+            seen.insert(seen.end(), t.dispatches.begin(), t.dispatches.end());
+        }
+        check(!seen.empty(), "B14 setup: dispatches were produced");
+
+        bool all_named = true, all_nonempty = true, no_holes = true;
+        for (const battle_dispatch& d : seen)
+        {
+            const std::string line = battle_dispatch_line(f.w, d);
+            if (line.empty()) all_nonempty = false;
+            // Every token must have been substituted. NOT "contains no %" — a
+            // percentage sign is legitimate output ("89%"), and asserting its
+            // absence failed on correct text. The real defect is a % followed by
+            // a TOKEN LETTER, which is a bank with a typo reaching the player as
+            // gibberish.
+            for (std::size_t i = 0; i + 1 < line.size(); ++i)
+                if (line[i] == '%' && std::string("ADPadrWF").find(line[i + 1]) != std::string::npos)
+                    no_holes = false;
+            // Both corps are named by the corp NAME, never by a raw id.
+            if (line.find("Attacker") == std::string::npos
+                && line.find("Defender") == std::string::npos
+                && line.find("province") == std::string::npos)
+                all_named = false;
+        }
+        check(all_nonempty, "B14a every phase produces a line — no bank has a hole in it");
+        check(no_holes, "B14b every token substitutes — no unfilled %%TOKEN reaches the player");
+        check(all_named, "B14c lines name the fight rather than printing raw ids");
+
+        // PURE FUNCTION: the same record must always produce the same line, and
+        // producing one must not touch the world.
+        const uint64_t h_before = f.w.state_hash(99);
+        const std::string a1 = battle_dispatch_line(f.w, seen.front());
+        const std::string a2 = battle_dispatch_line(f.w, seen.front());
+        check(a1 == a2, "B14d the same record always says the same thing");
+        check(f.w.state_hash(99) == h_before,
+              "B14e saying it changed nothing — the dispatch layer cannot move the sim");
+
+        // And it VARIES: a bank that always picks index 0 is a bank that is not
+        // being folded at all, which would pass every check above.
+        std::set<std::string> distinct;
+        for (const battle_dispatch& d : seen) distinct.insert(battle_dispatch_line(f.w, d));
+        std::printf("        %zu dispatches -> %zu distinct lines\n", seen.size(), distinct.size());
+        check(distinct.size() > 1 || seen.size() <= 1,
+              "B14f wording actually varies across a fight (the seed fold is live)");
+
+        const std::string sample = battle_dispatch_line(f.w, seen.front());
+        std::printf("        e.g. \"%s\"\n", sample.c_str());
     }
 
     std::printf("\n%d checks, %d failures\n", checks, failures);

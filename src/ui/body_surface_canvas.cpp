@@ -10,6 +10,7 @@
 #include "market_ledger.hpp" // market_city_name (Market lens catchment key, BL-015)
 #include "nav_pane.hpp"
 #include "presentation.hpp"
+#include "world/battle_system.hpp" // first_battle_in (BL-469 battle rung)
 #include "world/hex_neighbors.hpp"   // canonical odd-r neighbour offsets (BL-363)
 #include "world/logistics.hpp"       // intra_body_path (convoy vision beam, BL-152)
 #include "world/market_clearing.hpp" // market_for_tile (Scarcity catchment, prices)
@@ -1167,6 +1168,13 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     if (state.selected_entity != state.province_sync_entity)
     {
         state.selected_province    = 0;
+        // BL-469: the battle selection is a THIRD channel into the same one
+        // element, so it clears on the same reconciliation. Without this arm a
+        // battle card would survive a click on a building and the Selection
+        // element would have two things to draw — the exact failure the
+        // province_sync_entity witness exists to prevent, one selection kind
+        // later.
+        state.clear_battle_selection();
         state.province_sync_entity = state.selected_entity;
     }
 
@@ -2664,6 +2672,39 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 icons::convoy(dl, {cx, cy}, gr, supply_col);
             }
 
+            // BATTLE MARKER (BL-469). Drawn on the ANCHOR tile of a province a
+            // fight is in — once per battle, not once per tile, or a large
+            // province would read as a dozen battles.
+            //
+            // It is an alert rather than a label, which is what earns it a place
+            // the deleted unit chevron (BL-294) did not have: a battle is
+            // time-limited AND reversible by a decision, so a fight the player
+            // never notices is a decision they never got to make.
+            //
+            // VISIBILITY (BL-068): a rival-vs-rival fight shows the marker — WHERE
+            // fighting is happening is public, the way a rival's buildings are —
+            // and the card withholds the internals. Tinted by whether it is yours,
+            // so the two read apart at a glance.
+            if (!w.battles.empty() && draw_r >= 6.0f)
+            {
+                const uint32_t pid = w.provinces.province_of(id);
+                if (pid != 0)
+                {
+                    const province* pv = w.provinces.find(pid);
+                    if (pv != nullptr && !pv->tiles.empty() && pv->tiles.front() == id)
+                    {
+                        if (const active_battle* b = first_battle_in(w, pid))
+                        {
+                            const bool mine = (b->attacker == w.player_entity
+                                            || b->defender == w.player_entity);
+                            const ImU32 col = mine ? IM_COL32(255, 120, 90, 235)
+                                                   : IM_COL32(190, 170, 160, 190);
+                            icons::battle(dl, {cx, cy}, std::max(3.0f, draw_r * 0.42f), col);
+                        }
+                    }
+                }
+            }
+
             // Selection outline is drawn on every visible copy of the selected
             // tile; hover is deferred to a single nearest copy, resolved below.
             draw_hex_highlight(dl, verts,
@@ -3245,25 +3286,44 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 // The province rung is expressed as null_entity + a province id,
                 // so "nothing here, skip it" cannot be a null check on that rung —
                 // hence the explicit `stage_live` table.
-                const entity_id stages[4] = { unit_here,
+                // BL-469 put the BATTLE on the front: five rungs now, and rung 0
+                // is expressed the same way the province rung is — null_entity
+                // plus a key that is not an entity — so `stage_live` carries its
+                // liveness too rather than a null check standing in for it.
+                const active_battle* battle_here =
+                    (hovered_prov != 0) ? first_battle_in(w, hovered_prov) : nullptr;
+
+                const entity_id stages[5] = { null_entity,      // battle rung
+                                              unit_here,
                                               null_entity,      // province rung
                                               building_here,
                                               hovered_tile };
-                const bool stage_live[4] = { unit_here != null_entity,
+                const bool stage_live[5] = { battle_here != nullptr,
+                                             unit_here != null_entity,
                                              hovered_prov != 0,
                                              building_here != null_entity,
                                              hovered_tile != null_entity };
                 int stage = state.selection_cycle_stage;
-                for (int i = 0; i < 4; ++i)
+                for (int i = 0; i < 5; ++i)
                 {
-                    stage = (stage + 1) % 4;
+                    stage = (stage + 1) % 5;
                     if (stage_live[stage])
                         break;
                 }
                 state.selection_cycle_stage = stage;
                 state.selected_entity       = stages[stage];
-                state.selected_province     = (stage == 1) ? hovered_prov : 0u;
+                state.selected_province     = (stage == 2) ? hovered_prov : 0u;
                 state.province_sync_entity  = state.selected_entity;
+                if (stage == 0 && battle_here != nullptr)
+                {
+                    state.selected_battle_province = battle_here->province;
+                    state.selected_battle_attacker = battle_here->attacker;
+                    state.selected_battle_defender = battle_here->defender;
+                }
+                else
+                {
+                    state.clear_battle_selection();
+                }
             }
             else
             {

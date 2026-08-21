@@ -466,11 +466,64 @@ indexed against a constant — so a repartition changes only how many bands the 
 An ocean or otherwise unpartitioned tile has no province and still selects as a **tile**, so
 clicking water selects something rather than nothing.
 
+### The battle element (BL-469, 2026-08-21)
+
+**A live battle selects ahead of everything else.** `draw_battle_selection` is dispatched
+**first** — before the province resolution, before `selection_kind_of` — because a battle is the
+only selection in the game whose subject is *spending an asset the player cannot re-buy this tick*
+while they watch. Everything else answers a standing question about a thing that will still be
+there next tick; this answers a decision that expires.
+
+Like a province, a battle is not an entity, so it travels in its own fields:
+
+| Field | Meaning |
+|---|---|
+| `ui_state::selected_battle_province` | The province the selected fight stands in, or `0` for none. |
+| `ui_state::selected_battle_attacker` / `_defender` | The two corps, which *name* the fight — a province can hold several. |
+| `ui_state::pending_withdraw_province` / `_against` | The withdraw press awaiting its confirm popup. |
+
+`has_battle_selection()` / `clear_battle_selection()` are the accessors; the canvas reconciles a
+stale battle selection on the same arm it reconciles a stale province one, and the battle sits at
+**rung 0** of the repeat-click cycle (widened from 4 rungs to 5 — see below).
+
+**More than one battle can stand in one province.** A third corp arriving opens its **own** battles
+against each existing participant rather than joining theirs, so "the battle here" is a choice.
+`first_battle_in()` makes it deliberately: **the player's own fight first**, then sorted
+`(province, attacker, defender)` order when none of them is the player's — the fight you are in is
+the one you need the card for. Flagged for Ben (NR-468).
+
+#### What the card carries, and why each part earns its place
+
+- **The phase word** — `battle_phase_word(read_battle_phase(…))`. Rounds are mechanically uniform;
+  the phase is a *reading* of one. It is derived **once, in the world layer**, precisely so this
+  card and the Field-channel dispatch stream (BL-468) cannot describe the same fight differently.
+- **Per-unit strength bars, both sides.** "I am at 60%" does not say whether that is one broken
+  formation or five even ones, which is the difference between staying and leaving.
+- **The withdrawal price, with its three terms separated** — base, per-round, pursuit — quoted from
+  `quote_withdrawal()`, i.e. **the resolver's own arithmetic**, never recomputed here. A second copy
+  of that sum in a card is a second place for what the card *says* leaving costs to drift from what
+  leaving *charges*. The harness asserts quote-against-charge for exactly this reason.
+- **A confirm popup on the withdraw press.** The press is irreversible and priced; it is the one
+  action on any Selection element that spends men.
+
+**Rival-vs-rival redaction (BL-068).** A fight that is not the player's shows the phase, the round
+and each side's *aggregate* strength, but each side's composition reads *"Composition unknown — a
+rival's forces are not yours to count"*, and the Withdraw press is **disabled with a reason rather
+than hidden**, so the rule reads as a rule instead of as a missing button. Spectator god view lifts
+the redaction in the UI only, on BL-408's existing pair-test. Whether the *aggregate* should be
+redacted too is open (NR-469) — and it is the opposite call to the one the dispatch stream makes,
+which skips rival fights entirely (NR-470). One question, two surfaces.
+
 ### Tile repeat-click selection cycle (placeholder, 2026-08-15; retargeted BL-511)
 
-`body_surface_canvas.cpp`'s click handler cycles **Soldier → Building → Province → Soldier** on a
-**repeat** click at the same tile the selection already sits on, skipping any stage with nothing
+`body_surface_canvas.cpp`'s click handler cycles **Battle → Soldier → Building → Province → Battle**
+on a **repeat** click at the same tile the selection already sits on, skipping any stage with nothing
 there (no unit on the tile skips straight to Building; no building skips to Province).
+
+> **BL-469 added the battle rung at position 0**, widening the stage tables from 4 entries to 5. It
+> leads because a live battle is the time-limited reading of that ground; the other three rungs are
+> standing facts about it. The rung is live only when `first_battle_in()` finds a fight in the
+> tile's province, so on peaceful ground the cycle is exactly what it was.
 `ui_state::selection_cycle_tile` / `selection_cycle_stage` track the anchor tile and current stage.
 
 > **BL-511 changed the terminal stage from Tile to Province.** Because a province is expressed as

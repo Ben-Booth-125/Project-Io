@@ -3160,6 +3160,122 @@
    "title": "Sprint C3's rider, measured: a flat per-head upkeep is BRUTALLY REGRESSIVE — at 'light' rates a 700-man army costs a small corp 155% of its entire income and a large one 7.8%",
    "source": "Sprint C3 rider; tools/verify/unit_upkeep_rates.cpp, built and run 2026-08-21.",
    "what": "The rider was 'turn the upkeep rates off zero and measure the movement'. I measured and did NOT turn them on: scripts/economy.lua says in as many words that the pricing is to be 'tuned by playtest against a MEASURED BASELINE rather than guessed here', so the numbers are yours to pick. New harness `unit_upkeep_rates` prints them; it asserts only invariants (shipped rates still zero, zero still costs nothing, the draw is linear in heads).\n\nTHE FORCE: 500 Levy Spear + 200 Rifle Regiment — 700 men, a mid-sized standing army.\n\n  rate set   credits/tick   ordnance/tick   ticks to collapse unsupplied   ticks to recover\n  shipped            0.00           0.000   never                          never\n  token             15.52           1.400   200                            100\n  light             77.60           7.000   50                             40\n  real             310.40          28.000   20                             25\n  heavy            776.00          70.000   9                              17\n\nTHE FINDING, and it is not the one I expected. As a SHARE of corp income the same rate lands completely differently by corp size:\n\n  rate set    vs 50/tick corp   vs 200/tick   vs 1000/tick\n  token              31.0%          7.8%          1.6%\n  light             155.2%         38.8%          7.8%\n  real              620.8%        155.2%         31.0%\n  heavy            1552.0%        388.0%         77.6%\n\nSo 'light' — a rate that reads as modest and costs a large corp 7.8% — is INSTANTLY FATAL to a small one, at 155% of everything it earns. A flat per-head rate does not scale a cost, it selects which corps may have armies at all. That may be exactly what you want (a militia is a rich corp's privilege) or exactly what you don't (only one corp can ever field a force, so there is no conflict). Either way it is a design choice the number hides, and it wants deciding before a rate is picked rather than after a playtest reads oddly.\n\nFOR BL-458 (supply lines cannot be cut), which this rider exists to unblock: the column that matters is ticks-to-collapse. At 'token' an unsupplied army takes 200 ticks to degrade — cutting a lane is a gesture nobody would notice. At 'real' it is 20 ticks, and at 'heavy' 9. Interdiction only becomes a mechanic somewhere around 'real'. Note also that an unsupplied unit is not dead but WEAK: supply_factor_permille feeds unit_to_stack_entry, so it is measurably worse in the resolver — which is now a live consequence rather than a theoretical one, since BL-467 landed the same day.\n\nOne more thing the sweep surfaces: `out_of_supply_reach` at 0 disables the reach trigger entirely, and its own comment notes the reach field is therefore never built from the upkeep pass — 'the Dijkstra cost is opt-in'. Turning it on has a PERFORMANCE cost nobody has measured. I did not measure it either, because it needs a real generated world rather than this fixture; flagging it so it is not discovered as a frame-time regression."
+  },
+  {
+   "id": "NR-468",
+   "title": "Which battle a click selects when several stand in one province",
+   "raised": "2026-08-21",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-469 (battle card) — adversarial scout pass over the surfaces.",
+   "what": "A third corp arriving in a province opens its OWN battles against each existing participant rather than joining theirs, so one province can hold several live battles. A click on the province is one press but has several possible targets. TAKEN: `first_battle_in()` returns the player's own fight first, falling back to sorted (province, attacker, defender) order when none of them is the player's.",
+   "why_it_matters": "The rule is invisible in the UI — the card shows one fight with no indication that others stand on the same ground. A player watching a three-way could reasonably think the other two fights do not exist.",
+   "options": [
+    "Keep the current rule (own fight first, then sorted).",
+    "Cycle through the province's battles on repeated clicks, as the 5-rung selection cycle already does for other kinds.",
+    "Show a chooser when more than one battle stands in the province."
+   ],
+   "recommendation": "Keep it for now; revisit if three-way fights turn out to be common in play. The cycle option is the cheapest upgrade and reuses machinery that already exists.",
+   "files": [
+    "src/world/battle_system.cpp",
+    "src/ui/selection_panel.cpp",
+    "src/ui/body_surface_canvas.cpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-469",
+   "title": "A rival-vs-rival battle card still shows both sides' aggregate strength",
+   "raised": "2026-08-21",
+   "kind": "question",
+   "status": "open",
+   "source": "BL-469 (battle card) — adversarial scout pass over the surfaces.",
+   "what": "The card DOES redact per-unit composition on a fight that is not the player's — each side reads 'Composition unknown - a rival's forces are not yours to count', and the Withdraw press is disabled with 'Not your fight' rather than hidden, so the rule reads as a rule. What is NOT redacted is the AGGREGATE: the strength bar, the '% of what marched in' figure, the phase word and the round count are shown for any battle. (Spectator god view lifts the redaction in the UI only, BL-408's existing pair-test.)",
+   "why_it_matters": "Aggregate strength is arguably still an internal under BL-068 — knowing a rival is at 30% is most of what you would pay a survey for. And it is the OPPOSITE call to the one the dispatch stream makes (NR-470: rival fights are skipped entirely), so the two surfaces on the same data currently disagree about what the player may see.",
+   "options": [
+    "Keep the aggregate visible — a fight's momentum is a public fact, its order of battle is not.",
+    "Redact the aggregate too: phase word and province only, no numbers.",
+    "Gate BOTH surfaces on the body's activity-fog tier (BL-089), so a war where you trade reads clearly and one elsewhere does not."
+   ],
+   "recommendation": "Option 3 makes the two surfaces agree by construction and reuses fog machinery that already exists. Settle it with NR-470 — one question, two surfaces.",
+   "files": [
+    "src/ui/selection_panel.cpp",
+    "docs/ui/DISCOVERY.md"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-470",
+   "title": "Field-channel dispatches are restricted to the player's own fights",
+   "raised": "2026-08-21",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-468 (battle dispatches) — adversarial scout pass over the surfaces.",
+   "what": "`post_battle_dispatches` posts a line ONLY when the player's corp is the attacker or the defender; rival-vs-rival dispatches are skipped. TAKEN on the BL-212 precedent — corporations are kept out of Public precisely so a rival's internals do not leak through comms, and a dispatch naming two rivals' strengths would be that leak by another route. A rival war is visible on the canvas as a battle marker, which says WHERE without saying how it is going.",
+   "why_it_matters": "It is the OPPOSITE call to the one the battle card currently makes (NR-469: the card shows a rival-vs-rival fight in full). Two surfaces on the same data disagreeing about what the player may see is the state worth settling, whichever way it goes — either the card should redact, or the dispatches should not.",
+   "options": [
+    "Keep as-is and redact the card to match (the conservative pairing).",
+    "Post rival fights as a one-line neutral notice and open the card up to match.",
+    "Gate BOTH on the body's activity-fog tier (BL-089), so a war where you trade reads clearly and one elsewhere does not."
+   ],
+   "recommendation": "Option 3 composes with the fog already built and makes the two surfaces agree by construction. Settle it together with NR-469 — one question, two surfaces.",
+   "files": [
+    "src/core/session_history.cpp",
+    "src/core/battle_dispatch_text.cpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-471",
+   "title": "The Field channel has no mute, and battle traffic is the loudest stream yet",
+   "raised": "2026-08-21",
+   "kind": "observation",
+   "status": "open",
+   "source": "BL-468 (battle dispatches).",
+   "what": "`chat_panel`'s channels are a fixed pair (Public, Field) with no per-channel mute flag. A dispatch posts per battle per tick, so a busy war is several lines a tick — an order of magnitude more traffic than the nation-voiced or counsel posters that channel model was built for.",
+   "why_it_matters": "Not a defect today (the Field channel is separate, so it does not bury Public), but the first stream in the game whose volume is driven by simulation intensity rather than by scripted events.",
+   "recommendation": "File a small backlog item for a per-channel mute if play shows it is needed. Not worth building on speculation.",
+   "files": [
+    "src/ui/chat_panel.hpp",
+    "src/core/session_history.cpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-472",
+   "title": "verify_api gained a GENERIC corp_command binding, not a narrow one",
+   "raised": "2026-08-21",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-469 — the visual-check class was blocked; the scout found verify_api could only issue place_sell_order, so no battle could be made to exist inside a verify run at all.",
+   "what": "TAKEN: added `verify.corp_command{...}`, a generic binding over the whole corp_verb seam, rather than a narrow `verify.hire_unit`. It is range-gated against `corp_verb_count` and range-checks the workforce value BEFORE the narrowing cast, per the untrusted-boundary rule; an out-of-range command is rejected whole and mutates nothing.",
+   "why_it_matters": "This is a widening of the verify seam's reach from one verb to all of them. It is the right shape (every future verb is testable without another binding) but it deserves a look, because the verify seam is a scripted input boundary and the standing rule treats those as untrusted.",
+   "options": [
+    "Keep the generic binding.",
+    "Replace it with per-verb narrow bindings, added as each is needed."
+   ],
+   "recommendation": "Keep it. The alternative is a binding per verb forever, and the validation is at the boundary either way.",
+   "files": [
+    "src/core/verify_api.cpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-473",
+   "title": "BL-469 touched two files outside its declared scope",
+   "raised": "2026-08-21",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-469 (battle card) implementation.",
+   "what": "BL-469's declared file scope is the UI surfaces. Delivering it also required `src/world/battle_system.{hpp,cpp}` (for `first_battle_in`, `quote_withdrawal` and `read_battle_phase` — the card must not recompute the withdrawal price, or it drifts from what withdrawing actually charges) and `src/core/verify_api.cpp` (see NR-472). TAKEN: made the changes and recorded them here rather than stopping.",
+   "why_it_matters": "The declared scope is what the collision map is built from. Two items in one batch both silently widening is how a batch loses its isolation guarantee — even though here the widening was small and additive.",
+   "recommendation": "Update BL-469's `files` in backlog.json to match what it actually touched, so the record is honest.",
+   "files": [
+    "docs/development/backlog.json",
+    "src/world/battle_system.hpp",
+    "src/core/verify_api.cpp"
+   ],
+   "resolution": null
   }
  ]
 }

@@ -264,6 +264,17 @@ decision surface, so it gave up the prime right-edge slot under the time panel; 
 quarter-width it gives back goes to the Selection band. The icon rail keeps its full
 height past the dock — at the 1280×720 floor a shortened rail would clip two slots.
 
+**The Field channel (BL-468, 2026-08-21)** is the dock's second standing channel, appended after
+Public — *appended*, never inserted, because `m_counsel_channel` caches an index into the channel
+list. It carries battle traffic for **the player's own fights**: one dispatch line per battle per tick,
+plus the aftermath line of any that concluded. Rival-vs-rival fights are skipped, on the BL-212
+precedent that corporations stay out of comms so a rival's internals do not leak through it — they
+are seen as a canvas marker instead, which says *where* without saying how it is going (NR-470). It is separate from Public because its volume is driven by **simulation
+intensity** rather than by scripted events — a running war is several lines a tick, which mixed into
+Public would bury everything else. It is also the only place the aftermath can live at all: a
+concluded battle is erased at the end of the tick it ends, so no state-reading surface can still see
+who held the ground by the time the player looks. There is no per-channel mute yet (NR-471).
+
 It replaced the Explorer placeholder (2026-07-26) in its original right-middle home.
 That home is not left empty: **BL-216 (shell re-plan)** gives it back to *pinned items*
 — see below. The diplomacy-as-communication principle behind the surface:

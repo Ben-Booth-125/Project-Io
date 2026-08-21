@@ -321,6 +321,21 @@ const active_battle* find_battle(const world& w, entity_id corp, uint32_t provin
     return nullptr;
 }
 
+const active_battle* first_battle_in(const world& w, uint32_t province)
+{
+    const active_battle* fallback = nullptr;
+    for (const active_battle& b : w.battles)
+    {
+        if (b.province != province)
+            continue;
+        if (b.attacker == w.player_entity || b.defender == w.player_entity)
+            return &b;                    // yours first — it is the one you can act on
+        if (fallback == nullptr)
+            fallback = &b;                // else the lowest in sorted order
+    }
+    return fallback;
+}
+
 bool request_withdraw(world& w, entity_id corp, uint32_t province, entity_id against)
 {
     // MUTATES NOTHING on rejection. This verb is reachable from the AI-facing

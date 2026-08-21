@@ -205,5 +205,15 @@ bool battle_ground(const world& w, const std::vector<entity_id>& defender_units,
 bool unit_in_battle(const world& w, entity_id unit);
 
 /// The battle @p corp is fighting in @p province, or nullptr. Read-side helper
-/// for the seam and the future card (BL-469).
+/// for the seam and the card (BL-469).
 const active_battle* find_battle(const world& w, entity_id corp, uint32_t province);
+
+/// The battle a click on @p province should select, or nullptr.
+///
+/// THE PLAYER'S OWN FIGHT FIRST, then the sorted order. More than one battle can
+/// stand in one province — a third corp arriving opens its OWN battles against
+/// each participant rather than joining theirs — so "the first one" is a choice,
+/// and this is the honest one: the fight you are in is the one you need the card
+/// for. Falling back to sorted order keeps the pick deterministic when none of
+/// them is yours. Flagged for Ben; see the review log.
+const active_battle* first_battle_in(const world& w, uint32_t province);

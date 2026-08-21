@@ -555,7 +555,7 @@
   ],
   [
    "gameplay.withdraw_from_battle",
-   "No player-facing surface yet. BL-469 (the battle card) is the item that adds one; until then this verb is reachable only through the corp-command seam (ProjectIo --serve, COMMAND opcode)."
+   "The BATTLE CARD in the Selection element (BL-469, landed 2026-08-21): select a live battle and its 'Break off' press sits under the withdrawal price, with a confirm popup. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the card."
   ]
  ]
 }

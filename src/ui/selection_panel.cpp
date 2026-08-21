@@ -1,5 +1,8 @@
 #include "selection_panel.hpp"
 
+#include "core/battle_dispatch_text.hpp" // battle_phase_word — SHARED with BL-468's dispatches
+#include "world/battle_system.hpp"      // active_battle, quote_withdrawal, read_battle_phase (BL-469)
+
 #include "charts.hpp"
 
 #include "detail_level.hpp"   // disclosure_controls — the drill-through idiom (BL-214/BL-265)
@@ -1924,6 +1927,194 @@ const char* road_tier_name(std::uint8_t road_level)
 // per-resource production graphs (each click-drillable into its time series, BL-196).
 // The zoomed render is the point — the card now SHOWS the tile it floats over, so it
 // no longer merely obscures it.
+// ---------------------------------------------------------------------------
+// The battle card (BL-469)
+// ---------------------------------------------------------------------------
+// The question it answers, from the item's own question-log entry: "How is my
+// battle going, and what does leaving cost right now?" The dispatch stream
+// (BL-468) is the other half — that one narrates, this one COMMANDS.
+//
+// It owns its whole layout, header included, the way the tile card does, because
+// its top region is a map rather than the shared three-column band.
+//
+// VISIBILITY (BL-068): the player's own battle shows everything. A rival-vs-rival
+// battle shows the participants, the round and who is winning — and NO per-unit
+// detail, because that is a rival's internals. The withdraw press is disabled
+// with a reason rather than hidden, so the rule reads as a rule instead of as a
+// missing button.
+
+/// Resolve the selected battle, or nullptr. Also clears a stale selection — a
+/// battle ends and is erased, and a card pointing at one that finished should
+/// fall back cleanly rather than draw nothing forever.
+const active_battle* selected_battle(const world& w, ui_state& ui)
+{
+    if (!ui.has_battle_selection())
+        return nullptr;
+    for (const active_battle& b : w.battles)
+        if (b.province == ui.selected_battle_province
+            && b.attacker == ui.selected_battle_attacker
+            && b.defender == ui.selected_battle_defender)
+            return &b;
+    ui.clear_battle_selection(); // the fight ended; stop pointing at it
+    return nullptr;
+}
+
+// The phase word is SHARED with the dispatch stream, not redefined here — BL-468
+// requires that the two surfaces never disagree about what phase a fight is in,
+// and a second copy of the vocabulary is exactly how they would come to.
+// battle_phase_word lives in core/battle_dispatch_text.hpp.
+
+
+/// One side's strength bar, with the decomposition the unit card already prints
+/// kept intact — count x quality x supply — so an unsupplied unit VISIBLY fights
+/// weaker here for the same reason it does there.
+void draw_battle_side(const world& w, const char* label, entity_id corp,
+                      const std::vector<entity_id>& units, int strength_permille,
+                      bool show_units)
+{
+    const auto cit = w.corporations.find(corp);
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", label);
+    ImGui::SameLine();
+    ImGui::TextUnformatted(cit != w.corporations.end() ? cit->second.name.c_str() : "Unknown");
+
+    // The aggregate first: it is the number that answers "am I winning".
+    ImGui::ProgressBar(std::clamp(strength_permille / 1000.0f, 0.0f, 1.0f),
+                       ImVec2(-1.0f, 0.0f));
+    ImGui::TextDisabled("%.1f%% of what marched in", strength_permille / 10.0f);
+
+    if (!show_units)
+    {
+        // BL-068: a rival's internals stay private. Say so rather than leaving a
+        // gap — an absent section reads as a bug, a stated rule reads as a rule.
+        ImGui::TextDisabled("Composition unknown — a rival's forces are not yours to count.");
+        return;
+    }
+
+    for (const entity_id uid : units)
+    {
+        const auto uit = w.units.find(uid);
+        if (uit == w.units.end() || uit->second.count <= 0)
+            continue;
+        const unit_component& u = uit->second;
+        ImGui::Text("%d men", u.count);
+        ImGui::SameLine();
+        ImGui::TextDisabled("x %.2f quality x %.2f supply = %lld",
+                            roster_type_quality_permille(u.type) / 1000.0f,
+                            u.supply_factor_permille / 1000.0f,
+                            static_cast<long long>(unit_strength(w, u)));
+        if (u.supply_factor_permille < 1000)
+        {
+            ImGui::SameLine();
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative),
+                               "  unsupplied");
+        }
+    }
+}
+
+void draw_battle_selection(world& w, ui_state& ui)
+{
+    // The caller has already resolved and validated the pointer — a stale battle
+    // selection falls through to the ordinary kind resolution there rather than
+    // being rendered as an empty card here.
+    const active_battle& b = *selected_battle(w, ui);
+
+    const entity_id player = w.player_entity;
+    const bool mine = (b.attacker == player || b.defender == player);
+    // The spectator god view lifts the redaction in the UI ONLY (BL-408) — the
+    // same pair-test every other read-site uses, never a world-side change.
+    const bool show_all = mine || (ui.spectating && ui.god_view);
+
+    const campaign_battle_params params{};
+    const battle_phase phase =
+        read_battle_phase(b, 0, 0, params); // no swing context on a redraw; state alone
+
+    // --- header -----------------------------------------------------------
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Battle");
+    ImGui::SameLine();
+    ImGui::Text("%s", battle_phase_word(phase));
+    ImGui::SameLine();
+    ImGui::TextDisabled("round %d / %d", b.state.rounds_fought, params.max_rounds);
+    ImGui::Separator();
+
+    // --- the map ----------------------------------------------------------
+    // The province's hexes drawn large, with each participating unit a marker on
+    // its OWN tile — positions are real, because ruling 1 kept them: the province
+    // frames the fight, it does not pool the forces into it.
+    if (const province* pv = w.provinces.find(b.province); pv && !pv->tiles.empty())
+    {
+        const float avail = ImGui::GetContentRegionAvail().x;
+        const float h     = std::min(avail * 0.55f, 220.0f);
+        ImVec2 origin = ImGui::GetCursorScreenPos();
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        draw_tile_neighbourhood(dl, w, pv->tiles.front(), origin, ImVec2(avail, h), 2);
+        ImGui::Dummy(ImVec2(avail, h));
+    }
+
+    // --- the two sides ----------------------------------------------------
+    draw_battle_side(w, "Attacker", b.attacker, b.attacker_units,
+                     b.state.attacker_strength_permille,
+                     show_all || b.attacker == player);
+    ImGui::Spacing();
+    draw_battle_side(w, "Defender", b.defender, b.defender_units,
+                     b.state.defender_strength_permille,
+                     show_all || b.defender == player);
+
+    // --- the withdraw press ----------------------------------------------
+    // THE ONE DECISION THE SPAN CONTAINS, and the reason the card exists at all.
+    // The price is quoted from the resolver's own arithmetic (quote_withdrawal)
+    // rather than recomputed here: a second copy in a surface is a second place
+    // for the quoted price to drift from the price actually charged.
+    ImGui::Spacing();
+    ImGui::Separator();
+    if (!mine)
+    {
+        ImGui::BeginDisabled();
+        ImGui::Button("Withdraw");
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        ImGui::TextDisabled("Not your fight.");
+    }
+    else
+    {
+        const withdrawing_side side = (b.attacker == player) ? withdrawing_side::attacker
+                                                             : withdrawing_side::defender;
+        const withdrawal_price q = quote_withdrawal(b, side, params);
+        const bool already = (b.withdraw_requested != withdrawing_side::none);
+
+        ImGui::BeginDisabled(already);
+        if (ImGui::Button("Withdraw"))
+            ImGui::OpenPopup("confirm_withdraw");
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        // All three terms legible, and updating as rounds pass — the per-round
+        // term is what makes leaving late dear, so hiding it inside a total would
+        // hide the shape of the decision.
+        ImGui::TextDisabled("costs %.1f%%  (base %.1f + %d rounds %.1f + pursuit %.1f)",
+                            q.total / 10.0f, q.base / 10.0f,
+                            b.state.rounds_fought, q.per_round / 10.0f, q.pursuit / 10.0f);
+        if (already)
+            ImGui::TextDisabled("Withdrawal ordered — it takes effect next tick.");
+
+        // Confirm on press, the declare_hostile pattern (BL-449): breaking off is
+        // priced and irreversible, so it is not a thing to do by mis-click.
+        if (ImGui::BeginPopup("confirm_withdraw"))
+        {
+            ImGui::Text("Break off, forfeiting %.1f%% of your remaining force?", q.total / 10.0f);
+            if (ImGui::Button("Break off"))
+            {
+                ui.construction.pending_withdraw_province = b.province;
+                ui.construction.pending_withdraw_against =
+                    (b.attacker == player) ? b.defender : b.attacker;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Hold"))
+                ImGui::CloseCurrentPopup();
+            ImGui::EndPopup();
+        }
+    }
+}
+
 void draw_tile_selection(world& w, ui_state& ui)
 {
     const entity_id sel = ui.selected_entity;
@@ -2473,6 +2664,23 @@ void draw_selection_content(world& w, const recipe_registry& reg,
     // chooses WHAT the one element is showing; the header, the separator and the
     // three-column band below are the same code every other kind runs. The canvas
     // guarantees the two selections are mutually exclusive (province_sync_entity).
+    // BL-469: a BATTLE resolves before everything else, for the same structural
+    // reason a province resolves before selection_kind_of — it is not an entity,
+    // so the kind resolution cannot see it — and for one reason of its own: a
+    // fight on the ground you are looking at is the most urgent thing that ground
+    // has to say. It owns its whole card, so it returns rather than falling
+    // through to the shared header.
+    // A battle that has CONCLUDED is erased from `world::battles`, so a selection
+    // can go stale between frames. `selected_battle` clears it and returns null,
+    // and the element falls through to the ordinary resolution — the fallback is
+    // a normal selection, never a blank card. Same shape as BL-511's "a province
+    // id that no longer resolves clears itself here".
+    if (ui.has_battle_selection() && selected_battle(w, ui) != nullptr)
+    {
+        draw_battle_selection(w, ui);
+        return;
+    }
+
     const province* pv = (ui.selected_province != 0)
                              ? w.provinces.find(ui.selected_province)
                              : nullptr;

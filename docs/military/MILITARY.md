@@ -686,7 +686,7 @@ Re-verified against the source 2026-08-19 (BL-476, RIVALS_START_UNARMED).
 **Landed:**
 
 - `resolve_battle` — the nation-scale resolver, consumed by the Era −1 history sim (BL-272, unit/doctrine combat model)
-- `resolve_campaign_battle` and its begin/step/withdraw state machine — compiled, harnessed, **no production caller** (BL-315, armed house conflict spine)
+- `resolve_campaign_battle` and its begin/step/withdraw state machine — ~~no production caller~~ **called by `run_battles` since BL-467 (2026-08-21)**; the begin/step/withdraw machine now runs in the live economy tick (BL-315, armed house conflict spine)
 - Terrain defence / attrition / resistance (BL-233, terrain combat modifiers)
 - `unit_component` with tile-canonical position (BL-157, military datamodel stub; BL-324, unit hire surface)
 - The **19**-row era-keyed roster and both gate paths (BL-274, era-keyed unit rosters; BL-352, hire gate live store)
@@ -704,6 +704,21 @@ Re-verified against the source 2026-08-19 (BL-476, RIVALS_START_UNARMED).
 - **Corp stance / hostility, with a surface** (BL-448, BL-449). Directed hostility, symmetric friendship, the Corporation panel Stance column and its three presses — landed 2026-08-19, still inert (no consequence wired, no serialiser)
 - **`campaign_roster_band` derives from the epoch** (BL-461). Was hard-coded to `industrial` against a 0 CE default; now `campaign_roster_band_for(era_band)` off `recipe_registry::era()` — landed 2026-08-19
 - **Unit march seam — march/halt/disband, path-marching on the shared traversal-cost metric** (BL-470). Extends `corp_command`, no parallel type. Per-class march points (`economy.military.march_points_per_class`), fractional carry-over, blocked-step recompute. Riders: the blackboard units export (BL-393's open half) and NR-344 ("war flips the queue") written down in phase order — landed 2026-08-19
+- **Battle dispatches and the battle card** (BL-468, BL-469 — landed 2026-08-21). A battle now
+  *reports*: `battle_tick::dispatches` carries one pure-data record per battle that acted this
+  tick, including battles that CONCLUDED this tick and are therefore already erased from
+  `world::battles` — which is the only way the aftermath (who held the field, what it cost) can
+  reach a surface at all. `battle_phase` is derived **once, in the world layer**
+  (`read_battle_phase`), because two surfaces consume it and BL-468 requires they never disagree.
+  `src/core/battle_dispatch_text.cpp` turns a record into a Field-channel line by folding
+  `stream_seed` with the round index — the BL-290 tongue-bank idiom, so wording varies between
+  fights, replays identically, and **consumes no draw**, which is what makes the dispatch layer
+  structurally unable to move the simulation. The Selection element gains a **battle kind**
+  (dispatched ahead of province and kind resolution), with per-unit strength bars both sides and
+  the withdrawal price shown as its three separate terms, quoted from `quote_withdrawal()` — the
+  resolver's own arithmetic, never recomputed in the card. A crossed-blades marker sits on the
+  province anchor tile. See `docs/ui/SELECTION.md` § The battle element and `docs/ui/LAYOUT.md`
+  § Comms dock.
 
 **Outstanding:**
 

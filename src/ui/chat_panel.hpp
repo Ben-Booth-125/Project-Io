@@ -38,7 +38,23 @@ struct chat_channel
 /// messages re-derive from deterministic sim events, see backlog BL-205).
 struct chat_state
 {
-    std::vector<chat_channel> channels{{"Public", {}}};
+    /// Channel 0 is Public; channel 1 is **Field** (BL-468, Ben's call
+    /// 2026-08-19): battle traffic gets a standing channel of its own so it
+    /// cannot drown the market chatter Public carries, and so it can be muted.
+    ///
+    /// APPENDED, NEVER INSERTED, and the order is load-bearing rather than
+    /// stylistic: `app::m_counsel_channel` caches channel INDICES, and every
+    /// other channel is created by push_back. Inserting anywhere but the end
+    /// would silently repoint every cached counsel index at the wrong channel.
+    ///
+    /// `members` stays empty. The renderer filters on `chat_message::channel`
+    /// alone and never reads `members`, so seeding the player into it would be a
+    /// claim the code does not honour.
+    std::vector<chat_channel> channels{{"Public", {}}, {"Field", {}}};
+
+    /// Named so posters do not spell the index (session_history.cpp posts here).
+    static constexpr int k_public_channel = 0;
+    static constexpr int k_field_channel  = 1;
     std::vector<chat_message> messages;
     int  active_channel = 0;
     char input[192]     = {};

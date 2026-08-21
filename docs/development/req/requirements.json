@@ -4932,68 +4932,171 @@
    "brief": "battle-state-in-world",
    "batch": "2026-08-21-engagement-trigger",
    "title": "BL-467 - battle state in world, and the engagement trigger (Sprint C3)",
-   "status": "pending",
+   "status": "complete",
    "promoted_from": "backlog.json BL-467 BATTLE_STATE_IN_WORLD",
    "rows": [
     {
      "id": "R1",
+     "status": "complete",
+     "result_metric": "1000 -> 648 men in one tick",
+     "requirement": "ITEM-SPANNING (headless): A FIGHT ACTUALLY HAPPENS. Two corps' units standing in the same province, with at least one holding a hostile stance toward the other, produce a battle that OPENS, is STEPPED over ticks, and applies losses to unit_component. This is the row that fails today and passes after the item: both resolvers are currently compiled, harnessed, and have NO production caller, so the military layer can compute a fight but cannot have one. The assertion must run the real tick entry point, not call the resolver directly - calling the resolver is what already works.",
+     "notes": "battle_engagement_harness B1 — runs run_economy_step, the real tick entry point, not the resolver. 1000 men -> 648 in one tick. B1c asserts the negative: two NEUTRAL corps sharing a province do not fight.",
+     "verification": "headless — tools/verify/battle_engagement_harness.cpp"
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "result_metric": "identical battle sets over 2 builds",
+     "requirement": "DISCOVERY IS ORDER-INDEPENDENT. Battle creation walks provinces in sorted (province id, corp-pair) order, so which battles exist cannot depend on container layout. Assert by building the same world twice and comparing the battle set exactly; the hazard is real because world's corp and unit containers are unordered and the stance tables may be too.",
+     "notes": "B2 — same world built twice, battle set compared exactly. Candidates are gathered then SORTED by (province, attacker, defender) before any battle opens.",
+     "verification": "headless — tools/verify/battle_engagement_harness.cpp"
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "result_metric": "1 battle per pair per province",
+     "requirement": "ONE BATTLE PER CORP PAIR PER PROVINCE. A pair cannot be fighting two battles in the same province, and a third corp arriving does not silently join or split an existing pair's battle.",
+     "notes": "B3 — a third corp arriving opens its OWN battles against each existing participant rather than joining or splitting theirs. The std::unique dedup that was a silent no-op with three corps was found by the scout and fixed (NR-463).",
+     "verification": "headless — tools/verify/battle_engagement_harness.cpp"
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "result_metric": "4/4 stream distinctness checks",
+     "requirement": "THE SEED FOLDS THE PROVINCE. Battle identity folds the province id where campaign_battle_identity folds tile_index today - same splitmix64 shape, ROLE ORDER PRESERVED so an attacker/defender swap is a different stream. Assert that two battles differing only in province get different streams, and that swapping roles does too.",
+     "notes": "B4 — campaign_battle_identity::tile_index renamed IN PLACE to `province`, same splitmix64 slot and constant, role order preserved. Two battles differing only in province get different streams; swapping roles does too.",
+     "verification": "headless — tools/verify/battle_engagement_harness.cpp"
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "result_metric": "sum == round loss, 0 extra draws",
+     "requirement": "PER-UNIT HITS ARE A PURE FUNCTION, NO NEW DRAWS. A side's round loss distributes across its participating units proportional to count, remainder by ascending entity id. Assert the distribution sums to the round loss exactly (no leaked or minted men) and that it consumes no RNG.",
+     "notes": "B5 — distribution sums to the round loss exactly, remainder by ascending entity id, no RNG consumed outside step_campaign_battle's fixed two draws per round.",
+     "verification": "headless — tools/verify/battle_engagement_harness.cpp"
+    },
+    {
+     "id": "R6",
+     "status": "complete",
+     "result_metric": "spectator hashes byte-identical",
+     "requirement": "DETERMINISM, IN-MEMORY REPLAY ONLY - the BL-448 precedent verbatim. No serialiser exists for battle state, so assert on replay and NEVER on a save round-trip. Same seed, same ticks, twice: identical battles, identical rounds_fought, identical unit counts.",
+     "notes": "B6 — in-memory replay only, the BL-448 precedent. world::battles folds into state_hash behind an empty-list guard, so a world that never fights hashes exactly as before; verified byte-identical against the pinned spectator_determinism hashes.",
+     "verification": "headless — tools/verify/battle_engagement_harness.cpp"
+    },
+    {
+     "id": "R7",
+     "status": "complete",
+     "result_metric": "argmax + tie-break asserted",
+     "requirement": "THE TERRAIN PAIR IS THE DEFENDER'S BEST GROUND. One pair for the whole battle, taken from the defender-side tile with the highest terrain_defence in the envelope, ties broken by ascending tile id. Since BL-519 that reads all three axes, so a forested crag must be able to beat bare rock - assert that the chosen tile is the argmax and that the tie-break is by id.",
+     "notes": "B7 / battle_ground() — the defender-side tile with the highest terrain_defence in the envelope, ties by ascending tile id. Exposed as a named function precisely so it stays assertable: a battle is erased the moment it concludes, so a rule only testable when a fight runs long is a rule that quietly stops being tested. Since BL-519 it reads all three terrain axes.",
+     "verification": "headless — tools/verify/battle_engagement_harness.cpp"
+    },
+    {
+     "id": "R8",
+     "status": "complete",
+     "result_metric": "quote == charge; rejection is a no-op",
+     "requirement": "WITHDRAWAL IS PRICED AND REJECTION MUTATES NOTHING. corp_verb::withdraw_from_battle{province} is legal for either participant, applies at the tick boundary before the next round batch, and prices the existing three-term cost. An illegal or duplicate withdraw must leave the world byte-identical - the AI-facing-seam rule, since this verb is reachable from --serve.",
+     "notes": "B8 / B12b — the three-term price is quoted from the resolver's own arithmetic (quote_withdrawal) and B12b asserts quote-against-charge. A rejected request (no such battle, or a non-participant) returns false and mutates nothing. The scout found the parting cost cost NO MEN — strength was captured after the withdrawal rather than before — and it is fixed (NR-463).",
+     "verification": "headless — tools/verify/battle_engagement_harness.cpp"
+    },
+    {
+     "id": "R9",
+     "status": "partial",
+     "result_metric": "aftermath computed; consequence absent",
+     "requirement": "AFTERMATH. The field is held by the side that stayed, defender on ties. Zero-count units are disbanded by the upkeep pass's EXISTING cleanup rather than a second mechanism, and the trace is discarded at battle end so nothing but the record crosses a tick boundary.",
+     "notes": "The field IS held by the side that stayed, defender on ties, and zero-count units ARE reaped (run_unit_upkeep gained the count<=0 test it never had — NR-464). PARTIAL because holding the field HAS NO CONSEQUENCE: no territorial-control concept exists for a battle to affect. Named rather than hidden, NR-465.",
+     "verification": "headless — tools/verify/battle_engagement_harness.cpp"
+    },
+    {
+     "id": "R10",
+     "status": "complete",
+     "result_metric": "verb 24, dictionary entry present",
+     "requirement": "ACTIONS.json TRAVELS WITH THE VERB. The new corp_verb gets its dictionary entry in the same commit (node tools/session/render_actions.js), per the stale-entry rule in src/world/CLAUDE.md - a stale entry misleads the AI player the way a stale golden misleads a visual check.",
+     "notes": "withdraw_from_battle APPENDED at corp_verb 24 with its ACTIONS.json dictionary entry in the same commit. unit_march_harness's corp_verb_count guard fired correctly on the append and was narrowed to assert the new count rather than deleted.",
+     "verification": "headless — tools/verify/battle_engagement_harness.cpp"
+    }
+   ],
+   "resolved": "2026-08-21",
+   "resolution": "All ten rows terminal: nine complete, R9 partial. R9 is partial for a stated reason rather than a missing check — the aftermath is computed correctly but nothing consumes it, because no territorial-control concept exists yet.\n\nThe row that could not have been written before this item is R1: it runs the real tick entry point rather than calling a resolver, which is the whole difference between a military layer that can COMPUTE a fight and one that can HAVE one.\n\nFour defects were found by an adversarial scout AFTER the code compiled and passed 26 checks (NR-463/NR-464), and all four are fixed. That is the argument for the scout pass, not against the harness: they were failures of what was asserted, not of whether the assertions ran."
+  },
+  {
+   "brief": "battle-surfaces",
+   "batch": "2026-08-21-engagement-trigger",
+   "title": "BL-468 + BL-469 - the battle dispatches and the battle card (Sprint C3)",
+   "status": "pending",
+   "promoted_from": "backlog.json BL-468 BATTLE_DISPATCHES, BL-469 BATTLE_CARD",
+   "rows": [
+    {
+     "id": "R1",
      "status": "pending",
+     "requirement": "ITEM-SPANNING (visual): A LIVE BATTLE IS SELECTABLE AND READABLE. With two hostile corps' units in contact, a click on the province selects the battle and the card shows the phase word, both sides' per-unit strength bars, and the withdrawal price with its three terms separated. The capture must come from a fight STAGED BY THE SCRIPT, not from a mocked record - the failure this guards against is a card that renders beautifully against data no tick ever produces.",
      "result_metric": null,
-     "requirement": "ITEM-SPANNING (headless): A FIGHT ACTUALLY HAPPENS. Two corps' units standing in the same province, with at least one holding a hostile stance toward the other, produce a battle that OPENS, is STEPPED over ticks, and applies losses to unit_component. This is the row that fails today and passes after the item: both resolvers are currently compiled, harnessed, and have NO production caller, so the military layer can compute a fight but cannot have one. The assertion must run the real tick entry point, not call the resolver directly - calling the resolver is what already works."
+     "verification": "visual - scripts/verify/battle_card.lua",
+     "notes": "AUTHORED, NOT RUN. scripts/verify/battle_card.lua exists and stages the fight end to end (identify the player corp from the buildings table, declare hostility both ways, march into the rival's province, step to contact). It could NOT be executed in this session's container: SDL3 is not installed, so `ProjectIo --verify` can be neither built nor run here. Both this row and R2 need a Windows run, and per the standing rule that a UI requirement needs a LIVE check, the card also needs the press clicked by hand - a scripted capture proves a surface renders, not that a press on it is reachable."
     },
     {
      "id": "R2",
      "status": "pending",
+     "requirement": "THE FIELD CHANNEL CARRIES THE FIGHT. A staged battle produces at least one dispatch line on channel 1 (Field), and the aftermath line of a concluded battle appears there - which is the only place it CAN appear, since a concluded battle is erased at the end of the tick it ends.",
      "result_metric": null,
-     "requirement": "DISCOVERY IS ORDER-INDEPENDENT. Battle creation walks provinces in sorted (province id, corp-pair) order, so which battles exist cannot depend on container layout. Assert by building the same world twice and comparing the battle set exactly; the hazard is real because world's corp and unit containers are unordered and the stance tables may be too."
+     "verification": "visual - scripts/verify/battle_card.lua",
+     "notes": "Asserted in the script (a chat_lines scan for a '1:' channel prefix, failing loudly on zero). Not run - see R1."
     },
     {
      "id": "R3",
-     "status": "pending",
-     "result_metric": null,
-     "requirement": "ONE BATTLE PER CORP PAIR PER PROVINCE. A pair cannot be fighting two battles in the same province, and a third corp arriving does not silently join or split an existing pair's battle."
+     "status": "complete",
+     "requirement": "THE PHASE VOCABULARY IS DERIVED ONCE. The card's phase readout and the dispatch line's phrasing come from the SAME read_battle_phase call in the world layer, so the two surfaces cannot describe the same fight differently. Assert structurally - one derivation site - rather than by comparing two strings.",
+     "result_metric": "6/6 phase values reachable",
+     "verification": "headless - tools/verify/battle_engagement_harness.cpp",
+     "notes": "read_battle_phase lives in src/world/battle_system.hpp and is the only derivation site; battle_phase_word is the shared rendering of its result. Harness rows B13a-B13e exercise every phase value including the two terminal ones."
     },
     {
      "id": "R4",
-     "status": "pending",
-     "result_metric": null,
-     "requirement": "THE SEED FOLDS THE PROVINCE. Battle identity folds the province id where campaign_battle_identity folds tile_index today - same splitmix64 shape, ROLE ORDER PRESERVED so an attacker/defender swap is a different stream. Assert that two battles differing only in province get different streams, and that swapping roles does too."
+     "status": "complete",
+     "requirement": "THE DISPATCH LAYER CONSUMES NO DRAW. Phrase selection folds stream_seed with the round index rather than drawing, so text generation is structurally unable to move the simulation. Assert that the same fight replays to the same lines AND that wording varies across rounds of one fight - a bank that never varies and a bank that varies non-deterministically fail the same check from opposite sides.",
+     "result_metric": "10 dispatches -> 6 distinct lines",
+     "verification": "headless - tools/verify/battle_engagement_harness.cpp",
+     "notes": "B14e asserts replay-identity; B14f asserts variation. B14f's measured result is the interesting one: 10 dispatches from one fight produced 6 distinct lines, so the fold is live rather than degenerate."
     },
     {
      "id": "R5",
-     "status": "pending",
-     "result_metric": null,
-     "requirement": "PER-UNIT HITS ARE A PURE FUNCTION, NO NEW DRAWS. A side's round loss distributes across its participating units proportional to count, remainder by ascending entity id. Assert the distribution sums to the round loss exactly (no leaked or minted men) and that it consumes no RNG."
+     "status": "complete",
+     "requirement": "THE QUOTED PRICE IS THE CHARGED PRICE. What the card says withdrawing costs equals what withdrawing actually charges, in all three terms. The hazard is a second copy of the resolver's arithmetic inside the card drifting from the resolver's own.",
+     "result_metric": "quote == charge, 3/3 terms",
+     "verification": "headless - tools/verify/battle_engagement_harness.cpp",
+     "notes": "B12b asserts quote_withdrawal() against the charge the resolver applies. Structurally the card cannot drift: it renders the quote rather than recomputing anything."
     },
     {
      "id": "R6",
-     "status": "pending",
-     "result_metric": null,
-     "requirement": "DETERMINISM, IN-MEMORY REPLAY ONLY - the BL-448 precedent verbatim. No serialiser exists for battle state, so assert on replay and NEVER on a save round-trip. Same seed, same ticks, twice: identical battles, identical rounds_fought, identical unit counts."
+     "status": "complete",
+     "requirement": "NO BANK HAS A HOLE, AND NO TOKEN SURVIVES UNSUBSTITUTED. Every phase's bank is non-empty and every %-token in every template resolves. B14b initially asserted 'no % survives in output' and was WRONG rather than the code - '89%' is a legitimate line - so the row is tightened to flag only a % followed by a token letter.",
+     "result_metric": "0 unsubstituted tokens over all banks",
+     "verification": "headless - tools/verify/battle_engagement_harness.cpp",
+     "notes": "B14a-B14d. The assertion's own bug is recorded here deliberately: a check that fails for the wrong reason and is then loosened is how a check quietly stops testing anything."
     },
     {
      "id": "R7",
-     "status": "pending",
-     "result_metric": null,
-     "requirement": "THE TERRAIN PAIR IS THE DEFENDER'S BEST GROUND. One pair for the whole battle, taken from the defender-side tile with the highest terrain_defence in the envelope, ties broken by ascending tile id. Since BL-519 that reads all three axes, so a forested crag must be able to beat bare rock - assert that the chosen tile is the argmax and that the tie-break is by id."
+     "status": "complete",
+     "requirement": "A MISSING CORP DEGRADES TO A NOUN. A dispatch naming a corp that has gone (disbanded, or a regenerated world) reads as prose, never as an empty string or a raw id - this layer must not be the thing that LOOKS broken.",
+     "result_metric": "no empty substitution",
+     "verification": "headless - tools/verify/battle_engagement_harness.cpp",
+     "notes": "B14c passes a dispatch naming an unknown entity; the line reads 'an unmarked company'."
     },
     {
      "id": "R8",
      "status": "pending",
+     "requirement": "THE MARKER IS PROVINCE-GRAIN. The crossed-blades glyph draws on the province ANCHOR TILE once per battle, not on every participating tile - the fight IS the province envelope (BL-467 ruling 1), and scattering the glyph would say the opposite. Also: it must not read as the chrome's X 'close this' affordance.",
      "result_metric": null,
-     "requirement": "WITHDRAWAL IS PRICED AND REJECTION MUTATES NOTHING. corp_verb::withdraw_from_battle{province} is legal for either participant, applies at the tick boundary before the next round batch, and prices the existing three-term cost. An illegal or duplicate withdraw must leave the world byte-identical - the AI-facing-seam rule, since this verb is reachable from --serve."
+     "verification": "visual - scripts/verify/battle_card.lua",
+     "notes": "Not run - see R1. The 'does not read as an X' half is a judgement, not an assertion: it needs Ben's eye on the capture, not a harness."
     },
     {
      "id": "R9",
-     "status": "pending",
+     "status": "complete",
+     "requirement": "THE SELECTION CHANNELS STAY MUTUALLY EXCLUSIVE. A battle selection clears the province and entity selections and survives the canvas's next-frame reconciliation; clear_selection clears all three. A shortcut that leaves one of the three channels set diverges from the gesture it stands in for, and a capture after it shows a stale card.",
      "result_metric": null,
-     "requirement": "AFTERMATH. The field is held by the side that stayed, defender on ties. Zero-count units are disbanded by the upkeep pass's EXISTING cleanup rather than a second mechanism, and the trace is discarded at battle end so nothing but the record crosses a tick boundary."
-    },
-    {
-     "id": "R10",
-     "status": "pending",
-     "result_metric": null,
-     "requirement": "ACTIONS.json TRAVELS WITH THE VERB. The new corp_verb gets its dictionary entry in the same commit (node tools/session/render_actions.js), per the stale-entry rule in src/world/CLAUDE.md - a stale entry misleads the AI player the way a stale golden misleads a visual check."
+     "verification": "review - src/ui/body_surface_canvas.cpp, src/core/verify_api.cpp",
+     "notes": "The battle arm was added to the same province_sync_entity reconciliation that already keeps entity and province exclusive, and clear_selection / select_battle both write the whole tuple. Verified by inspection rather than by harness: the reconciliation is a frame-loop property with no headless entry point."
     }
    ]
   }
