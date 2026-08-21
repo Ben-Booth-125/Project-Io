@@ -1,12 +1,19 @@
 # Project Io — Military
 
-The military layer is **parts, not a system**. Two battle resolvers, a unit roster, a muster
-building, a hire verb, a terrain model, a per-tick upkeep pass and a roster→combat adapter all
-ship compiled in the binary. Corp stance (hostility/friendship, BL-448/BL-449) also ships now, with
-a surface, and a unit can now march, halt and disband (BL-470, 2026-08-19) — but what still does not
-ship is anything that makes force meet stance — **until BL-467 (2026-08-21), which built the
-engagement trigger and battle state; what remains absent is listed below.** Formerly: no trigger, and nothing in production
-that calls the adapter.
+The military layer was **parts, not a system**, and as of 2026-08-21 it is a **thin system with
+named holes**. Two battle resolvers, a unit roster, a muster building, a hire verb, a terrain model,
+a per-tick upkeep pass and a roster→combat adapter ship compiled in the binary; corp stance
+(hostility/friendship, BL-448/BL-449) ships with a surface; a unit can march, halt and disband
+(BL-470, 2026-08-19).
+
+What was missing until BL-467 was the thing that makes force meet stance: **nothing discovered that
+a fight should happen, and nothing owned one between ticks.** `run_battles` is both halves, and
+BL-468/BL-469 give it its two surfaces — a Field-channel dispatch stream and a battle card with a
+priced withdrawal.
+
+Read the absences below as a LIST, not a gap: doctrine is an all-zero stub, season is hardcoded to
+summer, battle membership snapshots at open so nothing reinforces, upkeep has a pass but no rate,
+and holding the field has no consequence because no territorial-control concept exists yet.
 
 This document is the authority for what is built, written 2026-08-17 against the source. It exists
 because the absence of one cost real work: three sprint proposals in a row described the campaign

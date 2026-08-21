@@ -5,6 +5,7 @@
 
 #include <imgui.h>
 
+#include <algorithm> // std::clamp — MSVC pulls it in transitively, g++ does not (NR-450)
 #include <cmath>
 #include <string>
 #include <unordered_map>

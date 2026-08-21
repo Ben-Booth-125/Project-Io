@@ -133,9 +133,18 @@ row naming the input value and the rule that fired:
    or not (→ land). This is the first fork.
 2. **Latitude band & moisture** — the `band` index (its `temperature_class`-shifted
    width) and the `moisture` value that select the climate row.
-3. **Composition** — the resulting `terrain_composition`, and *which* branch chose
-   it (organic gated by `atmosphere_class`; volcanic scaled by `geological_activity`;
+3. **Substrate & cover** — the resulting `terrain_substrate`, the `terrain_cover`
+   sitting on it and that cover's `cover_density`, and *which* branch chose each
+   (organic gated by `atmosphere_class`; volcanic scaled by `geological_activity`;
    metallic under `composition_bias::metallic`).
+
+   **Two sub-steps since BL-519 (2026-08-21), and the ledger should show both.**
+   Pass 4a still picks a *biome* from the climate tables — RNG-identical, draw for
+   draw, to what it drew before the split — and 4c/4d then DECOMPOSE that biome into
+   the substrate/cover/density triple with no draws at all. So the breadcrumb has an
+   intermediate worth surfacing: the biome the tables chose, then what it decomposed
+   into. A tile whose cover looks wrong is far easier to diagnose when you can see
+   whether the *table* or the *decomposition* put it there.
 4. **Landform** — the `terrain_landform`, and whether it came from a mountain-range
    or rift-zone cluster seed (and the seed it belonged to) or the default.
 5. **Deposits** — the deposit profile rolled for that composition × landform, and
@@ -150,8 +159,12 @@ the pass rules spelled out; the card shows a condensed form.
 
 For a whole body, the aggregate shape of the generation:
 
-- **Composition histogram** — tile count per `terrain_composition` (ocean / barren /
-  grassland / forest / wetland / volcanic / metallic / icy …), with percentages. The
+- **Substrate and cover histograms** — two of them now, not one: tile count per
+  `terrain_substrate` (ocean / barren / rocky / sedimentary / volcanic / metallic /
+  regolith / icy) and per `terrain_cover` (none / grass / scrub / forest / marsh /
+  snow / dunes / ash / salt / urban), each with percentages, and cover ideally
+  weighted by `cover_density` as well as counted — a body that is 30% forest at
+  density 20 is a different place from one that is 30% forest at density 200. The
   surface for spotting "forest and wetland remain sparse on Kepler (~1% / ~0.5%)"
   (BACKLOG § Tile generation — Kepler biome balance) without eyeballing the map.
 - **Landform histogram** — tile count per `terrain_landform`.

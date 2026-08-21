@@ -46,7 +46,7 @@ The prototype validates the **economy loop only**. It covers resource extraction
 ### Units
 Units exist in the **data model** as minimal entities. They are defined enough that they will not need to be retrofitted when combat is added, but no combat rules are implemented. The following are explicitly excluded from the prototype:
 
-- ~~Combat resolution of any kind~~ — *superseded 2026-08-02 and again 2026-08-18; **both** resolvers ship. `resolve_battle` (BL-272) is called by the Era −1 sim; `resolve_campaign_battle` (BL-315, armed house conflict spine) is compiled and harnessed with no production caller.*
+- ~~Combat resolution of any kind~~ — *superseded 2026-08-02, 2026-08-18 and again 2026-08-21; **both** resolvers ship and **both are now called**. `resolve_battle` (BL-272) by the Era −1 sim; `resolve_campaign_battle` by `run_battles` in the live economy tick since BL-467, which built the engagement trigger and battle state the resolver had always lacked. BL-468/BL-469 give it its two surfaces. Campaign combat is reachable — see `docs/military/MILITARY.md` § Build status for the stubs that remain (doctrine, season, reinforcement, and the field having no consequence).*
 - ~~Opponent or AI factions~~ — *superseded; see § Factions below (2026-07-31)*
 - Unit transport infrastructure (troop carriers, shuttles, transit buildings) — *still holds (checked against source 2026-08-18: no such building type exists)*
 - ~~Weaponry or equipment systems~~ — *narrowed 2026-08-18. **Weaponry as a traded good ships**: `resource_type::ordnance` (BL-457, ordnance) is produced by the Fabricator and drawn per-head per-tick by unit upkeep (BL-454, unit upkeep), at an authored rate of 0.0. What still does not exist is an **equipment system** — nothing equips, upgrades or re-arms a unit; a roster row's `power_mod` is its whole materiel model.*
@@ -199,7 +199,7 @@ g++ -std=c++20 -O2 -I src tools/verify/<name>.cpp $WORLD -o <name> && ./<name>
 **Source portability note.** GCC rejects a struct field whose name matches its own
 type (`-Wchanges-meaning`, ill-formed per `[basic.scope.class]`) where MSVC accepts
 it. Keep enum-typed fields named for their *role*, not their type
-(`terrain_composition composition`, not `ideology ideology`) — see
+(`terrain_substrate substrate`, not `ideology ideology`) — see
 `src/world/components.hpp`. The portable font path is bundled under `assets/fonts/`
 and resolved cwd-relative first (`src/ui/fonts.cpp`), so on-screen text and visual
 goldens render identically across machines.
@@ -246,7 +246,7 @@ This means ImGui panel code should be written clearly, not cleverly. It is refer
 | Tick architecture | Three-layer calendar clock (`sim_loop`: 12 sim ticks/day → day tick → 90-day quarter econ tick); tick-boundary snapshots for saves (planned) |
 | Generation | In scope, deterministic (seeded) — planetology → continents → tiles → history ladder → nations/population/roads/corporations (superseded the out-of-scope call, 2026-07-31) |
 | Factions | Generated nations + rival corps with scoped AI (BL-079 reflexes, BL-202 corp AI, BL-203 predictive spending) |
-| Military (2026-08-18) | Both resolvers ship — `resolve_battle` for the Era −1 sim (BL-272), `resolve_campaign_battle` compiled + harnessed with no production caller (BL-315). Muster building (BL-325), hire verb, ordnance good (BL-457) and unit upkeep (BL-454, **rates 0.0**) all landed. Campaign combat is **unreachable**, not unbuilt. Authority: `docs/military/MILITARY.md` |
+| Military (2026-08-21) | Both resolvers ship and both are called — `resolve_battle` by the Era −1 sim (BL-272), `resolve_campaign_battle` by `run_battles` in the economy tick (BL-467), with dispatches and a battle card over it (BL-468/BL-469). Muster building (BL-325), hire verb, ordnance good (BL-457), unit upkeep (BL-454, **rates 0.0**), stance (BL-448/BL-449) and the unit march seam (BL-470) all landed. Campaign combat is **reachable**; what is still absent is a list, not a gap — doctrine is an all-zero stub, season is hardcoded, membership snapshots at open, and holding the field has no consequence. Authority: `docs/military/MILITARY.md` |
 | Tile memory | All tiles resident; flat binary structs; no per-tile Lua |
 | UI (prototype) | Dear ImGui |
 | UI (production) | Lua-driven retained layer — deferred to UI document |
