@@ -415,6 +415,31 @@ in `tools/verify/README.md`.
   rather than degenerate — wording actually varying across one fight (10 dispatches, 6 distinct
   lines).
 
+- **`interdiction_harness`** — Can a supply line be cut? (BL-458, Sprint C3, 2026-08-21.) The
+  item-spanning check for the mechanic that makes a convoy a military object: a hostile unit
+  standing on the tile a convoy's head occupies takes the cargo. **R4 is the load-bearing row** —
+  conservation: captured quantity in equals quantity credited, EXACTLY, and the destroyed fallback
+  (an interceptor holding no pools) credits nothing and mints nothing. No path creates goods.
+
+  R1 guards the defect the item predicted it would ship: `convoy_tile_at` must own the path
+  ORIENTATION rule, because `intra_body_path` caches on a canonicalised key and the renderer
+  conditionally reverses it. Get that wrong and the convoy's head lands at the wrong end of the
+  lane half the time — invisible on screen (the beam looks right either way) and fatal to
+  interdiction. R2 asserts stance is the predicate and the ONLY predicate (a neutral unit on the
+  same tile does not intercept); R5 that two runs of one seed cut the same convoys on the same
+  ticks, field for field; R6 that an unwarred world is untouched and that interdiction declares
+  hostility on nobody's behalf.
+
+  **R7 is the NR-407 row (added 2026-08-21, Lane C).** The mechanic worked from the day it landed
+  but shipped SILENT: `credit_arrived_convoys` called `(void)intercept_convoys(...)` and dropped
+  the records, while erasing the cut convoy in the same call — so the interception existed for one
+  statement and then did not exist at all, and no comms line or canvas mark could read it. R7
+  drives the real shared seam (`credit_arrived_convoys`, which app/main/every harness go through)
+  with its `out_cuts` sink and asserts the record names interceptor, victim, tile, body, cargo and
+  outcome; that a quiet tick reports nothing; that the sink APPENDS across ticks; and that the
+  two-arg form every existing caller uses still cuts and still credits. An interception is an
+  EVENT, not state — nothing is stored on `world`, serialised, or folded into `state_hash`.
+
 - **`tile_axes_harness`** — The substrate/cover terrain split (BL-519, 2026-08-21). 13 checks over
   the two-axis replacement for `terrain_composition`: the density invariant (density is 0 **iff**
   cover is `none`), `cover_fraction` monotonicity, `is_biotic_cover` membership, and — the rows that
