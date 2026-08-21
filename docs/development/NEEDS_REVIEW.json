@@ -2498,6 +2498,76 @@
     "Re-bless with a dated provenance line, if the full-tree run confirms the world legitimately moved."
    ],
    "recommendation": "Run it in a full tree first. Do not re-bless off this container's result."
+  },
+  {
+   "id": "NR-485",
+   "title": "hire_axis_cost moved into unit_roster.hpp, slightly past BL-498's literal wording",
+   "raised": "2026-08-21",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Lane C, BL-498 (shared hire gate table).",
+   "what": "BL-498 asked for one shared table behind `campaign_gate_input`'s preference lists. TAKEN: moved `hire_axis_cost` into `unit_roster.hpp § hire_axis_table` alongside it, so the cost and the resources it is paid in are ONE contract rather than two that must agree. A small widening past the item's literal words.",
+   "why_it_matters": "The bug class BL-498 names is exactly 'two hand-mirrored lists drift apart'. Leaving the cost outside the table it is paid against would have fixed one instance and left the neighbouring one. But it is a scope widening on an audit-finding item, so it should be seen rather than assumed.",
+   "recommendation": "Keep it. The harness can now assert cost and candidates together, which was not possible before.",
+   "files": [
+    "src/world/unit_roster.hpp",
+    "src/world/corp_command.cpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-486",
+   "title": "An interception is reported, not stored — the out_cuts sink rather than a world field",
+   "raised": "2026-08-21",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Lane C, BL-458 / NR-407.",
+   "what": "`supply_system.cpp:158` read `(void)intercept_convoys(w, tick);` — the interception records were computed and dropped, AND the cut convoy is erased inside that same call, so an interception existed for one statement and then did not exist at all. No UI work was possible against that. TAKEN: `credit_arrived_convoys` gained an optional `out_cuts` sink, so an interception rides the tick's report the way `agency_events` does. NOT state: nothing serialised, nothing folded into `state_hash`.",
+   "why_it_matters": "It is the same call BL-467's `battle_dispatch` made two commits earlier, for the same reason — an event that is erased in the tick it happens can only reach a surface by being reported. Worth Ben seeing as a pattern forming rather than as two isolated choices. Reversible; a `world` field would have touched `state_hash` and needed a serialisation seam that does not exist (NR-349).",
+   "options": [
+    "Keep it reported (no state, no hash, no save format).",
+    "Promote interceptions to world state if something later needs to read them across ticks."
+   ],
+   "recommendation": "Keep it reported. An interception is an event, not state.",
+   "files": [
+    "src/world/supply_system.hpp",
+    "src/world/supply_system.cpp",
+    "src/world/economy_system.hpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-487",
+   "title": "Two goldens are RED on origin/main, independently confirmed by two lanes",
+   "raised": "2026-08-21",
+   "kind": "observation",
+   "status": "open",
+   "source": "Lanes B3 and C, each reverting to base and rebuilding to confirm it was not their change.",
+   "what": "`spectator_determinism` R2: golden 344A9FE48306E93A against observed B4D09255AF346008. `ai_skill_harness`: 28 failures, and it self-declares its bands 'blessed 2026-08-09 (GCC - STALE since 2026-08-14/BL-386)'. Both fail identically on the untouched base. NEITHER RE-BLESSED.",
+   "why_it_matters": "Two independent lanes measured the same observed spectator hash (B4D09255AF346008), which is the corroboration that makes it a real world change rather than a container artifact. B3 caveats that it built with the container's Lua-free object set and cannot fully rule out that the exclusion itself shifts the hash — so the re-bless wants one run on Ben's toolchain before the number is pinned.",
+   "recommendation": "Re-bless both, on Ben's machine, once he is satisfied the world changes behind them were intended (BL-519's terrain split and BL-424's map area are the obvious candidates). Goldens are contracts; this is his signature, not an agent's.",
+   "files": [
+    "tools/verify/spectator_determinism.cpp",
+    "tools/verify/ai_skill_harness.cpp",
+    ".claude/rules/io-standing-rules.md"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-488",
+   "title": "A mutation test passed when it should have failed, and the agent caught itself",
+   "raised": "2026-08-21",
+   "kind": "observation",
+   "status": "open",
+   "source": "Lane C, BL-498. Reported by the agent against its own work.",
+   "what": "The first mutation probe written for the shared hire table PASSED — it had no teeth, because `hire_axis_resource`'s `return e.candidates[0]` fallback masked the mutation. Re-run with a mutation modelling the real drift (the debit stops recognising the table's LAST candidate), R5 then failed on exactly that candidate on all three axes, as it should.",
+   "why_it_matters": "This is the failure mode that makes a green harness worthless, and it is invisible unless someone deliberately tries to make the check fail. Worth recording as method: a new assertion should be proven to FAIL against a deliberate break before it is trusted to pass — the same discipline as BL-384's 'a row that would pass before the change proves nothing'.",
+   "recommendation": "Consider making mutation-proving a stated step for new harness rows in DELIVERY.md. Not filed as work; Ben's call whether it is worth the ceremony.",
+   "files": [
+    "tools/verify/corp_ai_harness.cpp",
+    "docs/development/DELIVERY.md"
+   ],
+   "resolution": null
   }
  ]
 }

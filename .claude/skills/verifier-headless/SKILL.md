@@ -415,6 +415,22 @@ in `tools/verify/README.md`.
   rather than degenerate — wording actually varying across one fight (10 dispatches, 6 distinct
   lines).
 
+- **`settlement_density`** — how many population centres a world places, and how they land per
+  NATION (Sprint B3, 2026-08-21). Report-only on the tuning question; S1–S4 assert only structural
+  properties (every seed produces land, the divisor places centres, every nation holds at least one —
+  BL-463's acceptance test — and a re-run at the shipped divisor reproduces the generated world).
+
+  It sweeps alternative divisors through `generate_population_centres`'s optional parameter, so an
+  alternative can be measured without a recompile and without changing what production generates.
+  **Read its per-nation column, not its world total**: the world-level centre count looks reasonable
+  while 86.3% of nations hold fewer than two centres, which is exactly `road_generation.cpp`'s
+  `n < 2` gate for a per-nation backbone. The world total is what hid the stale 180×84 clamp through
+  both a map tripling and a map shrinking.
+
+- **`interdiction_harness`** and **`corp_ai_harness`** were unregistered here until 2026-08-21
+  despite both being live; `campaign_roster_band` still is. An unregistered harness is one nobody
+  runs after an unrelated change.
+
 - **`sea_leg_census`** — what `crosses_ocean` actually selects (Sprint B2, 2026-08-21). Report-only,
   over market-pair routes; takes an optional seed count (`sea_leg_census 16`), default 8. It exists
   because a mode flag nobody had counted turned out to be firing on **64.5% of routes** and
