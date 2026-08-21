@@ -1,6 +1,7 @@
 #include "history_sim.hpp"
 
 #include "unit_roster.hpp"
+#include "terrain_combat.hpp" // BL-384 trace: the defence term the scorer never sees
 
 #include <algorithm>
 
@@ -591,6 +592,16 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // region and a row and the other verbs' single target already
             // means three different things (region, parent, domain).
             int      best_work_row = -1;
+            // BL-384 instrumentation, READ ONLY BY THE TRACE. The scorer's own
+            // estimate of the odds for the candidate it chose, and the staging
+            // hub it scored those odds against. Carried because the trace has to
+            // compare the ESTIMATE against the REALISED outcome, and by the time
+            // the battle resolves the scoring locals are long out of scope.
+            //
+            // Bookkeeping only: nothing reads these to make a decision, so the
+            // run is byte-identical with tracing on or off.
+            int      best_p_win_q = 0;
+            int      best_hub     = -1;
 
             // -- Campaign --------------------------------------------------
             for (int hi : held)
@@ -600,6 +611,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     const std::size_t ti = static_cast<std::size_t>(tn);
                     const int to = owner[ti];
                     if (to == q.id || to < 0) continue;
+                    if (params.trace_battles) ++out.campaign_contacts;
 
                     const region& tgt = ss.regions[ti];
                     const int cap_dist = region_distance(cap, tgt, gw);
@@ -739,12 +751,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
                         int s = value - (params.w_def * def_eff) / 2000;
                         if (winter) s -= params.winter_score_premium_q;
+                        if (params.trace_battles) ++out.campaign_scored;
                         s += static_cast<int>(salt(qs, static_cast<uint32_t>(ti)) % 16u); // Stable tie-break.
 
                         if (s > best_score && s >= params.campaign_threshold_q)
                         {
                             best_score = s; best_verb = sim_verb::campaign;
                             best_target = static_cast<int>(ti); best_winter = winter;
+                            best_p_win_q = p_win_q; best_hub = hi; // trace only
                         }
                     }
                 }
@@ -917,6 +931,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             {
             case sim_verb::campaign:
             {
+                if (params.trace_battles) ++out.campaign_chosen;
                 const std::size_t ti = static_cast<std::size_t>(best_target);
                 region& tgt = ss.regions[ti];
 
@@ -1011,8 +1026,44 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const int relief = (tgt.contest_q * params.contest_transfer_relief_q) / 1000;
                 const int needed = clampi(params.transfer_decisiveness_q - relief, 40, 1000);
 
-                if (bo.result == battle_result::attacker_victory
-                 && bo.decisiveness >= needed)
+                const bool won_it = (bo.result == battle_result::attacker_victory);
+                const bool takes_it = won_it && bo.decisiveness >= needed;
+
+                // BL-384's observation point, and it is HERE rather than beside
+                // resolve_battle for one reason: the conquest bar is computed
+                // here, and "did it win" and "did that win move a border" are
+                // different questions with different answers. 267 battles and
+                // zero conquests could be either, and a trace taken before this
+                // line could not tell them apart.
+                if (params.trace_battles)
+                {
+                    battle_trace bt;
+                    bt.year     = static_cast<int32_t>(y);
+                    bt.attacker = static_cast<uint16_t>(q.id);
+                    bt.defender = static_cast<uint16_t>(dq ? dq->id : 0);
+                    bt.region   = static_cast<uint16_t>(ti);
+                    bt.p_win_q    = best_p_win_q;
+                    bt.scored_hub = best_hub;
+                    bt.winter     = best_winter;
+                    bt.exec_hub          = src;
+                    bt.attacker_men      = stack_size(atk);
+                    bt.defender_men      = stack_size(def);
+                    bt.attacker_supply_q = atk_supply;
+                    bt.defender_ready_q  = def_ready;
+                    bt.works_defence_q   = def_works_q;
+                    // The term the scorer never sees — recomputed from the same
+                    // inputs the resolver was handed, not from a second source.
+                    bt.terrain_defence_q = terrain_defence(
+                        sub_at(terrain, tgt.anchor), cov_at(terrain, tgt.anchor),
+                        den_at(terrain, tgt.anchor), lf_at(terrain, tgt.anchor));
+                    bt.attacker_won    = won_it;
+                    bt.decisiveness    = bo.decisiveness;
+                    bt.transfer_needed = needed;
+                    bt.conquered       = takes_it;
+                    out.battle_traces.push_back(bt);
+                }
+
+                if (takes_it)
                 {
                     // The loser's cohesion falls: this is where defeat starts
                     // to compound rather than merely accumulate.

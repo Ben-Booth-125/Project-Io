@@ -1,6 +1,123 @@
 # Project Io — REFINED (active worklist)
 
-**Empty between work blocks.** Sprint P1 closed 2026-08-21; Sprint C3 is now active.
+**Empty between work blocks.** Sprints P1, C3, B2 and B3 closed 2026-08-21.
+**Sprint 28 (Lane A) is now active, re-scoped on measurement.**
+
+---
+
+## Sprint 28 — "growth stops extinguishing war" (Lane A)
+
+### Why it is re-scoped before a line is written
+
+Sprint 28's stated goal was *"a province changes hands, and a large polity keeps
+campaigning."* **The first half is already true.** `tools/verify/history_conquest_gap.cpp`
+measures 1199 conquests over 1226 battles across 8 worlds. Building toward it would have
+been building something that works.
+
+BL-384, which the sprint rests on, is **refuted as written**: it reports "267 battles and
+ZERO conquests" from a single seed and reads it as a property of the sim. All three
+mechanisms it names as candidates are dead:
+
+| Its hypothesis | Measured |
+|---|---|
+| The scorer is optimistic by roughly the terrain factor | **−0.0pp** over 1215 of 1226 battles |
+| The scored staging hub differs from the levying hub | **0 of 1226** |
+| Victories never clear the transfer bar | **99.8%** of victories convert |
+
+### The real defect, and it is stranger than the stated one
+
+**Two of eight worlds fight no war in an entire era.** Not few — none. And the funnel says
+exactly where they stop:
+
+| Seed | Battles | Contacts | Scored | **Chosen** |
+|---|---|---|---|---|
+| **0** | **0** | 4,972,710 | 9,945,420 | **0** |
+| 1 | 236 | 6,189,696 | 12,379,392 | 241 |
+| 2 | 435 | 2,620,190 | 5,240,380 | 435 |
+| **4** | **0** | 4,089,264 | 8,178,528 | **0** |
+| 7 | 184 | 1,578,177 | 3,156,354 | 185 |
+
+It is **not** adjacency and **not** candidate discovery. Seed 0's scorer looks at a war it
+could start **ten million times** and picks something else on every one of them. Note also
+that contacts do not predict war at all, and if anything predict it inversely — seed 7 has
+the fewest contacts and fights; seed 0 has the most and does not.
+
+So the sprint's subject is **verb competition**, not combat tuning. That is a different
+sprint from the one on the board, and a smaller one.
+
+### Tasks
+
+Foundation first; each scoped to its files.
+
+- **T1 — separate "never cleared the threshold" from "always lost to another verb".**
+  Two counters on the existing trace: campaign candidates whose score cleared
+  `campaign_threshold_q`, and rounds where a cleared campaign lost the `>` comparison to
+  Settle / Consolidate / build_work. **This is the whole sprint's fork** and everything
+  below is conditional on it. Files: `src/world/history_sim.{hpp,cpp}`,
+  `tools/verify/history_conquest_gap.cpp`. **No dependency.**
+
+- **T2 — report the WINNING verb's identity and margin when campaign is beaten.**
+  If T1 says campaign clears and loses, this names what beats it and by how much. A margin
+  of 3 and a margin of 3000 are different bugs: the first is a weighting nudge, the second
+  is BL-318 incommensurability — two scores authored on different scales, which this file
+  has been bitten by twice (`w_cult` as a flat 150; `w_dist` flat against a tripled map).
+  Files: `src/world/history_sim.{hpp,cpp}`, `tools/verify/history_conquest_gap.cpp`.
+  **Depends on T1.**
+
+- **T3 — the fix, whichever T1/T2 names.** Deliberately unspecified here: writing it now
+  would be committing to a mechanism before the measurement that chooses it. Two
+  constraints hold whatever it turns out to be, and they bound it from opposite ends:
+
+  **A zero-war world is a BUG** — Ben's ruling, 2026-08-21, and his reason is what makes it
+  a floor rather than a preference: *"many ancient tech quests would not be unlockable."*
+  The failure is content reachability, not atmosphere. But **the peaceful worlds must not
+  be tuned away wholesale** either: `BL-224`'s non-hegemony invariant wants some worlds to
+  stay multipolar. So the target is a *rate inside a stated band across seeds*, reported
+  and never clamped (Sprint 30's done-when says exactly this).
+
+  Worth knowing while building it (NR-490): the war-gated content the floor serves is
+  **designed, not live**. `scripts/tech_tree.lua` holds 150 nodes and says in its own
+  comment that E0-ML-01 is "THE ONE LIVE GATE"; the other 149 are authored stubs, and even
+  that one reads corp military strength rather than battles. This is an argument *for*
+  fixing the rate now — the tech design is being drawn on top of a war rate that is zero
+  in a quarter of worlds. Files: `src/world/history_sim.cpp`, `scripts/` tuning if the
+  answer is a constant. **Depends on T2.**
+
+- **T4 — BL-321's defence works are inert in practice, and it is a separate defect.**
+  `work_defence_mod` is non-zero in **zero** of 1226 traced battles. Both sides of the
+  plumbing are correct and no battle in eight full runs was ever fought against a region
+  carrying one. Two readings, needing different fixes: the works roster rarely fires at
+  all (the `works_raised` counter would say), or works are raised on safe interior regions
+  while fighting happens on frontiers that have none — which would mean the sim invests in
+  defence exactly where defence is not needed. Report `works_raised` beside the traces and
+  cross built-works regions against fought-over ones. Files:
+  `tools/verify/history_conquest_gap.cpp`, `src/world/history_sim.cpp`. **No dependency —
+  parallel with T1.**
+
+### Not in this sprint, and why
+
+- **Sprint 29 (the sim's result reaching the campaign map)** stays next, not now. Carrying
+  a political result over is worth less while a quarter of worlds have no political result
+  worth carrying.
+- **Combat constants.** Measurement says they are calibrated. BL-384's own design is
+  explicit that tuning them would be tuning the wrong thing.
+
+### Owed from the closed sprints
+
+- **Two goldens red on `main`**, confirmed independently by two lanes reverting to base:
+  `spectator_determinism` R2 and `ai_skill_harness` (28). Neither re-blessed — Ben's
+  signature, and B3 caveats that the container's Lua-free build may itself shift the hash
+  (NR-487).
+- **The population-centre divisor** (NR-482). Not a generation knob: `economy_system`
+  derives each body's whole workforce from its centres, so halving it takes headcount
+  27,580k → 90,980k. Two structural criteria point at ~150 and ~100–120; both more than
+  double the labour pool.
+- **BL-522** (whole-route haul mispricing, priority A) and **BL-523** (corp kind axis,
+  design-owed) both filed this session and unqueued.
+
+---
+
+## Previously (kept for the session's record)
 
 ## Sprint C3 — BL-467 LANDED 2026-08-21
 

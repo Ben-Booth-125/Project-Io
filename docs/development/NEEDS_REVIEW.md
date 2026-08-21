@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*175 entries — 175 open, 0 resolved.*
+*192 entries — 191 open, 1 resolved.*
 
 ---
 
@@ -1511,10 +1511,278 @@ TAKEN: added `verify.corp_command{...}`, a generic binding over the whole corp_v
 
 *Files: `src/core/verify_api.cpp`*
 
+### NR-474 — BL-384's premise is REFUTED — the sim conquers heavily, but a quarter of worlds fight no war at all
+*observation · raised 2026-08-21 · from Sprint 28 gate. tools/verify/history_conquest_gap.cpp, 8 real 0→1960 runs.*
+
+BL-384 records '267 battles and ZERO conquests' and reads it as a global property of the sim. Measured today over 8 worlds, it is not: seeds 1,2,3,5,6,7 produce 43–435 conquests each, 1199 conquests over 1226 battles. What IS true, and is a different defect, is that seeds 0 and 4 fight ZERO battles — not few, none. So the outcome is close to BINARY: a world is either warlike or perfectly peaceful, and BL-384 was written against one of the peaceful ones (seed 0, the default world).
+
+All three mechanisms the item names as candidates are refuted by measurement rather than argued away. (1) The scorer is NOT systematically optimistic by the terrain factor: bucketed against realised outcomes it is off by −0.0pp in the bucket holding 1215 of 1226 battles. (2) The scored staging hub differs from the levying hub in 0 of 1226 battles. (3) The transfer bar is not the constraint — 99.8% of victories convert to a conquest.
+
+CORRECTION, same day: the first run of this harness hardcoded a 312x145 grid against a real 261x121 (BL-424 took the homeworld to 70% area). build_sim_terrain fills an oversized grid with defaults, so region anchors outside the real bounds read as flat grassland and region_distance's cylinder wrapped at the wrong width. Every figure above is the CORRECTED one. The zero-war headline and all three refutations survived; the scorer's error moved from -2.5pp to -0.0pp and terrain defence from 20% of battles to 40%.
+
+**Why it matters.** Sprint 28's goal is 'a province changes hands'. Provinces change hands 1199 times. The sprint as written would have been spent tuning combat constants that measurement says are calibrated — which is precisely the outcome BL-384's own design warned about ('if it is not, the cause is elsewhere and tuning combat constants would be tuning the wrong thing'). The item needs restating around the real defect before any of it is built.
+
+Worth noting WHY it went stale: the world has changed a great deal since 2026-08-13 — the 3× map, BL-519's terrain axis split (which moved the settlement map, NR-447), BL-515's province ids and BL-516's water kinds. A single-seed observation from before all of that could not have survived it.
+
+> **Recommendation:** Restate BL-384 as 'a quarter of worlds fight no war at all' and re-scope Sprint 28 to that. The open question is whether a peaceful world is a BUG or a legitimate outcome — a world with room to expand choosing Settle over Campaign is arguably correct, and BL-224's non-hegemony invariant wants some worlds to stay multipolar. That is Ben's call, not a tuning decision.
+
+*Files: `docs/development/backlog.json`, `tools/verify/history_conquest_gap.cpp`, `src/world/history_sim.cpp`*
+
+### NR-475 — BL-321's defence works appear in ZERO of 1245 battles
+*observation · raised 2026-08-21 · from Same measurement run as NR-474 (history_conquest_gap Q3).*
+
+`work_defence_mod` is non-zero in 0 of 1226 traced battles across 8 worlds. The plumbing is live and correct on BOTH sides — works_roster.cpp:72 writes it, history_sim.cpp reads it at :634 (where it raises the defender's scored strength) and :965 (where it becomes readiness on the defender's stack), and the code comment reasons carefully about a Bastion Fort at +640 tilting a fight without deciding it — but no battle in eight full runs was ever fought against a region carrying one. Terrain defence is genuinely live: non-zero in 488/1226 (40%).
+
+CORRECTION to a claim I made in passing: the scorer is NOT blind to works. It carries `def_works` in the value term at :634. What it omits works from is the p_win_q odds estimate specifically, which uses raw manpower_stock. The narrow statement was right and the broad one ('the scorer never sees works') was wrong.
+
+**Why it matters.** A defence work that never defends is indistinguishable from one that was never built. Two readings, and they need different fixes: either the works roster rarely fires at all (the `works_raised` counter would say), or works are raised on safe interior regions while fighting happens on frontiers that have none. The second would be the more interesting finding — it would mean the sim invests in defence exactly where defence is not needed.
+
+> **Recommendation:** Cheap to settle: report `works_raised` alongside the battle traces, and cross the built-works regions against the fought-over ones. Worth doing before anyone tunes a combat constant, since it means one of the defender's two advantages is currently inert in practice.
+
+*Files: `src/world/history_sim.cpp`, `src/world/works_roster.cpp`, `tools/verify/history_conquest_gap.cpp`*
+
+### NR-476 — Ben's read that Lane A depends on Lane C — the ingredients already exist, at the other grain
+*decision taken on your behalf · raised 2026-08-21 · from Ben, 2026-08-21: 'A relies on C, or at least some pseudo war in provinces, using defense buffs and possibly buildings.'*
+
+Checked against the code rather than the docs, and the ingredients Ben names ALL already exist in the Era −1 sim — at polity grain, not campaign grain. `resolve_battle` is called with the full terrain quadruple (substrate, cover, density, landform) so terrain defence buffs are in; `work_defence_mod` is the buildings term and is read at history_sim.cpp:634 and :965; and history_sim.cpp's own comment says TERRITORY MOVES AT PROVINCE GRANULARITY, NEVER TILE. So Lane A already has its pseudo-war in provinces with defence buffs and buildings.
+
+TAKEN: sequenced Lane A independently of Lane C rather than behind it. The two resolvers are separate by explicit design — combat.hpp states resolve_battle is era-agnostic and knows nothing about walls or campaigns — and BL-467's campaign resolver runs in the economy tick on a different actor grain (corps, not polities).
+
+**Why it matters.** If Ben's read had been right, Lane C would gate Lane A and the whole arc would serialise. It does not, so the lanes can run in parallel — which is what they were doing when this was written. But it is worth him overturning if what he actually meant is that the two war models should CONVERGE rather than that one blocks the other; that would be a real design direction and a large one.
+
+- Keep the two resolvers separate — nation-scale history vs corp-scale campaign, as combat.hpp designs them.
+- Converge them: one resolver, one war model, both grains.
+
+> **Recommendation:** Keep them separate. They answer different questions and BL-467 has just shown the campaign one working. But the fact that BL-321's defence works are inert in practice (NR-475) means the sim's half is less real than it looks, which may be what prompted the read.
+
+*Files: `src/world/history_sim.cpp`, `src/world/combat.hpp`, `src/world/battle_system.hpp`*
+
+### NR-477 — The sea haulage rate contradicts BL-188's own ruling, and must NOT be flipped on its own
+*decision taken on your behalf · raised 2026-08-21 · from Sprint B2 (Lane B). tools/verify/sea_leg_census.cpp, 16 seeds, 1230 routes.*
+
+`scripts/economy.lua` has `land = 0.02, sea = 0.05` — sea is 2.5x DEARER than land, contradicting BL-188's settled ruling 1 that 'sea's advantage is a lower per-unit RATE'. TAKEN: left it alone. `path.cost` does double duty — it is the A* routing weight (`sea_leg_cost = 2.5` deliberately prices water above any landform so routes prefer land) AND the haul price. Flipping the rate in that one number sends every convoy to sea.
+
+**Why it matters.** It is a visible contradiction with a tempting one-line fix, and the one-line fix is wrong. Recorded so the next reader does not reach for it. Untangling the routing weight from the price is part of BL-522 (the per-leg split), not a tune that can precede it — and the resulting calibration constant is Ben's call, not an agent's.
+
+> **Recommendation:** Settle the rate as part of BL-522, once price and routing weight are separate numbers.
+
+*Files: `scripts/economy.lua`, `src/world/logistics.cpp`, `docs/economy/SUPPLY.md`*
+
+### NR-478 — 85.8% of nations are single-centre, but only 3.4% end stranded — so no new mechanism was built
+*decision taken on your behalf · raised 2026-08-21 · from Sprint B2 (Lane B). tools/verify/road_reach_census.cpp row C5, 8 seeds, 386 nations.*
+
+Sprint B2's plan floated giving single-centre nations 'a short local network'. The measurement says don't. 331 of 386 nations (85.8%) are single-centre — the number the sprint asked for and which the landed fix never reported — but after the per-centre Track plus the cross-strait border links, only 13 (3.4%) end STRANDED, meaning roaded with no roaded neighbour anywhere. TAKEN: added the measurement as harness row C5 and built no new generation mechanism.
+
+**Why it matters.** A new generation mechanism aimed at a 3.4% residue is the thing to avoid, and the 85.8% figure is exactly the kind of number that makes a problem look enormous when the actual failure is small. Flagged because the sprint plan said to do it and I did not.
+
+> **Recommendation:** Leave it. If the 13 stranded nations turn out to matter visually, they are a targeted fix, not a mechanism.
+
+*Files: `tools/verify/road_reach_census.cpp`, `src/world/road_generation.cpp`*
+
+### NR-479 — BL-188 stays parked, and the reason moved: the blocker is in the logistics leg, not the road raster
+*decision taken on your behalf · raised 2026-08-21 · from Sprint B2 (Lane B).*
+
+Sprint B2's plan was 'the three structural cuts, then BL-188 un-parked'. The cuts had already landed (commit 5305d25, then adapted by BL-516's water kinds), and they do NOT unblock BL-188 — not marginally. They change the road raster; BL-188's blocker is in `logistics.cpp` / `supply_system.cpp`, where `crosses_ocean` is a route-wide boolean. TAKEN: left BL-188 parked, appended the finding to its design field, and filed the real blocker as BL-522 (whole-route mispricing) at priority A.
+
+**Why it matters.** BL-188 has now been parked twice for reasons that turned out to be elsewhere. Naming the actual blocker as its own item is what stops that happening a third time — and BL-522 is worth doing on its own merits, since it mispricess 64.5% of hauls today whether or not a port is ever built.
+
+> **Recommendation:** Keep BL-188 parked until BL-522 lands, then re-read it against a per-leg cost model.
+
+*Files: `docs/development/backlog.json`*
+
+### NR-480 — Concurrent agents get worktrees at the SESSION base again — B2 was five commits behind
+*observation · raised 2026-08-21 · from Sprint B2 (Lane B), which caught it because the brief told it to check.*
+
+The B2 worktree was created at 4a504d7, FIVE commits behind the branch tip, and the agent fast-forwarded itself before reading any code. This is NR-459 recurring. It mattered concretely: at the stale base the three road cuts looked unlanded and BL-516's water kinds were absent, so the agent would have rebuilt work that already existed against an enum that had changed.
+
+**Why it matters.** NR-459 recorded this once and the mechanism has not changed. What DID work is the mitigation: briefing every agent to verify its base and fast-forward before reading anything, as its first action. That is now worth making standing practice rather than a per-brief habit — three agents launched today, and the one that was told to check, caught it.
+
+> **Recommendation:** Add the base-check to DELIVERY.md's sub-agent section so it is not a thing each brief has to remember.
+
+*Files: `docs/development/DELIVERY.md`*
+
+### NR-481 — Sprint B3's stated premise is stale in all three of its parts
+*observation · raised 2026-08-21 · from Sprint B3 Lane B agent, 2026-08-21. Verified against the tree at origin/main 269049d, not assumed.*
+
+B3's goal line reads: "The population-centre clamp is still clamp(tiles/1000, 20, 40) from the 180x84 era, against a 312x145 map." Every clause of that is now false.
+
+(1) THE CLAMP IS GONE. BL-463 (settlement count is seed-invariant) landed 2026-08-21 and replaced it with `land_tiles / k_land_tiles_per_centre` (410), clamped only structurally to [1, placeable_tiles].
+
+(2) THE MAP IS NOT 312x145. BL-424 took the homeworld to 70% area; `home_grid_width/height` have been 261x121 = 31,581 since commit efe1ff0. A comment in hard_coded_world.cpp still said 312x145 and has been corrected in this change.
+
+(3) THE PER-BODY FIRM CAP IS ALREADY REPLACED, and NOT by a per-nation bound. B3's plan for BL-374 (corp density target) was to swap the per-BODY firm cap for a per-NATION one. That work landed 2026-08-20: `max_firms_per_body` is now 200 (anti-runaway only) and shaping moved to a per-RESOURCE cap (8) and a per-PROVINCE cap (2), on Ben's own dated words: "we should have two levels, per resource caps, and per province caps." Building a per-nation bound now would contradict that ruling, so it was NOT done.
+
+[RENUMBERED ON MERGE from NR-473: three lanes ran concurrently and two of them minted the same review ids. The other NR-473 was already pushed. Cross-references inside this entry are remapped to match.]
+
+**Why it matters.** Three of the sprint's three planned actions were already taken by other lanes between the sprint being written (2026-08-20) and being worked (2026-08-21). An agent briefed on the sprint text alone would have re-derived a constant that had just been derived, or reversed a dated ruling. The sprint goal lines are snapshots and go stale within a day at this pace; the code is the authority.
+
+- Rewrite B3's goal to what actually remains (the density DECISION below, and BL-522).
+- Close B3 as overtaken and open its remainder as a fresh sprint.
+
+> **Recommendation:** Rewrite the goal. The remaining question is real and is the entry below.
+
+### NR-482 — Settlement density: 86% of nations hold exactly ONE centre, and raising it triples the labour pool
+*question · raised 2026-08-21 · from Sprint B3 Lane B agent, 2026-08-21. Measured by the new tools/verify/settlement_density.cpp over 3 seeds x 8 divisors, at the shipped 400-year prehistory. NOT TUNED - reported.*
+
+BL-463 fixed the defect it was written against (the count no longer being seed-invariant) and deliberately pinned the divisor at the shipped generator's OWN measured density, so the CENTRAL density was never re-derived. This measures what that central density produces, and the number that matters is per-NATION, not per-world.
+
+SHIPPED TODAY (divisor 410), 3 seeds, 39,543 land tiles, 168 nations:
+  200 centres | 197.7 land tiles/centre | 1.19 centres per nation | median 1 | max 4
+  centres-per-nation histogram: 0 nations with none, 145 with one, 15 with two, 7 with three, 1 with four
+  => 145 of 168 nations (86.3%) hold FEWER THAN TWO centres.
+
+WHY <2 IS THE THRESHOLD THAT MATTERS: road_generation.cpp's per-nation backbone skips any nation with `n < 2` centres. Sprint B2 gave a single-centre nation a Track on its own centre tile, so it is no longer road-LESS - but it has one roaded tile and no internal network. 86% of the world's nations are in that state. That is a far more direct reading of "does not appear physically civilised" than the world-level count is.
+
+A SECOND STRUCTURAL SIGNAL: at 410 the coverage pass (one seat per uncovered nation) places MORE centres than the primary geographic pass does - 104 vs 96. Over half the settled world is a structural top-up at an argmax tile rather than a geography. As the divisor tightens the primary pass takes over: 74% of centres at 200, 83% at 150, 91% at 100.
+
+THE SWEEP (aggregate over the same 3 seeds):
+  divisor | centres | land/centre | centres/nation | nations with <2 centres
+      410 |     200 |       197.7 |           1.19 |  145 (86.3%)   <- shipped
+      300 |     219 |       180.6 |           1.30 |  136 (81.0%)
+      200 |     264 |       149.8 |           1.57 |  119 (70.8%)
+      150 |     316 |       125.1 |           1.88 |  101 (60.1%)
+      120 |     373 |       106.0 |           2.22 |   87 (51.8%)
+      100 |     431 |        91.7 |           2.57 |   78 (46.4%)
+       80 |     521 |        75.9 |           3.10 |   64 (38.1%)
+       60 |     681 |        58.1 |           4.05 |   52 (31.0%)
+
+THE REASON THIS WAS NOT TUNED, and it is the whole point of the entry: THE DIVISOR IS NOT A GENERATION KNOB, IT IS AN ECONOMY KNOB. economy_system.cpp derives each body's entire workforce supply as a sum over its centres (`labour_by_scale[scale]`), so halving the divisor roughly doubles the labour pool the whole prototype economy runs on. Measured headcount over the 3 seeds: 27,580k at 410; 71,570k at 150; 90,980k at 100 - 2.6x and 3.3x. Workforce is one of the few binding constraints in the shipped economy. Picking a divisor here would be choosing the size of the labour market without pricing it, which is exactly the move BL-463's own "Direction, not a chosen number" section forbids.
+
+[RENUMBERED ON MERGE from NR-474: three lanes ran concurrently and two of them minted the same review ids. The other NR-474 was already pushed. Cross-references inside this entry are remapped to match.]
+
+**Why it matters.** Two defensible structural criteria point at different divisors, and BOTH more than double the labour pool:
+  * "the MEDIAN nation is internally connected" (>=2 centres) => divisor ~100-120
+  * "geography places more centres than the structural top-up does" (primary >=80% of centres) => divisor ~150
+Neither is a taste number, but neither can be adopted without deciding whether the economy should run on 2.6-3.3x today's workforce. There is also a third option nobody has costed: raise the centre COUNT while shifting the scale distribution DOWN (k_scale_weight is currently 40/30/20/8/2), so the map reads as more settled without the labour pool moving. That decouples "looks civilised" from "has more workers" and may be what the complaint actually wants.
+
+- Divisor ~150: geography dominates the top-up; ~2.6x headcount; 60% of nations still under 2 centres.
+- Divisor ~100-120: the median nation gets a road backbone; ~3.3x headcount.
+- Hold the divisor and re-weight k_scale_weight downward instead - more places, same people.
+- Hold everything; accept that 86% of nations are one-town nations and close the complaint elsewhere.
+
+> **Recommendation:** Do not pick from a table. The third option is the one worth costing first, because it is the only one that changes what the map LOOKS like without changing what the economy RUNS on - and the complaint was about how the world looks. Costing it needs a run of substrate_census/econ_harness in a Lua tree, which this container cannot do.
+
+### NR-483 — NOVEL WORK: no authority doc owns population-centre DENSITY as a tuning subject
+*novel-work · raised 2026-08-21 · from Sprint B3 Lane B agent, 2026-08-21. Flagged at the moment the density re-derivation was attempted.*
+
+docs/economy/POPULATION.md owns the population-centre MODEL (scale, agglomeration, habitability feedback). docs/generation/TILE_GENERATION.md owns the tile pipeline. Neither owns the question "how many centres should a world have, and what is that number answerable to?" BL-463 answered it once, by preserving the shipped generator's own historical density - which is a defensible way to avoid picking a number, but it means the density has never been derived from anything.
+
+The measurement above shows why it needs an owner: the divisor is simultaneously a GENERATION constant (how settled the map looks), a ROAD constant (road_generation's `n < 2` gate), and an ECONOMY constant (the body's whole labour supply). Three docs have a claim on it and none states the constraint.
+
+The same gap applies one level up: NOTHING in the corpus states what "physically civilised" means as a target. substrate_census (Sprint B1) measures it and explicitly refuses to threshold it, correctly, because thresholding it is a design act nobody has performed.
+
+[RENUMBERED ON MERGE from NR-475: three lanes ran concurrently and two of them minted the same review ids. The other NR-475 was already pushed. Cross-references inside this entry are remapped to match.]
+
+**Why it matters.** Without an owner this constant gets re-derived by whoever next reads the complaint, against whatever criterion is in front of them. That is how the 180x84 clamp survived the map tripling and then the map shrinking.
+
+- Give POPULATION.md a Density section that states the three constraints the divisor answers to.
+- Leave it to BL-463's successor item once the ruling above is made.
+
+> **Recommendation:** The former, as part of whatever change lands the ruling.
+
+### NR-484 — spectator_determinism's pinned golden is RED on origin/main in a Lua-free harness build
+*observation · raised 2026-08-21 · from Sprint B3 Lane B agent, 2026-08-21. Run at origin/main 269049d, with this session's own change STASHED - so the failure is not attributable to this work.*
+
+`spectator_determinism` R2 ("the unspectated hash equals the pre-BL-409 golden") fails:
+    golden=344A9FE48306E93A  observed=B4D09255AF346008
+The observed hash is byte-identical with this session's change applied and with it stashed, which is also the proof that the change moved nothing.
+
+CAVEAT, stated rather than glossed: this was built with the container's prescribed Lua-free object set (recipe_registry / works_registry / tech_tree / world_gen_config excluded from the link, per the brief's build recipe). The harness hand-builds its own recipe_registry, so it is *designed* to run Lua-free - but I cannot rule out that the exclusion itself shifts the hash, and I have no Windows/CMake tree here to check against. NOT re-blessed, and deliberately left red.
+
+[RENUMBERED ON MERGE from NR-476: three lanes ran concurrently and two of them minted the same review ids. The other NR-476 was already pushed. Cross-references inside this entry are remapped to match.]
+
+**Why it matters.** The standing rule is that goldens are contracts and movement is reported, never re-blessed without authorisation. Either the world legitimately moved on main since the golden was last blessed (the harness's own provenance log says it has been re-blessed before for exactly that reason) and it needs re-blessing with a dated note, or the Lua-free link is not hash-equivalent and the harness's build assumptions need stating. Both are worth knowing; neither should be settled by an agent.
+
+- Run it in a full CMake tree to establish which of the two it is.
+- Re-bless with a dated provenance line, if the full-tree run confirms the world legitimately moved.
+
+> **Recommendation:** Run it in a full tree first. Do not re-bless off this container's result.
+
+### NR-485 — hire_axis_cost moved into unit_roster.hpp, slightly past BL-498's literal wording
+*decision taken on your behalf · raised 2026-08-21 · from Lane C, BL-498 (shared hire gate table).*
+
+BL-498 asked for one shared table behind `campaign_gate_input`'s preference lists. TAKEN: moved `hire_axis_cost` into `unit_roster.hpp § hire_axis_table` alongside it, so the cost and the resources it is paid in are ONE contract rather than two that must agree. A small widening past the item's literal words.
+
+**Why it matters.** The bug class BL-498 names is exactly 'two hand-mirrored lists drift apart'. Leaving the cost outside the table it is paid against would have fixed one instance and left the neighbouring one. But it is a scope widening on an audit-finding item, so it should be seen rather than assumed.
+
+> **Recommendation:** Keep it. The harness can now assert cost and candidates together, which was not possible before.
+
+*Files: `src/world/unit_roster.hpp`, `src/world/corp_command.cpp`*
+
+### NR-486 — An interception is reported, not stored — the out_cuts sink rather than a world field
+*decision taken on your behalf · raised 2026-08-21 · from Lane C, BL-458 / NR-407.*
+
+`supply_system.cpp:158` read `(void)intercept_convoys(w, tick);` — the interception records were computed and dropped, AND the cut convoy is erased inside that same call, so an interception existed for one statement and then did not exist at all. No UI work was possible against that. TAKEN: `credit_arrived_convoys` gained an optional `out_cuts` sink, so an interception rides the tick's report the way `agency_events` does. NOT state: nothing serialised, nothing folded into `state_hash`.
+
+**Why it matters.** It is the same call BL-467's `battle_dispatch` made two commits earlier, for the same reason — an event that is erased in the tick it happens can only reach a surface by being reported. Worth Ben seeing as a pattern forming rather than as two isolated choices. Reversible; a `world` field would have touched `state_hash` and needed a serialisation seam that does not exist (NR-349).
+
+- Keep it reported (no state, no hash, no save format).
+- Promote interceptions to world state if something later needs to read them across ticks.
+
+> **Recommendation:** Keep it reported. An interception is an event, not state.
+
+*Files: `src/world/supply_system.hpp`, `src/world/supply_system.cpp`, `src/world/economy_system.hpp`*
+
+### NR-487 — Two goldens are RED on origin/main, independently confirmed by two lanes
+*observation · raised 2026-08-21 · from Lanes B3 and C, each reverting to base and rebuilding to confirm it was not their change.*
+
+`spectator_determinism` R2: golden 344A9FE48306E93A against observed B4D09255AF346008. `ai_skill_harness`: 28 failures, and it self-declares its bands 'blessed 2026-08-09 (GCC - STALE since 2026-08-14/BL-386)'. Both fail identically on the untouched base. NEITHER RE-BLESSED.
+
+**Why it matters.** Two independent lanes measured the same observed spectator hash (B4D09255AF346008), which is the corroboration that makes it a real world change rather than a container artifact. B3 caveats that it built with the container's Lua-free object set and cannot fully rule out that the exclusion itself shifts the hash — so the re-bless wants one run on Ben's toolchain before the number is pinned.
+
+> **Recommendation:** Re-bless both, on Ben's machine, once he is satisfied the world changes behind them were intended (BL-519's terrain split and BL-424's map area are the obvious candidates). Goldens are contracts; this is his signature, not an agent's.
+
+*Files: `tools/verify/spectator_determinism.cpp`, `tools/verify/ai_skill_harness.cpp`, `.claude/rules/io-standing-rules.md`*
+
+### NR-488 — A mutation test passed when it should have failed, and the agent caught itself
+*observation · raised 2026-08-21 · from Lane C, BL-498. Reported by the agent against its own work.*
+
+The first mutation probe written for the shared hire table PASSED — it had no teeth, because `hire_axis_resource`'s `return e.candidates[0]` fallback masked the mutation. Re-run with a mutation modelling the real drift (the debit stops recognising the table's LAST candidate), R5 then failed on exactly that candidate on all three axes, as it should.
+
+**Why it matters.** This is the failure mode that makes a green harness worthless, and it is invisible unless someone deliberately tries to make the check fail. Worth recording as method: a new assertion should be proven to FAIL against a deliberate break before it is trusted to pass — the same discipline as BL-384's 'a row that would pass before the change proves nothing'.
+
+> **Recommendation:** Consider making mutation-proving a stated step for new harness rows in DELIVERY.md. Not filed as work; Ben's call whether it is worth the ceremony.
+
+*Files: `tools/verify/corp_ai_harness.cpp`, `docs/development/DELIVERY.md`*
+
+### NR-490 — War-gated progression is designed but not yet live — one earnable gate in 150 tech nodes
+*observation · raised 2026-08-21 · from Checking Ben's stated reason for the 2026-08-21 zero-war ruling.*
+
+Ben ruled a world that never fights is a bug because 'many ancient tech quests would not be unlockable'. Checking what exists: `scripts/tech_tree.lua` holds 150 nodes and the file says in its own comment that E0-ML-01 is 'THE ONE LIVE GATE... Every other node in this file is authored data the F9 viewer draws'. Its predicate is in tech_gate.cpp, and it reads corp military_units/military_strength - not battles and not conquest. The Era -1 works roster gates on capacity band (materials), also not on war.
+
+So today no content anywhere is gated on a war HAPPENING. The dependency is real as design intent and absent as mechanism.
+
+**Why it matters.** Two things follow, pointing the same way. First, the ruling is sound but its stated justification cannot yet be verified by running anything - worth knowing before someone tries. Second, and more useful: the tech design is being drawn on top of a war rate that is ZERO in a quarter of worlds. Fixing the rate before the gates are authored is much cheaper than discovering, once 149 stubs become live gates, that a quarter of campaigns start with a dead branch.
+
+> **Recommendation:** No action beyond noting it. But when the ancient tech quests are authored (BL-478 and the tech-effect work), the war-rate band from Sprint 28's R2 should be the number their reachability is checked against - otherwise the two are designed independently and meet only in a bug report.
+
+*Files: `scripts/tech_tree.lua`, `src/world/tech_gate.cpp`, `docs/development/req/requirements.json`*
+
 ---
 
 ## Resolved
 
 Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
 answer has landed in an authority doc.
+
+### NR-489 — Sprint 28's real subject is verb competition — the scorer discards ~10M campaign candidates to reach zero wars
+*observation · raised 2026-08-21 · from Sprint 28 decomposition. history_conquest_gap campaign funnel, 8 worlds.*
+
+Added three funnel counters (contacts / scored / chosen) because a world with zero battles has zero battle_traces, so the per-battle record was mute about exactly the case needing explanation. The result rules out the two cheap explanations outright.
+
+Seed 0: 4,972,710 contacts, 9,945,420 candidates scored, ZERO chosen. Seed 4: 4,089,264 / 8,178,528 / ZERO. It is not adjacency and not candidate discovery — the scorer looks at a war it could start ten million times and picks something else on every single one.
+
+A second observation with no obvious reading yet: CONTACTS DO NOT PREDICT WAR, and if anything predict it inversely. Seed 7 has the fewest contacts (1.58M) and fights 184 times; seed 0 has the most (4.97M) and never fights at all.
+
+**Why it matters.** It makes Sprint 28 a much smaller and more specific sprint than the one on the board — verb competition inside the scorer, not combat tuning. And it is the difference between a fix and a guess: the remaining fork (never cleared the threshold, versus cleared it and lost to Settle) needs different fixes, and the code still cannot tell them apart. That fork is T1, and R7 is written as a NEGATIVE requirement forbidding any combat-constant tuning in the sprint, because that is the temptation the measurement has already ruled out.
+
+> **Recommendation:** Worth your eye on one thing before T3: whether a world that never fights is a BUG at all. A polity with room to expand preferring Settle to Campaign is defensible behaviour, and BL-224 wants some worlds multipolar. The target should be a rate inside a stated band, reported and never clamped.
+
+> **RESOLVED.** RULED 2026-08-21 (Ben): A WORLD THAT DOES NOT FIGHT IS A BUG. His reason, and it is the part that shapes the requirement rather than merely answering the question: 'many ancient tech quests would not be unlockable'. So the floor on the war rate is not aesthetic and not about the Era -1 premise reading well - it is CONTENT REACHABILITY. A world where war never happens is a world where war-gated progression is dead, and that is a different and harder failure than a quiet era.
+
+R2 is amended: the band's FLOOR is set by what war-gated content needs to be reachable, not chosen for distribution shape. The ceiling stays governed by BL-224's non-hegemony invariant, so the requirement is now bounded from both ends by a stated reason rather than one.
+
+ACCURACY NOTE, recorded so nobody goes looking for a gate that is not built yet: the dependency Ben names is DESIGNED, not yet live. Checked today - the campaign tech tree has 150 nodes and exactly ONE earnable gate (E0-ML-01 Standing Garrison Doctrine, whose predicate lives in tech_gate.cpp); the other 149 are authored stubs the F9 viewer draws. Nothing currently gates on battles or conquest, and the Era -1 works roster gates on capacity BAND (materials), not on war. So the ruling is forward-looking, and that is an argument FOR fixing the war rate now rather than against it: the tech design is being built on top of a war rate that is zero in a quarter of worlds.
+
+*Files: `src/world/history_sim.cpp`, `tools/verify/history_conquest_gap.cpp`, `docs/development/REFINED.md`*
 

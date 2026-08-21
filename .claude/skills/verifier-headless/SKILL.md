@@ -415,6 +415,78 @@ in `tools/verify/README.md`.
   rather than degenerate — wording actually varying across one fight (10 dispatches, 6 distinct
   lines).
 
+- **`settlement_density`** — how many population centres a world places, and how they land per
+  NATION (Sprint B3, 2026-08-21). Report-only on the tuning question; S1–S4 assert only structural
+  properties (every seed produces land, the divisor places centres, every nation holds at least one —
+  BL-463's acceptance test — and a re-run at the shipped divisor reproduces the generated world).
+
+  It sweeps alternative divisors through `generate_population_centres`'s optional parameter, so an
+  alternative can be measured without a recompile and without changing what production generates.
+  **Read its per-nation column, not its world total**: the world-level centre count looks reasonable
+  while 86.3% of nations hold fewer than two centres, which is exactly `road_generation.cpp`'s
+  `n < 2` gate for a per-nation backbone. The world total is what hid the stale 180×84 clamp through
+  both a map tripling and a map shrinking.
+
+- **`interdiction_harness`** and **`corp_ai_harness`** were unregistered here until 2026-08-21
+  despite both being live; `campaign_roster_band` still is. An unregistered harness is one nobody
+  runs after an unrelated change.
+
+- **`sea_leg_census`** — what `crosses_ocean` actually selects (Sprint B2, 2026-08-21). Report-only,
+  over market-pair routes; takes an optional seed count (`sea_leg_census 16`), default 8. It exists
+  because a mode flag nobody had counted turned out to be firing on **64.5% of routes** and
+  mispricing them by **1.59×** — `logistics_path::crosses_ocean` is one bit over a whole route, so a
+  single water tile bills every land tile at the sea rate (BL-522).
+
+  Run it after ANY change to `logistics.cpp`, `supply_system.cpp` or the `land`/`sea` rates in
+  `scripts/economy.lua`. **Its `kLandRate`/`kSeaRate` restate those Lua values as constants** — the
+  harness is deliberately Lua-free — so if the Lua moves, these must move with it or the census
+  silently measures the old economy. S4 asserts the census is identical across two generations of one
+  seed; S0–S3 report and assert nothing about the finding.
+
+- **`history_conquest_gap`** — WHY the Era −1 sim fights and never conquers (BL-384, 2026-08-21).
+  **Report-only by design**, and the model to copy when a harness's job is to EXPLAIN a red rather
+  than to add another one: `history_sim_harness`'s B384a/B384b already assert that a region changes
+  hands by war, so this one asserts nothing about the gap and instruments it instead. It reads
+  `history_sim_state::battle_traces`, populated only under `history_sim_params::trace_battles`.
+
+  It is built to REFUTE its own hypothesis, which is what it did. BL-384's design named a specific
+  mechanism — the scorer estimating odds with no terrain term while the resolver applies one — and
+  the harness separates that from two rival explanations (the scored hub differing from the levying
+  hub; the fight being won but the transfer bar never cleared) so a reading cannot be mistaken for
+  a guess. Measured over 8 worlds: the scorer is calibrated to −0.0pp, hub mismatch is 0/1226, and
+  99.8% of victories convert — all three mechanisms refuted. What it found instead is that **2 of 8
+  worlds fight no war at all** while the rest conquer heavily.
+
+  Its own two assertions are about the INSTRUMENT, not the finding: T1 that tracing is inert (a
+  traced run matches an untraced one in every other output — an instrument that perturbs what it
+  measures is worse than none), and T2 that it caught something. Runs ~8 real 0→1960 sims; budget
+  several minutes.
+
+- **`interdiction_harness`** — Can a supply line be cut? (BL-458, Sprint C3, 2026-08-21.) The
+  item-spanning check for the mechanic that makes a convoy a military object: a hostile unit
+  standing on the tile a convoy's head occupies takes the cargo. **R4 is the load-bearing row** —
+  conservation: captured quantity in equals quantity credited, EXACTLY, and the destroyed fallback
+  (an interceptor holding no pools) credits nothing and mints nothing. No path creates goods.
+
+  R1 guards the defect the item predicted it would ship: `convoy_tile_at` must own the path
+  ORIENTATION rule, because `intra_body_path` caches on a canonicalised key and the renderer
+  conditionally reverses it. Get that wrong and the convoy's head lands at the wrong end of the
+  lane half the time — invisible on screen (the beam looks right either way) and fatal to
+  interdiction. R2 asserts stance is the predicate and the ONLY predicate (a neutral unit on the
+  same tile does not intercept); R5 that two runs of one seed cut the same convoys on the same
+  ticks, field for field; R6 that an unwarred world is untouched and that interdiction declares
+  hostility on nobody's behalf.
+
+  **R7 is the NR-407 row (added 2026-08-21, Lane C).** The mechanic worked from the day it landed
+  but shipped SILENT: `credit_arrived_convoys` called `(void)intercept_convoys(...)` and dropped
+  the records, while erasing the cut convoy in the same call — so the interception existed for one
+  statement and then did not exist at all, and no comms line or canvas mark could read it. R7
+  drives the real shared seam (`credit_arrived_convoys`, which app/main/every harness go through)
+  with its `out_cuts` sink and asserts the record names interceptor, victim, tile, body, cargo and
+  outcome; that a quiet tick reports nothing; that the sink APPENDS across ticks; and that the
+  two-arg form every existing caller uses still cuts and still credits. An interception is an
+  EVENT, not state — nothing is stored on `world`, serialised, or folded into `state_hash`.
+
 - **`tile_axes_harness`** — The substrate/cover terrain split (BL-519, 2026-08-21). 13 checks over
   the two-axis replacement for `terrain_composition`: the density invariant (density is 0 **iff**
   cover is `none`), `cover_fraction` monotonicity, `is_biotic_cover` membership, and — the rows that

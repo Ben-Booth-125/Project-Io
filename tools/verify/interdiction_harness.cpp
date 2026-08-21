@@ -468,6 +468,107 @@ static void test_quiet_world()
     check(s.w.corp_hostile_pairs.empty(), "R6: interdiction declares nothing on anyone's behalf");
 }
 
+// ---------------------------------------------------------------------------
+// R7: the cut is REPORTABLE — NR-407, the reason interdiction shipped silent.
+// ---------------------------------------------------------------------------
+//
+// The mechanic worked from the day it landed; what it could not do was TELL
+// anyone. `credit_arrived_convoys` called `(void)intercept_convoys(...)` and
+// dropped the records on the floor, and a cut convoy is ERASED in that same
+// call — so the fact of the interception existed for the duration of one
+// statement and then did not exist at all. No comms line, no Convoys-tab
+// cause and no canvas mark could be written against that, whatever the UI
+// lane did, because there was nothing left to read.
+//
+// The fix is a sink on the shared seam, not a new field on `world`: an
+// interception is an EVENT, so it rides the tick's report exactly as
+// `agency_events` and `battle_dispatches` do. Nothing is serialised and
+// nothing is folded into `state_hash`.
+//
+// These rows would not have compiled before the parameter existed.
+static void test_reportable()
+{
+    std::printf("--- R7: an interception survives the tick that erased its convoy ---\n");
+
+    // The real seam every caller shares — app.cpp, main.cpp and every harness
+    // reach interdiction only through credit_arrived_convoys.
+    {
+        scene s = make_scene();
+        add_convoy(s, s.market_a, s.market_b, 61.25f, 0.0f);
+        add_unit(s, s.raider, s.tile_a);
+        declare_hostile(s.w, s.raider, s.victim);
+
+        std::vector<interception_record> cuts;
+        credit_arrived_convoys(s.w, 9, &cuts);
+
+        check(cuts.size() == 1, "R7: the shared seam reports the cut it made");
+        check(s.w.convoys.empty(), "R7: ... and the convoy it reports is already gone");
+        if (cuts.size() == 1)
+        {
+            check(cuts[0].interceptor_corp == s.raider,
+                  "R7: the record names the interceptor (the comms line needs it)");
+            check(cuts[0].interceptor_unit != null_entity,
+                  "R7: the record names the intercepting unit");
+            check(cuts[0].victim_corp == s.victim,
+                  "R7: the record names the victim whose lane was cut");
+            check(cuts[0].tile != null_entity && cuts[0].body != null_entity,
+                  "R7: the record names WHERE (the canvas mark needs a tile)");
+            check_f(near_f(cuts[0].cargo_qty, 61.25f),
+                    "R7: the record carries the cargo the lane lost",
+                    cuts[0].cargo_qty, 61.25);
+            check(cuts[0].outcome == interception_outcome::captured,
+                  "R7: the record states the OUTCOME, so the cause can be worded");
+        }
+    }
+
+    // A quiet tick reports nothing — the sink must not be a source of noise.
+    {
+        scene s = make_scene();
+        add_convoy(s, s.market_a, s.market_b, 10.0f, 0.0f);
+        add_unit(s, s.raider, s.tile_a); // present, but NOT hostile
+
+        std::vector<interception_record> cuts;
+        credit_arrived_convoys(s.w, 9, &cuts);
+        check(cuts.empty(), "R7: an uncut tick reports no interception");
+        check(s.w.convoys.size() == 1, "R7: ... and the convoy is still flying");
+    }
+
+    // The sink APPENDS. A caller accumulating across several ticks keeps the
+    // earlier ones, which is what a comms feed does.
+    {
+        scene s = make_scene();
+        add_unit(s, s.raider, s.tile_a);
+        declare_hostile(s.w, s.raider, s.victim);
+
+        std::vector<interception_record> cuts;
+        add_convoy(s, s.market_a, s.market_b, 5.0f, 0.0f);
+        credit_arrived_convoys(s.w, 1, &cuts);
+        const std::size_t after_first = cuts.size();
+        add_convoy(s, s.market_a, s.market_b, 7.0f, 0.0f);
+        credit_arrived_convoys(s.w, 2, &cuts);
+
+        check(after_first == 1 && cuts.size() == 2,
+              "R7: the sink appends across ticks rather than overwriting");
+    }
+
+    // The default (no sink) is unchanged: the pass still runs and still cuts.
+    // This is the row that keeps every pre-existing caller honest.
+    {
+        scene s = make_scene();
+        add_convoy(s, s.market_a, s.market_b, 33.0f, 0.0f);
+        add_unit(s, s.raider, s.tile_a);
+        declare_hostile(s.w, s.raider, s.victim);
+
+        credit_arrived_convoys(s.w, 9); // two-arg form, as every existing caller uses
+        check(s.w.convoys.empty(),
+              "R7: a caller passing no sink still gets the cut (behaviour unchanged)");
+        check_f(near_f(s.w.pool_for(s.raider, s.body).quantities[ri(resource_type::iron_ore)],
+                       33.0f),
+                "R7: ... including the capture credit",
+                s.w.pool_for(s.raider, s.body).quantities[ri(resource_type::iron_ore)], 33.0);
+    }
+}
+
 int main()
 {
     std::printf("=== BL-458 interdiction harness ===\n");
@@ -476,6 +577,7 @@ int main()
     test_conservation();
     test_determinism();
     test_quiet_world();
+    test_reportable();
 
     std::printf("\n%s (%d failure%s)\n", g_failures == 0 ? "ALL PASS" : "FAILURES",
                 g_failures, g_failures == 1 ? "" : "s");

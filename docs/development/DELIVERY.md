@@ -296,6 +296,17 @@ git worktree (`isolation: "worktree"`), so two agents editing the same file no l
 other — worktree isolation makes overlap safe. This replaces the old hard rule that sub-agents
 must have disjoint file write-sets.
 
+**EVERY AGENT VERIFIES ITS OWN BASE, AS ITS FIRST ACTION** (2026-08-21, after the second
+occurrence). A worktree is created at the **session's** base commit, not at the branch tip, so an
+agent launched mid-session starts behind — by five commits in the measured case. This is not a
+cosmetic staleness: one agent read its own `git log`, concluded correctly from it that a landed item
+"has not landed in code", and spent an hour widening an enum that had already been deleted (NR-459);
+a second would have rebuilt three road cuts that already existed (NR-480).
+
+So every brief must say, before any instruction about the work: run `git log --oneline -3`, fetch
+the working branch, and **fast-forward to its tip before reading any code** — and STOP and report if
+that is not possible. The agent told to check is the one that caught it.
+
 Consequences:
 
 - **The collision map is now a *splitting heuristic*, not a gate.** Use it to carve the work into

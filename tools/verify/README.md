@@ -56,6 +56,19 @@ of one seed). Report-first — the road-less count is a number to watch, not a p
 after any change to `road_generation.cpp`, to nation/population placement, or to the logistics
 traversal costs the road MST is laid out against.
 
+`sea_leg_census` (Sprint B2, the BL-188 un-parking decision) is the **sea-mode** instrument, and
+the counterpart to the road census above: where that one measures the land raster, this measures
+what `logistics_path::crosses_ocean` — a single boolean over the whole route — actually selects.
+Over every reachable market pair on every body it reports S1 the share of routes in sea mode and
+how much of such a route is *really* water, S2 which water kind flipped the bit (BL-516 made water
+three things; `crosses_ocean` still reads the undifferentiated `is_water`, so a lake can flip a
+route to sea mode), and S3 the money delta between the whole-route sea rate the supply layer
+charges today and a per-leg split. Report-first: S1–S3 print distributions, and only the vacuity
+guard and a determinism row assert. It measures the shipped `scripts/economy.lua` rates by
+restating them as constants — it is deliberately Lua-free — so **if `logistics.base_cost_per_unit_distance`
+moves, move `kLandRate`/`kSeaRate` with it**. Re-run it before touching BL-188, the convoy mode
+selection, or the sea/land logistics rates.
+
 `tile_height_retention` (BL-517) guards the retained per-tile heightmap. Its assertions are shaped
 around the item's negative scope — height must be **captured**, never recomputed: H1 asserts every
 `tile_component::height` is bit-identical to `generation_record::height`, H3 that the value is the
@@ -587,6 +600,43 @@ suite to remove (NR-259).
 cmake --build build --target substrate_census    # from a vcvars shell
 build_app.bat substrate_census                   # or via the pinned script
 IO_RUN_SWEEPS=1 ctest --test-dir build -R substrate_census
+```
+
+## settlement_density (Sprint B3)
+
+Population-centre density, over N seeds (default 3), at the shipped 400-year
+prehistory. Reports centres per body, **centres per nation**, land tiles per
+centre, the primary/coverage split, and the centres-per-nation histogram — then
+re-runs placement at a range of alternative density divisors and prints what each
+would produce.
+
+**Why it is not `substrate_census`.** The census answers "how civilised is the
+world" and must run the whole `start_new_game` ordering including
+`generate_background_firms`, so it needs **live Lua**. Centre placement needs
+none — it is a pure function of the tile surface plus the nation borders — so
+this harness links the plain `io_world_obj` objects and runs in a Lua-free tree.
+
+**The divisor sweep is the point.** `generate_population_centres` takes the
+density divisor as a *defaulted* parameter (default `k_land_tiles_per_centre`),
+so the harness can clear the centre maps on a copy of an already-generated world
+and re-place at another divisor without a recompile. Check **S4** asserts that
+re-running at the *shipped* divisor reproduces the generated world exactly — if
+that ever goes red, every other row in the table is describing a different
+pipeline than the one that ships.
+
+**A report, not a gate** — same discipline as `substrate_census` and
+`history_sweep`. S1/S2 are structural; S3 restates BL-463's acceptance test
+(*every nation holds at least one population centre*) so it is checked by a
+harness that can run without Lua.
+
+Registered as a **`sweep`** (skipped unless `IO_RUN_SWEEPS` is set): ~2.7 s/world
+at `g++ -O1`, so ~12 s for the three-seed default, and far slower in a Debug
+tree. It gates nothing a routine run needs.
+
+```
+cmake --build build --target settlement_density   # from a vcvars shell
+build_app.bat settlement_density                  # or via the pinned script
+IO_RUN_SWEEPS=1 ctest --test-dir build -R settlement_density
 ```
 
 ## unit_march_harness (BL-470, retargeted by BL-511)

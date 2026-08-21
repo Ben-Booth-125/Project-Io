@@ -377,6 +377,14 @@ struct history_sim_params
     /// Aggression assigned to the expansionist and preserving majors.
     int major_expansionist_aggression_q = 880;
     int major_preserving_aggression_q   = 260;
+
+    // --- Instrumentation (BL-384) -----------------------------------------
+    /// Record one `battle_trace` per battle into `history_sim_state`. OFF by
+    /// default, and it changes nothing when on: no decision reads a trace field
+    /// and no trace field feeds a draw, so a traced run and an untraced run
+    /// agree in every other output. The harness asserts that rather than
+    /// trusting this sentence.
+    bool trace_battles = false;
 };
 
 // ---------------------------------------------------------------------------
@@ -492,9 +500,75 @@ struct owner_change
 
 /// The run's output. `owner_changes` is the time-lapse substrate; everything
 /// else is either the political result or a counter the harness binds to.
+/// ONE BATTLE, AS THE SCORER SAW IT AND AS IT ACTUALLY WENT (BL-384).
+///
+/// The gap this closes: a full 0->1960 run reports 267 battles and ZERO
+/// conquests, deterministically, and no counter in this file can say WHY. The
+/// item's own design forbids guessing — "confirm the mechanism before changing
+/// a constant" — and the hypothesis it names is specific and testable: the
+/// scorer estimates the odds from levy x supply x cohesion against the
+/// defender's RAW manpower, with no terrain term and no works term, while
+/// `resolve_battle` applies both to the defender only. If that is right, the
+/// estimate is systematically optimistic by roughly the defence factor, and the
+/// fix is to give the scorer the terms the resolver already uses. If it is not
+/// right, tuning combat constants would be tuning the wrong thing.
+///
+/// PURE OBSERVATION. Populated only when `history_sim_params::trace_battles` is
+/// set; nothing here is read to make a decision, and no field feeds an RNG
+/// draw. A traced run and an untraced run are byte-identical in every other
+/// output, which the harness asserts rather than assumes.
+struct battle_trace
+{
+    int32_t  year        = 0;
+    uint16_t attacker    = 0;  ///< Polity id.
+    uint16_t defender    = 0;  ///< Polity id, or 0 where the region is unowned.
+    uint16_t region      = 0;  ///< The target region index.
+
+    // --- What the SCORER believed, at selection time ---------------------
+    int p_win_q          = 0;  ///< Its estimated odds of winning, per-mille.
+    int scored_hub       = -1; ///< The staging region it scored the odds against.
+    bool winter          = false;
+
+    // --- What the RESOLVER was actually handed ---------------------------
+    int      exec_hub       = -1; ///< The staging region execution levied from.
+    int64_t  attacker_men   = 0;
+    int64_t  defender_men   = 0;
+    int      attacker_supply_q = 0;
+    int      defender_ready_q  = 0; ///< Winter penalty + works, as passed.
+    int      works_defence_q   = 0; ///< The works half of that, alone.
+    int      terrain_defence_q = 0; ///< The term the scorer never sees.
+
+    // --- What happened ---------------------------------------------------
+    bool attacker_won   = false;
+    int  decisiveness   = 0;
+    int  transfer_needed = 0;  ///< The bar decisiveness had to clear this time.
+    bool conquered      = false;
+};
+
 struct history_sim_state
 {
     std::vector<polity> polities;
+
+    /// WHY A WORLD NEVER FIGHTS (BL-384's real question), counted only under
+    /// `params.trace_battles`.
+    ///
+    /// A world with zero battles has zero `battle_trace`s, so the per-battle
+    /// record is silent about exactly the case that needs explaining. These
+    /// three separate the possibilities, which need different fixes:
+    ///   - `campaign_contacts` 0  -> the polity never shares a border with a
+    ///     foreign owner at all. The gap is in expansion and adjacency; scoring
+    ///     is irrelevant because nothing is ever a candidate.
+    ///   - contacts > 0, `campaign_scored` 0 -> candidates exist and are
+    ///     discarded before scoring.
+    ///   - scored > 0 but `campaign_chosen` 0 -> the scorer sees war and prefers
+    ///     something else every time. That is a threshold/weighting question.
+    int64_t campaign_contacts = 0; ///< (own region, foreign-owned neighbour) pairs examined.
+    int64_t campaign_scored   = 0; ///< Candidates that reached the score comparison.
+    int64_t campaign_chosen   = 0; ///< Rounds where Campaign won the verb choice.
+
+    /// Per-battle observation, empty unless `params.trace_battles`. See
+    /// `battle_trace` for why it exists and why it cannot move the run.
+    std::vector<battle_trace> battle_traces;
 
     /// The History Log time-lapse substrate (Ben, 2026-08-04), DELTA-ENCODED:
     /// one record per ownership CHANGE, not per region per year.
