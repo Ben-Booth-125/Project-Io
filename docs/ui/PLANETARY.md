@@ -74,6 +74,90 @@ A tile's character has **two axes** (the two-axis model, [TILES.md](../economy/T
 
 ---
 
+## Province grain — the rendered and selected unit (BL-511, 2026-08-21)
+
+**The province, not the hex, is what this canvas renders and what a click selects.** A province is
+the ~4-tile 2×2 cell BL-466 already builds (`src/world/province.hpp`); BL-511 changed **no** sizing,
+partitioning or id layout. What moved is rendering and selection. Building placement did **not**
+move, and the tile did **not** retire — deposits, terrain, buildings and richness all remain
+tile-keyed. Ben, 2026-08-21: tiles *"are just going to be rendered differently, but still
+instrumental unit values."*
+
+### The blend
+
+Geometry is still per hex — the row-band cull, the wrap window and the fill LOD are untouched. What
+changed is a hex's **colour**, and it changed by one mechanism:
+
+- Each hex is drawn as a **6-triangle fan with per-corner colours** (`prim_blended_hex`), not as a
+  flat `AddConvexPolyFilled`. The centre vertex takes the tile's own composited colour.
+- A corner takes the **mean of the tile and the same-province neighbours sharing that corner**. Each
+  corner falls between exactly two of the six sides, tabulated once in `k_corner_sides`.
+- A blending hex is drawn at the **full circumradius**, not at `draw_r`. That `-1 px` is the whole
+  reason a hex grid reads as a grid — the background showing through as a border. Inside a province
+  the gap is given up: adjacent hexes share edges exactly, their corner colours already agree, and
+  the seam stops existing.
+- An **out-of-province** neighbour contributes nothing, so the province boundary keeps its colour
+  step. That step, plus a faint dark edge stroke on every side facing another province, is what
+  makes a cell read as a cell.
+
+The result is a gradient across the province's **real tile mixture** — explicitly not a dominant
+composition (which would discard the two-axis mixture [TILES.md](../economy/TILES.md) exists to
+express) and not a texture pattern. The Selection element's mixture bar is the blend's legend: it
+un-blends the same four colours so "what did that gradient just average?" is answerable at a glance
+(see [SELECTION.md](SELECTION.md) § The province element).
+
+**Three classes of tile are excluded from the blend and keep their crisp hex and 1 px border:**
+
+| Excluded | Why |
+|---|---|
+| A **built** tile | It renders *as an installation* — its hex is swapped wholesale for the owner plate. Smearing that plate across unbuilt ground would put a corp identity on land nobody owns. |
+| A **survey-masked** tile | The lock fill is a statement about *knowledge*, not terrain. (The province edge stroke is gated on `revealed` for the same reason — an outline through the mask would leak the shape of unsurveyed ground.) |
+| Any tile under a **non-blending lens** | See the reduction table below. |
+
+### Per-lens province reduction — the decided table
+
+**Every overlay mode keys on tile fields, so each needs a stated per-province answer.** A lens that
+silently showed one tile's value for a whole province would be a defect. The reductions were decided
+lens by lens; `lens_blend_mode` in `body_surface_canvas.cpp` is this table's executable half.
+
+| Lens | Field grain | Province reduction | Why |
+|---|---|---|---|
+| **none** (terrain) | per tile, continuous | **Blend** (vertex mean) | The terrain mixture *is* the thing being rendered. |
+| **Resource** | per tile, presence of one good | **Blend** (vertex mean) | Deposit extent is a real spatial field; the blend renders the deposit's soft edge, which is exactly what the lens is about — the *shape* of the deposit. |
+| **Country** | per tile, categorical (nation) | **Refusal — stays flat per tile** | The mean of two nation colours is a *third nation's* colour. A province straddling a border is a real fact the lens exists to show, not a thing to average away. |
+| **Continent** | per tile, categorical (plate) | **Refusal — stays flat per tile** | Same argument: the mean of two plate colours is a plate that does not exist, and the boundary emphasis is the lens's whole point. |
+| **Market** | per catchment | **No reduction needed** | A catchment already covers whole provinces. Blending would soften the catchment boundary the lens exists to show. |
+| **Scarcity** | per catchment | **No reduction needed** | As Market — the value is already constant across every province in the catchment. |
+| **Corporation** | sparse, per built tile | **Refusal — stays flat per tile** | Ownership is a property of a building on a tile, and built tiles are outside the blend by construction. |
+| **Production** | sparse, per producing tile | **Refusal — stays flat per tile** | The question is "where is output concentrated?" and the building's tile *is* the answer. A province-uniform block would claim the whole province produces. |
+| **Industry** | sparse, per tile with background plant | **Province SUM, filled uniformly** | The one sparse field whose question — "how much plant I did not build stands here?" — is genuinely about the locality. Density is additive, so the member tiles are summed and the whole province fills flat. Blending would spread one works' amber over empty ground beside it, reading as industry that is not there. |
+| **Population** | per-tile **dot mark**, no fill | **N/A — mark, not fill** | Nothing to blend; the dot stays per tile. |
+| **Opportunity** | per-catchment **dot mark**, no fill | **N/A — mark, not fill** | As Population. |
+| **Reach** | body-level | **N/A — paints no tile fill** | The readout is per connected body, not per tile. |
+| **Supply-routes** | body-level edges | **N/A — paints no tile fill** | Aggregated body-pair edges. |
+| **Supply** | per-tile convoy glyph, no fill | **N/A — glyph, not fill** | As Population. |
+
+Only **Industry** carries a genuinely computed per-province reduction; the rest are blends, refusals
+with a reason, or lenses that paint no fill. That is deliberate: the province is the *selection*
+grain under every lens, but it is the *render* grain only where the field is continuous.
+
+### Selection and hover at province grain
+
+- A click that hits no marker glyph selects the **province** (`ui_state::selected_province`). The
+  marker precedence above it (building > market_centre > unit) is untouched.
+- The **selection outline traces the province's outer boundary** — every side facing a different
+  province, never the interior seams. Hover uses the same shape at the hover colour and yields to
+  selection, per the highlight convention (`highlight.hpp`).
+- The always-on province edge is deliberately **faint** (`IM_COL32(10, 10, 16, 70)`, 1 px, and
+  skipped under the coarse LOD): Ben ruled for *softened* borders, so it suggests a cell rather than
+  laying a wireframe over the map. The crisp affordance is the on-demand selection outline.
+- An ocean or unpartitioned tile has no province and still selects as a tile.
+
+Full selection semantics — the mutual exclusion with `selected_entity`, the reconciliation rule, and
+the card's contents — are in [SELECTION.md](SELECTION.md) § The province element.
+
+---
+
 ## Layers — what draws on this canvas today (2026-07-31)
 
 Beyond the base grid and the chrome in the table above, the draw pass
@@ -189,7 +273,7 @@ for i in 0..5:
 ## Interaction
 
 - **Hover** a tile: show tooltip. Hit-tested by distance to hex centre (< circumradius).
-- **Single-click** the surface: set `selected_entity`. Markers are hit-tested first, in the order **building → market → tile** (`body_surface_canvas.cpp`), so buildings, markets and tiles are all independently selectable. Clicks do not change the view rung — the Planetary screen is the bottom of the ladder.
+- **Single-click** the surface: markers are hit-tested first, in the order **building → market → unit** (`body_surface_canvas.cpp`), so buildings, markets and units stay independently selectable. A click that misses every marker selects the **province** (BL-511, § Province grain above) rather than the tile; the tile is one press away in the province card. Clicks do not change the view rung — the Planetary screen is the bottom of the ladder.
 - **Rivers.** Directed river lines are drawn along tile edges with downstream chevrons (BL-170, `body_surface_canvas.cpp`), so a basin reads as flowing rather than as a static blue band. They are terrain drawing, not a lens, and are always on.
 - **Ascend:** clicking the minimap (which shows the Circumplanetary view) promotes it to primary.
 - **Middle mouse button drag:** pan. Horizontal panning is unbounded — the grid is a cylinder, so panning past the east or west edge wraps seamlessly to the opposite side. Each tile is drawn (and hit-tested) at every horizontal offset that falls within the canvas, so there is no visible seam and the column under the cursor is always correct.

@@ -1145,11 +1145,38 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             if (tc.body == m_ui.active_body && tc.grid_x == col && tc.grid_y == row)
             { m_ui.selected_entity = tid; break; }
     });
+    // BL-511: select the PROVINCE containing the tile at (col,row) on the active
+    // surface body — the province is what a canvas click now lands on, and no
+    // click injection exists headless. Mirrors select_tile's shape and is equally
+    // non-mutating. Sets province_sync_entity too, so the canvas's next-frame
+    // reconciliation (which clears the province when some other surface moved the
+    // entity selection) does not immediately undo this. Returns the province id,
+    // or 0 when the tile is ocean / unpartitioned / absent.
+    v.set_function("select_province", [this](int col, int row) -> unsigned int {
+        for (const auto& [tid, tc] : m_world.tiles)
+        {
+            if (tc.body != m_ui.active_body || tc.grid_x != col || tc.grid_y != row)
+                continue;
+            const uint32_t pid = m_world.provinces.province_of(tid);
+            m_ui.selected_entity      = null_entity;
+            m_ui.province_sync_entity = null_entity;
+            m_ui.selected_province    = pid;
+            return pid;
+        }
+        return 0u;
+    });
     v.set_function("clear_selection", [this]() {
         // Deselect (BL-266): the band never hides — with no selection it rests on
         // the player's own corporation. This is the empty-space-click equivalent;
         // no click/key injection exists in the headless harness.
-        m_ui.selected_entity = null_entity;
+        //
+        // BL-511: clears the PROVINCE too. An empty-space click on the real canvas
+        // resolves no hovered tile, so it writes both fields null; leaving the
+        // province set here would make this shortcut diverge from the gesture it
+        // stands in for, and a capture after it would show a stale province card.
+        m_ui.selected_entity      = null_entity;
+        m_ui.selected_province    = 0;
+        m_ui.province_sync_entity = null_entity;
     });
     v.set_function("card_drill", [this]() {
         // Drive the Selection band's resource drill-down (BL-196) for the currently

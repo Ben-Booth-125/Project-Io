@@ -44,7 +44,8 @@ two gestures, applied uniformly across all three canvases:
 
 - **Single-click an entity → select it.** Sets `selected_entity`, opens (or
   re-points) the Selection info element. **No view change** — same rung, same
-  pan, same zoom.
+  pan, same zoom. *On the Planetary canvas, a click that hits no marker selects
+  the **province** rather than the tile (BL-511) — see § The province element.*
 - **Double-click an entity → navigate to it.** The old descend/focus behaviour:
   routes through `ui::focus_on_entity`, which resolves the entity to its most
   informative view (descend a rung, focus a surface/tile, or — for non-spatial
@@ -384,18 +385,73 @@ land.
 
 `ui_state::selection_unit_page` is the pager index, mirroring `selection_building_page`.
 
-### Tile repeat-click selection cycle (placeholder, 2026-08-15)
+### The province element (BL-511, 2026-08-21)
 
-`body_surface_canvas.cpp`'s click handler now cycles **Soldier → Building → Tile → Soldier** on a
+**On the Planetary canvas the selected unit is the PROVINCE, not the tile.** A click that hits no
+marker glyph now lands on the hovered tile's province (`world/province.hpp` — the ~4-tile 2×2 cell
+BL-466 builds). The tile is **not retired**: deposits, terrain, buildings and richness all stay
+tile-keyed, and Ben's ruling is explicit that tiles "are just going to be rendered differently, but
+still instrumental unit values". What changed is which of the two the player *presses*.
+
+A province is not an entity, so it cannot travel in `selected_entity`. It has its own field:
+
+| Field | Meaning |
+|---|---|
+| `ui_state::selected_province` | The selected province id, or `0` for none. |
+| `ui_state::hovered_province` | The province under the cursor, driving the hover outline. |
+| `ui_state::province_sync_entity` | The `selected_entity` value the canvas last wrote. |
+
+**The two selections are mutually exclusive**, and the canvas is the single place that keeps them
+so. `selected_province` has exactly one writer (the Planetary canvas); `selected_entity` has many
+(ledger rows, the corporation list, "inspect the thing I just built"). Each frame the canvas
+compares `selected_entity` against `province_sync_entity`: a mismatch means some *other* surface
+moved the entity selection, that surface wins, and the province clears. Keeping the reconciliation
+in one place beats adding a clear-me duty to every selecting surface.
+
+`draw_selection_content` therefore dispatches on `selected_province` **before** `selection_kind_of`.
+It has to: the band substitutes the player's corporation whenever the entity selection is empty
+(BL-266, § Always open), which is exactly the state a province selection leaves behind, so a later
+test would be swallowed by the substitution.
+
+**The card's job is to give the tile back.** The canvas blends four tiles into one soft shape; the
+card un-blends them:
+
+- **Header** — `Province [x, y] · N tiles`, anchored on the lowest-id member tile's grid position.
+  Province ids are derived and opaque (body rank | block raster | component), so the raw id is not
+  a name a player can hold; the anchor coordinate is.
+- **Mixture bar** — one segment per member tile, in the province's own ascending-tile-id order,
+  each in exactly the colour the canvas gives that tile. This is the blend's legend: "what did that
+  gradient just average?" is answered at a glance instead of by zooming in and counting.
+- **Tiles** — every member tile as a press. Selecting one clears the province and hands over the
+  full tile card (deposits, the neighbourhood hex view, the Construct door). **Building placement
+  did not move to province grain**, so this list is also the route to building.
+- **Deposits** — summed across the province. A deposit is a stock, and for a player deciding
+  whether a locality is worth a mine, four tiles each holding a little iron is one province holding
+  that much iron.
+- **Buildings** — the roll-up of what already stands here, each a press that selects the building.
+  A locality question that used to mean clicking four hexes.
+
+An ocean or otherwise unpartitioned tile has no province and still selects as a **tile**, so
+clicking water selects something rather than nothing.
+
+### Tile repeat-click selection cycle (placeholder, 2026-08-15; retargeted BL-511)
+
+`body_surface_canvas.cpp`'s click handler cycles **Soldier → Building → Province → Soldier** on a
 **repeat** click at the same tile the selection already sits on, skipping any stage with nothing
-there (no unit on the tile skips straight to Building; no building skips to Tile).
+there (no unit on the tile skips straight to Building; no building skips to Province).
 `ui_state::selection_cycle_tile` / `selection_cycle_stage` track the anchor tile and current stage.
 
-A click on a **different** tile (or the first click anywhere) leaves the existing marker-hit /
-tile-fallback precedence (BL-031: building > market_centre > tile) completely untouched — it only
-additionally seeds the cycle anchor so a follow-up repeat click knows where to advance from. This is
-scaffolding ahead of units mostly existing in the live economy (BL-393) — deliberately built now per
-Ben's direction, not gated on combat landing first.
+> **BL-511 changed the terminal stage from Tile to Province.** Because a province is expressed as
+> `selected_entity = null_entity` **plus** a province id, the stage table's "nothing here, skip it"
+> test can no longer be a null check on the last stage — the handler carries an explicit
+> `stage_live[]` alongside the entity table. On a tile with no province (ocean) the stage falls back
+> to the tile, so the cycle never strands on an empty rung.
+
+A click on a **different** tile (or the first click anywhere) leaves the existing marker-hit
+precedence (BL-031: building > market_centre) completely untouched — it only additionally seeds the
+cycle anchor so a follow-up repeat click knows where to advance from. This is scaffolding ahead of
+units mostly existing in the live economy (BL-393) — deliberately built now per Ben's direction,
+not gated on combat landing first.
 
 ### The body element's action is the survey front door (then go-to-surface)
 
