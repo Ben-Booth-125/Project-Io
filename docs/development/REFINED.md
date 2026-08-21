@@ -2,44 +2,37 @@
 
 **Empty between work blocks.** Sprint P1 closed 2026-08-21; Sprint C3 is now active.
 
-## ACTIVE — Sprint C3, BL-467 (battle state in world)
+## Sprint C3 — BL-467 LANDED 2026-08-21
 
-**The gap:** both battle resolvers are compiled, harnessed, and have **no production
-caller**. The military layer can compute a fight but cannot have one. Unblocked by
-BL-448 (stance), BL-459 (the unit→stack bridge), BL-515 (provinces) and NR-439 (the
-battle envelope's size bound), all landed.
+Both resolvers now have a production caller. `src/world/battle_system.{hpp,cpp}` runs
+from `run_economy_step` immediately before `run_unit_march`. All ten tasks done;
+`battle_engagement_harness` 26/26.
 
-**The seam is already marked in the code.** `run_economy_step` carries a comment
-saying "there IS no battle-discovery phase yet ... so today marching units simply
-advance with nothing to precede them here", immediately above `run_unit_march`. That
-is where the battle pass goes, and the ordering it produces is the one BL-467's
-aftermath note assumes: battles → march → upkeep, so zero-count units are disbanded by
-the upkeep pass's **existing** cleanup rather than a second mechanism.
+**Its B1 is the row that could not have been written before the item**: it runs the
+REAL tick rather than calling a resolver, and asserts men died — 1000 → 648 in one
+tick. B1c asserts the negative that makes it mean something: two NEUTRAL corps
+sharing a province do not fight.
 
-### Tasks, foundation first
+**Four defects were found AFTER it compiled and passed 26 checks** (NR-463), by a
+scout told to refute rather than confirm — a withdrawal that cost no men, a dedup
+that silently no-oped with three corps, an unscreened all-naval false victory, and
+zero-count units that were never reaped because the item's own aftermath ruling was
+false about the code. All four fixed.
 
-| # | Task | Files | Depends on |
-|---|---|---|---|
-| T1 | `campaign_battle_identity` folds the **province** where it folds `tile_index` today — same splitmix64, role order preserved | `campaign_battle.{hpp,cpp}` | — |
-| T2 | The world-held record: `{province, attacker, defender, unit ids, rounds_fought, trace}` + an **ordered** container on `world`, and its `state_hash` decision stated | `world.hpp`, `campaign_battle.hpp` | T1 |
-| T3 | **Discovery**: walk provinces in sorted (province id, corp-pair) order; open a battle where two corps' units share a province and one is hostile. One battle per pair per province | new `battle_system.{hpp,cpp}` | T2 |
-| T4 | **The terrain pair**: defender-side tile with the highest `terrain_defence` in the envelope, ties by ascending tile id. Since BL-519 this reads all three axes | `battle_system.cpp` | T3 |
-| T5 | **Stepping**: `rounds_per_tick` as authored data in `campaign_battle_params`; several rounds per tick | `campaign_battle.hpp`, `battle_system.cpp` | T3 |
-| T6 | **Per-unit hits**: round loss distributed proportional to count, remainder by ascending entity id, **no new draws** | `battle_system.cpp` | T5 |
-| T7 | **The withdraw verb**: `corp_verb::withdraw_from_battle{province}`, **appended** (the enum is serialised and append-only), applied at the tick boundary before the next round batch | `corp_command.{hpp,cpp}`, `docs/ai/ACTIONS.json` | T5 |
-| T8 | Wire the pass into `run_economy_step` **before** `run_unit_march` | `economy_system.cpp` | T3–T7 |
-| T9 | Harness `tools/verify/battle_engagement_harness.cpp` — R1 must fail before T8 and pass after | `tools/verify/` | T8 |
-| T10 | Docs: MILITARY.md § What is absent loses the engagement trigger and battle state | `docs/military/MILITARY.md` | T9 |
+**The rider is measured, not taken** (NR-467): `tools/verify/unit_upkeep_rates.cpp`
+sweeps five candidate rate sets. Picking one stays Ben's, per `economy.lua`'s own
+"tuned against a measured baseline rather than guessed here".
 
-**Hotspots, main session only:** T2 (`world.hpp`), T7 (the serialised verb enum) and T8
-(the tick order). These are exactly the files a second lane would collide on.
+### Owed on C3
 
-### Settled by the item — do NOT re-litigate
-
-Province envelope with units keeping tiles; one terrain pair; several rounds per tick;
-directed hostility suffices (the declarer attacks, the target is drawn in); trace
-discarded at battle end; determinism asserted by **in-memory replay only**, never a save
-round-trip, because no serialiser exists (the BL-448 precedent verbatim).
+- **The rate ruling** (NR-467). The finding that should drive it: a flat per-head
+  rate is regressive to the point of being a different rule at different corp sizes
+  — "light" costs a large corp 7.8% of income and a small one **155%**.
+- **Four named stubs** (NR-465): doctrine is all-zeros, season is hardcoded to
+  summer, membership is snapshotted at open, and holding the field has no
+  consequence because no territorial-control concept exists. R9 is **partial**.
+- **BL-468** (battle dispatches) and **BL-469** (the battle card) are the surfaces
+  that make the fight watchable — C3's theme names them and neither is built.
 
 ## Landed this session (2026-08-21)
 
