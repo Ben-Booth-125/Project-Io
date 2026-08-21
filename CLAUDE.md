@@ -19,13 +19,20 @@ jobs `corporation_component` does at once, and **the terminology is settled** (B
   unchanged**, across `corporation_component`, `generate_corporations`, `corp_ai`, `corp_command` and the
   Corporation lens. Roughly 88 of them, each *already* self-running on the full `corp_ai` scorer.
 - A **syndicate** is the new **ownership tier** above it — holds equity, allocates capital, decides, and
-  owns no buildings at all. Roughly 8. The word is NR-479, taken on Ben's behalf and cheap to change until
-  `syndicate_component` reaches the serialisation seam.
+  owns no buildings at all. **Seven of them**, the player one of the seven (Ben, NR-475). The word is
+  NR-479, confirmed by Ben and cheap to change until `syndicate_component` reaches the serialisation seam.
 
-**Equity is a claim on profit, never a control seam** — a corporation a syndicate owns runs itself at any
-fraction, including 100% (NR-473). So the standing rule's subject is readable off the type: a **syndicate**
-is never auto-acted on strategically, a **corporation** always is. The mechanism design lives in BL-522 and
-its six children, BL-523 (equity data model) through BL-528 (portfolio ledger).
+**Equity confers operating control above a > 50% majority (Ben, 2026-08-21, NR-473)** — overturning an
+earlier call taken on his behalf that equity was never a control seam. So the standing rule's subject is
+now a derived predicate: a corporation whose **controlling holder** is the player's syndicate **is** the
+player's corp and is never auto-acted on; every other corporation runs itself on `corp_ai` as today.
+**Below the threshold equity stays purely financial** — a claim on profit and nothing more.
+
+Two consequences worth carrying: **control costs attention** (majorities held, not corporations in the
+world, is the bound on what the player must manage — which is the mechanic's central trade-off), and
+`corp_ai`'s uniform iteration now **forks** on a control gate, which must not shift any other corp's
+cadence slot. Control is **derived from the equity relation, never a stored flag**. The mechanism design
+lives in BL-522 and its six children, BL-523 (equity data model) through BL-528 (portfolio ledger).
 
 The scope has grown past the original 4X-economy prototype and now spans four load-bearing strands: the **economy loop** (shipped, playable end-to-end); **world generation with a simulated pre-campaign history** (the Era −1 institutional ladder and collapse metagame — `docs/lore/`, `docs/generation/`); a **military layer** (units, muster, two battle resolvers — partially built, `docs/military/MILITARY.md`); and the **AI direction** (deterministic scored-utility rivals today, a local-model opponent through the word interface as the v0.2.0 goal — `docs/ai/`). Nations act too, under the 2026-08-18 grant, in the same deterministic shape. The project is in prototype phase, solo-developed in C++ with Lua scripting.
 

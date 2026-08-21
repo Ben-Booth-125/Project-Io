@@ -51,6 +51,28 @@ threshold) would have reintroduced the ~88-build-queue micromanagement the econo
 exists to prevent, forked `corp_ai`'s uniform iteration, and re-muddied the subject BL-409 spent
 a ruling to clear.
 
+**...and overturned by Ben the same session.** He ruled **"above a majority threshold"**: past
+> 50% a syndicate does inherit the corporation's operating decisions. The recommendation lost on
+its merits, and the counter-argument is better than the one it replaced — **control costs
+attention**, and the exposure is bounded by *majorities held* rather than corporations in the
+world, so a syndicate chooses between spreading thin and staying financial, or concentrating and
+taking the wheel. That is a real strategic question; "never" had only one answer.
+
+The three costs the "never" position defended against were not deleted from the design, because
+they did not stop existing — they became costs with owners. Micromanagement is bounded by the
+carve (which makes BL-524's carve count load-bearing against *attention*, not just portfolio
+interest). `corp_ai`'s uniform iteration genuinely forks, and BL-527 now owns that control gate
+under two constraints from BL-409: it must not shift any other corp's cadence slot, and it has no
+subject under spectate. And the prohibition's subject stays crisp by **deriving** control from the
+equity relation rather than storing a flag. One question fell out of the ruling that the "never"
+design could not have had — NR-481, what happens the moment a majority flips — and its fourth part
+(can a rival take control of a corporation the player controls) is a standing-rule *grant*, not a
+mechanism, so it is flagged rather than assumed.
+
+The ruling also answered BL-526's open question for free: if a majority confers *operating*
+control it plainly confers *financial* policy, so the majority holder sets the payout ratio and
+the financial-versus-operating carve that item proposed collapses.
+
 **Ben's terminology ruling, and what it surfaced (NR-474 → NR-479).** His framing used
 *corporation* for the holder and *company* for the operator — inverted from the settled terms.
 His call: **keep `corporation` as the operator, name the holding tier something else.** The word
@@ -91,9 +113,17 @@ README also still carried the pre-NR-177 1960 epoch. Both corrected. The lesson 
 these two files are what a fresh session and a fresh reader start from, so a stale framing there
 propagates further than the same staleness in a subject doc nobody reads without traversing to it.
 
-**Runtime.** ~2h, Full mode (design/refinement only, remote, no build). Seven backlog items, one
-new GLOSSARY term, one named minor, seven review entries (NR-473 → NR-479, two already resolved
-by Ben in-session).
+**Review queue closed out.** All seven entries put to Ben and answered in-session: he overturned
+NR-473 (control at majority), took NR-475 literally (**seven** syndicates total, the player one of
+them — `corporation_count` drops 8 → 7), confirmed NR-479 (*syndicate*), and ruled NR-477 —
+**hold BL-523 until v0.1.15 is cut.** So the minor is designed and deliberately not started, which
+is the outcome the novelty flag was arguing for. NR-478 closed as an observation; NR-480 became
+BL-529 (session-close indent preservation), per the standing pattern that an answer creating work
+becomes an item rather than a longer review entry.
+
+**Runtime.** ~2.5h, Full mode (design/refinement only, remote, no build). Eight backlog items, one
+new GLOSSARY term, one named minor, nine review entries — NR-473 → NR-481, eight resolved in
+session, one (NR-481) newly raised by Ben's own ruling.
 
 ---
 

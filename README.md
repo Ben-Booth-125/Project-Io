@@ -11,11 +11,13 @@ for doing it, and buying its equipment from companies it does not own.
 That last clause is becoming a system of its own. **Ownership is separating from identity**:
 not every firm is publicly held, and owning one is divorced from being one. A **corporation**
 is an operating firm — one of roughly ninety, each already running itself, trading and growing
-on the same deterministic scored-utility AI the rivals use. A **syndicate** is an owner — one
-of roughly eight — that holds equity in corporations, allocates capital, and lives off the
-profit. Equity buys a claim on a corporation's earnings, never its build queue, so the game
-you play as an owner is portfolio judgement rather than ninety build orders. Designed, not
-yet built.
+on the same deterministic scored-utility AI the rivals use. A **syndicate** is an owner — there
+are seven, and you are one of them — that holds equity in corporations, allocates capital, and
+lives off the profit.
+
+A minority stake buys a claim on earnings and nothing else. Take a firm past half, though, and
+you inherit its decisions along with its profits — so control costs attention, and the question
+the game asks an owner is how much of it to spend. Designed, not yet built.
 
 The campaign world is **generated, history included**. A pre-campaign simulation (Era −1)
 plays out an institutional ladder — polities rising, fragmenting, and collapsing — to produce

@@ -2336,8 +2336,8 @@
     "docs/development/backlog.json",
     ".claude/rules/io-standing-rules.md"
    ],
-   "status": "open",
-   "resolution": null
+   "status": "resolved",
+   "resolution": "RULED BY BEN, 2026-08-21: \"Above a majority threshold\" — OVERTURNING the call taken on his behalf that equity never confers operating control. A corporation's CONTROLLING HOLDER is the syndicate above > 50%; a corporation controlled by the player's syndicate is the player's corp for the standing rule and is never auto-acted on. Below the threshold a holding stays purely financial, so both readings survive, split by the line rather than one replacing the other. The three costs the \"never\" position defended against do not vanish and are now designed against in BL-522 § The three costs: micromanagement is BOUNDED BY MAJORITIES HELD rather than corporations in the world (and that bound is the mechanic's central trade-off — control costs attention); corp_ai's uniform iteration genuinely forks on a control gate, owned by BL-527, which must not shift any other corp's cadence slot per BL-409 and has no subject under spectate; and the prohibition's subject is kept crisp by deriving control from the equity relation (BL-523) rather than storing a flag, with the threshold a single named constant. BL-526's open payout question is answered as a side effect — majority takes financial policy too. One new question raised BY the ruling: NR-481, control changing hands mid-campaign."
   },
   {
    "id": "NR-474",
@@ -2377,8 +2377,8 @@
    "files": [
     "src/world/corporation_generation.hpp"
    ],
-   "status": "open",
-   "resolution": null
+   "status": "resolved",
+   "resolution": "RULED BY BEN, 2026-08-21: option (b) — SEVEN syndicates in total, the player one of them. Taken literally from his original \"instead we have 7 corporations\", against the recommendation to keep 8 as the no-generation-change option. Consequence: `corporation_count` drops 8 → 7 and BL-524's carve runs over seven named corps, not eight. Propagated through BL-522, BL-524, GLOSSARY, CLAUDE.md, README and the ROADMAP entry."
   },
   {
    "id": "NR-476",
@@ -2419,8 +2419,8 @@
     "docs/development/backlog.json",
     "docs/CONCEPT.md"
    ],
-   "status": "open",
-   "resolution": null
+   "status": "resolved",
+   "resolution": "RULED BY BEN, 2026-08-21: hold BL-523 (equity data model) until the mercenary vertical slice (v0.1.15) is cut. The design is settled ahead of the build, which the time-slice permits; the build waits until the third identity framing is proved in play before the fourth is built on top of it. Recorded in the ROADMAP v0.1.23 entry as a ruling rather than a recommendation — the minor is designed and deliberately not started."
   },
   {
    "id": "NR-478",
@@ -2436,8 +2436,8 @@
     "CLAUDE.md",
     "README.md"
    ],
-   "status": "open",
-   "resolution": null
+   "status": "resolved",
+   "resolution": "No action was owed beyond the correction already made in-session: CLAUDE.md and README.md were updated off the superseded governing-body framing, and README's pre-NR-177 1960 epoch was corrected to 0 CE. Closed as an observation. The habit it argues for — that an identity or framing item's propagation set INCLUDES CLAUDE.md and README.md, because they are what a fresh session and a fresh reader start from — stands on the record without needing a rule built around it."
   },
   {
    "id": "NR-479",
@@ -2459,8 +2459,8 @@
     "CLAUDE.md",
     "README.md"
    ],
-   "status": "open",
-   "resolution": null
+   "status": "resolved",
+   "resolution": "CONFIRMED BY BEN, 2026-08-21: keep SYNDICATE. The term is now canonical — GLOSSARY § Syndicate, seven backlog items, CLAUDE.md, README and the ROADMAP v0.1.23 entry. Still cheap to change until BL-523 puts `syndicate_component` on the serialisation seam, which under NR-477's ruling does not happen until v0.1.15 is cut."
   },
   {
    "id": "NR-480",
@@ -2478,6 +2478,27 @@
    "recommendation": "Option 2 — detect and preserve. It is a three-line change, it cannot drift again when a store is reformatted for another reason, and it does not require auditing every other writer. Option 1 works but re-encodes the same assumption that just broke.",
    "files": [
     "tools/session/apply_session_close.js"
+   ],
+   "status": "resolved",
+   "resolution": "Filed as work: BL-529 (session-close indent preservation), version goal v0.1.22 (Harness truth — the tooling-truth minor). Recommendation carried into the item: detect and preserve each store's existing indent rather than hardcoding the other number, so it cannot drift again when a store is reformatted for an unrelated reason."
+  },
+  {
+   "id": "NR-481",
+   "title": "Control changing hands mid-campaign — what happens at the moment a majority flips",
+   "raised": "2026-08-21",
+   "kind": "question",
+   "source": "Raised BY Ben's NR-473 ruling. The \"never confers control\" design had no such moment; a threshold design necessarily does.",
+   "what": "Crossing > 50% turns a corporation the scorer was running into one the player drives, and dropping below hands it back. Four things are undefined: (1) whether reversion is immediate or lagged; (2) what happens to a build order already in flight at the moment control flips; (3) whether the corp_ai scorer, on regaining a corporation, resumes cleanly or needs its state rebuilt; (4) whether a rival syndicate can take control OF A CORPORATION THE PLAYER CONTROLS by buying past them.",
+   "why_it_matters": "Item (4) is the one that needs a ruling rather than a design. It is a relational action by a rival against a corp a human owns — the same threshold BL-450 (rivals score stance) needed its own dated grant to cross, and the standing rules treat that class of widening as requiring an explicit, dated grant rather than an inference. The other three are ordinary state-transition design, but they are the kind that is cheap now and expensive after BL-523 fixes the data model. All four are downstream of a ruling that only landed today, so none of them is a gap in the original design.",
+   "options": [
+    "Rule now, before BL-523 is written.",
+    "Defer to BL-527 (rival syndicate behaviour), where the acquisition-contest question naturally lands.",
+    "Rule (4) now — it is a standing-rule grant — and defer (1)-(3) to BL-527."
+   ],
+   "recommendation": "Option 3. The three mechanical questions are genuinely BL-527's to answer with the scorer in front of it. But a rival taking control of the player's corporation is a grant, not a mechanism, and the standing rules are explicit that such widenings are dated and scoped rather than inferred — so it should not arrive as an implementation detail inside a scoring item.",
+   "files": [
+    "docs/development/backlog.json",
+    ".claude/rules/io-standing-rules.md"
    ],
    "status": "open",
    "resolution": null

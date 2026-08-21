@@ -100,7 +100,12 @@ async loading screen, and the startup-hang fix. SPRINTS.md § Sprint 15 is the r
   **BL-522** (syndicate tier) splits the two jobs `corporation_component` does at once: a
   **corporation** keeps the operating sense — buildings, recipes, stockpiles, orders — and a
   **syndicate** is the new tier above it that holds equity, allocates capital, and owns no
-  buildings at all. Carried by the equity data model (**BL-523**), the syndicate carve +
+  buildings at all — **seven of them, the player one of the seven** (NR-475). **Equity confers
+  operating control above a > 50% majority** (NR-473, Ben overturning an earlier call taken on
+  his behalf that it never did), so a controlled corporation is the player's corp for the
+  standing rule while a minority holding stays purely financial. Control therefore **costs
+  attention**, and that trade — spread thin and stay financial, or concentrate and take the
+  wheel — is the tier's central question. Carried by the equity data model (**BL-523**), the syndicate carve +
   ownership class (**BL-524**), corporation valuation (**BL-525**), dividends and the payout
   dial (**BL-526**), rival syndicate behaviour (**BL-527**) and the portfolio ledger
   (**BL-528**).
@@ -112,10 +117,11 @@ async loading screen, and the startup-hang fix. SPRINTS.md § Sprint 15 is the r
   and valuation plus the profit split; the rest reuses `resolve_price`, FINANCE profitability,
   BL-350's negotiation seam and BL-218's industrialisation-timing scalar.
 
-  **Sequencing caution (NR-477, open):** the design is settled ahead of the build, which is
-  permitted — but this is the *fourth* framing to touch player identity, and the mercenary
-  vertical slice (v0.1.15) has not yet proved the *third*. The recommendation on file is to hold
-  BL-523 until that slice is cut; the design costs nothing sitting in the backlog.
+  **Sequencing — RULED (Ben, 2026-08-21, NR-477): hold BL-523 until v0.1.15 is cut.** The design
+  is settled ahead of the build, which is permitted; the build waits. This is the *fourth*
+  framing to touch player identity and the mercenary vertical slice has not yet proved the
+  *third*, so the foundation does not go in until it has. The design costs nothing sitting in the
+  backlog — **this minor is designed, and deliberately not started.**
 - **Still live from the old band, arc-agnostic:** v0.1.5's remainder (BL-325 unit supply decay),
   v0.1.6 (politics stub), v0.1.7 (generation visibility — generation is shared by both arcs),
   v0.1.13's infra tail (BL-107 save format and friends), and the v0.1.2 UI leftovers.
