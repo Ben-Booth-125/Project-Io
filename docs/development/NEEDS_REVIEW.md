@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*171 entries — 118 open, 53 resolved.*
+*174 entries — 121 open, 53 resolved.*
 
 ---
 
@@ -1106,6 +1106,21 @@ Recorded because it is the third dated position on the same question and the pre
 *question · raised 2026-08-21 · from BL-513 design, from Ben four-input heuristic.*
 
 Ben named infrastructure as one of the four inputs to the province building limit (area, infrastructure, habitability, population). Roads and hubs are built during play, so the ceiling would RISE as a player invests - unlike the per-tile deposit cap and every other placement bound, all fixed at generation. That coupling looks intended and desirable (BL-325 ruling 3 makes economic reach and military reach one field, so infrastructure paying off into capacity is consistent), but it is worth an explicit yes: a dynamic ceiling means a building can become legal later, and any UI that shows remaining capacity has to recompute rather than cache. If it should instead be read once at generation, that is a smaller item.
+
+### NR-407 — BL-458 shipped SILENT: interdiction works, but nothing tells the player it happened
+*observation · raised 2026-08-21 · from Lane M (BL-458 supply interdiction), agent report + main-session verification, merged and MSVC-confirmed.*
+
+The mechanic is real and proven - a hostile unit on a convoy head tile takes the cargo into its own pool and the convoy never arrives (interdiction_harness 49/49 under MSVC). But all three surfaces the item asks for are absent: the comms-dock message, the Convoys-tab row leaving with a stated cause, and the canvas mark. All three need somewhere to keep an interception_record, which means a field on world - a file other lanes in this batch hold open - so intercept_convoys RETURNS its records and credit_arrived_convoys discards them. As shipped a convoy vanishes with no explanation, which the item explicitly says it must not do. This is the honest incomplete of an otherwise complete lane: the requirement group supply-interdiction R3 is PARTIAL, not met. The surfaces are a small follow-up once the province-grain batch stops holding world.hpp.
+
+### NR-408 — Decision: the interdiction trigger sits INSIDE credit_arrived_convoys, which reads surprising
+*decision taken on your behalf · raised 2026-08-21 · from Lane M (BL-458 supply interdiction), agent report + main-session verification, merged and MSVC-confirmed.*
+
+intercept_convoys is called from the top of credit_arrived_convoys rather than from the four call sites (app.cpp, main.cpp twice, harnesses). The agent took this on my behalf because those files are outside its ownership and this is the only seam all four share. It is defensible - a convoy that was intercepted must not then be credited, so the two belong in one ordered step - but it reads oddly against the function name, and a future reader looking for the trigger will not look there. It carries a loud comment. Worth confirming, or renaming the function to say what it now does.
+
+### NR-409 — convoy_tile_at takes world&, not const world& - the A* cache forces it
+*observation · raised 2026-08-21 · from Lane M (BL-458 supply interdiction), agent report + main-session verification, merged and MSVC-confirmed.*
+
+The item specified entity_id convoy_tile_at(const world&, const convoy_component&). It shipped as world& because intra_body_path POPULATES the A* cache, so const is unreachable without paying for a second uncached path solve. Documented at the declaration. Minor, but recorded because the item text will otherwise read as unimplemented, and because a non-const read-shaped function is the kind of thing a later reviewer flags as a mistake when it was a measured trade.
 
 ---
 
