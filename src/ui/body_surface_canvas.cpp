@@ -3168,27 +3168,39 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 if (const auto tb2 = tile_to_bld.find(hovered_tile); tb2 != tile_to_bld.end())
                     building_here = tb2->second;
 
-                // BL-511: stage 2 is the PROVINCE, not the tile. It is expressed
-                // as null_entity + a province id, so the stage table's "nothing
-                // here, skip it" test can no longer be a null check on stage 2 —
-                // hence the explicit `stage_live` below. On a tile with no
-                // province the stage falls back to the tile, so the cycle never
-                // strands on an empty rung.
-                const entity_id stages[3] = { unit_here, building_here,
-                                              (hovered_prov != 0) ? null_entity : hovered_tile };
-                const bool stage_live[3] = { unit_here != null_entity,
+                // Cycle order, ruled by Ben 2026-08-21: UNIT > PROVINCE > BUILDING
+                // > TILE. Four rungs, not three — the province was stage 2 when
+                // BL-511 landed it, and the tile shared that rung; they are now
+                // separate, so a repeat click walks all the way down to the bare
+                // tile rather than stopping at whichever of the two was live.
+                //
+                // This is the CYCLE order only. The hit-test above is unchanged
+                // and still resolves most-specific-first, so a building is still
+                // reachable on the FIRST click — putting the province ahead of it
+                // here would otherwise have made buildings unclickable, which is
+                // the reading Ben explicitly did not pick.
+                //
+                // The province rung is expressed as null_entity + a province id,
+                // so "nothing here, skip it" cannot be a null check on that rung —
+                // hence the explicit `stage_live` table.
+                const entity_id stages[4] = { unit_here,
+                                              null_entity,      // province rung
+                                              building_here,
+                                              hovered_tile };
+                const bool stage_live[4] = { unit_here != null_entity,
+                                             hovered_prov != 0,
                                              building_here != null_entity,
-                                             hovered_prov != 0 || hovered_tile != null_entity };
+                                             hovered_tile != null_entity };
                 int stage = state.selection_cycle_stage;
-                for (int i = 0; i < 3; ++i)
+                for (int i = 0; i < 4; ++i)
                 {
-                    stage = (stage + 1) % 3;
+                    stage = (stage + 1) % 4;
                     if (stage_live[stage])
                         break;
                 }
                 state.selection_cycle_stage = stage;
                 state.selected_entity       = stages[stage];
-                state.selected_province     = (stage == 2) ? hovered_prov : 0u;
+                state.selected_province     = (stage == 1) ? hovered_prov : 0u;
                 state.province_sync_entity  = state.selected_entity;
             }
             else
@@ -3214,10 +3226,13 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                         building_here = tb2->second;
 
                     state.selection_cycle_tile  = hovered_tile;
+                    // Seed the anchor at the rung this click actually landed on,
+                    // in the four-rung order above, so the NEXT repeat click
+                    // advances from the right place rather than replaying a rung.
                     state.selection_cycle_stage = (marker_hit != null_entity && unit_here == marker_hit) ? 0
-                                                 : (marker_hit != null_entity) ? 1
-                                                 : (fallback != null_entity)   ? 1
-                                                                               : 2;
+                                                 : (marker_hit != null_entity) ? 2   // a building marker
+                                                 : (fallback != null_entity)   ? 2
+                                                                               : 1;  // plain ground = province
                 }
                 else
                 {

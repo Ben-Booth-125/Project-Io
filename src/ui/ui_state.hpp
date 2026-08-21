@@ -266,6 +266,14 @@ struct ui_state
     // (skipping stages with nothing there); a click elsewhere reseeds both.
     // Mirrors card_resource_page's per-selection reset idiom rather than adding a
     // separate "is this a repeat click" flag.
+    ///
+    /// Stage numbering is the cycle order Ben ruled on 2026-08-21:
+    /// **0 = unit, 1 = province, 2 = building, 3 = tile.** Four rungs, not the
+    /// three BL-511 shipped, where the province and the tile shared rung 2 —
+    /// they are separate now, so a repeat click walks all the way down to the
+    /// bare tile. This is the CYCLE order only; the canvas hit-test still
+    /// resolves most-specific-first, so a first click on a building selects the
+    /// building rather than its province.
     entity_id selection_cycle_tile  = null_entity;
     int       selection_cycle_stage = 0;
 
