@@ -2886,6 +2886,42 @@
    "status": "open",
    "source": "BL-515 (organic province borders), merged and verified 2026-08-21.",
    "what": "BL-511's seam work justified corp_command::province defaulting to no_province by the fact that province id 0 was a REAL id under the block layout. BL-515 makes ids the lowest member tile, and P8d now asserts no id is 0 - so that justification is false, hours after it was written. Two places carried it. (1) unit_march_harness asserted 'province id 0 IS a real province here' and went red; the BL-515 agent made the minimal narrowing edit with a dated reason, flagged that the file was outside its list, and got 88/88 - the right way to touch someone else's file. (2) corp_command.hpp's rationale, which I have now rewritten: it records the original argument as history, states that 0 is unreachable today, and keeps the default for a reason that does NOT depend on the id scheme - no_province is refused by the seam, so an omitted wire field is rejected rather than interpreted. A default of 0 would only be safe for as long as 0 happens to be unreachable, which is exactly the kind of accidental safety that stops being safe silently."
+  },
+  {
+   "id": "NR-438",
+   "title": "THE 12-TILE CEILING NO LONGER HOLDS: 4.9% of provinces exceed it, max 16 — and the alternative is costed",
+   "raised": "2026-08-21",
+   "kind": "question",
+   "status": "open",
+   "source": "Singleton absorption pass on BL-515, merged and verified 2026-08-21.",
+   "what": "Absorbing singletons into their cheapest neighbour means a province already at 12 can take one and become 13. Measured across 6 seeds: 1,099 of 22,401 provinces (4.9%) exceed 12, largest is 16, and every excess tile arrived by absorption - the harness now asserts that identity exactly (excess tiles == absorptions into full regions, 206 == 206 on the default world), so GROWTH's own clamp is still proven separately and is not the thing that slipped. The agent did not clamp it and did not invent a rule, which was right. It also costed the obvious alternative rather than describing it: preferring a neighbour WITH ROOM and falling back to a full one only when all six are full gives 241 over the ceiling, max 14, 80.63% in band, with identical absorbed and island counts. That variant is compiled out behind IO_ABSORB_PREFER_ROOM so the number is reproducible rather than taken on trust. The trade is real and it is yours: prefer-room is a better distribution, but it means deliberately choosing a COSTLIER neighbour, which contradicts the cheapest-edge rule the growth model is expressed in. Three ways: keep cheapest-edge and accept 13-16 tile provinces, switch to prefer-room, or raise the stated ceiling to 16 so the docs match the behaviour."
+  },
+  {
+   "id": "NR-439",
+   "title": "No authority doc owns whether a 13-16 tile province is acceptable DOWNSTREAM",
+   "raised": "2026-08-21",
+   "kind": "question",
+   "status": "open",
+   "source": "Singleton absorption pass on BL-515, merged and verified 2026-08-21.",
+   "what": "The agent flagged this as novel and it is the sharper half of NR-438. province.hpp described the 12-tile ceiling as 'the one size rule in this file that is a clamp' and province_section_max_tiles documented 'a built province is 1-12 tiles'. Both are now conditionally false; the comments and two harness rows were rewritten to say what is actually true. But nothing owns the QUESTION, and two landed systems read province size: BL-513's building ceiling (sustain units are summed per province, so a 16-tile province simply gets a larger ceiling - benign) and BL-467's battle envelope (units in the same province are drawn into one fight, so a larger province widens the engagement radius - not obviously benign, and BL-467 is not built yet). Worth deciding before BL-467 lands rather than discovering that battles pull in units from further away on 4.9% of the map."
+  },
+  {
+   "id": "NR-440",
+   "title": "Absorption improved the distribution on every axis except the ceiling",
+   "raised": "2026-08-21",
+   "kind": "observation",
+   "status": "open",
+   "source": "Singleton absorption pass on BL-515, merged and verified 2026-08-21.",
+   "what": "6-seed sweep, before -> after: provinces 24,498 -> 22,401 (exactly 2,097 absorbed, so the counts reconcile against the pre-pass baseline); mean 7.87 -> 8.61; under 3 tiles 3,008 -> 911; under 7 6,195 -> 4,098; in the 7-12 band 74.71% -> 76.80%. 2,148 singletons existed, 2,097 were absorbed, and 51 remain as TRUE ISLANDS with zero land neighbours - each one verified by a new harness row rather than asserted. Ben's retraction of 'do not reject tiny provinces' bought roughly a two-thirds cut in sub-3 provinces. The residual 911 under 3 are two-tile provinces, which the pass deliberately does not touch: the ruling said one tile, and reinstating a merge-to-floor rule would rebuild the de-facto clamp BL-515 existed to escape."
+  },
+  {
+   "id": "NR-441",
+   "title": "BL-513's pin drifted 0.06% and was again left alone",
+   "raised": "2026-08-21",
+   "kind": "observation",
+   "status": "open",
+   "source": "Singleton absorption pass on BL-515, merged and verified 2026-08-21.",
+   "what": "province_capacity_probe's BL-513 ratio moved 12.2546 -> 12.2477 across the absorption (0.06%), measured by running the probe at HEAD and again after rather than reasoned about. k_province_buildings_per_sustain_unit stays at 12.6468, un-re-pinned. That is now the third independent confirmation that the ceiling coefficient is insensitive to how the partition is drawn, which is what its shape predicted - both sides of its ratio are sums over tiles."
   }
  ]
 }
