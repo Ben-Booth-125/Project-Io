@@ -1607,6 +1607,11 @@ void app::render()
 
     ImGui_ImplSDLRenderer3_NewFrame();
     ImGui_ImplSDL3_NewFrame();
+    // BL-521: synthetic pointer input, queued LAST so it outranks whatever the SDL
+    // backend fed from the OS cursor above (ImGui applies queued events in order,
+    // last write wins). A no-op outside the verify harness — see app.hpp
+    // § Synthetic pointer input.
+    pump_injected_input();
     ImGui::NewFrame();
 
     // Main menu and the staged generation screen — drawn instead of the canvases
