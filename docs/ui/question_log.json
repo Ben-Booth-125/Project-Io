@@ -407,6 +407,17 @@
     "src/ui/strategy_readout.cpp"
    ],
    "status": "drafted"
+  },
+  "province_card": {
+   "surface": "Province card (Selection element, Planetary rung)",
+   "answers": "The canvas just blended four tiles into one shape — what is actually IN it, and what can I do there?",
+   "because": "BL-511 removed the tile as a click target, so the mixture, the deposits and the buildings of a locality became unreachable by the gesture that used to reach them. The card is where they go: the mixture bar is specifically the BLEND LEGEND (it says what the gradient is made of, which the gradient itself deliberately smooths away), the member-tile list keeps the tile visible as the data grain Ben ruled it remains, and the summed deposits answer the question a player actually asks of a locality rather than of one hex. Without it the render change would have been a net loss of information.",
+   "status": "drafted",
+   "backlog_item": "BL-511",
+   "files": [
+    "src/ui/selection_panel.cpp",
+    "src/ui/body_surface_canvas.cpp"
+   ]
   }
  }
 }

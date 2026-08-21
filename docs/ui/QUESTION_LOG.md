@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**27 surfaces** — 4 settled, 23 awaiting Ben's wording.
+**28 surfaces** — 4 settled, 24 awaiting Ben's wording.
 
 ---
 
@@ -147,6 +147,14 @@ alphabetical order.
 **Because:** Identity is carried by emblem and colour across every canvas and ledger (BL-090). One place has to establish that vocabulary, or the marker colours are arbitrary everywhere else.
 
 *Demanded by BL-090, BL-091 · `src/ui/profile_panel.cpp` · id `profile_panel`*
+
+### Province card (Selection element, Planetary rung)
+
+**Answers:** The canvas just blended four tiles into one shape — what is actually IN it, and what can I do there?
+
+**Because:** BL-511 removed the tile as a click target, so the mixture, the deposits and the buildings of a locality became unreachable by the gesture that used to reach them. The card is where they go: the mixture bar is specifically the BLEND LEGEND (it says what the gradient is made of, which the gradient itself deliberately smooths away), the member-tile list keeps the tile visible as the data grain Ben ruled it remains, and the summed deposits answer the question a player actually asks of a locality rather than of one hex. Without it the render change would have been a net loss of information.
+
+*Demanded by BL-511 · `src/ui/selection_panel.cpp`, `src/ui/body_surface_canvas.cpp` · id `province_card`*
 
 ### Selection band - Building card (3-column band)
 

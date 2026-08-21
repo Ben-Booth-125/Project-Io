@@ -711,12 +711,12 @@
    "id": "canvas.select",
    "family": "canvas",
    "surface": "The primary canvas (Solar, Circumplanetary, or Planetary rung — whichever fills the window).",
-   "press": "Single left-click on an entity: a body on the Solar/Circumplanetary rungs, a tile or marker on the Planetary surface.",
+   "press": "Single left-click on an entity: a body on the Solar/Circumplanetary rungs, a PROVINCE or marker on the Planetary surface (BL-511, 2026-08-21 — a plain click on the Planetary ground now selects the province, not the bare tile).",
    "args": [
     {
      "name": "target",
      "type": "entity",
-     "meaning": "The entity under the cursor. Overlapping candidates resolve to one entity: the stack building > market > unit > tile > body is walked most-specific first, the active lens filters validity, and nearest-to-cursor (entity id breaking ties) picks a single stable winner."
+     "meaning": "The entity under the cursor. Overlapping candidates resolve to one entity: the stack building > market > unit > PROVINCE > body is walked most-specific first, the active lens filters validity, and nearest-to-cursor (entity id breaking ties) picks a single stable winner. On the Planetary rung the ground itself resolves to the province containing the hovered tile (BL-511): the tile is still the data grain and the Selection card lists the province member tiles, their terrain and their summed deposits, but it is no longer what a plain click addresses."
     }
    ],
    "preconditions": [
@@ -724,7 +724,7 @@
     "The pointer is over the primary canvas, not over the minimap inset or any ImGui panel (panels capture the mouse).",
     "An entity is under the cursor (empty space is a different press — see canvas.deselect)."
    ],
-   "expected_output": "selected_entity becomes the target and the Selection band (fixed strip at the bottom of the screen) appears or re-points, showing that kind's action and facts; a new selection resets any drill-down stack in the band. Nothing else changes: same rung, same pan, same zoom, active_body untouched, no lens change, the canvas is not re-skinned, and any open fold-out ledger stays open. A single click never navigates.",
+   "expected_output": "selected_entity becomes the target and the Selection band (fixed strip at the bottom of the screen) appears or re-points, showing that kind's action and facts; a new selection resets any drill-down stack in the band. Nothing else changes: same rung, same pan, same zoom, active_body untouched, no lens change, the canvas is not re-skinned, and any open fold-out ledger stays open. A single click never navigates. PROVINCE GRAIN (BL-511, 2026-08-21): selecting Planetary ground opens the province card — a mixture bar (the blend legend), the member tiles with terrain, summed deposits and the buildings standing in it — and outlines the province OUTER boundary on the canvas. The repeat-click cycle terminal stage is now Soldier -> Building -> Province.",
    "reason_to_select": "Inspect a thing and surface its one primary move — Dispatch Survey on an unsurveyed body, Manage on your building, the construct/manage grid on a tile — without losing your current framing."
   },
   {

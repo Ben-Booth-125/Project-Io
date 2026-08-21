@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*179 entries — 126 open, 53 resolved.*
+*183 entries — 130 open, 53 resolved.*
 
 ---
 
@@ -1136,6 +1136,26 @@ The item specified entity_id convoy_tile_at(const world&, const convoy_component
 
 ### NR-414 — Scope taken in Lane U: blackboard facts for unit province and order destination
 *Lane U (BL-511 seam half, march_unit to province), merged and verified 2026-08-21. · raised 2026-08-21 · from The agent added unit_province and unit_order_dest_province to corp_ai.cpp blackboard export, beyond the literal task. Reason given, and it holds: without them an agent over the wire reads its unit position as a TILE but must name its destination as a PROVINCE, so the word interface would be unusable - it could not describe the move it is being asked to make. Small, in the spirit of the ruling, and stated rather than slipped in. Confirm or revert.*
+
+### NR-415 — novel-work: the per-lens reduction table is a NEW STANDING DESIGN ARTIFACT nobody has agreed to
+*novel-work · raised 2026-08-21 · from Lane R (BL-511 province render + selection), merged and verified 2026-08-21.*
+
+Province-grain rendering forces every lens to state how it reduces from tile to province - a blend, a sum, or a reasoned refusal. The agent decided all thirteen and wrote the table into PLANETARY.md. That table is the scope growth worth choosing deliberately: it is a CONTRACT every FUTURE lens now inherits, and neither LENSES.md nor PLANETARY.md previously had a slot for such a thing. Two calls for you. (1) Where does it live - LENSES.md has the better claim on lens-wide obligations, PLANETARY.md is where it landed. (2) Do you accept that adding a lens now means answering it? The refusals are the interesting content: Country and Continent refuse because the MEAN OF TWO NATION COLOURS IS A THIRD NATION COLOUR - a blended political map would draw borders that do not exist. Industry is the only computed reduction (a province sum, filled uniformly).
+
+### NR-416 — BL-511 R1 is PARTIAL: the live click is owed, and the agent was right not to take it
+*observation · raised 2026-08-21 · from Lane R (BL-511 province render + selection), merged and verified 2026-08-21.*
+
+The agent declined to drive your desktop unattended to satisfy the LIVE half of requirement R1, which was the correct call for a non-interactive sub-agent session. What it did instead is real coverage rather than a dodge: it added verify.mouse plus two-frame hover captures so the canvas OWN distance-to-hex-centre hit-test resolves a province from a cursor position, and the click handler consumes exactly that hovered_tile. The resolution path is proven; the PRESS is not. Per the 2026-08-19 standing rule a scripted capture does not prove a press is reachable, so R1 stays partial until someone clicks. The app is open on your machine now.
+
+### NR-417 — The map now mixes two visual languages, and the edge alpha is the one dial
+*question · raised 2026-08-21 · from Lane R (BL-511 province render + selection), merged and verified 2026-08-21.*
+
+Blended provinces read as continuous painted ground; ocean and BUILT tiles stay crisp hexes by construction. In the integrated capture the result is a map that is soft in some regions and hard-edged in others, which may or may not be what you pictured. Also relevant: the first pass had province edges at alpha 70 and they were INVISIBLE - the map read as one field with no cells at all. The committed version is 105, with the stroke moved onto the blended vertices so two neighbours strokes coincide rather than sitting a pixel apart. Soft by design, since you ruled softened borders, with the crisp affordance being the on-demand selection outline. If the gradient reads too blurry at close zoom, edge alpha is the dial to move first and the blur radius second.
+
+### NR-418 — Three small findings from the render work, all fixed or noted in place
+*observation · raised 2026-08-21 · from Lane R (BL-511 province render + selection), merged and verified 2026-08-21.*
+
+(1) verify.clear_selection had DIVERGED from the gesture it stands in for - it cleared selected_entity but left the province set, so a capture taken after it showed a stale province card. Fixed to match a real empty-space click. This is the harness-lies-quietly class of defect, and it was found by using the harness. (2) building_component has no owner field; ownership is corporation.assets, and the province card resolves it the way the canvas does. (3) dl->_Data->TexUvWhitePixel does not compile outside imgui_internal.h - ImGui::GetFontTexUvWhitePixel() is the public route, noted in a comment for the next person reaching for Prim*.
 
 ---
 
