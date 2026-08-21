@@ -109,11 +109,47 @@ ProjectIo --verify scripts/verify/<name>.lua
 - **Driver:** the script drives view and overlay state through the `verify` Lua API
   (`goto_surface`, `set_overlay`, `set_zoom`, `set_pan`, `add_pan`,
   `center_tile(col,row[,zoom])`, `command(name)`, `capture`, `buildings`,
-  `log_buildings`) — direct state manipulation, no synthetic input. `command(name)`
+  `log_buildings`) — direct state manipulation. `command(name)`
   uses the shared canvas command vocabulary (`canvas_command`) that also backs the
   player keyboard bindings (CANVASES.md § Keyboard), so a script reads as a key
   sequence; `center_tile` centres a Planetary tile using the canvas's own transform,
   so scripts no longer hand-compute pan.
+- **Click injection — a script can PRESS, not only stage (BL-521, 2026-08-21).** Until this
+  landed the API could only *write* `ui_state`, so a check could arrive at a selection but never
+  perform the gesture that produces one. The consequence was structural, not occasional: every
+  requirement phrased "click X and see Y" shipped with its live half **owed to a human by
+  construction** (NR-416, NR-424, both on BL-511 alone). Five bindings close it, and all of them
+  drive the **real** path — ImGui's own event queue, the canvas's own hit-test, the canvas's own
+  click handler:
+
+  | Call | Does |
+  |---|---|
+  | `verify.click(x, y [, button])` | Press + release at a screen position. Button: `"left"` (default) / `"right"` / `"middle"`. |
+  | `verify.double_click(x, y [, button])` | Two press/release pairs ImGui is *forced* to read as one double-click — the descend gesture on the Solar and Circumplanetary canvases. |
+  | `verify.click_tile(col, row [, button])` | Click Planetary tile (col,row). Centres it first (so it **pans**), then presses its centre. Returns false if the Planetary canvas is not the primary rung. |
+  | `verify.hover(x, y [, frames])` | Move the synthetic cursor and dwell `frames` frames there. Unlike `verify.mouse`, this moves **ImGui's** cursor too, so panels and buttons hover as well as canvases. |
+  | `verify.tile_screen(col, row)` | `{ok, x, y}` — the screen point that *is* that tile, asked of the canvas rather than re-derived in Lua. Also pans. |
+  | `verify.pointer_target()` | The assertion half: `{hovered_province, selected_province, has_selection, hover_card, hover_card_stuck, x, y}` — ids and booleans only. |
+
+  Each call renders its own frames and returns with the gesture complete, so a following
+  `capture`/`shot` shows the result. `dwell_on_tile(col, row [, frames])` in `lib.lua` pairs
+  `tile_screen` with `hover`.
+  - **Determinism is by frame count, never by clock.** The one place ImGui itself consults a
+    clock is double-click promotion (`g.Time` vs `MouseDoubleClickTime`), which would have made
+    "two singles or one double" depend on how long two Debug frames took to render;
+    `app::inject_pointer` forces that window per press instead (0 can never chain, `FLT_MAX`
+    always does), so the outcome is fixed by the script, not by the machine.
+  - **A move settles one frame before the press.** `WantCaptureMouse` and the canvas's
+    `hovered_tile` both resolve from the position ImGui saw *last* frame, so a press in the same
+    frame as the move would hit-test where the cursor used to be.
+  - **The shortcuts stay.** `select_tile` / `select_province` / `clear_selection` are cheaper
+    (no pan) and remain right for *staging* a selection. Use the click where the check is about
+    the **gesture** — and `click_injection.lua` (the BL-521 acceptance script) asserts the two
+    agree, so a divergence between the shortcut and the real handler is now caught rather than
+    assumed away.
+  - **Still direct state, not a screen recording.** Nothing here replays OS input; the harness
+    posts events into ImGui's queue between the backend's `NewFrame` and `ImGui::NewFrame`, and
+    a no-op guard keeps interactive play and every pre-BL-521 script byte-identical.
 - **Helpers:** `scripts/verify/lib.lua` is auto-loaded by the harness from the
   script's directory before the script runs (no `require` — the `package` lib is not
   opened). It provides high-level helpers — `sweep_overlays(prefix)`,
@@ -158,7 +194,9 @@ game state through the *same code path the interactive control uses*, then asser
   `dispatch_survey`. That fidelity is what makes the test catch a broken commit path.
 - **Shipped acceptance scripts:** `fresh_start_build.lua` (US-002 build), `recipe_workforce.lua`
   (US-007), `sell_order.lua` (US-008), `survey_dispatch.lua` (US-011). Each traces to its user
-  story's `testing.note`.
+  story's `testing.note`. `click_injection.lua` (BL-521) is the odd one out — its subject is the
+  harness itself: that a synthesised press reaches the canvas's click handler, agrees with the
+  shortcut it replaces, and that a second press is a second press.
 - **Capture-only is fine here** — these scripts assert via `verify.expect`, so they need no golden;
   the `capture()` at the end is incidental. Stage preconditions with existing primitives
   (e.g. `verify.set_balance` to afford an action) rather than entangling a separate concern.

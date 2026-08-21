@@ -108,3 +108,23 @@ function tour_buildings(zoom)
         verify.capture("building_" .. keys[i])
     end
 end
+
+-- Dwell on the exact centre of a Planetary tile (BL-521 click injection).
+--
+-- Two things a script would otherwise hand-roll: asking the canvas where the tile
+-- actually is (verify.tile_screen, which centres it and reports the screen point,
+-- so the transform is never re-derived in Lua), and then holding the synthetic
+-- cursor there long enough for dwell-gated UI to fire. Dwell is counted in FRAMES
+-- on the fixed 1/60 s verify clock — the hover card appears at 30 and sticks at
+-- 150 (hover_freeze.lua § phases) — so nothing here depends on wall-clock time.
+--
+--   col, row : grid coordinates of the tile to hover.
+--   frames   : dwell frames (default 31, i.e. just past the appear delay).
+-- Returns the screen point { ok, x, y }, so a caller can go on to click it.
+function dwell_on_tile(col, row, frames)
+    local p = verify.tile_screen(col, row)
+    if p.ok then
+        verify.hover(p.x, p.y, frames or 31)
+    end
+    return p
+end

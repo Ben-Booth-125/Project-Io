@@ -3,6 +3,7 @@
 /// Extracted verbatim from app.cpp (BL-361); behaviour and registered function
 /// names are unchanged (scripts/verify/*.lua call them by name).
 
+#include <cfloat>
 #include <cstdio>
 #include <iterator>
 #include <chrono>
@@ -197,6 +198,16 @@ entity_id find_body(const world& w, const std::string& name)
     return null_entity;
 }
 
+/// Map a mouse-button name (as used in the verify scripts) to its ImGui button.
+/// Unknown names fall back to the left button — the overwhelmingly common case,
+/// and a typo that silently did nothing would be worse than one that clicks.
+int mouse_button_from_name(const std::string& s)
+{
+    if (s == "right")  return ImGuiMouseButton_Right;
+    if (s == "middle") return ImGuiMouseButton_Middle;
+    return ImGuiMouseButton_Left;
+}
+
 } // namespace
 
 int app::run_autostart()
@@ -305,6 +316,116 @@ void app::reset_verify_transients()
     m_prev_selection = null_entity;
     m_last_orbit_days = 0.0;
     m_last_survey_day = 0;
+    // BL-521: the synthetic cursor is per-script state. Left held, a click at the
+    // end of one script would still be pinning the pointer during the next one's
+    // captures — exactly the cross-script leak the pristine restore exists to stop.
+    m_pointer_injected = false;
+    m_pointer_x = 0.0f;
+    m_pointer_y = 0.0f;
+    m_inject_button = -1;
+    m_inject_down = false;
+}
+
+// --- Synthetic pointer input (BL-521) ---------------------------------------
+//
+// Why this exists: before it, the verify API could only WRITE ui_state, so a
+// scripted check could stage a selection but never PRESS anything. Every
+// interactive surface therefore shipped with its live half owed to a human
+// (NR-416, NR-424 on BL-511 alone). These drive the real path instead — ImGui's
+// event queue, the canvases' own hit-tests, the real click handlers — so
+// "the press lands where the picture says it does" becomes checkable.
+//
+// Determinism is the binding constraint. The sequence is expressed entirely in
+// FRAMES; nothing here reads a clock, and the one place ImGui itself would have
+// (double-click promotion) is neutralised below.
+
+void app::pump_injected_input()
+{
+    if (!m_pointer_injected)
+        return;
+
+    ImGuiIO& io = ImGui::GetIO();
+
+    // Re-posted EVERY frame, not just on the frame that moved: the SDL3 backend
+    // feeds the real OS cursor into the queue on any frame the window takes
+    // focus, and ImGui applies queued events in order. Holding the position means
+    // settle frames and captures see the same cursor the click did.
+    io.AddMousePosEvent(m_pointer_x, m_pointer_y);
+
+    // At most one button transition per frame. ImGui's trickling rule applies a
+    // second change to the same button on the FOLLOWING frame anyway, so a
+    // press+release pair queued together would silently become a two-frame
+    // gesture with a frame of drawing between them that the script did not ask
+    // for. Explicit is better: one transition, one frame, driven by the caller.
+    if (m_inject_button >= 0)
+    {
+        io.AddMouseButtonEvent(m_inject_button, m_inject_down);
+        m_inject_button = -1;
+    }
+}
+
+ImVec2 app::resolve_tile_screen(int col, int row)
+{
+    if (m_ui.primary_level != canvas_level::planetary)
+        return {-1.0f, -1.0f};
+    m_ui.planetary_center_screen  = {-1.0f, -1.0f};
+    m_ui.planetary_center_col     = col;
+    m_ui.planetary_center_row     = row;
+    m_ui.planetary_center_pending = true;
+    render(); // the canvas consumes the request and publishes the screen point
+    return m_ui.planetary_center_screen;
+}
+
+void app::inject_move(float x, float y, int frames)
+{
+    m_pointer_injected = true;
+    m_pointer_x = x;
+    m_pointer_y = y;
+    // Both pointer sources, or the gesture disagrees with itself: the canvases
+    // hit-test with ui_state.mouse (BL-061, and it is the only source that works
+    // with a hidden window), while the shell decides minimap-vs-primary routing
+    // and ImGui panel capture from io.MousePos.
+    m_ui.mouse = {x, y, true};
+    const int count = std::max(1, frames);
+    for (int i = 0; i < count; ++i)
+        render();
+}
+
+void app::inject_pointer(float x, float y, int button, int clicks)
+{
+    // Move and settle ONE frame before pressing. Two things resolve from the
+    // position ImGui saw last frame — io.WantCaptureMouse (which decides whether
+    // the canvas gets the click at all) and the canvas's own hovered_tile, which
+    // the click handler consumes rather than re-deriving. A press in the same
+    // frame as the move would be hit-tested against where the cursor used to be.
+    inject_move(x, y, 1);
+
+    ImGuiIO&    io                = ImGui::GetIO();
+    const float saved_double_time = io.MouseDoubleClickTime;
+
+    for (int c = 0; c < std::max(1, clicks); ++c)
+    {
+        // The one clock ImGui would consult, forced. UpdateMouseInputs promotes a
+        // press to a repeat click by comparing g.Time (accumulated DeltaTime —
+        // the wall clock) against MouseDoubleClickTime, so left alone, whether an
+        // injected pair read as two singles or as one double would depend on how
+        // long two frames took to render. That is precisely the non-determinism
+        // this harness exists to exclude, and on a Debug build with a cold cache
+        // it is not a theoretical margin. So the window is set per press: 0 can
+        // never chain, FLT_MAX always does. The position is identical across the
+        // pair by construction, so MouseDoubleClickMaxDist is satisfied.
+        io.MouseDoubleClickTime = (c == 0) ? 0.0f : FLT_MAX;
+
+        m_inject_button = button;
+        m_inject_down   = true;
+        render();               // press frame: IsMouseClicked fires here
+
+        m_inject_button = button;
+        m_inject_down   = false;
+        render();               // release frame: IsMouseReleased, ImGui buttons fire
+    }
+
+    io.MouseDoubleClickTime = saved_double_time;
 }
 
 int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
@@ -514,6 +635,96 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         // canvas' per-tile hit-test resolves it after the centre pan settles.
         m_ui.mouse = {ImGui::GetIO().DisplaySize.x * 0.5f,
                       ImGui::GetIO().DisplaySize.y * 0.5f, true};
+    });
+
+    // --- Click injection (BL-521) -------------------------------------------
+    // The API above this line only WRITES state; these PRESS. A scripted check can
+    // now perform the gesture a player performs and capture what it produced, so a
+    // "live" requirement no longer has to wait on a human. Each of these renders
+    // its own frames and returns with the gesture complete — a following
+    // capture()/shot() shows the result, with no settle dance of the caller's own.
+    //
+    // Every one takes a screen position or a grid coordinate. None takes, returns
+    // or exposes tile internals: the standing rule (no individual tile data in
+    // Lua) is unaffected — click_tile below hands the canvas a (col,row) exactly
+    // as center_tile and select_tile already do, and gets back nothing but "did it
+    // land".
+
+    // Move the synthetic cursor and dwell there for `frames` frames. The dwell is
+    // the point: the hover card appears at 30 frames and sticks at 150 (the fixed
+    // 1/60 s verify clock), so hover behaviour is reachable by COUNT, never by
+    // sleeping. Equivalent to mouse() + frames(), except that it also moves
+    // ImGui's own cursor, so panels and buttons hover too — not just canvases.
+    v.set_function("hover", [this](float x, float y, sol::optional<int> frames) {
+        inject_move(x, y, frames.value_or(1));
+    });
+
+    // A full press+release at a screen position, through the real input path.
+    // Button: "left" (default), "right", "middle".
+    v.set_function("click", [this](float x, float y, sol::optional<std::string> button) {
+        inject_pointer(x, y, mouse_button_from_name(button.value_or("left")), 1);
+    });
+
+    // Two press+release pairs that ImGui is FORCED to read as one double-click
+    // (see inject_pointer). This is the descend gesture on the Solar and
+    // Circumplanetary canvases, which is otherwise reachable only by a human.
+    v.set_function("double_click", [this](float x, float y, sol::optional<std::string> button) {
+        inject_pointer(x, y, mouse_button_from_name(button.value_or("left")), 2);
+    });
+
+    // Click the Planetary tile at (col, row) — the gesture BL-511's province
+    // selection is made of, and the one that had no headless equivalent.
+    //
+    // It centres the tile first and clicks the canvas centre, because the canvas
+    // is the only honest source for "the screen point that is tile (col,row)": it
+    // publishes that point (planetary_center_screen) at the moment it applies the
+    // pan, so the harness never re-derives title_h / hex_size / pan in Lua. The
+    // view therefore MOVES — that is a real pan, and a capture after this call
+    // shows the tile centred. Use click(x, y) where the framing must not change.
+    //
+    // Returns false (clicking nothing) when the Planetary canvas is not the
+    // primary rung, or when it has not yet resolved the request.
+    v.set_function("click_tile", [this](int col, int row, sol::optional<std::string> button) -> bool {
+        const ImVec2 p = resolve_tile_screen(col, row);
+        if (p.x < 0.0f)
+            return false;
+        inject_pointer(p.x, p.y, mouse_button_from_name(button.value_or("left")), 1);
+        return true;
+    });
+
+    // The screen point that IS tile (col, row), for a script that wants to hover
+    // it, click it twice, or click a few pixels off it. Same centring caveat as
+    // click_tile: asking MOVES the view. Returns { ok, x, y }; ok = false when the
+    // Planetary canvas is not the primary rung / the request did not resolve.
+    v.set_function("tile_screen", [this](int col, int row) {
+        sol::state&  st = m_lua.state();
+        const ImVec2 p  = resolve_tile_screen(col, row);
+        sol::table out = st.create_table();
+        out["ok"] = (p.x >= 0.0f);
+        out["x"]  = p.x;
+        out["y"]  = p.y;
+        return out;
+    });
+
+    // What the canvas's own hit-test currently resolves under the synthetic
+    // cursor, as ids only — the province the last click would land on, and
+    // whether anything is selected. The ASSERTION half of a live check: a capture
+    // shows a card, this proves the click chose the subject the script meant.
+    // Ids, not contents; no tile data crosses the seam.
+    v.set_function("pointer_target", [this]() {
+        sol::state& st = m_lua.state();
+        sol::table  out = st.create_table();
+        out["hovered_province"]  = static_cast<unsigned int>(m_ui.hovered_province);
+        out["selected_province"] = static_cast<unsigned int>(m_ui.selected_province);
+        out["has_selection"]     = (m_ui.selected_entity != null_entity);
+        // The hover half of the same seam: dwell is reached by frame COUNT
+        // (hover(x, y, frames)), and these say whether the glance card came up
+        // and whether it has stuck. Booleans, not contents.
+        out["hover_card"]        = (m_ui.hover_card_entity != null_entity);
+        out["hover_card_stuck"]  = m_ui.hover_card_stuck;
+        out["x"]                 = m_pointer_x;
+        out["y"]                 = m_pointer_y;
+        return out;
     });
 
     // Drive the economy headlessly: run N economy ticks (production → market →
@@ -1146,8 +1357,11 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             { m_ui.selected_entity = tid; break; }
     });
     // BL-511: select the PROVINCE containing the tile at (col,row) on the active
-    // surface body — the province is what a canvas click now lands on, and no
-    // click injection exists headless. Mirrors select_tile's shape and is equally
+    // surface body — the province is what a canvas click now lands on. A SHORTCUT:
+    // since BL-521 verify.click_tile(col,row) performs the real gesture, and
+    // click_injection.lua asserts the two agree. Prefer the click where the check
+    // is about the gesture; this stays for staging a selection cheaply, without
+    // the pan click_tile performs. Mirrors select_tile's shape and is equally
     // non-mutating. Sets province_sync_entity too, so the canvas's next-frame
     // reconciliation (which clears the province when some other surface moved the
     // entity selection) does not immediately undo this. Returns the province id,
@@ -1167,8 +1381,9 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     });
     v.set_function("clear_selection", [this]() {
         // Deselect (BL-266): the band never hides — with no selection it rests on
-        // the player's own corporation. This is the empty-space-click equivalent;
-        // no click/key injection exists in the headless harness.
+        // the player's own corporation. This is the empty-space-click equivalent,
+        // without the pan a real click on empty ground would need staging for
+        // (verify.click(x, y) is the gesture itself, since BL-521).
         //
         // BL-511: clears the PROVINCE too. An empty-space click on the real canvas
         // resolves no hovered tile, so it writes both fields null; leaving the
@@ -1180,8 +1395,9 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     });
     v.set_function("card_drill", [this]() {
         // Drive the Selection band's resource drill-down (BL-196) for the currently
-        // selected tile — the equivalent of clicking a resource graph, since no
-        // click injection exists headless. Drills the tile's first deposited
+        // selected tile — the equivalent of clicking a resource graph, which
+        // BL-521's injection cannot reach without the graph's screen rect being
+        // published first (see its open question). Drills the tile's first deposited
         // resource and requests lazy tracking of it (BL-198). Returns the resource
         // index drilled, or -1 if the selection is not a deposit-bearing tile.
         const entity_id sel = m_ui.selected_entity;

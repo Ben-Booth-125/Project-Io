@@ -129,6 +129,51 @@ private:
 
     void render();
 
+    // --- Synthetic pointer input (BL-521) -----------------------------------
+    // The verify harness drove UI state DIRECTLY and could not press anything, so
+    // every interactive surface arrived with its live half owed by construction.
+    // These three drive the REAL input path instead: ImGui's own event queue, the
+    // real hit-tests, the real click handlers. Deterministic by construction — the
+    // sequence is measured in FRAMES, never in wall-clock time (see
+    // inject_pointer's note on MouseDoubleClickTime).
+
+    /// Feed the pending synthetic pointer state into ImGui's event queue for the
+    /// frame about to be built. Called from render() between the backend's
+    /// NewFrame and ImGui::NewFrame, so the injected events are the LAST in the
+    /// queue and therefore win over anything the SDL backend fed from the OS
+    /// cursor. A no-op until a script injects (so interactive play, and every
+    /// pre-BL-521 verify script, is byte-identical).
+    void pump_injected_input();
+
+    /// Move the synthetic cursor to a screen position and render `frames` frames
+    /// there. Writes BOTH pointer sources — ui_state.mouse (what the canvases
+    /// hit-test with, BL-061) and ImGui's MousePos (what the shell routes input
+    /// with) — because a disagreement between them hit-tests one place and routes
+    /// to another.
+    ///
+    /// @param x,y    Screen position in pixels.
+    /// @param frames Frames to render at that position (>= 1); dwell-gated UI is
+    ///               reached by frame count, the harness's fixed clock.
+    void inject_move(float x, float y, int frames);
+
+    /// Press and release a mouse button at a screen position, `clicks` times.
+    /// Renders its own frames and returns once the gesture is complete, so a
+    /// following capture() shows the result.
+    ///
+    /// @param x,y    Screen position in pixels.
+    /// @param button ImGuiMouseButton_Left / _Right / _Middle.
+    /// @param clicks 1 = single click, 2 = double click.
+    void inject_pointer(float x, float y, int button, int clicks);
+
+    /// Resolve the screen point that IS Planetary tile (col, row), by asking the
+    /// canvas: it centres the tile on the next draw and publishes where that put
+    /// it. Renders one frame, and therefore PANS the view — the canvas transform
+    /// lives in exactly one place and the harness does not get a second copy.
+    ///
+    /// @return The tile's screen centre, or {-1,-1} when the Planetary canvas is
+    ///         not the primary rung / the request did not resolve.
+    ImVec2 resolve_tile_screen(int col, int row);
+
     /// Draw the main menu — the deliberate entry point shown at launch (no world
     /// loaded yet). Wires the "New Game" button to open_new_world_wizard() and "Quit"
     /// to m_quit_requested. Carries the seed and the world-shape knobs; the
@@ -425,6 +470,13 @@ private:
     bool        m_show_help        = false;   ///< Toggle for the F1 key-binding cheat-sheet overlay.
     bool        m_show_options     = false;   ///< Toggle for the F10 display/options window.
     display_settings m_settings;              ///< Persisted display settings (options.cfg).
+    // --- Synthetic pointer input (BL-521), drained by pump_injected_input() ---
+    bool  m_pointer_injected = false; ///< Sticky once a script injects: the harness owns the cursor from then on, and re-posts it every frame so settle frames and captures see the same position the click did.
+    float m_pointer_x = 0.0f;         ///< Held synthetic cursor position (px), valid while m_pointer_injected.
+    float m_pointer_y = 0.0f;
+    int   m_inject_button = -1;       ///< Button whose state change is pending for the next frame; -1 = none. Consumed (reset) by pump_injected_input.
+    bool  m_inject_down = false;      ///< Down/up for the pending m_inject_button.
+
     bool        m_capture_requested = false;  ///< Set by F12 / capture_frame, consumed in render().
     std::string m_capture_name;              ///< Base name for the next capture; empty = timestamped (F12).
 

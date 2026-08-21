@@ -1135,6 +1135,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         state.planetary_pan_x = (grid_cx - lc.x) * zoom;
         state.planetary_pan_y = (grid_cy - lc.y) * zoom;
         state.planetary_center_pending = false;
+        // Publish where that tile just landed on screen (BL-521). The transform is
+        // only fully known here, so this is the one honest source for "the screen
+        // point that is tile (col,row)" — the verify harness's click injection
+        // reads it instead of re-deriving title_h / hex_size / pan in Lua.
+        state.planetary_center_screen = canvas_centre;
     }
 
     const ImVec2 view_origin = ImVec2{ canvas_centre.x + state.planetary_pan_x,
