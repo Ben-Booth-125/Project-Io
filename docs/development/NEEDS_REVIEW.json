@@ -3016,6 +3016,15 @@
    "status": "open",
    "source": "BL-519, src/ui migration.",
    "what": "SDL3 and ImGui come from CMake FetchContent and the session proxy blocks those downloads; there is also no display. So ProjectIo could not be built or run, and no scripts/verify/*.lua check could be executed. What I DID do: cloned ImGui's headers and ran `g++ -fsyntax-only` over every file in src/ui, which is clean. That covers type errors and my migration; it does NOT cover linkage, runtime behaviour, or how anything LOOKS. Specifically unverified: the terrain colour blend (calibrated so all four canonical covers reproduce their pre-split RGB exactly, and arithmetically checked - but never rendered), the generation ledger's new two-histogram layout, and the wizard preview globe's packed-axes sampling. Worth a look on your machine before this is treated as done."
+  },
+  {
+   "id": "NR-452",
+   "title": "The pre-BL-409 state_hash golden in the STANDING RULES is stale — it was already failing before BL-519, and BL-519 has moved the hash again",
+   "raised": "2026-08-21",
+   "kind": "question",
+   "status": "open",
+   "source": "Full 99-harness sweep during BL-519; spectator_determinism R2.",
+   "what": "`.claude/rules/io-standing-rules.md` cites `state_hash 3CBAD1D44EE71EDE` by value as the proof that BL-409's spectator mode leaves an ordinary played session byte-identical, and spectator_determinism R2 asserts it. THAT ROW FAILS, and it failed BEFORE this session: built at the previous commit (2c17e96) in a separate worktree, the unspectated hash is B7E6F60D6AFE78C0, not the golden. So something between BL-409 and today already moved world generation without the golden being re-pinned. BL-519 has now moved it again, to B4D09255AF346008 — expected, since deposits and the settlement map both changed, and the item's own resolution says so.\n\nWHAT STILL HOLDS, and it is the part that matters: every load-bearing property in that harness passes on both sides. The prohibition binds (the player corp issues ZERO decisions unspectated), an unspectated run is reproducible, admitting the player shifts no rival's cadence slot, and a spectated run is reproducible tick for tick. The failing row is byte-identity against a FROZEN NUMBER, not a property.\n\nNOT re-blessed. src/world/CLAUDE.md: 'Goldens and pinned bands (state hashes, generation sweeps) are contracts: report movement, never re-bless without authorisation.' And this one is quoted in the standing rules, so re-pinning it edits a rule file — squarely your call, not mine.\n\nTwo things need deciding: (1) re-pin to B4D09255AF346008 and update the standing-rules citation; (2) worth a moment's thought on whether a hash pinned to one generation build can survive as a contract at all, given generation legitimately changes — the OTHER three rows prove BL-409's property without any frozen number, which suggests the byte-identity row has done its job and could become a reported hash rather than an asserted one."
   }
  ]
 }
