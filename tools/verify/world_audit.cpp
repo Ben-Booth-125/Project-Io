@@ -88,7 +88,7 @@ static frag_stats measure_fragmentation(const world& w, const generation_report&
     for (const auto& [tid, tc] : w.tiles)
     {
         if (tc.body != body) continue;
-        if (tc.composition == terrain_composition::ocean) continue;
+        if (is_water(tc.substrate)) continue;
         const int idx = tc.grid_y * gw + tc.grid_x;
         if (idx < 0 || idx >= total) continue;
         is_land[static_cast<std::size_t>(idx)] = 1;
@@ -249,7 +249,7 @@ int main()
                     (has_base && has_unit) ? "PASS" : "FAIL");
     }
 
-    // --- S2: Kepler composition histogram ---
+    // --- S2: Kepler terrain-axis histogram (BL-519: substrate x cover) ---
     const entity_id kepler = w.home_body;
     std::map<int, int> hist;
     int land = 0, total = 0;
@@ -259,11 +259,11 @@ int main()
         if (tc.body != kepler)
             continue;
         ++total;
-        ++hist[static_cast<int>(tc.composition)];
-        if (tc.composition != terrain_composition::ocean)
+        ++hist[static_cast<int>(tc.substrate) * 16 + static_cast<int>(tc.cover)];
+        if (!is_water(tc.substrate))
             ++land;
-        if (tc.composition == terrain_composition::forest)  ++forest;
-        if (tc.composition == terrain_composition::wetland) ++wetland;
+        if (tc.cover == terrain_cover::forest)  ++forest;
+        if (tc.cover == terrain_cover::marsh) ++wetland;
     }
 
     std::printf("Kepler tiles: %d total, %d land\n", total, land);
@@ -276,7 +276,7 @@ int main()
                 fw_frac >= 3.0f ? "PASS" : "FAIL");
 
     // --- S3 (BL-231): per-body landform histogram ---
-    // The renderer keys only on composition, so the landform axis has never been
+    // The renderer keys only on the substrate/cover pair, so the landform axis has never been
     // looked at. It drives build cost (x1.0-x2.0), hazard, habitability and
     // mineral richness, so how SPARSE each landform is decides how it should be
     // drawn: a landform holding a third of a body wants a field treatment, one
@@ -294,7 +294,7 @@ int main()
     int system_land = 0;
     for (const auto& [tid, tc] : w.tiles)
     {
-        if (tc.composition == terrain_composition::ocean)
+        if (is_water(tc.substrate))
             continue;
         const int lf = static_cast<int>(tc.landform);
         if (lf < 0 || lf >= kNumLandform)
@@ -370,23 +370,26 @@ int main()
         {
             if (tc.body != bid)
                 continue;
-            const bool ocean = (tc.composition == terrain_composition::ocean);
+            const bool ocean = (is_water(tc.substrate));
 
             // Replicate the ladder's is_barrier exactly (history_ladder.cpp § is_barrier).
             const bool bin = ocean
                           || tc.landform == terrain_landform::mountain
                           || tc.landform == terrain_landform::canyon
-                          || tc.composition == terrain_composition::barren
-                          || tc.composition == terrain_composition::icy;
+                          || tc.substrate == terrain_substrate::barren
+                          || tc.substrate == terrain_substrate::icy;
             if (bin)   ++bin_barrier;
             if (ocean) ++bin_ocean;
 
             if (!ocean)
             {
                 ++land_n;
-                graded_sum += terrain_resistance(tc.composition, tc.landform);
-                def_sum    += terrain_defence(tc.composition, tc.landform);
-                att_sum    += terrain_attrition(tc.composition, tc.landform);
+                graded_sum += terrain_resistance(tc.substrate, tc.cover, tc.cover_density,
+                                                 tc.landform);
+                def_sum    += terrain_defence(tc.substrate, tc.cover, tc.cover_density,
+                                              tc.landform);
+                att_sum    += terrain_attrition(tc.substrate, tc.cover, tc.cover_density,
+                                                tc.landform);
             }
         }
         if (total_n <= 0)
@@ -437,7 +440,7 @@ int main()
     for (const auto& [tid, tc] : w.tiles)
     {
         const auto bit = body_lf.find(tc.body);
-        if (bit == body_lf.end() || tc.composition == terrain_composition::ocean)
+        if (bit == body_lf.end() || is_water(tc.substrate))
             continue;
         const auto bc = w.bodies.find(tc.body);
         if (bc == w.bodies.end())
@@ -536,7 +539,7 @@ int main()
                 ++bad; std::printf("  BAD: extraction asset on missing tile\n"); continue;
             }
             const tile_component& tc = tit->second;
-            bool ocean = (tc.composition == terrain_composition::ocean);
+            bool ocean = (is_water(tc.substrate));
             float dep = 0.0f;
             for (resource_type r : extractable) dep += tc.resource_deposit[ri(r)];
             const float tgt = tc.resource_deposit[ri(bit->second.target_resource)];
@@ -577,13 +580,13 @@ int main()
     }
     // Negative controls: ocean and zero-deposit tiles must be rejected.
     tile_component ocean_tile{};
-    ocean_tile.composition = terrain_composition::ocean;
+    ocean_tile.substrate = terrain_substrate::ocean;
     ocean_tile.resource_deposit[ri(resource_type::iron_ore)] = 10.0f; // deposit present, but ocean
     const bool ocean_rejected = !placement_rules::can_place(
         ocean_tile, building_type::extraction_site, resource_type::iron_ore);
 
     tile_component dry_tile{};
-    dry_tile.composition = terrain_composition::barren; // land, but no iron deposit
+    dry_tile.substrate = terrain_substrate::barren; // land, but no iron deposit
     const bool zero_rejected = !placement_rules::can_place(
         dry_tile, building_type::extraction_site, resource_type::iron_ore);
     // A processing facility on the same dry land tile is valid (target ignored).
@@ -634,7 +637,7 @@ int main()
     int kepler_land = 0, unclaimed_land = 0;
     for (const auto& [tid, tc] : w.tiles)
     {
-        if (tc.body != kepler || tc.composition == terrain_composition::ocean)
+        if (tc.body != kepler || is_water(tc.substrate))
             continue;
         ++kepler_land;
         if (w.tile_to_nation.find(tid) == w.tile_to_nation.end())
@@ -1042,7 +1045,7 @@ int main()
         int corps_measured = 0, holdings_total = 0, regions_spanned_total = 0;
         int single_region_corps = 0;
         long long spread_sum = 0; // summed max grid separation within a corp's holdings
-        std::map<terrain_composition, int> holding_comp;
+        std::map<std::pair<terrain_substrate, terrain_cover>, int> holding_comp;
         for (const auto& [cid, corp] : w.corporations)
         {
             std::set<int> provs;
@@ -1054,7 +1057,7 @@ int main()
                 const auto t = w.tiles.find(b->second.tile);
                 if (t == w.tiles.end() || t->second.body != kepler) continue;
                 ++holdings_total;
-                holding_comp[t->second.composition]++;
+                holding_comp[{ t->second.substrate, t->second.cover }]++;
                 pts.emplace_back(t->second.grid_x, t->second.grid_y);
                 if (kentry && kgw > 0)
                 {
@@ -1086,9 +1089,9 @@ int main()
                     corps_measured ? static_cast<double>(regions_spanned_total) / corps_measured : 0.0,
                     single_region_corps, corps_measured,
                     corps_measured ? static_cast<double>(spread_sum) / corps_measured : 0.0);
-        std::printf("  holdings by terrain composition:");
+        std::printf("  holdings by terrain (substrate/cover):");
         for (const auto& [c, n] : holding_comp)
-            std::printf(" %d=%d", static_cast<int>(c), n);
+            std::printf(" s%d/c%d=%d", static_cast<int>(c.first), static_cast<int>(c.second), n);
         std::printf("\n");
     }
 

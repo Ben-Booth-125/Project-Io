@@ -82,7 +82,7 @@ fixture make_body()
             tc.body        = f.body;
             tc.grid_x      = c;
             tc.grid_y      = r;
-            tc.composition = terrain_composition::grassland;
+            tc.substrate = terrain_substrate::sedimentary; tc.cover = terrain_cover::grass; tc.cover_density = 150;
             tc.landform    = terrain_landform::plains;
             tc.resource_deposit[static_cast<std::size_t>(resource_type::iron_ore)]  = 100.0f;
             tc.resource_remaining[static_cast<std::size_t>(resource_type::iron_ore)] = 40000.0f;

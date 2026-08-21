@@ -50,30 +50,44 @@ int main()
     std::printf("Multi-building tile (BL-366) harness\n");
 
     // --- R1: non_extraction_stack_cap table -----------------------------------
-    using tc_e = terrain_composition;
-    check(placement_rules::non_extraction_stack_cap(tc_e::grassland) == 6, "R1 grassland cap == 6");
-    check(placement_rules::non_extraction_stack_cap(tc_e::forest)    == 6, "R1 forest cap == 6");
-    check(placement_rules::non_extraction_stack_cap(tc_e::wetland)   == 6, "R1 wetland cap == 6");
-    check(placement_rules::non_extraction_stack_cap(tc_e::tundra)    == 3, "R1 tundra cap == 3");
-    check(placement_rules::non_extraction_stack_cap(tc_e::barren)    == 4, "R1 barren cap == 4");
-    check(placement_rules::non_extraction_stack_cap(tc_e::rocky)     == 4, "R1 rocky cap == 4");
-    check(placement_rules::non_extraction_stack_cap(tc_e::regolith)  == 4, "R1 regolith cap == 4");
-    check(placement_rules::non_extraction_stack_cap(tc_e::metallic)  == 4, "R1 metallic cap == 4");
-    check(placement_rules::non_extraction_stack_cap(tc_e::volcanic)  == 2, "R1 volcanic cap == 2");
-    check(placement_rules::non_extraction_stack_cap(tc_e::icy)       == 2, "R1 icy cap == 2");
-    check(placement_rules::non_extraction_stack_cap(tc_e::urban)     == 12, "R1 urban cap == 12");
-    check(placement_rules::non_extraction_stack_cap(tc_e::ocean)     == 0, "R1 ocean cap == 0");
+    // BL-519: the cap is now a function of (substrate, cover), so this table is
+    // written as the PAIR each pre-split composition became. That makes it a
+    // regression check on the split itself — every one of these numbers is the
+    // number BL-366 authored, and if the decomposition drifts, these fail.
+    using su = terrain_substrate;
+    using cv = terrain_cover;
+    auto cap = [](su s, cv c) { return placement_rules::non_extraction_stack_cap(s, c); };
+    check(cap(su::sedimentary, cv::grass)  == 6,  "R1 grassland (grass on soil) cap == 6");
+    check(cap(su::sedimentary, cv::forest) == 6,  "R1 forest (forest on soil) cap == 6");
+    check(cap(su::sedimentary, cv::marsh)  == 6,  "R1 wetland (marsh on soil) cap == 6");
+    check(cap(su::sedimentary, cv::scrub)  == 3,  "R1 tundra (scrub on soil) cap == 3");
+    check(cap(su::barren,   cv::none)      == 4,  "R1 barren cap == 4");
+    check(cap(su::rocky,    cv::none)      == 4,  "R1 rocky cap == 4");
+    check(cap(su::regolith, cv::none)      == 4,  "R1 regolith cap == 4");
+    check(cap(su::metallic, cv::none)      == 4,  "R1 metallic cap == 4");
+    check(cap(su::volcanic, cv::none)      == 2,  "R1 volcanic cap == 2");
+    check(cap(su::icy,      cv::none)      == 2,  "R1 icy cap == 2");
+    check(cap(su::sedimentary, cv::urban)  == 12, "R1 urban cap == 12");
+    check(cap(su::ocean,    cv::none)      == 0,  "R1 ocean cap == 0");
+
+    // R1b — THE PAIRS THE PRE-SPLIT MODEL COULD NOT NAME. Urban keeps its cap
+    // whatever it is built on, which is what makes it a cover rather than a
+    // replacement for the ground; and a forested crag is harder to build on than
+    // the bare rock beside it, which is the whole point of the axis.
+    check(cap(su::metallic, cv::urban) == 12, "R1b urban on metallic keeps the urban cap");
+    check(cap(su::rocky,    cv::forest) == 3, "R1b a forested crag is harder than bare rock (4)");
+    check(cap(su::rocky,    cv::none)   == 4, "R1b ...and the bare rock beside it is unchanged");
 
     // --- R7: a tile that never reaches its cap never transforms ---------------
     const entity_id under_cap_tile = w.create_entity();
-    { tile_component tc{}; tc.body = body; tc.composition = terrain_composition::grassland;
+    { tile_component tc{}; tc.body = body; tc.substrate = terrain_substrate::sedimentary; tc.cover = terrain_cover::grass; tc.cover_density = 150;
       tc.grid_x = 0; tc.grid_y = 0; w.tiles[under_cap_tile] = tc; }
     entity_id built = null_entity;
     construct_building(w, reg, corp, under_cap_tile, building_type::processing_facility,
                        resource_type::iron_ore, built);
     construct_building(w, reg, corp, under_cap_tile, building_type::inland_logistics_hub,
                        resource_type::iron_ore, built);
-    check(w.tiles[under_cap_tile].composition == terrain_composition::grassland,
+    check(w.tiles[under_cap_tile].cover == terrain_cover::grass,
           "R7 two buildings on grassland (cap 6) does not transform");
 
     // --- R2/R3: 6 MIXED non-extraction buildings fire the transform on the 6th,
@@ -82,7 +96,7 @@ int main()
     {
         tile_component t{};
         t.body = body;
-        t.composition = terrain_composition::grassland;
+        t.substrate = terrain_substrate::sedimentary; t.cover = terrain_cover::grass; t.cover_density = 150;
         t.grid_x = 1; t.grid_y = 0;
         t.resource_deposit[ri(resource_type::iron_ore)] = 100.0f; // for R4/R5 below
         w.tiles[tile] = t;
@@ -112,7 +126,7 @@ int main()
                                              resource_type::iron_ore, b);
         check(last_mix_result == construction_result::placed, "R2 mixed-type placement succeeds pre-cap");
     }
-    check(w.tiles[tile].composition == terrain_composition::urban,
+    check(w.tiles[tile].cover == terrain_cover::urban,
           "R2 6th mixed non-extraction building (aggregate cap 6) fires urban transform");
 
     // R3: urban's own cap (12) is higher — a 7th non-extraction placement still succeeds.
@@ -142,7 +156,7 @@ int main()
     {
         tile_component t{};
         t.body = body;
-        t.composition = terrain_composition::grassland;
+        t.substrate = terrain_substrate::sedimentary; t.cover = terrain_cover::grass; t.cover_density = 150;
         t.grid_x = 2; t.grid_y = 0;
         t.habitability = 0.95f;
         w.tiles[high_hab_tile] = t;
@@ -153,7 +167,7 @@ int main()
         construct_building(w, reg, corp, high_hab_tile, building_type::processing_facility,
                            resource_type::iron_ore, b);
     }
-    check(w.tiles[high_hab_tile].composition == terrain_composition::urban,
+    check(w.tiles[high_hab_tile].cover == terrain_cover::urban,
           "R6b setup: high-habitability tile also transforms at its cap");
     check(near(w.tiles[high_hab_tile].habitability, 0.95f),
           "R6b transform does not LOWER a habitability already above the urban floor");

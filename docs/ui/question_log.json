@@ -418,6 +418,20 @@
     "src/ui/selection_panel.cpp",
     "src/ui/body_surface_canvas.cpp"
    ]
+  },
+  "tile_texture": {
+   "surface": "Terrain texture (Planetary canvas ground pass)",
+   "answers": "What is this ground made of, and how heavily is it covered?",
+   "because": "Colour alone could not carry both halves once BL-519 split the terrain axes. The substrate and the cover blend into ONE fill, so a rocky slope with a thin wood and a sedimentary plain with a thin wood arrive at neighbouring greens and the player cannot tell which they are siting on. Texture separates the two readings onto separate channels: a faint substrate grain that says what the ground is, and a per-tile cover pattern whose mark count and weight scale with cover_density, so a sparse wood LOOKS thin exactly where the economy already CUTS it thin. It earns its space by being free of any: it adds no chrome, no legend and no control, and it is the only way a cover boundary reads as a boundary now that BL-511's province blend deliberately smooths the fills.",
+   "backlog_item": [
+    "BL-520",
+    "BL-519"
+   ],
+   "files": [
+    "src/ui/hex_render.cpp",
+    "src/ui/body_surface_canvas.cpp"
+   ],
+   "status": "drafted"
   }
  }
 }

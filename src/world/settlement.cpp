@@ -81,16 +81,38 @@ const tile_component* tile_at(const world& w, const std::vector<entity_id>& ids,
 /// floodplain signal on its own.
 int settle_score(const tile_component& t, bool coastal)
 {
+    // WHAT GROWS HERE sets the score; WHAT THE GROUND IS decides how much of it
+    // is real (BL-519). The pre-split table read one slot and so had to choose
+    // between naming the cover and naming the ground — which is exactly why a
+    // forested crag and a forested floodplain scored identically.
     int score = 0;
-    switch (t.composition)
+    switch (t.cover)
     {
-        case terrain_composition::grassland: score = 62; break;
-        case terrain_composition::wetland:   score = 58; break; // Floodplain, now that rivers are their own term.
-        case terrain_composition::forest:    score = 44; break;
-        case terrain_composition::tundra:    score =  9; break;
-        case terrain_composition::rocky:     score =  6; break;
-        default:                             return 0;          // Ocean, ice, barren, regolith, metallic, volcanic.
+        case terrain_cover::grass:  score = 62; break;
+        case terrain_cover::marsh:  score = 58; break; // Floodplain, now that rivers are their own term.
+        case terrain_cover::forest: score = 44; break;
+        case terrain_cover::scrub:  score =  9; break; // The old `tundra` row.
+        default:                    score =  0; break;
     }
+
+    switch (t.substrate)
+    {
+        // Real soil: the cover's score stands, and every pre-split number is
+        // reproduced exactly (grass 62, marsh 58, forest 44, scrub 9).
+        case terrain_substrate::sedimentary:
+            break;
+        // Vegetation on rock is worth SOMETHING and not much — a third. Bare rock
+        // keeps its old 6. This is the pair the split exists to express.
+        case terrain_substrate::rocky:
+            score = score > 0 ? score / 3 : 6;
+            break;
+        // Ocean, ice, barren, regolith, metallic, volcanic: nothing to settle for,
+        // whatever happens to be lying on top.
+        default:
+            return 0;
+    }
+    if (score <= 0)
+        return 0;
 
     switch (t.landform)
     {
@@ -120,7 +142,7 @@ bool touches_ocean(const world& w, const std::vector<entity_id>& ids,
         const int nr = row + dr[i];
         if (nr < 0 || nr >= gh) continue;
         const tile_component* t = tile_at(w, ids, raster(col + dc[i], nr, gw));
-        if (t && t->composition == terrain_composition::ocean) return true;
+        if (t && is_water(t->substrate)) return true; // BL-516
     }
     return false;
 }
@@ -155,7 +177,7 @@ endowment survey_endowment(const world& w, const std::vector<entity_id>& ids,
             const tile_component* t = tile_at(w, ids, raster(col + dc, r, gw));
             if (!t) continue;
             ++cells;
-            if (t->composition == terrain_composition::ocean) { ++water; continue; }
+            if (is_water(t->substrate)) { ++water; continue; } // BL-516
 
             const auto& d = t->resource_deposit;
             farm   += d[static_cast<std::size_t>(resource_type::agricultural_produce)];
@@ -315,7 +337,7 @@ settlement_state run_settlement(const planetology_state& pl,
     for (int idx = 0; idx < total; ++idx)
     {
         const tile_component* t = tile_at(w, tile_ids, idx);
-        if (!t || t->composition == terrain_composition::ocean) continue;
+        if (!t || is_water(t->substrate)) continue; // BL-516
         const int col = idx % gw, row = idx / gw;
         score[static_cast<std::size_t>(idx)] =
             settle_score(*t, touches_ocean(w, tile_ids, col, row, gw, gh));

@@ -193,7 +193,9 @@ int main()
             const tile_component& t0 = tile_at(a, idx);
             const tile_component& t1 = tile_at(c, idx);
             if (!bit_equal(t0.height, t1.height)) ++h_bad;
-            if (t0.composition != t1.composition || t0.landform != t1.landform) ++terrain_bad;
+            if (t0.substrate != t1.substrate || t0.cover != t1.cover
+                || t0.cover_density != t1.cover_density || t0.landform != t1.landform)
+                ++terrain_bad;
             if (std::memcmp(t0.resource_deposit.data(), t1.resource_deposit.data(),
                             sizeof(t0.resource_deposit)) != 0)
                 ++deposit_bad;

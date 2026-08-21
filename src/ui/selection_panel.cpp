@@ -382,7 +382,7 @@ void draw_rival_building_summary(const world& w, const recipe_registry& reg,
     const auto tile_it = w.tiles.find(b.tile);
     if (tile_it != w.tiles.end())
         ImGui::Text("Tile [%d, %d]  %s", tile_it->second.grid_x, tile_it->second.grid_y,
-                    composition_name(tile_it->second.composition));
+                    terrain_name(tile_it->second).c_str());
 
     if (god_view)
     {
@@ -2252,7 +2252,9 @@ void draw_province_selection_body(world& w, ui_state& ui, const province& pv)
             const auto tit = w.tiles.find(pv.tiles[i]);
             if (tit == w.tiles.end())
                 continue;
-            const ImU32 c = ui::landform_relief(ui::terrain_colour(tit->second.composition),
+            const ImU32 c = ui::landform_relief(ui::terrain_colour(tit->second.substrate,
+                                                                   tit->second.cover,
+                                                                   tit->second.cover_density),
                                                 tit->second.landform);
             dl->AddRectFilled({b0.x + seg_w * static_cast<float>(i), b0.y},
                               {b0.x + seg_w * static_cast<float>(i + 1), b0.y + bar_h}, c);
@@ -2330,7 +2332,7 @@ void draw_province_selection_body(world& w, ui_state& ui, const province& pv)
                 char label[160];
                 std::snprintf(label, sizeof label, "[%d, %d]  %s%s%s##prov_tile_%d",
                               tc.grid_x, tc.grid_y,
-                              ui::composition_name(tc.composition),
+                              ui::terrain_name(tc).c_str(),
                               plain ? "" : " \xc2\xb7 ",
                               plain ? "" : ui::landform_name(tc.landform),
                               static_cast<int>(i));

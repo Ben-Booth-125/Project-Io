@@ -74,8 +74,13 @@
 /// legal, and what the harness's synthetic cases use.
 struct sim_terrain_view
 {
-    const std::vector<terrain_composition>* composition = nullptr;
-    const std::vector<terrain_landform>*    landform    = nullptr;
+    /// The three tile axes (BL-519), as parallel raster arrays. `cover` and
+    /// `density` may be null independently of `substrate` — a caller that only
+    /// has geology still gets defensible ground, just bare ground.
+    const std::vector<terrain_substrate>* substrate = nullptr;
+    const std::vector<terrain_cover>*     cover     = nullptr;
+    const std::vector<std::uint8_t>*      density   = nullptr;
+    const std::vector<terrain_landform>*  landform  = nullptr;
 };
 
 // ---------------------------------------------------------------------------

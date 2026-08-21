@@ -57,7 +57,7 @@ struct world_metrics
     std::size_t        nations  = 0;
     std::size_t        corps    = 0;
     std::size_t        entities = 0; ///< sum of the public component containers
-    std::map<int, int> comp_hist;    ///< tiles per terrain_composition
+    std::map<int, int> comp_hist;    ///< tiles per (substrate, cover) pair (BL-519)
     double             deposit_total = 0.0;
 
     bool operator==(const world_metrics& o) const
@@ -79,7 +79,12 @@ world_metrics measure(const world& w)
                  w.population_centres.size() + w.nations.size() + w.corporations.size();
     for (const auto& [id, tc] : w.tiles)
     {
-        ++m.comp_hist[static_cast<int>(tc.composition)];
+        // BOTH AXES fold into the digest (BL-519). Hashing only the substrate
+        // would let a cover regression pass a determinism check silently, which
+        // is exactly the hole a split axis opens if the digest is not widened
+        // with it.
+        ++m.comp_hist[static_cast<int>(tc.substrate) * 16 + static_cast<int>(tc.cover)];
+        m.deposit_total += static_cast<double>(tc.cover_density) * 1e-6;
         for (std::size_t r = 0; r < resource_count; ++r)
             m.deposit_total += tc.resource_deposit[r];
     }

@@ -39,14 +39,14 @@ void check(bool ok, const char* label)
 std::size_t ri(resource_type r) { return static_cast<std::size_t>(r); }
 
 entity_id make_tile(world& w, entity_id body, int gx, int gy,
-                    terrain_composition comp, float iron_richness)
+                    terrain_substrate sub, float iron_richness)
 {
     const entity_id t = w.create_entity();
     tile_component tc{};
     tc.body        = body;
     tc.grid_x      = gx;
     tc.grid_y      = gy;
-    tc.composition = comp;
+    tc.substrate = sub;
     tc.landform    = terrain_landform::plains;
     if (iron_richness > 0.0f)
     {
@@ -112,7 +112,7 @@ int main()
             b.survey.phase = survey_phase::surveyed;
             w.bodies[body] = b;
         }
-        const entity_id t_pf = make_tile(w, body, 0, 0, terrain_composition::rocky, 0.0f);
+        const entity_id t_pf = make_tile(w, body, 0, 0, terrain_substrate::rocky, 0.0f);
         const entity_id market = w.create_entity();
         {
             market_component mc{};
@@ -172,7 +172,7 @@ int main()
             b.grid_width = 4; b.grid_height = 4; b.survey.phase = survey_phase::surveyed;
             w.bodies[body] = b;
         }
-        const entity_id tile = make_tile(w, body, 0, 0, terrain_composition::rocky, 1.0f);
+        const entity_id tile = make_tile(w, body, 0, 0, terrain_substrate::rocky, 1.0f);
         const entity_id market = w.create_entity();
         market_component mc{};
         mc.body = body;
@@ -230,7 +230,7 @@ int main()
         }
         // Tile creation is the needed side effect; the id itself is unused here
         // (the scorer discovers candidate tiles by scanning the body's grid).
-        const entity_id t_ai = make_tile(w, body, 0, 0, terrain_composition::rocky, 1.0f);
+        const entity_id t_ai = make_tile(w, body, 0, 0, terrain_substrate::rocky, 1.0f);
         (void)t_ai;
         const entity_id market = w.create_entity();
         {

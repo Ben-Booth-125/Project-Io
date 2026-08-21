@@ -86,7 +86,7 @@ campaign_battle_outcome fight(const campaign_battle_identity& id,
                               int withdraw_after_round = 0)
 {
     return resolve_campaign_battle(id, atk, neutral, def, neutral,
-                                    terrain_composition::grassland, terrain_landform::plains,
+                                    terrain_substrate::sedimentary, terrain_cover::grass, 150, terrain_landform::plains,
                                     season::summer, 1000, 1000,
                                     withdrawer, withdraw_after_round);
 }
@@ -135,7 +135,7 @@ int main()
         // The stepped API and the scripted wrapper must resolve identically —
         // otherwise a player-driven fight and a headless one diverge.
         campaign_battle_state st = begin_campaign_battle(id_at(9000), atk, neutral, def, neutral,
-                                                          terrain_composition::grassland,
+                                                          terrain_substrate::sedimentary, terrain_cover::grass, 150,
                                                           terrain_landform::plains,
                                                           season::summer, 1000, 1000);
         while (step_campaign_battle(st)) {}
@@ -325,7 +325,7 @@ int main()
         const std::vector<army_stack_entry> def = stack_of(unit_class::infantry, 200);
 
         const battle_outcome era = resolve_battle(atk, neutral, def, neutral,
-                                                   terrain_composition::grassland,
+                                                   terrain_substrate::sedimentary, terrain_cover::grass, 150,
                                                    terrain_landform::plains,
                                                    season::summer, 1000, 1000);
         int agree = 0;

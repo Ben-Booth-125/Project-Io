@@ -46,7 +46,7 @@ int main()
             grid[static_cast<std::size_t>(tc.grid_y) * gw + tc.grid_x] = tid;
         if (tc.road_level > 0)
         {
-            if (tc.composition == terrain_composition::ocean) ++roaded_ocean;
+            if (is_water(tc.substrate)) ++roaded_ocean;
             else                                              ++roaded_land;
             if      (tc.road_level == 1) ++track_tiles;
             else if (tc.road_level == 2) ++road_tiles;

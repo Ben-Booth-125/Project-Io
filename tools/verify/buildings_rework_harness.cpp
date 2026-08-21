@@ -43,7 +43,7 @@ entity_id make_tile(world& w, entity_id body, int c, int r,
     tc.body        = body;
     tc.grid_x      = c;
     tc.grid_y      = r;
-    tc.composition = terrain_composition::rocky;
+    tc.substrate = terrain_substrate::rocky;
     tc.landform    = lf;
     w.tiles.emplace(t, tc);
     return t;
@@ -201,7 +201,7 @@ int main()
         for (int r = 0; r < GH; ++r)
             for (int c = 0; c < GW; ++c)
                 grid[r][c] = make_tile(w, body, c, r);
-        w.tiles.at(grid[1][0]).composition = terrain_composition::ocean;
+        w.tiles.at(grid[1][0]).substrate = terrain_substrate::ocean;
 
         // A hub anchor at (0,0), so reach is measurable.
         {

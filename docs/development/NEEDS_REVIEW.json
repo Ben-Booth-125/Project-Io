@@ -2953,6 +2953,168 @@
    "status": "open",
    "source": "BL-519 / BL-520 design work, 2026-08-21.",
    "what": "Measured rather than estimated: 330 references to composition in src/, concentrated in tile_generation.cpp (60), terrain_combat.cpp (32), placement_rules.cpp (32), corporation_generation (18), nation_generation (15) and the UI (hex_render 14, presentation 13, generation_ledger 12). There is NO save format, so none of this is a data migration - it is call sites only, which is why the item is landable at all. BL-519 proposes a derived composition() accessor so every call site keeps working while the axes land underneath, then migrating by MEANING in batches. The question for you is whether that accessor is permanent or deleted last. Permanent is a much smaller diff and a lasting lie - the codebase would keep asking a question the data model no longer answers. Deleted is honest and a longer migration. The interesting part is that a call site asking 'is this forest?' usually means either 'is there timber here?' (cover) or 'can I build on it?' (substrate), and which it meant is precisely the information the overloaded enum has been losing."
+  },
+  {
+   "id": "NR-445",
+   "title": "BL-519 landed with FOUR calls of yours taken as given — and one of them, urban-as-cover, is the reason the shipped urban bug is fixed",
+   "raised": "2026-08-21",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-519 (tile axis split), landed 2026-08-21.",
+   "what": "You answered the item's four open questions before implementation: cover is GRADED (a density scalar), urban is a COVER value, tundra is DROPPED (scrub on cold ground), and the composition() shim is DELETED in this pass with all call sites migrated. All four are implemented as answered. Recording them here because the item's own design prose argued the OPPOSITE on urban - it proposed a separate state axis - and a future reader will otherwise read the code as having ignored the design. Your call is the better one and the code says why: urban-as-cover still preserves the SUBSTRATE, which is the entire shipped bug (paving a metallic tile destroyed the fact it was metallic). A separate state axis would have bought only the ability to remember what GREW there before the city, which nothing reads. tile_axes_harness A2c is the assertion that would have failed before the item and passes now."
+  },
+  {
+   "id": "NR-446",
+   "title": "BL-519's headline case was inert at the threshold the design implied — 'a mountain might have a forest' fired ZERO times until I moved a number",
+   "raised": "2026-08-21",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-519 (tile axis split), Pass 4d cover refinement.",
+   "what": "Your brief was 'a mountain might have a forest or not', and the design lists forest as a cover that reads on rocky and volcanic ground. I first gated forest-on-rock at moisture >= 0.55, matching the moisture the biome table uses for forest on soil. It fired ZERO times on a homeworld, and the reason is structural rather than a tuning miss: the biome table routes ground BY moisture, so `rocky` is only ever drawn in the dry and middling columns - wet rocky ground does not exist for the branch to find. I lowered it to 0.45 (the top half of the middling column) on the argument that 0.55 is the moisture at which SOIL grows a forest, and a slope is not soil. It now produces 3,054 forest tiles across a 6-seed sweep, of which 110 on the primary homeworld carry BOTH timber and iron - the pair the pre-split model could not express. FLAGGING IT because the number is a judgement about how common a wooded crag should be, and I picked it to make the feature reachable rather than because you chose it. The census is REPORTED by tile_axes_harness section D, so you can move it against a number."
+  },
+  {
+   "id": "NR-447",
+   "title": "BL-519 moved the settlement map: a wooded hillside now scores better than a bare crag, so population centres and province borders shifted",
+   "raised": "2026-08-21",
+   "kind": "observation",
+   "status": "open",
+   "source": "BL-519, settle_score / agrarian_score migration.",
+   "what": "settle_score and agrarian_score were single-slot tables that had to choose between naming the cover and naming the ground, so a forested crag and a forested floodplain scored the same. Migrated by meaning: the COVER sets the score, the SUBSTRATE decides how much of it is real (sedimentary keeps every pre-split number exactly; rocky gets a third, and bare rock keeps its old 6/5). CONSEQUENCE, measured: population centres move, and because BL-515 seeds provinces from centres, the partition moves with them - 3,709 provinces became 3,714 on the default seed, and the over-12 share went 4.72% -> 4.90%. Everything still passes and the hard cap of 20 still holds at max 16. Reporting it because a province-count change is exactly the kind of thing that looks alarming when noticed later without a cause attached. The cause is that cover now matters to settlement, which is the point of the axis."
+  },
+  {
+   "id": "NR-448",
+   "title": "TWO harnesses fail with stale goldens — ai_skill_harness (28) and history_sim_harness (8). Both PRE-EXISTING, proven against the previous commit, NOT BL-519",
+   "raised": "2026-08-21",
+   "kind": "observation",
+   "status": "open",
+   "source": "Full harness sweep during BL-519.",
+   "what": "ai_skill_harness prints its own banner: 'bands blessed: 2026-08-09 (GCC - STALE since 2026-08-14/BL-386; re-bless from the Linux build)'. history_sim_harness carries no such banner but fails the same way. I did not take either on trust: I built BOTH at the pre-BL-519 commit (2c17e96) in a separate worktree and ran them. ai_skill_harness: 28 failures each side, PASS/FAIL pattern byte-identical. history_sim_harness: 8 failures each side, PASS/FAIL pattern byte-identical. So BL-519 neither caused nor worsened either. Both want re-blessing, and BL-519 is a reason to do it AFTER this lands rather than before, since deposits and the settlement map both moved. NOT re-blessed here - re-blessing a golden without authorisation is exactly what src/world/CLAUDE.md forbids. The 8 history_sim rows are about whether the Era -1 sim fights and takes ground at all (B384a, B384c, BL384a), which is a BL-384-shaped problem and probably wants an item rather than a re-bless."
+  },
+  {
+   "id": "NR-449",
+   "title": "BL-521's design field in backlog.json is CORRUPTED — it holds the JavaScript that filed the item, not the design",
+   "raised": "2026-08-21",
+   "kind": "observation",
+   "status": "open",
+   "source": "Reading BL-521 at the start of the BL-519/BL-520 session.",
+   "what": "BL-521 (verify-API click injection) was filed by a script whose final line was `design: fs.readFileSync(process.argv[1], 'utf8')`. process.argv[1] is the SCRIPT ITSELF under node, not a design document, so the item's design field now contains the filing script's own source - including the code that resolved NR-438/NR-439. The item's title, files, priority and version goal are all fine; only the prose is lost. REFINED.md's paragraph on it is currently the best statement of intent that exists. Nothing recovers the original text, so it needs re-authoring rather than repairing. Worth knowing generally: a filing script that reads its own argv for prose will do this again."
+  },
+  {
+   "id": "NR-450",
+   "title": "src/ui/tech_tree_panel.cpp uses std::clamp without <algorithm> — invisible on MSVC, breaks the Linux build BL-057 is heading toward",
+   "raised": "2026-08-21",
+   "kind": "observation",
+   "status": "open",
+   "source": "Syntax-checking the UI layer with g++ during BL-519.",
+   "what": "Not mine and not BL-519's: `git log` puts the line in c49c2fa. MSVC pulls <algorithm> in transitively so it compiles on the shipped toolchain; g++ does not, and it is the ONLY error in src/ui once BL-519's migration is applied. One-line fix (add the include). Left alone because it is unrelated to the item in hand and I would rather you saw it as its own thing than buried in a 660-line terrain diff. It matters for BL-057 (move development to native Linux)."
+  },
+  {
+   "id": "NR-451",
+   "title": "BL-519's UI half is COMPILE-CHECKED but not RUN, and no visual check was possible — this container cannot build the app",
+   "raised": "2026-08-21",
+   "kind": "observation",
+   "status": "open",
+   "source": "BL-519, src/ui migration.",
+   "what": "SDL3 and ImGui come from CMake FetchContent and the session proxy blocks those downloads; there is also no display. So ProjectIo could not be built or run, and no scripts/verify/*.lua check could be executed. What I DID do: cloned ImGui's headers and ran `g++ -fsyntax-only` over every file in src/ui, which is clean. That covers type errors and my migration; it does NOT cover linkage, runtime behaviour, or how anything LOOKS. Specifically unverified: the terrain colour blend (calibrated so all four canonical covers reproduce their pre-split RGB exactly, and arithmetically checked - but never rendered), the generation ledger's new two-histogram layout, and the wizard preview globe's packed-axes sampling. Worth a look on your machine before this is treated as done."
+  },
+  {
+   "id": "NR-452",
+   "title": "The pre-BL-409 state_hash golden in the STANDING RULES is stale — it was already failing before BL-519, and BL-519 has moved the hash again",
+   "raised": "2026-08-21",
+   "kind": "question",
+   "status": "open",
+   "source": "Full 99-harness sweep during BL-519; spectator_determinism R2.",
+   "what": "`.claude/rules/io-standing-rules.md` cites `state_hash 3CBAD1D44EE71EDE` by value as the proof that BL-409's spectator mode leaves an ordinary played session byte-identical, and spectator_determinism R2 asserts it. THAT ROW FAILS, and it failed BEFORE this session: built at the previous commit (2c17e96) in a separate worktree, the unspectated hash is B7E6F60D6AFE78C0, not the golden. So something between BL-409 and today already moved world generation without the golden being re-pinned. BL-519 has now moved it again, to B4D09255AF346008 — expected, since deposits and the settlement map both changed, and the item's own resolution says so.\n\nWHAT STILL HOLDS, and it is the part that matters: every load-bearing property in that harness passes on both sides. The prohibition binds (the player corp issues ZERO decisions unspectated), an unspectated run is reproducible, admitting the player shifts no rival's cadence slot, and a spectated run is reproducible tick for tick. The failing row is byte-identity against a FROZEN NUMBER, not a property.\n\nNOT re-blessed. src/world/CLAUDE.md: 'Goldens and pinned bands (state hashes, generation sweeps) are contracts: report movement, never re-bless without authorisation.' And this one is quoted in the standing rules, so re-pinning it edits a rule file — squarely your call, not mine.\n\nTwo things need deciding: (1) re-pin to B4D09255AF346008 and update the standing-rules citation; (2) worth a moment's thought on whether a hash pinned to one generation build can survive as a contract at all, given generation legitimately changes — the OTHER three rows prove BL-409's property without any frozen number, which suggests the byte-identity row has done its job and could become a reported hash rather than an asserted one."
+  },
+  {
+   "id": "NR-453",
+   "kind": "novel-work",
+   "status": "open",
+   "raised": "2026-08-21",
+   "title": "BL-521 was built with NO design to build against — the whole API shape was chosen by the agent, because the item's design prose is the corrupted one",
+   "source": "BL-521 (verify-API click injection), built 2026-08-21.",
+   "what": "Flagged as novel by the agent, and it is right. The CAPABILITY is not scope growth — DEVELOPMENT_PRACTICES.md owns headless verification and BL-521 is a designed A-priority item. But its design field holds the filing script instead of the design (NR-449), so there was nothing to build against: the six Lua binding names, the pan-to-click trade-off and the double-click forcing were all chosen by the agent, not derived from an authority. That is worth knowing before the API is treated as settled, because a verify binding is a seam other checks will be written against and renaming one later invalidates every script that used it."
+  },
+  {
+   "id": "NR-454",
+   "kind": "question",
+   "status": "open",
+   "raised": "2026-08-21",
+   "title": "BL-521 closes the live-check class for CANVASES but not for PANELS — clicking a nav-rail button or a ledger tab by name needs a target registry nobody owns",
+   "source": "BL-521, reported by the implementing agent.",
+   "what": "What shipped: a script can click a POSITION or a TILE. What it still cannot do is `verify.click('nav.market')`. Nav-rail buttons, ledger tabs, Selection-band rows and the resource graph publish no screen rect, so clicking them by name needs every clickable surface declaring `{name, rect}` into ui_state. That is a design decision, not an implementation detail — who owns the registry, does every widget owe an entry, and does it duplicate ACTIONS.json, which already names every control? Genuine scope growth if pursued. Needs a ruling before the live-check class is FULLY closed, and it is the half that covers most of the surfaces NR-388's six landed-awaiting-a-live-check items are about."
+  },
+  {
+   "id": "NR-455",
+   "kind": "decision-taken",
+   "status": "open",
+   "raised": "2026-08-21",
+   "title": "BL-521's click_tile PANS the view as a side effect, and verify.mouse was deliberately left in place beside the new verify.hover",
+   "source": "BL-521, two calls taken by the implementing agent.",
+   "what": "(1) `verify.click_tile(col,row)` and `verify.tile_screen(col,row)` ask the canvas where a tile is, which CENTRES it — so clicking a tile moves the camera. Accepted because the alternative is a second copy of the canvas transform living in the verify API, which would drift. The fix, if you want one, is the canvas publishing tile screen rects without moving. (2) `verify.mouse` moves only the canvases' cursor; the new `verify.hover` moves ImGui's too. Unifying them would be cleaner but would re-bless every existing hover golden, so `mouse` was left untouched. Both are reasonable; both are the agent's calls rather than yours."
+  },
+  {
+   "id": "NR-456",
+   "title": "BL-520: texture SURVIVES the lenses at 0.45 rather than being replaced by them — a decision taken on your behalf",
+   "raised": "2026-08-21",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-520 (basic tile texturing), open question 1. src/ui/body_surface_canvas.cpp.",
+   "what": "The item asked whether texture survives the map lenses or whether lenses replace it — 'a texture underneath a Country-lens fill either reads as depth or as dirt'. I picked SURVIVES, at 0.45 strength, and implemented it. Reasons: (1) the precedent is one channel over — BL-231's landform relief is composited AFTER the lens tint on the argument that terrain facts stay true under an overlay, and 'this is closed-canopy forest' is the same class of fact as 'this is a mountain'; (2) replacing it would make each lens a different MAP rather than the same map read differently, which is what the lens bar depends on. The thing that actually keeps it from reading as dirt is not the 0.45 — it is that every mark's ink is derived from the tile's OWN drawn fill (pushed 55% toward a per-cover target), so under Country a mark is that nation's colour darkened, i.e. shading on the block rather than a second competing colour. Same derivation makes the fog and survey dim free. THE FRAME THAT FALSIFIES IT is texture_lens_country in scripts/verify/tile_texture.lua — if the marks read as unrelated speckle there, the answer was 'replace' and the fix is one constant (k_texture_lens_strength -> 0) plus deleting the attenuation branch.\n\n[ID NOTE: filed by the BL-520 agent as NR-452 while a concurrent lane was filing entries in the same range; renumbered on merge. The BL-520 commit message and any doc comment written by that agent cite the OLD id.]"
+  },
+  {
+   "id": "NR-457",
+   "title": "BL-520's texture pass is COMPILE-CHECKED ONLY — never rendered, and its verify script has never been run",
+   "raised": "2026-08-21",
+   "kind": "observation",
+   "status": "open",
+   "source": "BL-520, src/ui/hex_render.cpp + src/ui/body_surface_canvas.cpp.",
+   "what": "Same container limitation as NR-451: SDL3/ImGui come from FetchContent, the proxy blocks the downloads, and there is no display, so ProjectIo could not be built or run and no scripts/verify/*.lua could execute. What IS verified: `g++ -std=c++20 -fsyntax-only` is clean on both changed files, and every number quoted in the code comments and in PLANETARY.md was computed independently (LOD ramp 0/0.25/0.5/1 at r=14/16/18/22; density 75/150/205/255 -> 2/3/4/5 marks at alpha 123/157/182/204 of 255; grain alphas 36-76 of 255 at full strength, 16-34 under a lens). What is NOT verified: how ANY of it looks — whether the grain is too loud to let the province blend read as one shape, whether the cover marks are distinguishable from each other, and whether the lens attenuation in NR-452 is right. scripts/verify/tile_texture.lua was written and named in the verifier-visual skill for you to run; it is deliberately capture-only with NO golden blessed, since blessing an unseen frame pins whatever got built.\n\n[ID NOTE: filed by the BL-520 agent as NR-453 while a concurrent lane was filing entries in the same range; renumbered on merge. The BL-520 commit message and any doc comment written by that agent cite the OLD id.]"
+  },
+  {
+   "id": "NR-458",
+   "kind": "novel-work",
+   "status": "open",
+   "raised": "2026-08-21",
+   "title": "BL-520 created a NEW VISUAL VOCABULARY that no authority owns - thirteen mark kinds deliberately not icons, and a third always-on render channel",
+   "source": "BL-520 (basic tile texturing), merged 2026-08-21. Flagged by the implementing agent.",
+   "what": "Two parts, and the agent was right to raise both.\n\n(1) THE MARK VOCABULARY. Nine cover patterns and four substrate grain kinds, none of which existed before. ICONS.md owns the `ui::icons` glyph namespace under a `(dl, centre, r, colour)` contract; these marks are in NEITHER that namespace NOR on that contract. The agent put them in hex_render and documented them in PLANETARY.md, arguing that a hashed FIELD of marks is not an icon. That reads right - an icon is a symbol you look up, a grain is a texture you look through - but it is a boundary judgement that leaves two visual vocabularies where there was one, and ICONS.md currently says nothing about it.\n\n(2) A THIRD RENDER CHANNEL. Texture now composites on every tile forever, alongside hue (substrate x cover) and BL-231's landform relief. Small in code, permanent in consequence: every future overlay, lens and capture inherits it, and the LOD gate makes it the first channel that appears and disappears with zoom."
+  },
+  {
+   "id": "NR-459",
+   "kind": "observation",
+   "status": "open",
+   "raised": "2026-08-21",
+   "title": "Fanned-out agents get worktrees at the SESSION's base commit, not at HEAD — one built an entire item against an enum that had already been deleted",
+   "source": "BL-516, BL-520 and BL-521 run concurrently on 2026-08-21 while BL-519 landed in the main session.",
+   "what": "All three agents were briefed 'off the current HEAD' and all three got worktrees at 21d4834, the commit this SESSION started from — two behind by the time they launched. The BL-520 agent noticed and fast-forwarded itself before starting. The BL-516 agent did not: it concluded from its own `git log` that 'BL-519 has not landed in code', which was true of its base and false of the repo, and then widened `terrain_composition` — the exact enum BL-519 had just deleted. Roughly an hour of good work (structural water classification, a measurement-pinned seed spacing, per-domain cap assertions) landed on an axis that no longer exists. It is being ported rather than redone, and the port is cheap ONLY because that agent had routed every water test through one choke-point predicate.\n\nTWO THINGS WORTH KEEPING, because DELIVERY.md's worktree model assumes agents start from where the main session is:\n\n1. A brief that says 'off the current HEAD' is not enough. It should name the COMMIT HASH, and tell the agent to verify it and fast-forward if it is behind. Cheap, and it would have caught this in one command.\n2. The sharper rule, which is the one I gave that agent: when a brief's stated base and the repo disagree ABOUT THE THING YOU ARE CHANGING, that is a stop, not something to reconcile. The BL-516 agent reconciled — reasonably, in isolation — and the reconciliation is what cost the hour.\n\nAlso worth noting: two agents independently allocated the SAME review ids (NR-452, NR-453) while this lane was using them, because NEEDS_REVIEW.json has no equivalent of next_id.js. Resolved by renumbering on merge, but next_id.js exists for backlog ids precisely because minting off a local file collides, and the review log has the same shape and no such tool."
+  },
+  {
+   "id": "NR-460",
+   "raised": "2026-08-21",
+   "kind": "question",
+   "status": "open",
+   "title": "Sea provinces reach 82 tiles against your stated 80 — the SAME shape as the 12-vs-13 case you ruled on this morning, and it wants the same kind of answer",
+   "source": "BL-516 (water kinds and sea provinces), merged 2026-08-21.",
+   "what": "You said open-ocean provinces should be 'much larger, but not larger than say 80 tiles'. Growth clamps at 80 and holds. But singleton absorption picks a singleton's CHEAPEST neighbour, and that neighbour may already be full — so a survivor ships at 81 or 82, exactly as a land province shipped at 13. Measured over 6 seeds: 2,272 open-ocean provinces, mean 41.07, max 82; 11 over the clamp totalling 12 excess tiles, and absorption accounts for all 12. 26 sit exactly ON 80.\n\nThe agent did NOT invent a second number, which was right — it asserted the accounting identity instead (every tile above 80 arrived by absorption). But that leaves 80 as a clamp the shipped partition exceeds, which is the precise situation NR-438 existed to resolve on land. Your land answer was: 12 becomes a PREFERENCE, 20 becomes an asserted hard cap, and the over-share is reported not asserted. The parallel answer here would be 80-as-preference plus a sea hard cap — but 'say 80' may equally have meant an absolute you want enforced, in which case absorption needs a different rule at the sea boundary. Your call; the numbers are in province_partition_harness section W.\n\nCoastal water is a separate band and is fine: 4,213 provinces, mean 4.57, max 14, inside the 20-tile hard cap it inherits from land (asserted as W2b)."
+  },
+  {
+   "id": "NR-461",
+   "raised": "2026-08-21",
+   "kind": "decision-taken",
+   "status": "open",
+   "title": "A lakeshore is no longer a coast — 22% of coastal land tiles lost port and wharf eligibility, taken on your behalf",
+   "source": "BL-516, is_coastal narrowed to sea.",
+   "what": "`is_coastal` used to mean 'next to any water'. Now that lake, coast and open ocean are distinct, it means 'next to the SEA', so a tile on a lakeshore stops qualifying. That is the correct reading of the words and it is also a real gameplay change: a Port and a Fishing Wharf both gate on it.\n\nMEASURED, re-taken against the current base: 401 of 1,801 tiles lose eligibility on seed 0 (22.3%), 486/1,713 on seed 1 (28.4%), 432/2,391 on seed 2 (18.1%). So roughly a fifth to a quarter of what used to be buildable coast is not any more.\n\nDefensible either way. A lake genuinely should not support an ocean-going port; but a large lake plausibly should support a fishing wharf, and the current rule denies both. If you want that split, the natural shape is Port gating on sea and Wharf gating on any water — one line each, and it needs your ruling rather than mine."
+  },
+  {
+   "id": "NR-462",
+   "raised": "2026-08-21",
+   "kind": "question",
+   "status": "open",
+   "title": "Lakes were given their own provinces because your water ruling never said where they belong",
+   "source": "BL-516, the open question the item itself names.",
+   "what": "You named three water kinds — lakes, coasts, oceans — and gave province rules for coastal (3-12) and open ocean (much larger, ~80). Lakes got neither. The agent put a lake on the COASTAL band as its own province: it invents no new size rule and keeps the invariant that a province never spans two domains. Measured on seed 0: 1,433 lake tiles.\n\nThe alternatives it did not take, for when you rule: a lake could belong to the LAND province that surrounds it (which makes a lake a feature of a place rather than a place of its own, and would suit a small pond), or lakes could be excluded from the partition entirely the way ocean was before this item. The current choice is the most consistent one; it is not necessarily the one you want."
   }
  ]
 }

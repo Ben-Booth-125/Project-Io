@@ -1,26 +1,41 @@
 # Project Io — REFINED (active worklist)
 
-**Empty between work blocks.** Sprint P1 closed its build tasks on 2026-08-21.
+**Empty between work blocks.** Sprint P1 is open; the entries below are its live arc.
 
-## Next session takes these three (Ben, 2026-08-21)
+## Landed this session (2026-08-21)
 
-- **BL-519 — the tile axis split.** `terrain_composition` split into substrate ×
-  cover, with `landform` unchanged and `none` a first-class cover value. 330 call
-  sites across 49 files, no save migration (there is no save format). Open
-  questions live in the item: graded vs binary cover, whether `tundra` survives as
-  a cover, whether `urban` is a state or a cover, and whether the derived
-  `composition()` accessor is permanent or deleted last (NR-444).
-- **BL-520 — basic texturing.** Sequenced behind BL-519: 84 hand-authored
-  combinations against ~16 that compose. Decide **BL-514** (blend all tiles)
-  alongside it — texture and the blend are in direct tension, and each changes what
-  the other is for (NR-443).
-- **NR-438 / NR-439 — the raised ceiling**, now ruled. 12 tiles is a PREFERENCE,
-  20 a hard cap, larger-than-12 permitted in rare cases. **Check before coding: the
-  shipped behaviour already satisfies this** — max is 16 across 6 seeds. The work is
-  likely saying it (`province.hpp` still calls 12 a clamp), asserting it (a hard-cap
-  row at 20), deleting the now-unneeded `IO_ABSORB_PREFER_ROOM` variant, and
-  REPORTING the over-12 share (currently 4.9%) rather than asserting a rareness
-  threshold nobody has chosen.
+All four assigned items plus the two unqueued ones, on branch
+`claude/bl-519-520-nr-438-439-n29ljl`.
+
+- **NR-438 / NR-439 — the raised ceiling.** 12 is a preference, 20 the asserted
+  hard cap, over-12 share reported never asserted, `IO_ABSORB_PREFER_ROOM` gone.
+- **BL-519 — the tile axis split.** `terrain_composition` → substrate × cover ×
+  density. 522 references across ~110 files. New `tile_axes_harness` (13 checks).
+  The 120-seed earthlike census is bit-identical to the pre-split baseline.
+- **BL-521 — click injection in the verify API.** Drives ImGui's real event queue;
+  double-click promotion forced per press so frame time cannot decide it.
+- **BL-520 — basic tile texturing.** Grain on the substrate, pattern on the cover;
+  13 composable marks instead of 84 enumerated. LOD off below 14px.
+- **BL-516 — water kinds and sea provinces.** Structural lake/coast/ocean with no
+  threshold; sea provinces pinned by measurement at d=7, mean 41.07.
+
+**The one thing all of it shares: nothing has been rendered.** This container
+cannot build the GUI, so every UI half is compile-clean and arithmetically checked
+and visually unseen. No golden was blessed — blessing an unseen frame pins
+whatever got built.
+
+## Owed, and each has a review entry
+
+- **The visual pass**, on Ben's machine: BL-519's colour blend (NR-451), BL-520's
+  marks and lens attenuation (NR-457), BL-521's click script (never executed),
+  BL-516's water in/out of the blend.
+- **Rulings waiting**: the 80-tile sea clamp exceeded at 82 (NR-460, the same
+  shape as NR-438); `is_coastal` narrowed to sea, costing ~22% of coastal tiles
+  their port eligibility (NR-461); lakes' province home (NR-462); does the
+  province blend survive texturing, which also decides BL-514.
+- **Stale goldens, none re-blessed**: `ai_skill_harness` (28), `history_sim_harness`
+  (8), and the pre-BL-409 `state_hash` quoted in the standing rules (NR-452).
+- **Panels still not clickable by name** — needs a target registry (NR-454).
 
 ## Also ready, unqueued
 

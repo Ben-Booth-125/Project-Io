@@ -147,27 +147,177 @@ enum class resource_type : uint8_t
 
 static constexpr std::size_t resource_count = static_cast<std::size_t>(resource_type::count);
 
-/// Material character of a tile — what it is made of. Determines which resource
-/// deposits can appear, its terrain colour, and its base habitability ceiling.
-/// One of the two axes of the tile model; see docs/economy/TILES.md.
-enum class terrain_composition : uint8_t
+// ---------------------------------------------------------------------------
+// The tile terrain axes (BL-519, 2026-08-21)
+// ---------------------------------------------------------------------------
+// A tile is described on THREE orthogonal axes: what the ground is MADE OF
+// (`terrain_substrate`), what SITS ON IT (`terrain_cover`, which may be
+// `none`), and what SHAPE it is (`terrain_landform`, unchanged).
+//
+// WHY THE SPLIT EXISTS. Until BL-519 there were two axes, and the first of them
+// was doing three unrelated jobs at once: substrate (barren/rocky/volcanic/
+// metallic/regolith), cover (forest/grassland/tundra/wetland) and state
+// (urban/icy/ocean). Ben's brief was "a mountain might have a forest or not" —
+// and a mountain WITH a forest was already expressible (composition=forest ×
+// landform=mountain). What could not be said was a ROCKY mountain that happens
+// to be forested, because the one slot had been spent on the forest.
+//
+// `urban` was the proof rather than the exception. It is a one-way transform
+// (BL-366) that OVERWROTE the composition, so paving a metallic tile destroyed
+// the fact that it was metallic. The split fixes that as a side effect: urban is
+// a COVER value (Ben's call, 2026-08-21), so a city now sits ON its geology
+// instead of erasing it, and `maybe_transform_to_urban` leaves the substrate
+// alone.
+//
+// THIS ADDS NO CONCEPT. It un-mixes one that got overloaded. Authority:
+// docs/economy/TILES.md; the deposit consequences are in
+// docs/economy/RESOURCES.md.
+// ---------------------------------------------------------------------------
+
+/// What the ground is MADE OF — the geology. Fixed at generation and NEVER
+/// transformed: nothing in the simulation rewrites a tile's substrate, which is
+/// the property that distinguishes this axis from `terrain_cover`.
+///
+/// Determines which MINERAL deposits can appear (ore follows the substrate;
+/// timber and produce follow the cover), the tile's base build cost, and the
+/// terrain colour the map lenses tint. See docs/economy/TILES.md.
+enum class terrain_substrate : uint8_t
 {
-    barren    = 0,  ///< Dry, dusty, minimal organics; iron ore, coal, petroleum.
-    rocky     = 1,  ///< Hard rock outcrops; iron, copper, rare earth ore.
-    volcanic  = 2,  ///< Geologically active; rare earth and iron ore. High hazard.
-    icy       = 3,  ///< Ice-dominated surface; water ice. Low habitability.
-    tundra    = 4,  ///< Cold, sparse vegetation; surface iron, peat.
-    grassland = 5,  ///< Open fertile land; agricultural produce. Habitable.
-    forest    = 6,  ///< Dense tree cover; timber. Habitable.
-    wetland   = 7,  ///< Marsh, bog, floodplain; agricultural produce, clay. Habitable.
-    ocean     = 8,  ///< Open deep water; carries no land deposits and no buildings.
-    regolith  = 9,  ///< Loose surface material on airless bodies.
-    metallic  = 10, ///< High metal content; iron-nickel ore, platinum group metals.
-    urban     = 11, ///< BL-366: one-way transform, fired when a tile's non-extraction building
-                    ///< stack fills its starting composition's cap. No new extraction or
-                    ///< ambient-resource placement; existing extraction sites are grandfathered.
-                    ///< High habitability ceiling; never reverts.
+    barren      = 0, ///< Dry, dusty, minimal organics; iron ore, coal, petroleum.
+    rocky       = 1, ///< Hard rock outcrops; iron, copper, rare earth ore.
+    sedimentary = 2, ///< Soil, silt and sandstone — the ground a biotic cover grows on.
+                     ///< NEW with BL-519: the old model had no way to say "real
+                     ///< soil" except by spending the slot on what grew there.
+    volcanic    = 3, ///< Geologically active; rare earth and iron ore. High hazard.
+    metallic    = 4, ///< High metal content; iron-nickel ore, platinum group metals.
+    regolith    = 5, ///< Loose surface material on airless bodies.
+    icy         = 6, ///< Ice-dominated ground; water ice. A SUBSTRATE, not a cover —
+                     ///< an ice cap is what the ground is, whereas `cover::snow` is
+                     ///< what fell on it and could melt.
+    ocean       = 7, ///< OPEN water: the sea, out of sight of land. Carries no land
+                     ///< deposits and no buildings. NARROWED by BL-516 — it used to
+                     ///< mean every water tile; the shallows and the inland waters
+                     ///< are now `coast` and `lake` below.
+
+    // BL-516 (Ben, 2026-08-21): "We can have lakes, coasts, and oceans." Water
+    // stops being one value, and it stays on THIS axis because BL-519's interim
+    // note was right about why: every existing consumer asks "is this water?" of
+    // the ground. APPENDED, NEVER RENUMBERED — `ocean` keeps id 7, so no wire
+    // value, golden or fixture shifts meaning.
+    //
+    // The three kinds are EXCLUSIVE and STRUCTURAL — no threshold picks between
+    // them (tile_generation.cpp § classify_water_kinds):
+    //   * `lake`  — a water component that does not reach the body's sea.
+    //   * `coast` — a sea tile with at least one land neighbour: the shoreline ring.
+    //   * `ocean` — a sea tile with none: open water.
+    //
+    // ASK THE QUESTION YOU MEAN. Almost every existing consumer asks "is this
+    // water?", and must keep asking exactly that — use `is_water()`. Only the
+    // consumers that genuinely care WHICH water (the road pass's strait rule, the
+    // province partition's size band, the lenses) name a kind.
+    //
+    // A WATER TILE STILL CARRIES `terrain_cover::none`, whichever kind it is. The
+    // cover axis describes what grew on ground; water has no ground.
+    lake        = 8, ///< Inland water with no path to the sea. Buildings refuse it as ocean does.
+    coast       = 9, ///< Shallow sea adjacent to land — the shoreline ring. Not buildable.
 };
+
+// ---------------------------------------------------------------------------
+// Water predicates (BL-516) — the choke point every water test goes through
+// ---------------------------------------------------------------------------
+// These live HERE, beside the axis, rather than in placement_rules.hpp, because
+// half the callers (logistics, rivers, roads, provinces, terrain combat) ask the
+// question about TERRAIN and have no business depending on the placement layer.
+// `placement_rules::is_water_tile` delegates to `is_water` so there is one
+// implementation and one truth.
+
+/// Is this ground water OF ANY KIND? The question nearly every consumer means:
+/// nothing is built here, nothing is farmed here, and a land walker stops here.
+constexpr bool is_water(terrain_substrate s)
+{
+    return s == terrain_substrate::ocean || s == terrain_substrate::coast
+           || s == terrain_substrate::lake;
+}
+
+/// Open sea, out of sight of land — the water a road never crosses and a large
+/// sea province is drawn over.
+constexpr bool is_open_ocean(terrain_substrate s) { return s == terrain_substrate::ocean; }
+
+/// The shoreline ring: sea with land on at least one side. A strait is made of
+/// these and only these, which is what lets the road pass tell a crossing from
+/// an open-sea route out of the DATA rather than out of a run length.
+constexpr bool is_coastal_water(terrain_substrate s) { return s == terrain_substrate::coast; }
+
+/// Inland water with no path to the sea.
+constexpr bool is_lake(terrain_substrate s) { return s == terrain_substrate::lake; }
+
+/// Sea of either kind — water that is part of the body's connected ocean, as
+/// opposed to a lake. What "coastal" means for a port: a lakeshore is not a coast.
+constexpr bool is_sea(terrain_substrate s)
+{
+    return s == terrain_substrate::ocean || s == terrain_substrate::coast;
+}
+
+/// What SITS ON the substrate — and it may be absent. `none` is a FIRST-CLASS
+/// value, and that absence is the whole point of the axis: "a mountain with no
+/// forest" stops being a different kind of ground from "a mountain with one".
+///
+/// Determines BIOTIC deposits (timber, produce), defensive cover and forage in
+/// combat, and the overlay pattern BL-520 draws. Unlike the substrate, a cover
+/// CAN change — `urban` is the one transform that does so today (BL-366).
+enum class terrain_cover : uint8_t
+{
+    none   = 0, ///< Bare ground. A real answer, not a missing one.
+    grass  = 1, ///< Open fertile cover; agricultural produce.
+    scrub  = 2, ///< Sparse woody cover — the half-step that makes a forest line
+                ///< gradual instead of a hard edge. Also where `tundra` went:
+                ///< tundra was a climate outcome wearing a terrain slot, and it
+                ///< is now scrub (or none) on cold ground (Ben, 2026-08-21).
+    forest = 3, ///< Dense tree cover; timber. Ben's example case.
+    marsh  = 4, ///< Bog, floodplain, fen; produce and clay. Wants low landforms.
+    snow   = 5, ///< Lying snow. Falls out of latitude × BL-517's retained height
+                ///< with no new generation input.
+    dunes  = 6, ///< Wind-blown sand. Explains why some barren ground is workable
+                ///< and some is not.
+    ash    = 7, ///< Volcanic fall. A hazard reading rather than a resource one.
+    salt   = 8, ///< Dry-basin crust; a home for a salt deposit if one is restored.
+    urban  = 9, ///< BL-366: one-way transform, fired when a tile's non-extraction
+                ///< building stack fills its cap. No new extraction or ambient
+                ///< placement; existing extraction sites are grandfathered. High
+                ///< habitability ceiling; never reverts.
+                ///<
+                ///< A COVER, by Ben's call (2026-08-21) — so it still erases what
+                ///< grew here, but no longer erases the GEOLOGY underneath, which
+                ///< was the shipped bug the axis split was reaching for.
+};
+
+/// Cover density, 0-255: sparse scrub at the bottom, closed-canopy forest at the
+/// top. Ben's call, 2026-08-21 — cover is GRADED, not binary.
+///
+/// ONE NUMBER, TWO CONSUMERS, and that is why it earns a field rather than being
+/// two: BL-520's texture reads it as how heavily to draw the overlay pattern, and
+/// the economy reads it as biotic yield (timber richness, forage in combat). A
+/// sparse wood should both LOOK thin and CUT thin, and a single scalar is what
+/// keeps those two from drifting apart.
+///
+/// INVARIANT: density is 0 if and only if cover is `none`. Every producer and
+/// consumer may rely on it; `tile_axes_harness` asserts it over generated worlds.
+inline constexpr std::uint8_t k_cover_density_max = 255;
+
+/// Cover density as a fraction in [0, 1] — the form every scalar consumer wants.
+inline constexpr float cover_fraction(std::uint8_t density)
+{
+    return static_cast<float>(density) / static_cast<float>(k_cover_density_max);
+}
+
+/// True if @p c is a BIOTIC cover — something that grew rather than something
+/// that fell, was blown, or was built. The distinction the deposit rules turn on:
+/// timber and produce need life, snow/dunes/ash/salt/urban do not supply it.
+inline constexpr bool is_biotic_cover(terrain_cover c)
+{
+    return c == terrain_cover::grass || c == terrain_cover::scrub
+        || c == terrain_cover::forest || c == terrain_cover::marsh;
+}
 
 /// Physical shape of a tile — its elevation, slope, and form. Modifies the base
 /// properties set by composition without changing them. The second axis of the
@@ -240,7 +390,14 @@ struct tile_component
     entity_id  body;      ///< Body this tile belongs to.
     int        grid_x;    ///< Column index within the body's tile grid.
     int        grid_y;    ///< Row index within the body's tile grid.
-    terrain_composition composition; ///< Material character (geology/ecology).
+    /// What the ground is MADE OF. Fixed at generation; nothing rewrites it.
+    terrain_substrate   substrate;
+    /// What SITS ON the ground, `none` included. Mutable — `urban` is the one
+    /// transform today (maybe_transform_to_urban, placement_rules.cpp).
+    terrain_cover       cover = terrain_cover::none;
+    /// How heavily the cover sits, 0-255. ZERO IF AND ONLY IF `cover` is `none`
+    /// — an invariant `tile_axes_harness` asserts, not merely a convention.
+    std::uint8_t        cover_density = 0;
     terrain_landform    landform;    ///< Physical shape (elevation/slope).
     /// Fixed deposit **richness** per resource type (the extraction rate multiplier).
     /// Value-initialised for the same reason as market_component's arrays below: a
@@ -256,7 +413,15 @@ struct tile_component
 
     float      hazard_level;     ///< 0.0 (safe) – 1.0 (extreme hazard).
     float      habitability;     ///< 0.0 (uninhabitable) – 1.0 (hospitable).
-    float      substrate_density = 0.0f; ///< Background nation industrial occupation [0, 1].
+    /// Background nation industrial occupation [0, 1].
+    ///
+    /// NOT A TERRAIN FIELD, despite the name, and NOT related to
+    /// `terrain_substrate` or `cover_density` — it predates both (BL-365's
+    /// background-industry premise) and means how heavily the nation's own
+    /// industry already occupies this tile. Left named as it is because
+    /// renaming it is a separate change with its own call sites; flagged here
+    /// so the collision misleads nobody.
+    float      substrate_density = 0.0f;
 
     /// Road tier on this tile (BL-077 field; BL-172 ladder). 0 = no road; 1 = Track, 2 = Road,
     /// 3 = Highway. Higher tiers lower the intra-body A* traversal cost of the tile
@@ -296,8 +461,11 @@ struct tile_component
     /// ledger reads it, and it graduates by being named there. Do not delete this field
     /// to restore the symmetry.
     ///
-    /// **Not a terrain input.** `landform` and `composition` are NOT derived from this
+    /// **Not a terrain input.** `landform` and `substrate` are NOT derived from this
     /// field — they were decided inside the pass by rules this capture does not touch.
+    /// `cover` is the one partial exception, and it is deliberate: BL-519's snow cover
+    /// reads latitude × this height, which is what let snow arrive without a new
+    /// generation input of its own.
     /// Reading it is legitimate; re-deriving terrain from it is a different item.
     ///
     /// 0.0 on any tile not produced by `generate_body_tiles` (hand-built harness fixtures).
@@ -995,7 +1163,7 @@ struct nation_component
     /// Named `politics` (not `ideology`) so the field does not shadow its enum
     /// type — a field whose name matches its type is ill-formed under GCC
     /// (-Wchanges-meaning) and breaks the Linux build. Mirrors the
-    /// tile_component convention (terrain_composition composition).
+    /// tile_component convention (terrain_substrate substrate).
     ideology       politics = ::ideology::mercantile;
 
     /// Military / territorial posture; drawn from seeded RNG in Pass 4.

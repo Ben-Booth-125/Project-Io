@@ -80,7 +80,7 @@ synth_body build_synth_body(uint32_t salt)
             const entity_id tid = sb.w.create_entity();
             sb.w.tiles[tid] = tile_component{
                 .body = body_id, .grid_x = col, .grid_y = row,
-                .composition = is_ocean ? terrain_composition::ocean : terrain_composition::rocky,
+                .substrate = is_ocean ? terrain_substrate::ocean : terrain_substrate::rocky,
                 .landform = lf,
             };
             sb.tiles[static_cast<std::size_t>(idx)] = tid;

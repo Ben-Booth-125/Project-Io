@@ -61,7 +61,7 @@ int largest_enclosed_sea(const world& w, const std::vector<entity_id>& tile_ids,
 {
     std::vector<char> ocean(tile_ids.size(), 0);
     for (std::size_t i = 0; i < tile_ids.size(); ++i)
-        if (w.tiles.at(tile_ids[i]).composition == terrain_composition::ocean)
+        if (is_water(w.tiles.at(tile_ids[i]).substrate)) // BL-516: every water kind
             ocean[i] = 1;
 
     // Flood-fill ocean components on odd-r hex adjacency (columns wrap).
@@ -497,7 +497,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
         for (const entity_id tid : kepler_tiles)
         {
             const auto it = w.tiles.find(tid);
-            if (it != w.tiles.end() && it->second.composition != terrain_composition::ocean)
+            if (it != w.tiles.end() && !is_water(it->second.substrate))
                 ++kepler_land;
         }
         const int budget = std::max(1, kepler_land / std::max(1, kepler_np.land_tiles_per_seed));

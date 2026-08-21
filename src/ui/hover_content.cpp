@@ -22,9 +22,9 @@ namespace {
 void hover_terrain_header(const tile_component& tile)
 {
     if (tile.landform == terrain_landform::plains)
-        ImGui::TextUnformatted(composition_name(tile.composition));
+        ImGui::TextUnformatted(terrain_name(tile).c_str());
     else
-        ImGui::Text("%s \xc2\xb7 %s", composition_name(tile.composition),
+        ImGui::Text("%s \xc2\xb7 %s", terrain_name(tile).c_str(),
                     landform_name(tile.landform));
 }
 

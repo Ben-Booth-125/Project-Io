@@ -48,7 +48,7 @@ int main()
         world w;
         const entity_id body = w.create_entity(); w.bodies[body] = body_component{};
         const entity_id tile = w.create_entity();
-        { tile_component tc{}; tc.body = body; tc.composition = terrain_composition::grassland; w.tiles[tile] = tc; }
+        { tile_component tc{}; tc.body = body; tc.substrate = terrain_substrate::sedimentary; tc.cover = terrain_cover::grass; tc.cover_density = 150; w.tiles[tile] = tc; }
         const entity_id market = w.create_entity();
         { market_component mc; mc.body = body; mc.base_price[ri(resource_type::iron_ore)] = 2.5f;
           mc.base_price[ri(resource_type::steel)] = 8.0f; mc.price = mc.base_price;
@@ -75,7 +75,7 @@ int main()
         world w;
         const entity_id body = w.create_entity(); w.bodies[body] = body_component{};
         const entity_id tile = w.create_entity();
-        { tile_component tc{}; tc.body = body; tc.composition = terrain_composition::grassland; w.tiles[tile] = tc; }
+        { tile_component tc{}; tc.body = body; tc.substrate = terrain_substrate::sedimentary; tc.cover = terrain_cover::grass; tc.cover_density = 150; w.tiles[tile] = tc; }
         const entity_id market = w.create_entity();
         { market_component mc; mc.body = body; mc.base_price[ri(resource_type::iron_ore)] = 2.5f;
           mc.base_price[ri(resource_type::steel)] = 8.0f; mc.price = mc.base_price;
@@ -105,7 +105,7 @@ int main()
         world w;
         const entity_id body = w.create_entity(); w.bodies[body] = body_component{};
         const entity_id tile = w.create_entity();
-        { tile_component tc{}; tc.body = body; tc.composition = terrain_composition::grassland; w.tiles[tile] = tc; }
+        { tile_component tc{}; tc.body = body; tc.substrate = terrain_substrate::sedimentary; tc.cover = terrain_cover::grass; tc.cover_density = 150; w.tiles[tile] = tc; }
         const entity_id market = w.create_entity();
         { market_component mc; mc.body = body; mc.base_price[ri(resource_type::iron_ore)] = 2.5f;
           mc.base_price[ri(resource_type::steel)] = 8.0f; mc.price = mc.base_price;
@@ -136,7 +136,7 @@ int main()
         world w;
         const entity_id body = w.create_entity(); w.bodies[body] = body_component{};
         const entity_id tile = w.create_entity();
-        { tile_component tc{}; tc.body = body; tc.composition = terrain_composition::grassland; w.tiles[tile] = tc; }
+        { tile_component tc{}; tc.body = body; tc.substrate = terrain_substrate::sedimentary; tc.cover = terrain_cover::grass; tc.cover_density = 150; w.tiles[tile] = tc; }
         const entity_id market = w.create_entity();
         { market_component mc; mc.body = body; mc.base_price[ri(resource_type::iron_ore)] = 2.5f;
           mc.base_price[ri(resource_type::steel)] = 8.0f; mc.price = mc.base_price;
@@ -166,7 +166,7 @@ int main()
         world w;
         const entity_id body = w.create_entity(); w.bodies[body] = body_component{};
         const entity_id tile = w.create_entity();
-        { tile_component tc{}; tc.body = body; tc.composition = terrain_composition::grassland; w.tiles[tile] = tc; }
+        { tile_component tc{}; tc.body = body; tc.substrate = terrain_substrate::sedimentary; tc.cover = terrain_cover::grass; tc.cover_density = 150; w.tiles[tile] = tc; }
         const entity_id market = w.create_entity();
         { market_component mc; mc.body = body; mc.base_price[ri(resource_type::steel)] = 8.0f;
           mc.price = mc.base_price; w.markets[market] = mc; }
@@ -195,7 +195,7 @@ int main()
           reg2.set_economics(building_type::processing_facility, pr); }
         const entity_id body = w.create_entity(); w.bodies[body] = body_component{};
         const entity_id tile = w.create_entity();
-        { tile_component tc{}; tc.body = body; tc.composition = terrain_composition::grassland; w.tiles[tile] = tc; }
+        { tile_component tc{}; tc.body = body; tc.substrate = terrain_substrate::sedimentary; tc.cover = terrain_cover::grass; tc.cover_density = 150; w.tiles[tile] = tc; }
         const entity_id market = w.create_entity();
         { market_component mc; mc.body = body; mc.centre_tile = tile;
           mc.base_price[ri(resource_type::steel)] = 8.0f; mc.price = mc.base_price;

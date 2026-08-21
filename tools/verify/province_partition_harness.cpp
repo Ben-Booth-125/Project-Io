@@ -3,7 +3,8 @@
 //
 // Four sections:
 //   P — the partition's own invariants: coverage, no ocean, connectivity, the
-//       hard 12-tile ceiling, the ascending-id contract, seeded determinism,
+//       hard 20-tile cap (12 is the PREFERENCE, reported not asserted — Ben,
+//       2026-08-21, NR-438), the ascending-id contract, seeded determinism,
 //       THE DERIVED-IDENTITY CONTRACT (P8: an id IS its lowest member tile),
 //       and the settlement seeds (P9).
 //   C — THE COST MODEL, MEASURED. The pinning instrument for the two
@@ -13,7 +14,12 @@
 //   D — the SIZE DISTRIBUTION across a seed sweep. REPORTED, not engineered:
 //       organic borders are meant to be irregular, so D describes what the cost
 //       model produced against the superseded 3x3 partition's numbers rather
-//       than asserting a spread. Its one assertion is the hard ceiling.
+//       than asserting a spread. Its one size assertion is the hard CAP of 20.
+//   W — the WATER bands (BL-516). Coastal water takes land's band, hard cap
+//       included; the open ocean is "much larger, but not larger than say 80
+//       tiles" (Ben, 2026-08-21). The 80 is the clamp GROWTH obeys and is
+//       asserted as an exact identity, the distribution beneath it REPORTED —
+//       the discipline NR-438's ruling set for the land ceiling.
 //   S — the SERIALISATION SEAM, the risk in the item. Three properties:
 //       S1  one appender / no reorder — a pre-BL-466 stream is a byte-exact
 //           PREFIX of a post-BL-466 stream of the same log.
@@ -45,6 +51,43 @@
 #include <vector>
 
 static int g_failures = 0;
+
+// --- BL-516 domain helpers -------------------------------------------------
+// Deliberately RE-DERIVED here from the tile substrate rather than read out of
+// province.cpp's `in_domain`: a check that calls the code it is checking proves
+// nothing about it.
+
+static bool domain_matches(terrain_substrate sub, province_kind k)
+{
+    switch (k)
+    {
+        case province_kind::land:
+            return sub != terrain_substrate::ocean && sub != terrain_substrate::coast
+                   && sub != terrain_substrate::lake;
+        case province_kind::coastal_water:
+            return sub == terrain_substrate::coast || sub == terrain_substrate::lake;
+        case province_kind::open_ocean:
+            return sub == terrain_substrate::ocean;
+    }
+    return false;
+}
+
+/// The PREFERENCE each domain's growth clamps to.
+static std::size_t domain_preference(province_kind k)
+{
+    return (k == province_kind::open_ocean) ? k_sea_province_max_tiles : k_province_max_tiles;
+}
+
+static const char* domain_name(province_kind k)
+{
+    switch (k)
+    {
+        case province_kind::land:          return "land";
+        case province_kind::coastal_water: return "coastal water";
+        case province_kind::open_ocean:    return "open ocean";
+    }
+    return "?";
+}
 
 static void check(bool cond, const char* what)
 {
@@ -111,36 +154,58 @@ int main()
         check(ok, "P1  province ids are strictly ascending (the iteration contract)");
     }
 
-    // P2 — every land tile in exactly one province; no ocean tile in any.
+    // P2 — EVERY tile in exactly one province, and no province mixing domains.
+    //
+    // BL-516 WIDENED THE COVERAGE CLAIM AND NARROWED THE EXCLUSION CLAIM, which
+    // is the whole shape of this item in one row. Coverage used to be "every
+    // LAND tile"; water is partitioned now, so it is every tile. The old P2b
+    // ("no province holds an ocean tile") is not deleted — NR-428 rules it must
+    // be narrowed — it becomes the invariant that actually still holds and that
+    // everything downstream depends on: A PROVINCE HOLDS ONE DOMAIN. That is
+    // what keeps "a land province never spans water" true, and it is a stronger
+    // statement than the old row, because it also forbids a lake joining the sea.
     {
-        std::size_t land_total = 0;
-        for (const auto& [tid, tc] : w.tiles)
-            if (tc.composition != terrain_composition::ocean)
-                ++land_total;
+        const std::size_t tile_total = w.tiles.size();
 
         std::unordered_map<entity_id, int> seen;
-        bool                               ocean_member = false;
+        bool                               mixed_domain  = false;
         bool                               body_mismatch = false;
         std::size_t                        members = 0;
+        std::size_t                        by_kind[3] = { 0, 0, 0 };
+        std::size_t                        prov_by_kind[3] = { 0, 0, 0 };
         for (const province& p : part.provinces)
+        {
+            const province_kind pk = province_kind_of(w, p);
+            ++prov_by_kind[static_cast<std::size_t>(pk)];
             for (const entity_id t : p.tiles)
             {
                 ++members;
                 ++seen[t];
+                ++by_kind[static_cast<std::size_t>(pk)];
                 const auto it = w.tiles.find(t);
-                if (it == w.tiles.end() || it->second.composition == terrain_composition::ocean)
-                    ocean_member = true;
-                else if (it->second.body != p.body)
+                if (it == w.tiles.end())
+                {
+                    mixed_domain = true;
+                    continue;
+                }
+                if (!domain_matches(it->second.substrate, pk))
+                    mixed_domain = true;
+                if (it->second.body != p.body)
                     body_mismatch = true;
             }
+        }
 
-        bool once = (seen.size() == members);
-        check(members == land_total && once,
-              "P2a every land tile belongs to exactly one province");
-        check(!ocean_member, "P2b no province holds an ocean tile");
+        const bool once = (seen.size() == members);
+        check(members == tile_total && once,
+              "P2a every tile belongs to exactly one province (land AND water, BL-516)");
+        check(!mixed_domain,
+              "P2b no province mixes domains (the land-only claim, narrowed: a land province"
+              " still never spans water)");
         check(!body_mismatch, "P2c no province spans bodies");
-        std::printf("        %zu land tiles across %zu provinces\n", land_total,
-                    part.provinces.size());
+        std::printf("        %zu tiles across %zu provinces — land %zu tiles/%zu prov,"
+                    " coastal water %zu/%zu, open ocean %zu/%zu\n",
+                    tile_total, part.provinces.size(), by_kind[0], prov_by_kind[0], by_kind[1],
+                    prov_by_kind[1], by_kind[2], prov_by_kind[2]);
     }
 
     // P3 — tile_province agrees with the province membership, both ways.
@@ -197,8 +262,7 @@ int main()
                 if (t == null_entity)
                     continue;
                 const auto tit = sw.tiles.find(t);
-                if (tit == sw.tiles.end()
-                    || tit->second.composition == terrain_composition::ocean)
+                if (tit == sw.tiles.end() || is_water(tit->second.substrate)) // BL-516
                     continue;
                 const tile_component& tc = tit->second;
                 for (int s = 0; s < 6; ++s)
@@ -213,8 +277,7 @@ int main()
                     if (n == null_entity || n <= t)
                         continue; // each edge once, from its lower tile
                     const auto nit = sw.tiles.find(n);
-                    if (nit == sw.tiles.end()
-                        || nit->second.composition == terrain_composition::ocean)
+                    if (nit == sw.tiles.end() || is_water(nit->second.substrate)) // BL-516
                         continue;
                     land_edge e;
                     e.a      = t;
@@ -234,19 +297,22 @@ int main()
     const std::vector<land_edge> edges = collect_land_edges(w, grids, dims);
 
     // P4 — every province is hex-connected on its body's grid (columns wrap).
-    //      The LAND-ONLY invariant, narrowed to land provinces rather than
-    //      deleted (NR-428): ocean provinces are BL-516's and are not built
-    //      here, so "no province spans water" still holds outright.
-    // P5 — the size band. It is a GROWTH BUDGET, not a clamp (Ben, 2026-08-21):
-    //      7-12 soft, 3-12 hard, and TINY PROVINCES ARE KEPT. So the only
-    //      ASSERTION the band supports is the hard ceiling — the one clamp that
-    //      really is enforced — and everything below the floor is REPORTED.
+    //      Asserted over EVERY province since BL-516, sea included: connectivity
+    //      is a claim about the fill, and the fill is the same one in all three
+    //      domains. The land-only half of the old row moved to P2b, narrowed
+    //      rather than deleted (NR-428).
+    // P5 — the size band, MEASURED OVER LAND PROVINCES. It is a GROWTH BUDGET,
+    //      not a clamp (Ben, 2026-08-21): 7-12 soft, 3-12 hard, and TINY
+    //      PROVINCES ARE KEPT. The water bands are section W's; mixing them into
+    //      this histogram would make both unreadable and would silently move a
+    //      land number nobody changed.
     {
         bool                       all_connected = true;
         std::map<std::size_t, int> hist;
         for (const province& p : part.provinces)
         {
-            ++hist[p.tiles.size()];
+            if (province_kind_of(w, p) == province_kind::land)
+                ++hist[p.tiles.size()];
 
             const auto& grid = grids.at(p.body);
             const int   gw   = dims.at(p.body).first;
@@ -280,7 +346,8 @@ int main()
             if (seen.size() != p.tiles.size())
                 all_connected = false;
         }
-        check(all_connected, "P4  every land province is hex-connected (none spans water)");
+        check(all_connected,
+              "P4  every province is hex-connected on its body's grid (all three domains)");
 
         std::size_t in_band = 0, total = 0, under_soft = 0, under_hard = 0, over = 0;
         std::printf("        size histogram:");
@@ -299,37 +366,74 @@ int main()
         }
         std::printf("\n");
 
-        // P5a — THE HARD CEILING, as it stands after singleton absorption.
+        // P5a — THE HARD CAP, and the accounting identity beneath it.
         //
-        // GROWTH's clamp is untouched: pass 1 and pass 2 still stop dead at
-        // k_province_max_tiles. But pass 3 (Ben, 2026-08-21) absorbs a one-tile
-        // province into its CHEAPEST neighbour, and that neighbour may already
-        // be full — so a survivor can ship at 13, 14 or more. The alternative
-        // would be to pick a costlier neighbour instead, which contradicts the
-        // one rule absorption is defined by, so it is REPORTED, not clamped.
+        // Ben ruled on NR-438 (2026-08-21): "We prefer up to 12 tiles, but up to
+        // 20 is permitted in rare cases." So there are now two bounds doing two
+        // different jobs, and this section keeps them apart deliberately:
         //
-        // The row therefore asserts the exact identity rather than a weakened
-        // inequality: EVERY tile a province holds above the ceiling arrived by
-        // absorption, and the count of such absorptions accounts for all of it.
-        // If growth ever leaks past 12 on its own, the two sides diverge.
+        //   k_province_max_tiles (12)      the PREFERENCE. Growth's own clamp —
+        //                                  passes 1 and 2 stop dead here — but
+        //                                  NOT a claim about shipped sizes, and
+        //                                  therefore NOT asserted as one.
+        //   k_province_hard_cap_tiles (20) the BOUND. Asserted. Nothing in the
+        //                                  partition may ship larger.
+        //
+        // Pass 3 absorbs a one-tile province into its CHEAPEST neighbour, and
+        // that neighbour may already be full, so a survivor can ship at 13 or
+        // more. Under the ruling that is permitted rather than merely tolerated;
+        // what must stay true is that it stays RARE and stays UNDER 20.
+        //
+        // Three rows, and the split between them is the whole point:
+        //
+        //   P5a  the hard cap, ASSERTED. The one size claim this harness makes.
+        //   P5a2 the accounting identity, ASSERTED — every tile above the
+        //        PREFERENCE arrived by absorption, so growth's own clamp is
+        //        still proven separately. If growth ever leaks past 12 on its
+        //        own, the two sides diverge and this fails.
+        //   P5a3 "rare", REPORTED. The over-12 share was 4.9% at the ruling.
+        //        Whether that counts as rare is Ben's judgement to make against
+        //        a number, and no threshold for it has been chosen — so this
+        //        prints and never fails. Asserting an unchosen threshold would
+        //        be inventing the rule the ruling declined to state.
         {
-            std::size_t excess = 0;
+            std::size_t excess = 0, largest = 0;
             for (const auto& [size, count] : hist)
+            {
                 if (size > k_province_max_tiles)
                     excess += (size - k_province_max_tiles) * static_cast<std::size_t>(count);
+                if (count > 0 && size > largest)
+                    largest = size;
+            }
 
             world                     w5 = w;
             province_absorption_stats st5;
             build_province_partition(w5, part.seed, &st5);
 
-            std::printf("        %zu provinces over the 12-tile ceiling, %zu tiles of excess;"
-                        " absorption made %d of them (%d singletons: %d absorbed, %d true"
-                        " islands, %d fixpoint passes)\n",
-                        over, excess, st5.over_ceiling_created, st5.singletons_before,
-                        st5.absorbed, st5.true_islands, st5.passes);
-            check(excess == static_cast<std::size_t>(st5.over_ceiling_created),
-                  "P5a every tile above the 12-tile ceiling arrived by absorption (growth's"
-                  " clamp still holds)");
+            std::printf("        largest LAND province %zu tiles (hard cap %zu, preferred %zu)\n",
+                        largest, k_province_hard_cap_tiles, k_province_max_tiles);
+            check(largest <= k_province_hard_cap_tiles,
+                  "P5a  no LAND province exceeds the HARD CAP (Ben, 2026-08-21: 20 tiles)");
+
+            std::printf("        %zu provinces over the %zu-tile PREFERENCE, %zu tiles of"
+                        " excess; absorption made %d of them (%d singletons: %d absorbed,"
+                        " %d true islands, %d fixpoint passes)\n",
+                        over, k_province_max_tiles, excess, st5.over_ceiling_created,
+                        st5.singletons_before, st5.absorbed, st5.true_islands, st5.passes);
+            // BL-516: LAND's own breach count. The tally sums three domains now,
+            // so an identity asserted against the total could be satisfied by a
+            // breach in the wrong one. Section W asserts the same identity for
+            // each water domain against its own figure.
+            check(excess == static_cast<std::size_t>(
+                      st5.over_ceiling_by_domain[static_cast<std::size_t>(province_kind::land)]),
+                  "P5a2 every LAND tile above the PREFERRED ceiling arrived by absorption"
+                  " (growth's own clamp still holds)");
+
+            std::printf("        P5a3 REPORTED, never asserted: %.2f%% of provinces exceed the"
+                        " preferred %zu (%zu of %zu). \"Rare\" is Ben's call against this"
+                        " number; it was 4.9%% when the ceiling was ruled.\n",
+                        total ? 100.0 * double(over) / double(total) : 0.0,
+                        k_province_max_tiles, over, total);
         }
 
         // P5b — REPORTED, NOT ASSERTED, and deliberately so. Ben, 2026-08-21:
@@ -387,8 +491,12 @@ int main()
                     if (n == null_entity)
                         continue;
                     const auto nit = w.tiles.find(n);
+                    // BL-516: "somewhere to go" means a neighbour IN THE SAME
+                    // DOMAIN. A one-tile island's sea neighbours are no more
+                    // available to it than they ever were, and a one-tile pond
+                    // cannot be absorbed into the shore.
                     if (nit == w.tiles.end()
-                        || nit->second.composition == terrain_composition::ocean)
+                        || !domain_matches(nit->second.substrate, province_kind_of(w, p)))
                         continue;
                     ++not_islands;
                     break;
@@ -397,7 +505,8 @@ int main()
             std::printf("        %zu one-tile provinces survive, all true islands: %s\n", singles,
                         not_islands == 0 ? "yes" : "NO");
             check(not_islands == 0,
-                  "P5d every surviving one-tile province is a TRUE ISLAND (no land neighbour)");
+                  "P5d every surviving one-tile province is a TRUE ISLAND (no same-domain"
+                  " neighbour)");
         }
     }
 
@@ -654,16 +763,18 @@ int main()
     // -----------------------------------------------------------------------
     // D — THE SIZE DISTRIBUTION ACROSS SEEDS. REPORTED, not engineered. Organic
     // borders are meant to be irregular, so this table is a description of what
-    // the cost model produced, and the ONLY assertion it carries is the hard
-    // ceiling. The 3x3 block partition it replaces measured, over these same 6
+    // the cost model produced, and the ONLY size assertion it carries is the
+    // HARD CAP of 20 (Ben, 2026-08-21, NR-438) — the 12-tile figure is a
+    // preference and is reported, not asserted. The 3x3 block partition it replaces measured, over these same 6
     // seeds: 21,161 provinces, mean 9.11, 97.90% in the 7-12 band, 109 under
     // the floor (all true islands) and 336 over. That comparison is the honest
     // way to report what changed; it is NOT a target to match, and the cost
     // weights must not be tuned to chase it.
     // -----------------------------------------------------------------------
-    std::printf("\nD — size distribution across seeds (soft band %zu-%zu, hard %zu-%zu)\n",
+    std::printf("\nD — LAND size distribution across seeds (soft band %zu-%zu, hard floor %zu,"
+                " preferred ceiling %zu, HARD CAP %zu)\n",
                 k_province_min_tiles, k_province_max_tiles, k_province_hard_min_tiles,
-                k_province_max_tiles);
+                k_province_max_tiles, k_province_hard_cap_tiles);
     {
         constexpr int k_seeds = 6;
         std::size_t   all_total = 0, all_in_band = 0, all_under_soft = 0, all_under_hard = 0,
@@ -673,7 +784,10 @@ int main()
         std::size_t   worst_ceiling = 0;
         bool          floor_seen = false;
 
-        // A — SINGLETON ABSORPTION (Ben, 2026-08-21). Gathered in the same sweep
+        // A — SINGLETON ABSORPTION (Ben, 2026-08-21), across EVERY domain since
+        // BL-516: the pass runs once per domain and the tally sums them, so the
+        // ledger below balances over land, shallows and open sea together.
+        // Gathered in the same sweep
         // rather than a second one, because a seed's world costs more to build
         // than everything measured off it. The partition is RECOMPUTED from its
         // own stored seed purely to read the tally out; P6 asserts that
@@ -683,7 +797,8 @@ int main()
         bool        sums_ok = true;
 
         std::printf("  seed | provinces |  min  max   mean | <7  <3  >12 | %% in 7-12 |"
-                    " 1-tile absorbed islands breach\n");
+                    " 1-tile absorbed islands breach   (sizes LAND only; the three singleton"
+                    " columns are ALL-DOMAIN, breach is land's)\n");
         for (int sd = 0; sd < k_seeds; ++sd)
         {
             world_params wp;
@@ -697,6 +812,11 @@ int main()
             bool        lo_seen = false;
             for (const province& p : sw.provinces.provinces)
             {
+                // BL-516: LAND ONLY, so this table keeps measuring the thing it
+                // has always measured and the pre-BL-516 rows below it stay a
+                // like-for-like comparison. Water has its own table, section W.
+                if (province_kind_of(sw, p) != province_kind::land)
+                    continue;
                 const std::size_t sz = p.tiles.size();
                 ++n;
                 tiles += sz;
@@ -711,13 +831,18 @@ int main()
                         " %6d %8d %7d %6d\n",
                         sd, n, lo, hi, n ? double(tiles) / double(n) : 0.0, us, uh, over,
                         n ? 100.0 * double(in_band) / double(n) : 0.0, st.singletons_before,
-                        st.absorbed, st.true_islands, st.over_ceiling_created);
+                        st.absorbed, st.true_islands,
+                        st.over_ceiling_by_domain[static_cast<std::size_t>(province_kind::land)]);
             std::fflush(stdout);
 
             all_singles  += static_cast<std::size_t>(st.singletons_before);
             all_absorbed += static_cast<std::size_t>(st.absorbed);
             all_islands  += static_cast<std::size_t>(st.true_islands);
-            all_breach   += static_cast<std::size_t>(st.over_ceiling_created);
+            // LAND's breach only (BL-516): D's `>12` column counts land provinces,
+            // so the figure it is asserted against must be land's too. The
+            // all-domain total is section W's business.
+            all_breach   += static_cast<std::size_t>(
+                st.over_ceiling_by_domain[static_cast<std::size_t>(province_kind::land)]);
             if (st.singletons_before != st.absorbed + st.true_islands)
                 sums_ok = false;
 
@@ -741,15 +866,34 @@ int main()
         std::printf("  3x3 BASELINE (superseded)    |    1   18   9.11 | 109   -  336 |  97.90%%\n");
         std::printf("  BL-515 PRE-ABSORPTION        |    1   12   7.87 |6195 3008    0 |  74.71%%\n");
 
-        // D1 — the hard ceiling, across every seed. Growth's one clamp — and
-        // absorption's ONE licensed exception to it: a survivor already at 12
-        // that takes in a singleton ships at 13, because the alternative is to
-        // choose a costlier neighbour, which contradicts the cheapest-edge rule
-        // absorption is defined by. The row therefore asserts what is actually
-        // true: nothing exceeds the ceiling EXCEPT by absorption, and the breach
-        // count in the table is the whole account of it.
+        // D1 — THE HARD CAP, across every seed. This is the size claim the
+        // sweep asserts, and after Ben's 2026-08-21 ruling on NR-438 it is the
+        // ONLY one: 12 is the preference growth clamps to, 20 is the bound
+        // nothing may cross. `worst_ceiling` is the largest province over all
+        // six seeds, so one number carries the whole sweep.
+        std::printf("  worst-case province across %d seeds: %zu tiles (hard cap %zu)\n",
+                    k_seeds, worst_ceiling, k_province_hard_cap_tiles);
+        check(worst_ceiling <= k_province_hard_cap_tiles,
+              "D1  no province on any seed exceeds the HARD CAP of 20 tiles (NR-438)");
+
+        // D1a — the accounting identity, kept separate from the cap so growth's
+        // own clamp is still proven on its own terms. Absorption is the ONLY
+        // licensed route past the preference: a survivor already at 12 that takes
+        // in a singleton ships at 13, because the alternative is to choose a
+        // costlier neighbour, which contradicts the cheapest-edge rule absorption
+        // is defined by. If growth itself ever leaks past 12, `all_over` outruns
+        // the breach count and this fails.
         check(all_over <= all_breach,
-              "D1  the 12-tile ceiling holds except where absorption breached it");
+              "D1a nothing exceeds the PREFERRED 12 except where absorption breached it");
+
+        // D1b — "rare", REPORTED and never asserted. Ben ruled that over-12 is
+        // "permitted in rare cases" without naming what rare is, and inventing a
+        // threshold here would be inventing the half of the rule he declined to
+        // state. So the sweep prints the share and leaves the judgement with him.
+        std::printf("  over the preferred %zu: %zu of %zu provinces (%.2f%%) — REPORTED, not"
+                    " asserted; 4.9%% when the ceiling was ruled\n",
+                    k_province_max_tiles, all_over, all_total,
+                    all_total ? 100.0 * double(all_over) / double(all_total) : 0.0);
 
         // A1 — the absorption ledger balances. Every size-1 province that
         // existed is accounted for exactly once: absorbed, or kept as a true
@@ -761,6 +905,130 @@ int main()
         // D2 — the partition covers every seed's land, so the mean is a real
         // statistic and not an artefact of a body that failed to partition.
         check(all_total > 0 && all_tiles > 0, "D2  every seed produced a non-empty partition");
+    }
+
+    // -----------------------------------------------------------------------
+    // W — THE WATER BANDS (BL-516). Ben, 2026-08-21: "We can also draw provinces
+    // over the ocean, using 3-12 size coastal tile provinces. Ocean provinces
+    // should be much larger, but not larger than say 80 tiles."
+    //
+    // The rows follow P5a's split exactly, because the same two jobs need
+    // keeping apart. Coastal water inherits land's pair (preference 12, HARD CAP
+    // 20 — asserted). Open ocean has ONE number, the 80 Ben named, and it is the
+    // clamp GROWTH obeys; no separate sea hard cap exists, because inventing one
+    // would invent a threshold nobody chose. So what carries the 80 is the exact
+    // identity — every tile above it arrived by singleton absorption, never by
+    // growth — which is a stronger claim than a headroom bound, and everything
+    // else here is REPORTED.
+    // -----------------------------------------------------------------------
+    std::printf("\nW — water province bands (coastal %zu-%zu pref, hard cap %zu; open ocean"
+                " growth clamp %zu)\n",
+                k_province_hard_min_tiles, k_province_max_tiles, k_province_hard_cap_tiles,
+                k_sea_province_max_tiles);
+    {
+        constexpr int k_seeds = 6;
+        std::size_t   over_pref[3] = { 0, 0, 0 };     ///< provinces over the domain preference
+        std::size_t   excess_by_kind[3] = { 0, 0, 0 };   ///< tiles over it
+        std::size_t   absorbed_by_kind[3] = { 0, 0, 0 }; ///< how many absorption put there
+        std::size_t   grand_n[3] = { 0, 0, 0 }, grand_tiles[3] = { 0, 0, 0 };
+        std::size_t   grand_hi[3] = { 0, 0, 0 };
+        std::size_t   at_clamp = 0; ///< open-ocean provinces sitting EXACTLY on the 80
+        // Buckets over the ocean band, so the shape under the clamp is visible
+        // without anyone having to pick a threshold to describe it.
+        std::size_t   ocean_bucket[9] = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
+        std::printf("  seed |     domain     | provinces |  min  max   mean | over pref\n");
+        for (int sd = 0; sd < k_seeds; ++sd)
+        {
+            world_params wp;
+            wp.seed = static_cast<uint32_t>(sd);
+            world sw = make_hard_coded_world(no_prehistory(wp));
+            province_absorption_stats wst;
+            build_province_partition(sw, sw.provinces.seed, &wst);
+            for (int ki = 1; ki <= 2; ++ki)
+                absorbed_by_kind[ki] += static_cast<std::size_t>(wst.over_ceiling_by_domain[ki]);
+
+            for (int ki = 1; ki <= 2; ++ki)
+            {
+                const province_kind pk = static_cast<province_kind>(ki);
+                const std::size_t   pref = domain_preference(pk);
+                std::size_t n = 0, tiles = 0, lo = 0, hi = 0, over = 0;
+                bool        lo_seen = false;
+                for (const province& p : sw.provinces.provinces)
+                {
+                    if (province_kind_of(sw, p) != pk)
+                        continue;
+                    const std::size_t sz = p.tiles.size();
+                    ++n;
+                    tiles += sz;
+                    if (!lo_seen || sz < lo) { lo = sz; lo_seen = true; }
+                    if (sz > hi) hi = sz;
+                    if (sz > pref)
+                    {
+                        ++over;
+                        excess_by_kind[ki] += sz - pref;
+                    }
+                    if (pk == province_kind::open_ocean)
+                    {
+                        if (sz == k_sea_province_max_tiles) ++at_clamp;
+                        const std::size_t b = (sz - 1) / 10; // 1-10, 11-20, ... 81+
+                        ocean_bucket[b < 9 ? b : 8] += 1;
+                    }
+                }
+                std::printf("  %4d | %-14s | %9zu | %4zu %4zu %6.2f | %9zu\n", sd,
+                            domain_name(pk), n, lo, hi,
+                            n ? double(tiles) / double(n) : 0.0, over);
+                std::fflush(stdout);
+
+                over_pref[ki]   += over;
+                grand_n[ki]     += n;
+                grand_tiles[ki] += tiles;
+                if (hi > grand_hi[ki]) grand_hi[ki] = hi;
+            }
+        }
+
+        for (int ki = 1; ki <= 2; ++ki)
+            std::printf("  ALL  | %-14s | %9zu | %4s %4zu %6.2f | %9zu\n",
+                        domain_name(static_cast<province_kind>(ki)), grand_n[ki], "-",
+                        grand_hi[ki],
+                        grand_n[ki] ? double(grand_tiles[ki]) / double(grand_n[ki]) : 0.0,
+                        over_pref[ki]);
+
+        std::printf("  open-ocean size spread:");
+        for (int b = 0; b < 9; ++b)
+            std::printf(" %d-%d:%zu", b * 10 + 1, b == 8 ? 999 : (b + 1) * 10, ocean_bucket[b]);
+        std::printf("\n");
+
+        // W1 — Ben's 80, as the EXACT IDENTITY. Growth stops dead at the clamp;
+        // singleton absorption can then carry a survivor past it, because the
+        // alternative is to pick a costlier neighbour and contradict the
+        // cheapest-edge rule absorption is defined by. So what is asserted is
+        // that EVERY tile above 80 arrived that way — if growth ever leaks past
+        // the clamp on its own, the two sides diverge and this fails.
+        std::printf("        open ocean: %zu provinces over the %zu-tile clamp, %zu tiles of"
+                    " excess, absorption accounts for %zu; %zu sit exactly ON it\n",
+                    over_pref[2], k_sea_province_max_tiles, excess_by_kind[2],
+                    absorbed_by_kind[2], at_clamp);
+        check(excess_by_kind[2] == absorbed_by_kind[2],
+              "W1  every open-ocean tile above Ben's 80-tile clamp arrived by absorption"
+              " (growth's clamp holds)");
+
+        // W2 — the shallows are on land's pair, hard cap included, so the cap
+        // Ben set for a province is asserted over water as well as over land.
+        std::printf("        coastal water: %zu provinces over the %zu-tile preference, %zu"
+                    " tiles of excess, absorption accounts for %zu; largest %zu (hard cap"
+                    " %zu)\n",
+                    over_pref[1], k_province_max_tiles, excess_by_kind[1], absorbed_by_kind[1],
+                    grand_hi[1], k_province_hard_cap_tiles);
+        check(excess_by_kind[1] == absorbed_by_kind[1],
+              "W2a every coastal-water tile above the PREFERRED ceiling arrived by absorption");
+        check(grand_hi[1] <= k_province_hard_cap_tiles,
+              "W2b no coastal-water province exceeds the HARD CAP (20 tiles), as on land");
+
+        // W3 — water was actually partitioned. Guards against the whole section
+        // silently measuring an empty set if the domain masks ever go wrong.
+        check(grand_n[1] > 0 && grand_n[2] > 0,
+              "W3  both water domains produced provinces (the sweep measured something)");
     }
 
     // -----------------------------------------------------------------------

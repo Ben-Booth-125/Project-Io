@@ -33,9 +33,13 @@ const char* placement_reason_text(placement_reason r)
     return "Cannot build here";
 }
 
-bool is_ocean_tile(terrain_composition comp)
+bool is_water_tile(terrain_substrate sub)
 {
-    return comp == terrain_composition::ocean;
+    // BL-516: delegates to the terrain-level predicate so there is ONE
+    // definition of "is this water". Renamed from `is_ocean_tile` in the same
+    // change: since water gained kinds, a function called `is_ocean_tile` that
+    // answers true for a lake is a lie waiting to be believed.
+    return is_water(sub);
 }
 
 bool is_extractable(resource_type r)
@@ -75,7 +79,7 @@ resource_type richest_extractable(const tile_component& tc, bool& any)
 bool can_place_population_centre(const tile_component& tc)
 {
     // Ocean tiles never host population centres.
-    if (is_ocean_tile(tc.composition))
+    if (is_water_tile(tc.substrate))
         return false;
     // Uninhabitable tiles (hazard-dominated, airless, etc.) are also excluded.
     return tc.habitability > 0.0f;
@@ -84,7 +88,7 @@ bool can_place_population_centre(const tile_component& tc)
 placement_result can_place_road(const tile_component& tc, std::uint8_t tier)
 {
     // No road on water — roads are land infrastructure.
-    if (is_ocean_tile(tc.composition))
+    if (is_water_tile(tc.substrate))
         return placement_reason::ocean;
     // Upgrade-in-place (BL-172): a tile already carrying an equal-or-better road is a no-op — you
     // can raise a Track to a Road/Highway, but not re-lay the same or a lower tier. Reject rather
@@ -97,7 +101,7 @@ placement_result can_place_road(const tile_component& tc, std::uint8_t tier)
 placement_result can_place(const tile_component& tc, building_type type, resource_type target)
 {
     // No building ever sits on water.
-    if (is_ocean_tile(tc.composition))
+    if (is_water_tile(tc.substrate))
         return placement_reason::ocean;
 
     switch (type)
@@ -108,7 +112,7 @@ placement_result can_place(const tile_component& tc, building_type type, resourc
             // BL-366: an urban tile is built over — no new extraction or
             // ambient-resource placement. Sites already standing when the
             // transform fired are grandfathered (this only gates NEW placement).
-            if (tc.composition == terrain_composition::urban)
+            if (tc.cover == terrain_cover::urban)
                 return placement_reason::no_deposit;
             if (is_extractable(target)
                 && tc.resource_deposit[static_cast<std::size_t>(target)] > 0.0f)
@@ -193,7 +197,12 @@ bool is_coastal(const world& w, entity_id tile_id)
             if (nid == null_entity)
                 continue;
             const auto nit = w.tiles.find(nid);
-            if (nit != w.tiles.end() && is_ocean_tile(nit->second.composition))
+            // BL-516: SEA, not merely water. `is_coastal` gates ports, the
+            // Fishing Wharf and coastal-only extraction — a lakeshore is not a
+            // coast, and now the data can say so. This is the one place the
+            // narrowing changes an answer the old code gave; every other water
+            // test here is widened to `is_water` and answers exactly as before.
+            if (nit != w.tiles.end() && is_sea(nit->second.substrate))
                 return true;
             continue;
         }
@@ -203,7 +212,7 @@ bool is_coastal(const world& w, entity_id tile_id)
         {
             if (ntc.body == body && ntc.grid_x == ncol && ntc.grid_y == nrow)
             {
-                if (is_ocean_tile(ntc.composition))
+                if (is_sea(ntc.substrate)) // BL-516: sea, not lake — see above
                     return true;
                 break;
             }
@@ -294,7 +303,7 @@ placement_result can_place_in_world(const world& w, entity_id tile_id,
     // to refuse, and the terrain reasons above teach the player more.
     //
     // BL-366: non-extraction occupancy is counted in aggregate (every type
-    // combined) against the composition's cap, not per building type — the cap
+    // combined) against the tile's cap, not per building type — the cap
     // bounds the whole non-extraction stack, which is what fires the urban
     // transform.
     const int occupancy = (type == building_type::extraction_site)
@@ -346,42 +355,88 @@ float stack_output_scalar(int rank)
 int stack_capacity(const tile_component& tc, building_type type, resource_type target)
 {
     if (type != building_type::extraction_site)
-        return non_extraction_stack_cap(tc.composition);
+        return non_extraction_stack_cap(tc.substrate, tc.cover);
 
     const float richness = tc.resource_deposit[static_cast<std::size_t>(target)];
     const int   cap      = static_cast<int>(richness / k_richness_per_site);
     return cap < 1 ? 1 : cap;
 }
 
-// BL-366: authored per-composition non-extraction ceiling (first cut, a tuning
-// table not a hardcoded rule — see the item's design for the rationale behind
-// each band). Grassland/Forest/Wetland are the settlement-favoured compositions
-// (POPULATION.md); Volcanic/Icy already carry TILES.md's lowest habitability
-// ceiling; Ocean is exempt (can_place already refuses buildings there).
-int non_extraction_stack_cap(terrain_composition composition)
+// BL-366's non-extraction ceiling, SPLIT BY MEANING (BL-519).
+//
+// The pre-split table was one number per composition, and that hid the two
+// separate questions it was answering: how much weight will the GROUND take, and
+// how much does what is GROWING ON IT get in the way. Splitting them is what lets
+// a forested rocky upland be harder to build on than the bare rock beside it,
+// which the single slot could not say.
+//
+// CALIBRATED, not re-tuned. Every pre-split composition reproduces its old number:
+//
+//   old composition   substrate     cover    base + modifier = cap   (was)
+//   ---------------   -----------   ------   ---------------------   -----
+//   grassland         sedimentary   grass      6 +  0 =  6              6
+//   forest            sedimentary   forest     6 +  0 =  6              6
+//   wetland           sedimentary   marsh      6 +  0 =  6              6
+//   tundra            sedimentary   scrub      6 - 3 =  3               3
+//   barren            barren        none       4 +  0 =  4              4
+//   rocky             rocky         none       4 +  0 =  4              4
+//   regolith          regolith      none       4 +  0 =  4              4
+//   metallic          metallic      none       4 +  0 =  4              4
+//   volcanic          volcanic      none       2 +  0 =  2              2
+//   icy               icy           none       2 +  0 =  2              2
+//   urban             (any)         urban     12 (pinned)              12
+//   ocean             ocean         none       0 (pinned)               0
+//
+// Grassland/Forest/Wetland are the settlement-favoured ground (POPULATION.md);
+// Volcanic/Icy carry TILES.md's lowest habitability ceiling; Ocean is exempt
+// (can_place already refuses buildings there).
+int non_extraction_stack_cap(terrain_substrate sub, terrain_cover cov)
 {
-    switch (composition)
+    // Two pins that short-circuit the ground entirely, and both are real rather
+    // than convenient. Water takes nothing. Urban is BL-366's terminal state, and
+    // since Ben made urban a COVER (2026-08-21) it now sits on top of a substrate
+    // that survives it — so the cap must come from the paving, not from the
+    // geology the city happens to stand on.
+    if (is_water(sub)) // BL-516: every water kind takes nothing
+        return 0;
+    if (cov == terrain_cover::urban)
+        return 12; // Soft-bounded in practice by workforce contention, not this number.
+
+    int base = 4;
+    switch (sub)
     {
-        case terrain_composition::grassland:
-        case terrain_composition::forest:
-        case terrain_composition::wetland:
-            return 6;
-        case terrain_composition::tundra:
-            return 3;
-        case terrain_composition::barren:
-        case terrain_composition::rocky:
-        case terrain_composition::regolith:
-        case terrain_composition::metallic:
-            return 4;
-        case terrain_composition::volcanic:
-        case terrain_composition::icy:
-            return 2;
-        case terrain_composition::urban:
-            return 12; // Soft-bounded in practice by workforce contention, not this number.
-        case terrain_composition::ocean:
-        default:
-            return 0;
+        case terrain_substrate::sedimentary: base = 6; break;
+        case terrain_substrate::barren:
+        case terrain_substrate::rocky:
+        case terrain_substrate::regolith:
+        case terrain_substrate::metallic:    base = 4; break;
+        case terrain_substrate::volcanic:
+        case terrain_substrate::icy:         base = 2; break;
+        case terrain_substrate::ocean: // BL-516: unreachable — the is_water guard
+        case terrain_substrate::coast: // above returns first; listed so the
+        case terrain_substrate::lake:        return 0; // switch stays total.
     }
+
+    // The cover's own contribution. Scrub costs 3 on soil because that pair IS the
+    // old tundra row — thin, cold ground was never as buildable as the meadow next
+    // to it, and the pre-split table said so with a 3. Everywhere else a cover is
+    // something to clear rather than something that changes what the ground bears,
+    // so it costs at most one slot and never takes the tile below 1.
+    int mod = 0;
+    switch (cov)
+    {
+        case terrain_cover::scrub:  mod = (sub == terrain_substrate::sedimentary) ? -3 : -1; break;
+        case terrain_cover::forest: mod = (sub == terrain_substrate::sedimentary) ?  0 : -1; break;
+        case terrain_cover::marsh:  mod = (sub == terrain_substrate::sedimentary) ?  0 : -1; break;
+        case terrain_cover::snow:
+        case terrain_cover::dunes:
+        case terrain_cover::ash:    mod = -1; break;
+        case terrain_cover::grass:
+        case terrain_cover::salt:
+        case terrain_cover::none:
+        case terrain_cover::urban:  mod = 0; break;
+    }
+    return std::max(1, base + mod);
 }
 
 int non_extraction_buildings_on_tile(const world& w, entity_id tile_id)
@@ -401,17 +456,22 @@ bool maybe_transform_to_urban(world& w, entity_id tile_id)
     if (it == w.tiles.end())
         return false;
     tile_component& tc = it->second;
-    if (tc.composition == terrain_composition::urban
-        || tc.composition == terrain_composition::ocean)
+    if (tc.cover == terrain_cover::urban || is_water(tc.substrate)) // BL-516
         return false;
-    if (non_extraction_buildings_on_tile(w, tile_id) >= non_extraction_stack_cap(tc.composition))
+    if (non_extraction_buildings_on_tile(w, tile_id) >= non_extraction_stack_cap(tc.substrate, tc.cover))
     {
-        tc.composition = terrain_composition::urban;
+        // THE TRANSFORM NOW WRITES ONE AXIS, AND THAT IS THE BUG BL-519 FIXED.
+        // Before the split this line overwrote the composition, so paving a
+        // metallic tile destroyed the fact that it was metallic — a slot conflict
+        // that had already shipped. Urban is a COVER (Ben, 2026-08-21): the city
+        // still erases what GREW here, and the geology underneath survives it.
+        tc.cover         = terrain_cover::urban;
+        tc.cover_density = k_cover_density_max; // paved is not "sparsely paved"
         // Urban carries the same High habitability ceiling as the
-        // settlement-favoured compositions it supersedes (grassland/forest,
+        // settlement-favoured ground it supersedes (grass/forest on sedimentary,
         // derive_environment in tile_generation.cpp) — established
         // infrastructure, not raw terrain, now bounds who can live here. Raised,
-        // never lowered: a marginal composition (tundra/volcanic/icy) that built
+        // never lowered: marginal ground (scrub/volcanic/icy) that built
         // up to urban should not be stuck at its pre-transform ceiling.
         tc.habitability = std::max(tc.habitability, 0.80f);
         return true;

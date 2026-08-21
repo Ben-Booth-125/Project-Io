@@ -59,16 +59,33 @@ int clampi(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
 ///     count stands in for it, applied by the caller rather than per tile.
 int agrarian_score(const tile_component& t)
 {
+    // WHAT GROWS HERE sets the score; WHAT THE GROUND IS decides how much of it
+    // is real (BL-519). A cradle needs soil, and the pre-split model could not say
+    // "forested, but on rock" — so it scored a forested crag as a cradle.
     int score = 0;
-    switch (t.composition)
+    switch (t.cover)
     {
-        case terrain_composition::grassland: score = 70; break; // The staple cradle.
-        case terrain_composition::wetland:   score = 80; break; // Floodplain — see the BL-170 note.
-        case terrain_composition::forest:    score = 45; break; // Clearable, but costly.
-        case terrain_composition::tundra:    score = 10; break;
-        case terrain_composition::rocky:     score =  5; break;
-        default:                             return 0;          // Ocean, ice, barren, regolith, metallic, volcanic.
+        case terrain_cover::grass:  score = 70; break; // The staple cradle.
+        case terrain_cover::marsh:  score = 80; break; // Floodplain — see the BL-170 note.
+        case terrain_cover::forest: score = 45; break; // Clearable, but costly.
+        case terrain_cover::scrub:  score = 10; break; // The old `tundra` row.
+        default:                    score =  0; break;
     }
+
+    switch (t.substrate)
+    {
+        // Real soil — every pre-split number reproduced exactly.
+        case terrain_substrate::sedimentary:
+            break;
+        // Vegetation on rock: a third, and bare rock keeps its old 5.
+        case terrain_substrate::rocky:
+            score = score > 0 ? score / 3 : 5;
+            break;
+        default:
+            return 0; // Ocean, ice, barren, regolith, metallic, volcanic.
+    }
+    if (score <= 0)
+        return 0;
 
     switch (t.landform)
     {
@@ -182,14 +199,15 @@ history_ladder_state run_history_ladder(const planetology_state& pl,
         const tile_component* t = tile_at(w, tile_ids, i);
         if (!t) continue;
 
-        if (t->composition == terrain_composition::ocean)
+        if (is_water(t->substrate)) // BL-516
         {
             ++ocean_tiles;
         }
         else
         {
             ++land_tiles;
-            resistance_sum += terrain_resistance(t->composition, t->landform);
+            resistance_sum += terrain_resistance(t->substrate, t->cover, t->cover_density,
+                                                 t->landform);
         }
 
         score[i] = agrarian_score(*t);
@@ -241,7 +259,7 @@ history_ladder_state run_history_ladder(const planetology_state& pl,
                 taken[j] = 1;                              // Claim the neighbourhood.
                 if (score[j] >= 60) ++basin;
                 const tile_component* t = tile_at(w, tile_ids, j);
-                if (t && t->composition == terrain_composition::ocean) coastal = 1;
+                if (t && is_water(t->substrate)) coastal = 1; // BL-516
             }
         }
 

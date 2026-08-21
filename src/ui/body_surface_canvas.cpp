@@ -1135,6 +1135,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         state.planetary_pan_x = (grid_cx - lc.x) * zoom;
         state.planetary_pan_y = (grid_cy - lc.y) * zoom;
         state.planetary_center_pending = false;
+        // Publish where that tile just landed on screen (BL-521). The transform is
+        // only fully known here, so this is the one honest source for "the screen
+        // point that is tile (col,row)" — the verify harness's click injection
+        // reads it instead of re-deriving title_h / hex_size / pan in Lua.
+        state.planetary_center_screen = canvas_centre;
     }
 
     const ImVec2 view_origin = ImVec2{ canvas_centre.x + state.planetary_pan_x,
@@ -1700,6 +1705,35 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     constexpr float k_lod_radius_px = 7.0f;
     const bool      coarse_fill     = draw_r <= k_lod_radius_px;
 
+    // --- Terrain texture strength (BL-520) --------------------------------------
+    // Texture gets its OWN level-of-detail bound, and a stricter one than the fill
+    // LOD above. The coarse-fill threshold asks "is the corner cut still drawable"
+    // and answers 7 px. A texture asks a harder question: a *sampled pattern* at
+    // hex scale is not merely invisible when it is too small, it is MOIRE — the
+    // marks of adjacent tiles beat against the pixel grid and the map crawls. So
+    // the pass is off entirely below 14 px of drawn circumradius and ramps to full
+    // strength at 22 px (texture_lod_scale, hex_render.hpp, where the 14 is
+    // derived from the 0.20*r mark size needing ~2 px of extent).
+    //
+    // LENS DECISION (BL-520 open question 1): texture SURVIVES every lens, at
+    // 0.45 strength. Two reasons it survives rather than being replaced. First,
+    // the precedent is already set one channel over — BL-231's landform relief is
+    // composited AFTER the lens tint on exactly the argument that terrain facts
+    // stay true under an overlay, and "this ground is closed-canopy forest" is the
+    // same class of fact as "this ground is a mountain". Second, replacing it would
+    // make every lens a different map rather than the same map read differently,
+    // which is the property the lens bar depends on.
+    //
+    // It is ATTENUATED rather than left at full because a lens fill is a
+    // categorical claim and must stay the loudest thing on the tile; and because
+    // the marks derive their ink from the lens fill itself (texture_ink), so at
+    // 0.45 they read as shading on the lens colour instead of as dirt over it —
+    // which was the exact failure mode the open question named.
+    constexpr float k_texture_lens_strength = 0.45f;
+    const float     texture_strength =
+        texture_lod_scale(draw_r)
+        * (state.overlay == overlay_mode::none ? 1.0f : k_texture_lens_strength);
+
     // --- Infinite horizontal scroll ---
     // The grid is a cylinder: column gw wraps onto column 0. In screen space the
     // grid repeats every `period_px = gw * col_step * zoom`. Each tile is drawn
@@ -1750,7 +1784,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         const ImU32  owner_col  = has_owner ? corp_identity(corp_it->second)
                                             : IM_COL32(255, 255, 255, 255);
         ImU32 fill = built ? built_plate_colour(has_owner, owner_col)
-                           : terrain_colour(tile.composition);
+                           : terrain_colour(tile.substrate, tile.cover, tile.cover_density);
         if (state.overlay == overlay_mode::country)
         {
             const auto nat_it = w.tile_to_nation.find(id);
@@ -1968,7 +2002,18 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         const bool ct_built = built_tiles.find(cid) != built_tiles.end();
         const bool ct_seen  = survey_tile_visible(body.survey, gw, gh, ct.grid_x, ct.grid_y)
                               || god_view_lift;
-        sh.blend = lens_blends && !ct_built && ct_seen && sh.province != 0;
+        //
+        // WATER IS EXCLUDED EXPLICITLY (BL-516). It used to fall out of
+        // `province != 0` for free, because the partition covered land only —
+        // and that accident is what has been keeping the coastline crisp. Sea
+        // tiles carry provinces now, so the exclusion has to be stated. It is
+        // stated rather than dropped deliberately: a province never spans land
+        // and water, so blending water WOULD still leave the shoreline hard, but
+        // it would change how the sea reads, and that is a look nobody has seen
+        // yet. This change ships the pre-BL-516 rendering unchanged; softening
+        // the sea is a separate, visually-reviewed call.
+        sh.blend = lens_blends && !ct_built && ct_seen && sh.province != 0
+                   && !is_water(ct.substrate);
     }
 
     for (int t_row = row_lo; t_row <= row_hi; ++t_row)
@@ -2133,6 +2178,23 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 prim_blended_hex(dl, blend_verts, { cx, cy }, fill, corner_col);
             else
                 dl->AddConvexPolyFilled(verts, 6, fill);
+
+            // Terrain texture (BL-520). Immediately after the fill and BEFORE the
+            // province edge stroke, so the stroke stays the topmost ground mark
+            // and a province border is never broken up by a canopy tick.
+            //
+            // Gated on `revealed`: a cover pattern IS terrain information, and
+            // drawing it through the survey mask would leak the shape of ground
+            // the player has not paid to survey (DISCOVERY.md's geographic fog).
+            // Gated on `!built`: a built hex is swapped wholesale for its owner
+            // plate as an identity signal — that plate is not ground, and texturing
+            // it would read as terrain showing through a building.
+            // Never drawn under `coarse_fill`, which is implied: coarse_fill needs
+            // draw_r <= 7 and texture_strength is 0 below draw_r 14.
+            if (revealed && !built && texture_strength > 0.0f)
+                draw_tile_texture(dl, { cx, cy }, draw_r, tile.grid_x, tile.grid_y,
+                                  tile.substrate, tile.cover, tile.cover_density,
+                                  fill, texture_strength);
 
             // Province edge (BL-511). Every side facing a DIFFERENT province takes
             // a faint dark stroke. Deliberately faint: Ben ruled for softened
@@ -2575,7 +2637,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // tiles (suppressed above).
             if ((state.overlay == overlay_mode::population ||
                  state.overlay == overlay_mode::opportunity) &&
-                !placement_rules::is_ocean_tile(tile.composition))
+                !placement_rules::is_water_tile(tile.substrate))
             {
                 float t = 0.0f; // body-relative rank, [0, 1], red(low) -> green(high)
                 if (state.overlay == overlay_mode::population)

@@ -134,7 +134,7 @@ void draw_tile_summary(const world& w, entity_id id)
 
     // Coordinate + terrain header, mirroring the surface-canvas hover tooltip.
     ImGui::Text("[%d, %d]", tile.grid_x, tile.grid_y);
-    ImGui::Text("%s \xc2\xb7 %s", composition_name(tile.composition),
+    ImGui::Text("%s \xc2\xb7 %s", terrain_name(tile).c_str(),
                                   landform_name(tile.landform));
     ImGui::Text("Hazard: %.2f", tile.hazard_level);
     ImGui::Text("Habitability: %.2f", tile.habitability);
@@ -181,7 +181,7 @@ void draw_building_summary(const world& w, entity_id id)
     {
         const tile_component& t = tile_it->second;
         ImGui::Text("Tile [%d, %d]  %s", t.grid_x, t.grid_y,
-                    composition_name(t.composition));
+                    terrain_name(t).c_str());
     }
 
     // Read-only workforce display (BL-031).

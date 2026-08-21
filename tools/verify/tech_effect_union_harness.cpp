@@ -241,7 +241,7 @@ entity_id add_iron_tile(world& w, entity_id body, int gx, float remaining)
     tc.body        = body;
     tc.grid_x      = gx;
     tc.grid_y      = 0;
-    tc.composition = terrain_composition::rocky;
+    tc.substrate = terrain_substrate::rocky;
     tc.landform    = terrain_landform::plains;
     tc.resource_deposit[ri(resource_type::iron_ore)]   = 2.0f;
     tc.resource_remaining[ri(resource_type::iron_ore)] = remaining;

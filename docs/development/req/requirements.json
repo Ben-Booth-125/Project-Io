@@ -4876,6 +4876,57 @@
      "result_metric": null
     }
    ]
+  },
+  {
+   "brief": "tile-axis-split",
+   "batch": "2026-08-21-tile-axes",
+   "title": "BL-519 - terrain_composition split into substrate x cover (Sprint P1)",
+   "status": "complete",
+   "promoted_from": "backlog.json BL-519 TILE_AXIS_SPLIT",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "ITEM-SPANNING (headless): a tile carries three orthogonal axes - terrain_substrate, terrain_cover (none included, graded by cover_density) and the unchanged terrain_landform - and the pair the pre-split model could not express is REAL: a rocky tile carrying a forest yields BOTH timber (from the cover) and iron (from the substrate) on a generated world.",
+     "result_metric": "tile_axes_harness A5c/A5d: 366 composite tiles on the shipped homeworld, 110 carrying both timber and iron. ALL PASS (13 checks, 0 failures)."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "cover_density is 0 if and only if cover is none, on every generated tile. Stated as an invariant in components.hpp, so asserted rather than trusted.",
+     "result_metric": "tile_axes_harness A1: 0 violations across 15,120 tiles."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "THE SHIPPED BUG IS FIXED: maybe_transform_to_urban no longer destroys the geology. A metallic tile that fills its stack becomes urban AND STAYS METALLIC. This is the assertion that would have failed before the item.",
+     "result_metric": "tile_axes_harness A2a-A2e: transform fires, cover==urban, substrate==metallic preserved, density pinned at 255, urban cap 12 applies on any ground."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "REFACTOR, NOT RE-TUNE: all eleven pre-split compositions reproduce their pre-BL-519 terrain_defence, terrain_attrition and non_extraction_stack_cap EXACTLY, at the (substrate, cover, density) triple each decomposes into.",
+     "result_metric": "tile_axes_harness A3/A4 (11 rows each, 0 mismatches); multi_building_tile_harness R1 (12 rows) and R1b (the three new pairs)."
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "requirement": "NO STREAM DRIFT: the Pass 4a biome tables consume RNG draw-for-draw as before, and Pass 4c decomposition and Pass 4d cover refinement consume none. Evidence must be an INDEPENDENT measurement, not an inspection of the code.",
+     "result_metric": "earthlike_tile_census over 120 seeds is BIT-IDENTICAL to the pre-split baseline. world_audit's Kepler forest/wetland counts unchanged at 711/654."
+    },
+    {
+     "id": "R6",
+     "status": "complete",
+     "requirement": "Determinism: two generations at one seed produce byte-identical substrate, cover, density and landform.",
+     "result_metric": "tile_axes_harness A6; world_determinism ALL PASS with the digest widened to fold BOTH axes and the density."
+    },
+    {
+     "id": "R7",
+     "status": "pending",
+     "requirement": "VISUAL (owed): the map still reads correctly. terrain_colour is now a substrate base blended toward a cover endpoint by density, calibrated so grassland/forest/wetland/tundra render at their EXACT pre-split RGB. The generation ledger shows two histograms where it showed one, and the wizard preview globe samples packed axes.",
+     "result_metric": "NOT RUN - this container cannot build the GUI (SDL3/ImGui blocked by the proxy, no display). Arithmetic verified offline; src/ui is g++ -fsyntax-only clean against real ImGui headers. See NR-451."
+    }
+   ]
   }
  ]
 }

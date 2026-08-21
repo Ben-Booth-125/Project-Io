@@ -62,14 +62,14 @@ struct scene
 };
 
 entity_id make_tile(world& w, entity_id body, int gx, int gy,
-                    terrain_composition comp, float iron_richness)
+                    terrain_substrate sub, float iron_richness)
 {
     const entity_id t = w.create_entity();
     tile_component tc{};
     tc.body        = body;
     tc.grid_x      = gx;
     tc.grid_y      = gy;
-    tc.composition = comp;
+    tc.substrate = sub;
     tc.landform    = terrain_landform::plains;
     if (iron_richness > 0.0f)
     {
@@ -108,12 +108,12 @@ scene make_scene(float ai_cash)
         w.bodies[s.hidden] = b;
     }
 
-    s.t_rich   = make_tile(w, s.body, 0, 0, terrain_composition::rocky, 1.0f);
-    s.t_ocean  = make_tile(w, s.body, 1, 0, terrain_composition::ocean, 0.0f);
-    make_tile(w, s.body, 2, 0, terrain_composition::rocky, 0.0f); // poor filler
-    const entity_id t_ai = make_tile(w, s.body, 3, 0, terrain_composition::rocky, 0.5f);
-    const entity_id t_pl = make_tile(w, s.body, 0, 1, terrain_composition::rocky, 0.5f);
-    s.t_hidden = make_tile(w, s.hidden, 0, 0, terrain_composition::rocky, 1.0f);
+    s.t_rich   = make_tile(w, s.body, 0, 0, terrain_substrate::rocky, 1.0f);
+    s.t_ocean  = make_tile(w, s.body, 1, 0, terrain_substrate::ocean, 0.0f);
+    make_tile(w, s.body, 2, 0, terrain_substrate::rocky, 0.0f); // poor filler
+    const entity_id t_ai = make_tile(w, s.body, 3, 0, terrain_substrate::rocky, 0.5f);
+    const entity_id t_pl = make_tile(w, s.body, 0, 1, terrain_substrate::rocky, 0.5f);
+    s.t_hidden = make_tile(w, s.hidden, 0, 0, terrain_substrate::rocky, 1.0f);
 
     s.market = w.create_entity();
     {

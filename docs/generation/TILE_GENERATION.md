@@ -203,12 +203,39 @@ ensures band boundaries are irregular rather than sharp horizontal lines.
 
 ---
 
-### Pass 4 — Composition assignment
+### Pass 4 — Biome, then the axes it decomposes into
 
-Each non-ocean land tile receives a `terrain_composition` by looking up
+**Restructured by BL-519 (2026-08-21), and the sub-pass names below are the
+current ones.** What this pass produces is no longer one enum but three axes —
+`terrain_substrate` × `terrain_cover` (+ `cover_density`) × the unchanged
+`terrain_landform`. See `docs/economy/TILES.md` § Three-axis terrain model.
+
+- **4a — biome.** The `(temperature_band, moisture_value)` table below, unchanged
+  in its values and in its RNG consumption draw for draw. It now returns an
+  internal `biome` — the same twelve-valued vocabulary the world used to store,
+  under a name that admits it was never one axis.
+- **4b — drainage** (BL-338, pre-existing). Still operates on the biome.
+- **4c — decompose.** `decompose_biome` maps each biome to
+  (substrate, cover, density). **Consumes no RNG stream** — density varies through
+  a stateless fold.
+- **4d — cover refinement.** The only genuinely new terrain behaviour: it dresses
+  ground the biome table left **bare** (a forest on a wet rocky upland, snow on
+  cold high ground, dunes on dry barren) and never rewrites a substrate. Also no
+  stream.
+- **4e — water kinds** (BL-516). Classifies water structurally into lake / coast /
+  open ocean by flood fill. Also no stream, and it writes a separate reported
+  substrate so Passes 5 and 6 still see the coarse `ocean` they were written
+  against.
+
+That structure is what makes the split auditable: every downstream pass sees the
+draws it saw before, so anything that moved is attributable to the new cover axis
+rather than to stream drift. The evidence is a measurement — the 120-seed
+`earthlike_tile_census` is bit-identical to the pre-split baseline.
+
+Each non-ocean land tile receives a biome by looking up
 `(temperature_band, moisture_value)` in the table below.
 
-**Bodies with `atmosphere_class == none` or `thin`** skip habitable compositions
+**Bodies with `atmosphere_class == none` or `thin`** skip habitable biomes
 (grassland, forest, wetland). The moisture axis still applies to choose among the
 available inorganic types.
 
@@ -509,16 +536,75 @@ defined in history."*
 | Boundaries are rivers, elevation difference, and sometimes roads — but **a road binds** | Integer edge cost `base 10 + river 40 + round(\|Δheight\| × 683) + jitter 0–4`, the whole sum divided by 4 when both tiles are roaded |
 | Identity is the **lowest-id member tile** | Derived, never allocated — so an id cannot be handed out in the wrong order, and nothing new is serialised |
 | Country no centre reaches becomes **hinterland** | Seeds chosen from the least-accessible tile onward at a minimum spacing of 3, all chosen before any grows |
-| 7–12 soft, 3–12 hard, boundaries win ties; **tiny provinces are kept** | 12 is the one hard clamp; a region takes its first 3 tiles at any cost, then grows to its budget, then annexes only ground no harder to reach than what it already holds. Nothing is ever merged away |
+| 7–12 soft, 3–12 hard, boundaries win ties; **tiny provinces are kept** | A region takes its first 3 tiles at any cost, then grows to its budget, then annexes only ground no harder to reach than what it already holds. Nothing is ever merged away |
+| **12 is a PREFERENCE; 20 is the hard cap** (Ben, 2026-08-21, NR-438) | Growth clamps at 12, but singleton absorption can carry a full region past it. The bound that is *asserted* is 20 (`k_province_hard_cap_tiles`); the over-12 share is **reported**, never asserted |
+
+**The ceiling was raised on 2026-08-21**, and the reason is worth keeping: pass 3
+absorbs a one-tile province into its **cheapest** neighbour, and that neighbour may
+already hold 12. The three ways out were clamping (dishonest), preferring a
+roomier neighbour (which contradicts the cheapest-edge rule the growth model is
+*expressed in*), or raising the bound. Ben raised the bound — *"we prefer up to 12
+tiles, but up to 20 is permitted in rare cases"* — so the cheapest-edge rule
+survives intact, which is what the ruling was chosen to protect. The prefer-room
+variant was measured (241 over the preference, max 14) and then deleted; the
+breach was its only justification.
 
 **Elevation is why BL-517 exists.** The pass reads `tile_component::height` — the
 retained Pass 1 heightmap — not the seven landform classes, whose numeric order
 means nothing. That field graduated out of the disposable-intermediate set
 precisely for this consumer (`GENERATION_LEDGER.md` § Data lifetime).
 
-**Ocean is out of scope**; provinces over water are BL-516. Until then the
-land-only invariant stands as written, narrowed to land provinces rather than
-deleted (NR-428).
+### Provinces over water (BL-516, landed 2026-08-21)
+
+Ben: *"We can also draw provinces over the ocean, using 3-12 size coastal tile
+provinces. Ocean provinces should be much larger, but not larger than say 80
+tiles."* The partition now runs **the same algorithm three times**, over three
+exclusive tile sets, and a province never spans two of them:
+
+| Domain | Tiles | Growth clamp | Hard cap | Seed spacing | Seeded by |
+|---|---|---|---|---|---|
+| Land | everything not water | 12 (preferred) | 20 | 3 | population centres, then hinterland |
+| Coastal water | `coast` + `lake` | 12 (preferred) | 20 | 3 | hinterland only |
+| Open ocean | `ocean` | **80** | — (see below) | 7 | hinterland only |
+
+**The land-only invariant is narrowed, not deleted** (NR-428). Land provinces are
+still hex-connected land that never spans water; the general claim that survives —
+and that the harness now asserts as P2b — is that **a province holds exactly one
+domain**, which is strictly stronger, since it also forbids a lake joining the sea.
+
+**Open ocean has no separate hard cap, deliberately.** Land needed one because Ben
+ruled a preference (12) and a bound (20) as two different numbers; for the sea he
+named one number. Inventing a second would invent a threshold nobody chose, so
+what carries the 80 instead is the exact identity the harness asserts: *every tile
+above it arrived by singleton absorption, never by growth.*
+
+**The sea spacing is measurement-pinned, and the pin rule is "the cap must stay a
+guard, not a clamp."** Seeds at separation *d* tile a plane in cells of area
+(√3/2)·*d*², so the lattice predicts a mean size; where growth is running into the
+ceiling instead of meeting its neighbours, the measured mean falls away from that
+prediction and provinces pile up on the clamp exactly:
+
+| d | ideal cell | measured mean | max | exactly on the 80 | provinces |
+|---|---|---|---|---|---|
+| 6 | 31.2 | 32.17 | 75 | 0 (0.0%) | 2,901 |
+| **7** | **42.4** | **41.07** | **82** | **26 (1.1%)** | **2,272** |
+| 8 | 55.4 | 49.29 | 83 | 207 (10.9%) | 1,893 |
+| 9 | 70.1 | 55.25 | 83 | 507 (30.0%) | 1,689 |
+
+At *d* = 8 one province in nine sits exactly on 80 — the clamp is drawing the size
+rather than guarding it. At *d* = 7 the measured mean still matches its lattice
+prediction, which is the evidence that terrain and spacing set the size. 41 tiles
+against land's 8.6 is also "much larger" by nearly five times.
+
+**Nothing can be in a sea province yet**, and that is expected rather than a gap:
+units are land-bound (`march_unit` refuses a water destination outright), buildings
+refuse water, and a sea province sustains zero buildings. They are addressable
+empty space — built without inventing a naval model to justify them.
+
+**Open question for Ben:** a **lake** is currently partitioned on the coastal band,
+as its own province. Ben named lakes as a tile kind but did not rule what province a
+lake belongs to (its own, the surrounding land province, or a coastal one). Its own
+was chosen because it invents no new size rule and keeps the one-domain invariant.
 
 **The measured distribution, 6 seeds** (`tools/verify/province_partition_harness.cpp`,
 sections C and D — which is also the re-pinning instrument for the two
@@ -527,12 +613,22 @@ measurement-pinned coefficients):
 | Partition | provinces | min | max | mean | < 7 | < 3 | > 12 | % in 7–12 |
 |---|---|---|---|---|---|---|---|---|
 | 3×3 blocks (superseded) | 21,161 | 1 | 18 | 9.11 | 109 | — | 336 | 97.90% |
-| BL-515 organic | 24,498 | 1 | 12 | 7.87 | 6,195 | 3,008 | 0 | 74.71% |
+| BL-515 organic, pre-absorption | 24,498 | 1 | 12 | 7.87 | 6,195 | 3,008 | 0 | 74.71% |
+| BL-515 organic, **shipped** (with absorption) | 22,390 | 1 | **16** | 8.61 | 4,098 | 913 | 1,096 | 76.80% |
 
 The spread is wider **on purpose** and is reported rather than tuned: organic
-borders are irregular, the 12-tile ceiling is now absolute where the block
-partition's merge could overshoot it, and the sub-floor tail is the pockets a
-hard ceiling leaves behind — kept by ruling, not repaired.
+borders are irregular, and the sub-floor tail is the pockets a ceiling leaves
+behind — kept by ruling, not repaired.
+
+Read the shipped row against the hard cap, not against 12. **Max 16 against a cap
+of 20**, so the bound holds with four tiles of headroom, and **4.90% sit above the
+preferred 12**. Absorption is what moved every one of those numbers: it converted
+2,098 one-tile provinces into member tiles of their cheapest neighbour, which is
+why the count fell, the mean rose, and the sub-floor tail more than halved. The
+harness asserts the cap and the accounting identity (every tile above 12 arrived
+by absorption, so growth's own clamp is still proven separately) and **reports**
+the 4.90% — whether that counts as "rare" is Ben's judgement against a number, and
+no threshold for it has been chosen.
 
 ---
 
@@ -603,19 +699,21 @@ identity.
   composition before deposits (Pass 6). Landform (Pass 5) runs before deposits,
   since deposit modifiers are landform-dependent.
 - **Colour table** — `terrain_colour()` now lives in `src/ui/hex_render.hpp`
-  (moved out of `body_surface_canvas.cpp`), keyed on `terrain_composition` (the
-  11-value enum). **Superseded (2026-07-31, BL-231/BL-232):** landform *is* now
+  (moved out of `body_surface_canvas.cpp`). **Since BL-519** it is keyed on the
+  `(substrate, cover, density)` triple: a substrate base blended toward a cover
+  endpoint by density, calibrated so the four canonical covers render at their
+  exact pre-split RGB. **Superseded (2026-07-31, BL-231/BL-232):** landform *is* now
   rendered — a subtle relief tint (`landform_relief`, `src/ui/hex_render.cpp`)
-  over the composition colour, plus always-on glyphs for the four dramatic
+  over the terrain colour, plus always-on glyphs for the four dramatic
   landforms (mountain, canyon, crater, rift — `ui::icons::landform`,
   `src/ui/icons.cpp`), with contiguous same-landform runs bridged into spanning
   markers (`landform_span`, BL-232). The old "reserved for overlay glyphs later"
   note is dead.
 - **`first_land_tiles()`** — moved into `tile_generation.cpp`; checks against
-  `terrain_composition::ocean` to pick building attachment tiles.
+  water (`is_water`, since BL-516) to pick building attachment tiles.
 - **Hazard / habitability** — not specified by the design tables but carried on
-  `tile_component`, so they are *derived*: a per-composition base (the habitability
-  ceiling from TILES.md, plus a hazard base) modified by landform (mountain/rift
+  `tile_component`, so they are *derived*: a per-substrate base (the habitability
+  ceiling from TILES.md, plus a hazard base), modified by the cover and then by landform (mountain/rift
   raise hazard and cut habitability; valley raises habitability), with light
   jitter.
 - **`road_level` is stamped outside this pipeline.** The six-pass tile generation

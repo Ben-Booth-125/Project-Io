@@ -25,13 +25,21 @@ constexpr std::uint8_t kHighway = 3;
 constexpr int          kMajorScale = 3;
 constexpr int          kMidScale   = 2;
 
-// Water crossing (Sprint B2). Roads stay a LAND feature — no ocean tile is ever stamped, so a
-// crossing always leaves a gap in the raster; what a port does with that gap is BL-188's, not
-// this pass's. What this constant decides is which crossings the pass will lay a road TOWARD.
-// A run of up to kMaxCrossingTiles water is a strait: both shores are stamped, so a coastal or
-// island nation joins the lattice and the corridor resumes on the far side. A longer run is
-// open ocean — a sea route, not a road — and stamping it would scatter disconnected road
-// fragments across distant shores, which reads as a broken network rather than a crossing.
+// Water crossing (Sprint B2, narrowed by BL-516). Roads stay a LAND feature — no water tile is
+// ever stamped, so a crossing always leaves a gap in the raster; what a port does with that gap
+// is BL-188's, not this pass's. What this rule decides is which crossings the pass will lay a
+// road TOWARD: a strait, where both shores are stamped so a coastal or island nation joins the
+// lattice and the corridor resumes on the far side — never open sea, where stamping would
+// scatter disconnected road fragments across distant shores.
+//
+// BL-516 MADE THE DISTINCTION DATA. Before water had kinds, "is this a strait" could only be
+// INFERRED from the length of the contiguous water run, because a three-tile clip across the
+// corner of an ocean and a three-tile channel between two shores were the same tiles. Now they
+// are not: a channel is made of `coast` (water with land beside it) and the open sea is
+// `ocean`. So the rule is the conjunction — a crossing is a strait when it is SHORT and made
+// of SHORE. The length bound stays because it is a second, independent claim (a road bridges a
+// channel, it does not run twenty tiles along a shelf), and dropping it would let a long
+// shallow shelf read as a crossing.
 constexpr int          kMaxCrossingTiles = 3;
 
 // Tier for an edge between two centres of the given scales (BL-172).
@@ -61,20 +69,25 @@ entity_id nation_of(const world& w, entity_id tile)
     return (it != w.tile_to_nation.end()) ? it->second : null_entity;
 }
 
-/// True if every contiguous ocean run along @p p is a strait (<= kMaxCrossingTiles), i.e. the
-/// route is one a road can plausibly follow shore-to-shore rather than an open-sea crossing.
+/// True if every contiguous water run along @p p is a strait: SHORT (<= kMaxCrossingTiles) and
+/// made entirely of SHORE (`coast`, or a lake — enclosed water a causeway crosses; never open
+/// `ocean`). See kMaxCrossingTiles for why both halves are needed.
 bool crossings_are_straits(const world& w, const logistics_path& p)
 {
     int run = 0;
     for (const entity_id t : p.tiles)
     {
         const auto it = w.tiles.find(t);
-        const bool ocean = (it != w.tiles.end() && it->second.composition == terrain_composition::ocean);
-        if (!ocean)
+        if (it == w.tiles.end() || !is_water(it->second.substrate))
         {
             run = 0;
             continue;
         }
+        // BL-516: one open-sea tile anywhere in the run disqualifies it outright,
+        // however short the run is. That is the case the old length-only rule could
+        // not see — a path clipping the corner of an ocean in three tiles.
+        if (is_open_ocean(it->second.substrate))
+            return false;
         if (++run > kMaxCrossingTiles)
             return false;
     }
@@ -82,8 +95,8 @@ bool crossings_are_straits(const world& w, const logistics_path& p)
 }
 
 /// Stamp a road of @p level along the A* path between two tiles, taking the max on
-/// overlap and skipping ocean (roads are a land feature). No-op if unreachable, or if
-/// the route crosses open ocean rather than a strait (see kMaxCrossingTiles).
+/// overlap and skipping WATER OF EVERY KIND (roads are a land feature). No-op if unreachable, or if
+/// the route crosses open sea rather than a strait (see kMaxCrossingTiles).
 void stamp_edge(world& w, entity_id body, entity_id ta, entity_id tb, std::uint8_t level)
 {
     const logistics_path& p = intra_body_path(w, body, ta, tb);
@@ -94,7 +107,7 @@ void stamp_edge(world& w, entity_id body, entity_id ta, entity_id tb, std::uint8
     for (const entity_id t : p.tiles)
     {
         const auto it = w.tiles.find(t);
-        if (it == w.tiles.end() || it->second.composition == terrain_composition::ocean)
+        if (it == w.tiles.end() || is_water(it->second.substrate)) // BL-516
             continue;
         it->second.road_level = std::max(it->second.road_level, level);
     }
@@ -134,7 +147,7 @@ void generate_roads(world& w, entity_id body)
     for (const road_node& node : nodes)
     {
         const auto it = w.tiles.find(node.tile);
-        if (it != w.tiles.end() && it->second.composition != terrain_composition::ocean)
+        if (it != w.tiles.end() && !is_water(it->second.substrate)) // BL-516
             it->second.road_level = std::max(it->second.road_level, kTrack);
     }
 

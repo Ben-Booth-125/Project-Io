@@ -1,54 +1,181 @@
 # Project Io — Tile Design
 
-Tiles are the smallest addressable unit of land. Every tile has a fixed character set at world generation — it does not change during play except through deliberate player development. The character has two independent axes: **terrain composition** (what the tile is made of) and **terrain landform** (its physical shape). Together they determine resource deposit potential, construction cost, habitability ceiling, and visual identity.
+Tiles are the smallest addressable unit of land. Every tile has a fixed character set at world generation — it does not change during play except through deliberate player development. The character has **three** independent axes (BL-519, 2026-08-21): **terrain substrate** (what the ground is made of), **terrain cover** (what sits on it, which may be nothing), and **terrain landform** (its physical shape). Together they determine resource deposit potential, construction cost, habitability ceiling, and visual identity.
 
 This document is the design authority for tile classification. The procedural generation rules that produce the authored world bodies are in `docs/generation/TILE_GENERATION.md` and implemented in `hard_coded_world.cpp`.
 
 ---
 
-## Two-axis terrain model
+## Three-axis terrain model (BL-519, 2026-08-21)
 
-### Terrain composition
+### Why there are three axes and not two
 
-Composition describes the material character of the tile — the geology, ecology, or surface type. It determines what resource deposits can appear, what terrain colour and visual identity it carries, and its base habitability ceiling.
+Until BL-519 there were two, and the first of them was doing **three unrelated jobs at once**:
 
-| Composition | Description | Habitability ceiling | Primary deposit category |
-|-------------|-------------|---------------------|--------------------------|
+| Job | Values it held |
+|---|---|
+| **Substrate** — what the ground is made of | barren, rocky, volcanic, metallic, regolith |
+| **Cover** — what is growing or lying on it | forest, grassland, tundra, wetland |
+| **State** — what has happened to it | urban, icy, ocean |
+
+Ben's brief was *"a mountain might have a forest or not"*. A mountain **with** a forest was
+already expressible (`composition = forest` × `landform = mountain`). What could not be said was
+*a **rocky** mountain that happens to be forested* — because the one slot had been spent on the
+forest.
+
+`urban` was the proof rather than the exception. It is a one-way transform that **overwrote** the
+composition, so paving a metallic tile destroyed the fact that it was metallic. That is a slot
+conflict that had already shipped, and the split fixes it as a side effect.
+
+**So this adds no concept. It un-mixes one that got overloaded.**
+
+### Terrain substrate
+
+What the ground is **made of** — the geology. Fixed at generation and **never transformed**;
+nothing in the simulation rewrites a tile's substrate, which is the property that separates this
+axis from cover. It decides which **mineral** deposits can appear, the base build cost, the base
+habitability ceiling, and the terrain colour the lenses tint.
+
+| Substrate | Description | Habitability ceiling | Primary deposit category |
+|-----------|-------------|---------------------|--------------------------|
 | Barren | Dry, dusty, minimal organic matter | Low | Iron ore, coal, petroleum, stone |
 | Rocky | Hard rock outcrops, fractured surface | Low | Iron ore, copper ore, rare earth ore, stone |
+| **Sedimentary** | Soil, silt and sandstone — the ground a biotic cover grows on | High | Decided by the cover (see below) |
 | Volcanic | Geologically active, lava flows or recent ejecta | Very low | Rare earth ore, iron ore |
-| Icy | Ice-dominated surface; frozen subsurface | Low | Water ice (only — see deposit tables) |
-| Tundra | Cold but not ice-covered; sparse vegetation | Low–medium | Iron ore (surface), peat, stone |
-| Grassland | Open fertile land; moderate climate | High | Agricultural produce, stone, sand |
-| Forest | Dense tree cover | High | Timber, agricultural produce (clearing) |
-| Wetland | Marsh, bog, floodplain | Medium–high | Agricultural produce, timber, clay |
-| Ocean | Open deep water | — (no buildings) | Marine goods (deferred) |
-| Regolith | Loose surface material on airless bodies | Very low | Regolith, stone (polar ice sits on icy tiles) |
 | Metallic | High metal content; asteroid or ancient impact surface | Very low | Iron-nickel ore, platinum group metals, regolith |
-| Urban | Built over by its own non-extraction building stack (BL-366, runtime-only) | High | None — no new extraction or ambient placement |
+| Regolith | Loose surface material on airless bodies | Very low | Regolith, stone |
+| Icy | Ice-dominated ground; frozen subsurface | Low | Water ice (only — see deposit tables) |
+| Ocean | Open water, out of sight of land | — (no buildings) | Marine goods (deferred) |
+| Coast | Shallow sea with land alongside — the shoreline ring (BL-516) | — (no buildings) | Marine goods (deferred) |
+| Lake | Inland water with no path to the sea (BL-516) | — (no buildings) | Marine goods (deferred) |
 
-**Habitable compositions** — grassland, forest, wetland — support population centres and amenity production. The others are primarily extraction or infrastructure terrain.
+**Sedimentary is the axis's new value**, and the finding the item turned on: grassland, forest,
+wetland and tundra were never four kinds of *ground*. They were **one** kind of ground under four
+kinds of cover, and spending the slot on the cover is what made "a rocky mountain that happens to
+be forested" inexpressible.
+
+### Water kinds: lake, coast and ocean (BL-516, landed 2026-08-21)
+
+Ben, 2026-08-21: *"We can also draw provinces over the ocean, using 3-12 size coastal tile
+provinces. That creates another tile type, which is ok. We can have lakes, coasts, and oceans.
+Ocean provinces should be much larger, but not larger than say 80 tiles."*
+
+BL-519 left `ocean` on this axis as an interim value, on the reasoning that every consumer asks
+"is this water?" of the ground. **That reasoning held**, so the split landed here rather than
+anywhere else: `ocean` keeps its id and narrows to mean open water, and `lake` and `coast` are
+appended at the tail. A water tile carries `cover::none` whatever its kind — the cover axis
+describes what grew on ground, and water has no ground.
+
+The three kinds are **structural** — no threshold picks between them
+(`tile_generation.cpp` § Pass 4e, `classify_water_kinds`):
+
+1. Flood-fill the water into connected components on the body's hex grid (columns wrap).
+2. **The sea** is the largest component; every other component is a **lake**. "Does not reach
+   the sea" is the whole definition of a lake, so no size cut-off is needed or wanted.
+3. Within the sea, a tile with at least one land neighbour is **coast** — the shoreline ring —
+   and a tile with none is **ocean**.
+
+**Almost every consumer asks "is this water?" and must keep asking exactly that.** That question
+is `is_water()` in `components.hpp`, and it is the choke point: placement, the urban transform,
+logistics traversal, river termination, terrain defence and attrition, nation and settlement land
+counts all went through it unchanged, so the generated world is bit-identical. Two consumers
+genuinely care *which* water, and both got a better answer than they had:
+
+- **The road pass.** A crossing is a strait when it is short **and made of shore**. Before the
+  split, "is this a strait" could only be inferred from the length of the contiguous water run;
+  a three-tile clip across the corner of an ocean and a three-tile channel between two shores
+  were indistinguishable. They are now, and only the second gets a road.
+- **`is_coastal`** (ports, the Fishing Wharf, coastal-only extraction) now means the **sea**
+  specifically. A lakeshore is not a coast, and before the split the code could not tell.
+
+Water carries no deposits, no buildings, no cover and no population on any of the three kinds —
+the distinction is about connectivity and locality, not about resources.
+
+### Terrain cover
+
+What **sits on** the substrate — and it may be absent. **`none` is a first-class value**, and that
+absence is the whole point of the axis: "a mountain with no forest" stops being a different kind of
+ground from "a mountain with one". Cover decides **biotic** deposits (timber, produce), defensive
+cover and forage in combat, and the overlay pattern BL-520 draws. Unlike the substrate, a cover
+**can** change — `urban` is the one transform that does so today.
+
+| Cover | Reads on | Why it earns a slot |
+|---|---|---|
+| None | anything | Bare ground is a real answer, not a missing one |
+| Grass | sedimentary, barren | Open fertile cover; agricultural produce |
+| Scrub | barren, rocky, sedimentary | The half-step that makes a treeline gradual instead of a hard edge. **This is where `tundra` went** — tundra was a climate outcome wearing a terrain slot (Ben, 2026-08-21) |
+| Forest | sedimentary, rocky, volcanic | Ben's example case; timber |
+| Marsh | sedimentary, on low landforms | Was `wetland`; produce and clay, and it wants valley/plains |
+| Snow | anything cold | Falls out of latitude × BL-517's retained height with no new generation input |
+| Dunes | barren, rocky | Explains why some barren ground is workable and some is not |
+| Ash | volcanic | A hazard reading rather than a resource one |
+| Salt | barren, low basins | Dry-basin crust; a home for a salt deposit if one is restored |
+| Urban | anything | BL-366's one-way transform — see below |
+
+**Cover is graded, not binary** (Ben's call, 2026-08-21). `tile_component::cover_density` is a
+0–255 scalar: sparse scrub at the bottom, closed canopy at the top. **One number, two consumers**,
+which is why it earns a field rather than being two — BL-520's texture reads it as how heavily to
+draw the pattern, and the economy reads it as biotic yield (timber richness, forage in combat). A
+sparse wood should both *look* thin and *cut* thin.
+
+**Invariant:** density is 0 **if and only if** cover is `none`. `tile_axes_harness` asserts it over
+generated worlds; it is not merely a convention.
+
+**Habitable ground** — a biotic cover (grass, forest, marsh) on **sedimentary** substrate —
+supports population centres and amenity production. Both halves matter: a forested crag is not a
+cradle, and the pre-split model had no way to say so.
+
+### What is deliberately NOT on these axes
+
+Recorded so the model is not later widened to swallow them:
+
+- **Edge features** live *between* tiles. `tile_component::river_edges` is already a per-side
+  bitmask and BL-515 draws province borders against it — the precedent exists and works. Cliffs,
+  escarpments and coastline fit the same shape. These are what make a map read as terrain rather
+  than as tiles.
+- **Point features** occupy one tile and do not tile-fill: volcano cone, oasis, spring, cave mouth,
+  waterfall. Cheap, disproportionately legible, and what a player names a place after.
+
+Both are separate items when wanted.
 
 ### Urban transform (BL-366)
 
-Composition is fixed at generation for every other value, but `urban` is the one deliberate
-runtime exception the opening paragraph carves out: a tile whose **non-extraction** building
-stack (processors, ports, hubs, admin, amenity, military base, research institute — combined,
-not per type) fills its starting composition's cap **transforms**, one-way, to `urban`. This
+The substrate is fixed at generation, and the **cover** is the mutable axis: a tile whose
+**non-extraction** building stack (processors, ports, hubs, admin, amenity, military base,
+research institute — combined, not per type) fills its cap **transforms**, one-way, to
+`cover = urban`.
+
+**Since BL-519 the transform writes ONE axis, and that is the shipped bug it fixed.** Before the
+split it overwrote the composition, so a metallic tile that built up to a city stopped being
+metallic. Urban is a **cover** (Ben's call, 2026-08-21): the city still erases what *grew* here,
+and the geology underneath survives it. This
 answers the half of BL-193 (building stacks) that stacking left open — extraction already stacks
 by deposit richness (`k_richness_per_site`, unchanged by this item); non-extraction stacking is
 now bounded by this cap instead of the old flat ceiling of 1.
 
-**Non-extraction cap by starting composition** (`non_extraction_stack_cap`, `placement_rules.cpp`):
+**Non-extraction cap** (`non_extraction_stack_cap`, `placement_rules.cpp`). Since BL-519 it is a
+**substrate base plus a cover modifier** — the substrate says how much weight the ground will take,
+the cover says how much what grows on it gets in the way:
 
-| Composition | Cap | Rationale |
+| Substrate | Base | Rationale |
 |---|---|---|
-| Grassland, Forest, Wetland | 6 | Habitable; already the settlement-favoured compositions (POPULATION.md) |
-| Tundra | 3 | Marginal habitability |
+| Sedimentary | 6 | Habitable; the settlement-favoured ground (POPULATION.md) |
 | Barren, Rocky, Regolith, Metallic | 4 | Industrial-friendly, low habitability ceiling |
 | Volcanic, Icy | 2 | Hostile; already carry the lowest habitability ceiling |
-| Ocean | 0 (exempt) | No buildings at all — `can_place` already refuses it |
-| Urban | 12 | Soft-bounded in practice by workforce contention, not this number |
+| Ocean, Coast, Lake | 0 (pinned, exempt) | No buildings at all, on any water kind — `can_place` already refuses them |
+
+| Cover | Modifier | Rationale |
+|---|---|---|
+| Urban | **12, pinned** | The paving decides the cap, not the geology under it. Soft-bounded in practice by workforce contention |
+| Scrub | −3 on sedimentary, −1 elsewhere | On soil this pair **is** the old `tundra` row, and its −3 reproduces BL-366's 3 exactly |
+| Forest, Marsh | 0 on sedimentary, −1 elsewhere | On soil these were already settlement-favoured; on rock, vegetation is one more thing to clear |
+| Snow, Dunes, Ash | −1 | Something to clear |
+| Grass, Salt, None | 0 | Nothing in the way |
+
+Never below 1. **Every pre-split number is reproduced exactly** — the calibration table is in
+`placement_rules.cpp` and asserted by `multi_building_tile_harness` R1 and `tile_axes_harness` A4.
+What is new is that the pairs the old model could not name now have caps too: a forested crag is
+3 where the bare rock beside it is 4, and urban on metallic is still 12.
 
 Once urban, a tile takes **no new extraction or ambient-resource placement** — the ground is
 built over. Extraction sites already standing when the transform fired are grandfathered; they
@@ -97,15 +224,38 @@ Landform describes the physical geography of the tile — its elevation, slope, 
 | Crater | Impact basin; common on airless bodies | ×1.3 | Crater rim/floor distinction possible later. |
 | Rift | Geological fault zone | ×1.6 | Strong volcanic association. Elevated rare earth ore. |
 
-The combination of composition and landform produces the full tile identity. A **volcanic canyon** has the deposit profile of volcanic terrain (rare earth ore, iron ore) with the access difficulty of a canyon (high construction cost, erosion-exposed deposits). A **grassland valley** has high agricultural potential plus better habitability than a highland equivalent.
+The combination of the three axes produces the full tile identity. A **volcanic canyon** has the
+deposit profile of volcanic ground (rare earth ore, iron ore) with the access difficulty of a
+canyon (high construction cost, erosion-exposed deposits). A **grassland valley** — grass on
+sedimentary ground, in a valley — has high agricultural potential plus better habitability than a
+highland equivalent. And since BL-519, a **forested rocky mountain** is expressible for the first
+time: it carries timber from the cover *and* iron from the substrate, defends like woodland on
+rock, and forages far better than the bare crag beside it.
 
 ---
 
 ## Resource deposit profiles
 
-The deposits that can appear on a tile are determined primarily by composition, modulated by landform.
+The deposits that can appear on a tile are determined by the terrain axes, modulated by landform.
 
-### Composition deposit tables
+**Which axis decides which deposit is the whole content of the BL-519 split, and it is a real
+economic change rather than a renaming:**
+
+- **Ore follows the SUBSTRATE.** Iron, copper, rare earth, iron-nickel, PGM, coal, silica, regolith
+  and water ice all key on the ground alone. Dressing a tile with vegetation no longer costs it its
+  geology.
+- **Timber and produce follow the COVER**, scaled by `cover_density`. Timber wants forest or marsh;
+  produce wants grass, forest or marsh.
+- **Peat** is the old `tundra` row and keys on the pair `sedimentary + scrub`, which nothing else
+  produces.
+- **Crops** (tobacco, spices, coffee, furs) follow the cover, because each is a claim about what
+  grows here. Furs moved from `tundra` to `scrub` — the ground where the trapping happens.
+
+The payoff the single slot made impossible: **a forested metallic mountain now carries both timber
+and ore.** Measured on the shipped homeworld, 110 tiles carry both timber and iron
+(`tile_axes_harness` A5d).
+
+### Deposit tables (by substrate, and by cover where the cover decides)
 
 > **⚠ These tables are no longer the final word (2026-08-04).** They remain faithful to
 > `generate_deposits` — spot-checked and accurate — but `generate_deposits` is now one factor of
@@ -262,10 +412,29 @@ A tile's amenity potential can be realised directly (leaving it undeveloped as g
 
 ## Implementation note
 
-This two-axis model is **implemented** (2026-06-14; see DEVLOG § "Two-axis terrain model + six-pass procedural generation"). The old single flat `terrain_type` enum was replaced in `components.hpp` by two enums, both carried on `tile_component`:
+The terrain model is **implemented**. It began as two axes (2026-06-14; see DEVLOG § "Two-axis
+terrain model + six-pass procedural generation") and became **three** on 2026-08-21 (BL-519). The
+enums live in `components.hpp`, all carried on `tile_component`:
 
-- `terrain_composition` — the geological/ecological type (11 values: barren, rocky, volcanic, icy, tundra, grassland, forest, wetland, ocean, regolith, metallic)
-- `terrain_landform` — the physical shape (7 values: plains, highland, mountain, canyon, valley, crater, rift)
+- `terrain_substrate` — what the ground is made of (8 values: barren, rocky, sedimentary, volcanic,
+  metallic, regolith, icy, ocean)
+- `terrain_cover` — what sits on it (10 values: none, grass, scrub, forest, marsh, snow, dunes, ash,
+  salt, urban), plus `cover_density`, a 0–255 scalar
+- `terrain_landform` — the physical shape (7 values: plains, highland, mountain, canyon, valley,
+  crater, rift) — **unchanged by the split**; it already did exactly one job
+
+**How the split was landed, and why the numbers can be trusted.** Pass 4a — the (band, moisture)
+tables that decide a tile's biome — is **unchanged in its values and, critically, in its RNG
+consumption draw for draw**. It now returns an internal `biome` that Pass 4c decomposes onto the two
+axes with **no RNG stream** (density varies through a stateless fold), and Pass 4d — the only
+genuinely new behaviour — dresses ground the biome table left **bare**, also with no stream. So every
+downstream pass sees the draws it saw before, and anything that moved is attributable to the new
+cover axis rather than to stream drift. The 120-seed `earthlike_tile_census` came back
+**bit-identical** to the pre-split baseline, which is the evidence for that claim.
+
+**There is no save migration**, and that is why an item of this size was landable in one pass: tiles
+are never serialised — they are regenerated from the seed (confirmed while landing BL-517, NR-430).
+The only flat-binary streams are the history log, the order book and procurement.
 
 The prototype bodies are generated against the full model by the six-pass pipeline in `src/world/tile_generation.cpp` (see `docs/generation/TILE_GENERATION.md`); there is no remaining retrofit. Tuning refinements that remain open are tracked in `docs/development/BACKLOG.md` § Environment.
 

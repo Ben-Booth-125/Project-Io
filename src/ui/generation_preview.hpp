@@ -37,8 +37,15 @@ struct preview_body
     const planetology_state* state           = nullptr;
 };
 
-/// The homeworld's REAL surface, when the app has one: raster-order
-/// terrain_composition values (cast to uint8_t), home_grid_width × height.
+/// The homeworld's REAL surface, when the app has one: raster-order PACKED
+/// terrain axes, home_grid_width × height.
+///
+/// PACKING (BL-519): one byte per tile, `substrate << 4 | cover`. Both enums fit
+/// in four bits (8 substrates, 10 covers), so the split cost the preview no
+/// memory and no new plumbing. `cover_density` is deliberately NOT carried — the
+/// globe is a ~100px sphere sampled by majority vote per cell, where a density
+/// gradation could not be seen; it draws at a mid density instead. See
+/// `preview_pack` / `preview_substrate` / `preview_cover` below.
 /// When `comp` is non-null the globe samples THIS — the actual map "Begin"
 /// will hand over — instead of the stylised continent blobs; the blobs remain
 /// only as the fallback while the first async build is still in flight.
@@ -46,8 +53,28 @@ struct preview_surface_view
 {
     int            gw   = 0;
     int            gh   = 0;
-    const uint8_t* comp = nullptr;
+    const uint8_t* comp = nullptr; ///< Packed axes; see preview_pack.
 };
+
+/// Pack a tile's two terrain axes into the preview's one byte.
+inline uint8_t preview_pack(terrain_substrate sub, terrain_cover cov)
+{
+    return static_cast<uint8_t>((static_cast<int>(sub) << 4) | static_cast<int>(cov));
+}
+
+inline terrain_substrate preview_substrate(uint8_t packed)
+{
+    return static_cast<terrain_substrate>((packed >> 4) & 0x0F);
+}
+
+inline terrain_cover preview_cover(uint8_t packed)
+{
+    return static_cast<terrain_cover>(packed & 0x0F);
+}
+
+/// The density the globe draws a cover at. A constant on purpose — see the
+/// packing note above.
+inline constexpr uint8_t k_preview_cover_density = 150;
 
 /// Paint the round's preview into the current window's remaining content
 /// region. Pure draw-list painting; no widgets, no state.

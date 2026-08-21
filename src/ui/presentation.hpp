@@ -5,6 +5,8 @@
 
 #include <imgui.h>
 
+#include <string>
+
 namespace ui {
 
 /// Display metadata for one resource type — the single source of truth for how a
@@ -31,11 +33,33 @@ const resource_presentation& presentation_of(resource_type r);
 /// @return  Null-terminated display name.
 const char* resource_name(resource_type r);
 
-/// Display name for a tile's material composition (e.g. "Grassland").
+/// Display name for a tile's SUBSTRATE alone (e.g. "Rock", "Ice").
 ///
-/// @param c Composition to name.
-/// @return  Null-terminated display name.
-const char* composition_name(terrain_composition c);
+/// A noun, not an adjective, because `terrain_name` composes it with a cover
+/// adjective. Use `terrain_name` for anything the player reads as "what is this
+/// tile"; this one is for a ledger column that means the ground specifically.
+const char* substrate_name(terrain_substrate s);
+
+/// Display name for a tile's COVER alone (e.g. "Forest", "Snow"), or "None".
+const char* cover_name(terrain_cover c);
+
+/// One word for how heavy a cover is: "Sparse", "Moderate" or "Dense".
+/// Returns nullptr when there is no cover to qualify.
+const char* cover_density_word(std::uint8_t density);
+
+/// What the player reads as "what is this tile" — the two axes composed into one
+/// phrase (BL-519).
+///
+/// THE FAMILIAR NAMES SURVIVE. A player who knew "Grassland", "Forest",
+/// "Wetland" still sees exactly those words: the four canonical covers on
+/// sedimentary ground keep their pre-split label, because renaming terrain the
+/// player already recognises would have been a cost the split never needed to
+/// impose. What is new is that the pairs the old model could not express now
+/// have names too — "Forested Rock", "Snowy Ice", "Dune Barrens".
+std::string terrain_name(terrain_substrate sub, terrain_cover cov, std::uint8_t density);
+
+/// Convenience overload reading the axes straight off a tile.
+std::string terrain_name(const tile_component& t);
 
 /// Display name for a tile's landform (e.g. "Mountain").
 ///

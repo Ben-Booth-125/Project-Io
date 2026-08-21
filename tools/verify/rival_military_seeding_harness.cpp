@@ -271,7 +271,7 @@ int main()
         const entity_id ocean_tile = w.create_entity();
         tile_component tc{};
         tc.body = body;
-        tc.composition = terrain_composition::ocean;
+        tc.substrate = terrain_substrate::ocean;
         tc.grid_x = 0;
         tc.grid_y = 0;
         w.tiles[ocean_tile] = tc;

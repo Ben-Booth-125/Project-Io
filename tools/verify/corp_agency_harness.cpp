@@ -49,7 +49,7 @@ scene make_scene()
         const entity_id tile = w.create_entity();
         tile_component tc{};
         tc.body = body;
-        tc.composition = terrain_composition::rocky;
+        tc.substrate = terrain_substrate::rocky;
         tc.resource_deposit[ri(resource_type::iron_ore)]   = 0.02f;  // tiny richness
         tc.resource_remaining[ri(resource_type::iron_ore)] = 1.0e6f; // ample reserve (loss, not exhaustion)
         w.tiles[tile] = tc;

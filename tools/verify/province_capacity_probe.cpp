@@ -124,10 +124,10 @@ int main(int argc, char** argv)
         long long cap_total = 0;
         for (const auto& [tid, tc] : w.tiles)
         {
-            if (tc.composition == terrain_composition::ocean)
+            if (is_water(tc.substrate))
                 continue;
             ++land;
-            const int cap = placement_rules::non_extraction_stack_cap(tc.composition);
+            const int cap = placement_rules::non_extraction_stack_cap(tc.substrate, tc.cover);
             cap_total += cap;
             const auto it = non_extraction_on_tile.find(tid);
             const int used = (it == non_extraction_on_tile.end()) ? 0 : it->second;
@@ -145,7 +145,8 @@ int main(int argc, char** argv)
             {
                 const auto tit = w.tiles.find(t);
                 if (tit != w.tiles.end())
-                    c += placement_rules::non_extraction_stack_cap(tit->second.composition);
+                    c += placement_rules::non_extraction_stack_cap(tit->second.substrate,
+                                                                  tit->second.cover);
             }
             prov_cap[pr.id] = c;
             prov_used[pr.id] = 0;

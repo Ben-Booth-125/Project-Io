@@ -101,7 +101,7 @@ int main()
         {
             tile_component tc{};
             tc.body = body_a;
-            tc.composition = terrain_composition::rocky;
+            tc.substrate = terrain_substrate::rocky;
             tc.landform    = terrain_landform::plains;
             w.tiles[tile_a] = tc;
         }
@@ -109,7 +109,7 @@ int main()
         {
             tile_component tc{};
             tc.body = body_b;
-            tc.composition = terrain_composition::rocky;
+            tc.substrate = terrain_substrate::rocky;
             tc.landform    = terrain_landform::plains;
             w.tiles[tile_b] = tc;
         }

@@ -553,4 +553,11 @@ struct ui_state
     bool planetary_center_pending = false; ///< True when a centre-on-tile request is waiting to be consumed.
     int  planetary_center_col     = 0;     ///< Grid column to centre; valid only while planetary_center_pending.
     int  planetary_center_row     = 0;     ///< Grid row to centre; valid only while planetary_center_pending.
+
+    /// Screen position (px) the last CONSUMED centre-on-tile request placed that
+    /// tile's centre at — written by the Planetary canvas at the moment it applies
+    /// the pan, read by the verify harness's click injection (BL-521) so a scripted
+    /// click can land on a KNOWN tile without re-deriving the canvas transform in
+    /// Lua. Presentation-only feedback, never serialised. {-1,-1} = never resolved.
+    ImVec2 planetary_center_screen { -1.0f, -1.0f };
 };

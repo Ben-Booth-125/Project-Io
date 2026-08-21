@@ -87,7 +87,7 @@ int main()
     // Three extraction sites (silica, copper_ore, rare_earth_ore), ample reserve.
     auto make_extractor = [&](resource_type target, entity_id corp) {
         const entity_id tile = w.create_entity();
-        tile_component tc{}; tc.body = body; tc.composition = terrain_composition::rocky;
+        tile_component tc{}; tc.body = body; tc.substrate = terrain_substrate::rocky;
         tc.resource_deposit[ri(target)] = 2.0f;
         tc.resource_remaining[ri(target)] = 1.0e7f;
         w.tiles[tile] = tc;
@@ -110,7 +110,7 @@ int main()
     // moment the market/auto-buy settles it in, exactly as any multi-tier
     // in-game chain (e.g. iron_ore -> steel -> a consumer) already works.
     const entity_id tile_p = w.create_entity();
-    { tile_component tc{}; tc.body = body; tc.composition = terrain_composition::grassland; w.tiles[tile_p] = tc; }
+    { tile_component tc{}; tc.body = body; tc.substrate = terrain_substrate::sedimentary; tc.cover = terrain_cover::grass; tc.cover_density = 150; w.tiles[tile_p] = tc; }
     const entity_id chain_corp = w.create_entity();
     { corporation_component cc; cc.name = "Chain Co"; cc.starting_capital = cc.balance = 1.0e6f;
       cc.is_player = true; w.corporations[chain_corp] = cc; }

@@ -71,10 +71,10 @@ int main()
         const std::vector<army_stack_entry> def = stack_of(unit_class::cavalry,   800, 0, 22);
 
         const battle_outcome a = resolve_battle(atk, neutral_doctrine, def, neutral_doctrine,
-                                                 terrain_composition::grassland, terrain_landform::plains,
+                                                 terrain_substrate::sedimentary, terrain_cover::grass, 150, terrain_landform::plains,
                                                  season::summer, 900, 900);
         const battle_outcome b = resolve_battle(atk, neutral_doctrine, def, neutral_doctrine,
-                                                 terrain_composition::grassland, terrain_landform::plains,
+                                                 terrain_substrate::sedimentary, terrain_cover::grass, 150, terrain_landform::plains,
                                                  season::summer, 900, 900);
 
         check(a.result == b.result &&
@@ -95,7 +95,7 @@ int main()
         const std::vector<army_stack_entry> def = stack_of(unit_class::cavalry, 500);
 
         const battle_outcome o = resolve_battle(atk, neutral_doctrine, def, neutral_doctrine,
-                                                 terrain_composition::grassland, terrain_landform::plains,
+                                                 terrain_substrate::sedimentary, terrain_cover::grass, 150, terrain_landform::plains,
                                                  season::summer, 1000, 1000);
         std::printf("      ranged(500) vs cavalry(500), open ground: attacker %d, defender %d, result %s\n",
                     o.attacker_power, o.defender_power,
@@ -108,7 +108,7 @@ int main()
         // otherwise-losing matchup for the defender).
         const doctrine_row mountain_defender{ .frontal_bonus = 300 };
         const battle_outcome m = resolve_battle(atk, neutral_doctrine, def, mountain_defender,
-                                                 terrain_composition::rocky, terrain_landform::mountain,
+                                                 terrain_substrate::rocky, terrain_cover::none, 0, terrain_landform::mountain,
                                                  season::summer, 1000, 1000);
         std::printf("      same armies, defender dug into a rocky mountain: attacker %d, defender %d, result %s\n",
                     m.attacker_power, m.defender_power,
@@ -122,7 +122,7 @@ int main()
         const std::vector<army_stack_entry> atk = stack_of(unit_class::infantry, 500);
         const std::vector<army_stack_entry> def = stack_of(unit_class::infantry, 500);
         const battle_outcome o = resolve_battle(atk, neutral_doctrine, def, neutral_doctrine,
-                                                 terrain_composition::grassland, terrain_landform::plains,
+                                                 terrain_substrate::sedimentary, terrain_cover::grass, 150, terrain_landform::plains,
                                                  season::summer, 1000, 1000);
         check(o.attacker_power == o.defender_power, "R2 setup: mirrored armies produce an exact tie");
         check(o.result == battle_result::defender_victory,
@@ -134,7 +134,7 @@ int main()
         const std::vector<army_stack_entry> atk = stack_of(unit_class::cavalry, 2000, 400);
         const std::vector<army_stack_entry> def = stack_of(unit_class::siege,    100);
         const battle_outcome o = resolve_battle(atk, neutral_doctrine, def, neutral_doctrine,
-                                                 terrain_composition::grassland, terrain_landform::plains,
+                                                 terrain_substrate::sedimentary, terrain_cover::grass, 150, terrain_landform::plains,
                                                  season::summer, 1000, 1000);
         check(o.attacker_losses_permille >= 0 && o.attacker_losses_permille <= 1000 &&
               o.defender_losses_permille >= 0 && o.defender_losses_permille <= 1000,
@@ -155,10 +155,10 @@ int main()
         const doctrine_row cautious{ .frontal_bonus = 50, .flank_fragility = 0, .mountain_penalty = 0 };
 
         const battle_outcome open_ground = resolve_battle(atk, phalanx, def, cautious,
-                                                            terrain_composition::grassland, terrain_landform::plains,
+                                                            terrain_substrate::sedimentary, terrain_cover::grass, 150, terrain_landform::plains,
                                                             season::summer, 1000, 1000);
         const battle_outcome mountain = resolve_battle(atk, phalanx, def, cautious,
-                                                         terrain_composition::rocky, terrain_landform::mountain,
+                                                         terrain_substrate::rocky, terrain_cover::none, 0, terrain_landform::mountain,
                                                          season::summer, 1000, 1000);
 
         check(open_ground.result == battle_result::attacker_victory,
@@ -175,7 +175,7 @@ int main()
         const std::vector<army_stack_entry> atk = stack_of(unit_class::naval, 500);
         const std::vector<army_stack_entry> def = stack_of(unit_class::infantry, 10);
         const battle_outcome o = resolve_battle(atk, neutral_doctrine, def, neutral_doctrine,
-                                                 terrain_composition::grassland, terrain_landform::plains,
+                                                 terrain_substrate::sedimentary, terrain_cover::grass, 150, terrain_landform::plains,
                                                  season::summer, 1000, 1000);
         check(o.attacker_power == 0,
               "R4 an all-naval stack contributes zero tactical power (strategic-only, deferred)");

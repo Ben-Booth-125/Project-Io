@@ -105,7 +105,7 @@ static scene make_scene()
             tc.body        = s.body;
             tc.grid_x      = x;
             tc.grid_y      = y;
-            tc.composition = terrain_composition::barren; // land
+            tc.substrate = terrain_substrate::barren; // land
             tc.landform    = terrain_landform::plains;    // x1.0 traversal
             s.w.tiles[t]   = tc;
             s.tiles.push_back(t);

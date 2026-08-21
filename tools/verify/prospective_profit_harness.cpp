@@ -98,7 +98,7 @@ int main()
     {
         tile_component tc{};
         tc.body = body;
-        tc.composition = terrain_composition::rocky;
+        tc.substrate = terrain_substrate::rocky;
         tc.resource_deposit[ri(resource_type::iron_ore)]   = 2.0f;
         tc.resource_remaining[ri(resource_type::iron_ore)] = 1.0e6f;
         tc.hazard_level = 0.0f;
@@ -108,7 +108,7 @@ int main()
     {
         tile_component tc{};
         tc.body = body;
-        tc.composition = terrain_composition::grassland;
+        tc.substrate = terrain_substrate::sedimentary; tc.cover = terrain_cover::grass; tc.cover_density = 150;
         w.tiles[tile_bare] = tc;
     }
 
