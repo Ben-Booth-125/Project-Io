@@ -218,7 +218,7 @@ fixture make_fixture(recipe_registry& reg, float base_price)
     {
         tile_component tc{};
         tc.body        = f.body;
-        tc.composition = terrain_composition::rocky;
+        tc.substrate = terrain_substrate::rocky;
         tc.resource_deposit[ri(resource_type::iron_ore)]   = 2.0f;
         tc.resource_remaining[ri(resource_type::iron_ore)] = 1.0e6f;
         tc.hazard_level = 0.0f;

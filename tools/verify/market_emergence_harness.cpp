@@ -63,7 +63,7 @@ int main()
     { body_component bc{}; bc.orbital_radius_au = 5.0f; bc.parent = null_entity; w.bodies[outpost_body] = bc; }
 
     const entity_id outpost_tile = w.create_entity();
-    { tile_component tc{}; tc.body = outpost_body; tc.composition = terrain_composition::rocky;
+    { tile_component tc{}; tc.body = outpost_body; tc.substrate = terrain_substrate::rocky;
       tc.resource_deposit[ri(resource_type::iron_ore)] = 100.0f; w.tiles[outpost_tile] = tc; }
 
     const entity_id corp = w.create_entity();

@@ -78,7 +78,7 @@ void generate_rivers(world& w, const std::vector<entity_id>& tile_ids,
     for (int idx = 0; idx < total; ++idx)
     {
         const tile_component* tc = tc_at(idx);
-        if (!tc || tc->composition == terrain_composition::ocean)
+        if (!tc || tc->substrate == terrain_substrate::ocean)
             continue;
         if (tc->landform == terrain_landform::mountain || tc->landform == terrain_landform::highland)
             candidates.push_back(idx);
@@ -129,7 +129,7 @@ void generate_rivers(world& w, const std::vector<entity_id>& tile_ids,
         for (int idx = 0; idx < total; ++idx)
         {
             const tile_component* tc = tc_at(idx);
-            if (tc && tc->composition == terrain_composition::ocean)
+            if (tc && tc->substrate == terrain_substrate::ocean)
             {
                 flooded[static_cast<std::size_t>(idx)] = 1;
                 q.push(node{ height[static_cast<std::size_t>(idx)], idx });
@@ -230,7 +230,7 @@ void generate_rivers(world& w, const std::vector<entity_id>& tile_ids,
             n_tc->river_edges       |= bit_n;
             n_tc->river_downstream  &= static_cast<std::uint8_t>(~bit_n); // inflow into n
 
-            if (n_tc->composition == terrain_composition::ocean)
+            if (n_tc->substrate == terrain_substrate::ocean)
                 break; // reached the sea — trace complete.
 
             cur = best_idx;

@@ -69,7 +69,7 @@ bool crossings_are_straits(const world& w, const logistics_path& p)
     for (const entity_id t : p.tiles)
     {
         const auto it = w.tiles.find(t);
-        const bool ocean = (it != w.tiles.end() && it->second.composition == terrain_composition::ocean);
+        const bool ocean = (it != w.tiles.end() && it->second.substrate == terrain_substrate::ocean);
         if (!ocean)
         {
             run = 0;
@@ -94,7 +94,7 @@ void stamp_edge(world& w, entity_id body, entity_id ta, entity_id tb, std::uint8
     for (const entity_id t : p.tiles)
     {
         const auto it = w.tiles.find(t);
-        if (it == w.tiles.end() || it->second.composition == terrain_composition::ocean)
+        if (it == w.tiles.end() || it->second.substrate == terrain_substrate::ocean)
             continue;
         it->second.road_level = std::max(it->second.road_level, level);
     }
@@ -134,7 +134,7 @@ void generate_roads(world& w, entity_id body)
     for (const road_node& node : nodes)
     {
         const auto it = w.tiles.find(node.tile);
-        if (it != w.tiles.end() && it->second.composition != terrain_composition::ocean)
+        if (it != w.tiles.end() && it->second.substrate != terrain_substrate::ocean)
             it->second.road_level = std::max(it->second.road_level, kTrack);
     }
 

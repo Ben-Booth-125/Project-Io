@@ -98,12 +98,18 @@ void check(bool ok, const char* label)
     if (!ok) ++g_failures;
 }
 
-constexpr int kNumComposition = 12; // terrain_composition, barren..urban
+// BL-519: the axis split replaced one 12-value enum with substrate x cover, so
+// this census keeps ONE row per substrate and reports cover separately rather
+// than re-flattening the pair back into a 12-row table.
+constexpr int kNumSubstrate = 8;  // terrain_substrate, barren..ocean
+constexpr int kNumCover     = 10; // terrain_cover, none..urban
 constexpr int kNumLandform    = 7;  // terrain_landform, plains..rift
 
-const char* const kCompositionName[kNumComposition] = {
-    "barren", "rocky", "volcanic", "icy", "tundra", "grassland",
-    "forest", "wetland", "ocean", "regolith", "metallic", "urban" };
+const char* const kSubstrateName[kNumSubstrate] = {
+    "barren", "rocky", "sedimentary", "volcanic", "metallic", "regolith", "icy", "ocean" };
+
+const char* const kCoverName[kNumCover] = {
+    "none", "grass", "scrub", "forest", "marsh", "snow", "dunes", "ash", "salt", "urban" };
 
 const char* const kLandformName[kNumLandform] = {
     "plains", "highland", "mountain", "canyon", "valley", "crater", "rift" };
@@ -162,7 +168,8 @@ struct census_row
     std::string home_name;
     int home_w = 0, home_h = 0;
     int tiles_total = 0, land = 0, ocean = 0;
-    std::array<int, kNumComposition> comp{};
+    std::array<int, kNumSubstrate> comp{};   ///< tiles per SUBSTRATE (BL-519)
+    std::array<int, kNumCover>     cover{}; ///< tiles per COVER (BL-519)
     std::array<int, kNumLandform>    landform{}; // land only
 
     int nations = 0;
@@ -232,10 +239,12 @@ census_row measure(const world& w, uint32_t seed)
     {
         if (tc.body != home) continue;
         ++r.tiles_total;
-        const int ci = static_cast<int>(tc.composition);
-        if (ci >= 0 && ci < kNumComposition) ++r.comp[static_cast<std::size_t>(ci)];
+        const int si = static_cast<int>(tc.substrate);
+        if (si >= 0 && si < kNumSubstrate) ++r.comp[static_cast<std::size_t>(si)];
+        const int vi = static_cast<int>(tc.cover);
+        if (vi >= 0 && vi < kNumCover) ++r.cover[static_cast<std::size_t>(vi)];
 
-        const bool ocean = (tc.composition == terrain_composition::ocean);
+        const bool ocean = (tc.substrate == terrain_substrate::ocean);
         if (ocean) { ++r.ocean; }
         else
         {
@@ -429,11 +438,16 @@ void print_row(const census_row& r)
                 r.ocean, r.tiles_total ? 100.0 * r.ocean / r.tiles_total : 0.0,
                 static_cast<long long>(r.ms));
 
-    std::printf("  composition (of all tiles):");
-    for (int i = 0; i < kNumComposition; ++i)
+    std::printf("  substrate (of all tiles):");
+    for (int i = 0; i < kNumSubstrate; ++i)
         if (r.comp[static_cast<std::size_t>(i)] > 0)
-            std::printf("  %s %d (%.1f%%)", kCompositionName[i], r.comp[static_cast<std::size_t>(i)],
+            std::printf("  %s %d (%.1f%%)", kSubstrateName[i], r.comp[static_cast<std::size_t>(i)],
                         r.tiles_total ? 100.0 * r.comp[static_cast<std::size_t>(i)] / r.tiles_total : 0.0);
+    std::printf("\n  cover (of all tiles):");
+    for (int i = 0; i < kNumCover; ++i)
+        if (r.cover[static_cast<std::size_t>(i)] > 0)
+            std::printf("  %s %d (%.1f%%)", kCoverName[i], r.cover[static_cast<std::size_t>(i)],
+                        r.tiles_total ? 100.0 * r.cover[static_cast<std::size_t>(i)] / r.tiles_total : 0.0);
     std::printf("\n  landform    (of land):");
     for (int i = 0; i < kNumLandform; ++i)
         std::printf("  %s %d (%.1f%%)", kLandformName[i], r.landform[static_cast<std::size_t>(i)],

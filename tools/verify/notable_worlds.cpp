@@ -124,7 +124,7 @@ world_score score_seed(uint32_t campaign_seed, bool keep_map)
             tile_seed, 1.0f, &st, nullptr, &cs.height_bias, &cs.convergent);
         std::vector<char> po(probe.size(), 0);
         for (std::size_t i = 0; i < probe.size(); ++i)
-            if (scratch.tiles.at(probe[i]).composition == terrain_composition::ocean) po[i] = 1;
+            if (scratch.tiles.at(probe[i]).substrate == terrain_substrate::ocean) po[i] = 1;
         std::vector<int> psz;
         label(po, psz);
         int pmain = -1, pmain_sz = 0;
@@ -162,7 +162,7 @@ world_score score_seed(uint32_t campaign_seed, bool keep_map)
     for (int i = 0; i < static_cast<int>(ids.size()); ++i)
     {
         const auto& t = w.tiles.at(ids[static_cast<std::size_t>(i)]);
-        if (t.composition == terrain_composition::ocean) ocean[static_cast<std::size_t>(i)] = 1;
+        if (t.substrate == terrain_substrate::ocean) ocean[static_cast<std::size_t>(i)] = 1;
         else                                             land[static_cast<std::size_t>(i)]  = 1;
     }
 
@@ -201,9 +201,9 @@ world_score score_seed(uint32_t campaign_seed, bool keep_map)
             shore[static_cast<std::size_t>(i)] = 1;
             ++shore_n;
             const auto& t = w.tiles.at(ids[static_cast<std::size_t>(i)]);
-            if (t.composition == terrain_composition::grassland
-                || t.composition == terrain_composition::forest
-                || t.composition == terrain_composition::wetland) ++arable_n;
+            if (t.cover == terrain_cover::grass
+                || t.cover == terrain_cover::forest
+                || t.cover == terrain_cover::marsh) ++arable_n;
             if (t.landform == terrain_landform::mountain
                 || t.landform == terrain_landform::highland) ++relief_n;
             if (t.river_edges != 0) ++river_n;

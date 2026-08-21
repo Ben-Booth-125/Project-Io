@@ -72,24 +72,91 @@ ImU32 contrast_ink(ImU32 bg)
                          : IM_COL32(238, 240, 246, 225);
 }
 
-ImU32 terrain_colour(terrain_composition t)
+ImU32 substrate_colour(terrain_substrate sub)
 {
-    switch (t)
+    switch (sub)
     {
-        case terrain_composition::barren:    return IM_COL32(170, 145, 100, 255);
-        case terrain_composition::rocky:     return IM_COL32(112, 105,  95, 255);
-        case terrain_composition::volcanic:  return IM_COL32(135,  55,  28, 255);
-        case terrain_composition::icy:       return IM_COL32(200, 224, 236, 255);
-        case terrain_composition::tundra:    return IM_COL32(140, 140, 118, 255);
-        case terrain_composition::grassland: return IM_COL32( 96, 150,  72, 255);
-        case terrain_composition::forest:    return IM_COL32( 48, 102,  56, 255);
-        case terrain_composition::wetland:   return IM_COL32( 78, 120,  92, 255);
-        case terrain_composition::ocean:     return IM_COL32( 40,  80, 160, 255);
-        case terrain_composition::regolith:  return IM_COL32(138, 130, 120, 255);
-        case terrain_composition::metallic:  return IM_COL32(158, 150, 140, 255);
-        case terrain_composition::urban:     return IM_COL32(120, 118, 128, 255); // BL-366: built-over grey.
+        case terrain_substrate::barren:   return IM_COL32(170, 145, 100, 255);
+        case terrain_substrate::rocky:    return IM_COL32(112, 105,  95, 255);
+        case terrain_substrate::volcanic: return IM_COL32(135,  55,  28, 255);
+        case terrain_substrate::icy:      return IM_COL32(200, 224, 236, 255);
+        case terrain_substrate::ocean:    return IM_COL32( 40,  80, 160, 255);
+        case terrain_substrate::regolith: return IM_COL32(138, 130, 120, 255);
+        case terrain_substrate::metallic: return IM_COL32(158, 150, 140, 255);
+        // BARE SOIL — a tan that no pre-split composition had, because the old
+        // model could not draw sedimentary ground without something growing on
+        // it. It is the base every biotic cover below is blended INTO, and the
+        // four canonical blends are calibrated against exactly this value.
+        case terrain_substrate::sedimentary: return IM_COL32(150, 138, 110, 255);
     }
     return IM_COL32( 60,  60,  60, 255);
+}
+
+namespace {
+
+/// The colour a cover tends toward at FULL density. Deliberately more saturated
+/// than anything that reaches the screen: the drawn colour is the substrate
+/// blended this far by the tile's density, so these are endpoints, not samples.
+///
+/// CALIBRATED (BL-519). The four biotic endpoints are solved so that each old
+/// composition, at the density decompose_biome grades it to, reproduces its
+/// pre-split colour EXACTLY on sedimentary ground:
+///
+///   grassland = sedimentary + grass  @150 -> (96,150,72)   the old grassland
+///   forest    = sedimentary + forest @205 -> (48,102,56)   the old forest
+///   wetland   = sedimentary + marsh  @170 -> (78,120,92)   the old wetland
+///   tundra    = sedimentary + scrub  @ 75 -> (140,140,118) the old tundra
+///
+/// So the map a player already knows is pixel-identical, and what is NEW is that
+/// a forested crag now reads as rock tinted green rather than as flat woodland.
+/// Blend that ROUNDS. `blend` above truncates, and the four calibrated cover
+/// endpoints land a channel short of their pre-split colour under truncation
+/// (grassland came out (95,149,71) instead of (96,150,72)). Rounding here rather
+/// than fixing `blend` keeps every OTHER colour path in this file bit-identical,
+/// which matters because the visual goldens compare pixels.
+ImU32 blend_round(ImU32 a, ImU32 b, float t)
+{
+    t = std::clamp(t, 0.0f, 1.0f);
+    auto ch = [&](int shift)
+    {
+        const float av = static_cast<float>((a >> shift) & 0xFF);
+        const float bv = static_cast<float>((b >> shift) & 0xFF);
+        return static_cast<int>(std::lround(av + (bv - av) * t));
+    };
+    return IM_COL32(ch(IM_COL32_R_SHIFT), ch(IM_COL32_G_SHIFT), ch(IM_COL32_B_SHIFT),
+                    (a >> IM_COL32_A_SHIFT) & 0xFF);
+}
+
+ImU32 cover_endpoint(terrain_cover c)
+{
+    switch (c)
+    {
+        case terrain_cover::grass:  return IM_COL32( 58, 158,  45, 255);
+        case terrain_cover::forest: return IM_COL32( 23,  93,  43, 255);
+        case terrain_cover::marsh:  return IM_COL32( 42, 111,  83, 255);
+        case terrain_cover::scrub:  return IM_COL32(116, 145, 137, 255);
+        case terrain_cover::snow:   return IM_COL32(240, 246, 252, 255);
+        case terrain_cover::dunes:  return IM_COL32(214, 190, 138, 255);
+        case terrain_cover::ash:    return IM_COL32( 78,  72,  70, 255);
+        case terrain_cover::salt:   return IM_COL32(232, 228, 216, 255);
+        case terrain_cover::urban:  return IM_COL32(120, 118, 128, 255); // BL-366: built-over grey.
+        case terrain_cover::none:   break;
+    }
+    return IM_COL32(0, 0, 0, 0);
+}
+
+} // namespace
+
+ImU32 terrain_colour(terrain_substrate sub, terrain_cover cov, std::uint8_t density)
+{
+    const ImU32 base = substrate_colour(sub);
+    if (cov == terrain_cover::none || density == 0)
+        return base;
+    // Urban is opaque, not a tint: a paved tile is not "grey-ish ground", and
+    // letting the geology show through it would misread as a lens artefact.
+    if (cov == terrain_cover::urban)
+        return cover_endpoint(terrain_cover::urban);
+    return blend_round(base, cover_endpoint(cov), cover_fraction(density));
 }
 
 void hex_vertices(ImVec2 out[6], float cx, float cy, float r)
@@ -192,7 +259,8 @@ void draw_tile_neighbourhood(ImDrawList* dl, world& w, entity_id centre_tile,
             ImU32 fill = built_plate;
             if (!is_built)
             {
-                fill = have_tile ? terrain_colour(tt->second.composition)
+                fill = have_tile ? terrain_colour(tt->second.substrate, tt->second.cover,
+                                                 tt->second.cover_density)
                                  : IM_COL32(60, 60, 60, 255);
                 // Same landform channel the Planetary canvas draws (BL-231) — this
                 // view exists so the two surfaces cannot drift apart.

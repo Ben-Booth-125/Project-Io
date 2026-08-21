@@ -186,7 +186,7 @@ scenario make_scenario(float stock = 100.0f, float balance = 1000.0f)
             tc.body        = s.body;
             tc.grid_x      = c;
             tc.grid_y      = r;
-            tc.composition = terrain_composition::grassland;
+            tc.substrate = terrain_substrate::sedimentary; tc.cover = terrain_cover::grass; tc.cover_density = 150;
             tc.landform    = terrain_landform::plains;
             s.w.tiles[t] = tc;
         }

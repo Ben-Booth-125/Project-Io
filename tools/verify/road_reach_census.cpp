@@ -60,7 +60,7 @@ seed_result census(const world& w)
     {
         if (tc.road_level == 0)
             continue;
-        if (tc.composition == terrain_composition::ocean)
+        if (tc.substrate == terrain_substrate::ocean)
             ++r.roaded_ocean;
         const auto it = w.tile_to_nation.find(tid);
         if (it != w.tile_to_nation.end() && it->second != null_entity)

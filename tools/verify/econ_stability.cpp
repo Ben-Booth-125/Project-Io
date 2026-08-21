@@ -113,7 +113,7 @@ static built_world build_world(world& w, float iron_base, float steel_base, uint
             {
                 tile_component tc{};
                 tc.body = body;
-                tc.composition = terrain_composition::rocky;
+                tc.substrate = terrain_substrate::rocky;
                 tc.resource_deposit[ri(resource_type::iron_ore)]   = 2.0f;
                 // ~20/tick at full rate => the base seed exhausts partway through
                 // 100 ticks, exercising the taper + exhaustion path under the
@@ -146,7 +146,7 @@ static built_world build_world(world& w, float iron_base, float steel_base, uint
             {
                 tile_component tc{};
                 tc.body = body;
-                tc.composition = terrain_composition::grassland;
+                tc.substrate = terrain_substrate::sedimentary; tc.cover = terrain_cover::grass; tc.cover_density = 150;
                 w.tiles[tile_p] = tc;
             }
             const entity_id bld_p = w.create_entity();

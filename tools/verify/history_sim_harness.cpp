@@ -127,15 +127,24 @@ constexpr int syn_gh = 90;
 /// their ground is that comparison.
 struct flat_terrain
 {
-    std::vector<terrain_composition> composition;
-    std::vector<terrain_landform>    landform;
+    std::vector<terrain_substrate> substrate;
+    std::vector<terrain_cover>     cover;
+    std::vector<std::uint8_t>      density;
+    std::vector<terrain_landform>  landform;
 
-    flat_terrain(int gw, int gh, terrain_composition c, terrain_landform l)
-        : composition(static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh), c)
+    flat_terrain(int gw, int gh, terrain_substrate su, terrain_cover cv, std::uint8_t d,
+                 terrain_landform l)
+        : substrate(static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh), su)
+        , cover(static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh), cv)
+        , density(static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh), d)
         , landform(static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh), l)
-    {}
+    {
+    }
 
-    sim_terrain_view view() const { return sim_terrain_view{&composition, &landform}; }
+    sim_terrain_view view() const
+    {
+        return sim_terrain_view{ &substrate, &cover, &density, &landform };
+    }
 };
 
 /// Did two runs produce a different history at all? The inertness check.
@@ -428,9 +437,9 @@ int main()
         ps.neighbour_radius = 40;
 
         const flat_terrain plains(syn_gw, syn_gh,
-                                  terrain_composition::grassland, terrain_landform::plains);
+                                  terrain_substrate::sedimentary, terrain_cover::grass, 150, terrain_landform::plains);
         const flat_terrain alps(syn_gw, syn_gh,
-                                terrain_composition::rocky, terrain_landform::mountain);
+                                terrain_substrate::rocky, terrain_cover::none, 0, terrain_landform::mountain);
 
         settlement_state wp_ = two_polity_world(6);
         settlement_state wm  = two_polity_world(6);
@@ -468,9 +477,9 @@ int main()
         ps.terrain_reach_cost_q = 400;
 
         const flat_terrain plains(syn_gw, syn_gh,
-                                  terrain_composition::grassland, terrain_landform::plains);
+                                  terrain_substrate::sedimentary, terrain_cover::grass, 150, terrain_landform::plains);
         const flat_terrain alps(syn_gw, syn_gh,
-                                terrain_composition::rocky, terrain_landform::mountain);
+                                terrain_substrate::rocky, terrain_cover::none, 0, terrain_landform::mountain);
 
         settlement_state wp_ = two_polity_world(20);
         settlement_state wm  = two_polity_world(20);

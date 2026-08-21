@@ -29,14 +29,14 @@ void check(bool ok, const char* label)
 std::size_t ri(resource_type r) { return static_cast<std::size_t>(r); }
 
 entity_id make_tile(world& w, entity_id body, int gx, int gy,
-                    terrain_composition comp, float iron_richness)
+                    terrain_substrate sub, float iron_richness)
 {
     const entity_id t = w.create_entity();
     tile_component tc{};
     tc.body        = body;
     tc.grid_x      = gx;
     tc.grid_y      = gy;
-    tc.composition = comp;
+    tc.substrate = sub;
     tc.landform    = terrain_landform::plains;
     if (iron_richness > 0.0f)
     {
@@ -83,8 +83,8 @@ scene make_scene()
         w.bodies[s.known] = b;
     }
 
-    s.t_home  = make_tile(w, s.body,  0, 0, terrain_composition::rocky, 1.0f);
-    s.t_known = make_tile(w, s.known, 0, 0, terrain_composition::rocky, 1.0f);
+    s.t_home  = make_tile(w, s.body,  0, 0, terrain_substrate::rocky, 1.0f);
+    s.t_known = make_tile(w, s.known, 0, 0, terrain_substrate::rocky, 1.0f);
 
     s.market = w.create_entity();
     {

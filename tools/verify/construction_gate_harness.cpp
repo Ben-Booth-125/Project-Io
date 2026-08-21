@@ -44,7 +44,7 @@ scene make_scene(const recipe_registry& reg, float steel_supply)
     {
         tile_component tc{};
         tc.body = body;
-        tc.composition = terrain_composition::grassland;
+        tc.substrate = terrain_substrate::sedimentary; tc.cover = terrain_cover::grass; tc.cover_density = 150;
         w.tiles[tile] = tc;
     }
 

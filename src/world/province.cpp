@@ -207,7 +207,7 @@ void grow_regions(body_work& bw, const world& w, uint32_t seed, std::vector<regi
             if (n == null_entity)
                 continue;
             const auto nit = w.tiles.find(n);
-            if (nit == w.tiles.end() || nit->second.composition == terrain_composition::ocean)
+            if (nit == w.tiles.end() || nit->second.substrate == terrain_substrate::ocean)
                 continue;
             if (bw.owner.find(n) != bw.owner.end())
                 continue;
@@ -295,7 +295,7 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
             const auto tit = w.tiles.find(t);
             if (tit == w.tiles.end())
                 continue;
-            if (tit->second.composition == terrain_composition::ocean)
+            if (tit->second.substrate == terrain_substrate::ocean)
                 continue;
             bw.land.push_back(t);
         }
@@ -324,7 +324,7 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
                 const auto tit = w.tiles.find(tile_id);
                 if (tit == w.tiles.end() || tit->second.body != body_id)
                     continue;
-                if (tit->second.composition == terrain_composition::ocean)
+                if (tit->second.substrate == terrain_substrate::ocean)
                     continue;
 
                 const int clamped = scale < 1 ? 1 : (scale > 5 ? 5 : scale);
@@ -373,7 +373,7 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
                     const entity_id n = bw.grid[static_cast<std::size_t>(ny) * gw + nx];
                     const auto      nit = (n == null_entity) ? w.tiles.end() : w.tiles.find(n);
                     if (nit == w.tiles.end()
-                        || nit->second.composition == terrain_composition::ocean)
+                        || nit->second.substrate == terrain_substrate::ocean)
                     {
                         walls += k_no_land_side_cost;
                         continue;
@@ -423,7 +423,7 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
                                 continue;
                             const auto nit = w.tiles.find(n);
                             if (nit == w.tiles.end()
-                                || nit->second.composition == terrain_composition::ocean)
+                                || nit->second.substrate == terrain_substrate::ocean)
                                 continue;
                             if (seed_blocked.find(n) != seed_blocked.end())
                                 continue;
@@ -552,7 +552,7 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
                             continue;
                         const auto nit = w.tiles.find(n);
                         if (nit == w.tiles.end()
-                            || nit->second.composition == terrain_composition::ocean)
+                            || nit->second.substrate == terrain_substrate::ocean)
                             continue;
                         const auto oit = bw.owner.find(n);
                         if (oit == bw.owner.end())

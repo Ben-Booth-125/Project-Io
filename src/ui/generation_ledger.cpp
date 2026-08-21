@@ -1,7 +1,7 @@
 #include "generation_ledger.hpp"
 
 #include "foldout_column.hpp" // the shell-column host + nav_button's toggle rule
-#include "presentation.hpp"   // composition_name / landform_name / resource_name
+#include "presentation.hpp"   // terrain_name / substrate_name / cover_name / landform_name
 #include "world/components.hpp"
 
 #include <imgui.h>
@@ -187,7 +187,7 @@ void draw_tile_derivation(const world& w, const generation_record& rec,
     const float  height    = rec.height[idx];
     const float  moisture  = rec.moisture[idx];
     const std::uint8_t bnd = rec.band[idx];
-    const bool   is_ocean  = (t.composition == terrain_composition::ocean);
+    const bool   is_ocean  = (t.substrate == terrain_substrate::ocean);
 
     ImGui::Text("Tile %d, %d", t.grid_x, t.grid_y);
     ImGui::Separator();
@@ -221,9 +221,25 @@ void draw_tile_derivation(const world& w, const generation_record& rec,
                 static_cast<double>(moisture), moisture_col_name(moisture_col(moisture)));
     ImGui::Spacing();
 
-    // --- 3. Composition, and which branch chose it -------------------------
-    ImGui::TextDisabled("3  COMPOSITION");
-    ImGui::Text("%s", composition_name(t.composition));
+    // --- 3. The terrain axes, and which branch chose each ------------------
+    // BL-519 split what used to be one line into three, and the ledger is the one
+    // surface where that MUST show: its whole job is explaining why a tile came
+    // out as it did, and "substrate rocky, cover forest" is a different (and more
+    // honest) explanation than "composition forest" ever was.
+    ImGui::TextDisabled("3  TERRAIN");
+    ImGui::Text("%s", terrain_name(t).c_str());
+    ImGui::TextDisabled("   substrate  %s   (Pass 4a/4c - the biome table, then decomposed)",
+                        substrate_name(t.substrate));
+    if (t.cover == terrain_cover::none)
+    {
+        ImGui::TextDisabled("   cover      none   (bare ground is a real answer, not a gap)");
+    }
+    else
+    {
+        const char* dw = cover_density_word(t.cover_density);
+        ImGui::TextDisabled("   cover      %s, %s (density %u/255)", cover_name(t.cover),
+                            dw ? dw : "-", static_cast<unsigned>(t.cover_density));
+    }
     if (is_ocean)
     {
         ImGui::TextWrapped("Set by Pass 2, not the climate table - an ocean tile never "
@@ -251,7 +267,7 @@ void draw_tile_derivation(const world& w, const generation_record& rec,
             else
                 ImGui::TextWrapped("Airless and cool: 65/30 regolith / rocky.");
         }
-        else if (t.composition == terrain_composition::volcanic && (bnd == 3 || bnd == 4))
+        else if (t.substrate == terrain_substrate::volcanic && (bnd == 3 || bnd == 4))
         {
             ImGui::TextWrapped("The volcanic roll fired: only the subtropical and tropical "
                                "bands offer it, at p = %.3f for %s geological activity.",
@@ -261,7 +277,7 @@ void draw_tile_derivation(const world& w, const generation_record& rec,
                                    p.geology == geological_activity::low      ? 0.040f : 0.0f),
                                geology_name(p.geology));
         }
-        else if (t.composition == terrain_composition::wetland && bnd == 2)
+        else if (t.cover == terrain_cover::marsh && bnd == 2)
         {
             // The table's wet cell yields wetland in the subtropical and tropical
             // bands ONLY, so a temperate marsh can only have come from Pass 4b.
@@ -274,7 +290,7 @@ void draw_tile_derivation(const world& w, const generation_record& rec,
             ImGui::TextWrapped("The %s climate table, cell (%s, %s).%s",
                                biotic ? "biotic" : "abiotic",
                                band_name(bnd), moisture_col_name(moisture_col(moisture)),
-                               t.composition == terrain_composition::wetland
+                               t.cover == terrain_cover::marsh
                                    ? " Pass 4b drainage can also produce wetland here; the "
                                      "record does not distinguish the two in this band."
                                    : "");
@@ -350,13 +366,13 @@ void draw_tile_derivation(const world& w, const generation_record& rec,
     }
     if (shown == 0)
         ImGui::TextDisabled("None - the %s / %s profile rolls no deposit here.",
-                            composition_name(t.composition), landform_name(t.landform));
+                            terrain_name(t).c_str(), landform_name(t.landform));
 
     ImGui::TextWrapped("Rolled from the (%s, %s) deposit profile, then post-multiplied by "
                        "the abundance scalar (x%.2f), the Planetology endowment, and the ore-"
                        "region field. Those multiplies draw no RNG, so the figure above is "
                        "the roll times a known set of factors - not a separate draw.",
-                       composition_name(t.composition), landform_name(t.landform),
+                       terrain_name(t).c_str(), landform_name(t.landform),
                        static_cast<double>(entry.tiles.deposit_scalar));
 }
 
@@ -514,24 +530,35 @@ void draw_generation_ledger(const world& w, ui_state& s,
     // Histograms over the LIVE tiles: the record holds the intermediates, the
     // world holds the outcome, and the outcome is what a balance question is about.
     const std::vector<entity_id> tiles = raster_index(w, subject, rec->gw, rec->gh);
-    std::array<int, 12> comp_counts{};
+    // BL-519: two histograms where there was one. Collapsing them back into a
+    // single 12-row table is exactly the overloading the axis split undid.
+    std::array<int, 8>  sub_counts{};
+    std::array<int, 10> cov_counts{};
     std::array<int, 7>  land_counts{};
     int counted = 0;
     for (entity_id id : tiles)
     {
         if (id == null_entity) continue;
         const tile_component& t = w.tiles.at(id);
-        const std::size_t c = static_cast<std::size_t>(t.composition);
-        const std::size_t l = static_cast<std::size_t>(t.landform);
-        if (c < comp_counts.size()) ++comp_counts[c];
+        const std::size_t su = static_cast<std::size_t>(t.substrate);
+        const std::size_t cv = static_cast<std::size_t>(t.cover);
+        const std::size_t l  = static_cast<std::size_t>(t.landform);
+        if (su < sub_counts.size()) ++sub_counts[su];
+        if (cv < cov_counts.size()) ++cov_counts[cv];
         if (l < land_counts.size()) ++land_counts[l];
         ++counted;
     }
 
-    ImGui::TextDisabled("COMPOSITION  (%d tiles)", counted);
-    for (std::size_t c = 0; c < comp_counts.size(); ++c)
-        histogram_row(composition_name(static_cast<terrain_composition>(c)),
-                      comp_counts[c], counted);
+    ImGui::TextDisabled("SUBSTRATE  (%d tiles)", counted);
+    for (std::size_t c = 0; c < sub_counts.size(); ++c)
+        histogram_row(substrate_name(static_cast<terrain_substrate>(c)),
+                      sub_counts[c], counted);
+    ImGui::Spacing();
+
+    ImGui::TextDisabled("COVER");
+    for (std::size_t c = 0; c < cov_counts.size(); ++c)
+        histogram_row(cover_name(static_cast<terrain_cover>(c)),
+                      cov_counts[c], counted);
     ImGui::Spacing();
 
     ImGui::TextDisabled("LANDFORM");

@@ -136,7 +136,7 @@ sample run_one(const world_preferences& pref, uint32_t campaign_seed)
             tile_seed, 1.0f, &st, nullptr, &cs.height_bias, &cs.convergent);
         std::vector<char> pocean(probe.size(), 0);
         for (std::size_t i = 0; i < probe.size(); ++i)
-            if (scratch.tiles.at(probe[i]).composition == terrain_composition::ocean) pocean[i] = 1;
+            if (scratch.tiles.at(probe[i]).substrate == terrain_substrate::ocean) pocean[i] = 1;
         std::vector<int> psizes;
         label(pocean, psizes);
         int pmain = -1, pmain_sz = 0;
@@ -176,12 +176,12 @@ sample run_one(const world_preferences& pref, uint32_t campaign_seed)
     for (int i = 0; i < static_cast<int>(ids.size()); ++i)
     {
         const auto& t = w.tiles.at(ids[static_cast<std::size_t>(i)]);
-        if (t.composition == terrain_composition::ocean) continue;
+        if (t.substrate == terrain_substrate::ocean) continue;
         land[static_cast<std::size_t>(i)] = 1;
         ++n_land;
-        if (t.composition == terrain_composition::forest) ++n_forest;
-        if (t.composition == terrain_composition::barren) ++n_barren;
-        if (t.composition == terrain_composition::icy)    ++n_icy;
+        if (t.cover == terrain_cover::forest) ++n_forest;
+        if (t.substrate == terrain_substrate::barren) ++n_barren;
+        if (t.substrate == terrain_substrate::icy)    ++n_icy;
         if (t.landform == terrain_landform::mountain || t.landform == terrain_landform::highland) ++n_relief;
         coal_sum   += static_cast<double>(t.resource_deposit[static_cast<std::size_t>(resource_type::coal)]);
         iron_sum   += static_cast<double>(t.resource_deposit[static_cast<std::size_t>(resource_type::iron_ore)]);

@@ -88,7 +88,7 @@ entity_id make_row_body(world& w, int gw, terrain_landform lf = terrain_landform
         tc.body        = body;
         tc.grid_x      = c;
         tc.grid_y      = 0;
-        tc.composition = terrain_composition::grassland;
+        tc.substrate = terrain_substrate::sedimentary; tc.cover = terrain_cover::grass; tc.cover_density = 150;
         tc.landform    = lf;
         w.tiles[t]     = tc;
     }
@@ -169,7 +169,7 @@ entity_id make_grid_body(world& w, int gw, int gh,
             tc.body        = body;
             tc.grid_x      = c;
             tc.grid_y      = r;
-            tc.composition = terrain_composition::grassland;
+            tc.substrate = terrain_substrate::sedimentary; tc.cover = terrain_cover::grass; tc.cover_density = 150;
             tc.landform    = lf;
             w.tiles[t]     = tc;
         }
@@ -334,7 +334,7 @@ void m1_march_unit_legality()
         const entity_id ob = w3.create_entity();
         body_component obc3{}; obc3.grid_width = 1; obc3.grid_height = 1; w3.bodies[ob] = obc3;
         const entity_id ot3 = w3.create_entity();
-        tile_component otc3{}; otc3.body = ob; otc3.composition = terrain_composition::ocean;
+        tile_component otc3{}; otc3.body = ob; otc3.substrate = terrain_substrate::ocean;
         w3.tiles[ot3] = otc3;
         partition(w3);
         check(prov_of(w3, ot3) == 0, "an ocean tile belongs to NO province — water is unreachable by province id");

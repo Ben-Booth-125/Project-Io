@@ -61,19 +61,27 @@ space access opens.
 
 Raw materials are extracted by buildings placed on tiles with matching deposits.
 
+> **Which terrain axis a deposit follows (BL-519, 2026-08-21).** Tiles carry three axes —
+> `terrain_substrate` (what the ground is made of), `terrain_cover` (what sits on it, graded by
+> `cover_density`) and `terrain_landform` (its shape). **Ore follows the substrate; timber and
+> produce follow the cover.** Before the split there was one slot for both, so naming a forest cost
+> you the geology underneath it — which meant a forested metallic mountain could carry timber *or*
+> ore and never both. It now carries both. The "Terrain affinity" columns below name the axis they
+> mean; `docs/economy/TILES.md` is the authority for the axes themselves.
+
 ### Earth-sourced
 
 Available in Era 0 and all subsequent eras. Found predominantly on habitable or rocky planets.
 
 | Resource | Terrain affinity | Notes |
 |----------|-----------------|-------|
-| Iron ore | Barren, rocky, volcanic | Most common structural mineral; the backbone of early industry. |
-| Coal | Barren (sedimentary) | Carbon-rich energy source; consumed as fuel and reagent in smelting. |
-| Petroleum | Barren (geological) | Liquid hydrocarbon; chemical feedstock and fuel precursor. |
-| Silica | Barren, rocky | Silicon dioxide; raw input for semiconductor-grade silicon and bulk construction. |
-| Copper ore | Rocky, volcanic | Primary conductive metal ore. |
-| Rare earth ore | Volcanic, rocky | Suite of critical minerals used in electronics and high-performance magnets. Low deposit concentration; high base price. |
-| Agricultural produce | High-habitability, water-adjacent | Food crop output. Only viable on planets with substantial surface water and habitability above a settlement threshold. Three producers as of BL-166/BL-168: the Farm (terrain deposit), the Hydroponics Bay (a processing_facility recipe, only where the Farm's deposit was NOT seeded), and the Fishing Wharf (an extraction_site gated on coastal adjacency instead of a deposit) — see `docs/economy/PRODUCTION.md` § Extraction / § Processing. |
+| Iron ore | **Substrate**: barren, rocky, volcanic, metallic; also sedimentary under scrub (surface iron — the old `tundra` row) | Most common structural mineral; the backbone of early industry. |
+| Coal | **Substrate**: barren. Ore-field siting additionally wants low, wet, **vegetated** ground — a **cover** test (grass, forest or marsh; scrub is excluded, sparse woody cover is not the swamp that lays down a seam) | Carbon-rich energy source; consumed as fuel and reagent in smelting. |
+| Petroleum | **Substrate**: barren (marine legacy — ore-field siting wants ground that sat low) | Liquid hydrocarbon; chemical feedstock and fuel precursor. |
+| Silica | **Substrate**: barren, rocky | Silicon dioxide; raw input for semiconductor-grade silicon and bulk construction. |
+| Copper ore | **Substrate**: rocky, volcanic | Primary conductive metal ore. |
+| Rare earth ore | **Substrate**: volcanic, rocky | Suite of critical minerals used in electronics and high-performance magnets. Low deposit concentration; high base price. |
+| Agricultural produce | **Cover**: grass, forest or marsh — scaled by `cover_density` — on **substrate** sedimentary | Food crop output. Only viable on planets with substantial surface water and habitability above a settlement threshold. Three producers as of BL-166/BL-168: the Farm (terrain deposit), the Hydroponics Bay (a processing_facility recipe, only where the Farm's deposit was NOT seeded), and the Fishing Wharf (an extraction_site gated on coastal adjacency instead of a deposit) — see `docs/economy/PRODUCTION.md` § Extraction / § Processing. |
 
 ### Space-sourced
 
@@ -86,7 +94,7 @@ Available in Era 1 and beyond. Found predominantly on moons, asteroids, and oute
 
 | Resource | Terrain affinity | Notes |
 |----------|-----------------|-------|
-| Water | Icy | Deposits on icy terrain, extracted as liquid water; also the baseline life-support input for off-world populations. Trades terrestrially from tick 0 — see note above. |
+| Water | **Substrate**: icy | Deposits on icy ground, extracted as liquid water; also the baseline life-support input for off-world populations. Trades terrestrially from tick 0 — see note above. |
 
 ### Logistics goods (BL-286, 2026-08-04) — five of the eight REMOVED 2026-08-16
 
@@ -177,11 +185,11 @@ Ambient resources are present at low deposit values on almost every eligible til
 
 | Resource | Found on | Extraction building | Notes |
 |----------|----------|---------------------|-------|
-| Stone | All non-water, non-icy compositions | Quarry | Universal construction aggregate; base price very low. |
-| Timber | Forest, wetland; sparse on grassland | Lumber Camp | Construction material and fuel; base price low. |
+| Stone | **Substrate**: everything except ocean and icy | Quarry | Universal construction aggregate; base price very low. |
+| Timber | **Cover**: forest or marsh, scaled by `cover_density` — on ANY substrate, which is the BL-519 payoff: a forested crag now yields timber without giving up its ore | Lumber Camp | Construction material and fuel; base price low. |
 | Sand | Barren plains, barren canyon | Quarry | Glass precursor; construction aggregate. |
-| Clay | Wetland, valley landform | Quarry | Ceramics and construction; base price low. |
-| Peat | Tundra plains and valley | Mine (surface layer) | Fuel; pre-industrial energy source. |
+| Clay | **Cover**: marsh; or the valley **landform** on any ground | Quarry | Ceramics and construction; base price low. |
+| Peat | **Pair**: scrub cover on sedimentary substrate (the old `tundra`), plains or valley | Mine (surface layer) | Fuel; pre-industrial energy source. |
 
 Ambient resources feed into construction material chains (stone → building materials, timber → processed lumber) that reduce construction costs locally and support habitability-track production.
 
@@ -204,10 +212,10 @@ worlds can both have temperate grassland and only one of them grow tobacco.
 
 | Resource | Climate band | Terrain affinity | Notes |
 |---|---|---|---|
-| Tobacco | Temperate / subtropical | Grassland | Cured leaf crop; the archetypal colonial cash crop. |
-| Spices | Tropical | Wetland, forest | Aromatics; the highest value-to-mass good in the set. |
-| Coffee | Subtropical | Forest (highland-favouring) | Stimulant bean; typically the scarcest, and so the widest-margin. |
-| Furs | Subpolar / polar | Tundra | Pelts; the one good that comes from the cold end of the map. |
+| Tobacco | Temperate / subtropical | **Cover**: grass | Cured leaf crop; the archetypal colonial cash crop. |
+| Spices | Tropical | **Cover**: marsh or forest | Aromatics; the highest value-to-mass good in the set. |
+| Coffee | Subtropical | **Cover**: forest (highland-favouring) | Stimulant bean; typically the scarcest, and so the widest-margin. |
+| Furs | Subpolar / polar | **Cover**: scrub — tundra is gone as a terrain (BL-519); scrub is the ground the trapping happens on | Pelts; the one good that comes from the cold end of the map. |
 
 **A world only carries the ones its own biosphere produced** — roughly 2–3 of the four, rolled per
 world. A world with no land biosphere carries none at all, because the C → D stage sits downstream of

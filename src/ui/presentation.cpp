@@ -1,5 +1,7 @@
 #include "presentation.hpp"
 
+#include <string>
+
 #include <cstddef>
 
 namespace ui {
@@ -132,24 +134,109 @@ const char* resource_name(resource_type r)
     return presentation_of(r).name;
 }
 
-const char* composition_name(terrain_composition c)
+const char* substrate_name(terrain_substrate s)
+{
+    switch (s)
+    {
+        case terrain_substrate::barren:      return "Barrens";
+        case terrain_substrate::rocky:       return "Rock";
+        case terrain_substrate::sedimentary: return "Soil";
+        case terrain_substrate::volcanic:    return "Volcanic";
+        case terrain_substrate::metallic:    return "Metallic";
+        case terrain_substrate::regolith:    return "Regolith";
+        case terrain_substrate::icy:         return "Ice";
+        case terrain_substrate::ocean:       return "Ocean";
+    }
+    return "?";
+}
+
+const char* cover_name(terrain_cover c)
 {
     switch (c)
     {
-        case terrain_composition::barren:    return "Barren";
-        case terrain_composition::rocky:     return "Rocky";
-        case terrain_composition::volcanic:  return "Volcanic";
-        case terrain_composition::icy:       return "Icy";
-        case terrain_composition::tundra:    return "Tundra";
-        case terrain_composition::grassland: return "Grassland";
-        case terrain_composition::forest:    return "Forest";
-        case terrain_composition::wetland:   return "Wetland";
-        case terrain_composition::ocean:     return "Ocean";
-        case terrain_composition::regolith:  return "Regolith";
-        case terrain_composition::metallic:  return "Metallic";
-        case terrain_composition::urban:     return "Urban";
+        case terrain_cover::none:   return "None";
+        case terrain_cover::grass:  return "Grass";
+        case terrain_cover::scrub:  return "Scrub";
+        case terrain_cover::forest: return "Forest";
+        case terrain_cover::marsh:  return "Marsh";
+        case terrain_cover::snow:   return "Snow";
+        case terrain_cover::dunes:  return "Dunes";
+        case terrain_cover::ash:    return "Ash";
+        case terrain_cover::salt:   return "Salt";
+        case terrain_cover::urban:  return "Urban";
     }
     return "?";
+}
+
+const char* cover_density_word(std::uint8_t density)
+{
+    if (density == 0)  return nullptr;
+    if (density < 100) return "Sparse";
+    if (density < 190) return "Moderate";
+    return "Dense";
+}
+
+namespace {
+
+/// The cover as an ADJECTIVE, for composing with a substrate noun.
+const char* cover_adjective(terrain_cover c)
+{
+    switch (c)
+    {
+        case terrain_cover::grass:  return "Grassy";
+        case terrain_cover::scrub:  return "Scrubby";
+        case terrain_cover::forest: return "Forested";
+        case terrain_cover::marsh:  return "Marshy";
+        case terrain_cover::snow:   return "Snowy";
+        case terrain_cover::dunes:  return "Dune";
+        case terrain_cover::ash:    return "Ashen";
+        case terrain_cover::salt:   return "Salt-crusted";
+        case terrain_cover::urban:  return "Urban";
+        case terrain_cover::none:   break;
+    }
+    return nullptr;
+}
+
+} // namespace
+
+std::string terrain_name(terrain_substrate sub, terrain_cover cov, std::uint8_t density)
+{
+    (void)density; // the density WORD is a separate line; see cover_density_word
+
+    // Water and paving are answers on their own — neither wants a qualifier, and
+    // urban deliberately says nothing about the ground it stands on even though
+    // (since BL-519) the ground is still there underneath.
+    if (sub == terrain_substrate::ocean) return "Ocean";
+    if (cov == terrain_cover::urban)     return "Urban";
+
+    // THE FAMILIAR NAMES. Every one of these is the exact word the pre-split
+    // model showed for the composition this pair replaces, so the split is
+    // invisible to a player looking at ground they already knew.
+    if (sub == terrain_substrate::sedimentary)
+    {
+        switch (cov)
+        {
+            case terrain_cover::grass:  return "Grassland";
+            case terrain_cover::forest: return "Forest";
+            case terrain_cover::marsh:  return "Wetland";
+            case terrain_cover::scrub:  return "Scrubland"; // was "Tundra"
+            case terrain_cover::none:   return "Bare Soil";
+            default: break;
+        }
+    }
+
+    if (cov == terrain_cover::none)
+        return substrate_name(sub);
+
+    const char* adj = cover_adjective(cov);
+    if (adj == nullptr)
+        return substrate_name(sub);
+    return std::string(adj) + " " + substrate_name(sub);
+}
+
+std::string terrain_name(const tile_component& t)
+{
+    return terrain_name(t.substrate, t.cover, t.cover_density);
 }
 
 const char* landform_name(terrain_landform l)

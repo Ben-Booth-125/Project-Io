@@ -247,34 +247,79 @@ lat_band band_for_row(int row, int gh, temperature_class temp)
 }
 
 // ---------------------------------------------------------------------------
-// Pass 4 — composition
+// Pass 4 — biome, then the two axes it decomposes into (BL-519)
 // ---------------------------------------------------------------------------
+//
+// BL-519 split `terrain_composition` into `terrain_substrate` × `terrain_cover`.
+// This pass is where the split is PRODUCED, and its structure is chosen to make
+// the change auditable rather than merely correct:
+//
+//   4a  BIOME. The (band, moisture) tables below, UNCHANGED in their values and
+//       — critically — in their RNG consumption, draw for draw. They now return
+//       an internal `biome` rather than a `terrain_composition`, which is the
+//       same twelve-valued vocabulary under a name that admits it was never one
+//       axis. Keeping this stream bit-identical is what lets every downstream
+//       pass (deposits, environment, clusters, nations, provinces) reproduce
+//       exactly, so anything that DID move is attributable to the new axis
+//       rather than to stream drift.
+//
+//   4b  DRAINAGE (BL-338, pre-existing). Still operates on the biome, so it is
+//       unchanged: it converts lowland grassland/forest to wetland before the
+//       axes are derived, which is the same decision it always made.
+//
+//   4c  DECOMPOSE. `decompose_biome` maps each biome to (substrate, cover,
+//       density). It consumes NO RNG — density varies per tile through a
+//       stateless fold of (seed, index, moisture), the same idiom province.cpp
+//       uses for its edge jitter. A graded cover (Ben's call, 2026-08-21) that
+//       cost a new random stream would have perturbed every later pass for a
+//       cosmetic gain; a fold costs nothing and is just as varied.
+//
+//   4d  REFINE. `refine_cover` is the only genuinely NEW terrain behaviour, and
+//       it is what Ben's brief asked for: "a mountain might have a forest or
+//       not". It may add cover to ground the biome table left bare — a forest on
+//       a wet rocky upland, snow on cold high ground, dunes on dry barren — and
+//       it NEVER touches the substrate. Also stateless; also no stream.
+//
+// The invariant that makes 4d safe: it only writes where `cover == none`. A tile
+// the biome table gave a cover to keeps it.
+// ---------------------------------------------------------------------------
+
+// The twelve-value vocabulary the (band, moisture) tables speak. Internal to this
+// pass: it is what the world model USED to store, and it survives only as the
+// intermediate the tables produce before decomposition. Nothing outside this file
+// sees it.
+enum class biome : uint8_t
+{
+    barren, rocky, volcanic, icy, tundra, grassland,
+    forest, wetland, ocean, regolith, metallic
+};
+
 
 // Tuned 2026-06-14 (Kepler biome balance): the high-moisture cutoff was lowered
 // from 0.65 to 0.55 so more tiles reach the wet (mc==2) branches of
-// composition_atmospheric() that produce forest and wetland — these stayed sparse
+// biome_atmospheric() that produce forest and wetland — these stayed sparse
 // (~1% / ~0.5%) on Kepler even after the Pass 2 ocean-bias reduction.
 int moisture_column(float m) { return m < 0.35f ? 0 : (m < 0.55f ? 1 : 2); }
 
 // 60/40 weighting toward `a`, resolved against the per-tile RNG.
-terrain_composition pick_60_40(std::mt19937& rng, terrain_composition a, terrain_composition b)
+biome pick_60_40(std::mt19937& rng, biome a, biome b)
 {
     std::uniform_real_distribution<float> u(0.0f, 1.0f);
     return (u(rng) < 0.6f) ? a : b;
 }
 
-terrain_composition pick_weighted2(std::mt19937& rng,
-                                   terrain_composition a, int wa,
-                                   terrain_composition b, int wb)
+biome pick_weighted2(std::mt19937& rng,
+                     biome a, int wa,
+                     biome b, int wb)
 {
     std::uniform_int_distribution<int> d(0, wa + wb - 1);
     return (d(rng) < wa) ? a : b;
 }
 
-terrain_composition pick_weighted3(std::mt19937& rng,
-                                   terrain_composition a, int wa,
-                                   terrain_composition b, int wb,
-                                   terrain_composition c, int wc)
+biome pick_weighted3(std::mt19937& rng,
+                     biome a, int wa,
+                     biome b, int wb,
+                     biome c, int wc)
 {
     std::uniform_int_distribution<int> d(0, wa + wb + wc - 1);
     const int r = d(rng);
@@ -291,12 +336,12 @@ terrain_composition pick_weighted3(std::mt19937& rng,
 // every subpolar band. Each cell falls back to its own inorganic member instead —
 // rocky in the cool bands, barren in the warm ones.
 //
-// Mirrors composition_atmospheric's RNG consumption draw-for-draw, so the two
+// Mirrors biome_atmospheric's RNG consumption draw-for-draw, so the two
 // branches stay stream-aligned and switching between them cannot shift any
 // downstream pass.
-terrain_composition composition_abiotic(lat_band band, float moisture, std::mt19937& rng)
+biome biome_abiotic(lat_band band, float moisture, std::mt19937& rng)
 {
-    using tc = terrain_composition;
+    using tc = biome;
     const int mc = moisture_column(moisture);
     switch (band)
     {
@@ -324,9 +369,9 @@ terrain_composition composition_abiotic(lat_band band, float moisture, std::mt19
 
 // Atmosphere-present composition from the (band, moisture) table. Only reached on
 // bodies that support biology (atmosphere moderate or thick).
-terrain_composition composition_atmospheric(lat_band band, float moisture, std::mt19937& rng)
+biome biome_atmospheric(lat_band band, float moisture, std::mt19937& rng)
 {
-    using tc = terrain_composition;
+    using tc = biome;
     const int mc = moisture_column(moisture);
     switch (band)
     {
@@ -350,6 +395,223 @@ terrain_composition composition_atmospheric(lat_band band, float moisture, std::
             return pick_60_40(rng, tc::forest, tc::wetland);
     }
     return tc::barren;
+}
+
+// ---------------------------------------------------------------------------
+// Pass 4c/4d — the axes (BL-519)
+// ---------------------------------------------------------------------------
+
+/// One tile's terrain on the three axes, as this pass produces it.
+struct tile_axes
+{
+    terrain_substrate substrate = terrain_substrate::barren;
+    terrain_cover     cover     = terrain_cover::none;
+    std::uint8_t      density   = 0;
+};
+
+/// Stateless per-tile fold in [0, 1). NO RNG STREAM IS CONSUMED — this is the
+/// campaign_battle / province.cpp idiom, and using it here is what lets a graded
+/// cover and a whole new cover pass land WITHOUT perturbing a single downstream
+/// draw. `salt` mixes two independent uses of the fold on the same tile apart.
+float axis_fold(uint32_t seed, int idx, uint32_t salt)
+{
+    uint32_t h = seed ^ (static_cast<uint32_t>(idx) * 2654435761u) ^ (salt * 2246822519u);
+    h ^= h >> 15; h *= 2246822519u;
+    h ^= h >> 13; h *= 3266489917u;
+    h ^= h >> 16;
+    return static_cast<float>(h & 0xFFFFFFu) / static_cast<float>(0x1000000u);
+}
+
+/// Grade a cover: a centre value for the kind, spread by moisture and the fold.
+/// Density is 0 if and only if the cover is `none` — the invariant
+/// `tile_axes_harness` asserts.
+std::uint8_t grade_cover(terrain_cover c, float moisture, uint32_t seed, int idx)
+{
+    if (c == terrain_cover::none)
+        return 0;
+
+    // Centre and half-spread per cover kind, in density units. Urban is pinned at
+    // full: a paved tile is not "sparsely paved", and BL-520 must not draw it as
+    // a thinning pattern.
+    int centre = 128, spread = 40;
+    switch (c)
+    {
+        case terrain_cover::forest: centre = 205; spread = 45; break;
+        case terrain_cover::marsh:  centre = 170; spread = 50; break;
+        case terrain_cover::grass:  centre = 150; spread = 55; break;
+        case terrain_cover::scrub:  centre =  75; spread = 40; break;
+        case terrain_cover::snow:   centre = 160; spread = 60; break;
+        case terrain_cover::dunes:  centre = 140; spread = 60; break;
+        case terrain_cover::ash:    centre = 110; spread = 50; break;
+        case terrain_cover::salt:   centre = 120; spread = 45; break;
+        case terrain_cover::urban:  return k_cover_density_max;
+        case terrain_cover::none:   return 0;
+    }
+
+    // Moisture pushes a biotic cover thicker and a dry cover thinner, so the two
+    // families grade in opposite directions off the same field. Half the
+    // variation is terrain-driven and half is the fold, which keeps a wet region
+    // visibly denser than a dry one instead of dissolving into noise.
+    const float wet  = std::clamp(moisture, 0.0f, 1.0f);
+    const float lean = is_biotic_cover(c) ? (wet - 0.5f) : (0.5f - wet);
+    const float f    = axis_fold(seed, idx, 0x0C0FFEEu) * 2.0f - 1.0f;
+    const int   v    = centre + static_cast<int>(static_cast<float>(spread) * (0.5f * f + lean));
+    return static_cast<std::uint8_t>(std::clamp(v, 1, static_cast<int>(k_cover_density_max)));
+}
+
+/// Pass 4c — map the biome the (band, moisture) table drew onto the two axes.
+///
+/// This is the whole of the OLD model expressed in the NEW one, and every row is
+/// a 1:1 restatement rather than a re-tuning. The four biotic biomes all sit on
+/// `sedimentary` — which is the finding the item turned on: grassland, forest,
+/// wetland and tundra were never four kinds of GROUND, they were one kind of
+/// ground under four kinds of cover, and spending the slot on the cover is what
+/// made "a rocky mountain that happens to be forested" inexpressible.
+///
+/// `sedimentary + scrub` is exactly the old `tundra`, and nothing else produces
+/// that pair (refinement only writes where cover is `none`, and sedimentary
+/// always carries a cover from this table). Deposit rules that used to key on
+/// tundra key on the pair, and stay bit-identical.
+tile_axes decompose_biome(biome b, float moisture, uint32_t seed, int idx)
+{
+    using su = terrain_substrate;
+    using cv = terrain_cover;
+
+    tile_axes a;
+    switch (b)
+    {
+        case biome::barren:    a.substrate = su::barren;      a.cover = cv::none;   break;
+        case biome::rocky:     a.substrate = su::rocky;       a.cover = cv::none;   break;
+        case biome::volcanic:  a.substrate = su::volcanic;    a.cover = cv::none;   break;
+        case biome::icy:       a.substrate = su::icy;         a.cover = cv::none;   break;
+        case biome::regolith:  a.substrate = su::regolith;    a.cover = cv::none;   break;
+        case biome::metallic:  a.substrate = su::metallic;    a.cover = cv::none;   break;
+        case biome::ocean:     a.substrate = su::ocean;       a.cover = cv::none;   break;
+        case biome::tundra:    a.substrate = su::sedimentary; a.cover = cv::scrub;  break;
+        case biome::grassland: a.substrate = su::sedimentary; a.cover = cv::grass;  break;
+        case biome::forest:    a.substrate = su::sedimentary; a.cover = cv::forest; break;
+        case biome::wetland:   a.substrate = su::sedimentary; a.cover = cv::marsh;  break;
+    }
+    a.density = grade_cover(a.cover, moisture, seed, idx);
+    return a;
+}
+
+/// Pass 4d — THE NEW BEHAVIOUR, and the only part of this pass that says
+/// something the old model could not.
+///
+/// Ben's brief: "a mountain might have a forest or not." A mountain WITH a forest
+/// was always expressible; a ROCKY mountain that happens to be forested was not,
+/// because the single slot had been spent. This pass is where that tile now comes
+/// from — it dresses bare ground with what the climate would actually put there,
+/// and it never rewrites the geology underneath.
+///
+/// THE GUARD THAT KEEPS IT HONEST: it writes only where `cover == none`. A tile
+/// the biome table already dressed is left exactly as it was, so this pass can
+/// add tiles to a cover class but can never take one away — which is why the
+/// old biotic distributions are a floor rather than a moving target.
+///
+/// Stateless throughout: latitude, moisture, the retained height (BL-517) and a
+/// fold. No RNG stream, so adding it perturbs nothing downstream.
+void refine_cover(tile_axes& a, lat_band band, float moisture, float height,
+                  bool biotic, uint32_t seed, int idx)
+{
+    using su = terrain_substrate;
+    using cv = terrain_cover;
+
+    if (a.cover != cv::none || a.substrate == su::ocean)
+        return;
+
+    const float f    = axis_fold(seed, idx, 0x5EEDu);
+    const bool  cold = band == lat_band::polar || band == lat_band::subpolar;
+
+    // SNOW — lying snow on cold high ground. Reads latitude × BL-517's retained
+    // height and needs no generation input of its own, which is the reason it
+    // was worth admitting to the roster at all. Checked before the biotic cases:
+    // a snowline is above a treeline, not beside it.
+    if (cold && height > 0.62f && f < 0.75f)
+    {
+        a.cover   = cv::snow;
+        a.density = grade_cover(cv::snow, moisture, seed, idx);
+        return;
+    }
+    if (a.substrate == su::icy && f < 0.45f)
+    {
+        a.cover   = cv::snow;
+        a.density = grade_cover(cv::snow, moisture, seed, idx);
+        return;
+    }
+
+    // ASH — volcanic fall. A hazard reading rather than a resource one, so it is
+    // common on volcanic ground and appears nowhere else. GATED ON DRYNESS so it
+    // does not pre-empt the vegetation case below: wet volcanic ground is some of
+    // the most fertile there is, and ash claiming every volcanic tile would have
+    // made that unreachable.
+    if (a.substrate == su::volcanic && moisture < 0.45f && f < 0.55f)
+    {
+        a.cover   = cv::ash;
+        a.density = grade_cover(cv::ash, moisture, seed, idx);
+        return;
+    }
+
+    // THE CASE BEN ASKED FOR — vegetation on ground that is not soil. Needs a
+    // biosphere (a dead world grows nothing, however wet), and it grades with
+    // moisture: woodland where it is wet enough, scrub as the half-step that
+    // makes a treeline gradual instead of an edge.
+    //
+    // THE THRESHOLD IS 0.45, NOT 0.55, AND THAT NUMBER IS THE WHOLE FEATURE.
+    // Measured first: at 0.55 this branch fired ZERO times on a homeworld, and
+    // the reason is structural rather than a tuning miss. The biome table routes
+    // ground by moisture, so `rocky` is only ever drawn in the dry and middling
+    // columns (mc 0 and 1, i.e. moisture below 0.55) — wet rocky ground does not
+    // exist for the branch to find. Reading the top half of the middling column
+    // instead is both reachable and the honest claim: 0.55 is the moisture at
+    // which SOIL grows a forest, and a slope is not soil.
+    if (biotic && !cold && (a.substrate == su::rocky || a.substrate == su::volcanic))
+    {
+        if (moisture >= 0.45f && f < 0.35f)
+        {
+            a.cover   = cv::forest;
+            a.density = grade_cover(cv::forest, moisture, seed, idx);
+            return;
+        }
+        if (moisture >= 0.30f && f < 0.50f)
+        {
+            a.cover   = cv::scrub;
+            a.density = grade_cover(cv::scrub, moisture, seed, idx);
+            return;
+        }
+    }
+    // Cold rocky ground gets scrub rather than forest — the tundra-as-cover case,
+    // reached from the substrate side now that tundra is no longer a terrain of
+    // its own (Ben, 2026-08-21).
+    if (biotic && cold && a.substrate == su::rocky && moisture >= 0.45f && f < 0.40f)
+    {
+        a.cover   = cv::scrub;
+        a.density = grade_cover(cv::scrub, moisture, seed, idx);
+        return;
+    }
+
+    // DUNES and SALT — the dry pair on barren ground, and the reason two barren
+    // tiles can now read differently. Dunes are wind-blown sand and want the
+    // driest ground; salt is a dry-basin crust and wants a LOW dry basin, which
+    // is why it reads height as well as moisture.
+    if (a.substrate == su::barren && moisture < 0.30f)
+    {
+        if (height < 0.42f && f > 0.86f)
+        {
+            a.cover   = cv::salt;
+            a.density = grade_cover(cv::salt, moisture, seed, idx);
+            return;
+        }
+        if (f < 0.42f)
+        {
+            a.cover   = cv::dunes;
+            a.density = grade_cover(cv::dunes, moisture, seed, idx);
+            return;
+        }
+    }
+    // Everything else stays BARE, and that is a real answer rather than a gap —
+    // `none` being first-class is half the point of the axis.
 }
 
 float volcanic_probability(geological_activity g)
@@ -475,17 +737,17 @@ void grow_cluster(feature_kind kind, int seed_col, int seed_row, int gw, int gh,
 // back to any non-ocean tile when the preferred pool is too small.
 std::vector<int> pick_seeds(feature_kind kind, int n_seeds, int gw, int gh,
                             const std::vector<float>& height,
-                            const std::vector<terrain_composition>& comp,
+                            const std::vector<terrain_substrate>& sub,
                             const std::vector<lat_band>& band,
                             const std::vector<bool>& is_ocean,
                             std::mt19937& rng,
                             const std::vector<uint8_t>* convergent)
 {
-    using tc = terrain_composition;
+    using su = terrain_substrate;
     std::vector<int> preferred;
     std::vector<int> any_land;
     // Tiles on a classified convergent plate boundary — where mountains actually
-    // form. Tried BEFORE the height/composition rule for mountains, so a range
+    // form. Tried BEFORE the height/substrate rule for mountains, so a range
     // follows the collision that raised it. Seeding on "already high and rocky"
     // instead is what made ranges pool into blobs: every extra seed landed in
     // the same uplands and overlapped a range already there, which is why raising
@@ -507,14 +769,17 @@ std::vector<int> pick_seeds(feature_kind kind, int n_seeds, int gw, int gh,
         switch (kind)
         {
             case feature_kind::mountain:
-                ok = height[idx] > 0.65f && (comp[idx] == tc::rocky || comp[idx] == tc::barren);
+                // Landform clustering reads the SUBSTRATE alone (BL-519): a range
+                // is raised by geology, and whether a forest happens to be growing
+                // on it is not a fact about where mountains form.
+                ok = height[idx] > 0.65f && (sub[idx] == su::rocky || sub[idx] == su::barren);
                 break;
             case feature_kind::rift:
-                ok = (comp[idx] == tc::volcanic || comp[idx] == tc::barren)
+                ok = (sub[idx] == su::volcanic || sub[idx] == su::barren)
                      && (band[idx] == lat_band::subtropical || band[idx] == lat_band::tropical);
                 break;
             case feature_kind::crater:
-                ok = (comp[idx] == tc::regolith || comp[idx] == tc::barren);
+                ok = (sub[idx] == su::regolith || sub[idx] == su::barren);
                 break;
         }
         if (ok)
@@ -586,11 +851,11 @@ struct ore_field { int centre; float radius; };
 std::vector<ore_field> ore_fields_for(resource_type res, int n, int gw, int gh,
                                         const std::vector<float>& height,
                                         const std::vector<bool>& is_ocean,
-                                        const std::vector<terrain_composition>& comp,
+                                        const std::vector<terrain_cover>& cov,
                                         const std::vector<uint8_t>* convergent,
                                         std::mt19937& rng)
 {
-    using tc = terrain_composition;
+    using cv = terrain_cover;
     const int total = gw * gh;
     const bool have_conv = convergent != nullptr
                            && convergent->size() == static_cast<std::size_t>(total);
@@ -635,8 +900,13 @@ std::vector<ore_field> ore_fields_for(resource_type res, int n, int gw, int gh,
                 break;
             // Coal wants the swamp: low, wet, vegetated ground.
             case resource_type::coal:
+                // "Vegetated" is a claim about the COVER (BL-519), and saying so
+                // is what the axis split buys here: the old list named three
+                // compositions to mean one thing. Scrub is excluded deliberately —
+                // sparse woody cover is not the swamp that lays down a seam.
                 ok = height[idx] <= swamp_cut
-                     && (comp[idx] == tc::wetland || comp[idx] == tc::forest || comp[idx] == tc::grassland);
+                     && (cov[idx] == cv::marsh || cov[idx] == cv::forest
+                         || cov[idx] == cv::grass);
                 break;
             default: break;
         }
@@ -826,12 +1096,26 @@ std::array<float, resource_count> build_rarity_profile(uint32_t seed)
     return rarity;
 }
 
-void generate_deposits(terrain_composition comp, terrain_landform lf,
+// Deposits, keyed on the axis that actually decides each one (BL-519).
+//
+// THIS SPLIT IS THE ITEM PAYING FOR ITSELF. Ore follows the SUBSTRATE, timber and
+// produce follow the COVER, and separating them is what makes a forested metallic
+// mountain carry both — which the single overloaded slot made impossible, since
+// naming the forest cost you the metal.
+//
+// Every row below is the old table restated, not re-tuned: each old composition
+// maps to exactly one (substrate, cover) pair, the draws happen in the same order
+// with the same magnitudes, and the tiles that were bearing before are bearing
+// now. What is genuinely new is that MORE tiles reach the biotic rows, because
+// Pass 4d can dress rocky and volcanic ground the biome table left bare.
+void generate_deposits(terrain_substrate sub, terrain_cover cov, std::uint8_t density,
+                       terrain_landform lf,
                        std::array<float, resource_count>& dep, std::mt19937& rng,
                        std::mt19937& rare_rng,
                        const std::array<float, resource_count>& rarity)
 {
-    using tc = terrain_composition;
+    using su = terrain_substrate;
+    using cv = terrain_cover;
     using r  = resource_type;
     auto put = [&](resource_type res, float v) { dep[static_cast<std::size_t>(res)] = v; };
 
@@ -841,56 +1125,84 @@ void generate_deposits(terrain_composition comp, terrain_landform lf,
     const bool plains   = lf == terrain_landform::plains;
     const bool canyon   = lf == terrain_landform::canyon;
 
+    // Cover thickness as a yield scalar, 0.6x at the sparse end to 1.15x at
+    // closed canopy. This is the second consumer `cover_density` was added for
+    // (BL-520's texture is the first): a wood that LOOKS thin should CUT thin,
+    // and one number is what keeps those two from drifting apart. Centred so the
+    // typical forest (density ~205) lands near 1.0 and the old magnitudes stand.
+    const float thickness = 0.6f + 0.55f * cover_fraction(density);
+
     // --- ambient resources (guarantee at least one extractable per tile) ---
-    if (comp != tc::ocean && comp != tc::icy)
+    if (sub != su::ocean && sub != su::icy)
         put(r::stone, roll(rng, 10.0f, 30.0f));
-    if (comp == tc::forest || comp == tc::wetland)
-        put(r::timber, roll(rng, 15.0f, 40.0f));
-    if (comp == tc::barren && (plains || canyon))
+    // TIMBER FOLLOWS THE COVER, not the ground. The old rule read
+    // `forest || wetland`; those are covers, and saying so is what admits a
+    // forested rocky upland to the timber set.
+    if (cov == cv::forest || cov == cv::marsh)
+        put(r::timber, roll(rng, 15.0f, 40.0f) * thickness);
+    if (sub == su::barren && (plains || canyon))
         put(r::sand, roll(rng, 10.0f, 25.0f));
-    if (comp == tc::wetland || valley)
+    if (cov == cv::marsh || valley)
         put(r::clay, roll(rng, 8.0f, 20.0f));
-    if (comp == tc::tundra && (plains || valley))
+    // PEAT is the old `tundra` row, and `sedimentary + scrub` is exactly that
+    // biome — nothing else produces the pair, because Pass 4c writes only onto
+    // bare ground and sedimentary always leaves the biome table dressed.
+    if (sub == su::sedimentary && cov == cv::scrub && (plains || valley))
         put(r::peat, roll(rng, 5.0f, 15.0f));
 
     // --- primary deposits (prototype subset; other resources stay zero) ---
-    switch (comp)
+    // ORE FOLLOWS THE SUBSTRATE. Every mineral row keys on the ground alone, so
+    // dressing a tile with vegetation no longer costs it its geology.
+    switch (sub)
     {
-        case tc::barren:
+        case su::barren:
             put(r::iron_ore,  roll_mod(rng, 0.0f, 150.0f, mountain ? 1.4f : rift ? 1.2f : 1.0f));
             put(r::petroleum, roll_mod(rng, 0.0f, 120.0f, valley ? 1.2f : 1.0f));
             break;
-        case tc::rocky:
+        case su::rocky:
             put(r::iron_ore,  roll_mod(rng, 0.0f, 200.0f, mountain ? 1.5f : 1.0f));
             break;
-        case tc::volcanic:
+        case su::volcanic:
             put(r::iron_ore,  roll_mod(rng, 0.0f, 150.0f, rift ? 1.3f : 1.0f));
             break;
-        case tc::icy:
+        case su::icy:
             put(r::water,     roll(rng, 0.0f, 400.0f));
             break;
-        case tc::grassland:
-            put(r::agricultural_produce, roll_mod(rng, 40.0f, 180.0f, valley ? 1.3f : 1.0f));
-            break;
-        case tc::forest:
-            put(r::agricultural_produce, roll_mod(rng, 10.0f, 80.0f, valley ? 1.15f : 1.0f));
-            break;
-        case tc::wetland:
-            put(r::agricultural_produce, roll(rng, 40.0f, 200.0f));
-            break;
-        case tc::tundra:
-            put(r::iron_ore,  roll_mod(rng, 0.0f, 60.0f, mountain ? 1.3f : 1.0f));
-            break;
-        case tc::metallic:
+        case su::metallic:
             // Prototype maps the metallic primary to iron_ore (the 7-resource
             // subset); iron-nickel ore and PGM are authored in a later pass.
             put(r::iron_ore, roll(rng, 50.0f, 250.0f));
             put(r::regolith, roll(rng, 20.0f, 50.0f));
             break;
-        case tc::regolith:
+        case su::regolith:
             put(r::regolith, roll(rng, 20.0f, 50.0f));
             break;
-        case tc::ocean:
+        // SEDIMENTARY is the one substrate whose primary is decided by what grows
+        // on it — which is the honest reading of the old table, where grassland,
+        // forest, wetland and tundra were four covers on one kind of ground.
+        case su::sedimentary:
+            switch (cov)
+            {
+                case cv::grass:
+                    put(r::agricultural_produce,
+                        roll_mod(rng, 40.0f, 180.0f, valley ? 1.3f : 1.0f) * thickness);
+                    break;
+                case cv::forest:
+                    put(r::agricultural_produce,
+                        roll_mod(rng, 10.0f, 80.0f, valley ? 1.15f : 1.0f) * thickness);
+                    break;
+                case cv::marsh:
+                    put(r::agricultural_produce, roll(rng, 40.0f, 200.0f) * thickness);
+                    break;
+                case cv::scrub:
+                    // The old `tundra` row: thin ground with surface iron.
+                    put(r::iron_ore, roll_mod(rng, 0.0f, 60.0f, mountain ? 1.3f : 1.0f));
+                    break;
+                default:
+                    break;
+            }
+            break;
+        case su::ocean:
             break;
     }
 
@@ -909,22 +1221,22 @@ void generate_deposits(terrain_composition comp, terrain_landform lf,
         put(res, roll(rare_rng, lo, hi) * s);       // magnitude: small when rare
     };
 
-    switch (comp)
+    switch (sub)
     {
-        case tc::barren:
-            put_rare(r::coal,   30.0f, 140.0f);     // sedimentary carbon
+        case su::barren:
+            put_rare(r::coal,   30.0f, 140.0f);     // buried carbon
             put_rare(r::silica, 20.0f,  90.0f);
             break;
-        case tc::rocky:
+        case su::rocky:
             put_rare(r::silica,         20.0f, 100.0f);
             put_rare(r::copper_ore,     30.0f, 160.0f);
             put_rare(r::rare_earth_ore, 10.0f,  70.0f);
             break;
-        case tc::volcanic:
+        case su::volcanic:
             put_rare(r::copper_ore,     30.0f, 180.0f);
             put_rare(r::rare_earth_ore, 20.0f, 100.0f);
             break;
-        case tc::metallic:
+        case su::metallic:
             put_rare(r::iron_nickel_ore,       60.0f, 260.0f);
             put_rare(r::platinum_group_metals, 20.0f, 120.0f);
             break;
@@ -934,28 +1246,58 @@ void generate_deposits(terrain_composition comp, terrain_landform lf,
 }
 
 // Hazard and habitability are not authored in the design tables; they are derived
-// here from composition (a base ceiling) and landform (a slope/exposure modifier)
-// so the existing tile_component fields stay meaningful after the model change.
-void derive_environment(terrain_composition comp, terrain_landform lf,
+// here from the SUBSTRATE (a base ceiling), the COVER (what living there is
+// actually like) and the landform (a slope/exposure modifier).
+//
+// BL-519 split the first of those in two, and the split is legible in the numbers:
+// the old table's four biotic rows differed from each other by the cover, not the
+// ground — grassland and forest scored identically at 0.80, wetland a little lower
+// for the mire, tundra much lower for the cold. So the substrate row now carries
+// the geology's contribution and the cover row carries the rest, and each old
+// composition reproduces its old pair exactly.
+void derive_environment(terrain_substrate sub, terrain_cover cov, terrain_landform lf,
                         float& hazard, float& habitability, std::mt19937& rng)
 {
-    using tc = terrain_composition;
+    using su = terrain_substrate;
+    using cv = terrain_cover;
 
     float base_haz = 0.25f;
     float base_hab = 0.25f;
-    switch (comp)
+    switch (sub)
     {
-        case tc::grassland: base_haz = 0.15f; base_hab = 0.80f; break;
-        case tc::forest:    base_haz = 0.15f; base_hab = 0.80f; break;
-        case tc::wetland:   base_haz = 0.15f; base_hab = 0.65f; break;
-        case tc::tundra:    base_haz = 0.30f; base_hab = 0.40f; break;
-        case tc::barren:    base_haz = 0.25f; base_hab = 0.25f; break;
-        case tc::rocky:     base_haz = 0.35f; base_hab = 0.25f; break;
-        case tc::icy:       base_haz = 0.40f; base_hab = 0.20f; break;
-        case tc::regolith:  base_haz = 0.30f; base_hab = 0.20f; break;
-        case tc::metallic:  base_haz = 0.30f; base_hab = 0.10f; break;
-        case tc::volcanic:  base_haz = 0.70f; base_hab = 0.10f; break;
-        case tc::ocean:     base_haz = 0.10f; base_hab = 0.50f; break;
+        // Sedimentary is the settlement substrate; its cover decides how much of
+        // that potential is realised, immediately below.
+        case su::sedimentary: base_haz = 0.15f; base_hab = 0.80f; break;
+        case su::barren:      base_haz = 0.25f; base_hab = 0.25f; break;
+        case su::rocky:       base_haz = 0.35f; base_hab = 0.25f; break;
+        case su::icy:         base_haz = 0.40f; base_hab = 0.20f; break;
+        case su::regolith:    base_haz = 0.30f; base_hab = 0.20f; break;
+        case su::metallic:    base_haz = 0.30f; base_hab = 0.10f; break;
+        case su::volcanic:    base_haz = 0.70f; base_hab = 0.10f; break;
+        case su::ocean:       base_haz = 0.10f; base_hab = 0.50f; break;
+    }
+
+    // The cover's own contribution. On sedimentary ground these reproduce the old
+    // per-composition numbers exactly (grass/forest 0.80, marsh 0.65, scrub — the
+    // old tundra — 0.40 at a raised hazard); elsewhere they modulate a substrate
+    // that used to have no way to say a cover was there at all.
+    switch (cov)
+    {
+        case cv::marsh: base_hab = std::min(base_hab, 0.65f); break;
+        case cv::scrub: base_hab = std::min(base_hab, 0.40f); base_haz = std::max(base_haz, 0.30f); break;
+        case cv::snow:  base_hab *= 0.55f; base_haz += 0.10f; break;
+        case cv::dunes: base_hab *= 0.60f; base_haz += 0.05f; break;
+        case cv::ash:   base_hab *= 0.70f; base_haz += 0.10f; break;
+        case cv::salt:  base_hab *= 0.55f; break;
+        // Vegetation on ground that is not soil is a mild IMPROVEMENT — shelter,
+        // fuel and forage where there was none. It cannot lift a tile past the
+        // sedimentary ceiling, so a forested crag stays worse than a meadow.
+        case cv::forest:
+        case cv::grass: if (sub != su::sedimentary) base_hab = std::min(0.80f, base_hab * 1.30f); break;
+        // Urban: the BL-366 ceiling is applied by maybe_transform_to_urban at the
+        // moment of transform, not here — no tile generates urban.
+        case cv::urban:
+        case cv::none:  break;
     }
 
     switch (lf)
@@ -1025,7 +1367,12 @@ std::vector<entity_id> generate_body_tiles(
             moisture[col + row * gw] = fbm_cylinder(moisture_noise, col, row, gw, /*base_cycles=*/3.0f, /*octaves=*/4);
     normalise(moisture);
 
-    std::vector<terrain_composition> comp(total, terrain_composition::barren);
+    // The three terrain axes as parallel arrays (BL-519). `bio` is the internal
+    // Pass 4a intermediate; `sub`/`cov`/`dens` are what the tiles are built from.
+    std::vector<biome>             bio(total, biome::barren);
+    std::vector<terrain_substrate> sub(total, terrain_substrate::barren);
+    std::vector<terrain_cover>     cov(total, terrain_cover::none);
+    std::vector<std::uint8_t>      dens(total, 0u);
     std::vector<terrain_landform>    land(total, terrain_landform::plains);
     std::vector<bool>                is_ocean(total, false);
 
@@ -1050,7 +1397,7 @@ std::vector<entity_id> generate_body_tiles(
         // drowned most tropical/subtropical land, collapsing forest (~1%) and
         // wetland (~0%) on Kepler. Reducing the bias widens the equatorial
         // landmass belt and lets high-moisture tropical/subtropical tiles reach
-        // the forest/wetland branches of composition_atmospheric(). Total ocean
+        // the forest/wetland branches of biome_atmospheric(). Total ocean
         // fraction is still set by the percentile threshold against water_fraction
         // (0.60 for Kepler), so ocean coverage stays correct; only the
         // land-to-water *distribution* across latitudes changes.
@@ -1079,7 +1426,7 @@ std::vector<entity_id> generate_body_tiles(
             if (biased[idx] < ocean_threshold)
             {
                 is_ocean[idx] = true;
-                comp[idx]     = terrain_composition::ocean;
+                bio[idx]      = biome::ocean;
                 ++ocean_tiles;
             }
         }
@@ -1138,44 +1485,44 @@ std::vector<entity_id> generate_body_tiles(
             continue;
 
         const lat_band b = band[idx];
-        terrain_composition c;
+        biome c;
 
         if (profile.bias == composition_bias::metallic)
         {
-            c = pick_weighted3(comp_rng, terrain_composition::metallic, 55,
-                                         terrain_composition::rocky,    30,
-                                         terrain_composition::regolith, 15);
+            c = pick_weighted3(comp_rng, biome::metallic, 55,
+                                         biome::rocky,    30,
+                                         biome::regolith, 15);
         }
         else if (airless)
         {
             if (profile.hydrology == hydrological_state::polar_frozen && b == lat_band::polar)
             {
-                c = terrain_composition::icy; // polar override for frozen-pole moons
+                c = biome::icy; // polar override for frozen-pole moons
             }
             else if (profile.temperature == temperature_class::scorching
                   || profile.temperature == temperature_class::hot)
             {
-                c = pick_weighted3(comp_rng, terrain_composition::volcanic, 45,
-                                             terrain_composition::barren,   40,
-                                             terrain_composition::rocky,    15);
+                c = pick_weighted3(comp_rng, biome::volcanic, 45,
+                                             biome::barren,   40,
+                                             biome::rocky,    15);
             }
             else
             {
-                c = pick_weighted2(comp_rng, terrain_composition::regolith, 65,
-                                             terrain_composition::rocky,    30);
+                c = pick_weighted2(comp_rng, biome::regolith, 65,
+                                             biome::rocky,    30);
             }
         }
         else
         {
             const bool volcanic_band = (b == lat_band::subtropical || b == lat_band::tropical);
             if (volcanic_band && volc_p > 0.0f && u01(comp_rng) < volc_p)
-                c = terrain_composition::volcanic;
+                c = biome::volcanic;
             else
-                c = biotic ? composition_atmospheric(b, moisture[idx], comp_rng)
-                           : composition_abiotic(b, moisture[idx], comp_rng);
+                c = biotic ? biome_atmospheric(b, moisture[idx], comp_rng)
+                           : biome_abiotic(b, moisture[idx], comp_rng);
         }
 
-        comp[idx] = c;
+        bio[idx] = c;
     }
 
     // --- Pass 4b: drainage (BL-338) ---
@@ -1229,11 +1576,41 @@ std::vector<entity_id> generate_body_tiles(
             // vegetation. Barren, rocky and volcanic are excluded on their own
             // terms, and grassland/forest are the two covers the warm bands' wet
             // cells actually produce.
-            const terrain_composition c = comp[idx];
-            if (c == terrain_composition::grassland
-             || c == terrain_composition::forest)
-                comp[idx] = terrain_composition::wetland;
+            const biome c = bio[idx];
+            if (c == biome::grassland || c == biome::forest)
+                bio[idx] = biome::wetland;
         }
+    }
+
+    // --- Pass 4c: decompose the biome onto the two axes (BL-519) ---
+    //
+    // No RNG stream is touched here or in Pass 4d, and that is the property the
+    // whole change was structured around: every downstream pass — clusters,
+    // deposits, environment, rivers, roads, nations, provinces — sees the same
+    // draws it saw before, so any measurement that moved is attributable to the
+    // new cover axis rather than to stream drift.
+    for (int idx = 0; idx < total; ++idx)
+    {
+        const tile_axes a = decompose_biome(bio[idx], moisture[idx], seed_comp, idx);
+        sub[idx]  = a.substrate;
+        cov[idx]  = a.cover;
+        dens[idx] = a.density;
+    }
+
+    // --- Pass 4d: cover refinement — Ben's "a mountain might have a forest" ---
+    //
+    // The only genuinely new terrain behaviour in BL-519. It dresses ground the
+    // biome table left BARE and never rewrites a substrate, so it can add tiles
+    // to a cover class but never remove one: the pre-split biotic distributions
+    // are a floor, not a moving target.
+    for (int idx = 0; idx < total; ++idx)
+    {
+        if (is_ocean[idx])
+            continue;
+        tile_axes a{ sub[idx], cov[idx], dens[idx] };
+        refine_cover(a, band[idx], moisture[idx], height[idx], biotic, seed_comp, idx);
+        cov[idx]  = a.cover;
+        dens[idx] = a.density;
     }
 
     // --- Pass 5: landform clusters ---
@@ -1246,7 +1623,7 @@ std::vector<entity_id> generate_body_tiles(
     for (feature_kind kind : { feature_kind::mountain, feature_kind::rift, feature_kind::crater })
     {
         const int n = seed_count(kind, profile.geology, airless, total);
-        const std::vector<int> seeds = pick_seeds(kind, n, gw, gh, height, comp, band, is_ocean,
+        const std::vector<int> seeds = pick_seeds(kind, n, gw, gh, height, sub, band, is_ocean,
                                                   cluster_rng, convergent);
         for (int idx : seeds)
             grow_cluster(kind, idx % gw, idx / gw, gw, gh, land, claimed, cluster_rng);
@@ -1286,7 +1663,7 @@ std::vector<entity_id> generate_body_tiles(
             { resource_type::coal,       3, 0.45f },
         };
         // Which tiles will actually bear each of these. generate_deposits is a
-        // pure function of (composition, landform, per-tile seeds), so replaying
+        // pure function of (substrate, cover, landform, per-tile seeds), so replaying
         // it here is exact and costs one extra table-driven pass. Necessary
         // because the region budget has to be conserved over the BEARING set:
         // normalising over all land instead silently cost a world 10-47% of its
@@ -1299,7 +1676,7 @@ std::vector<entity_id> generate_body_tiles(
             std::mt19937 tr(seed_deposit ^ (static_cast<uint32_t>(idx) * 2654435761u));
             std::mt19937 rr(seed_deposit ^ (static_cast<uint32_t>(idx) * 40503u) ^ 0x5BD1E995u);
             std::array<float, resource_count> d{};
-            generate_deposits(comp[idx], land[idx], d, tr, rr, rarity);
+            generate_deposits(sub[idx], cov[idx], dens[idx], land[idx], d, tr, rr, rarity);
             for (std::size_t k = 0; k < 4; ++k)
                 if (d[static_cast<std::size_t>(k_specs[k].res)] > 0.0f)
                     bears[k][static_cast<std::size_t>(idx)] = 1u;
@@ -1311,7 +1688,7 @@ std::vector<entity_id> generate_body_tiles(
             if (pl->endowment[static_cast<std::size_t>(s.res)] <= 0.0f)
                 continue; // the world's history never made this — nothing to place
             const auto prov = ore_fields_for(s.res, s.count, gw, gh, height, is_ocean,
-                                            comp, convergent, prov_rng);
+                                            cov, convergent, prov_rng);
             if (prov.empty()) continue;
             ore_field_maps.emplace_back(s.res, ore_field_map(prov, gw, gh, bears[k], s.share));
         }
@@ -1333,7 +1710,7 @@ std::vector<entity_id> generate_body_tiles(
 
             std::array<float, resource_count> deposits{};
             if (!is_ocean[idx])
-                generate_deposits(comp[idx], land[idx], deposits, tile_rng, rare_rng, rarity);
+                generate_deposits(sub[idx], cov[idx], dens[idx], land[idx], deposits, tile_rng, rare_rng, rarity);
 
             // BL-114: resource-abundance scalar. A pure post-multiply on the filled
             // deposit array — it draws no RNG, so deposit_scalar == 1.0f reproduces the
@@ -1394,15 +1771,21 @@ std::vector<entity_id> generate_body_tiles(
                     // biotic, so they only exist on a world that reached a land
                     // biosphere in the first place — which is the same gate the
                     // endemic set itself sits behind.
-                    const terrain_composition c = comp[idx];
+                    // CROPS FOLLOW THE COVER (BL-519). Each of these is a
+                    // claim about what grows here, not about the geology — which
+                    // is why the old list had to name compositions to say it.
+                    const terrain_cover c = cov[idx];
                     bool suitable = false;
                     switch (e.good)
                     {
-                        case resource_type::tobacco: suitable = (c == terrain_composition::grassland); break;
-                        case resource_type::spices:  suitable = (c == terrain_composition::wetland
-                                                             || c == terrain_composition::forest); break;
-                        case resource_type::coffee:  suitable = (c == terrain_composition::forest); break;
-                        case resource_type::furs:    suitable = (c == terrain_composition::tundra); break;
+                        case resource_type::tobacco: suitable = (c == terrain_cover::grass); break;
+                        case resource_type::spices:  suitable = (c == terrain_cover::marsh
+                                                             || c == terrain_cover::forest); break;
+                        case resource_type::coffee:  suitable = (c == terrain_cover::forest); break;
+                        // Furs were the old `tundra` row. Tundra is gone as a
+                        // terrain (Ben, 2026-08-21) and its ground is scrub, which
+                        // is where the trapping actually happens.
+                        case resource_type::furs:    suitable = (c == terrain_cover::scrub); break;
                         default: break;
                     }
                     if (!suitable)
@@ -1428,14 +1811,16 @@ std::vector<entity_id> generate_body_tiles(
                     remaining[r] = deposits[r] * deposit_reserve_factor;
 
             float hazard = 0.0f, habitability = 0.0f;
-            derive_environment(comp[idx], land[idx], hazard, habitability, tile_rng);
+            derive_environment(sub[idx], cov[idx], land[idx], hazard, habitability, tile_rng);
 
             const entity_id tile_id = w.create_entity();
             w.tiles[tile_id] = tile_component{
                 .body               = body_id,
                 .grid_x             = col,
                 .grid_y             = row,
-                .composition        = comp[idx],
+                .substrate          = sub[idx],
+                .cover              = cov[idx],
+                .cover_density      = dens[idx],
                 .landform           = land[idx],
                 .resource_deposit   = deposits,
                 .resource_remaining = remaining,
@@ -1478,7 +1863,7 @@ std::vector<entity_id> first_land_tiles(const std::vector<entity_id>& tile_ids,
         for (int col = 0; col < gw && static_cast<int>(result.size()) < n; ++col)
         {
             const entity_id id = tile_ids[col + row * gw];
-            if (id != null_entity && w.tiles.at(id).composition != terrain_composition::ocean)
+            if (id != null_entity && w.tiles.at(id).substrate != terrain_substrate::ocean)
                 result.push_back(id);
         }
     return result;

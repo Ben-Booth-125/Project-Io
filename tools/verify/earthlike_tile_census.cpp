@@ -158,7 +158,7 @@ seed_metrics census_one(uint32_t campaign_seed)
             tile_seed, 1.0f, &st, nullptr, &cs.height_bias, &cs.convergent);
         std::vector<char> pocean(probe.size(), 0);
         for (std::size_t i = 0; i < probe.size(); ++i)
-            if (scratch.tiles.at(probe[i]).composition == terrain_composition::ocean) pocean[i] = 1;
+            if (scratch.tiles.at(probe[i]).substrate == terrain_substrate::ocean) pocean[i] = 1;
         std::vector<int> psizes;
         label(pocean, psizes);
         int pmain = -1, pmain_sz = 0;
@@ -210,7 +210,7 @@ seed_metrics census_one(uint32_t campaign_seed)
     for (int i = 0; i < static_cast<int>(ids.size()); ++i)
     {
         const auto& t = w.tiles.at(ids[static_cast<std::size_t>(i)]);
-        if (t.composition == terrain_composition::ocean) continue;
+        if (t.substrate == terrain_substrate::ocean) continue;
 
         land[static_cast<std::size_t>(i)] = 1;
         ++n_land;
@@ -218,13 +218,30 @@ seed_metrics census_one(uint32_t campaign_seed)
         const bool temperate_row = (row >= temp_lo && row < temp_hi);
         if (temperate_row) ++n_temp_land;
 
-        switch (t.composition)
+        // BL-519: the earthlike bands split across the two axes, and which axis
+        // each one lives on is the whole content of this block.
+        //
+        // FOREST / GRASS / WET are COVER questions — what grows here. Counting
+        // them on that axis is a real gain: a forested upland now counts as
+        // forest, where before it had to give up being rocky to say so.
+        //
+        // DESERT / ICE are GROUND questions, and they are read from the substrate
+        // REGARDLESS of cover. That distinction is not pedantry — reading them
+        // from the cover instead censored them, because Pass 4d dusts cold ground
+        // with snow and dry ground with dunes, and an ice cap with snow on it is
+        // still an ice cap. (Measured: doing it the wrong way round dropped the
+        // median icy share from 24.8% to 10.2%.)
+        switch (t.cover)
         {
-            case terrain_composition::forest:    ++n_forest; if (temperate_row) ++n_temp_forest; break;
-            case terrain_composition::grassland: ++n_grass; break;
-            case terrain_composition::barren:    ++n_desert; break;
-            case terrain_composition::icy:       ++n_ice; break;
-            case terrain_composition::wetland:   ++n_wet; break;
+            case terrain_cover::forest: ++n_forest; if (temperate_row) ++n_temp_forest; break;
+            case terrain_cover::grass:  ++n_grass; break;
+            case terrain_cover::marsh:  ++n_wet; break;
+            default: break;
+        }
+        switch (t.substrate)
+        {
+            case terrain_substrate::barren: ++n_desert; break;
+            case terrain_substrate::icy:    ++n_ice; break;
             default: break;
         }
         if (t.landform == terrain_landform::mountain) ++n_mountain;

@@ -131,7 +131,9 @@ battle_outcome resolve_battle(const std::vector<army_stack_entry>& attacker,
                                const doctrine_row&                 attacker_doctrine,
                                const std::vector<army_stack_entry>& defender,
                                const doctrine_row&                 defender_doctrine,
-                               terrain_composition                 terrain_comp,
+                               terrain_substrate                    terrain_sub,
+                               terrain_cover                        terrain_cov,
+                               std::uint8_t                         terrain_density,
                                terrain_landform                    terrain_lf,
                                season                               battle_season,
                                int                                  attacker_supply,
@@ -163,9 +165,11 @@ battle_outcome resolve_battle(const std::vector<army_stack_entry>& attacker,
     }
 
     // --- Terrain: defence favours the defender, attrition costs both -------
-    def_power = apply_permille(def_power, 1000 + terrain_defence(terrain_comp, terrain_lf));
+    def_power = apply_permille(def_power,
+                               1000 + terrain_defence(terrain_sub, terrain_cov,
+                                                      terrain_density, terrain_lf));
 
-    const int attrition = terrain_attrition(terrain_comp, terrain_lf) *
+    const int attrition = terrain_attrition(terrain_sub, terrain_cov, terrain_density, terrain_lf) *
                            season_attrition_multiplier(battle_season) / 1000;
     // Supply mitigates attrition: fully supplied (1000) cancels it out entirely,
     // cut off (0) takes the full attrition hit.

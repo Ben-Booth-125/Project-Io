@@ -478,7 +478,7 @@ std::vector<extraction_site> rank_extraction_sites(const world& w, int top_m,
 
     for (const auto& [tid, tc] : w.tiles)
     {
-        if (placement_rules::is_ocean_tile(tc.composition))
+        if (placement_rules::is_ocean_tile(tc.substrate))
             continue;
         if (tc.body != memo_body)
         {
@@ -1855,7 +1855,7 @@ corp_blackboard export_corp_blackboard(const world& w, entity_id corp, int tick)
         std::vector<entity_id> tids;
         for (const auto& [tid, tc] : w.tiles)
         {
-            if (placement_rules::is_ocean_tile(tc.composition))
+            if (placement_rules::is_ocean_tile(tc.substrate))
                 continue;
             if (!tile_surveyed(w, tc))
                 continue;

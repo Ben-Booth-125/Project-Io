@@ -177,7 +177,7 @@ scene make_scene()
         tc.body        = s.body;
         tc.grid_x      = 0;
         tc.grid_y      = 0;
-        tc.composition = terrain_composition::rocky;
+        tc.substrate = terrain_substrate::rocky;
         tc.landform    = terrain_landform::plains;
         tc.resource_deposit[ri(resource_type::iron_ore)]   = 1.0f;
         tc.resource_remaining[ri(resource_type::iron_ore)] = 1.0e6f;

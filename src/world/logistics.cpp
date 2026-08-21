@@ -68,7 +68,7 @@ float road_traversal_multiplier(std::uint8_t road_level)
 /// the only caller outside it reads land tiles a unit can actually stand on.
 float tile_traversal_cost(const tile_component& tc)
 {
-    const float base = (tc.composition == terrain_composition::ocean)
+    const float base = (tc.substrate == terrain_substrate::ocean)
                            ? sea_leg_cost
                            : landform_logistics_cost(tc.landform);
     return base * road_traversal_multiplier(tc.road_level);
@@ -137,7 +137,7 @@ const logistics_path& intra_body_path(world& w, entity_id body, entity_id src_ti
     {
         res.reachable     = true;
         res.cost          = 0.0f;
-        res.crosses_ocean = (sit->second.composition == terrain_composition::ocean);
+        res.crosses_ocean = (sit->second.substrate == terrain_substrate::ocean);
         res.tiles         = { src_tile };
         return w.astar_cost_cache.emplace(key, std::move(res)).first->second;
     }
@@ -163,7 +163,7 @@ const logistics_path& intra_body_path(world& w, entity_id body, entity_id src_ti
     const int destIdx = raster_idx(dc, dr, gw);
     dist[static_cast<std::size_t>(start)] = 0.0f;
     crossed[static_cast<std::size_t>(start)] =
-        (sit->second.composition == terrain_composition::ocean) ? 1 : 0;
+        (sit->second.substrate == terrain_substrate::ocean) ? 1 : 0;
 
     std::priority_queue<pq_entry, std::vector<pq_entry>, std::greater<pq_entry>> pq;
     pq.push({ 0.0f, sc, sr });
@@ -216,7 +216,7 @@ const logistics_path& intra_body_path(world& w, entity_id body, entity_id src_ti
                 dist[static_cast<std::size_t>(nidx)] = nd;
                 crossed[static_cast<std::size_t>(nidx)] =
                     (crossed[static_cast<std::size_t>(idx)]
-                     || n_tc->composition == terrain_composition::ocean) ? 1 : 0;
+                     || n_tc->substrate == terrain_substrate::ocean) ? 1 : 0;
                 came_from[static_cast<std::size_t>(nidx)] = idx;
                 pq.push({ nd, nc, nr });
             }

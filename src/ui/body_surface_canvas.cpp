@@ -1750,7 +1750,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         const ImU32  owner_col  = has_owner ? corp_identity(corp_it->second)
                                             : IM_COL32(255, 255, 255, 255);
         ImU32 fill = built ? built_plate_colour(has_owner, owner_col)
-                           : terrain_colour(tile.composition);
+                           : terrain_colour(tile.substrate, tile.cover, tile.cover_density);
         if (state.overlay == overlay_mode::country)
         {
             const auto nat_it = w.tile_to_nation.find(id);
@@ -2575,7 +2575,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // tiles (suppressed above).
             if ((state.overlay == overlay_mode::population ||
                  state.overlay == overlay_mode::opportunity) &&
-                !placement_rules::is_ocean_tile(tile.composition))
+                !placement_rules::is_ocean_tile(tile.substrate))
             {
                 float t = 0.0f; // body-relative rank, [0, 1], red(low) -> green(high)
                 if (state.overlay == overlay_mode::population)

@@ -181,8 +181,13 @@ struct campaign_battle_state
     doctrine_row attacker_doctrine{};
     doctrine_row defender_doctrine{};
 
-    terrain_composition terrain_comp = terrain_composition::grassland;
-    terrain_landform    terrain_lf   = terrain_landform::plains;
+    // The three tile axes (BL-519). The defaults are the BL-519 spelling of the
+    // old `grassland` default, not a new one: grass on sedimentary ground at the
+    // density decompose_biome grades a grassland to.
+    terrain_substrate   terrain_sub     = terrain_substrate::sedimentary;
+    terrain_cover       terrain_cov     = terrain_cover::grass;
+    std::uint8_t        terrain_density = 150u;
+    terrain_landform    terrain_lf      = terrain_landform::plains;
     season              battle_season = season::summer;
     int attacker_supply = 1000;
     int defender_supply = 1000;
@@ -211,7 +216,9 @@ campaign_battle_state begin_campaign_battle(const campaign_battle_identity&     
                                             const doctrine_row&                  attacker_doctrine,
                                             const std::vector<army_stack_entry>& defender,
                                             const doctrine_row&                  defender_doctrine,
-                                            terrain_composition                  terrain_comp,
+                                            terrain_substrate                    terrain_sub,
+                                            terrain_cover                        terrain_cov,
+                                            std::uint8_t                         terrain_density,
                                             terrain_landform                     terrain_lf,
                                             season                               battle_season,
                                             int                                  attacker_supply,
@@ -246,7 +253,9 @@ campaign_battle_outcome resolve_campaign_battle(const campaign_battle_identity& 
                                                 const doctrine_row&                  attacker_doctrine,
                                                 const std::vector<army_stack_entry>& defender,
                                                 const doctrine_row&                  defender_doctrine,
-                                                terrain_composition                  terrain_comp,
+                                                terrain_substrate                    terrain_sub,
+                                                terrain_cover                        terrain_cov,
+                                                std::uint8_t                         terrain_density,
                                                 terrain_landform                     terrain_lf,
                                                 season                               battle_season,
                                                 int                                  attacker_supply,

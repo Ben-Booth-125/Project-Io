@@ -2953,6 +2953,69 @@
    "status": "open",
    "source": "BL-519 / BL-520 design work, 2026-08-21.",
    "what": "Measured rather than estimated: 330 references to composition in src/, concentrated in tile_generation.cpp (60), terrain_combat.cpp (32), placement_rules.cpp (32), corporation_generation (18), nation_generation (15) and the UI (hex_render 14, presentation 13, generation_ledger 12). There is NO save format, so none of this is a data migration - it is call sites only, which is why the item is landable at all. BL-519 proposes a derived composition() accessor so every call site keeps working while the axes land underneath, then migrating by MEANING in batches. The question for you is whether that accessor is permanent or deleted last. Permanent is a much smaller diff and a lasting lie - the codebase would keep asking a question the data model no longer answers. Deleted is honest and a longer migration. The interesting part is that a call site asking 'is this forest?' usually means either 'is there timber here?' (cover) or 'can I build on it?' (substrate), and which it meant is precisely the information the overloaded enum has been losing."
+  },
+  {
+   "id": "NR-445",
+   "title": "BL-519 landed with FOUR calls of yours taken as given — and one of them, urban-as-cover, is the reason the shipped urban bug is fixed",
+   "raised": "2026-08-21",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-519 (tile axis split), landed 2026-08-21.",
+   "what": "You answered the item's four open questions before implementation: cover is GRADED (a density scalar), urban is a COVER value, tundra is DROPPED (scrub on cold ground), and the composition() shim is DELETED in this pass with all call sites migrated. All four are implemented as answered. Recording them here because the item's own design prose argued the OPPOSITE on urban - it proposed a separate state axis - and a future reader will otherwise read the code as having ignored the design. Your call is the better one and the code says why: urban-as-cover still preserves the SUBSTRATE, which is the entire shipped bug (paving a metallic tile destroyed the fact it was metallic). A separate state axis would have bought only the ability to remember what GREW there before the city, which nothing reads. tile_axes_harness A2c is the assertion that would have failed before the item and passes now."
+  },
+  {
+   "id": "NR-446",
+   "title": "BL-519's headline case was inert at the threshold the design implied — 'a mountain might have a forest' fired ZERO times until I moved a number",
+   "raised": "2026-08-21",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-519 (tile axis split), Pass 4d cover refinement.",
+   "what": "Your brief was 'a mountain might have a forest or not', and the design lists forest as a cover that reads on rocky and volcanic ground. I first gated forest-on-rock at moisture >= 0.55, matching the moisture the biome table uses for forest on soil. It fired ZERO times on a homeworld, and the reason is structural rather than a tuning miss: the biome table routes ground BY moisture, so `rocky` is only ever drawn in the dry and middling columns - wet rocky ground does not exist for the branch to find. I lowered it to 0.45 (the top half of the middling column) on the argument that 0.55 is the moisture at which SOIL grows a forest, and a slope is not soil. It now produces 3,054 forest tiles across a 6-seed sweep, of which 110 on the primary homeworld carry BOTH timber and iron - the pair the pre-split model could not express. FLAGGING IT because the number is a judgement about how common a wooded crag should be, and I picked it to make the feature reachable rather than because you chose it. The census is REPORTED by tile_axes_harness section D, so you can move it against a number."
+  },
+  {
+   "id": "NR-447",
+   "title": "BL-519 moved the settlement map: a wooded hillside now scores better than a bare crag, so population centres and province borders shifted",
+   "raised": "2026-08-21",
+   "kind": "observation",
+   "status": "open",
+   "source": "BL-519, settle_score / agrarian_score migration.",
+   "what": "settle_score and agrarian_score were single-slot tables that had to choose between naming the cover and naming the ground, so a forested crag and a forested floodplain scored the same. Migrated by meaning: the COVER sets the score, the SUBSTRATE decides how much of it is real (sedimentary keeps every pre-split number exactly; rocky gets a third, and bare rock keeps its old 6/5). CONSEQUENCE, measured: population centres move, and because BL-515 seeds provinces from centres, the partition moves with them - 3,709 provinces became 3,714 on the default seed, and the over-12 share went 4.72% -> 4.90%. Everything still passes and the hard cap of 20 still holds at max 16. Reporting it because a province-count change is exactly the kind of thing that looks alarming when noticed later without a cause attached. The cause is that cover now matters to settlement, which is the point of the axis."
+  },
+  {
+   "id": "NR-448",
+   "title": "TWO harnesses fail with stale goldens — ai_skill_harness (28) and history_sim_harness (8). Both PRE-EXISTING, proven against the previous commit, NOT BL-519",
+   "raised": "2026-08-21",
+   "kind": "observation",
+   "status": "open",
+   "source": "Full harness sweep during BL-519.",
+   "what": "ai_skill_harness prints its own banner: 'bands blessed: 2026-08-09 (GCC - STALE since 2026-08-14/BL-386; re-bless from the Linux build)'. history_sim_harness carries no such banner but fails the same way. I did not take either on trust: I built BOTH at the pre-BL-519 commit (2c17e96) in a separate worktree and ran them. ai_skill_harness: 28 failures each side, PASS/FAIL pattern byte-identical. history_sim_harness: 8 failures each side, PASS/FAIL pattern byte-identical. So BL-519 neither caused nor worsened either. Both want re-blessing, and BL-519 is a reason to do it AFTER this lands rather than before, since deposits and the settlement map both moved. NOT re-blessed here - re-blessing a golden without authorisation is exactly what src/world/CLAUDE.md forbids. The 8 history_sim rows are about whether the Era -1 sim fights and takes ground at all (B384a, B384c, BL384a), which is a BL-384-shaped problem and probably wants an item rather than a re-bless."
+  },
+  {
+   "id": "NR-449",
+   "title": "BL-521's design field in backlog.json is CORRUPTED — it holds the JavaScript that filed the item, not the design",
+   "raised": "2026-08-21",
+   "kind": "observation",
+   "status": "open",
+   "source": "Reading BL-521 at the start of the BL-519/BL-520 session.",
+   "what": "BL-521 (verify-API click injection) was filed by a script whose final line was `design: fs.readFileSync(process.argv[1], 'utf8')`. process.argv[1] is the SCRIPT ITSELF under node, not a design document, so the item's design field now contains the filing script's own source - including the code that resolved NR-438/NR-439. The item's title, files, priority and version goal are all fine; only the prose is lost. REFINED.md's paragraph on it is currently the best statement of intent that exists. Nothing recovers the original text, so it needs re-authoring rather than repairing. Worth knowing generally: a filing script that reads its own argv for prose will do this again."
+  },
+  {
+   "id": "NR-450",
+   "title": "src/ui/tech_tree_panel.cpp uses std::clamp without <algorithm> — invisible on MSVC, breaks the Linux build BL-057 is heading toward",
+   "raised": "2026-08-21",
+   "kind": "observation",
+   "status": "open",
+   "source": "Syntax-checking the UI layer with g++ during BL-519.",
+   "what": "Not mine and not BL-519's: `git log` puts the line in c49c2fa. MSVC pulls <algorithm> in transitively so it compiles on the shipped toolchain; g++ does not, and it is the ONLY error in src/ui once BL-519's migration is applied. One-line fix (add the include). Left alone because it is unrelated to the item in hand and I would rather you saw it as its own thing than buried in a 660-line terrain diff. It matters for BL-057 (move development to native Linux)."
+  },
+  {
+   "id": "NR-451",
+   "title": "BL-519's UI half is COMPILE-CHECKED but not RUN, and no visual check was possible — this container cannot build the app",
+   "raised": "2026-08-21",
+   "kind": "observation",
+   "status": "open",
+   "source": "BL-519, src/ui migration.",
+   "what": "SDL3 and ImGui come from CMake FetchContent and the session proxy blocks those downloads; there is also no display. So ProjectIo could not be built or run, and no scripts/verify/*.lua check could be executed. What I DID do: cloned ImGui's headers and ran `g++ -fsyntax-only` over every file in src/ui, which is clean. That covers type errors and my migration; it does NOT cover linkage, runtime behaviour, or how anything LOOKS. Specifically unverified: the terrain colour blend (calibrated so all four canonical covers reproduce their pre-split RGB exactly, and arithmetically checked - but never rendered), the generation ledger's new two-histogram layout, and the wizard preview globe's packed-axes sampling. Worth a look on your machine before this is treated as done."
   }
  ]
 }

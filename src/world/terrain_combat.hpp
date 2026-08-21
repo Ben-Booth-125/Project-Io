@@ -32,25 +32,29 @@
 //
 // Merging them is why a mountain and a barren plain scored identically while a
 // forest scored nothing. (1) and (2) are the two functions below; (3) stays an
-// explicit `composition == ocean` branch at the call site, exactly as logistics
+// explicit `substrate == ocean` branch at the call site, exactly as logistics
 // already branches land/sea, because a mode is not a number.
 // ---------------------------------------------------------------------------
 
 /// How well this ground holds against an attacker, 0..1000 (0 = open ground).
 ///
 /// Landform dominates — the shape of the ground is what a defender uses — with
-/// composition modulating for cover and going. Ocean returns 0: water is a mode
+/// cover and substrate modulating for going. Ocean returns 0: water is a mode
 /// change, and the caller must branch on it rather than read a defence value.
-int terrain_defence(terrain_composition comp, terrain_landform lf);
+int terrain_defence(terrain_substrate sub, terrain_cover cov, std::uint8_t density,
+                    terrain_landform lf);
 
 /// What crossing this ground costs an army in supply, 0..1000, independently of
-/// any defender. Composition dominates here (forage, water, shelter), with
-/// landform adding the climb. Ocean returns 0 for the same reason as above.
-int terrain_attrition(terrain_composition comp, terrain_landform lf);
+/// any defender. The substrate dominates here (what the ground itself denies an
+/// army), the cover relieves it (forage, fuel, shelter), and landform adds the
+/// climb. Ocean returns 0 for the same reason as above.
+int terrain_attrition(terrain_substrate sub, terrain_cover cov, std::uint8_t density,
+                      terrain_landform lf);
 
 /// The combined "this tile resists an army" quantity, 0..1000 — the graded
 /// replacement for the old `is_barrier` bool. Weighted toward defence, since a
 /// defensible frontier shapes a border more strongly than a merely expensive
 /// one, but attrition is what stops an army crossing an ice cap that no one is
 /// defending at all. Ocean returns 0; callers count water separately.
-int terrain_resistance(terrain_composition comp, terrain_landform lf);
+int terrain_resistance(terrain_substrate sub, terrain_cover cov, std::uint8_t density,
+                       terrain_landform lf);

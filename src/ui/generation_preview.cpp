@@ -335,28 +335,29 @@ void paint_homeworld(ImDrawList* dl, ImVec2 c, float R, const planetology_state&
                 const int c0    = static_cast<int>(lw / two_pi * static_cast<float>(surface.gw));
                 const int span  = std::max(1, surface.gw / n_slices);
                 const auto vote = [&](int tr) {
-                    int counts[16] = {};
+                    int counts[256] = {}; // packed substrate<<4|cover (BL-519)
                     for (int k = 0; k <= span; ++k)
                     {
                         const int tc = (c0 + k) % surface.gw;
                         const uint8_t comp = surface.comp[
                             static_cast<std::size_t>(tr) * static_cast<std::size_t>(surface.gw)
                             + static_cast<std::size_t>(tc)];
-                        if (comp < 16) ++counts[comp];
+                        ++counts[comp];
                     }
                     int best = 0;
-                    for (int k = 1; k < 16; ++k)
+                    for (int k = 1; k < 256; ++k)
                         if (counts[k] > counts[best]) best = k;
-                    return static_cast<terrain_composition>(best);
+                    return static_cast<uint8_t>(best);
                 };
 
                 const float p  = 0.5f - lat / 3.14159265f;
                 const float fr = std::clamp(p * static_cast<float>(surface.gh - 1),
                                             0.0f, static_cast<float>(surface.gh - 1));
                 const int   tr = std::clamp(static_cast<int>(fr + 0.5f), 0, surface.gh - 1);
-                const auto  comp = vote(tr);
-                fill    = terrain_colour(comp);
-                on_land = comp != terrain_composition::ocean;
+                const uint8_t packed = vote(tr);
+                const terrain_substrate vs = preview_substrate(packed);
+                fill    = terrain_colour(vs, preview_cover(packed), k_preview_cover_density);
+                on_land = vs != terrain_substrate::ocean;
             }
             else if (frozen)                         fill = ic;
             else if (std::fabs(lat_n) > ice_lat && st.profile.hydrology

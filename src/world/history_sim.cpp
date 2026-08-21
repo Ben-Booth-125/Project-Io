@@ -103,11 +103,25 @@ int work_score_q(const work_row&           r,
     return static_cast<int>(clampi64(s, 0, 100000));
 }
 
-terrain_composition comp_at(const sim_terrain_view& t, int idx)
+terrain_substrate sub_at(const sim_terrain_view& t, int idx)
 {
-    if (!t.composition || idx < 0 || idx >= static_cast<int>(t.composition->size()))
-        return terrain_composition::grassland;
-    return (*t.composition)[static_cast<std::size_t>(idx)];
+    if (!t.substrate || idx < 0 || idx >= static_cast<int>(t.substrate->size()))
+        return terrain_substrate::sedimentary; // the old grassland default, on its ground
+    return (*t.substrate)[static_cast<std::size_t>(idx)];
+}
+
+terrain_cover cov_at(const sim_terrain_view& t, int idx)
+{
+    if (!t.cover || idx < 0 || idx >= static_cast<int>(t.cover->size()))
+        return terrain_cover::grass; // the other half of the old grassland default
+    return (*t.cover)[static_cast<std::size_t>(idx)];
+}
+
+std::uint8_t den_at(const sim_terrain_view& t, int idx)
+{
+    if (!t.density || idx < 0 || idx >= static_cast<int>(t.density->size()))
+        return 150u; // the density decompose_biome grades a grassland to
+    return (*t.density)[static_cast<std::size_t>(idx)];
 }
 
 terrain_landform lf_at(const sim_terrain_view& t, int idx)
@@ -965,7 +979,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const battle_outcome bo = resolve_battle(
                     atk, doctrine_for(q),
                     def, dq ? doctrine_for(*dq) : doctrine_for(q),
-                    comp_at(terrain, tgt.anchor), lf_at(terrain, tgt.anchor),
+                    sub_at(terrain, tgt.anchor), cov_at(terrain, tgt.anchor),
+                    den_at(terrain, tgt.anchor), lf_at(terrain, tgt.anchor),
                     best_winter ? season::winter : season::summer,
                     atk_supply, def_supply);
 

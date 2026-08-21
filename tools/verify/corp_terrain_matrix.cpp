@@ -274,7 +274,7 @@ bool assert_asset_legality(const world& w, entity_id cid, const corporation_comp
             ++bad;
             // Derive a human reason (this branch predates placement_result/message()).
             const char* why = "rejected";
-            if (placement_rules::is_ocean_tile(tc.composition))
+            if (placement_rules::is_ocean_tile(tc.substrate))
                 why = "ocean tile";
             else if (bc.type == building_type::extraction_site
                      && tc.resource_deposit[ri(bc.target_resource)] <= 0.0f)

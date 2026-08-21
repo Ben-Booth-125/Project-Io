@@ -35,12 +35,12 @@ void check(bool ok, const char* label)
 std::size_t ri(resource_type r) { return static_cast<std::size_t>(r); }
 
 entity_id make_tile(world& w, entity_id body, int gx, int gy,
-                    terrain_composition comp, float iron_richness)
+                    terrain_substrate sub, float iron_richness)
 {
     const entity_id t = w.create_entity();
     tile_component tc{};
     tc.body = body; tc.grid_x = gx; tc.grid_y = gy;
-    tc.composition = comp; tc.landform = terrain_landform::plains;
+    tc.substrate = sub; tc.landform = terrain_landform::plains;
     if (iron_richness > 0.0f)
     {
         tc.resource_deposit[ri(resource_type::iron_ore)]   = iron_richness;
@@ -89,7 +89,7 @@ scene make_scene()
         cc.starting_capital = 500.0f; cc.balance = 500.0f;
         for (int i = 0; i < n_buildings; ++i)
         {
-            const entity_id tile = make_tile(w, s.body, i, 0, terrain_composition::rocky, 0.5f);
+            const entity_id tile = make_tile(w, s.body, i, 0, terrain_substrate::rocky, 0.5f);
             const entity_id bld  = w.create_entity();
             building_component b{};
             b.tile = tile; b.type = building_type::extraction_site;

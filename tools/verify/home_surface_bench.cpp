@@ -2,7 +2,7 @@
 // real-tile preview seam (extracted from make_hard_coded_world 2026-08-07).
 // Two jobs:
 //   * SANITY: the preview surface is the SAME surface make_hard_coded_world
-//     builds for Kepler — same composition on every tile, across seeds. This is
+//     builds for Kepler — same substrate on every tile, across seeds. This is
 //     the whole point of the extraction; if it drifts, the preview is lying.
 //   * BENCH: per-call wall time, printed. The wizard calls this on every
 //     control move, so the number decides whether the call stays synchronous.
@@ -58,23 +58,23 @@ int main()
         // layer), which is exactly why the wizard gets the carve-out instead.
         // Kepler's tiles are recovered raster-ordered from their grid coords.
         world full = make_hard_coded_world(no_prehistory(params));
-        std::vector<terrain_composition> full_comp(
+        std::vector<terrain_substrate> full_comp(
             static_cast<std::size_t>(home_grid_width * home_grid_height),
-            terrain_composition::ocean);
+            terrain_substrate::ocean);
         std::size_t found = 0;
         for (const auto& [id, t] : full.tiles)
             if (t.body == full.home_body)
             {
                 full_comp[static_cast<std::size_t>(t.grid_y * home_grid_width
-                                                   + t.grid_x)] = t.composition;
+                                                   + t.grid_x)] = t.substrate;
                 ++found;
             }
         bool same = found == preview_tiles.size();
         if (same)
             for (std::size_t i = 0; i < preview_tiles.size(); ++i)
-                if (scratch.tiles.at(preview_tiles[i]).composition != full_comp[i])
+                if (scratch.tiles.at(preview_tiles[i]).substrate != full_comp[i])
                     { same = false; break; }
-        check(same, "preview composition == make_hard_coded_world Kepler, tile for tile");
+        check(same, "preview substrate == make_hard_coded_world Kepler, tile for tile");
     }
 
     std::printf("bench: %d runs, mean %.1f ms, worst %.1f ms\n",

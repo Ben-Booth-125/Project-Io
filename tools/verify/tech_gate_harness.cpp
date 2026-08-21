@@ -67,7 +67,7 @@ entity_id make_tile(world& w, entity_id body, int gx, int gy)
     tc.body        = body;
     tc.grid_x      = gx;
     tc.grid_y      = gy;
-    tc.composition = terrain_composition::grassland;
+    tc.substrate = terrain_substrate::sedimentary; tc.cover = terrain_cover::grass; tc.cover_density = 150;
     tc.landform    = terrain_landform::plains;
     w.tiles[t] = tc;
     return t;

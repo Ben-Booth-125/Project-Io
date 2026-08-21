@@ -116,7 +116,7 @@ int main()
     {
         std::size_t land_total = 0;
         for (const auto& [tid, tc] : w.tiles)
-            if (tc.composition != terrain_composition::ocean)
+            if (tc.substrate != terrain_substrate::ocean)
                 ++land_total;
 
         std::unordered_map<entity_id, int> seen;
@@ -129,7 +129,7 @@ int main()
                 ++members;
                 ++seen[t];
                 const auto it = w.tiles.find(t);
-                if (it == w.tiles.end() || it->second.composition == terrain_composition::ocean)
+                if (it == w.tiles.end() || it->second.substrate == terrain_substrate::ocean)
                     ocean_member = true;
                 else if (it->second.body != p.body)
                     body_mismatch = true;
@@ -199,7 +199,7 @@ int main()
                     continue;
                 const auto tit = sw.tiles.find(t);
                 if (tit == sw.tiles.end()
-                    || tit->second.composition == terrain_composition::ocean)
+                    || tit->second.substrate == terrain_substrate::ocean)
                     continue;
                 const tile_component& tc = tit->second;
                 for (int s = 0; s < 6; ++s)
@@ -215,7 +215,7 @@ int main()
                         continue; // each edge once, from its lower tile
                     const auto nit = sw.tiles.find(n);
                     if (nit == sw.tiles.end()
-                        || nit->second.composition == terrain_composition::ocean)
+                        || nit->second.substrate == terrain_substrate::ocean)
                         continue;
                     land_edge e;
                     e.a      = t;
@@ -421,7 +421,7 @@ int main()
                         continue;
                     const auto nit = w.tiles.find(n);
                     if (nit == w.tiles.end()
-                        || nit->second.composition == terrain_composition::ocean)
+                        || nit->second.substrate == terrain_substrate::ocean)
                         continue;
                     ++not_islands;
                     break;

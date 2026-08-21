@@ -65,13 +65,26 @@ void cardinal_neighbours(int col, int row, int gw, int gh,
 /// Attempt to place `seed_target` seeds on non-ocean tiles, each at
 /// least `min_sep` grid distance from every previously placed seed. Fewer are
 /// placed when the separation rule leaves no eligible land — the caller treats
+/// Ground a nation would actually seed on: a real biotic cover on real SOIL
+/// (BL-519). The pre-split test named three compositions — grassland, forest,
+/// wetland — to say one thing, and could not exclude a forested crag because
+/// "forested" and "on rock" were alternatives rather than a pair. Scrub is out
+/// for the same reason it was before, when it was called tundra.
+bool habitable_ground(terrain_substrate sub, terrain_cover cov)
+{
+    return sub == terrain_substrate::sedimentary
+        && (cov == terrain_cover::grass || cov == terrain_cover::forest
+            || cov == terrain_cover::marsh);
+}
+
 /// the returned size as authoritative.
-/// Habitable compositions (grassland, forest, wetland) are strongly preferred.
+/// Habitable ground — a real biotic cover on real soil — is strongly preferred.
 /// Falls back to any land tile if the preferred pool is exhausted.
 ///
 /// Returns the raster indices of the chosen seed tiles.
 std::vector<int> place_seeds(const std::vector<bool>& is_ocean,
-                             const std::vector<terrain_composition>& comp,
+                             const std::vector<terrain_substrate>& sub,
+                             const std::vector<terrain_cover>& cov,
                              int gw, int gh,
                              int seed_target, int min_sep,
                              std::mt19937& rng)
@@ -89,13 +102,8 @@ std::vector<int> place_seeds(const std::vector<bool>& is_ocean,
         if (is_ocean[idx])
             continue;
         any_land.push_back(idx);
-        const terrain_composition c = comp[idx];
-        if (c == terrain_composition::grassland
-         || c == terrain_composition::forest
-         || c == terrain_composition::wetland)
-        {
+        if (habitable_ground(sub[idx], cov[idx]))
             preferred.push_back(idx);
-        }
     }
 
     // Shuffle both pools independently so candidate order is random.
@@ -110,13 +118,8 @@ std::vector<int> place_seeds(const std::vector<bool>& is_ocean,
     for (int idx : any_land)
     {
         // Only add tiles not already in preferred.
-        const terrain_composition c = comp[idx];
-        if (c != terrain_composition::grassland
-         && c != terrain_composition::forest
-         && c != terrain_composition::wetland)
-        {
+        if (!habitable_ground(sub[idx], cov[idx]))
             candidates.push_back(idx);
-        }
     }
 
     std::vector<int> seeds;
@@ -660,9 +663,10 @@ std::vector<entity_id> generate_nations(
     const uint32_t seed_pol    = seed ^ 0x8C7B6A59u;
     const uint32_t seed_name   = seed ^ 0x4E5F607Au;
 
-    // --- Build flat composition and is_ocean maps from the existing tile data ---
-    std::vector<terrain_composition> comp(static_cast<std::size_t>(total),
-                                          terrain_composition::barren);
+    // --- Build flat terrain-axis and is_ocean maps from the existing tile data ---
+    std::vector<terrain_substrate> sub(static_cast<std::size_t>(total),
+                                       terrain_substrate::barren);
+    std::vector<terrain_cover> cov(static_cast<std::size_t>(total), terrain_cover::none);
     std::vector<bool> is_ocean(static_cast<std::size_t>(total), false);
 
     for (int idx = 0; idx < total; ++idx)
@@ -673,8 +677,9 @@ std::vector<entity_id> generate_nations(
         const auto it = w.tiles.find(tid);
         if (it == w.tiles.end())
             continue;
-        comp[static_cast<std::size_t>(idx)] = it->second.composition;
-        if (it->second.composition == terrain_composition::ocean)
+        sub[static_cast<std::size_t>(idx)] = it->second.substrate;
+        cov[static_cast<std::size_t>(idx)] = it->second.cover;
+        if (it->second.substrate == terrain_substrate::ocean)
             is_ocean[static_cast<std::size_t>(idx)] = true;
     }
 
@@ -726,7 +731,7 @@ std::vector<entity_id> generate_nations(
     if (seeds.empty())
     {
         seeds = place_seeds(
-            is_ocean, comp, gw, gh,
+            is_ocean, sub, cov, gw, gh,
             seed_target, params.min_seed_separation,
             seed_rng);
     }

@@ -63,7 +63,8 @@ void app::refresh_wizard_preview()
                                                          m_pending_world_params);
         m_wiz_surface.resize(tiles.size());
         for (std::size_t i = 0; i < tiles.size(); ++i)
-            m_wiz_surface[i] = static_cast<uint8_t>(scratch.tiles.at(tiles[i]).composition);
+            m_wiz_surface[i] = ui::preview_pack(scratch.tiles.at(tiles[i]).substrate,
+                                                scratch.tiles.at(tiles[i]).cover);
     }
     else if (m_wiz_surface_future.valid())
         m_wiz_surface_stale = true;
@@ -80,7 +81,8 @@ void app::launch_wizard_surface_build()
             const auto tiles = generate_home_surface_preview(scratch, probe, params);
             std::vector<uint8_t> comp(tiles.size());
             for (std::size_t i = 0; i < tiles.size(); ++i)
-                comp[i] = static_cast<uint8_t>(scratch.tiles.at(tiles[i]).composition);
+                comp[i] = ui::preview_pack(scratch.tiles.at(tiles[i]).substrate,
+                                           scratch.tiles.at(tiles[i]).cover);
             return comp;
         });
 }

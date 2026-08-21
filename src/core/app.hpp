@@ -304,8 +304,9 @@ private:
     std::vector<planetology_state> m_wiz_preview; ///< Live chain result per prototype body at the resolved params.
     std::vector<planetology_state> m_wiz_undrawn; ///< The same run with drawdown forced to 0 — the Spend chart's "before" reference.
 
-    // The REAL homeworld surface for the preview globe: raster terrain_composition
-    // values from generate_home_surface_preview (same pipeline, same gate, same
+    // The REAL homeworld surface for the preview globe: raster PACKED terrain
+    // axes (substrate << 4 | cover — ui::preview_pack, BL-519)
+    // from generate_home_surface_preview (same pipeline, same gate, same
     // seed as "Begin" — bench + parity: tools/verify/home_surface_bench.cpp).
     // Built ASYNC (~0.5-0.9s: the BL-276 gate probes up to 6 scratch surfaces),
     // so a control click never blocks; the pane shows the previous surface until

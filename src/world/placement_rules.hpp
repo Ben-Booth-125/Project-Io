@@ -108,8 +108,10 @@ inline constexpr resource_type k_extractable[] = {
     resource_type::peat,
 };
 
-/// True if the given composition is ocean — buildings are never placed on water.
-bool is_ocean_tile(terrain_composition comp);
+/// True if the given substrate is ocean — buildings are never placed on water.
+/// A one-line SUBSTRATE test since BL-519: water is a property of the ground, and
+/// BL-516 will split it into lake / coast / ocean kinds on this same axis.
+bool is_ocean_tile(terrain_substrate sub);
 
 /// True if `r` is one of the prototype-extractable resources.
 bool is_extractable(resource_type r);
@@ -134,7 +136,7 @@ placement_result can_place_road(const tile_component& tc, std::uint8_t tier = 1)
 /// Returns true if a population centre may be placed on this tile.
 ///
 /// A population centre requires a non-ocean, non-deep-ocean land tile with
-/// positive habitability. Ocean tiles (composition == ocean) and tiles whose
+/// positive habitability. Ocean tiles (substrate == ocean) and tiles whose
 /// habitability is zero (harsh, uninhabitable terrain) are rejected.
 ///
 /// @param tc  The candidate tile.
@@ -269,15 +271,22 @@ int stack_capacity(const tile_component& tc, building_type type, resource_type t
 
 /// BL-366: ceiling on **total** non-extraction buildings (processors, ports, hubs,
 /// admin, amenity, military base, research institute — combined, not per type) a
-/// tile of the given starting composition can carry before it transforms to
+/// tile of the given starting substrate and cover can carry before it transforms to
 /// `urban`. Extraction stacking is a separate, richness-bound axis untouched by
 /// this cap. `urban` itself returns a high ceiling, soft-bounded in practice by
 /// workforce contention rather than this number; `ocean` returns 0 (no buildings
 /// there at all — `can_place` already refuses it).
 ///
-/// @param composition The tile's terrain_composition.
-/// @return             Non-extraction building ceiling for that composition.
-int non_extraction_stack_cap(terrain_composition composition);
+/// SPLIT BY MEANING (BL-519): the substrate sets the base — how much weight the
+/// ground itself will take — and the cover modifies it, because a forest is
+/// harder to build on than the rock beneath it and a paved tile is easier than
+/// either. The pre-split per-composition numbers are reproduced exactly; see the
+/// calibration table in the .cpp.
+///
+/// @param sub     The tile's terrain_substrate.
+/// @param cov     The tile's terrain_cover.
+/// @return        Non-extraction building ceiling for that pair.
+int non_extraction_stack_cap(terrain_substrate sub, terrain_cover cov);
 
 /// Total non-extraction buildings (every type except extraction_site) standing on
 /// @p tile_id — the aggregate `non_extraction_stack_cap` is the ceiling for.
@@ -288,7 +297,7 @@ int non_extraction_stack_cap(terrain_composition composition);
 int non_extraction_buildings_on_tile(const world& w, entity_id tile_id);
 
 /// BL-366: if @p tile_id's non-extraction building count has reached its
-/// composition's cap, flips `terrain_composition` to `urban`. One-way — a no-op
+/// cap, flips `terrain_cover` to `urban` and LEAVES THE SUBSTRATE ALONE. One-way — a no-op
 /// if the tile is already `urban` or `ocean`. Pure function of tile state (no
 /// RNG); call after a non-extraction building is placed.
 ///

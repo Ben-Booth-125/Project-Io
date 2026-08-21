@@ -509,11 +509,11 @@ void u7_adapter()
     const std::vector<army_stack_entry> def = {es};
     const doctrine_row                  d{};
     const battle_outcome r1 = resolve_battle(atk, d, def, d,
-                                             terrain_composition::rocky,
+                                             terrain_substrate::rocky, terrain_cover::none, 0,
                                              terrain_landform::plains,
                                              season::summer, 1000, 400);
     const battle_outcome r2 = resolve_battle(atk, d, def, d,
-                                             terrain_composition::rocky,
+                                             terrain_substrate::rocky, terrain_cover::none, 0,
                                              terrain_landform::plains,
                                              season::summer, 1000, 400);
     check(r1.attacker_power > 0 && r1.defender_power > 0,

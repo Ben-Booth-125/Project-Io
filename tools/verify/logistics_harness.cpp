@@ -29,7 +29,7 @@ static bool approx(float a, float b) { return std::fabs(a - b) < 1e-4f; }
 // Build a body with a gw x gh grid of uniform tiles; return the body id.
 static entity_id make_grid(world& w, int gw, int gh,
                            terrain_landform lf = terrain_landform::plains,
-                           terrain_composition comp = terrain_composition::grassland,
+                           terrain_substrate sub = terrain_substrate::sedimentary,
                            std::uint8_t road = 0)
 {
     const entity_id body = w.create_entity();
@@ -43,7 +43,7 @@ static entity_id make_grid(world& w, int gw, int gh,
             const entity_id t = w.create_entity();
             tile_component tc{};
             tc.body = body; tc.grid_x = c; tc.grid_y = r;
-            tc.composition = comp; tc.landform = lf; tc.road_level = road;
+            tc.substrate = sub; tc.landform = lf; tc.road_level = road;
             w.tiles[t] = tc;
         }
     return body;
@@ -87,9 +87,9 @@ int main()
     // T3 — road discount: road_level lowers the traversal cost of the crossed tiles.
     {
         world w0; const entity_id b0 = make_grid(w0, 1, 5, terrain_landform::plains,
-                                                 terrain_composition::grassland, /*road=*/0);
+                                                 terrain_substrate::sedimentary, /*road=*/0);
         world w2; const entity_id b2 = make_grid(w2, 1, 5, terrain_landform::plains,
-                                                 terrain_composition::grassland, /*road=*/2);
+                                                 terrain_substrate::sedimentary, /*road=*/2);
         const float c0 = intra_body_path(w0, b0, tile_at(w0,b0,0,0), tile_at(w0,b0,0,4)).cost;
         const float c2 = intra_body_path(w2, b2, tile_at(w2,b2,0,0), tile_at(w2,b2,0,4)).cost;
         check(c2 < c0, "a roaded corridor costs less than an unroaded one");
@@ -117,7 +117,7 @@ int main()
         world ws; const entity_id bs = make_grid(ws, 1, 3, terrain_landform::plains);
         // Make the middle tile ocean, so the only col-0 path must cross it.
         const entity_id mid = tile_at(ws, bs, 0, 1);
-        ws.tiles[mid].composition = terrain_composition::ocean;
+        ws.tiles[mid].substrate = terrain_substrate::ocean;
         const logistics_path sea = intra_body_path(ws, bs, tile_at(ws,bs,0,0), tile_at(ws,bs,0,2));
         check(sea.reachable && sea.crosses_ocean, "a path forced through ocean -> sea mode");
         check(approx(sea.cost, 3.5f), "ocean sea-leg raises the crossing cost (0.5*(1+2.5)*2 = 3.5)");

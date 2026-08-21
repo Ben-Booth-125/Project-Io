@@ -164,7 +164,7 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed)
     constexpr int k_land_tiles_per_centre = 410;
     int land_tiles = 0;
     for (const auto& [tid, tc] : w.tiles)
-        if (tc.body == body_id && tc.composition != terrain_composition::ocean)
+        if (tc.body == body_id && tc.substrate != terrain_substrate::ocean)
             ++land_tiles;
 
     const int centre_count = std::clamp(land_tiles / k_land_tiles_per_centre,

@@ -80,7 +80,9 @@ campaign_battle_state begin_campaign_battle(const campaign_battle_identity&     
                                             const doctrine_row&                  attacker_doctrine,
                                             const std::vector<army_stack_entry>& defender,
                                             const doctrine_row&                  defender_doctrine,
-                                            terrain_composition                  terrain_comp,
+                                            terrain_substrate                    terrain_sub,
+                                            terrain_cover                        terrain_cov,
+                                            std::uint8_t                         terrain_density,
                                             terrain_landform                     terrain_lf,
                                             season                               battle_season,
                                             int                                  attacker_supply,
@@ -91,7 +93,9 @@ campaign_battle_state begin_campaign_battle(const campaign_battle_identity&     
     st.defender          = defender;
     st.attacker_doctrine = attacker_doctrine;
     st.defender_doctrine = defender_doctrine;
-    st.terrain_comp      = terrain_comp;
+    st.terrain_sub       = terrain_sub;
+    st.terrain_cov       = terrain_cov;
+    st.terrain_density   = terrain_density;
     st.terrain_lf        = terrain_lf;
     st.battle_season     = battle_season;
     st.attacker_supply   = clamp_permille(attacker_supply);
@@ -116,7 +120,8 @@ bool step_campaign_battle(campaign_battle_state& st, const campaign_battle_param
     // to a round, so this file computes its own (see header § what is shared).
     const battle_outcome scored = resolve_battle(atk, st.attacker_doctrine,
                                                   def, st.defender_doctrine,
-                                                  st.terrain_comp, st.terrain_lf,
+                                                  st.terrain_sub, st.terrain_cov,
+                                                  st.terrain_density, st.terrain_lf,
                                                   st.battle_season,
                                                   st.attacker_supply, st.defender_supply);
 
@@ -254,7 +259,9 @@ campaign_battle_outcome resolve_campaign_battle(const campaign_battle_identity& 
                                                 const doctrine_row&                  attacker_doctrine,
                                                 const std::vector<army_stack_entry>& defender,
                                                 const doctrine_row&                  defender_doctrine,
-                                                terrain_composition                  terrain_comp,
+                                                terrain_substrate                    terrain_sub,
+                                                terrain_cover                        terrain_cov,
+                                                std::uint8_t                         terrain_density,
                                                 terrain_landform                     terrain_lf,
                                                 season                               battle_season,
                                                 int                                  attacker_supply,
@@ -265,7 +272,8 @@ campaign_battle_outcome resolve_campaign_battle(const campaign_battle_identity& 
 {
     campaign_battle_state st = begin_campaign_battle(id, attacker, attacker_doctrine,
                                                       defender, defender_doctrine,
-                                                      terrain_comp, terrain_lf, battle_season,
+                                                      terrain_sub, terrain_cov, terrain_density,
+                                                      terrain_lf, battle_season,
                                                       attacker_supply, defender_supply);
 
     const bool scripted = (withdrawer != withdrawing_side::none) && (withdraw_after_round > 0);

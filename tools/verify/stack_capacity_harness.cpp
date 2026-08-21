@@ -94,7 +94,7 @@ fixture make_fixture(int sites, float reserve, bool with_market = false)
     {
         tile_component tc{};
         tc.body        = f.body;
-        tc.composition = terrain_composition::rocky;
+        tc.substrate = terrain_substrate::rocky;
         tc.resource_deposit[ri(resource_type::iron_ore)]   = 2.0f;
         tc.resource_remaining[ri(resource_type::iron_ore)] = reserve;
         tc.hazard_level = 0.0f;
@@ -236,7 +236,7 @@ int main()
         for (std::size_t i = 0; i < sizeof(want) / sizeof(want[0]); ++i)
         {
             tile_component tc{};
-            tc.composition = terrain_composition::rocky;
+            tc.substrate = terrain_substrate::rocky;
             tc.resource_deposit[ri(resource_type::iron_ore)] = bands[i];
             const int cap = placement_rules::stack_capacity(
                 tc, building_type::extraction_site, resource_type::iron_ore);
@@ -268,17 +268,21 @@ int main()
                                          building_type::launchpad,
                                          building_type::inland_logistics_hub,
                                          building_type::none };
-        for (const terrain_composition comp : { terrain_composition::rocky,
-                                                terrain_composition::grassland,
-                                                terrain_composition::icy })
+        // One representative pair per substrate band (BL-519): bare rock (cap 4),
+        // grass on soil (cap 6) and bare ice (cap 2) — the same three ceilings the
+        // pre-split loop walked, now named on the axes that decide them.
+        struct axes { terrain_substrate sub; terrain_cover cov; std::uint8_t den; };
+        for (const axes a : { axes{ terrain_substrate::rocky, terrain_cover::none, 0 },
+                              axes{ terrain_substrate::sedimentary, terrain_cover::grass, 150 },
+                              axes{ terrain_substrate::icy, terrain_cover::none, 0 } })
         {
             tile_component barren{};
-            barren.composition = comp;
+            barren.substrate = a.sub; barren.cover = a.cov; barren.cover_density = a.den;
             tile_component rich{};
-            rich.composition = comp;
+            rich.substrate = a.sub; rich.cover = a.cov; rich.cover_density = a.den;
             rich.resource_deposit[ri(resource_type::iron_ore)] = 250.0f; // richest band
 
-            const int expected = placement_rules::non_extraction_stack_cap(comp);
+            const int expected = placement_rules::non_extraction_stack_cap(a.sub, a.cov);
             for (const building_type t : others)
             {
                 const int cap_barren = placement_rules::stack_capacity(barren, t, resource_type::iron_ore);
@@ -287,7 +291,7 @@ int main()
                       "S.R3 non-extraction capacity is invariant to deposit richness",
                       static_cast<float>(cap_rich), static_cast<float>(cap_barren));
                 check(cap_rich == expected,
-                      "S.R3 non-extraction capacity is the composition's own ceiling",
+                      "S.R3 non-extraction capacity is the tile's own ceiling",
                       static_cast<float>(cap_rich), static_cast<float>(expected));
             }
         }

@@ -323,29 +323,52 @@ float landform_lean(terrain_landform lf,
     return 1.0f;
 }
 
-/// How dry and firm a composition's ground is, as a placement multiplier. Used by
-/// the launchpad preference: dust and rock are good pad ground, marsh and ice are
-/// not. Not a hazard measure — hazard is applied separately for every type.
+/// How dry and firm a tile's ground is, as a placement multiplier. Used by
+/// background-industry placement to prefer workable ground.
 ///
-/// @param comp The tile's composition.
-/// @return     A positive multiplier, 1.0 for compositions with no strong lean.
-float dryness_lean(terrain_composition comp)
+/// SPLIT BY MEANING (BL-519), and it multiplies rather than switches: the
+/// SUBSTRATE says how firm the ground is, the COVER says how wet or awkward what
+/// sits on it is, and the pre-split table was the product of the two collapsed
+/// into one slot. Every old composition reproduces its old number exactly —
+/// barren/rocky/regolith 1.3 (dry × bare), grassland 1.0, forest 0.8,
+/// wetland 0.5, tundra 1.0, metallic 1.0, volcanic 0.7, icy 0.6, ocean 0.001 —
+/// and pairs the old model could not name now fall out of the product (a
+/// forested rocky upland is 1.3 × 0.8 = 1.04, firmer than a floodplain and
+/// slightly worse than bare rock).
+///
+/// @param sub The tile's substrate.
+/// @param cov The tile's cover.
+/// @return    A positive multiplier, 1.0 for ground with no strong lean.
+float dryness_lean(terrain_substrate sub, terrain_cover cov)
 {
-    switch (comp)
+    float ground = 1.0f;
+    switch (sub)
     {
-        case terrain_composition::barren:
-        case terrain_composition::rocky:
-        case terrain_composition::regolith:  return 1.3f;
-        case terrain_composition::metallic:
-        case terrain_composition::tundra:
-        case terrain_composition::grassland: return 1.0f;
-        case terrain_composition::forest:    return 0.8f;
-        case terrain_composition::volcanic:  return 0.7f;
-        case terrain_composition::icy:       return 0.6f;
-        case terrain_composition::wetland:   return 0.5f;
-        case terrain_composition::ocean:     return 0.001f; // can_place rejects these anyway
+        case terrain_substrate::barren:
+        case terrain_substrate::rocky:
+        case terrain_substrate::regolith:    ground = 1.3f;   break;
+        case terrain_substrate::metallic:
+        case terrain_substrate::sedimentary: ground = 1.0f;   break;
+        case terrain_substrate::volcanic:    ground = 0.7f;   break;
+        case terrain_substrate::icy:         ground = 0.6f;   break;
+        case terrain_substrate::ocean:       return 0.001f; // can_place rejects these anyway
     }
-    return 1.0f;
+
+    float on_top = 1.0f;
+    switch (cov)
+    {
+        case terrain_cover::marsh:  on_top = 0.5f; break; // the old `wetland` factor
+        case terrain_cover::snow:   on_top = 0.7f; break;
+        case terrain_cover::forest: on_top = 0.8f; break; // the old `forest` factor
+        case terrain_cover::ash:
+        case terrain_cover::dunes:  on_top = 0.9f; break;
+        case terrain_cover::salt:   on_top = 1.1f; break; // a dry crust IS firm ground
+        case terrain_cover::grass:
+        case terrain_cover::scrub:
+        case terrain_cover::urban:
+        case terrain_cover::none:   on_top = 1.0f; break;
+    }
+    return ground * on_top;
 }
 
 /// Score one tile for hosting a building of `btype`, higher is better. Mirrors the
@@ -382,9 +405,9 @@ float tile_score_for(const tile_component& tc, building_type btype)
             break;
         case building_type::launchpad:
             // Flat and dry: a pad wants easy ground and no weather. Plains best,
-            // slope penalised hard; dry compositions preferred over wet/icy ones.
+            // slope penalised hard; dry ground preferred over wet/icy ground.
             score = landform_lean(tc.landform, 1.6f, 1.0f, 0.35f, 0.5f, 1.1f, 0.9f, 0.4f);
-            score *= dryness_lean(tc.composition);
+            score *= dryness_lean(tc.substrate, tc.cover);
             break;
         case building_type::inland_logistics_hub:
             // Flat and peopled: a depot wants ground a road can cross and traffic
@@ -560,7 +583,7 @@ std::vector<entity_id> place_starting_assets(world& w,
         const auto it = w.tiles.find(tid);
         if (it == w.tiles.end())
             continue;
-        if (placement_rules::is_ocean_tile(it->second.composition))
+        if (placement_rules::is_ocean_tile(it->second.substrate))
             continue;
         const long long dx = it->second.grid_x - anchor_x;
         const long long dy = it->second.grid_y - anchor_y;

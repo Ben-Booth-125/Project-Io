@@ -1,26 +1,25 @@
 # Project Io — REFINED (active worklist)
 
-**Empty between work blocks.** Sprint P1 closed its build tasks on 2026-08-21.
+**Empty between work blocks.** Sprint P1 is open; the entries below are its live arc.
 
-## Next session takes these three (Ben, 2026-08-21)
+## In flight (2026-08-21 session)
 
-- **BL-519 — the tile axis split.** `terrain_composition` split into substrate ×
-  cover, with `landform` unchanged and `none` a first-class cover value. 330 call
-  sites across 49 files, no save migration (there is no save format). Open
-  questions live in the item: graded vs binary cover, whether `tundra` survives as
-  a cover, whether `urban` is a state or a cover, and whether the derived
-  `composition()` accessor is permanent or deleted last (NR-444).
-- **BL-520 — basic texturing.** Sequenced behind BL-519: 84 hand-authored
-  combinations against ~16 that compose. Decide **BL-514** (blend all tiles)
-  alongside it — texture and the blend are in direct tension, and each changes what
-  the other is for (NR-443).
-- **NR-438 / NR-439 — the raised ceiling**, now ruled. 12 tiles is a PREFERENCE,
-  20 a hard cap, larger-than-12 permitted in rare cases. **Check before coding: the
-  shipped behaviour already satisfies this** — max is 16 across 6 seeds. The work is
-  likely saying it (`province.hpp` still calls 12 a clamp), asserting it (a hard-cap
-  row at 20), deleting the now-unneeded `IO_ABSORB_PREFER_ROOM` variant, and
-  REPORTING the over-12 share (currently 4.9%) rather than asserting a rareness
-  threshold nobody has chosen.
+- **BL-519 — the tile axis split. LANDED.** `terrain_composition` is gone;
+  `terrain_substrate` × `terrain_cover` × `cover_density`, landform unchanged. 522
+  references across ~110 files, migrated by meaning, shim deleted in the same pass
+  per Ben's call. New `tools/verify/tile_axes_harness.cpp` (13 checks, all pass).
+  The 120-seed earthlike census is bit-identical to the pre-split baseline, which
+  is the evidence that no RNG stream drifted. **Owed: the visual check (R7)** —
+  this container cannot build the GUI (NR-451).
+- **NR-438 / NR-439 — the raised ceiling. LANDED.** 12 is a preference, 20 the
+  asserted hard cap, the over-12 share (4.90%) is reported and never asserted,
+  and `IO_ABSORB_PREFER_ROOM` is deleted.
+- **BL-520 — basic texturing.** Sequenced behind BL-519, now unblocked. Decide
+  **BL-514** (blend all tiles) alongside it — texture and the blend are in direct
+  tension, and each changes what the other is for (NR-443).
+- **BL-521 — click injection in the verify API.** In flight. Note its `design`
+  field in `backlog.json` is CORRUPTED (NR-449) — this paragraph and the one below
+  are the best statement of intent that survives.
 
 ## Also ready, unqueued
 
