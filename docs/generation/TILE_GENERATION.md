@@ -203,12 +203,39 @@ ensures band boundaries are irregular rather than sharp horizontal lines.
 
 ---
 
-### Pass 4 — Composition assignment
+### Pass 4 — Biome, then the axes it decomposes into
 
-Each non-ocean land tile receives a `terrain_composition` by looking up
+**Restructured by BL-519 (2026-08-21), and the sub-pass names below are the
+current ones.** What this pass produces is no longer one enum but three axes —
+`terrain_substrate` × `terrain_cover` (+ `cover_density`) × the unchanged
+`terrain_landform`. See `docs/economy/TILES.md` § Three-axis terrain model.
+
+- **4a — biome.** The `(temperature_band, moisture_value)` table below, unchanged
+  in its values and in its RNG consumption draw for draw. It now returns an
+  internal `biome` — the same twelve-valued vocabulary the world used to store,
+  under a name that admits it was never one axis.
+- **4b — drainage** (BL-338, pre-existing). Still operates on the biome.
+- **4c — decompose.** `decompose_biome` maps each biome to
+  (substrate, cover, density). **Consumes no RNG stream** — density varies through
+  a stateless fold.
+- **4d — cover refinement.** The only genuinely new terrain behaviour: it dresses
+  ground the biome table left **bare** (a forest on a wet rocky upland, snow on
+  cold high ground, dunes on dry barren) and never rewrites a substrate. Also no
+  stream.
+- **4e — water kinds** (BL-516). Classifies water structurally into lake / coast /
+  open ocean by flood fill. Also no stream, and it writes a separate reported
+  substrate so Passes 5 and 6 still see the coarse `ocean` they were written
+  against.
+
+That structure is what makes the split auditable: every downstream pass sees the
+draws it saw before, so anything that moved is attributable to the new cover axis
+rather than to stream drift. The evidence is a measurement — the 120-seed
+`earthlike_tile_census` is bit-identical to the pre-split baseline.
+
+Each non-ocean land tile receives a biome by looking up
 `(temperature_band, moisture_value)` in the table below.
 
-**Bodies with `atmosphere_class == none` or `thin`** skip habitable compositions
+**Bodies with `atmosphere_class == none` or `thin`** skip habitable biomes
 (grassland, forest, wetland). The moisture axis still applies to choose among the
 available inorganic types.
 
@@ -672,19 +699,21 @@ identity.
   composition before deposits (Pass 6). Landform (Pass 5) runs before deposits,
   since deposit modifiers are landform-dependent.
 - **Colour table** — `terrain_colour()` now lives in `src/ui/hex_render.hpp`
-  (moved out of `body_surface_canvas.cpp`), keyed on `terrain_composition` (the
-  11-value enum). **Superseded (2026-07-31, BL-231/BL-232):** landform *is* now
+  (moved out of `body_surface_canvas.cpp`). **Since BL-519** it is keyed on the
+  `(substrate, cover, density)` triple: a substrate base blended toward a cover
+  endpoint by density, calibrated so the four canonical covers render at their
+  exact pre-split RGB. **Superseded (2026-07-31, BL-231/BL-232):** landform *is* now
   rendered — a subtle relief tint (`landform_relief`, `src/ui/hex_render.cpp`)
-  over the composition colour, plus always-on glyphs for the four dramatic
+  over the terrain colour, plus always-on glyphs for the four dramatic
   landforms (mountain, canyon, crater, rift — `ui::icons::landform`,
   `src/ui/icons.cpp`), with contiguous same-landform runs bridged into spanning
   markers (`landform_span`, BL-232). The old "reserved for overlay glyphs later"
   note is dead.
 - **`first_land_tiles()`** — moved into `tile_generation.cpp`; checks against
-  `terrain_composition::ocean` to pick building attachment tiles.
+  water (`is_water`, since BL-516) to pick building attachment tiles.
 - **Hazard / habitability** — not specified by the design tables but carried on
-  `tile_component`, so they are *derived*: a per-composition base (the habitability
-  ceiling from TILES.md, plus a hazard base) modified by landform (mountain/rift
+  `tile_component`, so they are *derived*: a per-substrate base (the habitability
+  ceiling from TILES.md, plus a hazard base), modified by the cover and then by landform (mountain/rift
   raise hazard and cut habitability; valley raises habitability), with light
   jitter.
 - **`road_level` is stamped outside this pipeline.** The six-pass tile generation
