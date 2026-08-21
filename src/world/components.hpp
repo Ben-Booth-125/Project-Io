@@ -632,9 +632,21 @@ struct population_centre_component
 /// order was placed, so a fresh order starts at `next_index == 1`).
 /// `progress` banks fractional march points toward the next hop's cost
 /// across tick boundaries — see run_unit_march (economy_system.cpp).
+///
+/// BL-511 (2026-08-21): the ORDER IS NOW PROVINCE-GRAIN. `dest_province` is
+/// what the player/agent actually commanded; `dest` is the canonical member
+/// TILE the path was solved to, kept because the recompute path needs a tile
+/// endpoint and because every existing reader of `dest` keeps working. The
+/// march ENDS when the unit's tile lies in `dest_province` — it does not walk
+/// on to `dest` once it is already inside the commanded province. A legacy /
+/// harness-built order with `dest_province == 0` keeps the pure tile
+/// behaviour (arrive when the path is exhausted).
 struct movement_order
 {
     entity_id               dest       = null_entity;
+    /// BL-511: the commanded destination province (province::id). 0 means
+    /// "no province grain on this order" — see the note above.
+    uint32_t                dest_province = 0;
     std::vector<entity_id>  path;
     std::size_t             next_index = 1;
     float                   progress   = 0.0f;

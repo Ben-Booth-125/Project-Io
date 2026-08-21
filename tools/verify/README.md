@@ -579,3 +579,44 @@ cmake --build build --target substrate_census    # from a vcvars shell
 build_app.bat substrate_census                   # or via the pinned script
 IO_RUN_SWEEPS=1 ctest --test-dir build -R substrate_census
 ```
+
+## unit_march_harness (BL-470, retargeted by BL-511)
+
+The unit-march seam: the three `corp_verb`s BL-470 added (`march_unit` /
+`halt_unit` / `disband_unit`) plus the per-tick resolution pass
+`run_unit_march`. Never had a README entry when it landed; added 2026-08-21
+alongside BL-511's grain change.
+
+**BL-511 moved `march_unit`'s payload from a TILE to a PROVINCE** (Ben's
+2026-08-21 ruling; NR-405). The verb kept its value — the enum is serialised and
+append-only — and only the field it reads changed, so M7 asserts the values
+directly (`march_unit == 21`, `halt_unit == 22`, `disband_unit == 23`,
+`corp_verb_count == disband_unit + 1`). A renumber is a save-format break and
+this is the row that catches it.
+
+**M7 is the untrusted-input-boundary row** and the reason to re-run this harness
+after any change to the seam or the partition. A province id can arrive over
+`--serve`, and there are TWO gates that are not interchangeable: the wire gate
+(`agent_protocol.cpp`) proves the value FITS uint32 without a narrowing cast
+re-aiming it, and the seam gate (`province_partition::find`) proves it EXISTS.
+M7 sweeps ~123 in-range-but-absent ids — `no_province`, near-miss neighbours,
+and every single-bit flip of a valid id — and asserts each rejects
+`rejected_invalid` with the unit byte-identical afterwards.
+
+**Two measured facts the fixtures encode, both of which bit during BL-511:**
+province id **0 is a REAL province** (body rank 0 | block 0 | component 0), so it
+cannot be an absent-value sentinel — `corp_command::province` defaults to
+`no_province` (0xFFFFFFFF), which is structurally unreachable because it needs
+component index 7 and a 2x2 block yields at most 4. And the body grid is a
+**cylinder**: on a 7-wide row the coastal-merge pass folds col 6 into col 0's
+province, and on a 10-wide row the wrap route to col 8 is shorter than the
+direct one. Fixture rows assert their own preconditions rather than trusting the
+geometry.
+
+Links the world superset; CMake target via the generic glob.
+
+```
+cmake --build build --target unit_march_harness   # from a vcvars shell
+build_gen_harness.bat unit_march_harness          # or the CMake-free route
+ctest --test-dir build -R unit_march_harness
+```

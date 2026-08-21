@@ -82,6 +82,7 @@ namespace {
 //           target=<resource_type>
 //           recipe=<id> workforce=<n> road_tier=<n> unit_type=<n>
 //           quantity=<f> floor_price=<f> order=<n> counterparty=<id>
+//           province=<province::id>
 //                                                   -> apply_corp_command
 //   SHUTDOWN                                        -> BYE, then exit
 //
@@ -96,6 +97,13 @@ namespace {
 // in step with `corp_verb` — the last three verb families were added to the enum
 // without their arguments ever reaching this parser, which made them applicable
 // in the dictionary and inapplicable on the wire.
+//
+// BL-511 (2026-08-21) DID need a new key. `march_unit`'s destination moved from
+// a tile to a province, and a province id is not an entity_id — it is derived
+// from (body rank | block | component) and lives in its own uint32 domain — so
+// `tile=` could not be reused for it without conflating two id spaces. The verb
+// itself did not move: the enum is serialised and append-only, so `march_unit`
+// keeps its value and only the field it reads changed.
 //
 // BL-452's convoy pair (2026-08-17) needed NO new key: `dispatch_convoy` reads
 // subject / counterparty / target / quantity and `hold_convoy` reads order, all

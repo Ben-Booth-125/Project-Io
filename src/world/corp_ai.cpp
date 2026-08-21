@@ -1771,6 +1771,14 @@ corp_blackboard export_corp_blackboard(const world& w, entity_id corp, int tick)
             {
                 const unit_component& u = w.units.at(uid);
                 add_fact(bb, tick, uid, "unit_tile", static_cast<double>(u.position), 1.0f, fact_provenance::own_asset);
+                // BL-511: the unit STORES a tile and DERIVES its province, and
+                // the province is what march_unit now takes — so an agent that
+                // could only read `unit_tile` could read its own position but
+                // not name a destination in the same vocabulary. 0 = the tile
+                // is unpartitioned (ocean or a world with no partition built).
+                add_fact(bb, tick, uid, "unit_province",
+                         static_cast<double>(w.provinces.province_of(u.position)), 1.0f,
+                         fact_provenance::own_asset);
                 add_fact(bb, tick, uid, "unit_type", static_cast<double>(u.type), 1.0f, fact_provenance::own_asset);
                 add_fact(bb, tick, uid, "unit_count", static_cast<double>(u.count), 1.0f, fact_provenance::own_asset);
                 add_fact(bb, tick, uid, "unit_strength", static_cast<double>(unit_strength(w, u)), 1.0f, fact_provenance::own_asset);
@@ -1778,7 +1786,15 @@ corp_blackboard export_corp_blackboard(const world& w, entity_id corp, int tick)
                 const bool has_order = u.order.dest != null_entity;
                 add_fact(bb, tick, uid, "unit_order_state", has_order ? 1.0 : 0.0, 1.0f, fact_provenance::own_asset);
                 if (has_order)
+                {
                     add_fact(bb, tick, uid, "unit_order_dest", static_cast<double>(u.order.dest), 1.0f, fact_provenance::own_asset);
+                    // BL-511: the province the order was actually GIVEN in.
+                    // `unit_order_dest` is the member tile the path was solved
+                    // to, which is a route detail; this is the command.
+                    add_fact(bb, tick, uid, "unit_order_dest_province",
+                             static_cast<double>(u.order.dest_province), 1.0f,
+                             fact_provenance::own_asset);
+                }
             }
         }
     }

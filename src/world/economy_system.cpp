@@ -1740,7 +1740,8 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg)
                     break;
                 }
                 movement_order mo;
-                mo.dest = u.order.dest;
+                mo.dest          = u.order.dest;
+                mo.dest_province = u.order.dest_province; // BL-511: a recompute must not silently drop the grain
                 mo.path = rp.tiles;
                 if (mo.path.front() != u.position)
                     std::reverse(mo.path.begin(), mo.path.end());
@@ -1759,6 +1760,19 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg)
                 points -= step_cost;
                 u.position = next_id;
                 ++u.order.next_index;
+
+                // BL-511: the march ends on ENTERING the destination province,
+                // not on reaching the member tile the path was solved to. A
+                // unit's position IS a province under Ben's 2026-08-21 grain
+                // ruling, so walking on to a particular hex inside a province
+                // the unit already occupies would be movement with no
+                // meaning. Legacy / harness-built orders carry
+                // dest_province == 0 and keep the pure tile behaviour.
+                if (u.order.dest_province != 0
+                    && w.provinces.province_of(u.position) == u.order.dest_province)
+                {
+                    break; // the arrival check below clears the order and counts it
+                }
             }
             else
             {
@@ -1767,7 +1781,11 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg)
             }
         }
 
-        if (u.order.dest != null_entity && u.order.next_index >= u.order.path.size())
+        const bool in_dest_province =
+            u.order.dest_province != 0
+            && w.provinces.province_of(u.position) == u.order.dest_province;
+        if (u.order.dest != null_entity
+            && (in_dest_province || u.order.next_index >= u.order.path.size()))
         {
             u.order = movement_order{}; // arrived — order clears itself
             ++out.arrived;

@@ -16,7 +16,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*135 entries — 21 gameplay · 24 canvas · 15 lens · 45 ledger · 30 chrome.*
+*138 entries — 24 gameplay · 24 canvas · 15 lens · 45 ledger · 30 chrome.*
 
 ---
 
@@ -422,6 +422,61 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Expected output.** Unilateral and asymmetric on hostility: clears ONLY the acting corp's own directed hostility toward counterparty (the reverse direction, if counterparty is separately hostile toward the corp, is untouched — that is counterparty's own row to release). Clears the shared friendship row if one exists (either party may dissolve a friendship) and any pending offer between the two in either direction. A rejected call mutates nothing.
 
 **Reason to select.** The universal de-escalation press — the only one of the four verbs usable from every non-neutral state, and the one that lets a corp exit hostility unilaterally even though it could not enter friendship unilaterally.
+
+### `gameplay.march_unit` — No player-facing surface yet. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode). There is NO UI surface for it yet: BL-471 (unit marker + command surface) is the item that adds one, and it is deliberately sequenced after BL-511's canvas rewrite. Until then this verb is reachable only through the seam.
+
+**Press.** No press exists. Over the seam: COMMAND corp=<id> verb=21 subject=<unit id> province=<province id>. The command is applied through apply_corp_command, which recomputes every precondition itself — a stale destination or a unit that has since been disbanded is refused, not applied.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id` | The unit to order. Must exist in world.units and be owned by the acting corporation. NOTE the field: units use `subject`, not `tile` — `tile` is the build/place_road/hire_unit convention and this verb does not read it at all. |
+| `province` | `uint32 (province::id)` | The DESTINATION PROVINCE (BL-511, 2026-08-21 — this replaced a destination tile; the verb kept its value 21 because the enum is serialised and append-only, only the field it reads changed). A province id is NOT an entity_id: it is derived from (body rank | block raster index | component index), so it lives in its own uint32 domain. The default is `no_province` (0xFFFFFFFF) and an omitted field is rejected — id 0 is a REAL province (the first block of the first body), so it cannot serve as an absent-value sentinel. |
+
+**Valid when:**
+- `subject` names a real unit (rejected_invalid otherwise).
+- That unit is owned by the acting corporation (rejected_not_owner otherwise).
+- `province` is a province in the world's built partition — checked with province_partition::find, which is the authoritative domain test. Any uint32 that is not a built province, including the `no_province` default, is rejected (rejected_invalid otherwise). A wire range gate proves the value FITS; it does not prove it EXISTS, and both checks run.
+- That province is on the SAME BODY as the unit's current tile — intra-body path march only, BL-470's ruling 1 (rejected_invalid otherwise).
+- The unit is not already in that province — marching to where you already stand is not a move; halt_unit is the stop verb (rejected_state otherwise).
+- At least one member tile of the province is reachable from the unit's current tile by intra_body_path (rejected_invalid otherwise).
+- Water needs no separate check: the province partition covers LAND ONLY by construction, so no province id can ever name ocean.
+
+**Expected output.** The unit's movement_order is REPLACED (not queued behind an existing one): dest_province is the commanded province, dest is the province's lowest-id reachable member tile, path is the solved intra-body route with path[0] the tile the unit already occupies, next_index is 1 and progress is 0. The route is computed ONCE, here — never re-Dijkstra'd per tick, only on an actual block. Movement then resolves across ticks in run_unit_march, spending the unit's per-class march_points_per_class against the shared terrain traversal cost and banking the fractional remainder. The order CLEARS ITSELF the tick the unit enters the destination province — it does not walk on to `dest` once it is already inside. A rejection mutates nothing at all.
+
+**Reason to select.** The only verb that moves a unit. Until it is issued, a hired unit is pinned to its muster tile forever. Two things an agent should weigh. First, movement is not free of the economy: a unit beyond the reach field loses supply_factor_permille each tick in the upkeep pass, which lowers its derived strength in the resolver — marching away from your road network makes an army measurably weaker, not merely further away. Second, there is still no engagement trigger in this codebase (MILITARY.md's 'what is absent' list), so arriving somewhere does not yet cause a battle. Position is real; consequence is not, yet.
+
+### `gameplay.halt_unit` — No player-facing surface yet. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode). There is NO UI surface for it yet: BL-471 (unit marker + command surface) is the item that adds one, and it is deliberately sequenced after BL-511's canvas rewrite. Until then this verb is reachable only through the seam.
+
+**Press.** No press exists. Over the seam: COMMAND corp=<id> verb=22 subject=<unit id>. No other field is read.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id` | The unit whose standing movement order is to be cleared. |
+
+**Valid when:**
+- `subject` names a real unit (rejected_invalid otherwise).
+- That unit is owned by the acting corporation (rejected_not_owner otherwise).
+- That unit currently holds a live order — order.dest is not null (rejected_state otherwise). Halting an already-halted unit is a no-op and is reported as such rather than answering applied.
+
+**Expected output.** The unit's movement_order is reset to its default: no destination, no province, no path, no banked progress. The unit stays exactly where it is, on the tile it had reached. Nothing else about the unit changes.
+
+**Reason to select.** You gave an order you no longer want, and the alternative — waiting for arrival — costs supply every tick out of reach. Note there is no 'resume': halting discards the path, so restarting means a fresh march_unit and a fresh route solve.
+
+### `gameplay.disband_unit` — No player-facing surface yet. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode). There is NO UI surface for it yet: BL-471 (unit marker + command surface) is the item that adds one, and it is deliberately sequenced after BL-511's canvas rewrite. Until then this verb is reachable only through the seam.
+
+**Press.** No press exists. Over the seam: COMMAND corp=<id> verb=23 subject=<unit id>. No other field is read.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id` | The unit to erase. Irreversible. |
+
+**Valid when:**
+- `subject` names a real unit (rejected_invalid otherwise) — including a unit already disbanded, which is simply gone.
+- That unit is owned by the acting corporation (rejected_not_owner otherwise).
+
+**Expected output.** The unit entity is erased from world.units outright. NO REFUND — neither the credit hire cost nor the gated resource draw comes back; manpower walks away (BL-470). Nothing else is touched.
+
+**Reason to select.** The only way to stop paying a unit's upkeep. Since BL-454 a unit draws upkeep goods every tick and weakens when that draw goes unmet, so a force you cannot supply is a running cost with a falling return. Weigh it against the sunk hire cost, which you do not get back — and against the fact that hiring again means a completed military_base and the full gate chain a second time.
 
 ---
 
