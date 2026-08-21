@@ -68,6 +68,104 @@ ImU32 lerp_colour(ImU32 a, ImU32 b, float t)
     return IM_COL32(r, g, bl, 255);
 }
 
+// ---------------------------------------------------------------------------
+// BL-511 — the province as the rendered and selected unit
+// ---------------------------------------------------------------------------
+// Geometry is still per hex. What changed is that a hex's fill is blended into
+// its province's, so the seams inside a province disappear and the four-tile
+// cell reads as one soft shape that still carries its real terrain mixture.
+// The two tables below are the whole geometric argument, so they live together.
+//
+// Vertex i sits at angle 30 + 60i (hex_vertices), and hex_neighbors' side order
+// is 0=E, 1=NE, 2=NW, 3=W, 4=SW, 5=SE — i.e. sides at 0, 300, 240, 180, 120, 60
+// degrees with y down. Each corner therefore falls exactly between two sides,
+// and each side spans exactly two corners.
+
+/// The two sides sharing hex corner i. Read by the blend: a corner takes the
+/// mean of this tile and its corner-sharing same-province neighbours.
+constexpr int k_corner_sides[6][2] = { {0,5}, {5,4}, {4,3}, {3,2}, {2,1}, {1,0} };
+
+/// The two corners spanning hex side s. Read by the province-edge pass: an edge
+/// toward a different province is stroked between these two vertices.
+constexpr int k_side_verts[6][2] = { {5,0}, {4,5}, {3,4}, {2,3}, {1,2}, {0,1} };
+
+/// Per-tile shade, computed one pass ahead of the draw loop so a tile's
+/// neighbours' colours are in hand when its corners are blended.
+struct tile_shade
+{
+    ImU32    fill     = 0;      ///< The tile's final composited colour.
+    uint32_t province = 0;      ///< Owning province id; 0 = ocean / unpartitioned.
+    bool     blend    = false;  ///< Whether this tile joins its province's blend.
+};
+
+/// Per-channel mean of @p n opaque colours. The blend's only arithmetic: a
+/// corner shared by k same-province tiles takes the mean of their fills, which
+/// is what makes the gradient express the MIXTURE rather than a winner.
+ImU32 mean_colour(const ImU32* c, int n)
+{
+    if (n <= 0) return IM_COL32(0, 0, 0, 255);
+    int r = 0, g = 0, b = 0;
+    for (int i = 0; i < n; ++i)
+    {
+        r += static_cast<int>((c[i] >> IM_COL32_R_SHIFT) & 0xFFu);
+        g += static_cast<int>((c[i] >> IM_COL32_G_SHIFT) & 0xFFu);
+        b += static_cast<int>((c[i] >> IM_COL32_B_SHIFT) & 0xFFu);
+    }
+    return IM_COL32(r / n, g / n, b / n, 255);
+}
+
+/// Does @p m's field blend across a province, or must it stay crisp per tile?
+///
+/// THE PER-LENS REDUCTION IS A DECISION, NOT A DEFAULT (BL-511, requirement R3).
+/// The full table with the reasoning for each mode is in PLANETARY.md § Province
+/// grain; this is its executable half. Two lenses blend because their field is a
+/// continuous property of the ground itself. Every other mode refuses, and the
+/// refusals are the interesting half:
+///
+///   - CATEGORICAL fields (country, continent) must not blend: the mean of two
+///     nation colours is a third nation's colour, and the mean of two plate
+///     colours is a plate that does not exist. A province straddling a border is
+///     a real fact the lens exists to show.
+///   - CATCHMENT fields (market, scarcity, opportunity) are already coarser than
+///     a province; blending would soften the catchment boundary the lens is about.
+///   - SPARSE fields (corporation, production, industry) are attributes of one
+///     building on one tile. Smearing a point value over the empty ground beside
+///     it is exactly the "one tile's value standing for the whole province"
+///     defect — so these reduce per PROVINCE instead (see the uniform pass), not
+///     per vertex.
+///   - Population and Opportunity draw a per-tile DOT, not a fill, so there is no
+///     fill to blend.
+///   - Reach and Supply-routes are body-level and paint no tile fill at all.
+bool lens_blend_mode(overlay_mode m)
+{
+    return m == overlay_mode::none || m == overlay_mode::resource;
+}
+
+/// Emit @p verts as a 6-triangle fan with per-corner colours — the blend's draw
+/// call. ImDrawList's AddConvexPolyFilled is flat-colour only, so the fan is
+/// written through the Prim* API. 7 vertices / 18 indices against the ~10 an
+/// anti-aliased 6-gon costs, so this is not a regression on the measured
+/// vertex budget (BL-269).
+void prim_blended_hex(ImDrawList* dl, const ImVec2 verts[6], ImVec2 centre,
+                      ImU32 centre_col, const ImU32 corner_col[6])
+{
+    // The white-pixel UV via the PUBLIC accessor: ImDrawList::_Data points at
+    // ImDrawListSharedData, which is only a forward declaration outside
+    // imgui_internal.h, so reading TexUvWhitePixel off it does not compile here.
+    const ImVec2 uv = ImGui::GetFontTexUvWhitePixel();
+    dl->PrimReserve(18, 7);
+    const unsigned int base = dl->_VtxCurrentIdx;
+    dl->PrimWriteVtx(centre, uv, centre_col);
+    for (int i = 0; i < 6; ++i)
+        dl->PrimWriteVtx(verts[i], uv, corner_col[i]);
+    for (int i = 0; i < 6; ++i)
+    {
+        dl->PrimWriteIdx(static_cast<ImDrawIdx>(base));
+        dl->PrimWriteIdx(static_cast<ImDrawIdx>(base + 1 + i));
+        dl->PrimWriteIdx(static_cast<ImDrawIdx>(base + 1 + ((i + 1) % 6)));
+    }
+}
+
 /// The intra-body reach fog's wash (BL-151/152/154): dim a colour toward the fog dark
 /// by how little the player sees the tile — `vision` 1 = fully lit, 0 = unreached.
 /// Alpha is preserved (lerp_colour forces opaque, which would change how a translucent
@@ -1054,6 +1152,19 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // call starts fresh; the tile loop and the market-centre pass below fill it.
     state.marker_hit_zones.clear();
 
+    // BL-511 selection reconciliation. The canvas is the only writer of
+    // `selected_province`, but `selected_entity` has many writers (ledger rows,
+    // the corporation list, "inspect the thing I just built"). If the entity
+    // selection moved since this canvas last wrote it, that surface's selection
+    // wins and the province clears — so the Selection element never has both a
+    // province and an entity to draw. Cheap, and it keeps the invariant in ONE
+    // place rather than as a clear-me duty on every other selecting surface.
+    if (state.selected_entity != state.province_sync_entity)
+    {
+        state.selected_province    = 0;
+        state.province_sync_entity = state.selected_entity;
+    }
+
     // Clip to the grid area so hexes don't overdraw the title bar or the solar canvas.
     dl->PushClipRect(grid_area_origin, grid_area_origin + grid_area_size, true);
 
@@ -1375,6 +1486,36 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             thr += 0.5f + 0.5f * share;
             industry_max = std::max(industry_max, thr);
         }
+
+        // BL-511's per-province reduction for this lens: a SUM, rendered
+        // uniformly over the province. Industry is the one sparse field whose
+        // question — "how much plant I did not build stands here?" — is genuinely
+        // about the locality rather than about the individual works, and density
+        // is additive, so summing the member tiles and filling the whole province
+        // flat is the honest answer. It is also the reason this lens is NOT in
+        // lens_blend_mode: blending would spread one works' amber over the empty
+        // ground beside it, which reads as industry that is not there.
+        if (!industry_field.empty())
+        {
+            std::unordered_map<uint32_t, float> prov_total;
+            for (const auto& [tid, v] : industry_field)
+                if (const uint32_t pid = w.provinces.province_of(tid); pid != 0)
+                    prov_total[pid] += v;
+
+            // Driven from the totals, not from the whole partition: only the
+            // provinces that actually hold background plant are touched, so this
+            // costs the number of industrial localities on one body rather than
+            // the world's ~8,300 provinces per frame.
+            for (const auto& [pid, total] : prov_total)
+            {
+                const province* pv = w.provinces.find(pid);
+                if (!pv)
+                    continue;
+                for (entity_id tid : pv->tiles)
+                    industry_field[tid] = total;
+                industry_max = std::max(industry_max, total);
+            }
+        }
     }
 
     // Reach lens pre-pass (BL-011): `trade_route` is body-level, not per-tile, and
@@ -1588,69 +1729,26 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                ((grid_area_origin.y + grid_area_size.y + hit_r - view_origin.y) / zoom + grid_cy) / row_pitch)))
         : -1;
 
-    for (int t_row = row_lo; t_row <= row_hi; ++t_row)
-    for (int t_col = 0; t_col < gw; ++t_col)
+    // --- BL-511: the province fill cache ------------------------------------
+    // The province, not the hex, is the unit this canvas renders and the player
+    // selects. Geometry stays per hex — the cull, the LOD and the wrap window are
+    // untouched — but a tile's colour is now blended into its province's, so the
+    // seams INSIDE a province disappear and the cell reads as one shape carrying
+    // its real terrain mixture (Ben's ruling: a blended gradient, explicitly not a
+    // dominant composition and not a texture pattern).
+    //
+    // That needs a tile's NEIGHBOURS' colours at draw time, so the fill derivation
+    // is hoisted out of the draw loop into this lambda and run one pass ahead over
+    // the visible row band plus a one-row margin. The derivation itself is
+    // unchanged, line for line — only where it runs moved.
+    auto compute_tile_fill = [&](entity_id id, const tile_component& tile) -> ImU32
     {
-        const entity_id id = raster[static_cast<std::size_t>(t_row) * gw + t_col];
-        if (id == null_entity)
-            continue;
-        const tile_component& tile = w.tiles.at(id);
-
-        const ImVec2 lc   = hex_local_centre(tile.grid_x, tile.grid_y, hex_size);
-        const ImVec2 sc   = to_screen(lc);
-
-        // Column cull: the horizontal wrap-window (computed once here, reused by
-        // the draw below). No wrap copy of this tile lands inside the canvas —
-        // skip before the built/owner/lens work, which is the expensive part.
-        const int k_min = (period_px > 0.0f)
-            ? static_cast<int>(std::ceil((visible_left  - sc.x) / period_px)) : 0;
-        const int k_max = (period_px > 0.0f)
-            ? static_cast<int>(std::floor((visible_right - sc.x) / period_px)) : 0;
-        if (k_min > k_max)
-            continue;
-
-        // Does this tile carry a building, and who owns it? Resolved before the fill
-        // so a built tile can start from its owner plate instead of terrain, and so
-        // the marker pass below reuses the one lookup.
         const auto   built_it   = built_tiles.find(id);
         const bool   built      = built_it != built_tiles.end();
-        const building_type built_type = built ? built_it->second : building_type::none;
         const auto   corp_it    = tile_to_corp.find(id);
         const bool   has_owner  = corp_it != tile_to_corp.end();
         const ImU32  owner_col  = has_owner ? corp_identity(corp_it->second)
                                             : IM_COL32(255, 255, 255, 255);
-
-        // BL-429: the representative building's extraction target / processing
-        // primary output, so the on-canvas marker draws the same named-building
-        // glyph as the Build door and the Buildings tab. Reuses tile_to_bld's
-        // lowest-id-wins representative (BL-367) — resolved once per tile, ahead
-        // of the k-loop below, so every wrap copy shares one identity.
-        resource_type marker_identity = resource_type::iron_ore;
-        if (built)
-        {
-            if (const auto ctb_it = tile_to_bld.find(id); ctb_it != tile_to_bld.end())
-                if (const auto cbld_it = w.buildings.find(ctb_it->second); cbld_it != w.buildings.end())
-                {
-                    const building_component& rep = cbld_it->second;
-                    marker_identity =
-                        (rep.type == building_type::processing_facility
-                         && reg.get_recipe(rep.recipe) != nullptr)
-                            ? primary_output_resource(*reg.get_recipe(rep.recipe))
-                            : rep.target_resource;
-                }
-        }
-
-        // Fill starts as the tile's terrain colour — EXCEPT on a built tile, which is
-        // swapped out wholesale for its owner plate (2026-07-22): a tile that carries a
-        // building renders AS an installation, with no terrain showing through around
-        // the glyph. Lens tints then composite over the plate exactly as they do over
-        // terrain — a lens is a mode the player chose, so suppressing it where the
-        // player's own assets sit would blind it where it matters most.
-        //
-        // Under the Faction lens a tile owned by a nation is tinted that nation's
-        // identity colour. The tint is a direct replacement (no blend); unclaimed
-        // tiles — absent from tile_to_nation, e.g. ocean — keep their terrain hue so
-        // the political map still reads as terrain underneath.
         ImU32 fill = built ? built_plate_colour(has_owner, owner_col)
                            : terrain_colour(tile.composition);
         if (state.overlay == overlay_mode::country)
@@ -1837,6 +1935,154 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         const float vision = tile_vision(id);
         if (surveyed) // the survey mask (or its god-view tell) owns unsurveyed tiles
             fill = fog_dim(fill, vision);
+        return fill;
+    };
+
+    // One-pass-ahead shade cache over the visible band (+1 row each way, so a
+    // top/bottom-row tile still finds its corner neighbours). Sized to the whole
+    // raster and reused across frames; only the band is written each frame, and
+    // only the band is read.
+    static std::vector<tile_shade> shade_cache;
+    shade_cache.assign(static_cast<std::size_t>(gw) * gh, tile_shade{});
+    const int row_cache_lo = std::max(0,      row_lo - 1);
+    const int row_cache_hi = std::min(gh - 1, row_hi + 1);
+    const bool lens_blends = lens_blend_mode(state.overlay);
+    for (int cr = row_cache_lo; cr <= row_cache_hi; ++cr)
+    for (int cc = 0; cc < gw; ++cc)
+    {
+        const std::size_t ci = static_cast<std::size_t>(cr) * gw + cc;
+        const entity_id cid  = raster_ok ? raster[ci] : null_entity;
+        if (cid == null_entity)
+            continue;
+        const tile_component& ct = w.tiles.at(cid);
+        tile_shade& sh = shade_cache[ci];
+        sh.fill        = compute_tile_fill(cid, ct);
+        sh.province    = w.provinces.province_of(cid);
+        // A tile joins the blend only when it is ordinary ground under a lens
+        // whose field is continuous. A BUILT tile is excluded on purpose: it
+        // renders AS an installation (its hex is swapped wholesale for the owner
+        // plate), and smearing that plate across unbuilt ground would put a corp
+        // identity on land nobody owns. A survey-masked tile is excluded for the
+        // same reason in reverse — the lock fill is a statement about knowledge,
+        // not terrain.
+        const bool ct_built = built_tiles.find(cid) != built_tiles.end();
+        const bool ct_seen  = survey_tile_visible(body.survey, gw, gh, ct.grid_x, ct.grid_y)
+                              || god_view_lift;
+        sh.blend = lens_blends && !ct_built && ct_seen && sh.province != 0;
+    }
+
+    for (int t_row = row_lo; t_row <= row_hi; ++t_row)
+    for (int t_col = 0; t_col < gw; ++t_col)
+    {
+        const entity_id id = raster[static_cast<std::size_t>(t_row) * gw + t_col];
+        if (id == null_entity)
+            continue;
+        const tile_component& tile = w.tiles.at(id);
+
+        const ImVec2 lc   = hex_local_centre(tile.grid_x, tile.grid_y, hex_size);
+        const ImVec2 sc   = to_screen(lc);
+
+        // Column cull: the horizontal wrap-window (computed once here, reused by
+        // the draw below). No wrap copy of this tile lands inside the canvas —
+        // skip before the built/owner/lens work, which is the expensive part.
+        const int k_min = (period_px > 0.0f)
+            ? static_cast<int>(std::ceil((visible_left  - sc.x) / period_px)) : 0;
+        const int k_max = (period_px > 0.0f)
+            ? static_cast<int>(std::floor((visible_right - sc.x) / period_px)) : 0;
+        if (k_min > k_max)
+            continue;
+
+        // Does this tile carry a building, and who owns it? Resolved before the fill
+        // so a built tile can start from its owner plate instead of terrain, and so
+        // the marker pass below reuses the one lookup.
+        const auto   built_it   = built_tiles.find(id);
+        const bool   built      = built_it != built_tiles.end();
+        const building_type built_type = built ? built_it->second : building_type::none;
+        const auto   corp_it    = tile_to_corp.find(id);
+        const bool   has_owner  = corp_it != tile_to_corp.end();
+        const ImU32  owner_col  = has_owner ? corp_identity(corp_it->second)
+                                            : IM_COL32(255, 255, 255, 255);
+
+        // BL-429: the representative building's extraction target / processing
+        // primary output, so the on-canvas marker draws the same named-building
+        // glyph as the Build door and the Buildings tab. Reuses tile_to_bld's
+        // lowest-id-wins representative (BL-367) — resolved once per tile, ahead
+        // of the k-loop below, so every wrap copy shares one identity.
+        resource_type marker_identity = resource_type::iron_ore;
+        if (built)
+        {
+            if (const auto ctb_it = tile_to_bld.find(id); ctb_it != tile_to_bld.end())
+                if (const auto cbld_it = w.buildings.find(ctb_it->second); cbld_it != w.buildings.end())
+                {
+                    const building_component& rep = cbld_it->second;
+                    marker_identity =
+                        (rep.type == building_type::processing_facility
+                         && reg.get_recipe(rep.recipe) != nullptr)
+                            ? primary_output_resource(*reg.get_recipe(rep.recipe))
+                            : rep.target_resource;
+                }
+        }
+
+        // Fill starts as the tile's terrain colour — EXCEPT on a built tile, which is
+        // swapped out wholesale for its owner plate (2026-07-22): a tile that carries a
+        // building renders AS an installation, with no terrain showing through around
+        // the glyph. Lens tints then composite over the plate exactly as they do over
+        // terrain — a lens is a mode the player chose, so suppressing it where the
+        // player's own assets sit would blind it where it matters most.
+        //
+        // Under the Faction lens a tile owned by a nation is tinted that nation's
+        // identity colour. The tint is a direct replacement (no blend); unclaimed
+        // tiles — absent from tile_to_nation, e.g. ocean — keep their terrain hue so
+        // the political map still reads as terrain underneath.
+        // Fill comes from the province shade cache (BL-511), computed one pass
+        // ahead so a tile's neighbours' colours are in hand for the blend. The
+        // three scalars the rest of the loop still needs are recomputed here:
+        // they are map lookups, not the colour derivation.
+        const bool is_player_tile = has_owner && corp_it->second == w.player_entity;
+        const bool selected       = (id == state.selected_entity);
+        const bool surveyed = survey_tile_visible(body.survey, gw, gh, tile.grid_x, tile.grid_y);
+        const bool revealed = surveyed || god_view_lift;
+        const float vision  = tile_vision(id);
+
+        const std::size_t shade_idx = static_cast<std::size_t>(t_row) * gw + t_col;
+        const tile_shade& shade     = shade_cache[shade_idx];
+        const ImU32       fill      = shade.fill;
+        const uint32_t    prov_id   = shade.province;
+
+        // Corner colours for the blend. Each hex corner is shared with two of the
+        // six neighbours (k_corner_sides); a corner takes the MEAN of this tile's
+        // fill and those of its corner-sharing neighbours that are in the SAME
+        // province AND themselves blending. An out-of-province neighbour
+        // contributes nothing, so the province boundary keeps its colour step
+        // while every seam inside the province vanishes — which is the whole
+        // effect. A tile that does not blend (built, masked, or under a lens whose
+        // field is categorical or sparse — see PLANETARY.md's reduction table)
+        // renders exactly as it did before this item.
+        ImU32 corner_col[6] = { fill, fill, fill, fill, fill, fill };
+        if (shade.blend)
+        {
+            for (int v = 0; v < 6; ++v)
+            {
+                ImU32 acc[3] = { fill, 0u, 0u };
+                int   n      = 1;
+                for (int s = 0; s < 2; ++s)
+                {
+                    const int side = k_corner_sides[v][s];
+                    const auto nc  = hex_neighbors::neighbour(t_col, t_row, side);
+                    const int  ncol = ((nc.gx % gw) + gw) % gw; // cylinder wrap
+                    const int  nrow = nc.gy;
+                    if (nrow < row_cache_lo || nrow > row_cache_hi)
+                        continue;
+                    const tile_shade& ns =
+                        shade_cache[static_cast<std::size_t>(nrow) * gw + ncol];
+                    if (!ns.blend || ns.province != prov_id || prov_id == 0)
+                        continue;
+                    acc[n++] = ns.fill;
+                }
+                corner_col[v] = mean_colour(acc, n);
+            }
+        }
+
 
         // Wrap copies inside the canvas: k_min/k_max were computed at the top of
         // the loop body (BL-268), where they double as the column cull.
@@ -1850,6 +2096,18 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // it is EMITTING them as a filled 6-gon that costs.
             ImVec2 verts[6];
             hex_vertices(verts, cx, cy, draw_r);
+
+            // A BLENDING tile is drawn at the FULL circumradius, not at draw_r.
+            // draw_r is `hex_size * zoom - 1`, and that 1 px is the whole reason a
+            // hex grid reads as a grid — the background showing through as a
+            // border. Softening the province means giving that gap up INSIDE the
+            // province: adjacent blended hexes share their edges exactly, the
+            // corner colours already agree there, and the seam stops existing.
+            // Every non-blending tile keeps draw_r and its 1 px border, so a built
+            // installation and a categorical lens block stay crisp.
+            ImVec2 blend_verts[6];
+            if (shade.blend)
+                hex_vertices(blend_verts, cx, cy, draw_r + 1.0f);
 
             // Coarse fill below the LOD threshold (BL-269): a rect instead of a
             // 6-gon, ~4 vertices against ~10 and no AA fringe.
@@ -1871,8 +2129,37 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 const float hh   = 1.5f   * step * 0.5f - 0.5f;
                 dl->AddRectFilled({ cx - hw, cy - hh }, { cx + hw, cy + hh }, fill);
             }
+            else if (shade.blend)
+                prim_blended_hex(dl, blend_verts, { cx, cy }, fill, corner_col);
             else
                 dl->AddConvexPolyFilled(verts, 6, fill);
+
+            // Province edge (BL-511). Every side facing a DIFFERENT province takes
+            // a faint dark stroke. Deliberately faint: Ben ruled for softened
+            // borders, so this is a suggestion of a cell, not a wireframe over the
+            // map — the crisp affordance is the hover/selection outline below,
+            // which is drawn on demand rather than always on. Skipped under the
+            // coarse LOD, where a 1 px stroke on a 7 px hex is noise.
+            // `revealed` gates it: a province outline drawn through the survey
+            // mask would leak the shape of ground the player has not surveyed.
+            if (!coarse_fill && revealed && prov_id != 0)
+            {
+                // Stroked on the SAME vertices the blended fill uses, so the two
+                // provinces either side of a border lay their strokes exactly on
+                // top of each other rather than 1 px apart — two offset faint
+                // lines read as blur, one doubled line reads as an edge.
+                const ImVec2* ev = shade.blend ? blend_verts : verts;
+                for (int s = 0; s < 6; ++s)
+                {
+                    const auto nc   = hex_neighbors::neighbour(t_col, t_row, s);
+                    const int  ncol = ((nc.gx % gw) + gw) % gw;
+                    const entity_id nid = tile_at_rc(ncol, nc.gy);
+                    if (nid != null_entity && w.provinces.province_of(nid) == prov_id)
+                        continue;
+                    dl->AddLine(ev[k_side_verts[s][0]], ev[k_side_verts[s][1]],
+                                IM_COL32(8, 10, 16, 105), 1.0f);
+                }
+            }
 
             // Masked region: locked fill only — no borders, markers, selection, or
             // hit-testing for this copy. This single gate also *is* the rival-marker
@@ -2320,6 +2607,35 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             draw_hex_highlight(dl, verts,
                 resolve_highlight(selected, /*hovered=*/false, /*pinned=*/false));
 
+            // Province outline (BL-511). The province is what a click selects, so
+            // it is what the selection ring must trace: the OUTER boundary of the
+            // cell, drawn edge by edge on every side facing a different province,
+            // never the interior seams. This is the crisp affordance the faint
+            // always-on edge deliberately is not. Hover uses the same shape at the
+            // hover colour and yields to selection, per the highlight convention.
+            if (revealed && prov_id != 0)
+            {
+                const bool prov_selected = (prov_id == state.selected_province);
+                const bool prov_hovered  = (prov_id == state.hovered_province);
+                const highlight ph = resolve_highlight(prov_selected,
+                                                       prov_hovered, /*pinned=*/false);
+                if (ph != highlight::none)
+                {
+                    const ImU32 pc = (ph == highlight::selected) ? palette::selection
+                                                                 : palette::hover;
+                    for (int s = 0; s < 6; ++s)
+                    {
+                        const auto nc   = hex_neighbors::neighbour(t_col, t_row, s);
+                        const int  ncol = ((nc.gx % gw) + gw) % gw;
+                        const entity_id nid = tile_at_rc(ncol, nc.gy);
+                        if (nid != null_entity && w.provinces.province_of(nid) == prov_id)
+                            continue;
+                        dl->AddLine(verts[k_side_verts[s][0]], verts[k_side_verts[s][1]],
+                                    pc, 2.0f);
+                    }
+                }
+            }
+
             // Hit-test: distance to hex centre < circumradius (approximate,
             // sufficient for usability). Scoped per wrap copy so the highlight
             // lands on the copy actually under the cursor; nearest centre wins.
@@ -2348,6 +2664,13 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // also the selection — selection outranks hover, and its ring is already drawn.
     if (have_hover && !hovered_selected)
         draw_hex_highlight(dl, hover_verts, highlight::hovered);
+
+    // BL-511: the hovered PROVINCE, for the outline the tile loop draws. Written
+    // after the loop resolved the hovered tile, so the outline it feeds is one
+    // frame behind — the same lag `state.hovered_entity` already carries, and
+    // invisible at any frame rate the canvas runs at.
+    state.hovered_province = (hovered_tile != null_entity)
+                             ? w.provinces.province_of(hovered_tile) : 0u;
 
     // Market-centre markers (BL-059). Draw a circle+cross glyph at each market's
     // centre tile position and register a hit zone for click-selection (BL-031).
@@ -2803,7 +3126,15 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // BL-367: that "whole hex is one installation" assumption only holds for
             // exactly one building — once BL-366 lets a tile stack several, the hex
             // stays reachable as the grouped-by-stack tile view instead.
-            entity_id fallback = hovered_tile;
+            //
+            // BL-511: the fallback is now the hovered tile's PROVINCE, not the
+            // tile. The province is the selected unit; the tile stays the data
+            // grain, reached from the province card's member-tile list. A tile
+            // with no province (ocean, unpartitioned) falls back to itself, so
+            // clicking water still selects something rather than nothing.
+            const uint32_t hovered_prov = (hovered_tile != null_entity)
+                                          ? w.provinces.province_of(hovered_tile) : 0u;
+            entity_id fallback = (hovered_prov != 0) ? null_entity : hovered_tile;
             if (hovered_tile != null_entity)
             {
                 const auto tb = tile_to_bld.find(hovered_tile);
@@ -2837,20 +3168,39 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 if (const auto tb2 = tile_to_bld.find(hovered_tile); tb2 != tile_to_bld.end())
                     building_here = tb2->second;
 
-                const entity_id stages[3] = { unit_here, building_here, hovered_tile };
+                // BL-511: stage 2 is the PROVINCE, not the tile. It is expressed
+                // as null_entity + a province id, so the stage table's "nothing
+                // here, skip it" test can no longer be a null check on stage 2 —
+                // hence the explicit `stage_live` below. On a tile with no
+                // province the stage falls back to the tile, so the cycle never
+                // strands on an empty rung.
+                const entity_id stages[3] = { unit_here, building_here,
+                                              (hovered_prov != 0) ? null_entity : hovered_tile };
+                const bool stage_live[3] = { unit_here != null_entity,
+                                             building_here != null_entity,
+                                             hovered_prov != 0 || hovered_tile != null_entity };
                 int stage = state.selection_cycle_stage;
                 for (int i = 0; i < 3; ++i)
                 {
                     stage = (stage + 1) % 3;
-                    if (stages[stage] != null_entity)
+                    if (stage_live[stage])
                         break;
                 }
                 state.selection_cycle_stage = stage;
                 state.selected_entity       = stages[stage];
+                state.selected_province     = (stage == 2) ? hovered_prov : 0u;
+                state.province_sync_entity  = state.selected_entity;
             }
             else
             {
                 state.selected_entity = (marker_hit != null_entity) ? marker_hit : fallback;
+                // Province and entity selection are mutually exclusive: a marker
+                // hit (or an ocean tile) clears the province, and a plain click on
+                // ground sets it with no entity. Whichever is set last wins, so
+                // the Selection element never has two things to draw.
+                state.selected_province =
+                    (marker_hit == null_entity && fallback == null_entity) ? hovered_prov : 0u;
+                state.province_sync_entity = state.selected_entity;
 
                 // Seed/reset the cycle anchor so a follow-up repeat click on this
                 // SAME tile knows where to advance from next time.
@@ -2864,9 +3214,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                         building_here = tb2->second;
 
                     state.selection_cycle_tile  = hovered_tile;
-                    state.selection_cycle_stage = (unit_here != null_entity)     ? 0
-                                                 : (building_here != null_entity) ? 1
-                                                                                  : 2;
+                    state.selection_cycle_stage = (marker_hit != null_entity && unit_here == marker_hit) ? 0
+                                                 : (marker_hit != null_entity) ? 1
+                                                 : (fallback != null_entity)   ? 1
+                                                                               : 2;
                 }
                 else
                 {

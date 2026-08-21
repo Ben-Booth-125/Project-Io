@@ -2189,9 +2189,213 @@ void draw_tile_selection(world& w, ui_state& ui)
 
 } // namespace
 
+// ---------------------------------------------------------------------------
+// The province card (BL-511)
+// ---------------------------------------------------------------------------
+// The Planetary canvas selects a PROVINCE, so the Selection element gains a card
+// for one. The card exists to answer the question the province grain otherwise
+// takes away: "the canvas blended four tiles into one shape - what is actually in
+// it?" Ben's ruling is explicit that the tile is not retired ("they are just going
+// to be rendered differently, but still instrumental unit values"), so this card
+// is where the tile comes back: the mixture bar is the blend's legend, deposits
+// and buildings are read per tile and summed, and every member tile is a press
+// that selects the tile itself.
+//
+// It draws its whole layout, header included, like the tile card does - the
+// generic action|facts split has no province content to divide.
+void draw_province_selection(world& w, ui_state& ui)
+{
+    const province* pv = w.provinces.find(ui.selected_province);
+    if (!pv || pv->tiles.empty())
+    {
+        ui.selected_province = 0; // stale id (regenerated world) - fall back to nothing
+        ImGui::TextDisabled("\xe2\x80\x94");
+        return;
+    }
+
+    const float       bar_w   = ImGui::GetContentRegionAvail().x;
+    const float       frame_h = ImGui::GetFrameHeight();
+    const ImGuiStyle& style   = ImGui::GetStyle();
+    ImDrawList*       dl      = ImGui::GetWindowDrawList();
+
+    // Anchor coordinates: the lowest-id member tile. Province ids are derived and
+    // opaque (body rank | block raster | component), so a raw id is not a name a
+    // player can hold. The anchor tile's grid position is one they can find.
+    int anchor_x = 0, anchor_y = 0;
+    if (const auto ait = w.tiles.find(pv->tiles.front()); ait != w.tiles.end())
+    {
+        anchor_x = ait->second.grid_x;
+        anchor_y = ait->second.grid_y;
+    }
+
+    // -- Header --
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
+                       "Province [%d, %d]", anchor_x, anchor_y);
+    ImGui::SameLine();
+    ImGui::TextDisabled("%d tiles", static_cast<int>(pv->tiles.size()));
+    {
+        const float btn = frame_h;
+        ImGui::SameLine(bar_w - btn);
+        if (ImGui::Button(">##prov_goto", {btn, btn}))
+            focus_on_entity(w, ui, pv->tiles.front());
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Go to");
+    }
+
+    ImGui::Separator();
+
+    // -- The mixture bar: the blend's legend --
+    // One segment per member tile, in the province's own ascending-tile-id order,
+    // each drawn in exactly the colour the canvas gives that tile (composition hue
+    // composited with the landform relief). The canvas smooths these together; this
+    // bar un-smooths them, so "what did that gradient just average?" has an answer
+    // one glance away rather than requiring the player to zoom in and count.
+    {
+        const ImVec2 p0  = ImGui::GetCursorScreenPos();
+        const float  h   = frame_h * 0.8f;
+        const float  seg = bar_w / static_cast<float>(pv->tiles.size());
+        for (std::size_t i = 0; i < pv->tiles.size(); ++i)
+        {
+            const auto tit = w.tiles.find(pv->tiles[i]);
+            if (tit == w.tiles.end())
+                continue;
+            const ImU32 c = ui::landform_relief(ui::terrain_colour(tit->second.composition),
+                                                tit->second.landform);
+            dl->AddRectFilled({p0.x + seg * static_cast<float>(i), p0.y},
+                              {p0.x + seg * static_cast<float>(i + 1), p0.y + h}, c);
+        }
+        dl->AddRect(p0, {p0.x + bar_w, p0.y + h}, IM_COL32(0, 0, 0, 120));
+        ImGui::Dummy({bar_w, h + style.ItemSpacing.y});
+    }
+
+    // -- Member tiles: the tile is not retired, it is one press away --
+    // Each row selects the TILE, which clears the province selection and hands the
+    // player the full tile card - deposits, the neighbourhood hex view, the
+    // Construct door. Building placement did NOT move to province grain, so this
+    // list is also the route to building anywhere.
+    ImGui::TextDisabled("Tiles");
+    for (std::size_t i = 0; i < pv->tiles.size(); ++i)
+    {
+        const entity_id tid = pv->tiles[i];
+        const auto      tit = w.tiles.find(tid);
+        if (tit == w.tiles.end())
+            continue;
+        const tile_component& tc = tit->second;
+
+        const bool plain = (tc.landform == terrain_landform::plains);
+        char label[160];
+        std::snprintf(label, sizeof label, "[%d, %d]  %s%s%s##prov_tile_%d",
+                      tc.grid_x, tc.grid_y,
+                      ui::composition_name(tc.composition),
+                      plain ? "" : " \xc2\xb7 ",
+                      plain ? "" : ui::landform_name(tc.landform),
+                      static_cast<int>(i));
+        if (ImGui::Selectable(label))
+        {
+            ui.selected_entity   = tid;
+            ui.selected_province = 0; // entity and province selection are exclusive
+        }
+    }
+
+    // -- Deposits, summed across the province --
+    // Deposits stay TILE-keyed (Ben's ruling); this is a read over them, not a move
+    // of them. Summing is the right reduction here because a deposit is a stock:
+    // four tiles each holding a little iron is, for a player deciding whether this
+    // locality is worth a mine, one province holding that much iron.
+    {
+        std::array<float, resource_count> dep{};
+        for (entity_id tid : pv->tiles)
+            if (const auto tit = w.tiles.find(tid); tit != w.tiles.end())
+                for (std::size_t r = 0; r < resource_count; ++r)
+                    dep[r] += tit->second.resource_deposit[r];
+
+        std::vector<std::pair<float, std::size_t>> ranked;
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (dep[r] > 0.0f)
+                ranked.push_back({dep[r], r});
+        std::sort(ranked.begin(), ranked.end(),
+                  [](const std::pair<float, std::size_t>& a,
+                     const std::pair<float, std::size_t>& b) { return a.first > b.first; });
+
+        ImGui::Spacing();
+        ImGui::TextDisabled("Deposits");
+        if (ranked.empty())
+            ImGui::TextDisabled("none");
+        for (std::size_t i = 0; i < ranked.size() && i < 5; ++i)
+        {
+            const resource_type rt = static_cast<resource_type>(ranked[i].second);
+            const ImVec2 pc = ImGui::GetCursorScreenPos();
+            const float  pr = ImGui::GetTextLineHeight() * 0.30f;
+            dl->AddCircleFilled({pc.x + pr, pc.y + ImGui::GetTextLineHeight() * 0.5f},
+                                pr, ui::presentation_of(rt).colour);
+            ImGui::Dummy({pr * 2.0f + style.ItemSpacing.x, ImGui::GetTextLineHeight()});
+            ImGui::SameLine();
+            ImGui::Text("%s  %.1f", ui::resource_name(rt), static_cast<double>(ranked[i].first));
+        }
+    }
+
+    // -- Buildings standing in the province --
+    // Placement did NOT move to province grain, so a building still belongs to a
+    // tile. What the province adds is the roll-up: "what is already here?" is a
+    // locality question, and answering it used to mean clicking four hexes.
+    {
+        std::vector<entity_id> here;
+        for (const auto& kv : w.buildings)
+            if (w.provinces.province_of(kv.second.tile) == pv->id)
+                here.push_back(kv.first);
+        std::sort(here.begin(), here.end()); // w.buildings is unordered - pin the order
+
+        // A building carries no owner field; ownership is the corporation's
+        // `assets` list (the canvas resolves it the same way). Built once per
+        // draw over the province's handful of buildings, not per row.
+        std::unordered_map<entity_id, entity_id> bld_owner;
+        if (!here.empty())
+            for (const auto& ckv : w.corporations)
+                for (entity_id aid : ckv.second.assets)
+                    bld_owner[aid] = ckv.first;
+
+        ImGui::Spacing();
+        ImGui::TextDisabled("Buildings");
+        if (here.empty())
+            ImGui::TextDisabled("none");
+        for (std::size_t i = 0; i < here.size(); ++i)
+        {
+            const auto bit = w.buildings.find(here[i]);
+            if (bit == w.buildings.end())
+                continue;
+            const char* owner = "";
+            if (const auto oit = bld_owner.find(here[i]); oit != bld_owner.end())
+                if (const auto cit = w.corporations.find(oit->second);
+                    cit != w.corporations.end())
+                    owner = cit->second.name.c_str();
+            char label[200];
+            std::snprintf(label, sizeof label, "%s  %s##prov_bld_%d",
+                          building_type_name(bit->second.type), owner,
+                          static_cast<int>(i));
+            if (ImGui::Selectable(label))
+            {
+                ui.selected_entity   = here[i];
+                ui.selected_province = 0;
+            }
+        }
+    }
+}
+
 void draw_selection_content(world& w, const recipe_registry& reg,
                             const economy_report& report, ui_state& ui)
 {
+    // BL-511: a province selection is dispatched FIRST and unconditionally. It is
+    // not an entity, so selection_kind_of cannot see it - and the band substitutes
+    // the player corporation whenever the entity selection is empty (BL-266),
+    // which is exactly the state a province selection leaves behind. Testing this
+    // before the kind resolution is what stops that substitution swallowing it.
+    // The canvas guarantees the two are mutually exclusive (province_sync_entity).
+    if (ui.selected_province != 0)
+    {
+        draw_province_selection(w, ui);
+        return;
+    }
+
     const selection_kind kind = selection_kind_of(w, ui.selected_entity);
 
     // Nothing valid selected — draw nothing. (The band frame never lets this

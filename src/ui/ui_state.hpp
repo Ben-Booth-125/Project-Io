@@ -6,6 +6,7 @@
 #include "world/entity.hpp"
 
 #include <imgui.h>
+#include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -224,9 +225,36 @@ struct ui_state
     /// role for the new Soldier card) — Strength / Roster, whichever apply.
     int selection_unit_page = 0;
 
+    /// The province (BL-511) the player single-clicked, or 0 for none. The
+    /// province is the SELECTED unit on the Planetary canvas — a click that hits
+    /// no marker lands here rather than on a tile — while the tile stays the data
+    /// grain the province card then lists (deposits, terrain, buildings all remain
+    /// tile-keyed). Province ids are derived, never allocated (world/province.hpp),
+    /// so this is a plain id, not an entity: `selected_entity` and this field are
+    /// mutually exclusive, and whichever is set last clears the other. The
+    /// Selection element dispatches on this BEFORE `selection_kind_of`, so the
+    /// band's "substitute the player corp when nothing is selected" rule (BL-266)
+    /// cannot swallow a province selection. See SELECTION.md § Province.
+    uint32_t selected_province = 0;
+
+    /// The province under the cursor this frame, or 0. Written by the Planetary
+    /// canvas draw pass from the hovered tile; drives the province hover outline.
+    uint32_t hovered_province = 0;
+
+    /// The value of `selected_entity` the Planetary canvas last wrote, so the
+    /// canvas can tell "the player clicked a province" from "some OTHER surface
+    /// — a ledger row, a corp list, a just-built building — moved the entity
+    /// selection". The canvas is the only writer of `selected_province`, so
+    /// without this the two fields could both read as set at once and the
+    /// Selection element would have two things to draw. On a mismatch the entity
+    /// selection wins and the province clears; see body_surface_canvas.cpp.
+    entity_id province_sync_entity = null_entity;
+
     // --- Tile repeat-click selection cycle (placeholder unit-loop scaffolding) ---
     // Which tile the loop is currently anchored to, and which of the three fixed
-    // stages (0 = unit, 1 = building, 2 = tile) the selection currently sits on.
+    // stages (0 = unit, 1 = building, 2 = province) the selection currently sits
+    // on. BL-511 moved the terminal stage from the tile to its province; a tile is
+    // reached from the province card's member-tile list instead.
     // A click on hovered_tile == selection_cycle_tile advances the stage
     // (skipping stages with nothing there); a click elsewhere reseeds both.
     // Mirrors card_resource_page's per-selection reset idiom rather than adding a
