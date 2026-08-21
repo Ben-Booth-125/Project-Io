@@ -148,14 +148,16 @@ std::vector<interception_record> intercept_convoys(world& w, int tick)
     return cuts;
 }
 
-void credit_arrived_convoys(world& w, int tick)
+void credit_arrived_convoys(world& w, int tick, std::vector<interception_record>* out_cuts)
 {
     // BL-458: interdiction runs FIRST, before anything is credited. This is the
     // ordering the item specifies — after advance_convoys, before crediting —
     // and it is placed here rather than at the four call sites because this is
     // the one seam app.cpp, main.cpp and every harness already share. A convoy
     // cut here never reaches the loop below, so it never credits its destination.
-    (void)intercept_convoys(w, tick);
+    std::vector<interception_record> cuts = intercept_convoys(w, tick);
+    if (out_cuts != nullptr)
+        out_cuts->insert(out_cuts->end(), cuts.begin(), cuts.end());
 
     // Credit in insertion order, then erase in one sweep.
     for (const auto& convoy : w.convoys)

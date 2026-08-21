@@ -74,8 +74,12 @@ struct interception_record
 /// already shares. Exposed separately so a harness can fire it directly.
 ///
 /// @return one record per cut convoy, in the order they were cut. Nothing is
-///         stored on `world`: the comms message, the Convoys-tab cause and the
-///         canvas mark BL-458 asks for all need a store this lane did not open.
+///         stored on `world` — deliberately, and it is not owed: an interception
+///         is an EVENT, not state, so it belongs on the tick's report the way
+///         `agency_events` and `battle_dispatches` do (economy_system.hpp), not
+///         on the serialised world. `credit_arrived_convoys`' `out_cuts`
+///         parameter is how a caller collects them; this signature stays for a
+///         harness that wants to fire the pass directly.
 std::vector<interception_record> intercept_convoys(world& w, int tick);
 
 /// Advance every in-flight convoy by its speed increment. Convoys whose progress
@@ -98,10 +102,21 @@ void advance_convoys(world& w);
 /// the same body) record nothing. Routes are never erased here — the commercial-sphere
 /// fog (BL-089) ages them at read time.
 ///
-/// @param w    World; pools, market supply, convoys, and trade_routes are mutated.
-/// @param tick Current sim day tick, stamped onto routes as last-traffic time. The
-///             default keeps pre-BL-088 callers (and pure market/pool tests) compiling.
-void credit_arrived_convoys(world& w, int tick = 0);
+/// Runs `intercept_convoys` FIRST (BL-458), so a cut convoy never reaches the
+/// crediting loop below and never delivers.
+///
+/// @param w        World; pools, market supply, convoys, and trade_routes are mutated.
+/// @param tick     Current sim day tick, stamped onto routes as last-traffic time. The
+///                 default keeps pre-BL-088 callers (and pure market/pool tests) compiling.
+/// @param out_cuts Optional sink for this tick's interceptions, APPENDED to in the
+///                 order `intercept_convoys` cut them. Before this existed the records
+///                 were computed and dropped on the floor (`(void)intercept_convoys`),
+///                 which is why interdiction shipped SILENT — NR-407. A convoy that is
+///                 cut is erased here, so this is the ONLY moment the fact exists;
+///                 nothing downstream can reconstruct it. Null (the default) keeps
+///                 every existing caller compiling and discards as before.
+void credit_arrived_convoys(world& w, int tick = 0,
+                            std::vector<interception_record>* out_cuts = nullptr);
 
 /// Auto-dispatch convoys to fill shortfalls. For each (corp, body, resource) where
 /// market demand exceeded supply in the last clearing pass (indicated by the market
