@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*175 entries — 175 open, 0 resolved.*
+*179 entries — 179 open, 0 resolved.*
 
 ---
 
@@ -1510,6 +1510,95 @@ TAKEN: added `verify.corp_command{...}`, a generic binding over the whole corp_v
 > **Recommendation:** Keep it. The alternative is a binding per verb forever, and the validation is at the boundary either way.
 
 *Files: `src/core/verify_api.cpp`*
+
+### NR-473 — Sprint B3's stated premise is stale in all three of its parts
+*observation · raised 2026-08-21 · from Sprint B3 Lane B agent, 2026-08-21. Verified against the tree at origin/main 269049d, not assumed.*
+
+B3's goal line reads: "The population-centre clamp is still clamp(tiles/1000, 20, 40) from the 180x84 era, against a 312x145 map." Every clause of that is now false.
+
+(1) THE CLAMP IS GONE. BL-463 (settlement count is seed-invariant) landed 2026-08-21 and replaced it with `land_tiles / k_land_tiles_per_centre` (410), clamped only structurally to [1, placeable_tiles].
+
+(2) THE MAP IS NOT 312x145. BL-424 took the homeworld to 70% area; `home_grid_width/height` have been 261x121 = 31,581 since commit efe1ff0. A comment in hard_coded_world.cpp still said 312x145 and has been corrected in this change.
+
+(3) THE PER-BODY FIRM CAP IS ALREADY REPLACED, and NOT by a per-nation bound. B3's plan for BL-374 (corp density target) was to swap the per-BODY firm cap for a per-NATION one. That work landed 2026-08-20: `max_firms_per_body` is now 200 (anti-runaway only) and shaping moved to a per-RESOURCE cap (8) and a per-PROVINCE cap (2), on Ben's own dated words: "we should have two levels, per resource caps, and per province caps." Building a per-nation bound now would contradict that ruling, so it was NOT done.
+
+**Why it matters.** Three of the sprint's three planned actions were already taken by other lanes between the sprint being written (2026-08-20) and being worked (2026-08-21). An agent briefed on the sprint text alone would have re-derived a constant that had just been derived, or reversed a dated ruling. The sprint goal lines are snapshots and go stale within a day at this pace; the code is the authority.
+
+- Rewrite B3's goal to what actually remains (the density DECISION below, and BL-522).
+- Close B3 as overtaken and open its remainder as a fresh sprint.
+
+> **Recommendation:** Rewrite the goal. The remaining question is real and is the entry below.
+
+### NR-474 — Settlement density: 86% of nations hold exactly ONE centre, and raising it triples the labour pool
+*question · raised 2026-08-21 · from Sprint B3 Lane B agent, 2026-08-21. Measured by the new tools/verify/settlement_density.cpp over 3 seeds x 8 divisors, at the shipped 400-year prehistory. NOT TUNED - reported.*
+
+BL-463 fixed the defect it was written against (the count no longer being seed-invariant) and deliberately pinned the divisor at the shipped generator's OWN measured density, so the CENTRAL density was never re-derived. This measures what that central density produces, and the number that matters is per-NATION, not per-world.
+
+SHIPPED TODAY (divisor 410), 3 seeds, 39,543 land tiles, 168 nations:
+  200 centres | 197.7 land tiles/centre | 1.19 centres per nation | median 1 | max 4
+  centres-per-nation histogram: 0 nations with none, 145 with one, 15 with two, 7 with three, 1 with four
+  => 145 of 168 nations (86.3%) hold FEWER THAN TWO centres.
+
+WHY <2 IS THE THRESHOLD THAT MATTERS: road_generation.cpp's per-nation backbone skips any nation with `n < 2` centres. Sprint B2 gave a single-centre nation a Track on its own centre tile, so it is no longer road-LESS - but it has one roaded tile and no internal network. 86% of the world's nations are in that state. That is a far more direct reading of "does not appear physically civilised" than the world-level count is.
+
+A SECOND STRUCTURAL SIGNAL: at 410 the coverage pass (one seat per uncovered nation) places MORE centres than the primary geographic pass does - 104 vs 96. Over half the settled world is a structural top-up at an argmax tile rather than a geography. As the divisor tightens the primary pass takes over: 74% of centres at 200, 83% at 150, 91% at 100.
+
+THE SWEEP (aggregate over the same 3 seeds):
+  divisor | centres | land/centre | centres/nation | nations with <2 centres
+      410 |     200 |       197.7 |           1.19 |  145 (86.3%)   <- shipped
+      300 |     219 |       180.6 |           1.30 |  136 (81.0%)
+      200 |     264 |       149.8 |           1.57 |  119 (70.8%)
+      150 |     316 |       125.1 |           1.88 |  101 (60.1%)
+      120 |     373 |       106.0 |           2.22 |   87 (51.8%)
+      100 |     431 |        91.7 |           2.57 |   78 (46.4%)
+       80 |     521 |        75.9 |           3.10 |   64 (38.1%)
+       60 |     681 |        58.1 |           4.05 |   52 (31.0%)
+
+THE REASON THIS WAS NOT TUNED, and it is the whole point of the entry: THE DIVISOR IS NOT A GENERATION KNOB, IT IS AN ECONOMY KNOB. economy_system.cpp derives each body's entire workforce supply as a sum over its centres (`labour_by_scale[scale]`), so halving the divisor roughly doubles the labour pool the whole prototype economy runs on. Measured headcount over the 3 seeds: 27,580k at 410; 71,570k at 150; 90,980k at 100 - 2.6x and 3.3x. Workforce is one of the few binding constraints in the shipped economy. Picking a divisor here would be choosing the size of the labour market without pricing it, which is exactly the move BL-463's own "Direction, not a chosen number" section forbids.
+
+**Why it matters.** Two defensible structural criteria point at different divisors, and BOTH more than double the labour pool:
+  * "the MEDIAN nation is internally connected" (>=2 centres) => divisor ~100-120
+  * "geography places more centres than the structural top-up does" (primary >=80% of centres) => divisor ~150
+Neither is a taste number, but neither can be adopted without deciding whether the economy should run on 2.6-3.3x today's workforce. There is also a third option nobody has costed: raise the centre COUNT while shifting the scale distribution DOWN (k_scale_weight is currently 40/30/20/8/2), so the map reads as more settled without the labour pool moving. That decouples "looks civilised" from "has more workers" and may be what the complaint actually wants.
+
+- Divisor ~150: geography dominates the top-up; ~2.6x headcount; 60% of nations still under 2 centres.
+- Divisor ~100-120: the median nation gets a road backbone; ~3.3x headcount.
+- Hold the divisor and re-weight k_scale_weight downward instead - more places, same people.
+- Hold everything; accept that 86% of nations are one-town nations and close the complaint elsewhere.
+
+> **Recommendation:** Do not pick from a table. The third option is the one worth costing first, because it is the only one that changes what the map LOOKS like without changing what the economy RUNS on - and the complaint was about how the world looks. Costing it needs a run of substrate_census/econ_harness in a Lua tree, which this container cannot do.
+
+### NR-475 — NOVEL WORK: no authority doc owns population-centre DENSITY as a tuning subject
+*novel-work · raised 2026-08-21 · from Sprint B3 Lane B agent, 2026-08-21. Flagged at the moment the density re-derivation was attempted.*
+
+docs/economy/POPULATION.md owns the population-centre MODEL (scale, agglomeration, habitability feedback). docs/generation/TILE_GENERATION.md owns the tile pipeline. Neither owns the question "how many centres should a world have, and what is that number answerable to?" BL-463 answered it once, by preserving the shipped generator's own historical density - which is a defensible way to avoid picking a number, but it means the density has never been derived from anything.
+
+The measurement above shows why it needs an owner: the divisor is simultaneously a GENERATION constant (how settled the map looks), a ROAD constant (road_generation's `n < 2` gate), and an ECONOMY constant (the body's whole labour supply). Three docs have a claim on it and none states the constraint.
+
+The same gap applies one level up: NOTHING in the corpus states what "physically civilised" means as a target. substrate_census (Sprint B1) measures it and explicitly refuses to threshold it, correctly, because thresholding it is a design act nobody has performed.
+
+**Why it matters.** Without an owner this constant gets re-derived by whoever next reads the complaint, against whatever criterion is in front of them. That is how the 180x84 clamp survived the map tripling and then the map shrinking.
+
+- Give POPULATION.md a Density section that states the three constraints the divisor answers to.
+- Leave it to BL-463's successor item once the ruling above is made.
+
+> **Recommendation:** The former, as part of whatever change lands the ruling.
+
+### NR-476 — spectator_determinism's pinned golden is RED on origin/main in a Lua-free harness build
+*observation · raised 2026-08-21 · from Sprint B3 Lane B agent, 2026-08-21. Run at origin/main 269049d, with this session's own change STASHED - so the failure is not attributable to this work.*
+
+`spectator_determinism` R2 ("the unspectated hash equals the pre-BL-409 golden") fails:
+    golden=344A9FE48306E93A  observed=B4D09255AF346008
+The observed hash is byte-identical with this session's change applied and with it stashed, which is also the proof that the change moved nothing.
+
+CAVEAT, stated rather than glossed: this was built with the container's prescribed Lua-free object set (recipe_registry / works_registry / tech_tree / world_gen_config excluded from the link, per the brief's build recipe). The harness hand-builds its own recipe_registry, so it is *designed* to run Lua-free - but I cannot rule out that the exclusion itself shifts the hash, and I have no Windows/CMake tree here to check against. NOT re-blessed, and deliberately left red.
+
+**Why it matters.** The standing rule is that goldens are contracts and movement is reported, never re-blessed without authorisation. Either the world legitimately moved on main since the golden was last blessed (the harness's own provenance log says it has been re-blessed before for exactly that reason) and it needs re-blessing with a dated note, or the Lua-free link is not hash-equivalent and the harness's build assumptions need stating. Both are worth knowing; neither should be settled by an agent.
+
+- Run it in a full CMake tree to establish which of the two it is.
+- Re-bless with a dated provenance line, if the full-tree run confirms the world legitimately moved.
+
+> **Recommendation:** Run it in a full tree first. Do not re-bless off this container's result.
 
 ---
 
