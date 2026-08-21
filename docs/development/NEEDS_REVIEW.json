@@ -3025,6 +3025,33 @@
    "status": "open",
    "source": "Full 99-harness sweep during BL-519; spectator_determinism R2.",
    "what": "`.claude/rules/io-standing-rules.md` cites `state_hash 3CBAD1D44EE71EDE` by value as the proof that BL-409's spectator mode leaves an ordinary played session byte-identical, and spectator_determinism R2 asserts it. THAT ROW FAILS, and it failed BEFORE this session: built at the previous commit (2c17e96) in a separate worktree, the unspectated hash is B7E6F60D6AFE78C0, not the golden. So something between BL-409 and today already moved world generation without the golden being re-pinned. BL-519 has now moved it again, to B4D09255AF346008 — expected, since deposits and the settlement map both changed, and the item's own resolution says so.\n\nWHAT STILL HOLDS, and it is the part that matters: every load-bearing property in that harness passes on both sides. The prohibition binds (the player corp issues ZERO decisions unspectated), an unspectated run is reproducible, admitting the player shifts no rival's cadence slot, and a spectated run is reproducible tick for tick. The failing row is byte-identity against a FROZEN NUMBER, not a property.\n\nNOT re-blessed. src/world/CLAUDE.md: 'Goldens and pinned bands (state hashes, generation sweeps) are contracts: report movement, never re-bless without authorisation.' And this one is quoted in the standing rules, so re-pinning it edits a rule file — squarely your call, not mine.\n\nTwo things need deciding: (1) re-pin to B4D09255AF346008 and update the standing-rules citation; (2) worth a moment's thought on whether a hash pinned to one generation build can survive as a contract at all, given generation legitimately changes — the OTHER three rows prove BL-409's property without any frozen number, which suggests the byte-identity row has done its job and could become a reported hash rather than an asserted one."
+  },
+  {
+   "id": "NR-453",
+   "kind": "novel-work",
+   "status": "open",
+   "raised": "2026-08-21",
+   "title": "BL-521 was built with NO design to build against — the whole API shape was chosen by the agent, because the item's design prose is the corrupted one",
+   "source": "BL-521 (verify-API click injection), built 2026-08-21.",
+   "what": "Flagged as novel by the agent, and it is right. The CAPABILITY is not scope growth — DEVELOPMENT_PRACTICES.md owns headless verification and BL-521 is a designed A-priority item. But its design field holds the filing script instead of the design (NR-449), so there was nothing to build against: the six Lua binding names, the pan-to-click trade-off and the double-click forcing were all chosen by the agent, not derived from an authority. That is worth knowing before the API is treated as settled, because a verify binding is a seam other checks will be written against and renaming one later invalidates every script that used it."
+  },
+  {
+   "id": "NR-454",
+   "kind": "question",
+   "status": "open",
+   "raised": "2026-08-21",
+   "title": "BL-521 closes the live-check class for CANVASES but not for PANELS — clicking a nav-rail button or a ledger tab by name needs a target registry nobody owns",
+   "source": "BL-521, reported by the implementing agent.",
+   "what": "What shipped: a script can click a POSITION or a TILE. What it still cannot do is `verify.click('nav.market')`. Nav-rail buttons, ledger tabs, Selection-band rows and the resource graph publish no screen rect, so clicking them by name needs every clickable surface declaring `{name, rect}` into ui_state. That is a design decision, not an implementation detail — who owns the registry, does every widget owe an entry, and does it duplicate ACTIONS.json, which already names every control? Genuine scope growth if pursued. Needs a ruling before the live-check class is FULLY closed, and it is the half that covers most of the surfaces NR-388's six landed-awaiting-a-live-check items are about."
+  },
+  {
+   "id": "NR-455",
+   "kind": "decision-taken",
+   "status": "open",
+   "raised": "2026-08-21",
+   "title": "BL-521's click_tile PANS the view as a side effect, and verify.mouse was deliberately left in place beside the new verify.hover",
+   "source": "BL-521, two calls taken by the implementing agent.",
+   "what": "(1) `verify.click_tile(col,row)` and `verify.tile_screen(col,row)` ask the canvas where a tile is, which CENTRES it — so clicking a tile moves the camera. Accepted because the alternative is a second copy of the canvas transform living in the verify API, which would drift. The fix, if you want one, is the canvas publishing tile screen rects without moving. (2) `verify.mouse` moves only the canvases' cursor; the new `verify.hover` moves ImGui's too. Unifying them would be cleaner but would re-bless every existing hover golden, so `mouse` was left untouched. Both are reasonable; both are the agent's calls rather than yours."
   }
  ]
 }
