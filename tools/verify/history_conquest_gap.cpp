@@ -71,8 +71,18 @@ int median_of(std::vector<int> v)
     return v[v.size() / 2];
 }
 
-constexpr int kgw = 312;
-constexpr int kgh = 145;
+// THE CONSTANTS, NEVER THE NUMBERS. The first cut of this harness hardcoded
+// 312x145 — the homeworld's size before BL-424 took it to 70% area — against a
+// real grid of 261x121. `build_sim_terrain` fills an oversized grid with its
+// defaults (sedimentary / grass / plains), so every region anchor outside the
+// real bounds read as flat grassland and `region_distance`'s cylinder wrapped at
+// the wrong width. The measurement was of a world that does not exist.
+//
+// It is worth naming the tell: terrain_defence came back non-zero in only 20% of
+// battles, which read as a finding about the sim and was actually a finding about
+// the harness. A number that surprises you is a number to check the fixture for.
+constexpr int kgw = home_grid_width;
+constexpr int kgh = home_grid_height;
 
 } // namespace
 
