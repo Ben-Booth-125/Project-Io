@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*187 entries — 134 open, 53 resolved.*
+*189 entries — 136 open, 53 resolved.*
 
 ---
 
@@ -1176,6 +1176,16 @@ BL-512 per_province_firm_cap = 2 was measured as nearly inert against 4-tile pro
 *observation · raised 2026-08-21 · from Province repartition to 7-12 tiles, merged and verified 2026-08-21.*
 
 unit_march_harness went from 81/81 to 8 failures the moment provinces changed, all of them fixture-shape rather than product defects. Root cause worth recording: make_row_body builds a body of grid_height 1, and on a one-row body EVERY 3x3 block is a 3-tile fragment, so the merge cascades and the entire row becomes one province however long it is - widening the fixture from 8 to 24 tiles changed nothing. A row fixture can no longer express march from one province to another at all. I added make_grid_body/grid_tile_at helpers and converted M1; the remaining fixtures went back to the agent that wrote them, with instructions not to weaken any assertion and to stop and report if any assertion turns out to be genuinely impossible under the new partition. The general lesson: a synthetic fixture encodes assumptions about world SHAPE, and a generation change can invalidate it silently - here it failed loudly, which is the good case.
+
+### NR-423 — The province selection fold is a conformance win, and it removed a real behaviour divergence
+*observation · raised 2026-08-21 · from Selection fold agent, merged and verified 2026-08-21.*
+
+Ben read draw_province_selection as a second selection element and he was right about the cause: it was dispatched first and drew its own header, chrome and linear layout rather than being a body of the one polymorphic panel. It is now shaped exactly like draw_building_selection_body and draw_unit_selection_body - shared header block, shared three-column band, shared pager chrome, shared 2x3 action grid. Two details worth keeping: the icon borrows the TILE kind deliberately (a province is a cluster of tiles, not a new kind of thing), and Construct is absent from the action grid because placement is still tile-grain and the Tiles page is the route to it. The stale-id fallback also IMPROVED as a side effect - it now falls through to ordinary kind resolution and renders a normal selection, where the old card drew a bare dash. Nothing in the code assumes a province size, so the 7-12 repartition only changes how many bands the mixture bar has.
+
+### NR-424 — The live click on a province is STILL owed - two agents in a row could not take it
+*observation · raised 2026-08-21 · from Selection fold agent; follows NR-416.*
+
+The second agent to touch this surface also could not satisfy the standing live-check rule: the verify API has no click injection, and computer-use has no granted applications in a non-interactive sub-agent session. So the press remains as untested by harness as it was before the fold - the hit-test resolution path is proven, the press is not. Recording it a second time because that is now a PATTERN rather than an incident: any interactive surface built by a sub-agent will arrive with its live half owed, by construction. Two ways out worth considering - give the verify API a click-injection hook so the press becomes scriptable, or accept that live checks are Ben work and batch them. The first is a small item and would close this class permanently.
 
 ---
 
