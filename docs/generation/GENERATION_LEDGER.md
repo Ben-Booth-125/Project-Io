@@ -57,11 +57,24 @@ ledger and `src/world/history_log.{hpp,cpp}` answer the same instinct — explai
 why — and it would be reasonable to ask why they are not one mechanism. They differ on the axis
 that matters for storage: **lifetime**.
 
-- **The ledger is DISPOSABLE.** Per-tile derivation breadcrumbs — height, band, moisture,
+- **The ledger is DISPOSABLE.** Per-tile derivation breadcrumbs — band, moisture,
   composition, landform, deposits — regenerate on demand from `generate_body_tiles(..., &record)`
   (see § Data lifetime below); they are never persisted, scoped to **tuning**, and the developer
   (or the History slot's Chain view) recomputes them per body on open. Storing one per tile for
   every generated body would be pure bloat when a single deterministic call rebuilds it exactly.
+
+  **HEIGHT IS THE ONE EXCEPTION, from 2026-08-21 (BL-517), and the exception has a rule.**
+  Height was in the list above until a downstream system needed to read it: BL-515 grows province
+  borders against elevation difference, which makes height an INPUT to the partition rather than a
+  breadcrumb explaining a past decision. A field a live system reads is world state, whatever pass
+  first computed it — so height is retained on `tile_component` and serialised, and it leaves this
+  bullet.
+  
+  The rule that keeps this from becoming a loophole: an intermediate graduates out of the
+  disposable set **only when a system outside the ledger reads it**, and it graduates by being
+  named here. Nothing else in that list has a reader today. If a later reader finds a persisted
+  height field and takes it for an oversight, this paragraph is the answer — do not delete it to
+  restore the symmetry.
 - **The log is DURABLE.** `world::history_log` is a persisted, append-only record — genesis
   chapter, checkpoint decisions, strategic AI commands, agency actions, and trade-route
   establishment — scoped to **narrative**. It is designed to be recited, told, and partially lost
