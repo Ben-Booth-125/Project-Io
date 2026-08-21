@@ -10,7 +10,93 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — The province becomes a thing you can see (BL-458, BL-513, BL-511, BL-466, BL-515, BL-517, BL-392, BL-463; Sprints 27/B2/B3/C3/D4 + P1) (2026-08-20 → 08-21, latest)
+## Session — Tiles gain a third axis, and a fight finally happens (NR-438/439, BL-519, BL-521, BL-520, BL-516, BL-467; Sprints P1 closed + C3) (2026-08-21, latest)
+
+Full mode, two sprints: P1's tile/province arc closed out, then C3 opened and its two
+named items taken. Six items on PR #49 plus BL-467 after it. Three worktree agents and
+one 15-agent adversarial scout.
+
+**The ceiling, ruled and generalised.** NR-438/439: 12 tiles becomes a *preference*, 20
+the asserted hard cap, and the over-12 share is **reported and never asserted** — "rare"
+was never defined, and inventing a threshold would have invented half a rule. That shape
+was reused within hours by BL-516's sea provinces, which hit the identical wall at 82
+against Ben's "say 80" (NR-460). A ruling that produces a reusable discipline is worth
+more than one that produces a number.
+
+**BL-519 — the tile axis split.** `terrain_composition` was doing three unrelated jobs:
+substrate, cover, and state. Ben's brief — *"a mountain might have a forest or not"* —
+named the case it could not express, and `urban` was the proof rather than the exception:
+it overwrote the composition, so paving a metallic tile destroyed the fact that it was
+metallic. 522 references across ~110 files, migrated **by meaning**, shim deleted in the
+same pass on Ben's call.
+
+The structure is what made an L-difficulty split landable in one go: Pass 4a's tables are
+unchanged **draw for draw**, and both new passes consume **no RNG stream**, so the claim
+"nothing drifted" became testable rather than assertable. The 120-seed `earthlike_tile_census`
+came back **bit-identical**, and that single measurement is what made every other moved
+number attributable.
+
+**The finding that justified measuring the NEW behaviour, not just the regression.** The
+forest-on-rock threshold was set at the value the design implied (moisture ≥ 0.55), measured,
+and found to fire **zero times** — the biome table only ever draws rocky ground in the dry and
+middling columns, so wet rock does not exist for the branch to find. The item's headline case
+would have shipped inert and looked implemented (NR-446).
+
+**BL-521, BL-520, BL-516** followed: click injection driving ImGui's real event queue (with
+double-click promotion forced per press, because ImGui decides it by accumulated frame time);
+texturing as grain-on-substrate plus pattern-on-cover, 13 composable marks against 84
+enumerated; and water gaining lake/coast/ocean kinds decided **structurally**, with sea
+province spacing pinned *by measurement* rather than chosen.
+
+**The fan-out lesson (NR-459).** All three agents were briefed "off the current HEAD" and all
+three got worktrees at the **session's** base. One fast-forwarded itself; one did not, and
+built an entire item against the enum BL-519 had just deleted. The port was cheap only
+because that agent had routed every water test through one choke-point predicate. Two agents
+also independently minted the same review ids — `next_id.js` exists for backlog ids because
+minting off a local file collides, and `NEEDS_REVIEW.json` has the same shape with no such tool.
+
+**Sprint C3 — BL-467, and the method note that is this session's real output.** Both battle
+resolvers were compiled, harnessed and **called by nothing**: the military layer could compute
+a fight but could not have one. `battle_system.{hpp,cpp}` is the trigger and the step, running
+before `run_unit_march`. A fight now happens through the real tick — 1000 men → 648 in one tick.
+
+Then an adversarial scout read the code **after it compiled and passed 26 checks**, and found
+**four real defects** (NR-463): a withdrawal that cost no men (strength captured after the
+withdrawal, not before), a mutual-hostility dedup that silently no-oped with three corps
+(`std::unique` collapses only *adjacent* equals), an unscreened all-naval 0-vs-0 that resolved
+as a false defender victory with 400/200 casualties, and zero-count units that were never
+reaped — because the item's own aftermath ruling was **false about the code**.
+
+My own harness row had passed over the first one, because it asserted the withdrawal request
+was *accepted* rather than that it *cost* anything. **P1's method note was "build it, look at
+it, then rule" — about renders. C3's is its counterpart, about code: compiling and going green
+is evidence a thing does not crash, not evidence it works.** What found the defects was an
+agent told to *refute* rather than confirm, defaulting to "unverified" when it could not
+confirm from what it actually read.
+
+**The rider, measured and deliberately not taken (NR-467).** `unit_upkeep_rates` sweeps five
+candidate rate sets. The finding is a design question the number hides: a flat per-head rate
+costs a 1000/tick corp 7.8% of income and a 50/tick corp **155%** — it does not scale a cost,
+it selects which corps may field an army at all.
+
+**Verification.** 83 of 100 harnesses pass; 14 cannot build here (sol2/ImGui/non-`world` TUs).
+The 3 failures — `ai_skill_harness` (28), `history_sim_harness` (8), `spectator_determinism`
+(1) — were each proven **pre-existing** by building them at the parent commit in a separate
+worktree and diffing the pass/fail patterns byte-for-byte. None re-blessed. The
+`spectator_determinism` one matters beyond itself: it asserts a `state_hash` **quoted by value
+in the standing rules**, and it was already stale before this session (NR-452).
+
+**The standing debt.** Nothing built in P1 was ever *rendered*. Four of its six items have a UI
+half, the container cannot build the GUI, and no golden was blessed — blessing an unseen frame
+pins whatever got built. For a sprint whose own method note is *build it, look at it, then rule*,
+that is the thing to fix first, and BL-521 (built the same session) is what makes the looking cheap.
+
+**Runtime.** ~7h, Full mode (two sprints: one closed with a retro, one opened and half taken).
+23 review entries, NR-445 → NR-467.
+
+---
+
+## Session — The province becomes a thing you can see (BL-458, BL-513, BL-511, BL-466, BL-515, BL-517, BL-392, BL-463; Sprints 27/B2/B3/C3/D4 + P1) (2026-08-20 → 08-21)
 
 Full mode, two Batch Deliveries and a design arc: nine worktree build agents, one cold
 static reviewer, and a long tail of rulings made against renders rather than specs.
