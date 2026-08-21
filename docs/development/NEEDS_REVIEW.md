@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*182 entries — 181 open, 1 resolved.*
+*182 entries — 180 open, 2 resolved.*
 
 ---
 
@@ -1540,21 +1540,6 @@ Today: 8 named corps = the player plus 7 rivals, and separately ~80 background f
 
 *Files: `src/world/corporation_generation.hpp`*
 
-### NR-476 — The equity cluster carries a proposed v0.1.23 that ROADMAP does not name
-*decision taken on your behalf · raised 2026-08-21 · from BL-522..BL-528 needed a version goal. ROADMAP's ancient arc names v0.1.15 through v0.1.22; v0.1.22 is the last.*
-
-TAKEN: filed all seven items with version_goal v0.1.23 and did NOT edit ROADMAP.md. Naming a new minor and stating its theme is a scope decision that belongs to Ben and to the roadmap's own authority, and the time-slice says a design lives in the item until the work lands.
-
-**Why it matters.** It leaves a small incoherence on purpose: seven items point at a minor the roadmap has never heard of. The alternative was to invent a minor and its theme unilaterally, which is worse. If Ben would rather these sit inside an existing minor — v0.1.17 (economy breadth) is the nearest fit — it is a field edit, not a rewrite.
-
-- Name v0.1.23 in ROADMAP with a theme (e.g. "who owns the world").
-- Re-home the cluster into v0.1.17 (economy breadth).
-- Park the cluster until the mercenary slice settles.
-
-> **Recommendation:** Name v0.1.23. The cluster is coherent enough to be a minor in its own right, and folding seven items into v0.1.17 would bury the framing change inside an economy-breadth theme it is much bigger than.
-
-*Files: `docs/development/ROADMAP.md`, `docs/development/backlog.json`*
-
 ### NR-477 — Novelty flag — the ownership tier is a framing change, and it is the fourth on player identity
 *novel-work · raised 2026-08-21 · from BL-522 (ownership tier), raised per io-standing-rules § "Raise the novelty flag".*
 
@@ -1629,4 +1614,21 @@ The new design was written in Ben's own words (corporation = holder, company = o
 > **RESOLVED.** RULED BY BEN, 2026-08-21: option 2 — "Keep corporation as the operator, name the holding tier something else." The operating sense of `corporation` is unchanged across code and docs, so no migration is owed. Ben delegated the actual word; it is SYNDICATE, taken on his behalf and recorded separately as NR-479 so the word stays overturnable independently of the fork he settled. BL-522..BL-528 rewritten to the settled terms.
 
 *Files: `docs/GLOSSARY.md`, `docs/development/backlog.json`*
+
+### NR-476 — The equity cluster carries a proposed v0.1.23 that ROADMAP does not name
+*decision taken on your behalf · raised 2026-08-21 · from BL-522..BL-528 needed a version goal. ROADMAP's ancient arc names v0.1.15 through v0.1.22; v0.1.22 is the last.*
+
+TAKEN: filed all seven items with version_goal v0.1.23 and did NOT edit ROADMAP.md. Naming a new minor and stating its theme is a scope decision that belongs to Ben and to the roadmap's own authority, and the time-slice says a design lives in the item until the work lands.
+
+**Why it matters.** It leaves a small incoherence on purpose: seven items point at a minor the roadmap has never heard of. The alternative was to invent a minor and its theme unilaterally, which is worse. If Ben would rather these sit inside an existing minor — v0.1.17 (economy breadth) is the nearest fit — it is a field edit, not a rewrite.
+
+- Name v0.1.23 in ROADMAP with a theme (e.g. "who owns the world").
+- Re-home the cluster into v0.1.17 (economy breadth).
+- Park the cluster until the mercenary slice settles.
+
+> **Recommendation:** Name v0.1.23. The cluster is coherent enough to be a minor in its own right, and folding seven items into v0.1.17 would bury the framing change inside an economy-breadth theme it is much bigger than.
+
+> **RESOLVED.** RULED BY BEN, 2026-08-21: name it. ROADMAP.md now carries v0.1.23 - Who owns whom, themed "ownership separates from identity, and profit becomes a position rather than a payroll", carrying BL-522 through BL-528. The entry also records why the minor is affordable (BL-365 already shipped the self-running layer) and carries the NR-477 sequencing caution forward, so a reader of the roadmap alone sees both the theme and the hold recommendation.
+
+*Files: `docs/development/ROADMAP.md`, `docs/development/backlog.json`*
 

@@ -95,6 +95,27 @@ async loading screen, and the startup-hang fix. SPRINTS.md § Sprint 15 is the r
   lazy-sim cost (**BL-425**), the stale-exe gate guard (**BL-426**), the verify world-snapshot
   cache (**BL-427**), harnesses measuring a different sim than ships (**BL-462**), and
   settlement count being seed-invariant (**BL-463**).
+- **v0.1.23 — Who owns whom.** *(Named 2026-08-21 on Ben's ruling, resolving NR-476.)* *Theme:
+  ownership separates from identity, and profit becomes a position rather than a payroll.*
+  **BL-522** (syndicate tier) splits the two jobs `corporation_component` does at once: a
+  **corporation** keeps the operating sense — buildings, recipes, stockpiles, orders — and a
+  **syndicate** is the new tier above it that holds equity, allocates capital, and owns no
+  buildings at all. Carried by the equity data model (**BL-523**), the syndicate carve +
+  ownership class (**BL-524**), corporation valuation (**BL-525**), dividends and the payout
+  dial (**BL-526**), rival syndicate behaviour (**BL-527**) and the portfolio ledger
+  (**BL-528**).
+
+  **Why the minor is affordable:** the self-running layer it needs is already shipped. Since
+  **BL-365** every background firm runs the *full* `corp_ai` scored-utility layer, identical to
+  a rival, so this band hangs ownership on autonomy that exists rather than building autonomy.
+  Its own new mechanics are three — an equity relation, a public/private/closed ownership class,
+  and valuation plus the profit split; the rest reuses `resolve_price`, FINANCE profitability,
+  BL-350's negotiation seam and BL-218's industrialisation-timing scalar.
+
+  **Sequencing caution (NR-477, open):** the design is settled ahead of the build, which is
+  permitted — but this is the *fourth* framing to touch player identity, and the mercenary
+  vertical slice (v0.1.15) has not yet proved the *third*. The recommendation on file is to hold
+  BL-523 until that slice is cut; the design costs nothing sitting in the backlog.
 - **Still live from the old band, arc-agnostic:** v0.1.5's remainder (BL-325 unit supply decay),
   v0.1.6 (politics stub), v0.1.7 (generation visibility — generation is shared by both arcs),
   v0.1.13's infra tail (BL-107 save format and friends), and the v0.1.2 UI leftovers.

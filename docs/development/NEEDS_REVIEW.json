@@ -2398,8 +2398,8 @@
     "docs/development/ROADMAP.md",
     "docs/development/backlog.json"
    ],
-   "status": "open",
-   "resolution": null
+   "status": "resolved",
+   "resolution": "RULED BY BEN, 2026-08-21: name it. ROADMAP.md now carries v0.1.23 - Who owns whom, themed \"ownership separates from identity, and profit becomes a position rather than a payroll\", carrying BL-522 through BL-528. The entry also records why the minor is affordable (BL-365 already shipped the self-running layer) and carries the NR-477 sequencing caution forward, so a reader of the roadmap alone sees both the theme and the hold recommendation."
   },
   {
    "id": "NR-477",
