@@ -863,6 +863,14 @@ set(IO_TEST_LONG_HARNESSES
     # "3x-6000x" this block claims above. If R3 grows a sixth world, re-tier or
     # label it `sweep` rather than letting the margin quietly close.
     world_determinism
+    # sea_leg_census added 2026-08-21 (Sprint B2, the BL-188 un-parking decision).
+    # Builds 10 prehistory-off worlds (an 8-seed sweep plus a same-seed pair for
+    # its determinism row) and runs A* over every market pair on every body.
+    # 30 s at -O1 over 16 seeds, 17 s over the default 8; tiered LONG rather than
+    # measured in Debug, on NR-259's lesson — the cost of guessing the tier wrong
+    # is a Timeout, which reads as infrastructure noise rather than as a harness
+    # that has never verified anything.
+    sea_leg_census
 )
 
 # EXCLUDED FROM THE ROUTINE GATE - labelled `sweep`. TWO REASONS live here, and
