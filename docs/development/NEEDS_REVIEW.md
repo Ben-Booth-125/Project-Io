@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*175 entries — 175 open, 0 resolved.*
+*178 entries — 178 open, 0 resolved.*
 
 ---
 
@@ -1510,6 +1510,48 @@ TAKEN: added `verify.corp_command{...}`, a generic binding over the whole corp_v
 > **Recommendation:** Keep it. The alternative is a binding per verb forever, and the validation is at the boundary either way.
 
 *Files: `src/core/verify_api.cpp`*
+
+### NR-474 — BL-384's premise is REFUTED — the sim conquers heavily, but a quarter of worlds fight no war at all
+*observation · raised 2026-08-21 · from Sprint 28 gate. tools/verify/history_conquest_gap.cpp, 8 real 0→1960 runs.*
+
+BL-384 records '267 battles and ZERO conquests' and reads it as a global property of the sim. Measured today over 8 worlds, it is not: seeds 1,2,3,5,6,7 produce 43–435 conquests each, 1185 conquests over 1245 battles. What IS true, and is a different defect, is that seeds 0 and 4 fight ZERO battles — not few, none. So the outcome is close to BINARY: a world is either warlike or perfectly peaceful, and BL-384 was written against one of the peaceful ones (seed 0, the default world).
+
+All three mechanisms the item names as candidates are refuted by measurement rather than argued away. (1) The scorer is NOT systematically optimistic by the terrain factor: bucketed against realised outcomes it is off by −2.5pp in the bucket holding 1238 of 1245 battles. (2) The scored staging hub differs from the levying hub in 0 of 1245 battles. (3) The transfer bar is not the constraint — 99.2% of victories convert to a conquest.
+
+**Why it matters.** Sprint 28's goal is 'a province changes hands'. Provinces change hands 1185 times. The sprint as written would have been spent tuning combat constants that measurement says are calibrated — which is precisely the outcome BL-384's own design warned about ('if it is not, the cause is elsewhere and tuning combat constants would be tuning the wrong thing'). The item needs restating around the real defect before any of it is built.
+
+Worth noting WHY it went stale: the world has changed a great deal since 2026-08-13 — the 3× map, BL-519's terrain axis split (which moved the settlement map, NR-447), BL-515's province ids and BL-516's water kinds. A single-seed observation from before all of that could not have survived it.
+
+> **Recommendation:** Restate BL-384 as 'a quarter of worlds fight no war at all' and re-scope Sprint 28 to that. The open question is whether a peaceful world is a BUG or a legitimate outcome — a world with room to expand choosing Settle over Campaign is arguably correct, and BL-224's non-hegemony invariant wants some worlds to stay multipolar. That is Ben's call, not a tuning decision.
+
+*Files: `docs/development/backlog.json`, `tools/verify/history_conquest_gap.cpp`, `src/world/history_sim.cpp`*
+
+### NR-475 — BL-321's defence works appear in ZERO of 1245 battles
+*observation · raised 2026-08-21 · from Same measurement run as NR-474 (history_conquest_gap Q3).*
+
+`work_defence_mod` is non-zero in 0 of 1245 traced battles across 8 worlds. The plumbing is live and correct — history_sim.cpp reads it at :634 and :965, works_roster.cpp:72 writes it, and the code comment reasons carefully about a Bastion Fort at +640 tilting a fight without deciding it — but no battle in eight full runs was ever fought against a region carrying one. Terrain defence fares better and is still thin: non-zero in 248/1245 (20%).
+
+**Why it matters.** A defence work that never defends is indistinguishable from one that was never built. Two readings, and they need different fixes: either the works roster rarely fires at all (the `works_raised` counter would say), or works are raised on safe interior regions while fighting happens on frontiers that have none. The second would be the more interesting finding — it would mean the sim invests in defence exactly where defence is not needed.
+
+> **Recommendation:** Cheap to settle: report `works_raised` alongside the battle traces, and cross the built-works regions against the fought-over ones. Worth doing before anyone tunes a combat constant, since it means one of the defender's two advantages is currently inert in practice.
+
+*Files: `src/world/history_sim.cpp`, `src/world/works_roster.cpp`, `tools/verify/history_conquest_gap.cpp`*
+
+### NR-476 — Ben's read that Lane A depends on Lane C — the ingredients already exist, at the other grain
+*decision taken on your behalf · raised 2026-08-21 · from Ben, 2026-08-21: 'A relies on C, or at least some pseudo war in provinces, using defense buffs and possibly buildings.'*
+
+Checked against the code rather than the docs, and the ingredients Ben names ALL already exist in the Era −1 sim — at polity grain, not campaign grain. `resolve_battle` is called with the full terrain quadruple (substrate, cover, density, landform) so terrain defence buffs are in; `work_defence_mod` is the buildings term and is read at history_sim.cpp:634 and :965; and history_sim.cpp's own comment says TERRITORY MOVES AT PROVINCE GRANULARITY, NEVER TILE. So Lane A already has its pseudo-war in provinces with defence buffs and buildings.
+
+TAKEN: sequenced Lane A independently of Lane C rather than behind it. The two resolvers are separate by explicit design — combat.hpp states resolve_battle is era-agnostic and knows nothing about walls or campaigns — and BL-467's campaign resolver runs in the economy tick on a different actor grain (corps, not polities).
+
+**Why it matters.** If Ben's read had been right, Lane C would gate Lane A and the whole arc would serialise. It does not, so the lanes can run in parallel — which is what they were doing when this was written. But it is worth him overturning if what he actually meant is that the two war models should CONVERGE rather than that one blocks the other; that would be a real design direction and a large one.
+
+- Keep the two resolvers separate — nation-scale history vs corp-scale campaign, as combat.hpp designs them.
+- Converge them: one resolver, one war model, both grains.
+
+> **Recommendation:** Keep them separate. They answer different questions and BL-467 has just shown the campaign one working. But the fact that BL-321's defence works are inert in practice (NR-475) means the sim's half is less real than it looks, which may be what prompted the read.
+
+*Files: `src/world/history_sim.cpp`, `src/world/combat.hpp`, `src/world/battle_system.hpp`*
 
 ---
 

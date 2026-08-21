@@ -415,6 +415,25 @@ in `tools/verify/README.md`.
   rather than degenerate — wording actually varying across one fight (10 dispatches, 6 distinct
   lines).
 
+- **`history_conquest_gap`** — WHY the Era −1 sim fights and never conquers (BL-384, 2026-08-21).
+  **Report-only by design**, and the model to copy when a harness's job is to EXPLAIN a red rather
+  than to add another one: `history_sim_harness`'s B384a/B384b already assert that a region changes
+  hands by war, so this one asserts nothing about the gap and instruments it instead. It reads
+  `history_sim_state::battle_traces`, populated only under `history_sim_params::trace_battles`.
+
+  It is built to REFUTE its own hypothesis, which is what it did. BL-384's design named a specific
+  mechanism — the scorer estimating odds with no terrain term while the resolver applies one — and
+  the harness separates that from two rival explanations (the scored hub differing from the levying
+  hub; the fight being won but the transfer bar never cleared) so a reading cannot be mistaken for
+  a guess. Measured over 8 worlds: the scorer is calibrated to −2.5pp, hub mismatch is 0/1245, and
+  99.2% of victories convert — all three mechanisms refuted. What it found instead is that **2 of 8
+  worlds fight no war at all** while the rest conquer heavily.
+
+  Its own two assertions are about the INSTRUMENT, not the finding: T1 that tracing is inert (a
+  traced run matches an untraced one in every other output — an instrument that perturbs what it
+  measures is worse than none), and T2 that it caught something. Runs ~8 real 0→1960 sims; budget
+  several minutes.
+
 - **`tile_axes_harness`** — The substrate/cover terrain split (BL-519, 2026-08-21). 13 checks over
   the two-axis replacement for `terrain_composition`: the density invariant (density is 0 **iff**
   cover is `none`), `cover_fraction` monotonicity, `is_biotic_cover` membership, and — the rows that
