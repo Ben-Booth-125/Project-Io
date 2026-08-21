@@ -145,11 +145,17 @@ int main()
         if (on.battles == 0) ++peaceful_worlds;
         ++worlds;
 
-        std::printf("  seed %d: %lld battles, %lld conquests, %lld foundings, %zu traces\n",
+        // The funnel, printed for EVERY seed including the silent ones — a world
+        // with no battles has no traces, so the per-battle record is mute about
+        // exactly the case that needs explaining.
+        std::printf("  seed %d: %4lld battles  %4lld conquests  %4lld foundings"
+                    "  | contacts %7lld  scored %8lld  chosen %5lld\n",
                     i, static_cast<long long>(on.battles),
                     static_cast<long long>(on.conquests),
                     static_cast<long long>(on.foundings),
-                    on.battle_traces.size());
+                    static_cast<long long>(on.campaign_contacts),
+                    static_cast<long long>(on.campaign_scored),
+                    static_cast<long long>(on.campaign_chosen));
 
         all.insert(all.end(), on.battle_traces.begin(), on.battle_traces.end());
     }
@@ -161,7 +167,10 @@ int main()
     // fight NO WAR AT ALL. A sim that conquers heavily on most seeds and is
     // perfectly peaceful on others has a different defect from one that never
     // conquers, and the item was written against a single seed.
-    std::printf("\n  --- Q0. How many worlds fight at all? ---\n");
+    std::printf("\n  --- Q0. How many worlds fight at all, and where the silent ones stop ---\n");
+    std::printf("    contacts = own region beside a FOREIGN-OWNED neighbour (an unowned\n"
+                "    neighbour is not contact — it is somewhere to Settle). scored = reached\n"
+                "    the score comparison. chosen = Campaign won the verb choice that round.\n");
     std::printf("    worlds with ZERO battles: %d / %d (%.0f%%)\n",
                 peaceful_worlds, worlds,
                 worlds > 0 ? 100.0 * peaceful_worlds / worlds : 0.0);

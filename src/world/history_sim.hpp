@@ -549,6 +549,23 @@ struct history_sim_state
 {
     std::vector<polity> polities;
 
+    /// WHY A WORLD NEVER FIGHTS (BL-384's real question), counted only under
+    /// `params.trace_battles`.
+    ///
+    /// A world with zero battles has zero `battle_trace`s, so the per-battle
+    /// record is silent about exactly the case that needs explaining. These
+    /// three separate the possibilities, which need different fixes:
+    ///   - `campaign_contacts` 0  -> the polity never shares a border with a
+    ///     foreign owner at all. The gap is in expansion and adjacency; scoring
+    ///     is irrelevant because nothing is ever a candidate.
+    ///   - contacts > 0, `campaign_scored` 0 -> candidates exist and are
+    ///     discarded before scoring.
+    ///   - scored > 0 but `campaign_chosen` 0 -> the scorer sees war and prefers
+    ///     something else every time. That is a threshold/weighting question.
+    int64_t campaign_contacts = 0; ///< (own region, foreign-owned neighbour) pairs examined.
+    int64_t campaign_scored   = 0; ///< Candidates that reached the score comparison.
+    int64_t campaign_chosen   = 0; ///< Rounds where Campaign won the verb choice.
+
     /// Per-battle observation, empty unless `params.trace_battles`. See
     /// `battle_trace` for why it exists and why it cannot move the run.
     std::vector<battle_trace> battle_traces;

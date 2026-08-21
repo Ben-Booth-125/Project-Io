@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*190 entries — 190 open, 0 resolved.*
+*191 entries — 191 open, 0 resolved.*
 
 ---
 
@@ -1531,7 +1531,9 @@ Worth noting WHY it went stale: the world has changed a great deal since 2026-08
 ### NR-475 — BL-321's defence works appear in ZERO of 1245 battles
 *observation · raised 2026-08-21 · from Same measurement run as NR-474 (history_conquest_gap Q3).*
 
-`work_defence_mod` is non-zero in 0 of 1226 traced battles across 8 worlds. The plumbing is live and correct — history_sim.cpp reads it at :634 and :965, works_roster.cpp:72 writes it, and the code comment reasons carefully about a Bastion Fort at +640 tilting a fight without deciding it — but no battle in eight full runs was ever fought against a region carrying one. Terrain defence is genuinely live: non-zero in 488/1226 (40%).
+`work_defence_mod` is non-zero in 0 of 1226 traced battles across 8 worlds. The plumbing is live and correct on BOTH sides — works_roster.cpp:72 writes it, history_sim.cpp reads it at :634 (where it raises the defender's scored strength) and :965 (where it becomes readiness on the defender's stack), and the code comment reasons carefully about a Bastion Fort at +640 tilting a fight without deciding it — but no battle in eight full runs was ever fought against a region carrying one. Terrain defence is genuinely live: non-zero in 488/1226 (40%).
+
+CORRECTION to a claim I made in passing: the scorer is NOT blind to works. It carries `def_works` in the value term at :634. What it omits works from is the p_win_q odds estimate specifically, which uses raw manpower_stock. The narrow statement was right and the broad one ('the scorer never sees works') was wrong.
 
 **Why it matters.** A defence work that never defends is indistinguishable from one that was never built. Two readings, and they need different fixes: either the works roster rarely fires at all (the `works_raised` counter would say), or works are raised on safe interior regions while fighting happens on frontiers that have none. The second would be the more interesting finding — it would mean the sim invests in defence exactly where defence is not needed.
 
@@ -1742,6 +1744,21 @@ The first mutation probe written for the shared hire table PASSED — it had no 
 > **Recommendation:** Consider making mutation-proving a stated step for new harness rows in DELIVERY.md. Not filed as work; Ben's call whether it is worth the ceremony.
 
 *Files: `tools/verify/corp_ai_harness.cpp`, `docs/development/DELIVERY.md`*
+
+### NR-489 — Sprint 28's real subject is verb competition — the scorer discards ~10M campaign candidates to reach zero wars
+*observation · raised 2026-08-21 · from Sprint 28 decomposition. history_conquest_gap campaign funnel, 8 worlds.*
+
+Added three funnel counters (contacts / scored / chosen) because a world with zero battles has zero battle_traces, so the per-battle record was mute about exactly the case needing explanation. The result rules out the two cheap explanations outright.
+
+Seed 0: 4,972,710 contacts, 9,945,420 candidates scored, ZERO chosen. Seed 4: 4,089,264 / 8,178,528 / ZERO. It is not adjacency and not candidate discovery — the scorer looks at a war it could start ten million times and picks something else on every single one.
+
+A second observation with no obvious reading yet: CONTACTS DO NOT PREDICT WAR, and if anything predict it inversely. Seed 7 has the fewest contacts (1.58M) and fights 184 times; seed 0 has the most (4.97M) and never fights at all.
+
+**Why it matters.** It makes Sprint 28 a much smaller and more specific sprint than the one on the board — verb competition inside the scorer, not combat tuning. And it is the difference between a fix and a guess: the remaining fork (never cleared the threshold, versus cleared it and lost to Settle) needs different fixes, and the code still cannot tell them apart. That fork is T1, and R7 is written as a NEGATIVE requirement forbidding any combat-constant tuning in the sprint, because that is the temptation the measurement has already ruled out.
+
+> **Recommendation:** Worth your eye on one thing before T3: whether a world that never fights is a BUG at all. A polity with room to expand preferring Settle to Campaign is defensible behaviour, and BL-224 wants some worlds multipolar. The target should be a rate inside a stated band, reported and never clamped.
+
+*Files: `src/world/history_sim.cpp`, `tools/verify/history_conquest_gap.cpp`, `docs/development/REFINED.md`*
 
 ---
 

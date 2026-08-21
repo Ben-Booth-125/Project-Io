@@ -611,6 +611,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     const std::size_t ti = static_cast<std::size_t>(tn);
                     const int to = owner[ti];
                     if (to == q.id || to < 0) continue;
+                    if (params.trace_battles) ++out.campaign_contacts;
 
                     const region& tgt = ss.regions[ti];
                     const int cap_dist = region_distance(cap, tgt, gw);
@@ -750,6 +751,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
                         int s = value - (params.w_def * def_eff) / 2000;
                         if (winter) s -= params.winter_score_premium_q;
+                        if (params.trace_battles) ++out.campaign_scored;
                         s += static_cast<int>(salt(qs, static_cast<uint32_t>(ti)) % 16u); // Stable tie-break.
 
                         if (s > best_score && s >= params.campaign_threshold_q)
@@ -929,6 +931,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             {
             case sim_verb::campaign:
             {
+                if (params.trace_battles) ++out.campaign_chosen;
                 const std::size_t ti = static_cast<std::size_t>(best_target);
                 region& tgt = ss.regions[ti];
 
