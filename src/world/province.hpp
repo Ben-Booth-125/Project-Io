@@ -122,6 +122,132 @@ struct province_partition
 void build_province_partition(world& w, uint32_t seed);
 
 // ---------------------------------------------------------------------------
+// Province building ceiling (BL-513) — "how much can this land sustain?"
+// ---------------------------------------------------------------------------
+// TWO LIMITS COEXIST, and they answer different questions. The per-tile stack
+// cap (placement_rules::stack_capacity) asks "may this DEPOSIT support another
+// site?" and answers from richness. This one asks "how much can this LAND
+// sustain?" and answers from Ben's four inputs (2026-08-21):
+//
+//     area + infrastructure + habitability + population
+//
+// It is TYPE-AGNOSTIC by ruling — it bounds the TOTAL number of buildings
+// standing in the province, and the mix inside it is the player's business:
+// "it does not matter if you can build 60 buildings, whether they are 5 of one
+// type and 5 of another, or 10 of one type."
+//
+// THE SHAPE, and where each of the four inputs enters:
+//
+//   sustain_units(province) = pop_factor * SUM over land tiles of
+//                                 habitability_t * (1 + road_level_t / 3)
+//
+//   ceiling(province)       = max(1, round(k_province_buildings_per_sustain_unit
+//                                          * sustain_units))
+//
+//   * AREA is the number of terms in the sum — a bigger province sustains more
+//     simply by being bigger.
+//   * HABITABILITY is each tile's weight. Land nobody can live on sustains
+//     nothing, which is the honest reading of the input.
+//   * INFRASTRUCTURE is the per-tile road multiplier, spanning exactly [1, 2]
+//     across the road ladder's OWN defined domain (BL-172: 0 = none .. 3 =
+//     Highway). The span is structural, not tuned: an unroaded tile gets its
+//     bare habitability, a Highway tile gets twice it.
+//   * POPULATION is the province-level multiplier, 1 + SUM(centre scale) / 5,
+//     again over the scale's own defined domain (1 = village .. 5 = metropolis,
+//     population_centre_component). A province with a metropolis sustains twice
+//     what the same empty land would.
+//
+// Every band above is read off a domain the codebase already defines. That
+// leaves exactly ONE free scalar — `k_province_buildings_per_sustain_unit` —
+// and it is PINNED BY MEASUREMENT, never picked; see its own comment.
+//
+// COMPUTED ON DEMAND, NEVER CACHED. Roads are built during play, so this
+// ceiling MOVES during play — the first placement bound in the game that is not
+// fixed at generation. Whether that is intended is flagged to Ben (NR-406) and
+// not yet answered; computing on demand keeps either answer cheap and adds NO
+// persistent field, so the flat-binary save/load path is untouched by this item.
+// ---------------------------------------------------------------------------
+
+/// Top of the road ladder (BL-172: 1 = Track, 2 = Road, 3 = Highway). Structural:
+/// it is the ladder's own maximum, so the infrastructure multiplier below spans
+/// exactly [1, 2] over the domain road_level is defined on.
+inline constexpr float k_road_ladder_max = 3.0f;
+
+/// Top of the population scale (population_centre_component: 1 = village ..
+/// 5 = metropolis). Structural for the same reason as k_road_ladder_max.
+inline constexpr float k_population_scale_max = 5.0f;
+
+/// Buildings per sustain unit — the heuristic's ONLY free coefficient.
+///
+/// PINNED BY MEASUREMENT, 2026-08-21, following BL-463's discipline on the
+/// settlement divisor.
+///
+/// THE ANCHOR. It is set so the new ceiling's WORLD TOTAL matches the capacity
+/// the world already grants under the existing pooled per-tile cap. That makes
+/// the province ceiling a REDISTRIBUTION of capacity the world already has onto
+/// the four sustaining inputs — not a new tighter or looser regime laid over the
+/// top. The pooled per-tile cap is the only measured statement of "how much this
+/// world already permits" that exists, so it is the only honest anchor available;
+/// anything else would be a number chosen for feel.
+///
+/// THE MEASUREMENT. `province_capacity_probe`, 8 seeds, post-background-firms.
+/// SUM(pooled per-tile cap) / SUM(sustain units), per seed:
+///
+///   seed 0  12.4733     seed 4  12.7495
+///   seed 1  11.4694     seed 5  11.5268
+///   seed 2  13.4241     seed 6  12.2953
+///   seed 3  15.2588     seed 7  13.1463
+///
+///   aggregate 12.6468, spread 11.4694 .. 15.2588 (28.36% of the mean)
+///
+/// The value below is that aggregate. THE SPREAD IS WIDE AND IS REPORTED RATHER
+/// THAN HIDDEN: seeds differ in how much of their land is habitable and how the
+/// composition cap table falls across it, so the ratio genuinely moves by seed.
+/// Pinning on the aggregate means a seed at the low end (1, 5) gets a ceiling
+/// slightly above the capacity it already has and a seed at the high end (3)
+/// slightly below — neither by enough to bind, at 0.65% utilisation.
+///
+/// Re-pin by running `province_capacity_probe`, which prints the ratio and its
+/// spread on every run for exactly this purpose.
+inline constexpr float k_province_buildings_per_sustain_unit = 12.6468f;
+
+/// The heuristic's working, kept whole so the probe can report each term rather
+/// than only the answer. A ceiling nobody can decompose is a picked number with
+/// extra steps.
+struct province_sustain
+{
+    int   land_tiles          = 0;    ///< AREA — land tiles in the province.
+    float habitability_area   = 0.0f; ///< SUM of habitability over those tiles.
+    float infrastructure_gain = 0.0f; ///< SUM of habitability * road_level / 3.
+    float population_factor   = 1.0f; ///< 1 + SUM(centre scale) / 5.
+    float units               = 0.0f; ///< (habitability_area + infrastructure_gain) * population_factor.
+    int   ceiling             = 0;    ///< max(1, round(k * units)).
+};
+
+/// Measure @p pr's sustain terms and ceiling against @p w.
+///
+/// Deterministic: the tile sum walks `province::tiles`, which is ascending
+/// entity id by contract, and the population term is gathered through an ordered
+/// index so no unordered_map iteration order can reach the arithmetic.
+///
+/// @param w  Read-only world state (tiles, population centres).
+/// @param pr The province to measure.
+/// @return   Every term plus the resulting ceiling.
+province_sustain measure_province_sustain(const world& w, const province& pr);
+
+/// The total-buildings ceiling for the province with id @p province_id, or -1
+/// when there is no such province (id 0, an unpartitioned tile, a world whose
+/// partition has not been built). **-1 means UNKNOWN, never "no room"** — the
+/// same contract `tile_reach_cost` uses, so a rule is skipped rather than
+/// guessed at.
+int province_building_ceiling(const world& w, uint32_t province_id);
+
+/// Buildings of EVERY type standing in the province with id @p province_id —
+/// the total the ceiling bounds. Type-agnostic by ruling; extraction sites are
+/// counted here too, and are bounded independently by their deposit's richness.
+int province_buildings_standing(const world& w, uint32_t province_id);
+
+// ---------------------------------------------------------------------------
 // Serialisation — the trailing section of the world's flat-binary stream
 // ---------------------------------------------------------------------------
 // The history log (history_log.{hpp,cpp}) is the project's flat-binary seam.

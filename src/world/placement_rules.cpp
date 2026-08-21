@@ -2,6 +2,7 @@
 
 #include "world/hex_neighbors.hpp"
 #include "world/logistics.hpp"
+#include "world/province.hpp"  // BL-513: the province building ceiling
 #include "world/tech_gate.hpp" // BL-344: structure_unlocked
 #include "world/world.hpp"
 
@@ -27,6 +28,7 @@ const char* placement_reason_text(placement_reason r)
         case placement_reason::deposit_present:   return "This terrain already supports a Farm — no Hydroponics Bay needed here";
         case placement_reason::out_of_logistics_range: return "Too far from a city, port or logistics hub to be supplied";
         case placement_reason::tech_locked: return "Locked - the technology that permits this has not been researched";
+        case placement_reason::province_full: return "This land already sustains as much as it can - improve it, or build elsewhere";
     }
     return "Cannot build here";
 }
@@ -300,6 +302,31 @@ placement_result can_place_in_world(const world& w, entity_id tile_id,
         : non_extraction_buildings_on_tile(w, tile_id);
     if (occupancy >= stack_capacity(tc_it->second, type, target))
         return placement_reason::slot_full;
+
+    // Province ceiling (BL-513) — "how much can this land sustain?"
+    //
+    // A SECOND, INDEPENDENT LIMIT, not a replacement for the stack cap above.
+    // The stack cap asks whether the DEPOSIT under this tile supports another
+    // site and answers from richness; this asks whether the LAND supports
+    // another building at all, and answers from area + infrastructure +
+    // habitability + population (province.hpp holds the shape). Both must pass.
+    //
+    // TYPE-AGNOSTIC by Ben's ruling, 2026-08-21: it bounds the TOTAL standing in
+    // the province and says nothing about the mix. Extraction sites count toward
+    // it like everything else — they occupy land too — while staying separately
+    // bounded by their deposit.
+    //
+    // Checked LAST, and deliberately: every reason above teaches the player
+    // something about THIS tile, whereas this one is about the neighbourhood.
+    // A -1 ceiling means the partition has not been built (or the tile is
+    // unpartitioned) and is UNKNOWN, never "no room" — the rule is skipped
+    // rather than guessed at, the same contract tile_reach_cost uses.
+    if (const uint32_t province_id = w.provinces.province_of(tile_id); province_id != 0)
+    {
+        const int ceiling = ::province_building_ceiling(w, province_id);
+        if (ceiling >= 0 && ::province_buildings_standing(w, province_id) >= ceiling)
+            return placement_reason::province_full;
+    }
 
     return placement_reason::ok;
 }

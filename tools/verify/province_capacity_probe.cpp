@@ -83,6 +83,18 @@ int main(int argc, char** argv)
 
     long long tot_at_cap = 0, tot_land = 0, tot_bldg = 0, tot_cap = 0;
 
+    // BL-513 pinning instrument. `k_province_buildings_per_sustain_unit` is the
+    // heuristic's only free coefficient, and it is set so the new ceiling's WORLD
+    // TOTAL matches the capacity the world already grants under the pooled
+    // per-tile cap — a REDISTRIBUTION of existing capacity onto the four
+    // sustaining inputs, not a new tighter or looser regime laid over it. The
+    // ratio below IS that coefficient, measured; its spread across seeds is the
+    // evidence that it is measured rather than picked. Re-run this to re-pin.
+    double tot_units = 0.0;
+    long long tot_ceiling = 0;
+    double ratio_min = 0.0, ratio_max = 0.0;
+    bool ratio_seen = false;
+
     for (int i = 0; i < seed_count; ++i)
     {
         world_params p;
@@ -194,12 +206,43 @@ int main(int argc, char** argv)
             max_firms = std::max(max_firms, n);
         }
 
+        // --- BL-513: the sustain ceiling, alongside the capacity above --------
+        double seed_units = 0.0;
+        long long seed_ceiling = 0;
+        int    ceil_min = -1, ceil_max = 0;
+        int    fullest_prov_ceiling = 0;
+        int    provs_at_ceiling = 0;
+        for (const province& pr : w.provinces.provinces)
+        {
+            const province_sustain s = measure_province_sustain(w, pr);
+            seed_units   += s.units;
+            seed_ceiling += s.ceiling;
+            if (ceil_min < 0 || s.ceiling < ceil_min) ceil_min = s.ceiling;
+            if (s.ceiling > ceil_max)                 ceil_max = s.ceiling;
+            if (pr.id == fullest_id)                  fullest_prov_ceiling = s.ceiling;
+            const auto uit = prov_used.find(pr.id);
+            if (uit != prov_used.end() && uit->second >= s.ceiling)
+                ++provs_at_ceiling;
+        }
+        const double seed_ratio = seed_units > 0.0 ? double(cap_sum) / seed_units : 0.0;
+        if (!ratio_seen) { ratio_min = ratio_max = seed_ratio; ratio_seen = true; }
+        else { ratio_min = std::min(ratio_min, seed_ratio); ratio_max = std::max(ratio_max, seed_ratio); }
+        tot_units   += seed_units;
+        tot_ceiling += seed_ceiling;
+
         const int bldgs = static_cast<int>(w.buildings.size());
         std::printf("%4d | %5d %9d | %5d | %8d %6.2f | %6lld/%-6lld %5.1f | #%u %d/%d\n",
                     i, land, static_cast<int>(w.provinces.provinces.size()), bldgs,
                     at_cap, land ? 100.0 * at_cap / land : 0.0,
                     used_sum, cap_sum, cap_sum ? 100.0 * double(used_sum) / double(cap_sum) : 0.0,
                     fullest_id, fullest_used, fullest_cap);
+        std::printf("       BL-513 ceiling: sustain units %.1f  ceilings sum %lld  per-prov %d..%d"
+                    "  fullest prov #%u %d/%d  provinces AT ceiling %d\n",
+                    seed_units, seed_ceiling, ceil_min < 0 ? 0 : ceil_min, ceil_max,
+                    fullest_id, fullest_used, fullest_prov_ceiling, provs_at_ceiling);
+        std::printf("       BL-513 pin: pooled per-tile cap / sustain units = %.4f"
+                    "   (k in use = %.4f)\n",
+                    seed_ratio, double(k_province_buildings_per_sustain_unit));
         for (const auto& [bid, n] : firms_per_body)
         {
             if (bid == null_entity)
@@ -228,6 +271,24 @@ int main(int argc, char** argv)
     std::printf("Aggregate non-extraction capacity across all land: %lld slots for %lld buildings"
                 " (%.2f%% used)\n",
                 tot_cap, tot_bldg, tot_cap ? 100.0 * double(tot_bldg) / double(tot_cap) : 0.0);
+    std::printf("\nBL-513 PINNING SUMMARY (this is the evidence the coefficient is measured):\n");
+    std::printf("  sustain units total %.1f  |  ceilings total %lld  |  buildings standing %lld\n",
+                tot_units, tot_ceiling, tot_bldg);
+    std::printf("  pooled per-tile cap / sustain units: aggregate %.4f, per-seed spread %.4f..%.4f"
+                " (%.2f%% of the mean)\n",
+                tot_units > 0.0 ? double(tot_cap) / tot_units : 0.0,
+                ratio_min, ratio_max,
+                (ratio_min > 0.0) ? 100.0 * (ratio_max - ratio_min)
+                                        / (0.5 * (ratio_min + ratio_max)) : 0.0);
+    std::printf("  k_province_buildings_per_sustain_unit currently %.4f -> ceilings are %.2f%%"
+                " of the pooled per-tile capacity\n",
+                double(k_province_buildings_per_sustain_unit),
+                tot_cap ? 100.0 * double(tot_ceiling) / double(tot_cap) : 0.0);
+    std::printf("  the ceiling binds on %s today: %lld buildings against %lld ceiling slots"
+                " (%.3f%% used)\n",
+                tot_ceiling && tot_bldg >= tot_ceiling ? "SOMETHING" : "NOTHING",
+                tot_bldg, tot_ceiling,
+                tot_ceiling ? 100.0 * double(tot_bldg) / double(tot_ceiling) : 0.0);
     std::printf("\nREAD THIS BEFORE CHANGING A CAP: if tiles-at-cap is ~0, the per-tile ceiling\n"
                 "is refusing nothing, and a province-pooled budget cannot add a single building.\n");
     return 0;

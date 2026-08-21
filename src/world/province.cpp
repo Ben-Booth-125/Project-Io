@@ -509,3 +509,97 @@ bool read_province_section(province_partition& out, std::istream& in)
 
     return true;
 }
+
+// ---------------------------------------------------------------------------
+// Province building ceiling (BL-513) — the four-input sustain heuristic
+// ---------------------------------------------------------------------------
+// The shape, the role each of Ben's four inputs plays, and the pinning
+// discipline behind the single free coefficient all live in province.hpp beside
+// the constants. This file is only the arithmetic.
+//
+// DETERMINISM. Two ordering hazards exist here and both are closed:
+//   * the tile sum walks `province::tiles`, ascending entity id by the partition
+//     contract, so the float addition order is fixed;
+//   * population centres are stored centre-keyed in an unordered_map, so the
+//     reverse tile -> centre lookup is gathered into an ORDERED std::map first
+//     and read back in tile order. No unordered iteration order reaches the sum.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+/// Tile -> summed population scale standing on it. The map is ordered so the
+/// caller reads it in ascending tile order; the CONTENT is independent of the
+/// source unordered_map's iteration order because every entry is an
+/// accumulation, never a first-wins pick.
+std::map<entity_id, int> population_scale_by_tile(const world& w)
+{
+    std::map<entity_id, int> by_tile;
+    for (const auto& [centre_id, tile_id] : w.population_centre_tile)
+    {
+        const auto pit = w.population_centres.find(centre_id);
+        if (pit == w.population_centres.end())
+            continue;
+        by_tile[tile_id] += pit->second.scale;
+    }
+    return by_tile;
+}
+
+} // namespace
+
+province_sustain measure_province_sustain(const world& w, const province& pr)
+{
+    const std::map<entity_id, int> pop_by_tile = population_scale_by_tile(w);
+
+    province_sustain s;
+    int pop_scale_total = 0;
+
+    for (const entity_id tile_id : pr.tiles) // ascending, by the partition contract
+    {
+        const auto tit = w.tiles.find(tile_id);
+        if (tit == w.tiles.end())
+            continue;
+        const tile_component& tc = tit->second;
+
+        ++s.land_tiles;                         // AREA
+        s.habitability_area += tc.habitability;  // HABITABILITY
+        s.infrastructure_gain +=                 // INFRASTRUCTURE
+            tc.habitability * (static_cast<float>(tc.road_level) / k_road_ladder_max);
+
+        const auto pit = pop_by_tile.find(tile_id);
+        if (pit != pop_by_tile.end())
+            pop_scale_total += pit->second;      // POPULATION
+    }
+
+    s.population_factor =
+        1.0f + static_cast<float>(pop_scale_total) / k_population_scale_max;
+    s.units = (s.habitability_area + s.infrastructure_gain) * s.population_factor;
+
+    // A province that exists at all sustains at least one building. That floor is
+    // the partition's own claim that this is habitable land, not a tuning clamp:
+    // the partition never emits an ocean province, so "some land, room for
+    // nothing" would be a contradiction rather than a constraint.
+    const int scaled =
+        static_cast<int>(s.units * k_province_buildings_per_sustain_unit + 0.5f);
+    s.ceiling = scaled < 1 ? 1 : scaled;
+    return s;
+}
+
+int province_building_ceiling(const world& w, uint32_t province_id)
+{
+    const province* pr = w.provinces.find(province_id);
+    if (pr == nullptr)
+        return -1; // UNKNOWN, never "no room" — see the header's contract.
+    return measure_province_sustain(w, *pr).ceiling;
+}
+
+int province_buildings_standing(const world& w, uint32_t province_id)
+{
+    if (province_id == 0)
+        return 0;
+    // Order-independent: a count, not a fold, so the unordered walk is safe.
+    int n = 0;
+    for (const auto& [bid, bc] : w.buildings)
+        if (w.provinces.province_of(bc.tile) == province_id)
+            ++n;
+    return n;
+}
