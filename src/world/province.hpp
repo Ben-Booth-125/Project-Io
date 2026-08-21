@@ -2,14 +2,19 @@
 
 #include "entity.hpp"
 
+#include <cstddef>
 #include <cstdint>
 #include <iosfwd>
 #include <unordered_map>
 #include <vector>
 
 // ---------------------------------------------------------------------------
-// Province partition (BL-466) — the 3-5 tile locality cell, made real
+// Province partition (BL-466) — the 7-12 tile locality cell, made real
 // ---------------------------------------------------------------------------
+// SIZE RULING, 2026-08-21 (Ben, after seeing the grain rendered): a province of
+// 3-5 tiles is too small on screen. THE TARGET IS 7-12 TILES. This supersedes
+// the original ~4-tile band, which was set before anything was drawn.
+//
 // A deterministic, seeded partition of every body's LAND tiles into small,
 // contiguous, purely spatial cells. Ocean is excluded outright: water is a
 // movement mode, not a locality, and a sea battle is not this object's job.
@@ -32,6 +37,29 @@
 
 struct world;
 
+// ---------------------------------------------------------------------------
+// The size band (Ben's ruling, 2026-08-21) and the block edge that produces it
+// ---------------------------------------------------------------------------
+
+/// Floor of the target band. A province below this is a FRAGMENT and pass 2
+/// merges it away unless it is a true islet with no land neighbour at all.
+inline constexpr std::size_t k_province_min_tiles = 7;
+
+/// Top of the target band. Not a hard clamp — a merge that has no smaller
+/// neighbour available may land above it, and that is reported rather than
+/// hidden (the coast bends the band; it always did).
+inline constexpr std::size_t k_province_max_tiles = 12;
+
+/// Base block edge, in tiles. A full 3x3 block is 9 tiles — the centre of the
+/// 7-12 band — so an interior province is in band with no repair at all.
+///
+/// THE COMPONENT BOUND STILL HOLDS. A block splits into hex-connected
+/// components and the component index is 3 bits (max 8). A 3x3 offset block's
+/// three grid rows are each internally adjacent left-to-right, so any set of
+/// mutually non-adjacent tiles takes at most 2 from each row: at most 6
+/// components, since one representative per component is such a set. 6 < 8.
+inline constexpr int k_province_block_edge = 3;
+
 /// One province — a contiguous run of land tiles on a single body.
 struct province
 {
@@ -39,13 +67,17 @@ struct province
     ///   bits 31..20 (12) — the body's RANK in ascending entity-id order over
     ///                      `world::bodies`. Makes the id globally unique while
     ///                      keeping ascending-id iteration body-major.
-    ///   bits 19..3  (17) — the base 2x2 block's raster index within the body
-    ///                      (block_row * block_cols + block_col).
+    ///   bits 19..3  (17) — the base 3x3 block's raster index within the body
+    ///                      (block_row * block_cols + block_col). A 3x3 grid has
+    ///                      fewer blocks than the 2x2 one it replaced, so 17 bits
+    ///                      remain comfortable.
     ///   bits  2..0  (3)  — the connected-component index within that block,
-    ///                      assigned smallest-member-tile-id first (a 2x2 block
-    ///                      bisected by ocean splits; a block yields at most 4).
+    ///                      assigned smallest-member-tile-id first (a block
+    ///                      bisected by ocean splits; a 3x3 block yields at most
+    ///                      6 components — see k_province_block_edge).
     /// Ids are DERIVED, never allocated, so they are stable under recompute and
-    /// carry gaps wherever a block held no land or a fragment was merged away.
+    /// carry gaps wherever a block held no land, a fragment was merged away, or
+    /// a merge folded two provinces into the lower of their two ids.
     uint32_t id = 0;
 
     /// The body every tile in this province sits on. A province never spans
@@ -97,21 +129,30 @@ struct province_partition
 /// perturb another generation pass's draws no matter where it is called.
 ///
 /// Three passes (BL-466's settled algorithm):
-///   1. Base blocks. A per-body origin offset (dx, dy in {0,1}) folded from
-///      (seed, body), then 2x2 offset-coordinate blocks over the land tiles.
-///      An interior block is 4 tiles — inside the 3-5 band. Each block is then
-///      split into hex-connected components, so no province spans a strait.
-///   2. Terrain-seam jitter. One sweep over boundary tiles in ascending tile id,
+///   1. Base blocks. A per-body origin offset (dx, dy in {0,1,2}) folded from
+///      (seed, body), then 3x3 offset-coordinate blocks over the land tiles.
+///      An interior block is 9 tiles — the middle of the 7-12 band. Each block
+///      is then split into hex-connected components, so no province spans a
+///      strait.
+///   2. FRAGMENT MERGE — the pass that actually holds the floor. Water and
+///      coastline cut blocks up, and a bisected 3x3 yields components of 1-4
+///      tiles, far under the floor. Every province below k_province_min_tiles
+///      merges into its SMALLEST hex-adjacent province (ties by lowest id), and
+///      the merged province keeps the LOWER of the two ids, so ids stay derived.
+///      Run to a fixpoint in ascending id order, so the result is a function of
+///      the partition alone and not of visit order. A true islet with no land
+///      neighbour stands alone — it is genuinely all the land there is.
+///      Merging smallest-first is what keeps the ceiling honest: a fragment
+///      joins the emptiest neighbour rather than the first one found.
+///   3. Terrain-seam jitter. One sweep over boundary tiles in ascending tile id,
 ///      moving a tile across a border when it sits across a seam (a river edge
 ///      or a composition/landform change) from its OWN province and shares an
 ///      unseamed edge with the neighbouring one. Borders drift onto rivers and
 ///      terrain edges, so a battle envelope's boundary means something. Clamped:
-///      both provinces stay 3-5, the mover may not be a cut vertex of its
-///      source, and each province is resized at most once per sweep.
-///   3. Coastal repair. A one-tile province merges into its lowest-id
-///      hex-adjacent province (Ben's ruling); a true islet with no neighbour
-///      stands alone. Post-merge coastal sizes may exceed 5 — the coast bends
-///      the band, and that is recorded rather than hidden.
+///      both provinces stay inside the band, the mover may not be a cut vertex
+///      of its source, and each province is resized at most once per sweep.
+///      It runs AFTER the merge (it ran before it, when the merge only repaired
+///      single tiles) so its band clamp reads the real, final sizes.
 ///
 /// Columns wrap east-west (the cylinder every other body-grid consumer uses);
 /// rows do not.
@@ -271,7 +312,8 @@ inline constexpr uint32_t province_section_version = 1;
 inline constexpr uint32_t province_section_max_provinces = 1u << 24;
 
 /// Sanity ceiling on one province's declared tile count. Real provinces are
-/// 1-5 tiles (coastal merges aside); this is orders of magnitude clear.
+/// 7-12 tiles (islets and crowded-coast merges aside); this is orders of
+/// magnitude clear.
 inline constexpr uint32_t province_section_max_tiles = 1u << 16;
 
 /// Append @p p to @p out as: magic, version, seed, province count, then per

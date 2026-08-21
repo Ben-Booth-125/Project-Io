@@ -232,14 +232,17 @@ void build_province_partition(world& w, uint32_t seed)
             continue;
         std::sort(bw.land.begin(), bw.land.end());
 
-        // --- Pass 1: base 2x2 blocks, then a component split so no province
-        // spans a strait even before jitter runs.
+        // --- Pass 1: base 3x3 blocks, then a component split so no province
+        // spans a strait even before the merge runs. A full block is 9 tiles —
+        // the middle of Ben's 7-12 band (2026-08-21), so the interior needs no
+        // repair at all and pass 2 only has the coastline to deal with.
         const uint64_t h  = fold(seed, static_cast<uint64_t>(body_id));
-        const int      dx = static_cast<int>(h & 1u);
-        const int      dy = static_cast<int>((h >> 1) & 1u);
+        const int      e  = k_province_block_edge;
+        const int      dx = static_cast<int>(h % static_cast<uint64_t>(e));
+        const int      dy = static_cast<int>((h >> 32) % static_cast<uint64_t>(e));
 
-        const int block_cols = (gw + dx + 1) / 2;
-        const int block_rows = (gh + dy + 1) / 2;
+        const int block_cols = (gw + dx + e - 1) / e;
+        const int block_rows = (gh + dy + e - 1) / e;
         if (static_cast<uint64_t>(block_cols) * block_rows >= k_max_blocks)
             continue; // grid past the id layout's 17-bit block field; no real body is
 
@@ -247,8 +250,8 @@ void build_province_partition(world& w, uint32_t seed)
         for (const entity_id t : bw.land)
         {
             const tile_component& tc = w.tiles.at(t);
-            const uint32_t        bx = static_cast<uint32_t>((tc.grid_x + dx) / 2);
-            const uint32_t        by = static_cast<uint32_t>((tc.grid_y + dy) / 2);
+            const uint32_t        bx = static_cast<uint32_t>((tc.grid_x + dx) / e);
+            const uint32_t        by = static_cast<uint32_t>((tc.grid_y + dy) / e);
             blocks[by * static_cast<uint32_t>(block_cols) + bx].push_back(t);
         }
 
@@ -264,8 +267,107 @@ void build_province_partition(world& w, uint32_t seed)
             }
         }
 
-        // --- Pass 2: terrain-seam jitter. One sweep, ascending tile id, each
-        // tile moving at most once and each province resized at most once.
+        // --- Pass 2: FRAGMENT MERGE — the pass that actually holds the floor.
+        //
+        // A full 3x3 block is 9 tiles and needs nothing. The coastline is the
+        // whole problem: a block bisected by ocean comes out of the component
+        // split as pieces of 1-4 tiles, far under Ben's 7-tile floor, and
+        // shipping those as provinces is exactly the "too small" he ruled out.
+        //
+        // So every below-floor province merges into a hex-adjacent one. The
+        // target is the SMALLEST neighbour (ties by lowest id): a fragment joins
+        // the emptiest province next to it, which is what keeps the merged sizes
+        // near the band instead of piling every scrap onto one victim. The
+        // survivor keeps the LOWER of the two ids, so every id in the finished
+        // partition is still one the block grid derived — nothing is allocated.
+        //
+        // Run to a fixpoint: a merge can leave the survivor still under the
+        // floor (2 + 3 = 5), and it must merge again. Each merge removes exactly
+        // one province, so the loop is bounded by the province count and cannot
+        // cycle. A true islet — land with no land neighbour at all — stands
+        // alone; there is nothing to merge it with, and that is honest.
+        {
+            /// Neighbouring province ids of @p tiles (excluding @p self) with
+            /// their current sizes. Ordered, so no unordered walk reaches a pick.
+            const auto province_neighbours = [&](const std::vector<entity_id>& tiles,
+                                                 uint32_t self) {
+                std::map<uint32_t, std::size_t> nbrs;
+                for (const entity_id t : tiles)
+                {
+                    const tile_component& tc = w.tiles.at(t);
+                    for (int s = 0; s < 6; ++s)
+                    {
+                        int nx = 0, ny = 0;
+                        if (!wrapped_neighbour(tc.grid_x, tc.grid_y, s, gw, gh, nx, ny))
+                            continue;
+                        const entity_id n = bw.grid[static_cast<std::size_t>(ny) * gw + nx];
+                        if (n == null_entity)
+                            continue;
+                        const auto oit = bw.owner.find(n);
+                        if (oit == bw.owner.end() || oit->second == self)
+                            continue;
+                        nbrs[oit->second] = bw.members.at(oit->second).size();
+                    }
+                }
+                return nbrs;
+            };
+
+            // Ids below `scan_from` are settled: a merge only ever GROWS a
+            // province, and it never creates an adjacency that did not exist, so
+            // an earlier province that was in band (or a neighbourless islet)
+            // stays that way. Resuming from the survivor's id keeps the fixpoint
+            // loop linear-ish instead of quadratic without changing its result.
+            uint32_t scan_from = 0;
+            for (std::size_t guard = bw.members.size(); guard-- > 0;)
+            {
+                uint32_t fragment = 0;
+                uint32_t target   = 0;
+                bool     found    = false;
+                for (auto it = bw.members.lower_bound(scan_from); it != bw.members.end(); ++it)
+                {
+                    if (it->second.size() >= k_province_min_tiles)
+                        continue;
+                    const auto nbrs = province_neighbours(it->second, it->first);
+                    if (nbrs.empty())
+                        continue; // a true islet — this is all the land there is
+                    uint32_t    best      = 0;
+                    std::size_t best_size = 0;
+                    bool        have      = false;
+                    for (const auto& [nid, nsize] : nbrs) // ascending id: ties take the lowest
+                        if (!have || nsize < best_size)
+                        {
+                            best      = nid;
+                            best_size = nsize;
+                            have      = true;
+                        }
+                    fragment = it->first;
+                    target   = best;
+                    found    = true;
+                    break;
+                }
+                if (!found)
+                    break;
+
+                const uint32_t keep = std::min(fragment, target);
+                const uint32_t drop = std::max(fragment, target);
+
+                std::vector<entity_id>        merged = std::move(bw.members.at(keep));
+                const std::vector<entity_id>& add    = bw.members.at(drop);
+                merged.insert(merged.end(), add.begin(), add.end());
+                std::sort(merged.begin(), merged.end());
+                bw.members.erase(drop);
+                for (const entity_id t : merged)
+                    bw.owner[t] = keep;
+                bw.members[keep] = std::move(merged);
+
+                scan_from = keep;
+            }
+        }
+
+        // --- Pass 3: terrain-seam jitter, now on real (post-merge) sizes. One
+        // sweep, ascending tile id, each tile moving at most once and each
+        // province resized at most once. It runs AFTER the merge so its band
+        // clamp reads the sizes that will actually ship.
         std::vector<uint32_t> resized;
         const auto            is_resized = [&resized](uint32_t p) {
             return std::find(resized.begin(), resized.end(), p) != resized.end();
@@ -278,8 +380,8 @@ void build_province_partition(world& w, uint32_t seed)
                 continue;
 
             auto& src_tiles = bw.members.at(src);
-            if (src_tiles.size() < 3 || src_tiles.size() > 5)
-                continue; // only the in-band interior jitters; the coast is pass 3's job
+            if (src_tiles.size() < k_province_min_tiles || src_tiles.size() > k_province_max_tiles)
+                continue; // only an in-band province jitters; a merged outlier is left alone
 
             const tile_component& ta = w.tiles.at(a);
 
@@ -321,10 +423,11 @@ void build_province_partition(world& w, uint32_t seed)
                     continue; // this edge IS a seam — the border belongs here, not past it
 
                 auto& dst_tiles = bw.members.at(dst);
-                if (dst_tiles.size() < 3 || dst_tiles.size() >= 5)
+                if (dst_tiles.size() < k_province_min_tiles
+                    || dst_tiles.size() >= k_province_max_tiles)
                     continue;
-                if (src_tiles.size() <= 3)
-                    continue; // the clamp never creates a fragment
+                if (src_tiles.size() <= k_province_min_tiles)
+                    continue; // the clamp never pushes a province back under the floor
 
                 if ((fold(seed, static_cast<uint64_t>(a), static_cast<uint64_t>(b)) & 0xFFu) >= 128u)
                     continue;
@@ -346,50 +449,6 @@ void build_province_partition(world& w, uint32_t seed)
                 resized.push_back(dst);
                 break;
             }
-        }
-
-        // --- Pass 3: coastal repair. A one-tile province merges into its
-        // lowest-id hex-adjacent province; a true islet stands alone.
-        for (auto it = bw.members.begin(); it != bw.members.end();)
-        {
-            if (it->second.size() != 1)
-            {
-                ++it;
-                continue;
-            }
-            const entity_id       a  = it->second.front();
-            const tile_component& ta = w.tiles.at(a);
-
-            uint32_t best  = 0;
-            bool     found = false;
-            for (int s = 0; s < 6; ++s)
-            {
-                int nx = 0, ny = 0;
-                if (!wrapped_neighbour(ta.grid_x, ta.grid_y, s, gw, gh, nx, ny))
-                    continue;
-                const entity_id n = bw.grid[static_cast<std::size_t>(ny) * gw + nx];
-                if (n == null_entity)
-                    continue;
-                const auto oit = bw.owner.find(n);
-                if (oit == bw.owner.end() || oit->second == it->first)
-                    continue;
-                if (!found || oit->second < best)
-                {
-                    best  = oit->second;
-                    found = true;
-                }
-            }
-            if (!found)
-            {
-                ++it; // islet — no neighbour to merge into
-                continue;
-            }
-
-            auto& into = bw.members.at(best);
-            into.push_back(a);
-            std::sort(into.begin(), into.end());
-            bw.owner[a] = best;
-            it          = bw.members.erase(it);
         }
 
         for (auto& [pid, tiles] : bw.members)
