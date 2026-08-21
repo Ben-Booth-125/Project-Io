@@ -11991,6 +11991,80 @@
     "docs/ui/PLANETARY.md"
    ],
    "design": "## Held deliberately, awaiting Ben's look\n\nBen, 2026-08-21, on seeing province-grain rendering land:\n\n> \"I have a feeling that we should blend all tiles, not just within provinces,\n> but hold off on that until I see what it looks like with larger provinces.\"\n\nSo this is **not** a decision deferred through inattention — it is a decision\nBen has explicitly sequenced behind evidence he does not have yet. Do not build\nit, and do not fold it into a province-rendering task as a tidy-up.\n\n## What it would mean\n\nToday the blend stops at the province boundary by construction: vertices are\naveraged within a province, and the seam between two provinces stays a seam\n(softened to alpha 105, but present). Blending ALL tiles removes that stop —\nthe whole land surface becomes one continuous field, and province edges exist\nonly as the on-demand selection outline.\n\n## Why the sequencing is right\n\nThe current seam is visible *because* provinces are small. At 3-5 tiles the eye\nsees a dense clover mosaic, and the province edge is the dominant repeating\nfeature of the map. At **7-12 tiles** (the revised ruling, being built now) the\nseams are far fewer and much longer, and the same alpha may read completely\ndifferently — either as pleasing region definition, or as arbitrary lines\nacross continuous ground.\n\nWhich of those it is decides this item, and it cannot be decided from the\n4-tile screenshots.\n\n## What to have ready when Ben looks\n\n- The same close-zoom framing as `province_blend_close.png`, at the new size.\n- The map at play zoom, where the seam density is what actually reads.\n- A capture with province edges at alpha 0 as the A/B — that is this item's\n  proposal rendered, and it costs one constant to produce.\n\n## The consequence to name if it goes ahead\n\nOcean and BUILT tiles are currently outside the blend by construction, which is\nwhat keeps installations and coastline crisp. A global blend does not\nautomatically change that — but if the land reads as one field and buildings\nstill sit on visibly crisp hexes, the map still carries two visual languages\n(NR-417). Worth deciding both together rather than in sequence.\n"
+  },
+  {
+   "id": "BL-515",
+   "short_name": "ORGANIC_PROVINCE_BORDERS",
+   "title": "Grow provinces from population centres, bounded by rivers, elevation and roads",
+   "status": "designed",
+   "priority": "A",
+   "difficulty": "L",
+   "version_goal": "v0.1.18",
+   "category": "Generation",
+   "raised": "2026-08-21",
+   "files": [
+    "src/world/province.hpp",
+    "src/world/province.cpp",
+    "tools/verify/province_partition_harness.cpp",
+    "tools/verify/province_capacity_probe.cpp",
+    "docs/generation/TILE_GENERATION.md"
+   ],
+   "design": "## Ben's ruling (2026-08-21, elicitation form + notes)\n\nSupersedes BL-466's partition ALGORITHM. The province as a concept, its place in\nthe world, and everything downstream of it (BL-511 rendering, BL-513 ceiling,\nmarch_unit's payload) stand unchanged — this replaces how the shapes are drawn.\n\nWhy: seeing 9-tile packed blocks rendered, Ben's judgement was that \"packing each\nprovince perfectly looks nice, but it is scarcely how borders were defined in\nhistory.\" Provinces should be grown from settlement and stopped by terrain.\n\n### The rules, as ruled\n\n| Question | Ruling |\n|---|---|\n| Seeds | **Population centres**, which become the larger provinces |\n| Boundaries | **Rivers, elevation difference, and sometimes roads** |\n| Roads | A road **BINDS** — tiles a road links tend to share a province |\n| Identity | An **allocated id**, created once and serialised |\n| Wilderness | **Hinterland provinces** — same boundary rules, no centre |\n| When borders move | **Generation only**, fixed once the campaign starts |\n| Elevation source | **Retain the generation heightmap** as a per-tile field (BL-517) |\n| Size | **7-12 soft target**, boundaries win ties; **3-12 hard target** |\n| Tiny provinces | **Do not reject them** — an island is allowed to be small |\n| Water | Provinces are drawn over **ocean** too (BL-516) |\n\n### The constraint Ben's answers imply and did not state\n\n**An allocated id must still be allocated DETERMINISTICALLY.** \"Allocated, not\nderived\" removes the geometric derivation, not the replay guarantee: the same\nseed must produce the same ids, or `determinism_harness`'s province comparison\n(added 2026-08-21) fails and every downstream id — a battle record, an agent's\nmarch order — becomes seed-unstable. Allocate in a fixed walk order, never from a\nhash map's iteration order. This is the same class of leak already caught once in\n`build_province_partition`, where `world::bodies` being an `unordered_map` fed\nprovince ids.\n\n### What this breaks that currently holds\n\n`province.hpp` states, and `province_partition_harness` asserts, that a province\nis \"a contiguous run of LAND tiles\" that \"never spans water\". Ocean provinces\noverturn both. The harness rows must be rewritten with the ruling, not quietly\ndeleted — a land-only assertion that stops being true should become a\nwater-aware assertion, not disappear.\n\nAlso: `province_of` currently returns 0 for ocean, and 0 is a real province id.\nThat collision is already handled for land by the `no_province` sentinel\n(0xFFFFFFFF, BL-511's seam work); ocean membership must use the same discipline.\n\n### Growth shape, proposed\n\n1. **Seed** at each population centre; seed strength scales with centre scale (1-5).\n2. **Grow** by cost-weighted flood fill, where crossing an edge costs:\n   - a **river edge** (`tile_component::river_edges`, already a per-side bitmask —\n     the right shape for a border) — expensive;\n   - an **elevation difference** (BL-517's retained height) — expensive in\n     proportion to the gradient;\n   - a **road link** — CHEAP, because a road binds;\n   - flat, road-free, river-free ground — ordinary.\n3. **Hinterland**: land unclaimed when the centre-seeded fronts stop becomes its\n   own provinces under the same cost rules, seeded from the least-accessible tile\n   so hinterlands are shaped by terrain rather than by leftovers.\n4. **Size**: 7-12 is a soft target expressed as a growth budget, not a clamp.\n   Boundaries win ties. Hard target 3-12, and tiny provinces are kept, not merged\n   away.\n\n### Deferred to its own item, not built here\n\nBen: *\"We can also use generation to edit province borders as wars are won.\"*\nThat is the Era -1 history sim redrawing provinces on conquest, and it belongs\nwith the sim rather than with the partition pass. Filed as **BL-518**.\n\n### Reference measurements to beat\n\nThe 3x3 block partition it replaces, over 6 seeds: 21,161 provinces, mean 9.11,\n97.90% in the 7-12 band, 109 under-floor (all true islands, proven), 336 over.\nThe organic partition will not match that spread and is not meant to — but the\ncomparison is the honest way to report what changed.\n"
+  },
+  {
+   "id": "BL-516",
+   "short_name": "WATER_KINDS_AND_SEA_PROVINCES",
+   "title": "Lake, coast and ocean as tile kinds; provinces drawn over water",
+   "status": "designed",
+   "priority": "B",
+   "difficulty": "L",
+   "version_goal": "v0.1.19",
+   "category": "Generation",
+   "raised": "2026-08-21",
+   "files": [
+    "src/world/components.hpp",
+    "src/world/placement_rules.cpp",
+    "src/world/road_generation.cpp",
+    "src/world/province.cpp",
+    "src/ui/body_surface_canvas.cpp",
+    "docs/economy/TILES.md"
+   ],
+   "design": "## Ben's ruling (2026-08-21)\n\n> \"We can also draw provinces over the ocean, using 3-12 size coastal tile\n> provinces. That creates another tile type, which is ok. We can have lakes,\n> coasts, and oceans. Ocean provinces should be much larger, but not larger than\n> say 80 tiles\"\n\nTwo changes, and the first is the load-bearing one.\n\n## 1. Water gains kinds: lake, coast, ocean\n\nToday `terrain_composition::ocean` is a single value and every water tile is the\nsame thing. It becomes three, and Ben has accepted that explicitly (\"that creates\nanother tile type, which is ok\").\n\n**This is an enum widening on a SERIALISED type**, so it follows the one-appender\nrule: append, never renumber, or every existing tile record shifts meaning.\n\nWhat reads `ocean` today and must be re-examined, one by one — this list is the\nactual work of the item:\n\n- `placement_rules::is_ocean_tile` and `can_place` (buildings refuse water).\n- `non_extraction_stack_cap` (ocean is exempt).\n- `road_generation.cpp`'s water-crossing rule. Sprint B2 landed\n  `kMaxCrossingTiles`, which distinguishes a strait from open sea by counting a\n  contiguous run — that distinction becomes expressible in the DATA rather than\n  inferred from run length, which is strictly better.\n- The blend (BL-511): ocean is currently outside it by construction, which is\n  what keeps the coastline crisp against blended land.\n- Every lens that colours water.\n- `province.hpp`'s land-only invariant, which BL-515 overturns.\n\n## 2. Provinces are drawn over water\n\n- **Coastal** provinces: 3-12 tiles, the same band as land.\n- **Ocean** provinces: much larger, capped at **80 tiles**.\n- **Lakes**: Ben named them as a tile kind but did not rule what province a lake\n  belongs to — its own, the surrounding land province, or a coastal one. That is\n  the open question of this item.\n\n## What has no answer yet, and does not need one to build this\n\nNothing can currently BE in an ocean province. Units are land-bound, buildings\nrefuse water, and BL-467's battle envelope assumes units standing in a province.\nSo on the day they land, ocean provinces are addressable empty space.\n\nThat is not an argument against them — a naval layer needs somewhere to happen,\nand convoys already cross water (BL-458's interdiction is tile-pathed and could\nextend to sea lanes). It IS an argument for building them without inventing a\nnaval model to justify them.\n\n## Why this is a real item and not a rider on BL-515\n\nIt touches the tile enum, the placement rules, the road pass, the blend and every\nwater-colouring lens. BL-515 can be built against land-only provinces first and\nextended to water once this lands; sequencing them apart keeps each reviewable.\n"
+  },
+  {
+   "id": "BL-517",
+   "short_name": "RETAIN_HEIGHTMAP",
+   "title": "Retain the generation heightmap as a per-tile field",
+   "status": "designed",
+   "priority": "A",
+   "difficulty": "S",
+   "version_goal": "v0.1.18",
+   "category": "Generation",
+   "raised": "2026-08-21",
+   "files": [
+    "src/world/components.hpp",
+    "src/world/tile_generation.cpp",
+    "src/world/serialisation.cpp",
+    "docs/generation/GENERATION_LEDGER.md"
+   ],
+   "design": "## Ben's ruling (2026-08-21)\n\nElevation difference is one of the three boundary signals BL-515 grows provinces\nagainst. Asked where it should come from — the existing categorical `landform`\n(plains / highland / mountain / canyon / valley / crater / rift) or a retained\nheightmap — Ben chose **retain the generation heightmap as a per-tile field**.\n\n## Why the choice matters\n\n`terrain_landform` is seven classes whose numeric order means nothing:\n`mountain = 2` and `canyon = 3` are not one step apart in height. A boundary rule\nkeyed to it can only ask \"are these two tiles the same class?\", which draws\nborders around terrain TYPE rather than terrain SHAPE — and a watershed is a\nshape.\n\nThe heightmap already exists. Tile generation Pass 1 computes it, and\n`GENERATION_LEDGER.md` exposes it through `generate_body_tiles`'s optional\n`generation_record`. It is then thrown away.\n\n## The tension worth naming\n\n`GENERATION_LEDGER.md` states a deliberate data lifetime for those intermediates:\n**regenerate on demand, do not persist**. Retaining height contradicts that\nstance for one field.\n\nThe justification: height stops being a generation intermediate the moment a\ndownstream system reads it. BL-515 makes it an input to the partition, so it\nbecomes world state rather than a breadcrumb. That reasoning belongs IN\n`GENERATION_LEDGER.md` as part of landing this — not left as an inconsistency for\na later reader to trip over and \"fix\" by deleting the field.\n\n## Cost\n\nA float per tile: 45,240 tiles on the homeworld, roughly 180 KB. Trivial in\nmemory. The real cost is the serialisation seam — one more per-tile field,\nappended, with the round-trip proof the tile record already carries.\n\n## Scope\n\n- Retain height on `tile_component`, written by the pass that already computes it.\n- Serialise it: appended, no existing field moved.\n- Expose it to the Generation Ledger's field overlay, where it is already designed.\n- Do NOT re-derive `landform` from it, and do NOT change any existing terrain\n  rule. This item only stops throwing the number away.\n"
+  },
+  {
+   "id": "BL-518",
+   "short_name": "WAR_REDRAWS_BORDERS",
+   "title": "The Era -1 sim redraws province borders as its wars resolve",
+   "status": "design-owed",
+   "priority": "B",
+   "difficulty": "M",
+   "version_goal": "v0.1.20",
+   "category": "Generation",
+   "raised": "2026-08-21",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/province.cpp",
+    "docs/lore/HISTORY.md"
+   ],
+   "design": "## Ben's brief (2026-08-21)\n\n> \"We can also use generation to edit province borders as wars are won.\"\n\nProvinces are grown from settlement and terrain (BL-515). This item makes the\nEra -1 history sim REDRAW them as its wars resolve, so the campaign opens on a\nmap whose borders carry the history that produced them — a province that changed\nhands three times looks like it did.\n\n## Why it belongs with the sim, not the partition\n\nBL-515 is a generation pass: it runs once and derives shapes from terrain. This is\na consequence of simulated events across 4,000 years, and it reads the sim's\nconquest record. Its natural home is beside the sim that produces that record\n(`history_sim.cpp`), consuming the partition rather than computing it.\n\n## The constraint that makes it buildable\n\nBen ruled that borders move **during generation only**, fixed once the campaign\nstarts. That keeps provinces generation output rather than live mutable state,\nwhich is exactly what lets `world::provinces` stay outside `state_hash` — the\nexclusion is documented on the field, and `determinism_harness` compares the\npartition across two generations instead.\n\nIf this item ever grew into campaign-era border changes, that whole arrangement\nwould need revisiting. Worth remembering before anyone extends it.\n\n## Open, and genuinely undecided\n\n- **What a conquest does to a border.** Move it in the victor's favour by some\n  margin? Transfer whole provinces? Split one?\n- **Whether the sim's conquest record carries enough to act on.** BL-384's\n  measurement (2026-08-20): 4 of 8 seeds conquer, at a near-1:1 conquest:battle\n  ratio; the other 4 see no war at all. On a peaceful seed this item does nothing\n  — correct behaviour, but it means the feature is invisible on half the worlds,\n  and that should be expected rather than diagnosed as a bug later.\n- **Interaction with the allocated id (BL-515).** If a province is split or\n  absorbed, does its id die, survive, or fork? The allocated-id ruling makes the\n  question answerable; it does not answer it.\n\n## Prerequisite\n\nBL-515 must land first. There is no point redrawing borders that are about to be\nreplaced by a different algorithm.\n"
   }
  ]
 }

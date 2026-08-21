@@ -2781,6 +2781,33 @@
    "status": "open",
    "source": "March fixture rebuild, 2026-08-21. Correcting my own earlier instruction to the agent.",
    "what": "I told the agent that on a one-row body the merge cascades so the whole row becomes one province HOWEVER LONG it is, having observed 8 and 24 tiles both giving one province. That generalisation was wrong. Measured: rows of 1-12 tiles give 1 province, 20 and 24 give 2, and 30 gives 3. My 24-tile test appeared to fail for a different reason - 24 was too short to give two REACHABLE provinces for what M1 needed, not too short to split at all. Consequence: M2 20-wide row fixture is honest and was correctly left alone rather than converted. Recording because the false generalisation is the sort of thing that gets quoted back later as a property of the partition."
+  },
+  {
+   "id": "NR-427",
+   "title": "An allocated province id must still be allocated DETERMINISTICALLY - the ruling removes the derivation, not the replay guarantee",
+   "raised": "2026-08-21",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-515 design, from the 2026-08-21 elicitation form.",
+   "what": "Ben ruled province identity is an allocated id, created once and serialised. Read literally that ends the derived-id property BL-466 was built on. But it must NOT end the replay property: the same seed has to produce the same ids, or determinism_harness province comparison (added today) fails and every id held across a boundary - a battle record, an agent march order, a save - becomes seed-unstable. So the rule I have written into BL-515 is: allocate in a fixed walk order, never from a hash map iteration order. This is the same class of leak already caught once in build_province_partition, where world::bodies being an unordered_map fed province ids. Flagging as a decision-taken rather than an assumption because Ben did not say it and a reasonable implementer could read allocated as a licence to hand out ids in encounter order."
+  },
+  {
+   "id": "NR-428",
+   "title": "Ocean provinces overturn a stated invariant, and the harness rows must be rewritten rather than deleted",
+   "raised": "2026-08-21",
+   "kind": "observation",
+   "status": "open",
+   "source": "BL-516 design, from Ben notes on the 2026-08-21 form.",
+   "what": "province.hpp states, and province_partition_harness asserts, that a province is a contiguous run of LAND tiles that never spans water. Drawing provinces over ocean overturns both. The risk is the easy path: an assertion that stops being true gets deleted, and the file quietly loses a guarantee nobody notices is gone. It should become a WATER-AWARE assertion instead - a province is single-kind, land provinces hold no water tiles, ocean provinces hold no land, coastal provinces are bounded at 3-12 and ocean ones at 80. Also worth carrying forward: province_of returns 0 for ocean today and 0 is a real province id; ocean membership must use the no_province sentinel discipline BL-511 seam work already established."
+  },
+  {
+   "id": "NR-429",
+   "title": "Retaining the heightmap contradicts GENERATION_LEDGER own stated data lifetime, deliberately",
+   "raised": "2026-08-21",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-517 design, from the 2026-08-21 form.",
+   "what": "GENERATION_LEDGER.md sets a deliberate lifetime for per-pass intermediates: regenerate on demand, do not persist. BL-517 retains one of them. The justification is that height stops being an intermediate the moment a downstream system reads it - BL-515 makes it an input to the partition, so it becomes world state rather than a breadcrumb. That reasoning needs to be written INTO GENERATION_LEDGER.md as part of landing BL-517, or a later reader will find a persisted field contradicting the doc and delete it as an oversight. Recorded because doc-truth drift of exactly this shape is what the 2026-07-31 sweep existed to clean up."
   }
  ]
 }
