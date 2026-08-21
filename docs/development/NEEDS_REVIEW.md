@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*194 entries — 138 open, 56 resolved.*
+*197 entries — 141 open, 56 resolved.*
 
 ---
 
@@ -1196,6 +1196,21 @@ I reported unit_march_harness as 81 passed, 0 failed and treated that as verific
 *observation · raised 2026-08-21 · from March fixture rebuild, 2026-08-21. Correcting my own earlier instruction to the agent.*
 
 I told the agent that on a one-row body the merge cascades so the whole row becomes one province HOWEVER LONG it is, having observed 8 and 24 tiles both giving one province. That generalisation was wrong. Measured: rows of 1-12 tiles give 1 province, 20 and 24 give 2, and 30 gives 3. My 24-tile test appeared to fail for a different reason - 24 was too short to give two REACHABLE provinces for what M1 needed, not too short to split at all. Consequence: M2 20-wide row fixture is honest and was correctly left alone rather than converted. Recording because the false generalisation is the sort of thing that gets quoted back later as a property of the partition.
+
+### NR-430 — CORRECTION: my BL-517 brief claimed a tile serialisation seam that does not exist
+*observation · raised 2026-08-21 · from BL-517 (retain the heightmap), merged and verified 2026-08-21.*
+
+I briefed the agent to append height to the tile record because 'the tile record already carries a round-trip proof - extend it, do not replace it'. There IS no tile serialiser. The only flat-binary streams in the project are the history log (which carries the province section), the order book and procurement. Tiles are never written; they are regenerated from the seed, and province_partition_harness's round-trip proof is over the HISTORY-LOG stream, not a tile record. The agent correctly did nothing rather than inventing a tile serialiser to satisfy the instruction, and said so plainly. Requirement retain-heightmap R2 is therefore N/A rather than complete. Worth carrying forward: the same wrong assumption is easy to make again, because several items talk about 'the serialisation seam' as though tiles were in it.
+
+### NR-431 — The Generation Ledger field overlay BL-517 was told to feed does not exist yet
+*observation · raised 2026-08-21 · from BL-517 (retain the heightmap), merged and verified 2026-08-21.*
+
+BL-517's scope included exposing height to the Generation Ledger's field overlay, 'where it is already designed'. It is designed and not built: GENERATION_LEDGER.md's own status table reads 'Field lenses ... Partial substrate - the generation_record seam exists and is filled on demand; no lens built'. So there was nothing to expose it to, and no UI change was made (src/ui was outside the agent's file scope in any case). The retained field is exactly what such a lens would read without regenerating, so the item still paid for the lens - it just did not build it. Not a gap to fix now; a note so the scope line in BL-517 is not read later as unfinished work.
+
+### NR-432 — I damaged tools/verify/README.md with a keep-both conflict resolution, and an agent spotted it
+*decision taken on your behalf · raised 2026-08-21 · from BL-517 (retain the heightmap), merged and verified 2026-08-21.*
+
+Resolving tools/verify/README.md conflicts twice today by keeping both sides spliced a sentence into the middle of another one - the clause 'and for font_glyph_harness, which links ImGui and is hand-declared in' appeared twice with trade_routes_harness / province_partition_harness wedged between. The BL-517 agent noticed it, correctly left it alone rather than guessing at the intended text, and reported it. Repaired now, and the province-partition clause corrected while I was in there: its three serialisation properties are over the HISTORY-LOG stream, which the old wording left ambiguous and which NR-430 shows is easy to misread. The method lesson is mine: keep-both is safe for two ADDITIONS to a list and unsafe inside a paragraph, and I applied it without reading the surrounding prose.
 
 ---
 

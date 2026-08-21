@@ -2814,6 +2814,33 @@
    "what": "GENERATION_LEDGER.md sets a deliberate lifetime for per-pass intermediates: regenerate on demand, do not persist. BL-517 retains one of them. The justification is that height stops being an intermediate the moment a downstream system reads it - BL-515 makes it an input to the partition, so it becomes world state rather than a breadcrumb. That reasoning needs to be written INTO GENERATION_LEDGER.md as part of landing BL-517, or a later reader will find a persisted field contradicting the doc and delete it as an oversight. Recorded because doc-truth drift of exactly this shape is what the 2026-07-31 sweep existed to clean up.",
    "resolved": "2026-08-21",
    "resolution": "RESOLVED 2026-08-21, Ben: update GENERATION_LEDGER.md to match this session's work - done. The DISPOSABLE bullet no longer lists height, and a new paragraph records why: height was a breadcrumb until BL-515 made it an INPUT to the province partition, and a field a live system reads is world state whatever pass first computed it. The paragraph also states the rule that stops this becoming a loophole - an intermediate graduates out of the disposable set only when a system outside the ledger reads it, and it graduates by being named there. Nothing else in that list has a reader today. Written AHEAD of BL-517 landing, deliberately: the doc previously asserted something the design had already overturned, and a silent doc is the thing the authority time-slice protects, not a wrong one."
+  },
+  {
+   "id": "NR-430",
+   "title": "CORRECTION: my BL-517 brief claimed a tile serialisation seam that does not exist",
+   "raised": "2026-08-21",
+   "kind": "observation",
+   "status": "open",
+   "source": "BL-517 (retain the heightmap), merged and verified 2026-08-21.",
+   "what": "I briefed the agent to append height to the tile record because 'the tile record already carries a round-trip proof - extend it, do not replace it'. There IS no tile serialiser. The only flat-binary streams in the project are the history log (which carries the province section), the order book and procurement. Tiles are never written; they are regenerated from the seed, and province_partition_harness's round-trip proof is over the HISTORY-LOG stream, not a tile record. The agent correctly did nothing rather than inventing a tile serialiser to satisfy the instruction, and said so plainly. Requirement retain-heightmap R2 is therefore N/A rather than complete. Worth carrying forward: the same wrong assumption is easy to make again, because several items talk about 'the serialisation seam' as though tiles were in it."
+  },
+  {
+   "id": "NR-431",
+   "title": "The Generation Ledger field overlay BL-517 was told to feed does not exist yet",
+   "raised": "2026-08-21",
+   "kind": "observation",
+   "status": "open",
+   "source": "BL-517 (retain the heightmap), merged and verified 2026-08-21.",
+   "what": "BL-517's scope included exposing height to the Generation Ledger's field overlay, 'where it is already designed'. It is designed and not built: GENERATION_LEDGER.md's own status table reads 'Field lenses ... Partial substrate - the generation_record seam exists and is filled on demand; no lens built'. So there was nothing to expose it to, and no UI change was made (src/ui was outside the agent's file scope in any case). The retained field is exactly what such a lens would read without regenerating, so the item still paid for the lens - it just did not build it. Not a gap to fix now; a note so the scope line in BL-517 is not read later as unfinished work."
+  },
+  {
+   "id": "NR-432",
+   "title": "I damaged tools/verify/README.md with a keep-both conflict resolution, and an agent spotted it",
+   "raised": "2026-08-21",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-517 (retain the heightmap), merged and verified 2026-08-21.",
+   "what": "Resolving tools/verify/README.md conflicts twice today by keeping both sides spliced a sentence into the middle of another one - the clause 'and for font_glyph_harness, which links ImGui and is hand-declared in' appeared twice with trade_routes_harness / province_partition_harness wedged between. The BL-517 agent noticed it, correctly left it alone rather than guessing at the intended text, and reported it. Repaired now, and the province-partition clause corrected while I was in there: its three serialisation properties are over the HISTORY-LOG stream, which the old wording left ambiguous and which NR-430 shows is easy to misread. The method lesson is mine: keep-both is safe for two ADDITIONS to a list and unsafe inside a paragraph, and I applied it without reading the surrounding prose."
   }
  ]
 }
