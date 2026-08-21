@@ -1,12 +1,19 @@
-// Headless harness for the province partition (BL-466).
+// Headless harness for the province partition (BL-466, rewritten for BL-515 —
+// provinces GROWN from settlement and stopped by terrain).
 //
-// Two halves:
-//   P — the partition's own invariants (coverage, no ocean, connectivity, size
-//       band, ascending-id contract, seeded determinism, jitter did not no-op).
-//   D — the SIZE DISTRIBUTION across a seed sweep. Ben's 2026-08-21 ruling put
-//       the target at 7-12 tiles, and a mean says nothing about whether the
-//       floor HOLDS where coastline cuts a block up — only the spread does. D
-//       reports floor, ceiling, mean and the out-of-band count per seed.
+// Four sections:
+//   P — the partition's own invariants: coverage, no ocean, connectivity, the
+//       hard 12-tile ceiling, the ascending-id contract, seeded determinism,
+//       THE DERIVED-IDENTITY CONTRACT (P8: an id IS its lowest member tile),
+//       and the settlement seeds (P9).
+//   C — THE COST MODEL, MEASURED. The pinning instrument for the two
+//       coefficients province.hpp declares measurement-pinned, plus the
+//       direction checks that prove the model draws the borders Ben ruled:
+//       rivers and slopes divide, and a ROAD BINDS.
+//   D — the SIZE DISTRIBUTION across a seed sweep. REPORTED, not engineered:
+//       organic borders are meant to be irregular, so D describes what the cost
+//       model produced against the superseded 3x3 partition's numbers rather
+//       than asserting a spread. Its one assertion is the hard ceiling.
 //   S — the SERIALISATION SEAM, the risk in the item. Three properties:
 //       S1  one appender / no reorder — a pre-BL-466 stream is a byte-exact
 //           PREFIX of a post-BL-466 stream of the same log.
@@ -29,6 +36,7 @@
 #include "harness_params.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <map>
 #include <sstream>
@@ -82,7 +90,7 @@ static void legacy_write_history_log(const world& w, std::ostream& out)
 
 int main()
 {
-    std::printf("Province partition harness (BL-466)\n\n");
+    std::printf("Province partition harness (BL-466 partition, BL-515 organic borders)\n\n");
 
     // The partition is a generation output, so it needs a real generated world.
     // The Era -1 sim is not under test here.
@@ -151,20 +159,90 @@ int main()
         check(ok, "P3  tile_province and province membership agree in both directions");
     }
 
-    // P4 — every province is hex-connected on its body's grid (columns wrap).
-    // P5 — size band (Ben, 2026-08-21): the target is 7-12. A full 3x3 block is
-    //      9; the merge pass lifts coastal fragments to the floor, and only a
-    //      true islet — land with no land neighbour — may ship under it.
+    // -----------------------------------------------------------------------
+    // Grids, and the adjacent-land edge list every terrain row below reads.
+    // Built ONCE: an edge is a pair (a < b) of hex-adjacent land tiles on one
+    // body, plus the side index leading from a to b.
+    // -----------------------------------------------------------------------
+    struct land_edge
     {
-        std::map<entity_id, std::vector<entity_id>> grids;
-        std::map<entity_id, std::pair<int, int>>    dims;
-        for (const auto& [bid, bc] : w.bodies)
-        {
-            grids[bid] = body_tile_grid(w, bid);
-            dims[bid]  = { bc.grid_width, bc.grid_height };
-        }
+        entity_id a = null_entity;
+        entity_id b = null_entity;
+        int       side = 0;
+        float     dh = 0.0f;
+        bool      river = false;
+        bool      roaded = false;
+    };
 
-        bool                   all_connected = true;
+    std::map<entity_id, std::vector<entity_id>> grids;
+    std::map<entity_id, std::pair<int, int>>    dims;
+    for (const auto& [bid, bc] : w.bodies)
+    {
+        grids[bid] = body_tile_grid(w, bid);
+        dims[bid]  = { bc.grid_width, bc.grid_height };
+    }
+
+    const auto collect_land_edges = [](const world& sw,
+                                       const std::map<entity_id, std::vector<entity_id>>& gs,
+                                       const std::map<entity_id, std::pair<int, int>>& ds) {
+        std::vector<land_edge> out;
+        for (const auto& [bid, grid] : gs)
+        {
+            const int gw = ds.at(bid).first;
+            const int gh = ds.at(bid).second;
+            if (gw <= 0 || gh <= 0)
+                continue;
+            for (const entity_id t : grid)
+            {
+                if (t == null_entity)
+                    continue;
+                const auto tit = sw.tiles.find(t);
+                if (tit == sw.tiles.end()
+                    || tit->second.composition == terrain_composition::ocean)
+                    continue;
+                const tile_component& tc = tit->second;
+                for (int s = 0; s < 6; ++s)
+                {
+                    const auto c = hex_neighbors::neighbour(tc.grid_x, tc.grid_y, s);
+                    if (c.gy < 0 || c.gy >= gh)
+                        continue;
+                    int nx = c.gx % gw;
+                    if (nx < 0)
+                        nx += gw;
+                    const entity_id n = grid[static_cast<std::size_t>(c.gy) * gw + nx];
+                    if (n == null_entity || n <= t)
+                        continue; // each edge once, from its lower tile
+                    const auto nit = sw.tiles.find(n);
+                    if (nit == sw.tiles.end()
+                        || nit->second.composition == terrain_composition::ocean)
+                        continue;
+                    land_edge e;
+                    e.a      = t;
+                    e.b      = n;
+                    e.side   = s;
+                    e.dh     = std::fabs(tc.height - nit->second.height);
+                    e.river  = ((tc.river_edges >> s) & 1u) != 0u
+                              || ((nit->second.river_edges >> ((s + 3) % 6)) & 1u) != 0u;
+                    e.roaded = tc.road_level > 0 && nit->second.road_level > 0;
+                    out.push_back(e);
+                }
+            }
+        }
+        return out;
+    };
+
+    const std::vector<land_edge> edges = collect_land_edges(w, grids, dims);
+
+    // P4 — every province is hex-connected on its body's grid (columns wrap).
+    //      The LAND-ONLY invariant, narrowed to land provinces rather than
+    //      deleted (NR-428): ocean provinces are BL-516's and are not built
+    //      here, so "no province spans water" still holds outright.
+    // P5 — the size band. It is a GROWTH BUDGET, not a clamp (Ben, 2026-08-21):
+    //      7-12 soft, 3-12 hard, and TINY PROVINCES ARE KEPT. So the only
+    //      ASSERTION the band supports is the hard ceiling — the one clamp that
+    //      really is enforced — and everything below the floor is REPORTED.
+    {
+        bool                       all_connected = true;
         std::map<std::size_t, int> hist;
         for (const province& p : part.provinces)
         {
@@ -202,9 +280,9 @@ int main()
             if (seen.size() != p.tiles.size())
                 all_connected = false;
         }
-        check(all_connected, "P4  every province is hex-connected (no province spans water)");
+        check(all_connected, "P4  every land province is hex-connected (none spans water)");
 
-        std::size_t in_band = 0, total = 0, under_floor = 0, islets = 0;
+        std::size_t in_band = 0, total = 0, under_soft = 0, under_hard = 0, over = 0;
         std::printf("        size histogram:");
         for (const auto& [size, count] : hist)
         {
@@ -213,67 +291,40 @@ int main()
             if (size >= k_province_min_tiles && size <= k_province_max_tiles)
                 in_band += static_cast<std::size_t>(count);
             if (size < k_province_min_tiles)
-            {
-                under_floor += static_cast<std::size_t>(count);
-                if (size == 1)
-                    islets += static_cast<std::size_t>(count);
-            }
+                under_soft += static_cast<std::size_t>(count);
+            if (size < k_province_hard_min_tiles)
+                under_hard += static_cast<std::size_t>(count);
+            if (size > k_province_max_tiles)
+                over += static_cast<std::size_t>(count);
         }
         std::printf("\n");
-        // The band is a shape claim, not a clamp: the coast bends it, and the
-        // merge cannot invent land for a true islet. The interior must dominate.
-        check(total > 0 && (in_band * 100 / total) >= 50,
-              "P5a the majority of provinces sit in the 7-12 tile band");
-        std::printf("        %zu of %zu below the %zu-tile floor (%zu single-tile islets"
-                    " with no land neighbour)\n",
-                    under_floor, total, k_province_min_tiles, islets);
-        // P5b is the claim the 2026-08-21 ruling actually turns on: a fragment
-        // ships ONLY when there was nothing to merge it into. Anything else
-        // under the floor means the merge pass missed a case.
-        check(under_floor * 20 < total,
-              "P5b sub-floor provinces are rare (the merge pass holds the floor)");
 
-        // P5c — the STRONGEST form of the floor claim, and the one that would
-        // catch a merge-pass bug that P5b's 5% slack would hide: a province
-        // below the floor must have NO land neighbour at all. If it had one,
-        // the merge had somewhere to put it and failed to.
-        {
-            std::size_t stranded = 0;
-            for (const province& p : part.provinces)
-            {
-                if (p.tiles.size() >= k_province_min_tiles)
-                    continue;
-                const auto& grid = grids.at(p.body);
-                const int   gw   = dims.at(p.body).first;
-                const int   gh   = dims.at(p.body).second;
-                bool        has_neighbour = false;
-                for (const entity_id t : p.tiles)
-                {
-                    const tile_component& tc = w.tiles.at(t);
-                    for (int s = 0; s < 6 && !has_neighbour; ++s)
-                    {
-                        const auto c = hex_neighbors::neighbour(tc.grid_x, tc.grid_y, s);
-                        if (c.gy < 0 || c.gy >= gh)
-                            continue;
-                        int nx = c.gx % gw;
-                        if (nx < 0)
-                            nx += gw;
-                        const entity_id n = grid[static_cast<std::size_t>(c.gy) * gw + nx];
-                        if (n == null_entity)
-                            continue;
-                        const uint32_t owner = part.province_of(n);
-                        if (owner != 0 && owner != p.id)
-                            has_neighbour = true;
-                    }
-                }
-                if (has_neighbour)
-                    ++stranded;
-            }
-            std::printf("        %zu sub-floor provinces still had a neighbour to merge into\n",
-                        stranded);
-            check(stranded == 0,
-                  "P5c every sub-floor province is a true island (nothing to merge into)");
-        }
+        // P5a — THE HARD CEILING. The single size rule that is a clamp: growth
+        // stops at k_province_max_tiles whatever the next edge costs.
+        check(over == 0, "P5a no province exceeds the hard ceiling of 12 tiles");
+
+        // P5b — REPORTED, NOT ASSERTED, and deliberately so. Ben, 2026-08-21:
+        // "Don't reject tiny provinces." The pre-BL-515 harness asserted here
+        // that every sub-floor province was a true island with nothing to merge
+        // into — that claim belonged to a merge pass that the ruling REMOVED, so
+        // it is not merely awkward now, it is contrary to the ruling. It is
+        // replaced by the number rather than dropped: a rise here is a signal
+        // about the cost model, and reading it is the point.
+        std::printf("        %zu of %zu below the %zu-tile SOFT floor, %zu below the %zu-tile"
+                    " HARD floor (kept by ruling, never merged)\n",
+                    under_soft, total, k_province_min_tiles, under_hard,
+                    k_province_hard_min_tiles);
+        std::printf("        %zu of %zu inside the %zu-%zu band\n", in_band, total,
+                    k_province_min_tiles, k_province_max_tiles);
+
+        // P5c — the floor that IS structural: a province in the partition always
+        // holds at least one tile, so `tiles.front()` (and therefore `id`) is
+        // always defined.
+        bool nonempty = true;
+        for (const province& p : part.provinces)
+            if (p.tiles.empty())
+                nonempty = false;
+        check(nonempty, "P5c every province holds at least one tile (id is always defined)");
     }
 
     // P6 — determinism: recomputing from the stored seed reproduces the
@@ -308,8 +359,9 @@ int main()
         check(same, "P6  recompute from the stored seed reproduces the partition exactly");
     }
 
-    // P7 — a different seed produces a different partition. Proves the seed is
-    // actually load-bearing rather than decorative.
+    // P7 — a different seed produces a different partition. The fill is
+    // otherwise a pure function of terrain, so this is what proves
+    // k_province_edge_jitter keeps the seed load-bearing rather than decorative.
     {
         world w3 = w;
         build_province_partition(w3, part.seed ^ 0xABCDEF01u);
@@ -324,93 +376,237 @@ int main()
         check(differs, "P7  a different seed yields a different partition");
     }
 
-    // P8 — jitter did not silently no-op: at least one province holds a tile
-    // whose block-derived home was a DIFFERENT province, i.e. a border moved.
-    // Compared against a jitter-free reference: the pure 2x2 block assignment.
+    // -----------------------------------------------------------------------
+    // P8 — THE IDENTITY CONTRACT (BL-515). This row REPLACES the block-derived
+    // rows the 3x3 partition carried: the old id layout was
+    // `body_rank | block_raster_index | component`, and P8 used to recover a
+    // body's block offset and count tiles sitting outside their base block.
+    // That scheme is superseded — an id is now DERIVED FROM THE LOWEST MEMBER
+    // TILE and nothing else — so the old row is not merely stale, it has no
+    // subject. What replaces it asserts the new contract directly.
+    // -----------------------------------------------------------------------
     {
-        std::size_t moved = 0;
-        for (const auto& [bid, bc] : w.bodies)
+        bool derived = true, unique = true, nonzero = true, sorted_members = true;
+        std::unordered_map<uint32_t, int> id_seen;
+        for (const province& p : part.provinces)
         {
-            const int gw = bc.grid_width, gh = bc.grid_height;
-            if (gw <= 0 || gh <= 0)
+            if (p.tiles.empty())
                 continue;
-            // Recover this body's (dx, dy) from any province: a tile's block
-            // coords must agree with its province id's block field under the
-            // right offset. Try all nine (the 3x3 block edge, 2026-08-21) and
-            // take the one that explains the most.
-            int best_dx = 0, best_dy = 0;
-            std::size_t best_hits = 0;
-            const int   e = k_province_block_edge;
-            for (int dx = 0; dx < e; ++dx)
-                for (int dy = 0; dy < e; ++dy)
-                {
-                    const int   cols = (gw + dx + e - 1) / e;
-                    std::size_t hits = 0;
-                    for (const province& p : part.provinces)
-                    {
-                        if (p.body != bid)
-                            continue;
-                        const uint32_t block = (p.id >> 3) & 0x1FFFFu;
-                        for (const entity_id t : p.tiles)
-                        {
-                            const tile_component& tc = w.tiles.at(t);
-                            const uint32_t bx = static_cast<uint32_t>((tc.grid_x + dx) / e);
-                            const uint32_t by = static_cast<uint32_t>((tc.grid_y + dy) / e);
-                            if (by * static_cast<uint32_t>(cols) + bx == block)
-                                ++hits;
-                        }
-                    }
-                    if (hits > best_hits)
-                    {
-                        best_hits = hits;
-                        best_dx   = dx;
-                        best_dy   = dy;
-                    }
-                }
+            const entity_id lowest = *std::min_element(p.tiles.begin(), p.tiles.end());
+            if (p.id != lowest)
+                derived = false;
+            if (p.tiles.front() != lowest)
+                sorted_members = false;
+            if (p.id == 0)
+                nonzero = false;
+            if (++id_seen[p.id] > 1)
+                unique = false;
+        }
+        check(derived, "P8a every province id IS its lowest member tile (derived, not allocated)");
+        check(sorted_members, "P8b member tiles are ascending, so tiles.front() == id");
+        check(unique, "P8c ids are unique (a tile belongs to exactly one province)");
+        check(nonzero, "P8d no id is 0 — null_entity is not a tile, so province_of's 0 is safe");
+    }
 
-            const int cols = (gw + best_dx + e - 1) / e;
-            for (const province& p : part.provinces)
+    // P9 — THE SEEDS. Provinces GROW FROM POPULATION CENTRES (Ben, 2026-08-21),
+    // so every centre must sit in a province and no two centres may share one:
+    // the settlement pass gives each its own region.
+    {
+        std::map<entity_id, int> centre_tile_scale;
+        for (const auto& [cid, tid] : w.population_centre_tile)
+        {
+            const auto pit = w.population_centres.find(cid);
+            if (pit == w.population_centres.end())
+                continue;
+            centre_tile_scale[tid] += pit->second.scale;
+        }
+
+        bool                        all_placed = true, all_distinct = true;
+        std::map<uint32_t, int>     province_centres;
+        std::map<int, std::pair<int, std::size_t>> by_scale; // scale -> (count, total tiles)
+        for (const auto& [tid, scale] : centre_tile_scale)
+        {
+            const uint32_t pid = part.province_of(tid);
+            if (pid == 0)
             {
-                if (p.body != bid)
-                    continue;
-                const uint32_t block = (p.id >> 3) & 0x1FFFFu;
-                for (const entity_id t : p.tiles)
-                {
-                    const tile_component& tc = w.tiles.at(t);
-                    const uint32_t bx = static_cast<uint32_t>((tc.grid_x + best_dx) / e);
-                    const uint32_t by = static_cast<uint32_t>((tc.grid_y + best_dy) / e);
-                    if (by * static_cast<uint32_t>(cols) + bx != block)
-                        ++moved;
-                }
+                all_placed = false;
+                continue;
+            }
+            if (++province_centres[pid] > 1)
+                all_distinct = false;
+            const province* p = part.find(pid);
+            if (p != nullptr)
+            {
+                auto& row = by_scale[scale];
+                ++row.first;
+                row.second += p->tiles.size();
             }
         }
-        std::printf("        %zu tiles sit outside their base block (merge + jitter)\n", moved);
-        check(moved > 0, "P8  merge/jitter moved at least one border off the raw block grid");
+        check(all_placed, "P9a every population-centre tile belongs to a province");
+        check(all_distinct, "P9b no two population centres share a province (one seed each)");
+
+        std::printf("        centre-seeded province size by centre scale:");
+        for (const auto& [scale, row] : by_scale)
+            std::printf(" s%d:%d@%.2f", scale, row.first,
+                        row.first ? double(row.second) / double(row.first) : 0.0);
+        std::printf("\n");
+
+        // P9c — SEED STRENGTH SCALES WITH CENTRE SCALE. The budget runs 7 tiles
+        // at scale 1 to 12 at scale 5, so the mean province of the largest scale
+        // present must beat the mean of the smallest. Terrain can stop any one
+        // of them short; it cannot invert the whole population.
+        if (by_scale.size() >= 2)
+        {
+            const auto& lo = *by_scale.begin();
+            const auto& hi = *by_scale.rbegin();
+            const double lo_mean = lo.second.first
+                                       ? double(lo.second.second) / double(lo.second.first) : 0.0;
+            const double hi_mean = hi.second.first
+                                       ? double(hi.second.second) / double(hi.second.first) : 0.0;
+            check(hi_mean > lo_mean,
+                  "P9c a larger centre draws a larger province (seed strength scales with scale)");
+        }
+        else
+            std::printf("        (P9c skipped — only one centre scale present)\n");
     }
 
     // -----------------------------------------------------------------------
-    // D — THE SIZE DISTRIBUTION ACROSS SEEDS. The ruling is about a spread, not
-    // a mean: a partition averaging 9 tiles while shipping a tail of 2s has not
-    // met it. So report floor, ceiling, mean and the out-of-band count for each
-    // seed, and assert on the aggregate.
-    std::printf("\nD — size distribution across seeds (target %zu-%zu)\n",
-                k_province_min_tiles, k_province_max_tiles);
+    // C — THE COST MODEL, MEASURED. This section is the PINNING INSTRUMENT for
+    // the two coefficients province.hpp says are pinned by measurement, and it
+    // reports them on every run so either can be re-pinned without new tooling
+    // (BL-463's discipline, BL-513's precedent).
+    //
+    //   C1  the adjacent-land |dh| distribution, and the k_province_height_cost
+    //       it implies under the pinning rule: a gradient at the 90th
+    //       percentile of steepness costs the same to cross as a river.
+    //   C2  does the cost model actually draw the borders Ben ruled? Border
+    //       share by edge class — river, steep, roaded, plain. A road that
+    //       BINDS shows up as roaded edges being borders LESS often than plain
+    //       ones; a river that divides shows up as the opposite. The roaded
+    //       internal share is also the instrument that pinned
+    //       k_province_road_bind_divisor (sweep the constant, re-run, compare).
+    // -----------------------------------------------------------------------
+    std::printf("\nC — the cost model, measured\n");
+    float p90_dh = 0.0f;
+    {
+        // The pin is quoted over a SEED SWEEP, not one world: relief varies by
+        // seed, and a coefficient pinned on a single world is pinned on an
+        // accident. The primary world's own edges go in first, then six seeds.
+        std::vector<float> dh;
+        for (const land_edge& e : edges)
+            dh.push_back(e.dh);
+        std::size_t sweep_edges = 0;
+        for (int sd = 0; sd < 6; ++sd)
+        {
+            world_params wp;
+            wp.seed = static_cast<uint32_t>(sd);
+            world sw = make_hard_coded_world(no_prehistory(wp));
+            std::map<entity_id, std::vector<entity_id>> sg;
+            std::map<entity_id, std::pair<int, int>>    sd_dims;
+            for (const auto& [bid, bc] : sw.bodies)
+            {
+                sg[bid]      = body_tile_grid(sw, bid);
+                sd_dims[bid] = { bc.grid_width, bc.grid_height };
+            }
+            const auto se = collect_land_edges(sw, sg, sd_dims);
+            sweep_edges += se.size();
+            for (const land_edge& e : se)
+                dh.push_back(e.dh);
+        }
+        std::printf("  C0  sweep: %zu adjacent land edges over 6 seeds (+%zu on the primary"
+                    " world)\n",
+                    sweep_edges, edges.size());
+        std::sort(dh.begin(), dh.end());
+
+        double sum = 0.0;
+        for (const float v : dh)
+            sum += v;
+        const auto pct = [&dh](double q) {
+            if (dh.empty())
+                return 0.0f;
+            std::size_t i = static_cast<std::size_t>(q * double(dh.size()));
+            if (i >= dh.size())
+                i = dh.size() - 1;
+            return dh[i];
+        };
+        const float p50 = pct(0.50), p90 = pct(0.90), p99 = pct(0.99);
+        p90_dh = p90;
+
+        std::printf("  C1  %zu edges pooled | mean |dh| %.4f  p50 %.4f  p90 %.4f  p99 %.4f\n",
+                    dh.size(), dh.empty() ? 0.0 : sum / double(dh.size()), p50, p90, p99);
+        std::printf("      implied k_province_height_cost = %d / p90 = %.1f  (shipped: %d)\n",
+                    k_province_river_edge_cost,
+                    p90 > 0.0f ? double(k_province_river_edge_cost) / double(p90) : 0.0,
+                    k_province_height_cost);
+        check(p90 > 0.0f, "C1  the retained heightmap carries real relief (BL-517)");
+    }
+
+    {
+        struct tally { std::size_t n = 0, border = 0; };
+        tally river, steep, roaded, plain, all;
+        for (const land_edge& e : edges)
+        {
+            const bool is_border = part.province_of(e.a) != part.province_of(e.b);
+            const auto bump      = [&](tally& t) { ++t.n; if (is_border) ++t.border; };
+            bump(all);
+            if (e.river)               bump(river);
+            if (e.dh >= p90_dh)        bump(steep);
+            if (e.roaded)              bump(roaded);
+            if (!e.river && !e.roaded && e.dh < p90_dh) bump(plain);
+        }
+        const auto pctf = [](const tally& t) {
+            return t.n ? 100.0 * double(t.border) / double(t.n) : 0.0;
+        };
+        std::printf("  C2  border share by edge class — all %.2f%% (%zu edges)\n", pctf(all),
+                    all.n);
+        std::printf("      river  %6.2f%% (%zu)   steep(>=p90) %6.2f%% (%zu)\n", pctf(river),
+                    river.n, pctf(steep), steep.n);
+        std::printf("      roaded %6.2f%% (%zu)   plain        %6.2f%% (%zu)\n", pctf(roaded),
+                    roaded.n, pctf(plain), plain.n);
+        std::printf("      roaded INTERNAL share %.2f%% vs plain %.2f%%  (lift %+.2fpp) —"
+                    " the divisor's pinning instrument\n",
+                    100.0 - pctf(roaded), 100.0 - pctf(plain),
+                    pctf(plain) - pctf(roaded));
+
+        // The three claims the ruling makes about what a boundary IS.
+        check(river.n > 0 && pctf(river) > pctf(plain),
+              "C2a a river edge is a border more often than plain ground (rivers divide)");
+        check(steep.n > 0 && pctf(steep) > pctf(plain),
+              "C2b a steep edge is a border more often than plain ground (elevation divides)");
+        check(roaded.n > 0 && pctf(roaded) < pctf(plain),
+              "C2c a roaded edge is a border LESS often than plain ground (a ROAD BINDS)");
+    }
+
+    // -----------------------------------------------------------------------
+    // D — THE SIZE DISTRIBUTION ACROSS SEEDS. REPORTED, not engineered. Organic
+    // borders are meant to be irregular, so this table is a description of what
+    // the cost model produced, and the ONLY assertion it carries is the hard
+    // ceiling. The 3x3 block partition it replaces measured, over these same 6
+    // seeds: 21,161 provinces, mean 9.11, 97.90% in the 7-12 band, 109 under
+    // the floor (all true islands) and 336 over. That comparison is the honest
+    // way to report what changed; it is NOT a target to match, and the cost
+    // weights must not be tuned to chase it.
+    // -----------------------------------------------------------------------
+    std::printf("\nD — size distribution across seeds (soft band %zu-%zu, hard %zu-%zu)\n",
+                k_province_min_tiles, k_province_max_tiles, k_province_hard_min_tiles,
+                k_province_max_tiles);
     {
         constexpr int k_seeds = 6;
-        std::size_t   all_total = 0, all_in_band = 0, all_under = 0, all_over = 0;
+        std::size_t   all_total = 0, all_in_band = 0, all_under_soft = 0, all_under_hard = 0,
+                    all_over = 0;
         std::size_t   all_tiles = 0;
         std::size_t   worst_floor = 0;
         std::size_t   worst_ceiling = 0;
         bool          floor_seen = false;
 
-        std::printf("  seed | provinces |  min  max   mean | under over | %% in band\n");
+        std::printf("  seed | provinces |  min  max   mean | <7  <3  >12 | %% in 7-12\n");
         for (int sd = 0; sd < k_seeds; ++sd)
         {
             world_params wp;
             wp.seed = static_cast<uint32_t>(sd);
             world sw = make_hard_coded_world(no_prehistory(wp));
 
-            std::size_t n = 0, tiles = 0, lo = 0, hi = 0, under = 0, over = 0, in_band = 0;
+            std::size_t n = 0, tiles = 0, lo = 0, hi = 0, us = 0, uh = 0, over = 0, in_band = 0;
             bool        lo_seen = false;
             for (const province& p : sw.provinces.provinces)
             {
@@ -419,36 +615,38 @@ int main()
                 tiles += sz;
                 if (!lo_seen || sz < lo) { lo = sz; lo_seen = true; }
                 if (sz > hi) hi = sz;
-                if (sz < k_province_min_tiles)      ++under;
-                else if (sz > k_province_max_tiles) ++over;
-                else                                ++in_band;
+                if (sz < k_province_min_tiles)       ++us;
+                if (sz < k_province_hard_min_tiles)  ++uh;
+                if (sz > k_province_max_tiles)       ++over;
+                if (sz >= k_province_min_tiles && sz <= k_province_max_tiles) ++in_band;
             }
-            std::printf("  %4d | %9zu | %4zu %4zu %6.2f | %5zu %4zu | %6.2f%%\n", sd, n, lo, hi,
-                        n ? double(tiles) / double(n) : 0.0, under, over,
+            std::printf("  %4d | %9zu | %4zu %4zu %6.2f | %3zu %3zu %4zu | %6.2f%%\n", sd, n, lo,
+                        hi, n ? double(tiles) / double(n) : 0.0, us, uh, over,
                         n ? 100.0 * double(in_band) / double(n) : 0.0);
             std::fflush(stdout);
 
-            all_total   += n;
-            all_tiles   += tiles;
-            all_in_band += in_band;
-            all_under   += under;
-            all_over    += over;
+            all_total      += n;
+            all_tiles      += tiles;
+            all_in_band    += in_band;
+            all_under_soft += us;
+            all_under_hard += uh;
+            all_over       += over;
             if (!floor_seen || lo < worst_floor) { worst_floor = lo; floor_seen = true; }
             if (hi > worst_ceiling) worst_ceiling = hi;
         }
 
-        std::printf("  ALL  | %9zu | %4zu %4zu %6.2f | %5zu %4zu | %6.2f%%\n", all_total,
+        std::printf("  ALL  | %9zu | %4zu %4zu %6.2f | %3zu %3zu %4zu | %6.2f%%\n", all_total,
                     worst_floor, worst_ceiling,
-                    all_total ? double(all_tiles) / double(all_total) : 0.0, all_under, all_over,
+                    all_total ? double(all_tiles) / double(all_total) : 0.0, all_under_soft,
+                    all_under_hard, all_over,
                     all_total ? 100.0 * double(all_in_band) / double(all_total) : 0.0);
+        std::printf("  3x3 BASELINE (superseded) |    1   18   9.11 | 109   -  336 |  97.90%%\n");
 
-        const double mean = all_total ? double(all_tiles) / double(all_total) : 0.0;
-        check(mean >= double(k_province_min_tiles) && mean <= double(k_province_max_tiles),
-              "D1  the mean province sits inside the 7-12 band");
-        check(all_total > 0 && all_in_band * 4 >= all_total * 3,
-              "D2  at least three quarters of provinces are inside the band");
-        check(all_total > 0 && all_under * 20 < all_total,
-              "D3  under-floor provinces stay under 5%% of the world");
+        // D1 — the hard ceiling, across every seed. The one clamp.
+        check(all_over == 0, "D1  no province on any seed exceeds the 12-tile hard ceiling");
+        // D2 — the partition covers every seed's land, so the mean is a real
+        // statistic and not an artefact of a body that failed to partition.
+        check(all_total > 0 && all_tiles > 0, "D2  every seed produced a non-empty partition");
     }
 
     // -----------------------------------------------------------------------

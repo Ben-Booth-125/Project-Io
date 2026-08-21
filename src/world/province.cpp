@@ -4,9 +4,12 @@
 #include "logistics.hpp" // body_tile_grid — the raster index every body-grid pass walks
 
 #include <algorithm>
+#include <cmath>
 #include <istream>
 #include <map>
 #include <ostream>
+#include <queue>
+#include <vector>
 
 namespace {
 
@@ -25,23 +28,12 @@ uint64_t mix64(uint64_t x)
 
 uint64_t fold(uint64_t a, uint64_t b) { return mix64(mix64(a) ^ (b * 0x9E3779B97F4A7C15ull)); }
 
-/// Three-input fold — the per-tile-pair jitter draw, (seed, tile a, tile b).
+/// Three-input fold — the per-edge jitter draw, (seed, lower tile, upper tile).
 uint64_t fold(uint64_t a, uint64_t b, uint64_t c) { return mix64(fold(a, b) ^ mix64(c)); }
 
 // ---------------------------------------------------------------------------
-// Id layout (see province::id)
+// Grid helpers
 // ---------------------------------------------------------------------------
-
-constexpr int      k_component_bits = 3;
-constexpr int      k_block_bits     = 17;
-constexpr uint32_t k_max_blocks     = 1u << k_block_bits;
-constexpr uint32_t k_max_components = 1u << k_component_bits;
-
-uint32_t make_province_id(uint32_t body_rank, uint32_t block_id, uint32_t component)
-{
-    return (body_rank << (k_block_bits + k_component_bits)) | (block_id << k_component_bits)
-           | component;
-}
 
 /// The odd-r hex neighbour of (@p gx, @p gy) on side @p side, with the column
 /// wrapped into [0, gw) and the row rejected when it leaves the grid. Columns
@@ -60,121 +52,187 @@ bool wrapped_neighbour(int gx, int gy, int side, int gw, int gh, int& out_x, int
     return true;
 }
 
-/// Per-body working state for the three passes. Everything is keyed by tile
-/// entity id or by an index into `land` (ascending tile id), never by container
-/// iteration order.
+/// Per-body working state for the fill. Everything is keyed by tile entity id
+/// or by an index into `land` (ascending tile id), never by container order.
 struct body_work
 {
     int gw = 0;
     int gh = 0;
 
-    std::vector<entity_id> land;            ///< Land tiles, ascending entity id.
-    std::vector<entity_id> grid;            ///< gy*gw + gx -> tile, null_entity if absent.
-    std::unordered_map<entity_id, uint32_t> owner; ///< tile -> province id.
-    std::map<uint32_t, std::vector<entity_id>> members; ///< province id -> tiles (ascending id).
+    std::vector<entity_id> land; ///< Land tiles, ascending entity id.
+    std::vector<entity_id> grid; ///< gy*gw + gx -> tile, null_entity if absent.
+    std::unordered_map<entity_id, uint32_t> owner; ///< tile -> region index (+1; 0 = unclaimed).
 };
 
-/// Seam evidence on the edge from @p a out of its side @p side to @p b: how
-/// strongly the terrain argues that a province border belongs ON this edge.
-/// A river crossing is the strongest signal (2); a composition or landform
-/// change adds one each. 0 means the two tiles are the same ground.
-int seam_evidence(const tile_component& a, const tile_component& b, int side)
+/// One growing province. `seed` doubles as the region's stable tie-break key in
+/// the frontier ordering — it is unique across regions by construction, because
+/// a tile is claimed the instant it is seeded.
+struct region
 {
-    int e = 0;
-    if ((a.river_edges >> side) & 1u)
-        e += 2;
-    if (a.composition != b.composition)
-        e += 1;
-    if (a.landform != b.landform)
-        e += 1;
-    return e;
+    entity_id              seed   = null_entity;
+    std::size_t            target = k_province_min_tiles;
+    std::vector<entity_id> tiles;
+
+    /// Sum of the edge costs of the steps that claimed `tiles`, and how many
+    /// there were (the seed itself was not stepped to). Their mean is what the
+    /// SOFT brake reads — see grow_regions.
+    long long   step_cost_sum = 0;
+    std::size_t step_count    = 0;
+};
+
+/// A frontier entry: reaching @p tile from @p seed's region at total @p cost,
+/// where the LAST edge crossed cost @p step. `step` is what the soft-target
+/// rule reads — past its budget a region crosses only a binding edge, and that
+/// is a property of the edge itself, not of the path that got there.
+struct frontier_entry
+{
+    int         cost   = 0;
+    int         step   = 0;
+    entity_id   seed   = null_entity;
+    entity_id   tile   = null_entity;
+    std::size_t region_index = 0;
+};
+
+/// Min-heap ordering: cheapest first, ties broken on (seed tile, tile). A total
+/// order over unique keys — no two entries compare equal, so no container
+/// accident can reach a claim.
+struct frontier_worse
+{
+    bool operator()(const frontier_entry& a, const frontier_entry& b) const
+    {
+        if (a.cost != b.cost)
+            return a.cost > b.cost;
+        if (a.seed != b.seed)
+            return a.seed > b.seed;
+        return a.tile > b.tile;
+    }
+};
+
+/// The cost model, on already-fetched tiles. See province.hpp for what pins
+/// each coefficient. Symmetric in (a, b): the river term takes EITHER side's
+/// bit, the height term is an absolute difference, the jitter fold is over the
+/// sorted id pair, and the road term needs both tiles roaded.
+int edge_cost_impl(uint32_t seed, entity_id a_id, const tile_component& a, entity_id b_id,
+                   const tile_component& b, int side)
+{
+    const int opposite = (side + 3) % 6;
+
+    int c = k_province_edge_base_cost;
+
+    if (((a.river_edges >> side) & 1u) != 0u || ((b.river_edges >> opposite) & 1u) != 0u)
+        c += k_province_river_edge_cost;
+
+    const float dh = std::fabs(a.height - b.height);
+    c += static_cast<int>(dh * static_cast<float>(k_province_height_cost) + 0.5f);
+
+    const uint64_t lo = std::min(a_id, b_id);
+    const uint64_t hi = std::max(a_id, b_id);
+    c += static_cast<int>(fold(seed, lo, hi) % static_cast<uint64_t>(k_province_edge_jitter));
+
+    // A ROAD BINDS. Divided, not zeroed: a bridge over a gorge is still a gorge.
+    if (a.road_level > 0 && b.road_level > 0)
+        c = (c + k_province_road_bind_divisor - 1) / k_province_road_bind_divisor;
+
+    return c < 1 ? 1 : c;
 }
 
-/// Whether the tiles of @p tiles are hex-connected on @p bw's grid.
-bool connected(const body_work& bw, const world& w, const std::vector<entity_id>& tiles)
+/// Grow every region named in @p active SIMULTANEOUSLY as one cost-weighted
+/// multi-source fill, claiming into @p bw.owner. Neighbouring seeds therefore
+/// meet on the terrain between them rather than in the order they were listed.
+void grow_regions(body_work& bw, const world& w, uint32_t seed, std::vector<region>& regions,
+                  const std::vector<std::size_t>& active)
 {
-    if (tiles.size() <= 1)
-        return true;
+    std::priority_queue<frontier_entry, std::vector<frontier_entry>, frontier_worse> pq;
 
-    std::vector<entity_id> open{ tiles.front() };
-    std::vector<entity_id> seen{ tiles.front() };
-    const auto in_set = [&tiles](entity_id t) {
-        return std::find(tiles.begin(), tiles.end(), t) != tiles.end();
-    };
-
-    while (!open.empty())
+    for (const std::size_t ri : active)
     {
-        const entity_id cur = open.back();
-        open.pop_back();
-        const auto tit = w.tiles.find(cur);
-        if (tit == w.tiles.end())
+        frontier_entry e;
+        e.cost         = 0;
+        e.step         = 0;
+        e.seed         = regions[ri].seed;
+        e.tile         = regions[ri].seed;
+        e.region_index = ri;
+        pq.push(e);
+    }
+
+    while (!pq.empty())
+    {
+        const frontier_entry f = pq.top();
+        pq.pop();
+
+        if (bw.owner.find(f.tile) != bw.owner.end())
             continue;
+
+        region& r = regions[f.region_index];
+
+        // The one hard clamp in the file.
+        if (r.tiles.size() >= k_province_max_tiles)
+            continue;
+
+        // THE HARD FLOOR (3-12 hard target). A region takes its first three
+        // tiles whatever they cost. This is not a repair pass — nothing is ever
+        // merged — it is the growth rule refusing to stop early. A region can
+        // still ship below it when the land genuinely runs out, which is the
+        // island case the ruling protects.
+        //
+        // THE SOFT BRAKE, past the region's budget: it annexes only ground NO
+        // HARDER TO REACH than the ground it already holds. Self-referential on
+        // purpose — it needs no threshold constant, it is scale-free across
+        // gentle and broken country alike, and it is exactly "boundaries win
+        // ties": a region on a plain keeps spreading, a region ringed by rivers
+        // and slopes stops the moment its budget is met.
+        if (r.tiles.size() >= k_province_hard_min_tiles && r.tiles.size() >= r.target
+            && r.step_count > 0
+            && static_cast<long long>(f.step) * static_cast<long long>(r.step_count)
+                   > r.step_cost_sum)
+            continue;
+
+        bw.owner[f.tile] = static_cast<uint32_t>(f.region_index) + 1u;
+        r.tiles.push_back(f.tile);
+        if (f.tile != f.seed)
+        {
+            r.step_cost_sum += f.step;
+            ++r.step_count;
+        }
+        if (r.tiles.size() >= k_province_max_tiles)
+            continue; // full — do not extend its frontier any further
+
+        const tile_component& tc = w.tiles.at(f.tile);
         for (int s = 0; s < 6; ++s)
         {
             int nx = 0, ny = 0;
-            if (!wrapped_neighbour(tit->second.grid_x, tit->second.grid_y, s, bw.gw, bw.gh, nx, ny))
+            if (!wrapped_neighbour(tc.grid_x, tc.grid_y, s, bw.gw, bw.gh, nx, ny))
                 continue;
             const entity_id n = bw.grid[static_cast<std::size_t>(ny) * bw.gw + nx];
-            if (n == null_entity || !in_set(n))
+            if (n == null_entity)
                 continue;
-            if (std::find(seen.begin(), seen.end(), n) != seen.end())
+            const auto nit = w.tiles.find(n);
+            if (nit == w.tiles.end() || nit->second.composition == terrain_composition::ocean)
                 continue;
-            seen.push_back(n);
-            open.push_back(n);
+            if (bw.owner.find(n) != bw.owner.end())
+                continue;
+
+            frontier_entry e;
+            e.step         = edge_cost_impl(seed, f.tile, tc, n, nit->second, s);
+            e.cost         = f.cost + e.step;
+            e.seed         = f.seed;
+            e.tile         = n;
+            e.region_index = f.region_index;
+            pq.push(e);
         }
     }
-    return seen.size() == tiles.size();
-}
-
-/// Split @p tiles into hex-connected components, each ascending by tile id, and
-/// the components themselves ordered smallest-member-tile-id first.
-std::vector<std::vector<entity_id>> components(const body_work& bw, const world& w,
-                                               std::vector<entity_id> tiles)
-{
-    std::vector<std::vector<entity_id>> out;
-    std::sort(tiles.begin(), tiles.end());
-
-    std::vector<bool> used(tiles.size(), false);
-    for (std::size_t i = 0; i < tiles.size(); ++i)
-    {
-        if (used[i])
-            continue;
-        std::vector<entity_id> comp{ tiles[i] };
-        used[i] = true;
-        for (std::size_t head = 0; head < comp.size(); ++head)
-        {
-            const auto tit = w.tiles.find(comp[head]);
-            if (tit == w.tiles.end())
-                continue;
-            for (int s = 0; s < 6; ++s)
-            {
-                int nx = 0, ny = 0;
-                if (!wrapped_neighbour(tit->second.grid_x, tit->second.grid_y, s, bw.gw, bw.gh, nx,
-                                       ny))
-                    continue;
-                const entity_id n = bw.grid[static_cast<std::size_t>(ny) * bw.gw + nx];
-                if (n == null_entity)
-                    continue;
-                const auto at = std::find(tiles.begin(), tiles.end(), n);
-                if (at == tiles.end())
-                    continue;
-                const std::size_t idx = static_cast<std::size_t>(at - tiles.begin());
-                if (used[idx])
-                    continue;
-                used[idx] = true;
-                comp.push_back(n);
-            }
-        }
-        std::sort(comp.begin(), comp.end());
-        out.push_back(std::move(comp));
-    }
-
-    // Components arrive in ascending smallest-member order already, because the
-    // outer loop walks the sorted tile list and claims each component whole.
-    return out;
 }
 
 } // namespace
+
+int province_edge_cost(const world& w, uint32_t seed, entity_id a, entity_id b, int side)
+{
+    const auto ait = w.tiles.find(a);
+    const auto bit = w.tiles.find(b);
+    if (ait == w.tiles.end() || bit == w.tiles.end())
+        return k_province_edge_base_cost;
+    return edge_cost_impl(seed, a, ait->second, b, bit->second, side);
+}
 
 const province* province_partition::find(uint32_t id) const
 {
@@ -191,23 +249,34 @@ void build_province_partition(world& w, uint32_t seed)
     out.seed = seed;
 
     // `world::bodies` is an UNORDERED map: its iteration order is a container-layout
-    // accident, and is not even stable across a copy of the same world. Body rank is
-    // baked into every province id, so the walk is sorted here explicitly. This is
-    // the one place the partition could leak non-determinism, and it is exactly what
-    // the harness's P6 replay check caught.
+    // accident, and is not even stable across a copy of the same world. The walk is
+    // sorted here explicitly. Province ids no longer encode body rank, so a wrong
+    // order can no longer MISNUMBER anything — but it could still change which
+    // region reached a contested tile first, so the sort stays load-bearing.
     std::vector<entity_id> body_ids;
     body_ids.reserve(w.bodies.size());
     for (const auto& entry : w.bodies)
         body_ids.push_back(entry.first);
     std::sort(body_ids.begin(), body_ids.end());
 
-    uint32_t body_rank = 0;
+    // Population centres are stored centre-keyed in an unordered_map, so the
+    // reverse tile -> scale index is gathered into an ORDERED map first. Scale
+    // is ACCUMULATED, never first-wins, so the content is independent of the
+    // source's iteration order as well as the read order.
+    std::map<entity_id, int> centre_scale_by_tile;
+    for (const auto& [centre_id, tile_id] : w.population_centre_tile)
+    {
+        const auto pit = w.population_centres.find(centre_id);
+        if (pit == w.population_centres.end())
+            continue;
+        centre_scale_by_tile[tile_id] += pit->second.scale;
+    }
+
     for (const entity_id body_id : body_ids)
     {
-        const body_component& bc   = w.bodies.at(body_id);
-        const uint32_t        rank = body_rank++;
-        const int             gw   = bc.grid_width;
-        const int             gh   = bc.grid_height;
+        const body_component& bc = w.bodies.at(body_id);
+        const int             gw = bc.grid_width;
+        const int             gh = bc.grid_height;
         if (gw <= 0 || gh <= 0)
             continue;
 
@@ -216,7 +285,7 @@ void build_province_partition(world& w, uint32_t seed)
         bw.gh   = gh;
         bw.grid = body_tile_grid(w, body_id); // raster copy; the cache stays intact
 
-        // Land mask, ascending tile id. Ocean is excluded outright.
+        // Land mask, ascending tile id. Ocean is excluded outright (BL-516).
         for (const entity_id t : bw.grid)
         {
             if (t == null_entity)
@@ -232,237 +301,196 @@ void build_province_partition(world& w, uint32_t seed)
             continue;
         std::sort(bw.land.begin(), bw.land.end());
 
-        // --- Pass 1: base 3x3 blocks, then a component split so no province
-        // spans a strait even before the merge runs. A full block is 9 tiles —
-        // the middle of Ben's 7-12 band (2026-08-21), so the interior needs no
-        // repair at all and pass 2 only has the coastline to deal with.
-        const uint64_t h  = fold(seed, static_cast<uint64_t>(body_id));
-        const int      e  = k_province_block_edge;
-        const int      dx = static_cast<int>(h % static_cast<uint64_t>(e));
-        const int      dy = static_cast<int>((h >> 32) % static_cast<uint64_t>(e));
+        std::vector<region>    regions;
+        std::vector<entity_id> centre_seeds; ///< Ascending; pass 2 spaces itself off these.
 
-        const int block_cols = (gw + dx + e - 1) / e;
-        const int block_rows = (gh + dy + e - 1) / e;
-        if (static_cast<uint64_t>(block_cols) * block_rows >= k_max_blocks)
-            continue; // grid past the id layout's 17-bit block field; no real body is
-
-        std::map<uint32_t, std::vector<entity_id>> blocks;
-        for (const entity_id t : bw.land)
+        // --- Pass 1: SETTLEMENT GROWTH.
+        //
+        // Every population centre on this body is a seed, in ascending tile id,
+        // with a growth budget scaled by its centre scale (1 = village ..
+        // 5 = metropolis): a metropolis draws a larger province than a village.
+        // The budget spans the soft band over the scale's own defined domain,
+        // so nothing here is a tuned number — scale 1 gets k_province_min_tiles
+        // and scale 5 gets k_province_max_tiles.
+        //
+        // All seeds grow SIMULTANEOUSLY, as one multi-source fill, so two
+        // centres meet on the terrain between them rather than in list order.
         {
-            const tile_component& tc = w.tiles.at(t);
-            const uint32_t        bx = static_cast<uint32_t>((tc.grid_x + dx) / e);
-            const uint32_t        by = static_cast<uint32_t>((tc.grid_y + dy) / e);
-            blocks[by * static_cast<uint32_t>(block_cols) + bx].push_back(t);
-        }
-
-        for (auto& [block_id, tiles] : blocks)
-        {
-            auto comps = components(bw, w, std::move(tiles));
-            for (std::size_t c = 0; c < comps.size() && c < k_max_components; ++c)
+            std::vector<std::size_t> active;
+            for (const auto& [tile_id, scale] : centre_scale_by_tile) // ascending tile id
             {
-                const uint32_t pid = make_province_id(rank, block_id, static_cast<uint32_t>(c));
-                for (const entity_id t : comps[c])
-                    bw.owner[t] = pid;
-                bw.members[pid] = std::move(comps[c]);
+                const auto tit = w.tiles.find(tile_id);
+                if (tit == w.tiles.end() || tit->second.body != body_id)
+                    continue;
+                if (tit->second.composition == terrain_composition::ocean)
+                    continue;
+
+                const int clamped = scale < 1 ? 1 : (scale > 5 ? 5 : scale);
+                region    r;
+                r.seed   = tile_id;
+                r.target = k_province_min_tiles
+                           + static_cast<std::size_t>((clamped - 1))
+                                 * (k_province_max_tiles - k_province_min_tiles) / 4u;
+                centre_seeds.push_back(tile_id);
+                active.push_back(regions.size());
+                regions.push_back(std::move(r));
             }
+            grow_regions(bw, w, seed, regions, active);
         }
 
-        // --- Pass 2: FRAGMENT MERGE — the pass that actually holds the floor.
+        // --- Pass 2: HINTERLAND.
         //
-        // A full 3x3 block is 9 tiles and needs nothing. The coastline is the
-        // whole problem: a block bisected by ocean comes out of the component
-        // split as pieces of 1-4 tiles, far under Ben's 7-tile floor, and
-        // shipping those as provinces is exactly the "too small" he ruled out.
+        // Land no centre reached is partitioned under the SAME cost rules,
+        // seeded one region at a time from the LEAST-ACCESSIBLE unclaimed tile.
+        // Inaccessibility is the sum of the six sides' edge costs, with a side
+        // that has no land across it counted as a border at least as strong as
+        // a river — a tile ringed by ocean is the most walled-in thing there is.
         //
-        // So every below-floor province merges into a hex-adjacent one. The
-        // target is the SMALLEST neighbour (ties by lowest id): a fragment joins
-        // the emptiest province next to it, which is what keeps the merged sizes
-        // near the band instead of piling every scrap onto one victim. The
-        // survivor keeps the LOWER of the two ids, so every id in the finished
-        // partition is still one the block grid derived — nothing is allocated.
-        //
-        // Run to a fixpoint: a merge can leave the survivor still under the
-        // floor (2 + 3 = 5), and it must merge again. Each merge removes exactly
-        // one province, so the loop is bounded by the province count and cannot
-        // cycle. A true islet — land with no land neighbour at all — stands
-        // alone; there is nothing to merge it with, and that is honest.
+        // The order is computed ONCE over the whole land mask, before any
+        // hinterland claim, so it is a property of the terrain rather than of
+        // the fill's own progress. Walking it most-walled-in first is what makes
+        // a hinterland a shape the terrain chose rather than a leftover.
         {
-            /// Neighbouring province ids of @p tiles (excluding @p self) with
-            /// their current sizes. Ordered, so no unordered walk reaches a pick.
-            const auto province_neighbours = [&](const std::vector<entity_id>& tiles,
-                                                 uint32_t self) {
-                std::map<uint32_t, std::size_t> nbrs;
-                for (const entity_id t : tiles)
+            constexpr int k_no_land_side_cost =
+                k_province_edge_base_cost + k_province_river_edge_cost;
+
+            std::vector<std::pair<int, entity_id>> ranked; // (-inaccessibility, tile)
+            ranked.reserve(bw.land.size());
+            for (const entity_id t : bw.land)
+            {
+                const tile_component& tc = w.tiles.at(t);
+                int                   walls = 0;
+                for (int s = 0; s < 6; ++s)
                 {
-                    const tile_component& tc = w.tiles.at(t);
-                    for (int s = 0; s < 6; ++s)
+                    int nx = 0, ny = 0;
+                    if (!wrapped_neighbour(tc.grid_x, tc.grid_y, s, gw, gh, nx, ny))
                     {
-                        int nx = 0, ny = 0;
-                        if (!wrapped_neighbour(tc.grid_x, tc.grid_y, s, gw, gh, nx, ny))
-                            continue;
-                        const entity_id n = bw.grid[static_cast<std::size_t>(ny) * gw + nx];
-                        if (n == null_entity)
-                            continue;
-                        const auto oit = bw.owner.find(n);
-                        if (oit == bw.owner.end() || oit->second == self)
-                            continue;
-                        nbrs[oit->second] = bw.members.at(oit->second).size();
+                        walls += k_no_land_side_cost;
+                        continue;
                     }
+                    const entity_id n = bw.grid[static_cast<std::size_t>(ny) * gw + nx];
+                    const auto      nit = (n == null_entity) ? w.tiles.end() : w.tiles.find(n);
+                    if (nit == w.tiles.end()
+                        || nit->second.composition == terrain_composition::ocean)
+                    {
+                        walls += k_no_land_side_cost;
+                        continue;
+                    }
+                    walls += edge_cost_impl(seed, t, tc, n, nit->second, s);
                 }
-                return nbrs;
+                ranked.emplace_back(-walls, t);
+            }
+            // Most walled-in first (negated score ascending), ties by lowest
+            // tile id. A total order over unique tile ids.
+            std::sort(ranked.begin(), ranked.end());
+
+            // SEED SPACING. The hinterland seeds are chosen BEFORE any of them
+            // grows, and grow simultaneously afterwards — so a hinterland
+            // province's size comes from how far apart the seeds are and where
+            // the terrain lets each one reach, not from the order they were
+            // visited in. Seeding one at a time and growing it to its budget
+            // was measured to produce a de-facto clamp (a spike at exactly the
+            // budget) and a flood of one-tile slivers wedged between finished
+            // regions; spacing is what removes both.
+            //
+            // A chosen seed blocks every LAND tile within
+            // k_province_seed_spacing - 1 hex steps of it — a geodesic radius
+            // over land, so two seeds either side of a strait are correctly
+            // treated as far apart even where the grid says otherwise.
+            std::unordered_map<entity_id, bool> seed_blocked;
+            const auto block_around = [&](entity_id from) {
+                std::vector<entity_id> open{ from };
+                std::vector<entity_id> next;
+                seed_blocked[from] = true;
+                for (int depth = 1; depth < k_province_seed_spacing; ++depth)
+                {
+                    next.clear();
+                    for (const entity_id cur : open)
+                    {
+                        const auto cit = w.tiles.find(cur);
+                        if (cit == w.tiles.end())
+                            continue;
+                        for (int s = 0; s < 6; ++s)
+                        {
+                            int nx = 0, ny = 0;
+                            if (!wrapped_neighbour(cit->second.grid_x, cit->second.grid_y, s, gw,
+                                                   gh, nx, ny))
+                                continue;
+                            const entity_id n = bw.grid[static_cast<std::size_t>(ny) * gw + nx];
+                            if (n == null_entity)
+                                continue;
+                            const auto nit = w.tiles.find(n);
+                            if (nit == w.tiles.end()
+                                || nit->second.composition == terrain_composition::ocean)
+                                continue;
+                            if (seed_blocked.find(n) != seed_blocked.end())
+                                continue;
+                            seed_blocked[n] = true;
+                            next.push_back(n);
+                        }
+                    }
+                    open = next;
+                }
             };
 
-            // Ids below `scan_from` are settled: a merge only ever GROWS a
-            // province, and it never creates an adjacency that did not exist, so
-            // an earlier province that was in band (or a neighbourless islet)
-            // stays that way. Resuming from the survivor's id keeps the fixpoint
-            // loop linear-ish instead of quadratic without changing its result.
-            uint32_t scan_from = 0;
-            for (std::size_t guard = bw.members.size(); guard-- > 0;)
+            for (const entity_id c : centre_seeds) // ascending; a centre spaces the
+                block_around(c);                   // hinterland off itself too
+
+            std::vector<std::size_t> active;
+            for (const auto& [neg_walls, t] : ranked)
             {
-                uint32_t fragment = 0;
-                uint32_t target   = 0;
-                bool     found    = false;
-                for (auto it = bw.members.lower_bound(scan_from); it != bw.members.end(); ++it)
-                {
-                    if (it->second.size() >= k_province_min_tiles)
-                        continue;
-                    const auto nbrs = province_neighbours(it->second, it->first);
-                    if (nbrs.empty())
-                        continue; // a true islet — this is all the land there is
-                    uint32_t    best      = 0;
-                    std::size_t best_size = 0;
-                    bool        have      = false;
-                    for (const auto& [nid, nsize] : nbrs) // ascending id: ties take the lowest
-                        if (!have || nsize < best_size)
-                        {
-                            best      = nid;
-                            best_size = nsize;
-                            have      = true;
-                        }
-                    fragment = it->first;
-                    target   = best;
-                    found    = true;
-                    break;
-                }
-                if (!found)
-                    break;
+                (void)neg_walls;
+                if (bw.owner.find(t) != bw.owner.end())
+                    continue;
+                if (seed_blocked.find(t) != seed_blocked.end())
+                    continue;
+                region r;
+                r.seed   = t;
+                r.target = k_province_min_tiles;
+                active.push_back(regions.size());
+                regions.push_back(std::move(r));
+                block_around(t);
+            }
+            grow_regions(bw, w, seed, regions, active);
 
-                const uint32_t keep = std::min(fragment, target);
-                const uint32_t drop = std::max(fragment, target);
-
-                std::vector<entity_id>        merged = std::move(bw.members.at(keep));
-                const std::vector<entity_id>& add    = bw.members.at(drop);
-                merged.insert(merged.end(), add.begin(), add.end());
-                std::sort(merged.begin(), merged.end());
-                bw.members.erase(drop);
-                for (const entity_id t : merged)
-                    bw.owner[t] = keep;
-                bw.members[keep] = std::move(merged);
-
-                scan_from = keep;
+            // --- Leftovers. Land the spaced fill could not reach — enclosed by
+            // regions that hit the hard ceiling, or cut off behind a border too
+            // expensive for any of them to cross. Seeded in the same fixed
+            // least-accessible-first order and grown one at a time, because by
+            // now they are pockets rather than open country. This is where a
+            // genuinely tiny province comes from, and it is KEPT.
+            for (const auto& [neg_walls, t] : ranked)
+            {
+                (void)neg_walls;
+                if (bw.owner.find(t) != bw.owner.end())
+                    continue;
+                region r;
+                r.seed   = t;
+                r.target = k_province_min_tiles;
+                const std::size_t ri = regions.size();
+                regions.push_back(std::move(r));
+                grow_regions(bw, w, seed, regions, { ri });
             }
         }
 
-        // --- Pass 3: terrain-seam jitter, now on real (post-merge) sizes. One
-        // sweep, ascending tile id, each tile moving at most once and each
-        // province resized at most once. It runs AFTER the merge so its band
-        // clamp reads the sizes that will actually ship.
-        std::vector<uint32_t> resized;
-        const auto            is_resized = [&resized](uint32_t p) {
-            return std::find(resized.begin(), resized.end(), p) != resized.end();
-        };
-
-        for (const entity_id a : bw.land)
+        // --- Emit. Identity is DERIVED: the lowest member tile id. No id is
+        // allocated anywhere in this function.
+        for (region& r : regions)
         {
-            const uint32_t src = bw.owner.at(a);
-            if (is_resized(src))
+            if (r.tiles.empty())
                 continue;
-
-            auto& src_tiles = bw.members.at(src);
-            if (src_tiles.size() < k_province_min_tiles || src_tiles.size() > k_province_max_tiles)
-                continue; // only an in-band province jitters; a merged outlier is left alone
-
-            const tile_component& ta = w.tiles.at(a);
-
-            // Does `a` sit across a seam from its OWN province? That is the
-            // evidence the border is in the wrong place.
-            int own_seam = 0;
-            for (int s = 0; s < 6; ++s)
-            {
-                int nx = 0, ny = 0;
-                if (!wrapped_neighbour(ta.grid_x, ta.grid_y, s, gw, gh, nx, ny))
-                    continue;
-                const entity_id n = bw.grid[static_cast<std::size_t>(ny) * gw + nx];
-                if (n == null_entity)
-                    continue;
-                const auto oit = bw.owner.find(n);
-                if (oit == bw.owner.end() || oit->second != src)
-                    continue;
-                own_seam = std::max(own_seam, seam_evidence(ta, w.tiles.at(n), s));
-            }
-            if (own_seam < 2)
-                continue;
-
-            for (int s = 0; s < 6; ++s)
-            {
-                int nx = 0, ny = 0;
-                if (!wrapped_neighbour(ta.grid_x, ta.grid_y, s, gw, gh, nx, ny))
-                    continue;
-                const entity_id b = bw.grid[static_cast<std::size_t>(ny) * gw + nx];
-                if (b == null_entity)
-                    continue;
-                const auto oit = bw.owner.find(b);
-                if (oit == bw.owner.end() || oit->second == src)
-                    continue;
-
-                const uint32_t dst = oit->second;
-                if (is_resized(dst))
-                    continue;
-                if (seam_evidence(ta, w.tiles.at(b), s) != 0)
-                    continue; // this edge IS a seam — the border belongs here, not past it
-
-                auto& dst_tiles = bw.members.at(dst);
-                if (dst_tiles.size() < k_province_min_tiles
-                    || dst_tiles.size() >= k_province_max_tiles)
-                    continue;
-                if (src_tiles.size() <= k_province_min_tiles)
-                    continue; // the clamp never pushes a province back under the floor
-
-                if ((fold(seed, static_cast<uint64_t>(a), static_cast<uint64_t>(b)) & 0xFFu) >= 128u)
-                    continue;
-
-                // The mover may not be a cut vertex of its source.
-                std::vector<entity_id> without;
-                without.reserve(src_tiles.size() - 1);
-                for (const entity_id t : src_tiles)
-                    if (t != a)
-                        without.push_back(t);
-                if (!connected(bw, w, without))
-                    continue;
-
-                src_tiles = std::move(without);
-                dst_tiles.push_back(a);
-                std::sort(dst_tiles.begin(), dst_tiles.end());
-                bw.owner[a] = dst;
-                resized.push_back(src);
-                resized.push_back(dst);
-                break;
-            }
-        }
-
-        for (auto& [pid, tiles] : bw.members)
-        {
+            std::sort(r.tiles.begin(), r.tiles.end());
             province p;
-            p.id    = pid;
+            p.id    = r.tiles.front();
             p.body  = body_id;
-            p.tiles = std::move(tiles);
+            p.tiles = std::move(r.tiles);
             out.provinces.push_back(std::move(p));
         }
     }
 
-    // Ascending id — the iteration contract. The per-body runs are already
-    // ascending and body-major by construction; sorting makes it unconditional.
+    // Ascending id — the iteration contract. Ids are lowest-member-tile ids and
+    // are unique by construction (a tile belongs to exactly one province), so
+    // this sort is strict.
     std::sort(out.provinces.begin(), out.provinces.end(),
               [](const province& a, const province& b) { return a.id < b.id; });
 

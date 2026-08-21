@@ -9,83 +9,233 @@
 #include <vector>
 
 // ---------------------------------------------------------------------------
-// Province partition (BL-466) — the 7-12 tile locality cell, made real
+// Province partition (BL-515) — provinces GROWN from settlement, stopped by
+// terrain
 // ---------------------------------------------------------------------------
-// SIZE RULING, 2026-08-21 (Ben, after seeing the grain rendered): a province of
-// 3-5 tiles is too small on screen. THE TARGET IS 7-12 TILES. This supersedes
-// the original ~4-tile band, which was set before anything was drawn.
+// ALGORITHM RULING, 2026-08-21 (Ben, having seen the 3x3-block partition
+// rendered): "packing each province perfectly looks nice, but it is scarcely
+// how borders were defined in history." BL-515 replaces the block partition —
+// the third and settled algorithm. What the province IS, and everything
+// downstream of it (BL-511 rendering, BL-513's ceiling, march_unit's payload),
+// is unchanged; only the shapes are drawn differently.
 //
 // A deterministic, seeded partition of every body's LAND tiles into small,
 // contiguous, purely spatial cells. Ocean is excluded outright: water is a
 // movement mode, not a locality, and a sea battle is not this object's job.
+// (Provinces over ocean are BL-516 and are NOT in this file yet — so the
+// land-only invariant below is NARROWED to land provinces, never deleted.)
 //
 // The province is deliberately NOT the region: no name, no owner, no culture,
 // no economy. It exists because BL-467 (battle state) needs an engagement
 // envelope with a stable identity, and folds the province id into the battle's
 // seed stream.
 //
-// THE ID ORDER IS THE CONTRACT. Downstream code walks provinces in ascending
-// `province::id` and gets an order that does not depend on container internals,
-// tile-map iteration order, or the order bodies were created in. See the id
-// layout below — sorted id order is body-major, then block raster order, then
-// component index, which is also a sensible spatial walk.
+// THE FOUR RULINGS THE ALGORITHM IMPLEMENTS
+//
+//   1. Provinces GROW FROM POPULATION CENTRES, and seed strength scales with
+//      the centre's scale (1-5): a metropolis draws a larger province than a
+//      village does.
+//   2. BOUNDARIES ARE RIVERS, ELEVATION DIFFERENCE, AND SOMETIMES ROADS — but
+//      a ROAD BINDS. Tiles a road links tend to share a province; a road is
+//      never a divider.
+//   3. Country no centre reaches becomes HINTERLAND provinces under the same
+//      boundary rules, seeded from the LEAST-ACCESSIBLE tile so a hinterland is
+//      shaped by its terrain rather than being whatever was left over.
+//   4. Size is a growth BUDGET, not a clamp: 7-12 soft, 3-12 hard, and
+//      BOUNDARIES WIN TIES. TINY PROVINCES ARE KEPT — "don't reject tiny
+//      provinces" — so nothing is merged away to satisfy a floor.
+//
+// THE ID ORDER IS STILL THE CONTRACT. Downstream code walks provinces in
+// ascending `province::id` and gets an order that does not depend on container
+// internals, tile-map iteration order, or the order bodies were created in.
 //
 // THE PARTITION IS PART OF WORLD GENERATION AND VERSIONS WITH IT. It is never
 // patched in place: a change to the algorithm re-rolls every battle in every
-// world. Authority: docs/GLOSSARY.md (the spatial vocabulary) and BL-466.
+// world. Authority: docs/generation/TILE_GENERATION.md § Province partition,
+// docs/GLOSSARY.md (the spatial vocabulary) and BL-515.
 // ---------------------------------------------------------------------------
 
 struct world;
 
 // ---------------------------------------------------------------------------
-// The size band (Ben's ruling, 2026-08-21) and the block edge that produces it
+// The size band — a GROWTH BUDGET, not a clamp (Ben's ruling, 2026-08-21)
 // ---------------------------------------------------------------------------
 
-/// Floor of the target band. A province below this is a FRAGMENT and pass 2
-/// merges it away unless it is a true islet with no land neighbour at all.
+/// Soft floor of the target band, and the growth budget a hinterland seed is
+/// given. SOFT: a region grows freely until it holds this many tiles, and past
+/// it annexes only ground NO HARDER TO REACH than the ground it already holds
+/// (the mean of its own step costs — see build_province_partition's pass 1).
+/// That self-referential brake is what "boundaries win ties" means
+/// mechanically, and it needs no threshold constant of its own. Nothing
+/// enforces this floor downward: a province that ran out of land ships small.
 inline constexpr std::size_t k_province_min_tiles = 7;
 
-/// Top of the target band. Not a hard clamp — a merge that has no smaller
-/// neighbour available may land above it, and that is reported rather than
-/// hidden (the coast bends the band; it always did).
+/// HARD ceiling. Growth stops here outright, whatever the cost of the next
+/// edge. The one size rule in this file that is a clamp.
 inline constexpr std::size_t k_province_max_tiles = 12;
 
-/// Base block edge, in tiles. A full 3x3 block is 9 tiles — the centre of the
-/// 7-12 band — so an interior province is in band with no repair at all.
+/// Hard-target floor (Ben: "3-12 hard target"). A region takes its first three
+/// tiles WHATEVER THEY COST — the growth rule refusing to stop early, which is
+/// not the same thing as a repair pass, and nothing is ever merged. It can
+/// still be missed: an island of two tiles ships at two tiles, because the land
+/// genuinely ran out. That is the case "don't reject tiny provinces" protects,
+/// and the harness reports how often it happens rather than asserting it away.
+inline constexpr std::size_t k_province_hard_min_tiles = 3;
+
+/// Minimum hex spacing between HINTERLAND seeds (and between a hinterland seed
+/// and a population centre): a chosen seed blocks every land tile within
+/// `this - 1` steps of it, measured geodesically over land so a strait counts
+/// as the distance it really is.
 ///
-/// THE COMPONENT BOUND STILL HOLDS. A block splits into hex-connected
-/// components and the component index is 3 bits (max 8). A 3x3 offset block's
-/// three grid rows are each internally adjacent left-to-right, so any set of
-/// mutually non-adjacent tiles takes at most 2 from each row: at most 6
-/// components, since one representative per component is such a set. 6 < 8.
-inline constexpr int k_province_block_edge = 3;
+/// THIS, NOT THE BUDGET, IS WHAT SETS HINTERLAND PROVINCE SIZE. Seeds are all
+/// chosen before any of them grows and then grow simultaneously, so a province
+/// is as big as the terrain lets it reach before meeting its neighbours.
+///
+/// PINNED STRUCTURALLY, and confirmed by measurement. Seeds at minimum
+/// separation d tile a plane in cells of area (sqrt(3)/2) * d^2 tiles:
+/// d = 3 gives 7.79, the only integer spacing whose ideal cell lands inside the
+/// 7-12 band at all (d = 2 gives 3.46, d = 4 gives 13.86). Measured mean over
+/// the 6-seed sweep in `province_partition_harness` section D: 7.87 tiles
+/// against the ideal 7.79 — near enough that the lattice argument is the real
+/// explanation of the size, which is the point of pinning it structurally.
+inline constexpr int k_province_seed_spacing = 3;
+
+// ---------------------------------------------------------------------------
+// The cost model — what makes an edge a border (BL-515)
+// ---------------------------------------------------------------------------
+// Growth is a cost-weighted flood fill. The cost of stepping from one tile to
+// its hex neighbour is what draws the border: an expensive edge is one a
+// province stops at. Costs are INTEGERS so a tie is exact and breaks on a
+// stable key, never on float noise or container order.
+//
+//   cost(a, b) = ( base + river + elevation + jitter )  [ / road divisor ]
+//
+// Every coefficient below is either STRUCTURAL (read off a domain the codebase
+// already defines) or PINNED BY MEASUREMENT (BL-463's discipline), and says
+// which it is. None is picked for feel.
+// ---------------------------------------------------------------------------
+
+/// Plain ground: flat, riverless, unroaded. The unit every other term is quoted
+/// against — the river cost is four of these, the jitter is half of one — so
+/// changing it rescales the whole model rather than shifting one term.
+inline constexpr int k_province_edge_base_cost = 10;
+
+/// Crossing a river edge (`tile_component::river_edges`, a per-side bitmask —
+/// already the right shape for a border). Four times plain ground: a river is
+/// the strongest single boundary signal the terrain offers, and this is the
+/// anchor the elevation coefficient is then pinned AGAINST rather than a
+/// number chosen on its own.
+inline constexpr int k_province_river_edge_cost = 40;
+
+/// Elevation cost per unit of normalised height difference (BL-517's retained
+/// `tile_component::height`, [0, 1]). The term is `round(|dh| * this)`, so it
+/// scales with the gradient exactly as ruled.
+///
+/// PINNED BY MEASUREMENT, 2026-08-21, against the river anchor above: a
+/// gradient at the 90th percentile of adjacent-land steepness should cost the
+/// same to cross as a river. `province_partition_harness` section C measures
+/// the adjacent-land |dh| distribution over a seed sweep and prints the implied
+/// coefficient on every run for exactly this purpose. The measurement, 653,910
+/// adjacent land edges pooled over 6 seeds plus the default world:
+///
+///   mean |dh| 0.0270   p50 0.0186   p90 0.0586   p99 0.1406
+///   implied k = k_province_river_edge_cost / p90 = 40 / 0.0586 = 682.7
+///
+/// The value below is that implied coefficient, rounded. What it makes true, in
+/// the terms the ruling is written in: the steepest tenth of edges are borders
+/// as strong as rivers, the median edge (0.0186 -> 13) costs a shade over plain
+/// ground, and a cliff (p99, 0.1406 -> 96) is nearly impassable to growth.
+///
+/// It is measured on TERRAIN ALONE, so re-pinning it does not chase its own
+/// tail: the |dh| distribution does not depend on the partition it feeds.
+inline constexpr int k_province_height_cost = 683;
+
+/// A ROAD BINDS (Ben, 2026-08-21). When BOTH tiles carry a road, the whole edge
+/// cost is divided by this — the road does not annihilate the terrain (a bridge
+/// over a gorge is still a gorge), it makes the link that much more binding.
+///
+/// PINNED BY MEASUREMENT, 2026-08-21.
+///
+/// THE PIN RULE: the SMALLEST divisor at which a road link is more binding than
+/// plain ground EVEN WHERE IT CROSSES A RIVER — so "a road binds" holds against
+/// the strongest boundary the terrain offers, which is what the ruling says,
+/// while the road stays as weak as that requirement allows. Read off the
+/// measured median edge: plain ground is base 10 + median elevation 13 + mean
+/// jitter 2 = 25, and a roaded river edge is 10 + 40 + 13 + 2 = 65 before the
+/// divide. 65 / d < 25 needs d >= 3; 4 is the next power of two and leaves
+/// margin for the seeds whose relief runs above the median.
+///
+/// THE MEASURED EFFECT, so the rule is not taken on trust. The instrument is
+/// the share of roaded adjacent-land edges that end up INTERNAL to a province
+/// rather than on its border, against the same share for plain edges;
+/// `province_partition_harness` C2 prints the shipped row on every run, and
+/// changing this constant and re-running produces the rest of the table
+/// (default world, k_province_height_cost = 683):
+///
+///   divisor   roaded internal   plain internal   lift      world mean size
+///      1          56.85%            56.20%       +0.65pp        8.00
+///      2          67.96%            55.85%      +12.11pp        7.94
+///      4          74.81%            55.34%      +19.47pp        7.87
+///      8          78.89%            55.19%      +23.70pp        7.86
+///
+/// At 1 the road does not bind at all (+0.65pp is noise) — which is the honest
+/// evidence that the divisor, not the base cost, is what carries the ruling.
+/// The lift is concave with NO sharp knee, so the table alone would not pick a
+/// value; the pin rule above is what picks it, and the table is what confirms
+/// the choice buys a real effect.
+inline constexpr int k_province_road_bind_divisor = 4;
+
+/// Seeded jitter added to every edge cost, as `fold(seed, lo, hi) % this` — so
+/// 0..4 on a base of 10.
+///
+/// STRUCTURAL: half the base cost. Enough to break a tie between two equally
+/// plausible borders, so borders are irregular rather than perfectly
+/// cost-optimal (organic is the point of the item); never enough to outweigh a
+/// river or a real slope. It is also what keeps the partition SEED load-bearing
+/// now that the fill is otherwise a pure function of terrain.
+///
+/// No RNG stream is consumed: the draw is a stateless fold, symmetric in the
+/// two tile ids, so the cost of an edge does not depend on which side it is
+/// read from.
+inline constexpr int k_province_edge_jitter = 5;
 
 /// One province — a contiguous run of land tiles on a single body.
 struct province
 {
-    /// Stable derived identity. Layout, high bits first:
-    ///   bits 31..20 (12) — the body's RANK in ascending entity-id order over
-    ///                      `world::bodies`. Makes the id globally unique while
-    ///                      keeping ascending-id iteration body-major.
-    ///   bits 19..3  (17) — the base 3x3 block's raster index within the body
-    ///                      (block_row * block_cols + block_col). A 3x3 grid has
-    ///                      fewer blocks than the 2x2 one it replaced, so 17 bits
-    ///                      remain comfortable.
-    ///   bits  2..0  (3)  — the connected-component index within that block,
-    ///                      assigned smallest-member-tile-id first (a block
-    ///                      bisected by ocean splits; a 3x3 block yields at most
-    ///                      6 components — see k_province_block_edge).
-    /// Ids are DERIVED, never allocated, so they are stable under recompute and
-    /// carry gaps wherever a block held no land, a fragment was merged away, or
-    /// a merge folded two provinces into the lower of their two ids.
+    /// Stable derived identity: THE LOWEST ENTITY ID AMONG `tiles`.
+    ///
+    /// DERIVED, NEVER ALLOCATED (Ben, 2026-08-21, revising the allocated-id
+    /// answer). This dissolves the determinism hazard rather than guarding
+    /// against it — an id that is not handed out cannot be handed out in the
+    /// wrong order. Nothing new is serialised: no allocator state, no next-id
+    /// counter, no save-format surface. And it is unique by construction, since
+    /// every tile belongs to exactly one province.
+    ///
+    /// IT IS NEVER 0, because `null_entity` is 0 and no tile carries that id.
+    /// That makes `province_of`'s 0-for-absent return structurally safe rather
+    /// than merely unlikely — it was a real-id collision under the old block
+    /// layout, and is not one now.
+    ///
+    /// The cost it carries: a derived id CHANGES when the province changes
+    /// shape. Acceptable because borders move during GENERATION ONLY — ids
+    /// churn while the Era -1 sim redraws them (BL-518) and are frozen before
+    /// anything outside generation can hold one. A battle record, a march order
+    /// or a save only ever sees the settled id.
+    ///
+    /// Ascending id order is therefore ascending lowest-member-tile order. It
+    /// is a stable spatial walk, but it is NO LONGER guaranteed body-major:
+    /// that was a property of the old body-rank bit field, and nothing depends
+    /// on it (`province::body` names the body explicitly).
     uint32_t id = 0;
 
-    /// The body every tile in this province sits on. A province never spans
-    /// bodies, and never spans water.
+    /// The body every tile in this province sits on. A LAND province never
+    /// spans bodies, and never spans water. (Ocean provinces are BL-516; when
+    /// they land, this claim narrows to land provinces rather than vanishing —
+    /// NR-428.)
     entity_id body = null_entity;
 
     /// Member land tiles, ASCENDING entity id. Non-empty for every province in
-    /// a built partition.
+    /// a built partition — so `tiles.front()` IS `id`.
     std::vector<entity_id> tiles;
 };
 
@@ -105,10 +255,9 @@ struct province_partition
     std::unordered_map<entity_id, uint32_t> tile_province;
 
     /// Owning province id for @p tile, or 0 when the tile is ocean, off-body, or
-    /// otherwise unpartitioned. Province id 0 is unreachable as a real id (block
-    /// 0, component 0, body rank 0 would require a land tile there AND is still a
-    /// valid id) — so callers wanting certainty should check `tile_province`
-    /// directly. This accessor is the convenience path.
+    /// otherwise unpartitioned. Since BL-515 derived ids from the lowest member
+    /// tile, 0 is STRUCTURALLY unreachable as a real id (no tile carries
+    /// `null_entity`), so this accessor's 0 is an unambiguous "no province".
     uint32_t province_of(entity_id tile) const
     {
         const auto it = tile_province.find(tile);
@@ -123,44 +272,70 @@ struct province_partition
 /// Build @p w's province partition from its tiles, REPLACING `w.provinces`.
 ///
 /// Pure in everything but its inputs: the result is a function of (@p seed, each
-/// body's grid dimensions, its land mask, and its tiles' composition / landform /
-/// river edges) alone. NO RNG STREAM IS CONSUMED — every draw is a stateless fold
-/// from @p seed, the campaign_battle identity idiom, so the partition can never
-/// perturb another generation pass's draws no matter where it is called.
+/// body's grid dimensions, its land mask, its tiles' height / river edges / road
+/// level, and its population centres) alone. NO RNG STREAM IS CONSUMED — every
+/// draw is a stateless fold from @p seed, the campaign_battle identity idiom, so
+/// the partition can never perturb another generation pass's draws no matter
+/// where it is called.
 ///
-/// Three passes (BL-466's settled algorithm):
-///   1. Base blocks. A per-body origin offset (dx, dy in {0,1,2}) folded from
-///      (seed, body), then 3x3 offset-coordinate blocks over the land tiles.
-///      An interior block is 9 tiles — the middle of the 7-12 band. Each block
-///      is then split into hex-connected components, so no province spans a
-///      strait.
-///   2. FRAGMENT MERGE — the pass that actually holds the floor. Water and
-///      coastline cut blocks up, and a bisected 3x3 yields components of 1-4
-///      tiles, far under the floor. Every province below k_province_min_tiles
-///      merges into its SMALLEST hex-adjacent province (ties by lowest id), and
-///      the merged province keeps the LOWER of the two ids, so ids stay derived.
-///      Run to a fixpoint in ascending id order, so the result is a function of
-///      the partition alone and not of visit order. A true islet with no land
-///      neighbour stands alone — it is genuinely all the land there is.
-///      Merging smallest-first is what keeps the ceiling honest: a fragment
-///      joins the emptiest neighbour rather than the first one found.
-///   3. Terrain-seam jitter. One sweep over boundary tiles in ascending tile id,
-///      moving a tile across a border when it sits across a seam (a river edge
-///      or a composition/landform change) from its OWN province and shares an
-///      unseamed edge with the neighbouring one. Borders drift onto rivers and
-///      terrain edges, so a battle envelope's boundary means something. Clamped:
-///      both provinces stay inside the band, the mover may not be a cut vertex
-///      of its source, and each province is resized at most once per sweep.
-///      It runs AFTER the merge (it ran before it, when the merge only repaired
-///      single tiles) so its band clamp reads the real, final sizes.
+/// Two passes (BL-515's settled algorithm):
+///
+///   1. SETTLEMENT GROWTH. Every population centre on the body is a seed, in
+///      ascending tile id, with a growth budget scaled by its centre scale
+///      (1 -> 7 tiles .. 5 -> 12). All seeds grow SIMULTANEOUSLY as one
+///      cost-weighted multi-source fill, so neighbouring centres meet on the
+///      terrain between them rather than in the order they were listed. Every
+///      region takes its first `k_province_hard_min_tiles` whatever they cost,
+///      grows freely to its budget, then annexes only ground no harder to reach
+///      than what it already holds, and stops at `k_province_max_tiles`
+///      outright.
+///
+///   2. HINTERLAND. Land no centre reached is partitioned under the SAME cost
+///      rules. Seeds are chosen from the LEAST-ACCESSIBLE unclaimed tile
+///      onward — the tile whose six sides are the most expensive to cross,
+///      coast counted as a border at least as strong as a river — each one
+///      blocking `k_province_seed_spacing` around itself, and then they ALL
+///      grow simultaneously. Choosing the whole seed set before any of it grows
+///      is what makes a hinterland a shape the terrain chose; growing them one
+///      at a time was measured to produce a spike at exactly the budget and a
+///      flood of one-tile slivers wedged between finished regions.
+///
+///      Land the spaced fill still could not reach — pockets enclosed by
+///      regions that hit the ceiling — is seeded in the same fixed order
+///      afterwards. That is where a genuinely tiny province comes from, and it
+///      is KEPT.
+///
+/// There is NO third repair pass, by ruling: nothing is merged away to satisfy
+/// a floor, and a province that ran out of land small ships small.
 ///
 /// Columns wrap east-west (the cylinder every other body-grid consumer uses);
 /// rows do not.
+///
+/// DETERMINISM. `world::bodies` and `world::population_centre_tile` are both
+/// UNORDERED maps whose iteration order is a container-layout accident. Both
+/// walks are sorted explicitly here; the fill's priority queue breaks every tie
+/// on (cost, seed tile, tile), a total order over unique keys. No container
+/// order reaches any decision.
 ///
 /// @param w    World whose tiles are read and whose `provinces` is replaced.
 /// @param seed Partition seed. Callers derive this from the world seed with
 ///             their own XOR offset so the stream stays uncorrelated.
 void build_province_partition(world& w, uint32_t seed);
+
+/// The cost of stepping between two hex-adjacent LAND tiles, exposed so the
+/// harness can measure the cost model rather than re-implement it (a border
+/// check that re-derives its own costs proves nothing about the partition).
+///
+/// Symmetric in @p a and @p b: `edge = edge` however it is read.
+///
+/// @param w    World the tiles belong to.
+/// @param seed The partition seed, for the jitter term.
+/// @param a    One tile.
+/// @param b    Its hex neighbour.
+/// @param side The side index (0-5, odd-r) leading from @p a to @p b.
+/// @return     The integer edge cost, always >= 1.
+int province_edge_cost(const world& w, uint32_t seed, entity_id a, entity_id b, int side);
+
 
 // ---------------------------------------------------------------------------
 // Province building ceiling (BL-513) — "how much can this land sustain?"
@@ -311,9 +486,11 @@ inline constexpr uint32_t province_section_version = 1;
 /// against a corrupt or malicious length prefix.
 inline constexpr uint32_t province_section_max_provinces = 1u << 24;
 
-/// Sanity ceiling on one province's declared tile count. Real provinces are
-/// 7-12 tiles (islets and crowded-coast merges aside); this is orders of
-/// magnitude clear.
+/// Sanity ceiling on one province's declared tile count. A built province is
+/// 1-12 tiles — `k_province_max_tiles` is a hard clamp on growth, and the floor
+/// is whatever land was there — so this is orders of magnitude clear. It stays
+/// generous rather than tight to `k_province_max_tiles` so a future algorithm
+/// change is a format-compatible one.
 inline constexpr uint32_t province_section_max_tiles = 1u << 16;
 
 /// Append @p p to @p out as: magic, version, seed, province count, then per

@@ -302,13 +302,19 @@ void m1_march_unit_legality()
         check(order_equal(w.units.at(unit).order, snapshot), "  ...and mutates nothing");
     }
     // -- rejected_invalid: the unset default --
-    // MEASURED, not assumed: province id 0 is a REAL id (body rank 0 | block 0
-    // | component 0) and on this very fixture it is col 0/1's province. That is
-    // why `corp_command::province` defaults to `no_province` and not to 0 — a 0
-    // default would give an omitted wire field a real destination.
+    // THIS ROW WAS NARROWED BY BL-515 (2026-08-21), not deleted. It used to
+    // assert that province id 0 IS a real id — true under the block layout
+    // (body rank 0 | block 0 | component 0), and the original reason
+    // `corp_command::province` defaults to `no_province` rather than 0.
+    // BL-515 derives an id from its LOWEST MEMBER TILE, and no tile carries
+    // `null_entity` (0), so 0 became STRUCTURALLY unreachable as a province id.
+    // The old assertion is therefore not merely failing, it is contrary to the
+    // new contract — so it is replaced by the assertion that now carries the
+    // claim, and the BEHAVIOUR it protected (an omitted field is not a
+    // destination) is unchanged and still checked below.
     {
-        check(w.provinces.find(0u) != nullptr,
-              "province id 0 IS a real province here — which is why it cannot be the unset sentinel");
+        check(w.provinces.find(0u) == nullptr,
+              "province id 0 is unreachable (BL-515: ids derive from a tile id, never null_entity)");
         corp_command bad = cmd; bad.province = no_province;
         const auto rr = apply_corp_command(w, reg, bad);
         check(rr == corp_command_result::rejected_invalid,

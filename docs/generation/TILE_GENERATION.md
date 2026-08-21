@@ -491,6 +491,51 @@ monotonic descent / no cycles, discount ordering) and a bitmask-identity check f
 
 ---
 
+## Province partition (BL-515, landed 2026-08-21)
+
+The last generation pass over a body's land: `build_province_partition`
+(`src/world/province.{hpp,cpp}`), run from `make_hard_coded_world` after nations,
+corporations, population centres, rivers and roads exist — because it reads all of
+them. It replaces BL-466's 3×3 block partition, which Ben rejected on sight:
+*"packing each province perfectly looks nice, but it is scarcely how borders were
+defined in history."*
+
+**Provinces grow from settlement and are stopped by terrain.** Four rulings
+(2026-08-21) define it, and `province.hpp` is the authority for the mechanics:
+
+| Ruling | How the pass realises it |
+|---|---|
+| Seeds are population centres, strength scaling with scale 1–5 | Each centre seeds one region with a growth budget of 7 tiles (village) to 12 (metropolis); all centres grow simultaneously as one multi-source fill |
+| Boundaries are rivers, elevation difference, and sometimes roads — but **a road binds** | Integer edge cost `base 10 + river 40 + round(\|Δheight\| × 683) + jitter 0–4`, the whole sum divided by 4 when both tiles are roaded |
+| Identity is the **lowest-id member tile** | Derived, never allocated — so an id cannot be handed out in the wrong order, and nothing new is serialised |
+| Country no centre reaches becomes **hinterland** | Seeds chosen from the least-accessible tile onward at a minimum spacing of 3, all chosen before any grows |
+| 7–12 soft, 3–12 hard, boundaries win ties; **tiny provinces are kept** | 12 is the one hard clamp; a region takes its first 3 tiles at any cost, then grows to its budget, then annexes only ground no harder to reach than what it already holds. Nothing is ever merged away |
+
+**Elevation is why BL-517 exists.** The pass reads `tile_component::height` — the
+retained Pass 1 heightmap — not the seven landform classes, whose numeric order
+means nothing. That field graduated out of the disposable-intermediate set
+precisely for this consumer (`GENERATION_LEDGER.md` § Data lifetime).
+
+**Ocean is out of scope**; provinces over water are BL-516. Until then the
+land-only invariant stands as written, narrowed to land provinces rather than
+deleted (NR-428).
+
+**The measured distribution, 6 seeds** (`tools/verify/province_partition_harness.cpp`,
+sections C and D — which is also the re-pinning instrument for the two
+measurement-pinned coefficients):
+
+| Partition | provinces | min | max | mean | < 7 | < 3 | > 12 | % in 7–12 |
+|---|---|---|---|---|---|---|---|---|
+| 3×3 blocks (superseded) | 21,161 | 1 | 18 | 9.11 | 109 | — | 336 | 97.90% |
+| BL-515 organic | 24,498 | 1 | 12 | 7.87 | 6,195 | 3,008 | 0 | 74.71% |
+
+The spread is wider **on purpose** and is reported rather than tuned: organic
+borders are irregular, the 12-tile ceiling is now absolute where the block
+partition's merge could overshoot it, and the sub-floor tail is the pockets a
+hard ceiling leaves behind — kept by ruling, not repaired.
+
+---
+
 ## Deferred
 
 The following are noted here as future work. None are in scope for the prototype. **Each is a
