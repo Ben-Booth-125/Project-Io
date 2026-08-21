@@ -43,7 +43,10 @@
 //      shaped by its terrain rather than being whatever was left over.
 //   4. Size is a growth BUDGET, not a clamp: 7-12 soft, 3-12 hard, and
 //      BOUNDARIES WIN TIES. TINY PROVINCES ARE KEPT — "don't reject tiny
-//      provinces" — so nothing is merged away to satisfy a floor.
+//      provinces" — so nothing is merged away to satisfy a floor. 12 is a
+//      PREFERENCE (Ben, 2026-08-21, NR-438: "we prefer up to 12 tiles, but up
+//      to 20 is permitted in rare cases"); the absolute bound is 20, and it is
+//      the only size claim the harness asserts.
 //
 // THE ID ORDER IS STILL THE CONTRACT. Downstream code walks provinces in
 // ascending `province::id` and gets an order that does not depend on container
@@ -70,9 +73,33 @@ struct world;
 /// enforces this floor downward: a province that ran out of land ships small.
 inline constexpr std::size_t k_province_min_tiles = 7;
 
-/// HARD ceiling. Growth stops here outright, whatever the cost of the next
-/// edge. The one size rule in this file that is a clamp.
+/// PREFERRED ceiling, and the clamp GROWTH obeys. Passes 1 and 2 stop here
+/// outright, whatever the cost of the next edge. It is NOT the bound a shipped
+/// province is guaranteed to satisfy — see `k_province_hard_cap_tiles`.
+///
+/// Ben, 2026-08-21, ruling on NR-438: "We prefer up to 12 tiles, but up to 20
+/// is permitted in rare cases." So 12 stopped being the one absolute rule in
+/// this file the moment singleton absorption (pass 3) could carry a full
+/// region past it, and the ruling makes that deliberate rather than a slip.
 inline constexpr std::size_t k_province_max_tiles = 12;
+
+/// HARD CAP — the bound that really is absolute, and the only size assertion
+/// the harness makes (Ben, 2026-08-21, NR-438). Nothing in the partition may
+/// ship a province larger than this; `province_partition_harness` § P5a fails
+/// if one does.
+///
+/// It is not enforced by a clamp, and deliberately so. Absorption picks a
+/// singleton's CHEAPEST neighbour, and choosing a costlier one to respect a
+/// size bound would contradict the cheapest-edge rule the whole growth model is
+/// expressed in. So the cap is ASSERTED rather than imposed: it is a claim about
+/// what the cost model produces, and it breaks loudly if that stops being true.
+///
+/// Headroom, measured: the shipped partition tops out at 16 tiles across the
+/// 6-seed sweep, so the cap holds today with four tiles to spare. The over-12
+/// share (4.9% at the time of the ruling) is REPORTED by the harness, never
+/// asserted — "rare" is Ben's judgement to make against a number, and no
+/// threshold for it has been chosen.
+inline constexpr std::size_t k_province_hard_cap_tiles = 20;
 
 /// Hard-target floor (Ben: "3-12 hard target"). A region takes its first three
 /// tiles WHATEVER THEY COST — the growth rule refusing to stop early, which is
@@ -218,8 +245,10 @@ struct province_absorption_stats
     /// Fixpoint iterations run (>= 1 whenever any singleton existed).
     int passes = 0;
 
-    /// Absorptions that pushed a survivor PAST `k_province_max_tiles`. Reported,
-    /// never prevented — see the pass-3 note on build_province_partition.
+    /// Absorptions that pushed a survivor PAST the PREFERRED ceiling
+    /// `k_province_max_tiles`. Reported, never prevented — permitted by ruling
+    /// (Ben, 2026-08-21) up to `k_province_hard_cap_tiles`, which IS asserted.
+    /// See the pass-3 note on build_province_partition.
     int over_ceiling_created = 0;
 };
 
@@ -349,11 +378,20 @@ struct province_partition
 ///      absorbed. It is KEPT, and `province_absorption_stats` reports how many
 ///      remain — nothing reaches across water to place them.
 ///
-///      IT CAN BREACH THE CEILING. A survivor already holding
-///      `k_province_max_tiles` that absorbs a singleton ships at 13. That is
-///      reported (`over_ceiling_created`), never silently clamped: clamping
-///      would mean choosing a costlier neighbour, which is exactly the
+///      IT CAN EXCEED THE PREFERRED CEILING, BY RULING. A survivor already
+///      holding `k_province_max_tiles` that absorbs a singleton ships at 13.
+///      That is reported (`over_ceiling_created`), never silently clamped:
+///      clamping would mean choosing a costlier neighbour, which is exactly the
 ///      "boundaries win" logic the cheapest-edge rule exists to express.
+///
+///      Ben ruled on this directly (2026-08-21, NR-438): "We prefer up to 12
+///      tiles, but up to 20 is permitted in rare cases." So 12 is the PREFERENCE
+///      and `k_province_hard_cap_tiles` (20) is the bound — and the cheapest-edge
+///      rule survives intact, which is what the ruling was chosen to protect. The
+///      counterfactual that was costed at the time (prefer a neighbour WITH ROOM,
+///      falling back to a full one) was measured, reported and then DELETED under
+///      this ruling: it bought a tighter distribution by deliberately choosing a
+///      costlier neighbour, and the ceiling breach was its only justification.
 ///
 /// There is still NO merge-to-floor repair pass, by ruling: nothing else is
 /// merged away to satisfy a floor, and a province that ran out of land at two
@@ -541,11 +579,11 @@ inline constexpr uint32_t province_section_version = 1;
 inline constexpr uint32_t province_section_max_provinces = 1u << 24;
 
 /// Sanity ceiling on one province's declared tile count. A built province is a
-/// handful of tiles — `k_province_max_tiles` clamps GROWTH, the floor is
-/// whatever land was there, and singleton absorption can carry a survivor a few
-/// tiles past the ceiling — so this is orders of magnitude clear. It stays
-/// generous rather than tight to `k_province_max_tiles` so a future algorithm
-/// change is a format-compatible one.
+/// handful of tiles — `k_province_max_tiles` (12) is the PREFERRED size and the
+/// clamp growth obeys, `k_province_hard_cap_tiles` (20) is the absolute bound,
+/// and the floor is whatever land was there — so this is orders of magnitude
+/// clear of all three. It stays generous rather than tight to either constant so
+/// a future algorithm change is a format-compatible one.
 inline constexpr uint32_t province_section_max_tiles = 1u << 16;
 
 /// Append @p p to @p out as: magic, version, seed, province count, then per

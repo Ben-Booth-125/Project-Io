@@ -541,20 +541,6 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
                     int         best_cost  = 0;
                     entity_id   best_key   = null_entity; // candidate's province id
                     std::size_t best_index = 0;
-#ifdef IO_ABSORB_PREFER_ROOM
-                    // MEASURED, NOT SHIPPED (2026-08-21). The counterfactual Ben
-                    // will ask about the moment he sees the breach count: prefer
-                    // a neighbour with room under the ceiling, falling back to a
-                    // full one only when every neighbour is full. Kept compiled
-                    // out rather than described in prose so the number can be
-                    // reproduced with -DIO_ABSORB_PREFER_ROOM instead of taken
-                    // on trust (build_gen_harness.bat with /DIO_ABSORB_PREFER_ROOM
-                    // added to its cl line). It is NOT the shipped rule: choosing a
-                    // costlier neighbour contradicts the cheapest-edge rule the
-                    // ruling is expressed in — that call is Ben's, not this
-                    // pass's.
-                    int best_room = 0;
-#endif
 
                     for (int s = 0; s < 6; ++s)
                     {
@@ -577,17 +563,18 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
 
                         const int       cost = edge_cost_impl(seed, t, tc, n, nit->second, s);
                         const entity_id key  = region_id(nri);
-#ifdef IO_ABSORB_PREFER_ROOM
-                        const int room = regions[nri].tiles.size() < k_province_max_tiles ? 0 : 1;
-                        if (!found || room < best_room
-                            || (room == best_room
-                                && (cost < best_cost || (cost == best_cost && key < best_key))))
-                        {
-                            best_room = room;
-#else
+                        // CHEAPEST EDGE WINS, FULL OR NOT. The neighbour's size
+                        // is deliberately not consulted: a prefer-a-neighbour-
+                        // with-room variant was built and measured against this
+                        // one (241 over the preferred ceiling vs 1,099, max 14 vs
+                        // 16), and DELETED under Ben's 2026-08-21 ruling on
+                        // NR-438 — 12 became a preference and 20 the hard cap, so
+                        // the breach that was its only justification is now
+                        // permitted. Consulting size here would mean choosing a
+                        // COSTLIER neighbour, contradicting the cheapest-edge
+                        // rule the whole growth model is expressed in.
                         if (!found || cost < best_cost || (cost == best_cost && key < best_key))
                         {
-#endif
                             found      = true;
                             best_cost  = cost;
                             best_key   = key;

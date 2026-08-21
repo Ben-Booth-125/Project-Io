@@ -3,7 +3,8 @@
 //
 // Four sections:
 //   P — the partition's own invariants: coverage, no ocean, connectivity, the
-//       hard 12-tile ceiling, the ascending-id contract, seeded determinism,
+//       hard 20-tile cap (12 is the PREFERENCE, reported not asserted — Ben,
+//       2026-08-21, NR-438), the ascending-id contract, seeded determinism,
 //       THE DERIVED-IDENTITY CONTRACT (P8: an id IS its lowest member tile),
 //       and the settlement seeds (P9).
 //   C — THE COST MODEL, MEASURED. The pinning instrument for the two
@@ -13,7 +14,7 @@
 //   D — the SIZE DISTRIBUTION across a seed sweep. REPORTED, not engineered:
 //       organic borders are meant to be irregular, so D describes what the cost
 //       model produced against the superseded 3x3 partition's numbers rather
-//       than asserting a spread. Its one assertion is the hard ceiling.
+//       than asserting a spread. Its one size assertion is the hard CAP of 20.
 //   S — the SERIALISATION SEAM, the risk in the item. Three properties:
 //       S1  one appender / no reorder — a pre-BL-466 stream is a byte-exact
 //           PREFIX of a post-BL-466 stream of the same log.
@@ -299,37 +300,69 @@ int main()
         }
         std::printf("\n");
 
-        // P5a — THE HARD CEILING, as it stands after singleton absorption.
+        // P5a — THE HARD CAP, and the accounting identity beneath it.
         //
-        // GROWTH's clamp is untouched: pass 1 and pass 2 still stop dead at
-        // k_province_max_tiles. But pass 3 (Ben, 2026-08-21) absorbs a one-tile
-        // province into its CHEAPEST neighbour, and that neighbour may already
-        // be full — so a survivor can ship at 13, 14 or more. The alternative
-        // would be to pick a costlier neighbour instead, which contradicts the
-        // one rule absorption is defined by, so it is REPORTED, not clamped.
+        // Ben ruled on NR-438 (2026-08-21): "We prefer up to 12 tiles, but up to
+        // 20 is permitted in rare cases." So there are now two bounds doing two
+        // different jobs, and this section keeps them apart deliberately:
         //
-        // The row therefore asserts the exact identity rather than a weakened
-        // inequality: EVERY tile a province holds above the ceiling arrived by
-        // absorption, and the count of such absorptions accounts for all of it.
-        // If growth ever leaks past 12 on its own, the two sides diverge.
+        //   k_province_max_tiles (12)      the PREFERENCE. Growth's own clamp —
+        //                                  passes 1 and 2 stop dead here — but
+        //                                  NOT a claim about shipped sizes, and
+        //                                  therefore NOT asserted as one.
+        //   k_province_hard_cap_tiles (20) the BOUND. Asserted. Nothing in the
+        //                                  partition may ship larger.
+        //
+        // Pass 3 absorbs a one-tile province into its CHEAPEST neighbour, and
+        // that neighbour may already be full, so a survivor can ship at 13 or
+        // more. Under the ruling that is permitted rather than merely tolerated;
+        // what must stay true is that it stays RARE and stays UNDER 20.
+        //
+        // Three rows, and the split between them is the whole point:
+        //
+        //   P5a  the hard cap, ASSERTED. The one size claim this harness makes.
+        //   P5a2 the accounting identity, ASSERTED — every tile above the
+        //        PREFERENCE arrived by absorption, so growth's own clamp is
+        //        still proven separately. If growth ever leaks past 12 on its
+        //        own, the two sides diverge and this fails.
+        //   P5a3 "rare", REPORTED. The over-12 share was 4.9% at the ruling.
+        //        Whether that counts as rare is Ben's judgement to make against
+        //        a number, and no threshold for it has been chosen — so this
+        //        prints and never fails. Asserting an unchosen threshold would
+        //        be inventing the rule the ruling declined to state.
         {
-            std::size_t excess = 0;
+            std::size_t excess = 0, largest = 0;
             for (const auto& [size, count] : hist)
+            {
                 if (size > k_province_max_tiles)
                     excess += (size - k_province_max_tiles) * static_cast<std::size_t>(count);
+                if (count > 0 && size > largest)
+                    largest = size;
+            }
 
             world                     w5 = w;
             province_absorption_stats st5;
             build_province_partition(w5, part.seed, &st5);
 
-            std::printf("        %zu provinces over the 12-tile ceiling, %zu tiles of excess;"
-                        " absorption made %d of them (%d singletons: %d absorbed, %d true"
-                        " islands, %d fixpoint passes)\n",
-                        over, excess, st5.over_ceiling_created, st5.singletons_before,
-                        st5.absorbed, st5.true_islands, st5.passes);
+            std::printf("        largest province %zu tiles (hard cap %zu, preferred %zu)\n",
+                        largest, k_province_hard_cap_tiles, k_province_max_tiles);
+            check(largest <= k_province_hard_cap_tiles,
+                  "P5a  no province exceeds the HARD CAP (Ben, 2026-08-21: 20 tiles)");
+
+            std::printf("        %zu provinces over the %zu-tile PREFERENCE, %zu tiles of"
+                        " excess; absorption made %d of them (%d singletons: %d absorbed,"
+                        " %d true islands, %d fixpoint passes)\n",
+                        over, k_province_max_tiles, excess, st5.over_ceiling_created,
+                        st5.singletons_before, st5.absorbed, st5.true_islands, st5.passes);
             check(excess == static_cast<std::size_t>(st5.over_ceiling_created),
-                  "P5a every tile above the 12-tile ceiling arrived by absorption (growth's"
-                  " clamp still holds)");
+                  "P5a2 every tile above the PREFERRED ceiling arrived by absorption"
+                  " (growth's own clamp still holds)");
+
+            std::printf("        P5a3 REPORTED, never asserted: %.2f%% of provinces exceed the"
+                        " preferred %zu (%zu of %zu). \"Rare\" is Ben's call against this"
+                        " number; it was 4.9%% when the ceiling was ruled.\n",
+                        total ? 100.0 * double(over) / double(total) : 0.0,
+                        k_province_max_tiles, over, total);
         }
 
         // P5b — REPORTED, NOT ASSERTED, and deliberately so. Ben, 2026-08-21:
@@ -654,16 +687,18 @@ int main()
     // -----------------------------------------------------------------------
     // D — THE SIZE DISTRIBUTION ACROSS SEEDS. REPORTED, not engineered. Organic
     // borders are meant to be irregular, so this table is a description of what
-    // the cost model produced, and the ONLY assertion it carries is the hard
-    // ceiling. The 3x3 block partition it replaces measured, over these same 6
+    // the cost model produced, and the ONLY size assertion it carries is the
+    // HARD CAP of 20 (Ben, 2026-08-21, NR-438) — the 12-tile figure is a
+    // preference and is reported, not asserted. The 3x3 block partition it replaces measured, over these same 6
     // seeds: 21,161 provinces, mean 9.11, 97.90% in the 7-12 band, 109 under
     // the floor (all true islands) and 336 over. That comparison is the honest
     // way to report what changed; it is NOT a target to match, and the cost
     // weights must not be tuned to chase it.
     // -----------------------------------------------------------------------
-    std::printf("\nD — size distribution across seeds (soft band %zu-%zu, hard %zu-%zu)\n",
+    std::printf("\nD — size distribution across seeds (soft band %zu-%zu, hard floor %zu,"
+                " preferred ceiling %zu, HARD CAP %zu)\n",
                 k_province_min_tiles, k_province_max_tiles, k_province_hard_min_tiles,
-                k_province_max_tiles);
+                k_province_max_tiles, k_province_hard_cap_tiles);
     {
         constexpr int k_seeds = 6;
         std::size_t   all_total = 0, all_in_band = 0, all_under_soft = 0, all_under_hard = 0,
@@ -741,15 +776,34 @@ int main()
         std::printf("  3x3 BASELINE (superseded)    |    1   18   9.11 | 109   -  336 |  97.90%%\n");
         std::printf("  BL-515 PRE-ABSORPTION        |    1   12   7.87 |6195 3008    0 |  74.71%%\n");
 
-        // D1 — the hard ceiling, across every seed. Growth's one clamp — and
-        // absorption's ONE licensed exception to it: a survivor already at 12
-        // that takes in a singleton ships at 13, because the alternative is to
-        // choose a costlier neighbour, which contradicts the cheapest-edge rule
-        // absorption is defined by. The row therefore asserts what is actually
-        // true: nothing exceeds the ceiling EXCEPT by absorption, and the breach
-        // count in the table is the whole account of it.
+        // D1 — THE HARD CAP, across every seed. This is the size claim the
+        // sweep asserts, and after Ben's 2026-08-21 ruling on NR-438 it is the
+        // ONLY one: 12 is the preference growth clamps to, 20 is the bound
+        // nothing may cross. `worst_ceiling` is the largest province over all
+        // six seeds, so one number carries the whole sweep.
+        std::printf("  worst-case province across %d seeds: %zu tiles (hard cap %zu)\n",
+                    k_seeds, worst_ceiling, k_province_hard_cap_tiles);
+        check(worst_ceiling <= k_province_hard_cap_tiles,
+              "D1  no province on any seed exceeds the HARD CAP of 20 tiles (NR-438)");
+
+        // D1a — the accounting identity, kept separate from the cap so growth's
+        // own clamp is still proven on its own terms. Absorption is the ONLY
+        // licensed route past the preference: a survivor already at 12 that takes
+        // in a singleton ships at 13, because the alternative is to choose a
+        // costlier neighbour, which contradicts the cheapest-edge rule absorption
+        // is defined by. If growth itself ever leaks past 12, `all_over` outruns
+        // the breach count and this fails.
         check(all_over <= all_breach,
-              "D1  the 12-tile ceiling holds except where absorption breached it");
+              "D1a nothing exceeds the PREFERRED 12 except where absorption breached it");
+
+        // D1b — "rare", REPORTED and never asserted. Ben ruled that over-12 is
+        // "permitted in rare cases" without naming what rare is, and inventing a
+        // threshold here would be inventing the half of the rule he declined to
+        // state. So the sweep prints the share and leaves the judgement with him.
+        std::printf("  over the preferred %zu: %zu of %zu provinces (%.2f%%) — REPORTED, not"
+                    " asserted; 4.9%% when the ceiling was ruled\n",
+                    k_province_max_tiles, all_over, all_total,
+                    all_total ? 100.0 * double(all_over) / double(all_total) : 0.0);
 
         // A1 — the absorption ledger balances. Every size-1 province that
         // existed is accounted for exactly once: absorbed, or kept as a true

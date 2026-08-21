@@ -509,7 +509,18 @@ defined in history."*
 | Boundaries are rivers, elevation difference, and sometimes roads — but **a road binds** | Integer edge cost `base 10 + river 40 + round(\|Δheight\| × 683) + jitter 0–4`, the whole sum divided by 4 when both tiles are roaded |
 | Identity is the **lowest-id member tile** | Derived, never allocated — so an id cannot be handed out in the wrong order, and nothing new is serialised |
 | Country no centre reaches becomes **hinterland** | Seeds chosen from the least-accessible tile onward at a minimum spacing of 3, all chosen before any grows |
-| 7–12 soft, 3–12 hard, boundaries win ties; **tiny provinces are kept** | 12 is the one hard clamp; a region takes its first 3 tiles at any cost, then grows to its budget, then annexes only ground no harder to reach than what it already holds. Nothing is ever merged away |
+| 7–12 soft, 3–12 hard, boundaries win ties; **tiny provinces are kept** | A region takes its first 3 tiles at any cost, then grows to its budget, then annexes only ground no harder to reach than what it already holds. Nothing is ever merged away |
+| **12 is a PREFERENCE; 20 is the hard cap** (Ben, 2026-08-21, NR-438) | Growth clamps at 12, but singleton absorption can carry a full region past it. The bound that is *asserted* is 20 (`k_province_hard_cap_tiles`); the over-12 share is **reported**, never asserted |
+
+**The ceiling was raised on 2026-08-21**, and the reason is worth keeping: pass 3
+absorbs a one-tile province into its **cheapest** neighbour, and that neighbour may
+already hold 12. The three ways out were clamping (dishonest), preferring a
+roomier neighbour (which contradicts the cheapest-edge rule the growth model is
+*expressed in*), or raising the bound. Ben raised the bound — *"we prefer up to 12
+tiles, but up to 20 is permitted in rare cases"* — so the cheapest-edge rule
+survives intact, which is what the ruling was chosen to protect. The prefer-room
+variant was measured (241 over the preference, max 14) and then deleted; the
+breach was its only justification.
 
 **Elevation is why BL-517 exists.** The pass reads `tile_component::height` — the
 retained Pass 1 heightmap — not the seven landform classes, whose numeric order
@@ -527,12 +538,22 @@ measurement-pinned coefficients):
 | Partition | provinces | min | max | mean | < 7 | < 3 | > 12 | % in 7–12 |
 |---|---|---|---|---|---|---|---|---|
 | 3×3 blocks (superseded) | 21,161 | 1 | 18 | 9.11 | 109 | — | 336 | 97.90% |
-| BL-515 organic | 24,498 | 1 | 12 | 7.87 | 6,195 | 3,008 | 0 | 74.71% |
+| BL-515 organic, pre-absorption | 24,498 | 1 | 12 | 7.87 | 6,195 | 3,008 | 0 | 74.71% |
+| BL-515 organic, **shipped** (with absorption) | 22,390 | 1 | **16** | 8.61 | 4,098 | 913 | 1,096 | 76.80% |
 
 The spread is wider **on purpose** and is reported rather than tuned: organic
-borders are irregular, the 12-tile ceiling is now absolute where the block
-partition's merge could overshoot it, and the sub-floor tail is the pockets a
-hard ceiling leaves behind — kept by ruling, not repaired.
+borders are irregular, and the sub-floor tail is the pockets a ceiling leaves
+behind — kept by ruling, not repaired.
+
+Read the shipped row against the hard cap, not against 12. **Max 16 against a cap
+of 20**, so the bound holds with four tiles of headroom, and **4.90% sit above the
+preferred 12**. Absorption is what moved every one of those numbers: it converted
+2,098 one-tile provinces into member tiles of their cheapest neighbour, which is
+why the count fell, the mean rose, and the sub-floor tail more than halved. The
+harness asserts the cap and the accounting identity (every tile above 12 arrived
+by absorption, so growth's own clamp is still proven separately) and **reports**
+the 4.90% — whether that counts as "rare" is Ben's judgement against a number, and
+no threshold for it has been chosen.
 
 ---
 
