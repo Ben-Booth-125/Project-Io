@@ -10,15 +10,22 @@ whole space arc for DLC and put a **mercenary company** in the live seat (`docs/
 § The two arcs) — the same shape one era earlier. The older **governing body** framing is superseded;
 do not design against it.
 
-**Ownership is being separated from identity — BL-522 (ownership tier), designed 2026-08-21, not built.**
+**Ownership is being separated from identity — BL-522 (syndicate tier), designed 2026-08-21, not built.**
 Ben's framing: *not all companies are public, and company ownership is completely divorced from player
-identity* — the player holds, trades and invests in companies, and takes profit from them. This splits the
-two jobs `corporation_component` does at once. A **company** is an operating firm (~80 of them, each
-already self-running on the full `corp_ai` scorer); a **corporation** is a strategic actor (~8) that holds
-equity and allocates capital. **Equity is a claim on profit, never a control seam** — a company you own
-runs itself at any fraction, including 100% (NR-473, a ruling taken on Ben's behalf). The mechanism design
-lives in BL-522 and its six children, BL-523 (equity data model) through BL-528 (portfolio ledger); the
-terminology is not settled (NR-474 — today `corporation` means the *operating* firm).
+identity* — the player holds, trades and invests in firms, and takes profit from them. This splits the two
+jobs `corporation_component` does at once, and **the terminology is settled** (Ben, 2026-08-21, NR-474):
+
+- A **corporation** is the **operating firm** — buildings, recipes, stockpiles, orders. **This meaning is
+  unchanged**, across `corporation_component`, `generate_corporations`, `corp_ai`, `corp_command` and the
+  Corporation lens. Roughly 88 of them, each *already* self-running on the full `corp_ai` scorer.
+- A **syndicate** is the new **ownership tier** above it — holds equity, allocates capital, decides, and
+  owns no buildings at all. Roughly 8. The word is NR-479, taken on Ben's behalf and cheap to change until
+  `syndicate_component` reaches the serialisation seam.
+
+**Equity is a claim on profit, never a control seam** — a corporation a syndicate owns runs itself at any
+fraction, including 100% (NR-473). So the standing rule's subject is readable off the type: a **syndicate**
+is never auto-acted on strategically, a **corporation** always is. The mechanism design lives in BL-522 and
+its six children, BL-523 (equity data model) through BL-528 (portfolio ledger).
 
 The scope has grown past the original 4X-economy prototype and now spans four load-bearing strands: the **economy loop** (shipped, playable end-to-end); **world generation with a simulated pre-campaign history** (the Era −1 institutional ladder and collapse metagame — `docs/lore/`, `docs/generation/`); a **military layer** (units, muster, two battle resolvers — partially built, `docs/military/MILITARY.md`); and the **AI direction** (deterministic scored-utility rivals today, a local-model opponent through the word interface as the v0.2.0 goal — `docs/ai/`). Nations act too, under the 2026-08-18 grant, in the same deterministic shape. The project is in prototype phase, solo-developed in C++ with Lua scripting.
 

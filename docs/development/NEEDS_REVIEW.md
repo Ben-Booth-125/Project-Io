@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*181 entries — 181 open, 0 resolved.*
+*182 entries — 181 open, 1 resolved.*
 
 ---
 
@@ -1525,21 +1525,6 @@ TAKEN: equity is a claim on profit, never a control seam. The player's CORPORATI
 
 *Files: `docs/development/backlog.json`, `.claude/rules/io-standing-rules.md`*
 
-### NR-474 — Terminology fork — "corporation" currently means the OPERATING firm, not the holder
-*question · raised 2026-08-21 · from BL-522 (ownership tier). Ben's framing uses corporation = the ~7 decision-making bodies and company = the ~80 self-running operators. Today corporation_component means the OPERATOR.*
-
-The new design was written in Ben's own words (corporation = holder, company = operator) because he stated them. But "corporation" is the most-used term in the project: corporation_component, generate_corporations, the Corporation lens, corp_ai, corp_command, GLOSSARY § Corporation, and 483 backlog items all use it to mean the operating firm. Adopting the new sense inverts it.
-
-**Why it matters.** Rule: use the canonical GLOSSARY terms consistently; if a term is defined there, do not substitute an alternative. Two live senses of "corporation" would break exactly that. The three ways out are not equal in cost, and none is mine to pick.
-
-- Adopt Ben's sense — rename the operating tier to "company" across code and docs. Highest churn, ends with the clearest words.
-- Keep "corporation" = operator, and name the new holding tier something else (house, syndicate, trust, concern). Lowest churn, departs from Ben's phrasing.
-- Keep both, disambiguated only in GLOSSARY. Cheapest now, and the option most likely to rot.
-
-> **Recommendation:** Option 2 — a new word for the new thing. The holding tier is genuinely new and has no incumbent term; the operating tier has ~483 items of incumbency. Renaming the thing that already has a name to free it up for the thing that does not is the expensive direction. But Ben said "corporation" and it is his vocabulary.
-
-*Files: `docs/GLOSSARY.md`, `docs/development/backlog.json`*
-
 ### NR-475 — "7 corporations" against today's corporation_count = 8 — which slot is the player?
 *question · raised 2026-08-21 · from BL-522 (ownership tier). Ben proposed "7 corporations"; corporation_generation.hpp:26 sets corporation_count = 8.*
 
@@ -1596,10 +1581,52 @@ BL-094's 2026-08-10 rewrite replaced "governing body" with "national private mil
 
 *Files: `CLAUDE.md`, `README.md`*
 
+### NR-479 — The holding tier is named SYNDICATE — the word, chosen on Ben's behalf
+*decision taken on your behalf · raised 2026-08-21 · from Ben resolved NR-474 ("keep corporation as the operator, name the holding tier something else") but delegated the word itself.*
+
+TAKEN: the holding tier is a SYNDICATE — `syndicate_component`, `generate_syndicates`, GLOSSARY § Syndicate. A syndicate holds equity in operating corporations, allocates capital and decides; it owns no buildings and runs no recipes.
+
+**Why it matters.** It is a new canonical term, and the standing rule requires canonical terms be used consistently — so the word propagates into seven backlog items, GLOSSARY, CLAUDE.md and README the moment it is chosen. Cheap to overturn NOW (a rename across doc prose); expensive once `syndicate_component` is on the serialisation seam.
+
+Candidates were scored on three axes: semantic fit (does it mean an OWNER rather than an operator), grep-cleanliness, and whether it reads in BOTH arcs — the live ancient one at 0 CE and the parked near-future space one. Syndicate wins all three: it means a body of pooled interests that owns rather than operates; it has zero hits in `src/` and zero real hits in `docs/` (the only two are NR-474 itself); and a merchant syndicate at 0 CE and a corporate syndicate in near-future space are both natural.
+
+Runners-up and why they lost:
+  - HOUSE — reads best in both eras, but loses on grep noise (`greenhouse` in planetology, `warehouse` as a building type in CORPORATION_GENERATION Pass 2, `household`) and on promising a noble-family politics the game does not model.
+  - TRUST — the historically exact word for a holding entity, but collides head-on with the standing rules' own untrusted-input-boundary language (23 hits in `src/`, 92 in `docs/`).
+  - CHARTER — already taken twice: HISTORY.md's Charter Age and BL-094's chartered corp.
+  - CONSORTIUM — semantically right, but stiff, awkward in the plural, and reads poorly at 0 CE.
+  - ESTATE — implies land, which the game already means something else by.
+  - DYNASTY — promises inheritance and succession the game does not model.
+
+- Keep SYNDICATE.
+- Pick another word — HOUSE and CONSORTIUM are the live runners-up.
+- Defer the word and use a placeholder until the tier is built.
+
+> **Recommendation:** Keep it, but treat it as cheap to change until BL-523 (equity data model) puts `syndicate_component` on the serialisation seam. That is the point at which the rename stops being a doc edit.
+
+*Files: `docs/GLOSSARY.md`, `docs/development/backlog.json`, `CLAUDE.md`, `README.md`*
+
 ---
 
 ## Resolved
 
 Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
 answer has landed in an authority doc.
+
+### NR-474 — Terminology fork — "corporation" currently means the OPERATING firm, not the holder
+*question · raised 2026-08-21 · from BL-522 (ownership tier). Ben's framing uses corporation = the ~7 decision-making bodies and company = the ~80 self-running operators. Today corporation_component means the OPERATOR.*
+
+The new design was written in Ben's own words (corporation = holder, company = operator) because he stated them. But "corporation" is the most-used term in the project: corporation_component, generate_corporations, the Corporation lens, corp_ai, corp_command, GLOSSARY § Corporation, and 483 backlog items all use it to mean the operating firm. Adopting the new sense inverts it.
+
+**Why it matters.** Rule: use the canonical GLOSSARY terms consistently; if a term is defined there, do not substitute an alternative. Two live senses of "corporation" would break exactly that. The three ways out are not equal in cost, and none is mine to pick.
+
+- Adopt Ben's sense — rename the operating tier to "company" across code and docs. Highest churn, ends with the clearest words.
+- Keep "corporation" = operator, and name the new holding tier something else (house, syndicate, trust, concern). Lowest churn, departs from Ben's phrasing.
+- Keep both, disambiguated only in GLOSSARY. Cheapest now, and the option most likely to rot.
+
+> **Recommendation:** Option 2 — a new word for the new thing. The holding tier is genuinely new and has no incumbent term; the operating tier has ~483 items of incumbency. Renaming the thing that already has a name to free it up for the thing that does not is the expensive direction. But Ben said "corporation" and it is his vocabulary.
+
+> **RESOLVED.** RULED BY BEN, 2026-08-21: option 2 — "Keep corporation as the operator, name the holding tier something else." The operating sense of `corporation` is unchanged across code and docs, so no migration is owed. Ben delegated the actual word; it is SYNDICATE, taken on his behalf and recorded separately as NR-479 so the word stays overturnable independently of the fork he settled. BL-522..BL-528 rewritten to the settled terms.
+
+*Files: `docs/GLOSSARY.md`, `docs/development/backlog.json`*
 

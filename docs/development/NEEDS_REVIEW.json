@@ -2357,8 +2357,8 @@
     "docs/GLOSSARY.md",
     "docs/development/backlog.json"
    ],
-   "status": "open",
-   "resolution": null
+   "status": "resolved",
+   "resolution": "RULED BY BEN, 2026-08-21: option 2 — \"Keep corporation as the operator, name the holding tier something else.\" The operating sense of `corporation` is unchanged across code and docs, so no migration is owed. Ben delegated the actual word; it is SYNDICATE, taken on his behalf and recorded separately as NR-479 so the word stays overturnable independently of the fork he settled. BL-522..BL-528 rewritten to the settled terms."
   },
   {
    "id": "NR-475",
@@ -2433,6 +2433,29 @@
    "options": [],
    "recommendation": "No action needed beyond the correction already made — recorded so the pattern is visible if it recurs.",
    "files": [
+    "CLAUDE.md",
+    "README.md"
+   ],
+   "status": "open",
+   "resolution": null
+  },
+  {
+   "id": "NR-479",
+   "title": "The holding tier is named SYNDICATE — the word, chosen on Ben's behalf",
+   "raised": "2026-08-21",
+   "kind": "decision-taken",
+   "source": "Ben resolved NR-474 (\"keep corporation as the operator, name the holding tier something else\") but delegated the word itself.",
+   "what": "TAKEN: the holding tier is a SYNDICATE — `syndicate_component`, `generate_syndicates`, GLOSSARY § Syndicate. A syndicate holds equity in operating corporations, allocates capital and decides; it owns no buildings and runs no recipes.",
+   "why_it_matters": "It is a new canonical term, and the standing rule requires canonical terms be used consistently — so the word propagates into seven backlog items, GLOSSARY, CLAUDE.md and README the moment it is chosen. Cheap to overturn NOW (a rename across doc prose); expensive once `syndicate_component` is on the serialisation seam.\n\nCandidates were scored on three axes: semantic fit (does it mean an OWNER rather than an operator), grep-cleanliness, and whether it reads in BOTH arcs — the live ancient one at 0 CE and the parked near-future space one. Syndicate wins all three: it means a body of pooled interests that owns rather than operates; it has zero hits in `src/` and zero real hits in `docs/` (the only two are NR-474 itself); and a merchant syndicate at 0 CE and a corporate syndicate in near-future space are both natural.\n\nRunners-up and why they lost:\n  - HOUSE — reads best in both eras, but loses on grep noise (`greenhouse` in planetology, `warehouse` as a building type in CORPORATION_GENERATION Pass 2, `household`) and on promising a noble-family politics the game does not model.\n  - TRUST — the historically exact word for a holding entity, but collides head-on with the standing rules' own untrusted-input-boundary language (23 hits in `src/`, 92 in `docs/`).\n  - CHARTER — already taken twice: HISTORY.md's Charter Age and BL-094's chartered corp.\n  - CONSORTIUM — semantically right, but stiff, awkward in the plural, and reads poorly at 0 CE.\n  - ESTATE — implies land, which the game already means something else by.\n  - DYNASTY — promises inheritance and succession the game does not model.",
+   "options": [
+    "Keep SYNDICATE.",
+    "Pick another word — HOUSE and CONSORTIUM are the live runners-up.",
+    "Defer the word and use a placeholder until the tier is built."
+   ],
+   "recommendation": "Keep it, but treat it as cheap to change until BL-523 (equity data model) puts `syndicate_component` on the serialisation seam. That is the point at which the rename stops being a doc edit.",
+   "files": [
+    "docs/GLOSSARY.md",
+    "docs/development/backlog.json",
     "CLAUDE.md",
     "README.md"
    ],
