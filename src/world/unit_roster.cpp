@@ -138,20 +138,22 @@ float corp_stockpile_total(const world& w, entity_id corp, resource_type res)
 campaign_roster_gate_input campaign_gate_input(const world& w, entity_id corp)
 {
     campaign_roster_gate_input g;
-    const auto has = [&](resource_type r) { return corp_stockpile_total(w, corp, r) > 0.0f; };
 
-    // ore_q: metallurgy access — refined steel or either raw ore counts.
-    g.ore_q = (has(resource_type::steel) || has(resource_type::iron_ore)
-               || has(resource_type::iron_nickel_ore)) ? 1000 : 0;
-    // farm_q: PROXY FOR PASTURE, same convention the region table already
-    // uses (the roster has no horse/pasture signal at all) — food access stands in.
-    g.farm_q = (has(resource_type::food_rations)
-                || has(resource_type::agricultural_produce)) ? 1000 : 0;
-    // port_q: a building, not a resource — does the corp hold a port anywhere.
+    // BL-498: the resource axes walk the SHARED table (unit_roster.hpp
+    // § hire_axis_table), which the hire debit reads too. Adding a resource to
+    // an axis now moves the gate and the cost together, by construction.
+    for (std::size_t i = 0; i < hire_axis_count; ++i)
+    {
+        const hire_axis axis = static_cast<hire_axis>(i);
+        bool            held = false;
+        for (const resource_type r : hire_axis_resources(axis))
+            if (corp_stockpile_total(w, corp, r) > 0.0f) { held = true; break; }
+        gate_axis_q(g, axis) = held ? 1000 : 0;
+    }
+
+    // port_q is NOT on that table: a building, not a resource — does the corp
+    // hold a port anywhere. It gates a hire but never costs one.
     g.port_q = corp_owns_port(w, corp) ? 1000 : 0;
-    // energy_q: PROXY FOR SALTPETRE/FUEL, same convention as the region table.
-    g.energy_q = (has(resource_type::coal) || has(resource_type::refined_fuel)
-                  || has(resource_type::petroleum)) ? 1000 : 0;
     return g;
 }
 
