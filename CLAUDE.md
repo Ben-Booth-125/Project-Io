@@ -1,6 +1,24 @@
 # Project Io — Claude Reference
 
-Project Io is a near-future space-based grand strategy game. The player starts as a corporate entity competing through resource extraction, trade, and military conflict across an earth-like solar system — and pivots to a **governing body**, so that law, policy and science reach military as well as economic outcomes (BL-094, governing-body pivot, priority A; not yet landed).
+Project Io is a near-future space-based grand strategy game. The player starts as a corporate entity
+competing through resource extraction, trade, and military conflict across an earth-like solar system.
+
+**Who the player is has moved twice, and is not settled.** BL-094 (player-identity pivot) replaced the
+corporation with a **national private militia** on 2026-08-10 — armed and national in allegiance but not
+the state, *procuring* force rather than producing it. The 2026-08-12 two-arcs split then parked that
+whole space arc for DLC and put a **mercenary company** in the live seat (`docs/development/ROADMAP.md`
+§ The two arcs) — the same shape one era earlier. The older **governing body** framing is superseded;
+do not design against it.
+
+**Ownership is being separated from identity — BL-522 (ownership tier), designed 2026-08-21, not built.**
+Ben's framing: *not all companies are public, and company ownership is completely divorced from player
+identity* — the player holds, trades and invests in companies, and takes profit from them. This splits the
+two jobs `corporation_component` does at once. A **company** is an operating firm (~80 of them, each
+already self-running on the full `corp_ai` scorer); a **corporation** is a strategic actor (~8) that holds
+equity and allocates capital. **Equity is a claim on profit, never a control seam** — a company you own
+runs itself at any fraction, including 100% (NR-473, a ruling taken on Ben's behalf). The mechanism design
+lives in BL-522 and its six children, BL-523 (equity data model) through BL-528 (portfolio ledger); the
+terminology is not settled (NR-474 — today `corporation` means the *operating* firm).
 
 The scope has grown past the original 4X-economy prototype and now spans four load-bearing strands: the **economy loop** (shipped, playable end-to-end); **world generation with a simulated pre-campaign history** (the Era −1 institutional ladder and collapse metagame — `docs/lore/`, `docs/generation/`); a **military layer** (units, muster, two battle resolvers — partially built, `docs/military/MILITARY.md`); and the **AI direction** (deterministic scored-utility rivals today, a local-model opponent through the word interface as the v0.2.0 goal — `docs/ai/`). Nations act too, under the 2026-08-18 grant, in the same deterministic shape. The project is in prototype phase, solo-developed in C++ with Lua scripting.
 

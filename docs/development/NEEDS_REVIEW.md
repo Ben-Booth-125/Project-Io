@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*175 entries — 175 open, 0 resolved.*
+*181 entries — 181 open, 0 resolved.*
 
 ---
 
@@ -1510,6 +1510,91 @@ TAKEN: added `verify.corp_command{...}`, a generic binding over the whole corp_v
 > **Recommendation:** Keep it. The alternative is a binding per verb forever, and the validation is at the boundary either way.
 
 *Files: `src/core/verify_api.cpp`*
+
+### NR-473 — Equity confers NO operating control, at any fraction — including 100%
+*decision taken on your behalf · raised 2026-08-21 · from BL-522 (ownership tier) — Ben's 2026-08-21 framing idea. The standing rule "the player's own corp is never auto-acted on strategically" needed a subject, because the whole proposal is that companies the player owns keep running themselves.*
+
+TAKEN: equity is a claim on profit, never a control seam. The player's CORPORATION (the holding actor) is never auto-acted on — unchanged and absolute. The COMPANIES it holds equity in always self-run on their own corp_ai scorer, at any ownership fraction up to and including 100%. The holder's levers are which companies to hold and (pending BL-526) the payout ratio — never the build order.
+
+**Why it matters.** This qualifies a standing rule, which is why it is recorded rather than assumed. The precedent shape is BL-409 (spectator mode): the prohibition protects a corp BECAUSE a human owns it, so a changed ownership relation changes the precondition rather than carving an exception. The rejected alternative — a control threshold above which the holder inherits the build queue — was turned down on three grounds: it reintroduces the ~80-build-queue micromanagement the economic premise exists to prevent; it forks corp_ai.cpp's uniform iteration, which is the property making the whole design affordable; and it makes the prohibition's subject ambiguous again, which is what BL-409 spent a ruling to fix.
+
+- Keep: equity is purely financial, no control at any fraction.
+- Add a control threshold (e.g. >50% grants operating control of that company).
+
+> **Recommendation:** Keep it. The threshold version buys thematic realism and costs the economic premise, the uniform scorer, and a settled rule's clarity. BL-526's payout dial is the cheaper way to make majority ownership mean something.
+
+*Files: `docs/development/backlog.json`, `.claude/rules/io-standing-rules.md`*
+
+### NR-474 — Terminology fork — "corporation" currently means the OPERATING firm, not the holder
+*question · raised 2026-08-21 · from BL-522 (ownership tier). Ben's framing uses corporation = the ~7 decision-making bodies and company = the ~80 self-running operators. Today corporation_component means the OPERATOR.*
+
+The new design was written in Ben's own words (corporation = holder, company = operator) because he stated them. But "corporation" is the most-used term in the project: corporation_component, generate_corporations, the Corporation lens, corp_ai, corp_command, GLOSSARY § Corporation, and 483 backlog items all use it to mean the operating firm. Adopting the new sense inverts it.
+
+**Why it matters.** Rule: use the canonical GLOSSARY terms consistently; if a term is defined there, do not substitute an alternative. Two live senses of "corporation" would break exactly that. The three ways out are not equal in cost, and none is mine to pick.
+
+- Adopt Ben's sense — rename the operating tier to "company" across code and docs. Highest churn, ends with the clearest words.
+- Keep "corporation" = operator, and name the new holding tier something else (house, syndicate, trust, concern). Lowest churn, departs from Ben's phrasing.
+- Keep both, disambiguated only in GLOSSARY. Cheapest now, and the option most likely to rot.
+
+> **Recommendation:** Option 2 — a new word for the new thing. The holding tier is genuinely new and has no incumbent term; the operating tier has ~483 items of incumbency. Renaming the thing that already has a name to free it up for the thing that does not is the expensive direction. But Ben said "corporation" and it is his vocabulary.
+
+*Files: `docs/GLOSSARY.md`, `docs/development/backlog.json`*
+
+### NR-475 — "7 corporations" against today's corporation_count = 8 — which slot is the player?
+*question · raised 2026-08-21 · from BL-522 (ownership tier). Ben proposed "7 corporations"; corporation_generation.hpp:26 sets corporation_count = 8.*
+
+Today: 8 named corps = the player plus 7 rivals, and separately ~80 background firms placed on a MEASURED stop condition (~90% of demand), bounded at 200/body — not the "roughly 40" the proposal assumed. So "7 corporations" may mean (a) 7 AI holders plus the player as an 8th of the same type, which is exactly today's 8; or (b) 7 holders total including the player; or (c) 7 AI holders plus the player as a DIFFERENT type — the mercenary company of the live ancient arc, which is BL-094's shape.
+
+**Why it matters.** Reading (a) means the tier count needs no change at all and the item is purely additive. Readings (b) and (c) change generation. Worth settling before BL-523 lands, because the equity items were written assuming (a) — the cheapest reading, and the one that matches the running code.
+
+- (a) 7 AI holders + player as the 8th, same type — no generation change.
+- (b) 7 holders total including the player.
+- (c) 7 AI holders + the player as a mercenary company (a different entity type), per BL-094 / the ancient arc.
+
+> **Recommendation:** (a) for now — it is what the code already does, and it keeps this cluster additive. (c) is where the arc is heading, but it belongs to BL-094 (player-identity pivot), not to the ownership tier.
+
+*Files: `src/world/corporation_generation.hpp`*
+
+### NR-476 — The equity cluster carries a proposed v0.1.23 that ROADMAP does not name
+*decision taken on your behalf · raised 2026-08-21 · from BL-522..BL-528 needed a version goal. ROADMAP's ancient arc names v0.1.15 through v0.1.22; v0.1.22 is the last.*
+
+TAKEN: filed all seven items with version_goal v0.1.23 and did NOT edit ROADMAP.md. Naming a new minor and stating its theme is a scope decision that belongs to Ben and to the roadmap's own authority, and the time-slice says a design lives in the item until the work lands.
+
+**Why it matters.** It leaves a small incoherence on purpose: seven items point at a minor the roadmap has never heard of. The alternative was to invent a minor and its theme unilaterally, which is worse. If Ben would rather these sit inside an existing minor — v0.1.17 (economy breadth) is the nearest fit — it is a field edit, not a rewrite.
+
+- Name v0.1.23 in ROADMAP with a theme (e.g. "who owns the world").
+- Re-home the cluster into v0.1.17 (economy breadth).
+- Park the cluster until the mercenary slice settles.
+
+> **Recommendation:** Name v0.1.23. The cluster is coherent enough to be a minor in its own right, and folding seven items into v0.1.17 would bury the framing change inside an economy-breadth theme it is much bigger than.
+
+*Files: `docs/development/ROADMAP.md`, `docs/development/backlog.json`*
+
+### NR-477 — Novelty flag — the ownership tier is a framing change, and it is the fourth on player identity
+*novel-work · raised 2026-08-21 · from BL-522 (ownership tier), raised per io-standing-rules § "Raise the novelty flag".*
+
+Flagging that this session settled a framing change no authority doc owned. It reads as the fourth identity framing in seven weeks: corporation, then governing body (2026-08-03), then national private militia (2026-08-10), now an ownership tier. I argued in BL-522 that it is NOT a fourth pivot — BL-094 already made companies arm's-length counterparties, and explicitly left "the exact shape of the militia's non-mandate revenue" open, which equity income answers. That argument is honest but it is mine, and Ben should test it rather than inherit it.
+
+**Why it matters.** Ben was told the recommendation was to save the idea to the backlog rather than work it, precisely because BL-094 is parked and unlanded and a fourth framing settled on paper is how churn compounds. He chose to work it, which is his call and was carried out in full. The flag records that the concern was real and was overridden deliberately, not forgotten. The scope growth is bounded — seven items, all doc-only so far, none started.
+
+- Accept: the ownership tier funds the militia/mercenary identity rather than replacing it.
+- Treat it as a genuine fourth pivot and re-open BL-094 before building any of BL-523..BL-528.
+- Park the cluster with the space arc until the mercenary slice proves the current identity.
+
+> **Recommendation:** Accept, but do not start BL-523 until the mercenary vertical slice (v0.1.15) is cut. The design costs nothing sitting in the backlog; building it before the current identity is proven in play is what the concern was actually about.
+
+*Files: `docs/development/backlog.json`, `docs/CONCEPT.md`*
+
+### NR-478 — CLAUDE.md and README.md both still carried the superseded "governing body" framing
+*observation · raised 2026-08-21 · from Found while updating both files for BL-522 (ownership tier).*
+
+BL-094's 2026-08-10 rewrite replaced "governing body" with "national private militia" outright, and ROADMAP's 2026-08-12 two-arcs split then parked that whole arc for DLC and put a MERCENARY COMPANY in the live seat. CONCEPT.md and GLOSSARY.md were both updated. CLAUDE.md's opening paragraph and README.md's opening still described the pivot as being to a governing body — nine days and two supersessions stale. Corrected in this session's edits.
+
+**Why it matters.** These two files are the first thing a fresh session and a fresh reader see. A stale framing there propagates into every session that starts from it, which is more costly than the same staleness in a subject doc that only gets read on traversal. Worth a habit: when an identity or framing item lands, CLAUDE.md and README.md are part of its propagation set, not an afterthought.
+
+> **Recommendation:** No action needed beyond the correction already made — recorded so the pattern is visible if it recurs.
+
+*Files: `CLAUDE.md`, `README.md`*
 
 ---
 

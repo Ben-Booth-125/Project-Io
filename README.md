@@ -4,12 +4,22 @@ Project Io is a near-future, space-based grand strategy game. You begin as a **c
 — not a nation — competing across an Earth-like solar system through resource extraction,
 trade, and military conflict. Unlike a nation-state, a corporation starts with no territory
 and no standing force: every asset must justify itself through economic or strategic return.
-The design arc points beyond that start: the corporation is the on-ramp to a **governing
-body**, where law, policy, and science reach military as well as economic outcomes.
+The design arc points beyond that start, and it is deliberately still moving: the player is
+being redefined as a **mercenary company** — hired to make a fact about the world true, paid
+for doing it, and buying its equipment from companies it does not own.
+
+That last clause is becoming a system of its own. **Ownership is separating from identity**:
+not every company is public, and holding one is divorced from being one. A *company* is an
+operating firm — one of roughly eighty, each already running itself, trading and growing on
+the same deterministic scored-utility AI the rivals use. A *corporation* is a strategic actor
+— one of roughly eight — that holds equity in companies, allocates capital, and lives off the
+profit. Equity buys you a claim on a company's earnings, never its build queue, so the game
+you play as an owner is portfolio judgement rather than eighty build orders. Designed, not
+yet built.
 
 The campaign world is **generated, history included**. A pre-campaign simulation (Era −1)
 plays out an institutional ladder — polities rising, fragmenting, and collapsing — to produce
-the saturated, market-based, non-hegemonic 1960 the campaign opens on; its nations, cultures,
+the saturated, market-based, non-hegemonic world the campaign opens on (epoch 0 CE); its nations, cultures,
 names, and background corporations all fall out of that seeded run. In play, the game
 progresses through **Eras** — the home planet first (Era 0, Terrestrial), the solar system
 once the gate to Era 1 (Early Space) is met — across three nested **canvases** (Solar →
@@ -24,8 +34,7 @@ cloud dependency.
 The project is in **prototype phase**, solo-developed in C++ with Lua scripting. Design and
 technical documentation lives under [`docs/`](docs/) — start with
 [`docs/CONCEPT.md`](docs/CONCEPT.md) and [`docs/SYSTEMS.md`](docs/SYSTEMS.md); the milestone
-arc (v0.2.0 AI opponent → v0.3.0 governing-body pivot → v0.4.0 political layer → v1.0.0
-playable cut) lives in [`docs/development/ROADMAP.md`](docs/development/ROADMAP.md).
+arc — the live ancient band, and the parked space arc beyond it — lives in [`docs/development/ROADMAP.md`](docs/development/ROADMAP.md).
 
 ## Building & running
 
