@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*189 entries — 136 open, 53 resolved.*
+*191 entries — 138 open, 53 resolved.*
 
 ---
 
@@ -1186,6 +1186,16 @@ Ben read draw_province_selection as a second selection element and he was right 
 *observation · raised 2026-08-21 · from Selection fold agent; follows NR-416.*
 
 The second agent to touch this surface also could not satisfy the standing live-check rule: the verify API has no click injection, and computer-use has no granted applications in a non-interactive sub-agent session. So the press remains as untested by harness as it was before the fold - the hit-test resolution path is proven, the press is not. Recording it a second time because that is now a PATTERN rather than an incident: any interactive surface built by a sub-agent will arrive with its live half owed, by construction. Two ways out worth considering - give the verify API a click-injection hook so the press becomes scriptable, or accept that live checks are Ben work and batch them. The first is a small item and would close this class permanently.
+
+### NR-425 — CORRECTION: my 81/81 verification of unit_march_harness was hollow - M6 was segfaulting and M6/M7 never ran
+*observation · raised 2026-08-21 · from March fixture rebuild, 2026-08-21. Correcting my own earlier report.*
+
+I reported unit_march_harness as 81 passed, 0 failed and treated that as verification of Lane U. It was not. M6 discarded apply_corp_command result and then indexed u.order.path[u.order.next_index] on a REFUSED order, so it indexed an empty vector and SEGFAULTED the process mid-M5. M6 and M7 reported nothing because they never ran, and the exit code was 139 with output ending mid-word. I grepped for passed/failed and never checked the exit code, so the crash was invisible to me. Now fixed: the setup asserts instead of discarding, so a refused order fails loudly, and the harness is 88 passed 0 failed with EXIT_CODE=0 confirmed explicitly. The method lesson is mine, not the agent: a harness that prints a pass count can still have died before the end, and a pass count is not an exit code. Worth adding an exit-code check to how the verifier-headless skill reports.
+
+### NR-426 — CORRECTION: a one-row body does NOT always collapse to one province - it splits above 19 tiles
+*observation · raised 2026-08-21 · from March fixture rebuild, 2026-08-21. Correcting my own earlier instruction to the agent.*
+
+I told the agent that on a one-row body the merge cascades so the whole row becomes one province HOWEVER LONG it is, having observed 8 and 24 tiles both giving one province. That generalisation was wrong. Measured: rows of 1-12 tiles give 1 province, 20 and 24 give 2, and 30 gives 3. My 24-tile test appeared to fail for a different reason - 24 was too short to give two REACHABLE provinces for what M1 needed, not too short to split at all. Consequence: M2 20-wide row fixture is honest and was correctly left alone rather than converted. Recording because the false generalisation is the sort of thing that gets quoted back later as a property of the partition.
 
 ---
 
