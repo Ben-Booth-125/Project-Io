@@ -67,7 +67,8 @@ void eight_neighbours(const std::vector<entity_id>& tile_ids,
 // Public implementation
 // ---------------------------------------------------------------------------
 
-void generate_population_centres(world& w, entity_id body_id, unsigned seed)
+void generate_population_centres(world& w, entity_id body_id, unsigned seed,
+                                 int land_tiles_per_centre)
 {
     // Locate the body to get grid dimensions.
     const auto body_it = w.bodies.find(body_id);
@@ -161,13 +162,18 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed)
     //
     // The bounds are structural, not tuning: at least one centre, and never more
     // centres than there are tiles able to host one.
-    constexpr int k_land_tiles_per_centre = 410;
+    // The divisor now lives in the header as `k_land_tiles_per_centre` and
+    // arrives as a defaulted parameter, so a harness can measure an alternative
+    // without a recompile. Every production caller passes nothing and gets the
+    // shipped constant, so the generated world is unchanged.
+    const int divisor = (land_tiles_per_centre > 0) ? land_tiles_per_centre
+                                                    : k_land_tiles_per_centre;
     int land_tiles = 0;
     for (const auto& [tid, tc] : w.tiles)
         if (tc.body == body_id && !is_water(tc.substrate)) // BL-516
             ++land_tiles;
 
-    const int centre_count = std::clamp(land_tiles / k_land_tiles_per_centre,
+    const int centre_count = std::clamp(land_tiles / divisor,
                                         1, static_cast<int>(candidates.size()));
 
     // Seeded RNG — deterministic, never draws from random_device.

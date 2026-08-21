@@ -917,6 +917,16 @@ set(IO_TEST_SWEEP_HARNESSES
     # generates a full world per seed with the shipped 400-year pre-epoch era.
     province_capacity_probe
 
+    # Same cost, same reason, added 2026-08-21 (Sprint B3): settlement_density
+    # generates a full world per seed with the shipped 400-year pre-epoch era —
+    # the nation set the era leaves behind is exactly what its per-nation column
+    # counts against, so it cannot use no_prehistory() either. Cheaper than the
+    # two above (it needs no Lua and re-runs only the placement pass for each
+    # swept divisor: ~2.7 s/world at g++ -O1, ~12 s for the three-seed default),
+    # but it REPORTS a distribution and gates nothing a routine run needs, so it
+    # belongs here on substrate_census's own reasoning rather than in the gate.
+    settlement_density
+
     # PARKED FOR A DIFFERENT REASON (2026-08-12), and the distinction matters.
     #
     # The two above are open-ended exploration tools whose cost IS the point.
