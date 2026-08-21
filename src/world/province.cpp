@@ -243,10 +243,12 @@ const province* province_partition::find(uint32_t id) const
     return &*it;
 }
 
-void build_province_partition(world& w, uint32_t seed)
+void build_province_partition(world& w, uint32_t seed, province_absorption_stats* stats)
 {
     province_partition out;
     out.seed = seed;
+
+    province_absorption_stats tally;
 
     // `world::bodies` is an UNORDERED map: its iteration order is a container-layout
     // accident, and is not even stable across a copy of the same world. The walk is
@@ -473,6 +475,149 @@ void build_province_partition(world& w, uint32_t seed)
             }
         }
 
+        // --- Pass 3: SINGLETON ABSORPTION.
+        //
+        // Ben, 2026-08-21, on seeing the organic borders rendered: "We can add a
+        // pass to capture all the 1 tile provinces. I suppose I was wrong when I
+        // said 'don't reject'." A one-tile province is a hex with a border drawn
+        // round it, and enough of them read as the hex lattice the organic
+        // partition exists to hide.
+        //
+        // THE SCOPE IS EXACTLY ONE TILE. This is NOT the merge-to-floor pass
+        // BL-515 removed: that one produced a de-facto clamp, and a two-tile
+        // province is still kept here.
+        //
+        // The target is the neighbour across the CHEAPEST edge under the same
+        // cost model that drew the borders, so absorption is the growth logic
+        // run once more rather than a second, disagreeing rule. Ties break on
+        // the candidate's province id — its lowest member tile — unique across
+        // regions by construction, so no container order is ever read.
+        //
+        // Fixpoint, in ascending singleton-tile order: absorbing one singleton
+        // can expose another (its target may itself have been a singleton).
+        //
+        // A singleton with NO LAND NEIGHBOUR is a TRUE ISLAND and is KEPT.
+        // Nothing reaches across water to place it.
+        {
+            const auto region_id = [&](std::size_t ri) -> entity_id {
+                // A region's province id IS its lowest member tile (BL-515).
+                entity_id lo  = null_entity;
+                bool      any = false;
+                for (const entity_id t : regions[ri].tiles)
+                    if (!any || t < lo)
+                    {
+                        lo  = t;
+                        any = true;
+                    }
+                return lo;
+            };
+
+            int body_passes = 0;
+            for (;;)
+            {
+                std::vector<std::pair<entity_id, std::size_t>> singles;
+                for (std::size_t ri = 0; ri < regions.size(); ++ri)
+                    if (regions[ri].tiles.size() == 1)
+                        singles.emplace_back(regions[ri].tiles.front(), ri);
+                if (singles.empty())
+                    break;
+                // Ascending by the singleton's tile id: a total order, since a
+                // tile belongs to exactly one region.
+                std::sort(singles.begin(), singles.end());
+
+                if (body_passes == 0)
+                    tally.singletons_before += static_cast<int>(singles.size());
+                ++body_passes;
+
+                int absorbed_here = 0;
+                for (const auto& [t, ri] : singles)
+                {
+                    if (regions[ri].tiles.size() != 1)
+                        continue; // grew when an earlier singleton chose it
+
+                    const tile_component& tc = w.tiles.at(t);
+
+                    bool        found      = false;
+                    int         best_cost  = 0;
+                    entity_id   best_key   = null_entity; // candidate's province id
+                    std::size_t best_index = 0;
+#ifdef IO_ABSORB_PREFER_ROOM
+                    // MEASURED, NOT SHIPPED (2026-08-21). The counterfactual Ben
+                    // will ask about the moment he sees the breach count: prefer
+                    // a neighbour with room under the ceiling, falling back to a
+                    // full one only when every neighbour is full. Kept compiled
+                    // out rather than described in prose so the number can be
+                    // reproduced with -DIO_ABSORB_PREFER_ROOM instead of taken
+                    // on trust (build_gen_harness.bat with /DIO_ABSORB_PREFER_ROOM
+                    // added to its cl line). It is NOT the shipped rule: choosing a
+                    // costlier neighbour contradicts the cheapest-edge rule the
+                    // ruling is expressed in — that call is Ben's, not this
+                    // pass's.
+                    int best_room = 0;
+#endif
+
+                    for (int s = 0; s < 6; ++s)
+                    {
+                        int nx = 0, ny = 0;
+                        if (!wrapped_neighbour(tc.grid_x, tc.grid_y, s, gw, gh, nx, ny))
+                            continue;
+                        const entity_id n = bw.grid[static_cast<std::size_t>(ny) * gw + nx];
+                        if (n == null_entity)
+                            continue;
+                        const auto nit = w.tiles.find(n);
+                        if (nit == w.tiles.end()
+                            || nit->second.composition == terrain_composition::ocean)
+                            continue;
+                        const auto oit = bw.owner.find(n);
+                        if (oit == bw.owner.end())
+                            continue; // unreachable: every land tile is owned by now
+                        const std::size_t nri = static_cast<std::size_t>(oit->second) - 1u;
+                        if (nri == ri)
+                            continue; // unreachable: ri holds one tile, and it is t
+
+                        const int       cost = edge_cost_impl(seed, t, tc, n, nit->second, s);
+                        const entity_id key  = region_id(nri);
+#ifdef IO_ABSORB_PREFER_ROOM
+                        const int room = regions[nri].tiles.size() < k_province_max_tiles ? 0 : 1;
+                        if (!found || room < best_room
+                            || (room == best_room
+                                && (cost < best_cost || (cost == best_cost && key < best_key))))
+                        {
+                            best_room = room;
+#else
+                        if (!found || cost < best_cost || (cost == best_cost && key < best_key))
+                        {
+#endif
+                            found      = true;
+                            best_cost  = cost;
+                            best_key   = key;
+                            best_index = nri;
+                        }
+                    }
+
+                    if (!found)
+                        continue; // TRUE ISLAND — no land neighbour. Kept.
+
+                    regions[best_index].tiles.push_back(t);
+                    regions[ri].tiles.clear();
+                    bw.owner[t] = static_cast<uint32_t>(best_index) + 1u;
+                    ++absorbed_here;
+                    ++tally.absorbed;
+                    if (regions[best_index].tiles.size() > k_province_max_tiles)
+                        ++tally.over_ceiling_created;
+                }
+
+                if (absorbed_here == 0)
+                    break; // every remaining singleton is a true island
+            }
+            if (body_passes > tally.passes)
+                tally.passes = body_passes;
+
+            for (const region& r : regions)
+                if (r.tiles.size() == 1)
+                    ++tally.true_islands;
+        }
+
         // --- Emit. Identity is DERIVED: the lowest member tile id. No id is
         // allocated anywhere in this function.
         for (region& r : regions)
@@ -499,6 +644,9 @@ void build_province_partition(world& w, uint32_t seed)
             out.tile_province[t] = p.id;
 
     w.provinces = std::move(out);
+
+    if (stats)
+        *stats = tally;
 }
 
 // ---------------------------------------------------------------------------
