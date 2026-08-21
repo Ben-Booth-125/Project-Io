@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*183 entries — 130 open, 53 resolved.*
+*187 entries — 134 open, 53 resolved.*
 
 ---
 
@@ -1156,6 +1156,26 @@ Blended provinces read as continuous painted ground; ocean and BUILT tiles stay 
 *observation · raised 2026-08-21 · from Lane R (BL-511 province render + selection), merged and verified 2026-08-21.*
 
 (1) verify.clear_selection had DIVERGED from the gesture it stands in for - it cleared selected_entity but left the province set, so a capture taken after it showed a stale province card. Fixed to match a real empty-space click. This is the harness-lies-quietly class of defect, and it was found by using the harness. (2) building_component has no owner field; ownership is corporation.assets, and the province card resolves it the way the canvas does. (3) dl->_Data->TexUvWhitePixel does not compile outside imgui_internal.h - ImGui::GetFontTexUvWhitePixel() is the public route, noted in a comment for the next person reaching for Prim*.
+
+### NR-419 — Repartition result: 97.90% of provinces in the 7-12 band, and every miss is explained
+*observation · raised 2026-08-21 · from Province repartition to 7-12 tiles, merged and verified 2026-08-21.*
+
+21,161 provinces across 6 seeds. Mean 9.11, min 1, max 18. Under floor: 109 (0.52%). Over ceiling: 336 (1.59%). The two misses have different characters and both were reported rather than clamped, which is the right instinct. UNDER-FLOOR ARE ALL TRUE ISLANDS - the agent added assertion P5c which walks every sub-floor province neighbourhood and asserts none had an adjacent province to merge into; it reports 0 stranded. A merge cannot invent land for a 2-tile island, so that is the honest floor, not a failure. OVER-CEILING (max 18) come from a merge piling onto a crowded coast; reported, not clamped, per your standing preference for honest constraints over clamping.
+
+### NR-420 — BL-513 k survives the repartition, as predicted - 0.74% move
+*observation · raised 2026-08-21 · from Province repartition to 7-12 tiles, merged and verified 2026-08-21.*
+
+k was pinned at 12.6468 as (pooled per-tile capacity / sustain units) aggregated over the world. Both sides are sums over TILES, so the prediction was that province size cannot move the aggregate. Measured after repartition: 12.5535, a 0.74% move, well inside the pre-existing 28.59% per-seed spread, with ceilings totalling 100.75% of pooled per-tile capacity. k was NOT adjusted. What did change completely is the per-province distribution: ceilings now run 1..262 per province against a previously narrow spread. Worth knowing if the ceiling ever starts to bind.
+
+### NR-421 — The per-province firm cap is inert by ORDERS OF MAGNITUDE, not by a near miss
+*question · raised 2026-08-21 · from Province repartition to 7-12 tiles, merged and verified 2026-08-21.*
+
+BL-512 per_province_firm_cap = 2 was measured as nearly inert against 4-tile provinces, and the hope was that 9-tile provinces would make the spatial half of the two-level firm budget do real work. It does not. Measured across 8 seeds after repartition: 296 background firms anchored across 295 DISTINCT provinces; the busiest province holds ONE firm on 7 of 8 seeds; exactly one province in the entire sweep reaches the cap of 2. The reason is structural, not a tuning miss - there are ~24-50 background firms per world against ~3,500 provinces. A per-province cap cannot bind at that ratio at any plausible value. So the two-level budget is really a one-level budget: the per-RESOURCE cap carries the entire result (it took every seed to its coverage target), and the per-province cap is decoration. Three options: drop it as dead weight, keep it as a bound that only matters once player density arrives, or move the spatial constraint to the grain where firms actually compete. It costs nothing today either way, which is why this is a question and not a defect.
+
+### NR-422 — The march harness fixtures could not survive the repartition, and that is information
+*observation · raised 2026-08-21 · from Province repartition to 7-12 tiles, merged and verified 2026-08-21.*
+
+unit_march_harness went from 81/81 to 8 failures the moment provinces changed, all of them fixture-shape rather than product defects. Root cause worth recording: make_row_body builds a body of grid_height 1, and on a one-row body EVERY 3x3 block is a 3-tile fragment, so the merge cascades and the entire row becomes one province however long it is - widening the fixture from 8 to 24 tiles changed nothing. A row fixture can no longer express march from one province to another at all. I added make_grid_body/grid_tile_at helpers and converted M1; the remaining fixtures went back to the agent that wrote them, with instructions not to weaken any assertion and to stop and report if any assertion turns out to be genuinely impossible under the new partition. The general lesson: a synthetic fixture encodes assumptions about world SHAPE, and a generation change can invalidate it silently - here it failed loudly, which is the good case.
 
 ---
 

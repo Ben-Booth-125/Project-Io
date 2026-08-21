@@ -147,6 +147,44 @@ bool order_equal(const movement_order& a, const movement_order& b)
 /// way, which is what M5/M6 rely on.
 constexpr uint32_t PARTITION_SEED = 0xB1511u;
 
+/// A gw x gh land body. Needed since the 2026-08-21 repartition: provinces are
+/// carved from 3x3 blocks with a merge pass that folds anything under
+/// `k_province_min_tiles` (7) into a neighbour. On a ONE-ROW body every block is
+/// a 3-tile fragment, so the merge cascades and the whole row becomes a single
+/// province however long it is — a row fixture simply cannot express "march from
+/// one province to another" any more. Two rows of blocks give real provinces.
+entity_id make_grid_body(world& w, int gw, int gh,
+                         terrain_landform lf = terrain_landform::plains)
+{
+    const entity_id body = w.create_entity();
+    body_component bc{};
+    bc.grid_width  = gw;
+    bc.grid_height = gh;
+    w.bodies[body] = bc;
+    for (int r = 0; r < gh; ++r)
+        for (int c = 0; c < gw; ++c)
+        {
+            const entity_id t = w.create_entity();
+            tile_component tc{};
+            tc.body        = body;
+            tc.grid_x      = c;
+            tc.grid_y      = r;
+            tc.composition = terrain_composition::grassland;
+            tc.landform    = lf;
+            w.tiles[t]     = tc;
+        }
+    return body;
+}
+
+/// Tile at (col,row) on a body built by make_grid_body.
+entity_id grid_tile_at(const world& w, entity_id body, int col, int row)
+{
+    for (const auto& [id, tc] : w.tiles)
+        if (tc.body == body && tc.grid_x == col && tc.grid_y == row)
+            return id;
+    return null_entity;
+}
+
 void partition(world& w) { build_province_partition(w, PARTITION_SEED); }
 
 /// The province owning @p tile, or 0. Fixtures name a DESTINATION by naming a
@@ -176,11 +214,19 @@ void m1_march_unit_legality()
     std::printf("\n-- M1  march_unit: sets a reachable path to a PROVINCE; a rejection mutates nothing --\n");
 
     world w;
-    const entity_id body = make_row_body(w, 8);
+    // A 12x6 GRID, not a row. The 2026-08-21 repartition put the province floor
+    // at k_province_min_tiles (7) with a merge pass that folds anything smaller
+    // into a neighbour. On a one-row body every 3x3 block is a 3-tile fragment,
+    // so the merge cascades and the entire row becomes ONE province however long
+    // it is — which made this test's premise (march from one province to
+    // another) unsatisfiable on the old fixture. The assertions below are
+    // unchanged; only the ground they stand on got tall enough to hold two
+    // provinces.
+    const entity_id body = make_grid_body(w, 12, 6);
     const entity_id a    = add_corp(w, "A");
     const entity_id b    = add_corp(w, "B");
-    const entity_id t0   = tile_at(w, body, 0);
-    const entity_id t5   = tile_at(w, body, 5);
+    const entity_id t0   = grid_tile_at(w, body, 0, 0);
+    const entity_id t5   = grid_tile_at(w, body, 10, 4);
     partition(w);
     const entity_id unit = add_unit(w, a, t0);
     recipe_registry reg  = registry_with_march(1.0f);
