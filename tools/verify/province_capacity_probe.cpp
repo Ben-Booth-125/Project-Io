@@ -92,6 +92,14 @@ int main(int argc, char** argv)
     // evidence that it is measured rather than picked. Re-run this to re-pin.
     double tot_units = 0.0;
     long long tot_ceiling = 0;
+
+    // BL-512 instrument (added 2026-08-21 with the 7-12 repartition). Its
+    // `per_province_firm_cap = 2` was measured as nearly inert against 4-tile
+    // provinces — there were so many provinces that almost none held two firms.
+    // Provinces are now ~2.3x larger and ~2.3x fewer, so the cap has fewer
+    // buckets to spread the same firms across and may start to BIND. Reported,
+    // never adjusted here: the cap lives in corporation_generation.cpp.
+    long long tot_firms_placed = 0, tot_prov_at_firm_cap = 0, tot_prov_with_firms = 0;
     double ratio_min = 0.0, ratio_max = 0.0;
     bool ratio_seen = false;
 
@@ -230,6 +238,37 @@ int main(int argc, char** argv)
         tot_units   += seed_units;
         tot_ceiling += seed_ceiling;
 
+        // --- BL-512: firms per province, against per_province_firm_cap = 2 ---
+        // The firm's province is the one its FIRST asset stands in — the same
+        // rule generate_background_firms uses to apply the cap, transcribed so
+        // the measurement describes the shipped gate rather than a lookalike.
+        std::map<uint32_t, int> firms_by_province;
+        int firms_placed = 0;
+        for (const auto& [cid, corp] : w.corporations)
+        {
+            if (!corp.is_background || corp.assets.empty())
+                continue;
+            const auto abit = w.buildings.find(corp.assets.front());
+            if (abit == w.buildings.end())
+                continue;
+            const uint32_t pid = w.provinces.province_of(abit->second.tile);
+            if (pid == 0)
+                continue;
+            ++firms_by_province[pid];
+            ++firms_placed;
+        }
+        constexpr int k_per_province_firm_cap = 2; // corporation_generation.cpp
+        int prov_at_cap = 0, prov_over_cap = 0, busiest = 0;
+        for (const auto& [pid, n] : firms_by_province)
+        {
+            if (n >= k_per_province_firm_cap) ++prov_at_cap;
+            if (n >  k_per_province_firm_cap) ++prov_over_cap;
+            busiest = std::max(busiest, n);
+        }
+        tot_firms_placed     += firms_placed;
+        tot_prov_at_firm_cap += prov_at_cap;
+        tot_prov_with_firms  += static_cast<long long>(firms_by_province.size());
+
         const int bldgs = static_cast<int>(w.buildings.size());
         std::printf("%4d | %5d %9d | %5d | %8d %6.2f | %6lld/%-6lld %5.1f | #%u %d/%d\n",
                     i, land, static_cast<int>(w.provinces.provinces.size()), bldgs,
@@ -243,6 +282,11 @@ int main(int argc, char** argv)
         std::printf("       BL-513 pin: pooled per-tile cap / sustain units = %.4f"
                     "   (k in use = %.4f)\n",
                     seed_ratio, double(k_province_buildings_per_sustain_unit));
+        std::printf("       BL-512 firm cap: %d background firms anchored across %zu provinces"
+                    "  busiest %d  AT the cap of %d: %d%s\n",
+                    firms_placed, firms_by_province.size(), busiest,
+                    k_per_province_firm_cap, prov_at_cap,
+                    prov_over_cap ? "  <-- SOME PAST THE CAP" : "");
         for (const auto& [bid, n] : firms_per_body)
         {
             if (bid == null_entity)
@@ -289,6 +333,14 @@ int main(int argc, char** argv)
                 tot_ceiling && tot_bldg >= tot_ceiling ? "SOMETHING" : "NOTHING",
                 tot_bldg, tot_ceiling,
                 tot_ceiling ? 100.0 * double(tot_bldg) / double(tot_ceiling) : 0.0);
+    std::printf("\nBL-512 FIRM-CAP SUMMARY (per_province_firm_cap = 2, reported not changed):\n");
+    std::printf("  %lld background firms anchored across %lld distinct provinces;"
+                " %lld of those (%.2f%%) sit AT the cap\n",
+                tot_firms_placed, tot_prov_with_firms, tot_prov_at_firm_cap,
+                tot_prov_with_firms ? 100.0 * double(tot_prov_at_firm_cap)
+                                          / double(tot_prov_with_firms) : 0.0);
+    std::printf("  a cap that binds shows up as a high %% here AND as firms refused;"
+                " a low %% means it is still nearly inert\n");
     std::printf("\nREAD THIS BEFORE CHANGING A CAP: if tiles-at-cap is ~0, the per-tile ceiling\n"
                 "is refusing nothing, and a province-pooled budget cannot add a single building.\n");
     return 0;
