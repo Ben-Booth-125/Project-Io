@@ -70,7 +70,9 @@ uint64_t campaign_battle_seed(const campaign_battle_identity& id)
     // roles is a different battle and must be a different stream.
     uint64_t h = splitmix64(static_cast<uint64_t>(id.world_seed) * 0x9E3779B97F4A7C15ull);
     h = splitmix64(h ^ ((static_cast<uint64_t>(id.attacker) << 32) | static_cast<uint64_t>(id.defender)));
-    h = splitmix64(h ^ (static_cast<uint64_t>(id.tile_index) * 0xD1342543DE82EF95ull));
+    // The PROVINCE, in the slot the tile index held before BL-467 — same mix, same
+    // position, so the fold's shape is unchanged and only what it means moved.
+    h = splitmix64(h ^ (static_cast<uint64_t>(id.province) * 0xD1342543DE82EF95ull));
     h = splitmix64(h ^ id.tick);
     return h;
 }

@@ -552,6 +552,10 @@
   [
    "ledger.strategy_readout_select_corp",
    "Strategy readout, corporation selector"
+  ],
+  [
+   "gameplay.withdraw_from_battle",
+   "No player-facing surface yet. BL-469 (the battle card) is the item that adds one; until then this verb is reachable only through the corp-command seam (ProjectIo --serve, COMMAND opcode)."
   ]
  ]
 }

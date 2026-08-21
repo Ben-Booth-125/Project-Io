@@ -1,5 +1,7 @@
 #include "corp_command.hpp"
 
+#include "battle_system.hpp" // request_withdraw, unit_in_battle (BL-467)
+
 #include "condition_set.hpp" // BL-350: request_quote's embargo decline condition
 #include "construction.hpp"
 #include "economy_system.hpp" // BL-430: try_switch_recipe, the shared recipe-switch gate
@@ -979,12 +981,19 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             if (uit->second.owner != cmd.corp)
                 return corp_command_result::rejected_not_owner;
 
-            // BL-467's engagement trigger (an in-battle flag on unit_component)
-            // does not exist in this codebase yet — MILITARY.md's "what is
-            // absent" list — so the "reject march while in-battle" rule from
-            // BL-470's design has no field to test and is currently
-            // UNREACHABLE. Left as a named gap rather than invented state,
-            // so BL-467 only has to add the flag and one `if`, not this verb.
+            // BL-467 (2026-08-21) FILLED THE GAP THIS COMMENT RESERVED. The
+            // "reject march while in-battle" rule from BL-470's design was
+            // unreachable while nothing recorded that a unit was in contact;
+            // `world::battles` now does. A unit in a fight may not be given a
+            // new movement order — walking away from contact is a WITHDRAWAL,
+            // which is priced, not a march, which is not. The verb for it is
+            // corp_verb::withdraw_from_battle.
+            //
+            // Note the state is on the BATTLE, not on unit_component: the flag
+            // that comment predicted would have been a second place for the same
+            // fact to live, and a second place to forget to clear.
+            if (unit_in_battle(w, cmd.subject))
+                return corp_command_result::rejected_state;
 
             // BL-511: the destination is a PROVINCE, not a tile. THIS is the
             // domain check the untrusted-input rule asks for and the one a
@@ -1074,6 +1083,20 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             if (uit->second.owner != cmd.corp)
                 return corp_command_result::rejected_not_owner;
             w.units.erase(uit); // no refund — manpower walks away (BL-470's design)
+            return corp_command_result::applied;
+        }
+
+        case corp_verb::withdraw_from_battle:
+        {
+            // The DOMAIN CHECK the untrusted-input rule asks for, and the reason
+            // it cannot be a wire range gate: `province` is a real id in a built
+            // partition, so a value that merely fits a uint32 — including the 0
+            // default of an omitted field — must be refused rather than coerced
+            // into some nearby province. request_withdraw resolves against the
+            // live battle list and mutates NOTHING when it finds no match, so a
+            // rejection here leaves the world byte-identical.
+            if (!request_withdraw(w, cmd.corp, cmd.province, cmd.counterparty))
+                return corp_command_result::rejected_state;
             return corp_command_result::applied;
         }
     }

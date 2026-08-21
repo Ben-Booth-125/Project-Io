@@ -4,7 +4,8 @@ The military layer is **parts, not a system**. Two battle resolvers, a unit rost
 building, a hire verb, a terrain model, a per-tick upkeep pass and a roster→combat adapter all
 ship compiled in the binary. Corp stance (hostility/friendship, BL-448/BL-449) also ships now, with
 a surface, and a unit can now march, halt and disband (BL-470, 2026-08-19) — but what still does not
-ship is anything that makes force meet stance: no engagement trigger, and nothing in production
+ship is anything that makes force meet stance — **until BL-467 (2026-08-21), which built the
+engagement trigger and battle state; what remains absent is listed below.** Formerly: no trigger, and nothing in production
 that calls the adapter.
 
 This document is the authority for what is built, written 2026-08-17 against the source. It exists
@@ -53,9 +54,19 @@ round, and `tools/verify/combat_harness.cpp` calls it to assert.
 Arithmetic is **integers in per-mille throughout** (1000 = neutral). Battle outcomes move borders
 in the sandbox, so no float decides who wins.
 
-**Inputs.** Two `std::vector<army_stack_entry>`, two `doctrine_row`s, a
-`terrain_composition` + `terrain_landform` pair, a `season`, and two supply values 0..1000
-(clamped). Nothing is rejected — an empty or all-naval stack resolves rather than erroring.
+**Inputs.** Two `std::vector<army_stack_entry>`, two `doctrine_row`s, a terrain triple
+(`terrain_substrate` + `terrain_cover` + `cover_density`, since BL-519) plus a
+`terrain_landform`, a `season`, and two supply values 0..1000 (clamped). Nothing is rejected —
+an empty or all-naval stack resolves rather than erroring.
+
+> **The degenerate case that follows from "nothing is rejected", and what guards it.** Naval
+> entries score EXACTLY zero, and the victory test is a strict `>`. So a fight where BOTH sides
+> are empty or all-naval resolves as a **defender victory with 400/200 per-mille losses** —
+> casualties inflicted on forces that scored no power at all, in a shape indistinguishable from
+> a real outcome. BL-467's discovery opens a battle on stance and position alone and never
+> inspects unit class, so nothing downstream would have caught it; `battle_system.cpp`'s
+> `stack_can_fight` screens both stacks before opening. Unreachable with today's land-only
+> production roster, and guarded rather than left to be found when the first naval row lands.
 
 An **`army_stack_entry`** is one unit type's contribution, already resolved to numbers:
 `{type_id, cls, count, type_power_mod}`. It is deliberately **not** a lookup key into a roster
@@ -592,7 +603,13 @@ below is a real gap with a named owner.
 
 - ~~**No hostility model.**~~ — *landed 2026-08-19 (BL-448, BL-449). `src/world/stance.{hpp,cpp}` gives every corp pair a directed hostility state and a symmetric friendship state (`corp_hostile_pairs`, `corp_friend_pairs`, a pending `corp_friend_offers` table), reached through four `corp_command` verbs (`declare_hostile`, `offer_friendship`, `accept_friendship`, `return_to_neutral`) and a Corporation panel Stance column, gated on ordinary BL-068 competitor-visibility (NR-350: a declaration stays silent, discovered on contact rather than announced). Landing the substrate is deliberate and still carries* **no consequence** *— stance gates nothing yet. What hostility permits is BL-315 (armed house conflict spine, still absent, see below); what friendship permits is a later call. No serialiser exists for it either (see `src/world/serialization.cpp` — the file does not exist anywhere in the repo; NR-349), so stance does not yet survive a save.*
 - ~~**No unit-subject verbs.**~~ — *landed 2026-08-19 (BL-470, unit march seam). `march_unit`/`halt_unit`/`disband_unit` extend `corp_command`; a unit can now be marched (path, across ticks, on the shared traversal-cost metric), halted, or disbanded. Merge/split and garrison/scout stay absent — BL-472 (formations) owns them.*
-- **No engagement trigger.** Nothing in the world decides that two forces are fighting. `resolve_campaign_battle` has no caller but its harness. *(Amended 2026-08-18: the second half of this bullet — "no code composes an `army_stack_entry` from a `unit_component`" — is no longer true. `unit_to_stack_entry` exists (BL-459) and only the harness calls it. The resolver **could** now be called; nothing wants to.)*
+- ~~**No engagement trigger.**~~ **BUILT 2026-08-21 (BL-467).** `src/world/battle_system.cpp` is
+  both the trigger and the step: a battle opens when two corps' units stand in the same province
+  and at least one holds a hostile stance toward the other, and it is stepped several rounds per
+  tick from `run_economy_step`, immediately before `run_unit_march`. The record lives on
+  `world::battles`, kept sorted by (province, attacker, defender). *This bullet stood through two
+  amendments — 2026-08-18 noted the `unit_to_stack_entry` bridge existed and "nothing wants to"
+  call the resolver. Something does now.*
 - **No battle state in the world.** `campaign_battle_state` is a value a caller holds, not a world component. Nothing serialises a fight in progress, and nothing steps one across ticks.
 - **No upkeep *rate*.** *(Rewritten 2026-08-18 — the old bullet said "No upkeep", which BL-454 falsified.)* The upkeep **pass** ships and runs every economy tick, both halves wired: credits through `apply_budget`, goods through `run_unit_upkeep`. What is absent is a **number** — every authored rate is `0.0`, so a standing force still costs credits once, at hire, and nothing thereafter. Turning it on is an `economy.lua` edit, not a code change. See § Upkeep, at rate zero.
 - **No out-of-supply decay *in effect*.** *(Rewritten 2026-08-18 — the old bullet said the rule was unbuilt; BL-325 S3 landed with BL-454.)* The trigger, the reach lookup and the decay subtraction all ship. `out_of_supply_reach` is authored at `0.0`, which disables the trigger outright, so units outside the reach envelope still suffer nothing.
@@ -692,7 +709,14 @@ Re-verified against the source 2026-08-19 (BL-476, RIVALS_START_UNARMED).
 
 - Merge/split and garrison/scout unit verbs (BL-472, formations)
 - ACTIONS.json transcription of the march/halt/disband verbs (BL-314, unit verb family — now *requires* BL-470)
-- Anything that **calls** the campaign resolver: an engagement trigger, battle state in the world (BL-315). *The `unit_component` → `army_stack_entry` bridge this line used to list is built — see Landed*
+- ~~Anything that **calls** the campaign resolver~~ — **BUILT (BL-467, 2026-08-21).** Both the
+  engagement trigger and battle state in the world. What is STILL absent, and named so it is not
+  read as finished: **doctrine is an all-zero stub** on both sides (no per-corp doctrine field
+  exists, so the resolver's doctrine machinery contributes nothing to any production battle);
+  **season is hardcoded to summer** (the world carries none, so the winter penalty is dead in
+  production); **battle membership is snapshotted at open** (a unit marching in later does not
+  reinforce); and **"the field is held by the side that stayed" has no consequence**, because no
+  territorial-control concept exists for a battle to affect.
 - **Authoring the upkeep numbers.** The pass is inert until someone sets a rate; that tuning has no owning item as of 2026-08-18
 - Hire price on screen (BL-405, hire has no price on screen)
 - The Era −1 sim's conquest failure — 267 battles, zero region transfers (BL-384, Era −1 sim conquers nothing)

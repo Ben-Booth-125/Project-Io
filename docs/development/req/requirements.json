@@ -4659,26 +4659,26 @@
    "brief": "battle-state-in-world",
    "batch": "2026-08-20-four-lane",
    "title": "BL-467 + BL-315 remainder - battle state, trigger, losses",
-   "status": "pending",
+   "status": "complete",
    "promoted_from": "backlog.json BL-467 BATTLE_STATE_IN_WORLD",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "requirement": "ITEM-SPANNING (headless): two corps with units in one province and a directed hostile stance OPEN a battle; rounds resolve; losses land on unit_component. A resolver result is now read by production code.",
-     "result_metric": null
+     "result_metric": "battle_engagement_harness B1a/B1b: run_economy_step opens a battle from hostility + shared province alone, and men fall 1000 -> 648 in ONE tick. B1c: two NEUTRAL corps sharing a province do not fight, so the trigger is stance, not proximity."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "requirement": "Order independence: battle discovery walks provinces in sorted (province id, corp-pair) order, and a corp pair holds at most one battle per province. Same seed, same battles, same losses over two runs.",
-     "result_metric": null
+     "result_metric": "B2: twin worlds produce the same battle set in the same order. Discovery materialises w.units into a sorted vector before bucketing, walks the ORDERED corp_hostile_pairs set, then sorts candidates by (province, attacker, defender)."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "requirement": "Nothing crosses a tick boundary but the record itself - the per-round trace is retained for the battle span and discarded at end. No stance is acquired ambiently; hostility stays a declared state.",
-     "result_metric": null
+     "result_metric": "B3a/B3b: mutual hostility and four units still open exactly one battle, and a second tick opens no duplicate. NOTE the mechanism changed during review - a std::unique dedup was REMOVED after the adversarial pass proved it silently no-ops with a third corp A<C<B (unique only collapses ADJACENT equals, and the sort separates the mutual pair). The sort plus the `exists` scan own the rule now, and that works for any number of corps."
     }
    ]
   },
@@ -4925,6 +4925,75 @@
      "status": "pending",
      "requirement": "VISUAL (owed): the map still reads correctly. terrain_colour is now a substrate base blended toward a cover endpoint by density, calibrated so grassland/forest/wetland/tundra render at their EXACT pre-split RGB. The generation ledger shows two histograms where it showed one, and the wizard preview globe samples packed axes.",
      "result_metric": "NOT RUN - this container cannot build the GUI (SDL3/ImGui blocked by the proxy, no display). Arithmetic verified offline; src/ui is g++ -fsyntax-only clean against real ImGui headers. See NR-451."
+    }
+   ]
+  },
+  {
+   "brief": "battle-state-in-world",
+   "batch": "2026-08-21-engagement-trigger",
+   "title": "BL-467 - battle state in world, and the engagement trigger (Sprint C3)",
+   "status": "pending",
+   "promoted_from": "backlog.json BL-467 BATTLE_STATE_IN_WORLD",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "result_metric": null,
+     "requirement": "ITEM-SPANNING (headless): A FIGHT ACTUALLY HAPPENS. Two corps' units standing in the same province, with at least one holding a hostile stance toward the other, produce a battle that OPENS, is STEPPED over ticks, and applies losses to unit_component. This is the row that fails today and passes after the item: both resolvers are currently compiled, harnessed, and have NO production caller, so the military layer can compute a fight but cannot have one. The assertion must run the real tick entry point, not call the resolver directly - calling the resolver is what already works."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "result_metric": null,
+     "requirement": "DISCOVERY IS ORDER-INDEPENDENT. Battle creation walks provinces in sorted (province id, corp-pair) order, so which battles exist cannot depend on container layout. Assert by building the same world twice and comparing the battle set exactly; the hazard is real because world's corp and unit containers are unordered and the stance tables may be too."
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "result_metric": null,
+     "requirement": "ONE BATTLE PER CORP PAIR PER PROVINCE. A pair cannot be fighting two battles in the same province, and a third corp arriving does not silently join or split an existing pair's battle."
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "result_metric": null,
+     "requirement": "THE SEED FOLDS THE PROVINCE. Battle identity folds the province id where campaign_battle_identity folds tile_index today - same splitmix64 shape, ROLE ORDER PRESERVED so an attacker/defender swap is a different stream. Assert that two battles differing only in province get different streams, and that swapping roles does too."
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "result_metric": null,
+     "requirement": "PER-UNIT HITS ARE A PURE FUNCTION, NO NEW DRAWS. A side's round loss distributes across its participating units proportional to count, remainder by ascending entity id. Assert the distribution sums to the round loss exactly (no leaked or minted men) and that it consumes no RNG."
+    },
+    {
+     "id": "R6",
+     "status": "pending",
+     "result_metric": null,
+     "requirement": "DETERMINISM, IN-MEMORY REPLAY ONLY - the BL-448 precedent verbatim. No serialiser exists for battle state, so assert on replay and NEVER on a save round-trip. Same seed, same ticks, twice: identical battles, identical rounds_fought, identical unit counts."
+    },
+    {
+     "id": "R7",
+     "status": "pending",
+     "result_metric": null,
+     "requirement": "THE TERRAIN PAIR IS THE DEFENDER'S BEST GROUND. One pair for the whole battle, taken from the defender-side tile with the highest terrain_defence in the envelope, ties broken by ascending tile id. Since BL-519 that reads all three axes, so a forested crag must be able to beat bare rock - assert that the chosen tile is the argmax and that the tie-break is by id."
+    },
+    {
+     "id": "R8",
+     "status": "pending",
+     "result_metric": null,
+     "requirement": "WITHDRAWAL IS PRICED AND REJECTION MUTATES NOTHING. corp_verb::withdraw_from_battle{province} is legal for either participant, applies at the tick boundary before the next round batch, and prices the existing three-term cost. An illegal or duplicate withdraw must leave the world byte-identical - the AI-facing-seam rule, since this verb is reachable from --serve."
+    },
+    {
+     "id": "R9",
+     "status": "pending",
+     "result_metric": null,
+     "requirement": "AFTERMATH. The field is held by the side that stayed, defender on ties. Zero-count units are disbanded by the upkeep pass's EXISTING cleanup rather than a second mechanism, and the trace is discarded at battle end so nothing but the record crosses a tick boundary."
+    },
+    {
+     "id": "R10",
+     "status": "pending",
+     "result_metric": null,
+     "requirement": "ACTIONS.json TRAVELS WITH THE VERB. The new corp_verb gets its dictionary entry in the same commit (node tools/session/render_actions.js), per the stale-entry rule in src/world/CLAUDE.md - a stale entry misleads the AI player the way a stale golden misleads a visual check."
     }
    ]
   }

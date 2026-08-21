@@ -184,6 +184,44 @@ uint64_t world::state_hash(int tick) const
         fnv1a_u32(h, o.preferred_seller);
     }
 
+    // Battles in progress (BL-467). A battle is created, stepped and ended BY a
+    // tick, so it is exactly the kind of state this hash exists to catch a
+    // divergence in — unlike `provinces`, which is generation output and is
+    // deliberately excluded for the mirror-image reason.
+    //
+    // NOTHING IS FOLDED WHEN THE LIST IS EMPTY, and that is on purpose rather
+    // than a happy accident of the loop: a world that never fights must hash
+    // exactly as it did before this item, so BL-467 does not silently move every
+    // pinned hash in the project on worlds where it does nothing. The size is
+    // folded first so an empty list and a list of one zero-valued battle cannot
+    // collide.
+    //
+    // The per-round TRACE is deliberately not folded. It is retained only for the
+    // span of the fight (the card and the dispatches read it) and discarded at
+    // battle end, so folding it would make the hash depend on a display buffer.
+    // What is folded is what a divergence would actually be: who is fighting
+    // whom, where, how far in, and how much of each side is left.
+    if (!battles.empty())
+    {
+        fnv1a_u32(h, static_cast<uint32_t>(battles.size()));
+        for (const active_battle& b : battles)
+        {
+            fnv1a_u32(h, b.province);
+            fnv1a_u32(h, b.attacker);
+            fnv1a_u32(h, b.defender);
+            fnv1a_i32(h, b.state.rounds_fought);
+            fnv1a_i32(h, b.state.attacker_strength_permille);
+            fnv1a_i32(h, b.state.defender_strength_permille);
+            fnv1a_i32(h, static_cast<int>(b.state.end));
+            // The stream position, not the stream's history: two battles that
+            // have drawn a different number of times must not hash equal.
+            fnv1a_u32(h, static_cast<uint32_t>(b.state.rng_state & 0xFFFFFFFFull));
+            fnv1a_u32(h, static_cast<uint32_t>(b.state.rng_state >> 32));
+            for (const entity_id u : b.attacker_units) fnv1a_u32(h, u);
+            for (const entity_id u : b.defender_units) fnv1a_u32(h, u);
+        }
+    }
+
     return h;
 }
 

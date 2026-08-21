@@ -1,6 +1,45 @@
 # Project Io — REFINED (active worklist)
 
-**Empty between work blocks.** Sprint P1 is open; the entries below are its live arc.
+**Empty between work blocks.** Sprint P1 closed 2026-08-21; Sprint C3 is now active.
+
+## ACTIVE — Sprint C3, BL-467 (battle state in world)
+
+**The gap:** both battle resolvers are compiled, harnessed, and have **no production
+caller**. The military layer can compute a fight but cannot have one. Unblocked by
+BL-448 (stance), BL-459 (the unit→stack bridge), BL-515 (provinces) and NR-439 (the
+battle envelope's size bound), all landed.
+
+**The seam is already marked in the code.** `run_economy_step` carries a comment
+saying "there IS no battle-discovery phase yet ... so today marching units simply
+advance with nothing to precede them here", immediately above `run_unit_march`. That
+is where the battle pass goes, and the ordering it produces is the one BL-467's
+aftermath note assumes: battles → march → upkeep, so zero-count units are disbanded by
+the upkeep pass's **existing** cleanup rather than a second mechanism.
+
+### Tasks, foundation first
+
+| # | Task | Files | Depends on |
+|---|---|---|---|
+| T1 | `campaign_battle_identity` folds the **province** where it folds `tile_index` today — same splitmix64, role order preserved | `campaign_battle.{hpp,cpp}` | — |
+| T2 | The world-held record: `{province, attacker, defender, unit ids, rounds_fought, trace}` + an **ordered** container on `world`, and its `state_hash` decision stated | `world.hpp`, `campaign_battle.hpp` | T1 |
+| T3 | **Discovery**: walk provinces in sorted (province id, corp-pair) order; open a battle where two corps' units share a province and one is hostile. One battle per pair per province | new `battle_system.{hpp,cpp}` | T2 |
+| T4 | **The terrain pair**: defender-side tile with the highest `terrain_defence` in the envelope, ties by ascending tile id. Since BL-519 this reads all three axes | `battle_system.cpp` | T3 |
+| T5 | **Stepping**: `rounds_per_tick` as authored data in `campaign_battle_params`; several rounds per tick | `campaign_battle.hpp`, `battle_system.cpp` | T3 |
+| T6 | **Per-unit hits**: round loss distributed proportional to count, remainder by ascending entity id, **no new draws** | `battle_system.cpp` | T5 |
+| T7 | **The withdraw verb**: `corp_verb::withdraw_from_battle{province}`, **appended** (the enum is serialised and append-only), applied at the tick boundary before the next round batch | `corp_command.{hpp,cpp}`, `docs/ai/ACTIONS.json` | T5 |
+| T8 | Wire the pass into `run_economy_step` **before** `run_unit_march` | `economy_system.cpp` | T3–T7 |
+| T9 | Harness `tools/verify/battle_engagement_harness.cpp` — R1 must fail before T8 and pass after | `tools/verify/` | T8 |
+| T10 | Docs: MILITARY.md § What is absent loses the engagement trigger and battle state | `docs/military/MILITARY.md` | T9 |
+
+**Hotspots, main session only:** T2 (`world.hpp`), T7 (the serialised verb enum) and T8
+(the tick order). These are exactly the files a second lane would collide on.
+
+### Settled by the item — do NOT re-litigate
+
+Province envelope with units keeping tiles; one terrain pair; several rounds per tick;
+directed hostility suffices (the declarer attacks, the target is drawn in); trace
+discarded at battle end; determinism asserted by **in-memory replay only**, never a save
+round-trip, because no serialiser exists (the BL-448 precedent verbatim).
 
 ## Landed this session (2026-08-21)
 

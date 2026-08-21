@@ -96,7 +96,7 @@ campaign_battle_identity id_at(uint64_t tick)
     campaign_battle_identity id;
     id.attacker   = 11;
     id.defender   = 22;
-    id.tile_index = 4242;
+    id.province   = 4242; // BL-467: the envelope is a province now, not a tile
     id.tick       = tick;
     id.world_seed = 0xBEEF;
     return id;

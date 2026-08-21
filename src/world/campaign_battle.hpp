@@ -48,7 +48,20 @@ struct campaign_battle_identity
 {
     entity_id attacker      = null_entity; ///< Commanding force / corp entity.
     entity_id defender      = null_entity;
-    uint32_t  tile_index    = 0;           ///< The tile the fight stands on.
+    /// THE ENVELOPE THE FIGHT IS FRAMED BY — the province id since BL-467
+    /// (Ben's ruling 1, 2026-08-19: "hostile units standing in the same province
+    /// are drawn into one battle; the province frames the fight").
+    ///
+    /// It replaces the tile index in the same slot of the same fold, deliberately:
+    /// BL-467's design says to fold the province WHERE campaign_battle_identity
+    /// folds tile_index today, same splitmix64 shape, role order preserved. Doing
+    /// it in place rather than appending a field keeps the stream one field wide
+    /// and keeps the asymmetry argument below unchanged.
+    ///
+    /// Units still stand on TILES — BL-315's tile-token ruling is untouched. The
+    /// two grains answer different questions: the tile is where a unit is, the
+    /// province is who it is in a fight with.
+    uint32_t  province      = 0;
     uint64_t  tick          = 0;           ///< Campaign tick the battle opened.
     uint32_t  world_seed    = 0;           ///< So two worlds with equal ids still differ.
 };
@@ -104,6 +117,17 @@ struct campaign_battle_params
     int withdraw_base_permille      = 20;
     int withdraw_per_round_permille = 25;
     int withdraw_pursuit_scale      = 400;
+
+    /// BL-467, Ben's ruling 3: SEVERAL ROUNDS PER TICK. Authored data rather than
+    /// code (the corp_ai_params precedent), so tuning the window a commander gets
+    /// is a data edit.
+    ///
+    /// At the shipped `max_rounds` 6 and this first-cut 3, a full battle spans two
+    /// ticks and the player gets exactly one real between-tick decision — which is
+    /// the whole point of a withdrawal window. Raise it and the fight resolves
+    /// before anyone can react; lower it and a campaign tick becomes a tactical
+    /// game, which Ben's "a short time" ruled out.
+    int rounds_per_tick = 3;
 };
 
 /// Which side is breaking off. `none` means fight it out.
@@ -203,6 +227,57 @@ struct campaign_battle_state
 
     std::vector<campaign_battle_round> rounds;
 };
+
+// ---------------------------------------------------------------------------
+// The world-held record (BL-467)
+// ---------------------------------------------------------------------------
+
+/// One battle in progress, as `world` holds it.
+///
+/// WHY THIS IS A RECORD AND NOT A CALL. Until BL-467 both resolvers were pure
+/// functions with no production caller — the military layer could COMPUTE a fight
+/// but could not HAVE one, because nothing owned a fight between ticks. This
+/// struct is that ownership: it is what makes a battle a thing in the world with
+/// a duration, rather than an answer somebody computed.
+///
+/// IDENTITY is (province, attacker, defender). A corp pair fights at most one
+/// battle per province at a time — a third corp arriving opens its own battles
+/// against each of them rather than joining or splitting this one.
+struct active_battle
+{
+    uint32_t  province = 0;            ///< The envelope. Ruling 1: the province frames the fight.
+    entity_id attacker = null_entity;  ///< The corp whose hostility opened it.
+    entity_id defender = null_entity;
+
+    /// Participating unit ids per side, ASCENDING. Ascending because the
+    /// per-unit loss remainder is assigned by ascending entity id, so the order
+    /// is load-bearing rather than cosmetic (see distribute_losses).
+    std::vector<entity_id> attacker_units;
+    std::vector<entity_id> defender_units;
+
+    /// The resolver's own state: strengths, the stream, rounds fought, and the
+    /// per-round trace. Held whole rather than copied field-by-field so the
+    /// campaign resolver stays the single source of what a round does.
+    campaign_battle_state state;
+
+    /// A withdrawal asked for since the last round batch, honoured at the TICK
+    /// BOUNDARY before the next one. Held here rather than applied on request
+    /// because that delay IS the withdrawal window — applying it the instant it
+    /// is asked for would make breaking off free of the round you are already in.
+    /// Cleared once honoured.
+    withdrawing_side withdraw_requested = withdrawing_side::none;
+};
+
+/// Ordering for `world::battles` — (province, attacker, defender), ascending.
+/// The container is kept sorted by this so a walk over live battles is
+/// order-independent, which matters because the corp and unit containers the
+/// battles were discovered from are UNORDERED.
+inline bool battle_order_less(const active_battle& a, const active_battle& b)
+{
+    if (a.province != b.province) return a.province < b.province;
+    if (a.attacker != b.attacker) return a.attacker < b.attacker;
+    return a.defender < b.defender;
+}
 
 /// Fold @p id into the battle's stream seed. Exposed so a caller can log it
 /// and so a harness can assert that two different identities really do produce

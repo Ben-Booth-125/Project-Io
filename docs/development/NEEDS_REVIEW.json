@@ -3115,6 +3115,42 @@
    "title": "Lakes were given their own provinces because your water ruling never said where they belong",
    "source": "BL-516, the open question the item itself names.",
    "what": "You named three water kinds — lakes, coasts, oceans — and gave province rules for coastal (3-12) and open ocean (much larger, ~80). Lakes got neither. The agent put a lake on the COASTAL band as its own province: it invents no new size rule and keeps the invariant that a province never spans two domains. Measured on seed 0: 1,433 lake tiles.\n\nThe alternatives it did not take, for when you rule: a lake could belong to the LAND province that surrounds it (which makes a lake a feature of a place rather than a place of its own, and would suit a small pond), or lakes could be excluded from the partition entirely the way ocean was before this item. The current choice is the most consistent one; it is not necessarily the one you want."
+  },
+  {
+   "id": "NR-463",
+   "raised": "2026-08-21",
+   "kind": "observation",
+   "status": "open",
+   "title": "An adversarial scout found FOUR real defects in BL-467 an hour after I wrote it — including a withdrawal that cost no men",
+   "source": "BL-467, verified by a 15-agent scout workflow run against the working tree.",
+   "what": "Recording this because the finding rate is the point, not the fixes. I read the seam myself, wrote the item, and had it compiling and passing 26 harness checks. A scout that read the same code adversarially found four things wrong with it:\n\n1. WITHDRAWAL COST NO MEN. I captured each side's strength AFTER applying the withdrawal, so the parting cost - the resolver's three-term price, the whole reason disengaging is a decision - was invisible to the loss distribution. Breaking off was free in men and expensive only in a number that was erased at the end of the tick. My own harness row passed anyway, because it asserted the REQUEST was accepted rather than that it cost anything.\n\n2. THE MUTUAL-HOSTILITY DEDUP WAS A NO-OP. std::unique only collapses ADJACENT equals, and with a third corp C where A < C < B the sort puts (P,A,B), (P,A,C), (P,B,A) - the mutual pair is not adjacent, so the dedup did nothing in exactly the case it was written for. Correct by accident via a different guard, with a comment claiming a mechanism that did not work. Removed.\n\n3. THE ALL-NAVAL CASE WAS UNSCREENED. resolve_battle scores naval at exactly zero and rejects nothing, and its victory test is a strict '>', so a 0-vs-0 fight resolves as a DEFENDER VICTORY with 400/200 per-mille losses on forces that could not have fought. Discovery never inspects unit class. Unreachable today (land-only roster) and now guarded.\n\n4. ZERO-COUNT UNITS WERE NEVER REAPED - see the next entry.\n\nWhat made it work: the scout was told to REFUTE each claim and to default to holds=false when it could not confirm from what it read. Several verifications came back refuting the reader that produced them, and the plan it wrote carried the corrections rather than the original claims."
+  },
+  {
+   "id": "NR-464",
+   "raised": "2026-08-21",
+   "kind": "decision-taken",
+   "status": "open",
+   "title": "BL-467's aftermath ruling was FALSE about the code - nothing reaped a zero-count unit, so I extended the existing cleanup rather than adding a second one",
+   "source": "BL-467; the defect the scout's Q1 named.",
+   "what": "BL-467's design says 'zero-count units are disbanded by the upkeep pass's EXISTING cleanup, which runs last in the economy step', and I wrote requirement R9 repeating it. Both were wrong about what the code does: run_unit_upkeep's orphan cleanup tests for a missing owner, a missing muster base and a missing tile, and has NO count<=0 test anywhere. Before this item nothing could reduce a count to zero, so the case had never arisen.\n\nLeft alone, a unit ground to zero in a battle would have persisted forever - holding a tile, pinning its province, drawing upkeep, and folded into state_hash as a force that no longer exists.\n\nTAKEN ON YOUR BEHALF: I added 'count <= 0' as one more condition on the EXISTING orphan cleanup rather than disbanding inside the battle pass. That keeps the ruling's actual intent - the battle pass removes MEN, the upkeep pass removes UNITS, and there is exactly one disband site - while making the sentence true. The alternative reading, that a zero-count unit is a legitimate world object, seems clearly wrong but is yours to overturn."
+  },
+  {
+   "id": "NR-465",
+   "raised": "2026-08-21",
+   "kind": "question",
+   "status": "open",
+   "title": "Four things in BL-467 are stubs that nothing in the code, the item or the requirements admits are stubs",
+   "source": "BL-467, from the scout's 'what this plan is not sure of'.",
+   "what": "All four are live in every production battle, and none was written down anywhere as a known gap. Naming them because a stub nobody recorded becomes a bug somebody diagnoses later.\n\n1. DOCTRINE IS ALL ZEROS. Both sides are passed doctrine_row{}. No per-corp doctrine field exists on corporation_component, so resolve_battle's whole doctrine machinery - frontal bonus, flank fragility, the mountain penalty - contributes NOTHING to any battle the game plays. Reasonable as a first cut; it wants an item.\n\n2. SEASON IS HARDCODED TO SUMMER. The world carries no season at all, so the resolver's winter penalty is dead code in production. Forced rather than chosen.\n\n3. MEMBERSHIP IS SNAPSHOTTED AT OPEN. A unit marching into a province where a battle already runs never joins it, because discovery skips a pair already fighting there. Reinforcement is impossible, and whether it SHOULD be is not settled anywhere - ruling 1 says units keep their tiles and never pool, which does not answer it.\n\n4. 'THE FIELD IS HELD BY THE SIDE THAT STAYED' HAS NO CONSEQUENCE. It is in the item and in R9, but no territorial-control concept exists for a battle to affect, so holding the field means nothing happens. R9 is marked PARTIAL for this reason rather than complete."
+  },
+  {
+   "id": "NR-466",
+   "raised": "2026-08-21",
+   "kind": "question",
+   "status": "open",
+   "title": "Two smaller BL-467 calls you may want to overturn: disband-under-fire is legal, and the battle seed reads a tick the code says is not authoritative",
+   "source": "BL-467, the scout's Q4 and its determinism caveat.",
+   "what": "1. DISBAND-UNDER-FIRE IS LEGAL. march_unit is refused for a unit in contact, on the reasoning that walking away is a priced withdrawal. disband_unit is NOT guarded - a corp can dissolve its army mid-battle. I left it legal rather than blocking it for consistency, on the grounds that it is not actually an escape: disbanding forfeits the WHOLE remaining unit with no refund, where withdrawing costs a fraction, so it is strictly worse than the priced option and reads as a rout rather than an exploit. But the asymmetry with march_unit is real and it was my call.\n\n2. THE BATTLE SEED FOLDS world::current_day_tick, whose own comment says it is 'not authoritative sim state and not serialised'. Every tick driver sets it, so it is correct in practice - but it is now load-bearing for a random stream while the field disclaims exactly that role. Either the comment is too modest or the seed should fold something else.\n\n3. Related, smaller: campaign_battle_params is constructed fresh each tick and NOT stored on the battle, so a tuning change between ticks would silently re-tune a fight in flight - and setting swing_permille to 0 would change the DRAW COUNT mid-stream, which breaks replay. Impossible today (hardcoded defaults); a real hazard the moment params become data, which the item's own 'authored data' framing invites."
   }
  ]
 }

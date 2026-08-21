@@ -779,8 +779,16 @@ void m7_untrusted_boundary_and_enum()
     check(static_cast<uint8_t>(corp_verb::march_unit) == 21, "march_unit still holds value 21 (append-only)");
     check(static_cast<uint8_t>(corp_verb::halt_unit) == 22, "halt_unit still holds value 22 (append-only)");
     check(static_cast<uint8_t>(corp_verb::disband_unit) == 23, "disband_unit still holds value 23 (append-only)");
-    check(corp_verb_count == static_cast<uint8_t>(corp_verb::disband_unit) + 1,
-          "corp_verb_count is still last-enumerator + 1 — no verb was added or renumbered");
+    // BL-467 (2026-08-21) APPENDED withdraw_from_battle, and this row caught it —
+    // which is the row working, not breaking. It is NARROWED to what the guard is
+    // actually for rather than deleted: the property was never "no verb is ever
+    // added" (verbs are appended routinely), it is "no EXISTING verb renumbers,
+    // and the wire range gate tracks the real last enumerator". The three pins
+    // above are the first half and are untouched; these two are the second.
+    check(static_cast<uint8_t>(corp_verb::withdraw_from_battle) == 24,
+          "withdraw_from_battle was APPENDED at 24, renumbering nothing (BL-467)");
+    check(corp_verb_count == static_cast<uint8_t>(corp_verb::withdraw_from_battle) + 1,
+          "corp_verb_count tracks the last enumerator — the wire range gate is not stale");
 
     // --- the rejection property ------------------------------------------
     world w;

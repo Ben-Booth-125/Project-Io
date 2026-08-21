@@ -75,6 +75,13 @@ enum class corp_verb : uint8_t
     march_unit,    ///< Set/replace `subject`'s (a unit) movement order toward `province`, path-marched across ticks.
     halt_unit,     ///< Clear `subject`'s movement order. rejected_state if it has none.
     disband_unit,  ///< Erase `subject` (a unit) outright. No refund — manpower walks away.
+    // --- BL-467: the battle seam (2026-08-21) ---
+    // Appended AFTER disband_unit, same append-only rule. The engagement TRIGGER
+    // is deliberately not a verb — a battle opens because two hostile forces are
+    // in the same province, not because someone asked. Breaking off is the only
+    // decision a commander actually has once contact is made, so it is the only
+    // thing the seam exposes.
+    withdraw_from_battle, ///< `corp` breaks off the battle it is fighting in `province` against `counterparty` (null = the first in sorted order). Honoured at the tick boundary, before the next round batch; priced by the resolver's three-term withdrawal cost.
 };
 
 /// One past the highest verb — the wire parser's range gate (BL-396: run_serve
@@ -84,7 +91,7 @@ enum class corp_verb : uint8_t
 /// appending a verb means moving this with it — and only this, since existing
 /// values never renumber.
 inline constexpr uint8_t corp_verb_count =
-    static_cast<uint8_t>(corp_verb::disband_unit) + 1;
+    static_cast<uint8_t>(corp_verb::withdraw_from_battle) + 1;
 
 /// Ceiling on one corporation's outstanding sell orders. The book is now
 /// reachable by command, so it is reachable by a scorer with a bug in it — this
