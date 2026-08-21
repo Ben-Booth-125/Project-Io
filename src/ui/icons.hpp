@@ -293,6 +293,20 @@ void research(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param colour Stroke colour of the staff and fill of the pennant.
 void strategy(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
+/// Draw the Strategy-readout nav-rail glyph — a left axis stroke with three
+/// left-anchored horizontal tally bars of descending length — in @p colour.
+/// Reads as "counts compared": the axis anchor keeps it distinct from the
+/// supply route lines and the resource strata (both anchorless), and the
+/// horizontal orientation keeps it clear of the market lens's vertical bars.
+/// Nav rail slot 12, the Strategy readout ledger (BL-411). See ICONS.md
+/// § Nav-rail affordances.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Stroke colour of the axis and fill of the bars.
+void readout(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
 /// Draw the Diplomacy nav-rail glyph — two overlapping circle outlines (a
 /// two-parties-meeting motif) — in @p colour. Distinct from the single
 /// market-centre circle and the concentric activity pulse because the overlap

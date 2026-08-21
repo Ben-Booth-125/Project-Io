@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <map>
+#include <tuple>
 #include <vector>
 
 float body_mean_habitability(const world& w, entity_id body)
@@ -101,6 +102,14 @@ void apply_budget(world& w,
         return v;
     };
 
+    // BL-480 review fix (2026-08-19 #2): the treasury credit is the first
+    // CROSS-corp float accumulation in this loop, and `corporations` is an
+    // unordered_map — float addition is not associative, so summing credits in
+    // iteration order would make the treasury total platform-dependent the day
+    // anything reads it. Collect (corp, nation, levy) here and apply after the
+    // loop in sorted order. Debits stay per-corp and are untouched.
+    std::vector<std::tuple<entity_id, entity_id, float>> levy_credits;
+
     for (auto& [corp, cc] : w.corporations)
     {
         // Capture the flows into `bud` for the BL-072 breakdown, but keep the
@@ -190,25 +199,62 @@ void apply_budget(world& w,
         // deterministic order — and reads only extraction output, because a levy
         // on raw output is what the extraction levy IS. Processing output is
         // downstream of a levy already paid on its inputs.
+        //
+        // BL-480: the levy is a TRANSFER, and jurisdiction bounds it. Each
+        // schedule carries its author nation; only output extracted on tiles
+        // that nation owns (`tile_to_nation`) is charged, and the debit is
+        // credited to that nation's treasury in the SAME float, same tick — so
+        // the sum is conserved by construction, not by reconciliation. A
+        // schedule whose author nation no longer resolves charges NOTHING
+        // (debiting with no treasury to credit is the money destruction this
+        // item removed).
         if (levy_pass)
         {
             const law_effects fx = evaluate_laws(w, corp);
             if (fx.any)
             {
-                float levy = 0.0f;
-                for (const building_report& br : *production)
+                float levy_total = 0.0f;
+                for (const law_effects::levy_schedule& ls : fx.levies)
                 {
-                    if (br.corp != corp || br.type != building_type::extraction_site)
-                        continue;
-                    if (br.output_quantity <= 0.0f)
-                        continue;
-                    levy += fx.extraction_levy[static_cast<std::size_t>(br.target_resource)]
-                          * br.output_quantity;
+                    const auto nat = w.nations.find(ls.enacting_nation);
+                    if (nat == w.nations.end())
+                        continue; // ill-formed author: no charge, no transfer
+
+                    float levy = 0.0f;
+                    for (const building_report& br : *production)
+                    {
+                        if (br.corp != corp || br.type != building_type::extraction_site)
+                            continue;
+                        if (br.output_quantity <= 0.0f)
+                            continue;
+
+                        // Jurisdiction: the tile the extraction stands on must
+                        // belong to the enacting nation. Unclaimed tiles (and
+                        // whole bodies without nations) are outside every
+                        // jurisdiction and pay nothing.
+                        const auto bld = w.buildings.find(br.building);
+                        if (bld == w.buildings.end())
+                            continue;
+                        const auto tn = w.tile_to_nation.find(bld->second.tile);
+                        if (tn == w.tile_to_nation.end() || tn->second != ls.enacting_nation)
+                            continue;
+
+                        levy += ls.extraction_levy[static_cast<std::size_t>(br.target_resource)]
+                              * br.output_quantity;
+                    }
+                    if (levy != 0.0f)
+                    {
+                        levy_total += levy;
+                        // Credit half of the transfer — deferred to the post-loop
+                        // sorted application (same float, same tick, so the
+                        // conservation guarantee is unchanged).
+                        levy_credits.emplace_back(corp, ls.enacting_nation, levy);
+                    }
                 }
-                if (levy != 0.0f)
+                if (levy_total != 0.0f)
                 {
-                    bud.levies = levy;
-                    delta     -= levy;
+                    bud.levies = levy_total;
+                    delta     -= levy_total; // the debit half
                 }
             }
         }
@@ -227,5 +273,20 @@ void apply_budget(world& w,
 
         if (breakdown)
             (*breakdown)[corp] = bud;
+    }
+
+    // Apply the levy credits in (corp, nation) order — a total independent of
+    // unordered_map iteration. The author nation was verified to exist at
+    // collection time; re-find defensively anyway (a dangling author credits
+    // nothing, mirroring the charge-nothing rule above).
+    if (!levy_credits.empty())
+    {
+        std::sort(levy_credits.begin(), levy_credits.end());
+        for (const auto& [payer, nation, amount] : levy_credits)
+        {
+            const auto nat = w.nations.find(nation);
+            if (nat != w.nations.end())
+                nat->second.treasury += amount;
+        }
     }
 }

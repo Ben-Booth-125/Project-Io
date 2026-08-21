@@ -277,6 +277,31 @@ struct tile_component
     /// river_edges. See river_edge_discount (src/world/river_generation.hpp) for how this feeds
     /// the intra-body logistics cost.
     std::uint8_t river_downstream = 0;
+
+    /// Normalised generation heightmap value for this tile, [0, 1] (BL-517).
+    ///
+    /// **Captured, never recomputed.** This is the exact float tile generation Pass 1
+    /// produced for this tile — the continent-biased, normalised heightmap the whole
+    /// pipeline was then derived from (`generate_body_tiles`, src/world/tile_generation.cpp).
+    /// It is copied out of the pass's own `height` vector at tile assembly; nothing
+    /// re-derives it, and it is the same number `generation_record::height` reports.
+    ///
+    /// **Why it is world state and not a ledger breadcrumb.** Every other Pass 1/2
+    /// intermediate (moisture, band, ocean_score) stays disposable and regenerates on
+    /// demand — `docs/generation/GENERATION_LEDGER.md` § Data lifetime. Height graduated
+    /// out of that set on 2026-08-21 because BL-515 grows province borders against
+    /// elevation DIFFERENCE, making it an input to a live partition rather than a
+    /// breadcrumb explaining a past decision. The rule that keeps this from becoming a
+    /// loophole is in that doc: an intermediate graduates only when a system outside the
+    /// ledger reads it, and it graduates by being named there. Do not delete this field
+    /// to restore the symmetry.
+    ///
+    /// **Not a terrain input.** `landform` and `composition` are NOT derived from this
+    /// field — they were decided inside the pass by rules this capture does not touch.
+    /// Reading it is legitimate; re-deriving terrain from it is a different item.
+    ///
+    /// 0.0 on any tile not produced by `generate_body_tiles` (hand-built harness fixtures).
+    float height = 0.0f;
 };
 
 /// Survey lifecycle of a body (BL-067, docs/ui/SOLAR.md § Survey badge).
@@ -538,10 +563,21 @@ struct procurement_quote
     entity_id     buyer        = null_entity;
     entity_id     supplier     = null_entity;
     entity_id     body         = null_entity;    ///< Where the supplier fulfils from.
+    /// BL-392: where the goods LAND — the buyer's own body, not the supplier's.
+    /// Delivery used to credit `body`, so the stock arrived on a body the buyer
+    /// had no processor reservation on and the auto-surplus path liquidated it
+    /// in the same tick. Null only if the buyer owns nothing anywhere, in which
+    /// case it degrades to `body` (the pre-BL-392 behaviour, and the only case
+    /// where there is nowhere better to put it).
+    entity_id     delivery_body = null_entity;
     resource_type resource     = resource_type::iron_ore;
     float         quantity     = 0.0f;
-    float         unit_price   = 0.0f;           ///< Quoted at request time; locked in on accept.
-    int32_t       lead_time_ticks = 0;            ///< `base_ticks x ceil(quantity / throughput)`.
+    float         unit_price   = 0.0f;           ///< Quoted at request time; locked in on accept. BL-392: spot LESS the volume discount.
+    int32_t       lead_time_ticks = 0;            ///< BL-392: `base_ticks x ceil(quantity / the SUPPLIER's throughput for this good)`.
+    /// BL-392: carriage to `delivery_body`, in credits, for the WHOLE order.
+    /// Zero when the delivery body is the fulfilment body. Paid to the supplier,
+    /// who arranges the shipping — so it is a transfer, never a burn.
+    float         freight_cost = 0.0f;
 };
 
 /// An accepted procurement contract (BL-350) — "a build order placed with
@@ -555,15 +591,17 @@ struct procurement_contract
     entity_id     supplier        = null_entity;
     entity_id     body            = null_entity;
     resource_type resource        = resource_type::iron_ore;
+    entity_id     delivery_body   = null_entity; ///< BL-392: where the goods land — see procurement_quote.
     float         quantity        = 0.0f;
     float         unit_price      = 0.0f;
     int32_t       lead_time_ticks = 0;
     int32_t       ticks_elapsed   = 0;
     float         deposit_paid    = 0.0f; ///< Already debited at accept_quote (economy.procurement.deposit_fraction).
+    float         freight_cost    = 0.0f; ///< BL-392: carriage for the whole order; paid to the supplier.
 };
 
-static_assert(sizeof(procurement_quote)    == 32, "procurement_quote is a save-format record — see procurement.hpp");
-static_assert(sizeof(procurement_contract) == 40, "procurement_contract is a save-format record — see procurement.hpp");
+static_assert(sizeof(procurement_quote)    == 40, "procurement_quote is a save-format record — see procurement.hpp");
+static_assert(sizeof(procurement_contract) == 48, "procurement_contract is a save-format record — see procurement.hpp");
 
 /// Land-use classification of a tile or zone. Drives the trade-off between
 /// residential, industrial, agricultural, and undeveloped land.
@@ -619,9 +657,21 @@ struct population_centre_component
 /// order was placed, so a fresh order starts at `next_index == 1`).
 /// `progress` banks fractional march points toward the next hop's cost
 /// across tick boundaries — see run_unit_march (economy_system.cpp).
+///
+/// BL-511 (2026-08-21): the ORDER IS NOW PROVINCE-GRAIN. `dest_province` is
+/// what the player/agent actually commanded; `dest` is the canonical member
+/// TILE the path was solved to, kept because the recompute path needs a tile
+/// endpoint and because every existing reader of `dest` keeps working. The
+/// march ENDS when the unit's tile lies in `dest_province` — it does not walk
+/// on to `dest` once it is already inside the commanded province. A legacy /
+/// harness-built order with `dest_province == 0` keeps the pure tile
+/// behaviour (arrive when the path is exhausted).
 struct movement_order
 {
     entity_id               dest       = null_entity;
+    /// BL-511: the commanded destination province (province::id). 0 means
+    /// "no province grain on this order" — see the note above.
+    uint32_t                dest_province = 0;
     std::vector<entity_id>  path;
     std::size_t             next_index = 1;
     float                   progress   = 0.0f;
@@ -923,9 +973,10 @@ enum class economic_focus : uint8_t
 // ---------------------------------------------------------------------------
 
 /// All persistent data describing a single nation at campaign start. Nations
-/// take no autonomous actions in the prototype; this struct is generation output
-/// only. See docs/generation/NATION_GENERATION.md and docs/development/backlog.json
-/// for the deferred behaviour design.
+/// take no autonomous actions in the prototype; every field except `treasury`
+/// is generation output (the treasury is live state, credited each tick by the
+/// levy transfer — BL-480). See docs/generation/NATION_GENERATION.md and
+/// docs/development/backlog.json for the deferred behaviour design.
 struct nation_component
 {
     /// Generated name produced by Pass 5 of the nation generation pipeline.
@@ -952,4 +1003,19 @@ struct nation_component
 
     /// Dominant economic activity; drawn from seeded RNG in Pass 4.
     economic_focus focus    = ::economic_focus::extraction;
+
+    /// BL-480: the nation's credit account. A law's levy is a TRANSFER — the
+    /// payer's debit lands here in the same tick, same float, so the sum is
+    /// conserved (asserted by tools/verify/law_author_harness.cpp; the BL-392
+    /// class of silent money destruction is gone from this flow). Written only
+    /// by `apply_budget`'s levy pass and by the D4 import tariff, which credits
+    /// here exactly what the buying corporation is debited — also a transfer,
+    /// never a mint. Zero at generation; nothing spends it yet, and a treasury
+    /// that started full would be a balance change smuggled in as a field. The
+    /// spend side is future nation-grain work under the 2026-08-18 grant.
+    /// NOT yet serialised and NOT covered by state_hash (nations are hashed
+    /// nowhere) — BL-107 must pick this field up; until then a treasury
+    /// divergence is only detectable through the debit half on corp balances
+    /// (review 2026-08-19 #3).
+    float treasury = 0.0f;
 };

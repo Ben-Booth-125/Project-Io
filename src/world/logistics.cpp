@@ -489,3 +489,61 @@ int convoy_travel_ticks(const world& w, entity_id body, const logistics_path& pa
     const int ticks = static_cast<int>(days / static_cast<float>(econ_tick_days_world) + 0.999f);
     return ticks < 1 ? 1 : ticks;
 }
+
+// ---------------------------------------------------------------------------
+// Convoy position (BL-458)
+// ---------------------------------------------------------------------------
+
+convoy_route convoy_route_tiles(world& w, const convoy_component& cv)
+{
+    convoy_route route;
+
+    const auto sm = w.markets.find(cv.source_market);
+    const auto dm = w.markets.find(cv.dest_market);
+    if (sm == w.markets.end() || dm == w.markets.end())
+        return route; // unresolved endpoint — no lane to stand on
+    if (sm->second.body == null_entity || sm->second.body != dm->second.body)
+        return route; // inter-body leg: in transit between bodies, on no tile
+
+    const entity_id body = sm->second.body;
+    const entity_id st   = sm->second.centre_tile;
+    const entity_id dt   = dm->second.centre_tile;
+    if (st == null_entity || dt == null_entity)
+        return route; // an unanchored market has no centre to route from/to
+
+    const logistics_path& lp = intra_body_path(w, body, st, dt);
+    if (!lp.reachable || lp.tiles.empty())
+        return route;
+
+    route.body  = body;
+    route.tiles = lp.tiles; // copied: the cache entry stays canonical lo->hi
+
+    // THE ORIENTATION RULE (BL-458). intra_body_path canonicalises its stored
+    // sequence to lo->hi to match its canonicalised (lo, hi) cache key, so the
+    // cached order is source->destination only when the source tile is the
+    // lower id. Flip it when it is not. Skipping this puts a convoy's head at
+    // the far end of its own lane about half the time, and the vision beam
+    // renders identically either way, so nothing on screen would report it.
+    if (st != std::min(st, dt))
+        std::reverse(route.tiles.begin(), route.tiles.end());
+
+    return route;
+}
+
+int convoy_head_index(std::size_t tile_count, float progress)
+{
+    if (tile_count == 0)
+        return -1;
+    const int n = static_cast<int>(tile_count);
+    const float p = std::isfinite(progress) ? std::clamp(progress, 0.0f, 1.0f) : 0.0f;
+    return std::clamp(static_cast<int>(std::lround(p * static_cast<float>(n - 1))), 0, n - 1);
+}
+
+entity_id convoy_tile_at(world& w, const convoy_component& cv)
+{
+    const convoy_route route = convoy_route_tiles(w, cv);
+    const int head = convoy_head_index(route.tiles.size(), cv.progress);
+    if (head < 0)
+        return null_entity;
+    return route.tiles[static_cast<std::size_t>(head)];
+}

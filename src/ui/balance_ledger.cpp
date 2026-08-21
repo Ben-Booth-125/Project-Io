@@ -258,11 +258,12 @@ void draw_balance_ledger(const world& w, const recipe_registry& reg,
     ImGui::TextDisabled("Policy levers - not yet wired (BL-155)");
     ImGui::Spacing();
 
-    // --- Laws in force (BL-343). ---
-    // The first law that is not a stub sits directly under the two that are, so
-    // the difference between a drawn lever and a working one is visible in one
-    // glance. A checkbox, not an enactment flow: the politics of how a law gets
-    // passed is BL-186 (laws ledger) and BL-345 (relationship axis).
+    // --- Laws in force (BL-343; read-only since BL-480). ---
+    // A law has an author: enactment is the author nation's act, so the enact
+    // checkbox is gone — a corporation does not flip world law from its balance
+    // sheet. This listing answers the player's three questions (which laws bind
+    // me, whose are they, what do they cost me); the richer browse surface is
+    // BL-186's laws ledger, the politics BL-345's relationship axis.
     ImGui::SeparatorText("Laws");
     if (w.laws.empty())
     {
@@ -274,17 +275,29 @@ void draw_balance_ledger(const world& w, const recipe_registry& reg,
         {
             const law& l = w.laws[i];
             ImGui::PushID(static_cast<int>(i));
-            bool on = l.enacted;
-            if (ImGui::Checkbox(l.name.c_str(), &on))
-                ui.construction.pending_law_toggle = static_cast<int>(i);
+
+            const char* author = "Unknown authority";
+            if (const auto nit = w.nations.find(l.enacting_nation); nit != w.nations.end())
+                author = nit->second.name.c_str();
+
+            ImGui::Text("%s", l.name.c_str());
+            ImGui::SameLine();
+            if (l.enacted)
+                ImGui::TextDisabled("%s law - Cr %.2f / unit",
+                                    author, static_cast<double>(l.rate));
+            else
+                ImGui::TextDisabled("%s law - repealed", author);
             if (ImGui::IsItemHovered())
             {
                 ImGui::BeginTooltip();
-                ImGui::Text("Cr %.2f per unit of raw output extracted, charged on the "
-                            "Levies line of the Finance card.",
-                            static_cast<double>(l.rate));
+                ImGui::Text("Cr %.2f per unit of raw output extracted in %s's "
+                            "territory, charged on the Levies line of the Finance "
+                            "card and paid into that nation's treasury.",
+                            static_cast<double>(l.rate), author);
                 ImGui::TextDisabled("A law is a modifier over the market, never an "
                                     "override of it - the price you sell at does not move.");
+                ImGui::TextDisabled("Enacted by its author nation; corporations "
+                                    "cannot flip world law.");
                 if (l.conditions.always())
                     ImGui::TextDisabled("Unconditional once enacted.");
                 else
@@ -294,8 +307,6 @@ void draw_balance_ledger(const world& w, const recipe_registry& reg,
                                                            building_type_name).c_str());
                 ImGui::EndTooltip();
             }
-            ImGui::SameLine();
-            ImGui::TextDisabled("Cr %.2f / unit", static_cast<double>(l.rate));
             ImGui::PopID();
         }
     }

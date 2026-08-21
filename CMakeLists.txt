@@ -689,6 +689,26 @@ target_link_libraries(substrate_census PRIVATE io_world_obj lua54)
 target_compile_features(substrate_census PRIVATE cxx_std_20)
 target_compile_options(substrate_census PRIVATE ${IO_WARNING_FLAGS})
 
+# province_capacity_probe (2026-08-20) — live-Lua for exactly substrate_census's
+# reason above: it measures the world AFTER generate_background_firms, so every
+# authored input must be the real one or it reports a world the game never builds.
+# It asks whether the per-tile building cap is BINDING, ahead of any decision to
+# replace it with a province-pooled budget. Reports only; gates nothing.
+add_executable(province_capacity_probe
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/province_capacity_probe.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/works_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(province_capacity_probe PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(province_capacity_probe PRIVATE io_world_obj lua54)
+target_compile_features(province_capacity_probe PRIVATE cxx_std_20)
+target_compile_options(province_capacity_probe PRIVATE ${IO_WARNING_FLAGS})
+
 # font_glyph_harness (BL-234) is the one harness that links ImGui rather than
 # ${IO_WORLD_SOURCES}: the defect it guards is the ImFontConfig handed to
 # AddFontFromFileTTF, which lives in src/ui/fonts.cpp, not in world/*. It still
@@ -727,6 +747,29 @@ target_include_directories(price_band_harness PRIVATE
 target_link_libraries(price_band_harness PRIVATE io_world_obj lua54)
 target_compile_features(price_band_harness PRIVATE cxx_std_20)
 target_compile_options(price_band_harness PRIVATE ${IO_WARNING_FLAGS})
+
+# agent_seam_harness (BL-412) — the live agent control seam. Hand-declared
+# because it links two src/core TUs the world superset deliberately excludes:
+# agent_protocol.cpp (the --serve line protocol, shared with run_serve) and
+# agent_seam.cpp (the loopback listener + tick-boundary drain). Both are
+# SDL/Lua/ImGui-free — the socket layer is Winsock/BSD behind one shim — so
+# the harness stays in the fast headless tier; on Windows that shim needs
+# ws2_32 (the pragma in agent_seam.cpp covers MSVC, the explicit link covers
+# everything else).
+add_executable(agent_seam_harness
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/agent_seam_harness.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/core/agent_protocol.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/core/agent_seam.cpp"
+)
+target_include_directories(agent_seam_harness PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+)
+target_link_libraries(agent_seam_harness PRIVATE io_world_obj)
+if(WIN32)
+    target_link_libraries(agent_seam_harness PRIVATE ws2_32)
+endif()
+target_compile_features(agent_seam_harness PRIVATE cxx_std_20)
+target_compile_options(agent_seam_harness PRIVATE ${IO_WARNING_FLAGS})
 
 file(GLOB IO_VERIFY_HARNESSES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/*.cpp")
 
@@ -861,6 +904,10 @@ set(IO_TEST_SWEEP_HARNESSES
     # Timeout is a silent failure, so a harness that cannot reliably fit the gate
     # must not be registered as though it could).
     substrate_census
+
+    # Same cost, same reason, added 2026-08-20: province_capacity_probe also
+    # generates a full world per seed with the shipped 400-year pre-epoch era.
+    province_capacity_probe
 
     # PARKED FOR A DIFFERENT REASON (2026-08-12), and the distinction matters.
     #

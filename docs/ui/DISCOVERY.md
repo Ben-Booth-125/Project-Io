@@ -79,6 +79,31 @@ branch point is `is_player_owned(world, building)` (with `owner_corp_of` behind 
 This rule is what makes decisions interesting rather than trivial: intelligence is *earned by
 reasoning over public signals*, not handed over.
 
+### The spectator exemption — god view (BL-408, landed 2026-08-19)
+
+Both fogs and the competitor rule protect a **competitive relationship**; spectator mode
+(BL-409) has no player, so there is nobody being cheated. Under spectate — and only there —
+a **god view** flag (`ui_state::god_view`, toggled from the system menu, default off) lifts:
+
+- **This rule's internals redaction**: the rival building hover/Selection cards open their
+  Production/Stockpile rows (same rows, real values), the rival building card gains the
+  read-only Profitability page, and a selected corp's facts column carries the full readout
+  (cash, reserve floor, Should-Have buffer, per-body pools, running production).
+- **The geographic fog at draw time**: the Planetary canvas renders unsurveyed regions
+  through a heavy lock-colour wash — the *tell* — rather than as ordinary ground, so where
+  the corps' own blindness sits stays legible while the watcher sees through it. The
+  header's `UNSURVEYED / Surveying n/m` suffix stays for the same reason.
+
+The lift is **strictly presentational**: the flag lives in `ui_state`, is read at the draw
+call only, and `world/*`, `survey_tile_visible`, `body_activity_visibility` and
+`export_corp_blackboard` never see it — the AI stays exactly as visibility-honest as before
+(Ben, 2026-08-06: *"No additional information for the AI."*). God view grants **sight,
+never hands**: rival controls (Mothball / Dismantle / Auto, Method's recipe switch) stay
+disabled under it. With the flag off, every gated surface renders byte-identical to a
+played session. Not yet lifted: the comms-feed redaction (`post_nation_agency_comms`'s
+one-nation-line-per-tick throttle) — a post-time store, not a draw-time read, so it needs
+its own design rather than this flag.
+
 ---
 
 ## Trade routes — the substrate the activity fog reads (BL-088)

@@ -1,5 +1,7 @@
 #include "hard_coded_world.hpp"
 
+#include "province.hpp"
+
 #include "body_names.hpp"
 #include "city_names.hpp"
 #include "continents.hpp"
@@ -624,6 +626,23 @@ world make_hard_coded_world(world_params params, generation_report* report,
     derive_national_character(kepler_settlement, kepler_creeds, w,
                               kepler_nations, kepler_tiles, home_grid_width, home_grid_height);
 
+    // Coverage (BL-463): the population pass above ran before there were borders,
+    // so it could only derive its target from LAND AREA. The NATION term lands
+    // here — one founding for each nation that ended up holding no centre at all,
+    // which was 61% of them across an eight-seed census before this call existed.
+    // It must precede generate_roads (a nation below two centres gets no road
+    // lattice) and market seeding (a nation with no centre gets no market), which
+    // is why one constant explained the settlement, road and hub gaps at once.
+    ensure_national_population_centres(w, kepler, /*seed=*/params.seed ^ 0x70702002u);
+
+    // The coverage foundings were coined after the naming pass ran, so they have
+    // no name yet. Re-running it with the SAME seed is byte-stable for every
+    // centre that already had one — the pass walks centres in sorted-id order off
+    // an independent stream, and the new ids sort last, so the existing prefix of
+    // draws is reproduced exactly and only the new centres consume fresh ones.
+    name_population_centres(w, kepler, home_grid_width, kepler_settlement, kepler_creeds,
+                            /*seed=*/params.seed ^ 0xC17910E6u);
+
     // Everything from here to globalisation is the 0-1960 story. An antiquity
     // start (BL-271: epoch_year < 1700) generates the world BEFORE it happens —
     // no rupture is pre-resolved, no charter is enacted, no common tongue forms.
@@ -1157,9 +1176,20 @@ world make_hard_coded_world(world_params params, generation_report* report,
         report->stage_lines.emplace_back(buf);
     }
 
-    // BL-343: the prototype's one law, seeded UN-ENACTED so the shipped economy
-    // is unchanged until the player (or a harness) enacts it. See law.hpp.
+    // BL-343/BL-480: the prototype's one law, seeded ENACTED by its author
+    // nation (the player's home nation — choose_levy_author, deterministic).
+    // Enactment is a governing-body act, not a player control; the levy is a
+    // transfer into the author's treasury, bounded by its jurisdiction. Runs
+    // after generate_nations/generate_corporations, which the author choice
+    // reads. See law.hpp.
     seed_prototype_laws(w);
+
+    // BL-466: the province partition — every body's land carved into 3-5 tile
+    // locality cells. LAST, so it reads the finished tile map (rivers, roads,
+    // urban transforms all applied). Its own XOR offset keeps the fold
+    // uncorrelated with the tile/nation/corp streams, and it consumes no RNG
+    // stream at all, so adding it perturbs nothing above it. See province.hpp.
+    build_province_partition(w, params.seed ^ 0x50524F56u);
 
     bump(12);
     return w;

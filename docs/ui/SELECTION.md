@@ -44,7 +44,8 @@ two gestures, applied uniformly across all three canvases:
 
 - **Single-click an entity → select it.** Sets `selected_entity`, opens (or
   re-points) the Selection info element. **No view change** — same rung, same
-  pan, same zoom.
+  pan, same zoom. *On the Planetary canvas, a click that hits no marker selects
+  the **province** rather than the tile (BL-511) — see § The province element.*
 - **Double-click an entity → navigate to it.** The old descend/focus behaviour:
   routes through `ui::focus_on_entity`, which resolves the entity to its most
   informative view (descend a rung, focus a surface/tile, or — for non-spatial
@@ -384,18 +385,105 @@ land.
 
 `ui_state::selection_unit_page` is the pager index, mirroring `selection_building_page`.
 
-### Tile repeat-click selection cycle (placeholder, 2026-08-15)
+### The province element (BL-511, 2026-08-21)
 
-`body_surface_canvas.cpp`'s click handler now cycles **Soldier → Building → Tile → Soldier** on a
+**On the Planetary canvas the selected unit is the PROVINCE, not the tile.** A click that hits no
+marker glyph now lands on the hovered tile's province (`world/province.hpp` — the small
+multi-tile cell BL-466 builds; the partition owns its size and may change it, so no surface here
+assumes a member count). The tile is **not retired**: deposits, terrain, buildings and richness all stay
+tile-keyed, and Ben's ruling is explicit that tiles "are just going to be rendered differently, but
+still instrumental unit values". What changed is which of the two the player *presses*.
+
+A province is not an entity, so it cannot travel in `selected_entity`. It has its own field:
+
+| Field | Meaning |
+|---|---|
+| `ui_state::selected_province` | The selected province id, or `0` for none. |
+| `ui_state::hovered_province` | The province under the cursor, driving the hover outline. |
+| `ui_state::province_sync_entity` | The `selected_entity` value the canvas last wrote. |
+
+**The two selections are mutually exclusive**, and the canvas is the single place that keeps them
+so. `selected_province` has exactly one writer (the Planetary canvas); `selected_entity` has many
+(ledger rows, the corporation list, "inspect the thing I just built"). Each frame the canvas
+compares `selected_entity` against `province_sync_entity`: a mismatch means some *other* surface
+moved the entity selection, that surface wins, and the province clears. Keeping the reconciliation
+in one place beats adding a clear-me duty to every selecting surface.
+
+`draw_selection_content` therefore **resolves** `selected_province` **before** `selection_kind_of`.
+It has to: the band substitutes the player's corporation whenever the entity selection is empty
+(BL-266, § Always open), which is exactly the state a province selection leaves behind, so a later
+test would be swallowed by the substitution. A province id that no longer resolves (a regenerated
+world) clears itself there and the element falls through to the ordinary kind resolution — the
+fallback is a normal selection, never a broken card.
+
+#### It is a BODY of the one element, not a second element (Ben, 2026-08-21)
+
+The province first shipped as its own card, dispatched ahead of everything and drawing its own
+header and chrome. Ben read that for what it was: *"We don't need another selection element, we
+can just use the same one as we used for tiles."* It was refolded the same day.
+
+A province is now **one more thing the single polymorphic panel can be showing**. Resolving it
+early chooses only *what* the element shows; from there it runs the same code every other kind
+runs — the shared header (icon / title / muted trailing label / right-aligned `>`), the separator,
+and then `draw_province_selection_body`, which takes the **same three-column band** as
+`draw_building_selection_body` and `draw_unit_selection_body`. It borrows the **tile** kind for its
+header icon: a province is a cluster of tiles, not a new kind of thing.
+
+Two header slots are filled from the province rather than from `selection_title` /
+`selection_kind_name` (which key off an entity id): the title is `Province [x, y]`, anchored on the
+lowest-id member tile's grid position — province ids are derived and opaque (body rank | block
+raster | component), so the raw id is not a name a player can hold, and the anchor coordinate is —
+and the muted trailing label is `N tiles` rather than a kind name. The `>` and the icon act on the
+anchor tile.
+
+**The content's job is to give the tile back.** The canvas blends the member tiles into one soft
+shape; the body un-blends them:
+
+- **Left quarter — the province in situ, over its mixture bar.** The same slot the tile card gives
+  the zoomed hex neighbourhood: the neighbourhood centres on the anchor tile, and the **mixture
+  bar** runs along the bottom of the same panel — one band per member tile, in the province's own
+  ascending-tile-id order, each in exactly the colour the canvas gives that tile. This is the
+  blend's legend, so it stays permanently visible beside the gradient it explains rather than
+  living on a page you have to reach: "what did that gradient just average?" is answered at a
+  glance instead of by zooming in and counting.
+- **Centre half — a paged accordion** (`ui_state::selection_province_page`), same pager chrome as
+  every other card:
+  - **Tiles** — every member tile as a press. Selecting one clears the province and hands over the
+    full tile card (deposits, the neighbourhood hex view, the Construct door). **Building placement
+    did not move to province grain**, so this list is also the route to building.
+  - **Deposits** — summed across the province. A deposit is a stock, and for a player deciding
+    whether a locality is worth a mine, several tiles each holding a little iron is one province
+    holding that much iron.
+  - **Buildings** — the roll-up of what already stands here, each a press that selects the
+    building. A locality question that used to mean clicking every hex in turn.
+- **Right quarter — a 2×3 action grid**, `Go to` plus five reserved slots, exactly as the unit card.
+  Construct is deliberately **not** here: placement is tile-grain, so the Construct door stays on
+  the tile card and the Tiles page is the route to it.
+
+Nothing in the body assumes a province **size** — the member list is walked and divided by, never
+indexed against a constant — so a repartition changes only how many bands the mixture bar has.
+
+An ocean or otherwise unpartitioned tile has no province and still selects as a **tile**, so
+clicking water selects something rather than nothing.
+
+### Tile repeat-click selection cycle (placeholder, 2026-08-15; retargeted BL-511)
+
+`body_surface_canvas.cpp`'s click handler cycles **Soldier → Building → Province → Soldier** on a
 **repeat** click at the same tile the selection already sits on, skipping any stage with nothing
-there (no unit on the tile skips straight to Building; no building skips to Tile).
+there (no unit on the tile skips straight to Building; no building skips to Province).
 `ui_state::selection_cycle_tile` / `selection_cycle_stage` track the anchor tile and current stage.
 
-A click on a **different** tile (or the first click anywhere) leaves the existing marker-hit /
-tile-fallback precedence (BL-031: building > market_centre > tile) completely untouched — it only
-additionally seeds the cycle anchor so a follow-up repeat click knows where to advance from. This is
-scaffolding ahead of units mostly existing in the live economy (BL-393) — deliberately built now per
-Ben's direction, not gated on combat landing first.
+> **BL-511 changed the terminal stage from Tile to Province.** Because a province is expressed as
+> `selected_entity = null_entity` **plus** a province id, the stage table's "nothing here, skip it"
+> test can no longer be a null check on the last stage — the handler carries an explicit
+> `stage_live[]` alongside the entity table. On a tile with no province (ocean) the stage falls back
+> to the tile, so the cycle never strands on an empty rung.
+
+A click on a **different** tile (or the first click anywhere) leaves the existing marker-hit
+precedence (BL-031: building > market_centre) completely untouched — it only additionally seeds the
+cycle anchor so a follow-up repeat click knows where to advance from. This is scaffolding ahead of
+units mostly existing in the live economy (BL-393) — deliberately built now per Ben's direction,
+not gated on combat landing first.
 
 ### The body element's action is the survey front door (then go-to-surface)
 

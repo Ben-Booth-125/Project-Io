@@ -120,12 +120,12 @@
    "theme": "Communication surface (BL-205 chat log)",
    "state": "closed",
    "opened_date": "2026-07-31",
-   "closed_date": null,
+   "closed_date": "2026-08-10",
    "goal": "Land the § 7 chat principle: a channel-based message surface (Public + arbitrary groups) replacing the Explorer placeholder, carrying Stage-A templated decision-log messages now and becoming the medium personas (BL-207) and, later, a free-text LLM planner (Stage C) speak through. Designed, no dependency — could in principle run before Sprint 3, sequenced after only to keep one theme per sprint.",
    "planned": [
     "BL-205 (diff 3)"
    ],
-   "notes": "Status per the 2026-08-10 stand-of-things table: Mostly landed — slice 1 (window, channels, agency feed) complete 2026-07-26/28; only the C-route remainder (§7 Stage C) stays open, unstaffed."
+   "notes": "Status per the 2026-08-10 stand-of-things table: Mostly landed — slice 1 (window, channels, agency feed) complete 2026-07-26/28; only the C-route remainder (§7 Stage C) stays open, unstaffed. closed_date backfilled 2026-08-19 (record defect MP3): the C-route remainder was filed as BL-334 on 2026-08-08 and parked with v0.2.0, so the open-scope wording is resolved — the scope has a home."
   },
   {
    "id": "5",
@@ -573,9 +573,9 @@
   {
    "id": "27",
    "theme": "The run is retained, and its failure is falsifiable",
-   "state": "open",
+   "state": "closed",
    "opened_date": "2026-08-18",
-   "closed_date": null,
+   "closed_date": "2026-08-20",
    "goal": "Lane A opens. Make 'the sim conquers nothing' a red assertion rather than a remembered observation — and stop discarding the history the world was generated from.",
    "planned": [
     "BL-384 (Era −1 sim conquers nothing) — THE ASSERTION HALF ONLY. A conquest-count assertion, plus elimination and dominance-share counters the harness lacks, reusing history_sweep.cpp's existing hegemony_threshold_q shape. Sub-agent, worktree-isolated. Expected outcome is a RED assertion committed against today's build.",
@@ -584,7 +584,8 @@
    ],
    "done_when": "history_sim_harness fails on conquest count against today's build, with the measured conquest, elimination and dominance numbers recorded as the baseline Sprint 28 moves.",
    "risk": "If the assertion unexpectedly PASSES, the 267-battles/0-conquests measurement is stale and Sprint 28's premise changes. Agent instructed to report that as a major finding rather than adjust the seed set.",
-   "notes": "Open 2026-08-18 — Lane A; BL-384 assertion half only, expected RED (per status table). Explicitly out: the fix. No constant is tuned, no scorer term is changed, and the instrumentation is committed as evidence first — BL-384's own ordering discipline."
+   "notes": "Open 2026-08-18 — Lane A; BL-384 assertion half only, expected RED (per status table). Explicitly out: the fix. No constant is tuned, no scorer term is changed, and the instrumentation is committed as evidence first — BL-384's own ordering discipline.",
+   "retro": "Closed 2026-08-20 WITHOUT new code - the assertion half was already delivered at 610e276 and f4a0c18 before the sprint was promoted (NR-394, a refinement error). The lane paid for itself by RE-MEASURING against the current build, and the measurement overturns the sprint own baseline. Recorded baseline, 8-world sweep on real terrain: 4 of 8 seeds fight and take ground at a near-1:1 conquest:battle ratio (144/137, 272/272, 272/272, 27/27); the other 4 see zero battles; 0 eliminations and 0 hegemonies anywhere. The filed 267-battles/0-conquests shape is GONE and so is the 2026-08-19 zero-battles-everywhere shape. Sprint 27 risk clause fired exactly as written: the premise is stale, and Sprint 28 must be re-planned against a BIMODAL Campaign reachability rather than a uniform one (NR-393)."
   },
   {
    "id": "B1",
@@ -620,6 +621,22 @@
    "notes": "Open 2026-08-18 — BL-448+449+461 build, BL-464 design-only (per status table). Chosen over the Era −1 spine deliberately: Lane A's next two sprints were measuring a configuration that does not ship (BL-462), and ruling 1 of NR-340 has just re-pointed them at the production config; tuning a scorer before that re-measurement lands is how Sprint 19 lost its goal. Lane C1 has no such dependency. Not in this sprint: BL-450 (rivals score stance) is now legal but reads corp_reputation, which no player press can move (BL-446), so its toward-friendly branch would be dead arithmetic on the day it shipped. BL-464 — what 'begin codifying' means: overturns a settled scope line, recorded rather than hidden — SUPPLY.md § Infrastructure gates lists per-node throughput capacity as out of prototype scope, Sprint 25 re-affirmed it; Ben's instruction supersedes both under newest-dated-wins, SUPPLY.md corrected as part of landing the work. Why the concept is right regardless of shape: BL-325's ruling 3 (one reach field, economic reach IS military reach) is currently only topological; Logistic Points make it quantitative — how much can move, and what else that displaces. It hands four shipped systems a consumer they lack: road tiers only discount cost today, ports carry no throughput meaning, the Reach lens is a binary field, convoys never contend. The one non-negotiable: LP lands WITH its consumer, in the same batch — military_points was deleted for being write-only on 2026-08-17 and NR-257 deleted five resources for it the day before; an accrual-only first cut is that defect with a new name. Determinism: allocation under contention must be order-independent — a deterministic priority rule over a sorted set, never first-come by iteration order. Guarded by world::state_hash and convoy_command.cpp R5."
   },
   {
+   "id": "W1",
+   "theme": "The watch — an agent plays, a human watches",
+   "state": "open",
+   "opened_date": "2026-08-19",
+   "closed_date": null,
+   "goal": "Ben, 2026-08-19: the real aim is developing meta and observing AI playing the game, local model included. Build the campaign watch path: BL-412 (live agent control seam) makes an MCP-attached agent visible in a rendered session; BL-408 (god view) and BL-411 (emergent strategy readout) make the watching informative. Cuts toward v0.1.16, re-themed The watch by the same-day split. The Era −1 collapse replay is NOT this — it stays on Lane A (Sprint 31, watched replay per ruling 1); the two subjects were verified distinct (campaign corp seat vs generation polity).",
+   "planned": [
+    "BL-412 — live agent control seam (designed, B, d4): app::run gains a non-blocking drain of protocol requests applied at tick boundaries through apply_corp_command; local LISTEN socket (engine dials nothing out — the § 10 invariant); agent-gates-the-clock; commands arrival-ordered and recorded so a play transcript stays a replay artifact. The AI-facing seam is an untrusted input boundary (standing rule): validate as-landed values, reject whole commands, a rejection mutates nothing.",
+    "BL-408 — spectator god view (designed, B): the watcher sees every corp's internals; currently a spectator sees LESS than the AI does.",
+    "BL-411 — emergent strategy readout (designed, A): verb mix, spend buckets, reason codes per corp over time. Score fields EXCLUDED per the NR-226 fence added to the item today.",
+    "Riders: BL-413 (disable player presses under spectate); BL-306 un-parked (structured local-model client loop, design refresh only this sprint); BL-335 one-off token-cost measurement against --serve; local model runtime setup (Ollama-class, outside the engine)."
+   ],
+   "risk": "BL-412 touches the frame loop and adds a listening socket — determinism is preserved only if command application is tick-boundary, arrival-ordered and recorded; assert with a transcript-replay case. BL-408/BL-411 are surfaces: the 2026-08-19 rule applies — a visual requirement on an interactive surface needs a live check before completion, not just a harness capture.",
+   "notes": "Opened from the 2026-08-19 version-alignment session (research workflow + Ben's form verdicts). Sits beside Lane C, not inside it: C1 (stance) is closed-complete on BL-448; the watch is its own lane serving the observe-AI aim. STATUS (2026-08-19): all three build items LANDED (BL-412 e88636b, BL-408 57e596f, BL-411 d3d9e6e); BL-335 COMPLETE (the 60x input finding -> BL-481 filed, designed, A); the FIRST WATCH SESSION ran — Ollama qwen2.5:3b-instruct attached to the rendered app through the seam, gated clock released per round, and the actor gate refused a wrong-corp read live. Open on: the three live-check rows (Ben at the keyboard; app left open), BL-481 (compact encoding) and the BL-306 client loop."
+  },
+  {
    "id": "26-33",
    "theme": "The Fall — the arc to the Era −1 collapse",
    "state": "proposed",
@@ -647,7 +664,7 @@
    ],
    "done_when": "backlog_query.js --status designed returns only genuinely unbuilt work, world_determinism has a green prehistory-on case, and the nation-behaviour exception is in the standing rules with its date and scope.",
    "risk": "None material. The risk is skipping it and planning against a false board.",
-   "notes": "This is the arc's Sprint 26 as originally proposed; the adversarial pass finding 8 ('Sprint 26 is two sprints wearing one label') split it into Sprint 26a (three authority edits + determinism case) and Sprint 26b (close-out + doc pass), which are the entries actually opened 2026-08-18."
+   "notes": "This is the arc's Sprint 26 as originally proposed; the adversarial pass finding 8 ('Sprint 26 is two sprints wearing one label') split it into Sprint 26a (three authority edits + determinism case) and Sprint 26b (close-out + doc pass), which are the entries actually opened 2026-08-18. AMENDED 2026-08-19: the dropped half of the split (N2 in the session's contradiction audit) was executed this date — v0.1.16 split into The watch (v0.1.16), Ancient conflict & seams (v0.1.19), Stance & force (v0.1.20), The credible rival (v0.1.21), Harness truth (v0.1.22), with BL-296/BL-443 to v0.1.11; v0.1.18 defined in ROADMAP.md as economy truth (Ben chose define over dissolve). The ~15-item close-out claim is also corrected by the same audit: 8 of the 15 are complete, 7 remain open pending per-item verification (N1)."
   },
   {
    "id": "28",
@@ -715,8 +732,8 @@
   {
    "id": "B2",
    "theme": "Roads that reach, ports that mean something",
-   "state": "proposed",
-   "opened_date": null,
+   "state": "open",
+   "opened_date": "2026-08-20",
    "closed_date": null,
    "goal": "The three structural cuts in road_generation.cpp: nations with fewer than two centres, water crossing, and cross-water adjacency. Then BL-188 (coastal ports) un-parked. (Lane B.)",
    "planned": [
@@ -724,13 +741,13 @@
     "water crossing / cross-water adjacency (road_generation.cpp:65,:195)",
     "BL-188 (coastal ports) — sea is currently priced BACKWARDS against its own settled design, and one ocean tile prices the whole route"
    ],
-   "notes": "Proposed, not opened. Part of Lane B — the civilised world, which runs from day one and shares no file with Lane A except settlement.cpp."
+   "notes": "Proposed, not opened. Part of Lane B — the civilised world, which runs from day one and shares no file with Lane A except settlement.cpp. OPENED 2026-08-20 as part of the four-lane batch (REFINED.md)."
   },
   {
    "id": "B3",
    "theme": "Density, and corporations stop all being the same thing",
-   "state": "proposed",
-   "opened_date": null,
+   "state": "open",
+   "opened_date": "2026-08-20",
    "closed_date": null,
    "goal": "The population-centre clamp is still clamp(tiles/1000, 20, 40) from the 180×84 era, against a 312×145 map. (Lane B.)",
    "planned": [
@@ -738,7 +755,7 @@
     "BL-374 (corp density target) unblocked by replacing the per-BODY firm cap with a per-NATION bound",
     "NEW-11: a corporation KIND axis orthogonal to industrial_focus — Ben's 'not every corporation is a militia', currently inverted in code since every rival converges on a military base and only the player is seeded with one"
    ],
-   "notes": "Proposed, not opened. Part of Lane B — the civilised world."
+   "notes": "Proposed, not opened. Part of Lane B — the civilised world. OPENED 2026-08-20 as part of the four-lane batch (REFINED.md)."
   },
   {
    "id": "C2",
@@ -756,28 +773,28 @@
   {
    "id": "C3",
    "theme": "The engagement trigger, and the fight you can watch",
-   "state": "proposed",
-   "opened_date": null,
+   "state": "open",
+   "opened_date": "2026-08-20",
    "closed_date": null,
    "goal": "BL-315 (armed house conflict spine)'s actual remainder — a world-side battle store, the trigger, and losses applied to unit_component. Both resolvers currently return results NOTHING READS.",
    "planned": [
     "BL-315's remainder: world-side battle store, engagement trigger, losses applied to unit_component",
     "Rider: turn the upkeep rates off zero and measure the movement — what BL-458 (supply lines cannot be cut) has been waiting on"
    ],
-   "notes": "Proposed, not opened. Part of Lane C — force and stance."
+   "notes": "Proposed, not opened. Part of Lane C — force and stance. OPENED 2026-08-20 as part of the four-lane batch (REFINED.md)."
   },
   {
    "id": "D1",
    "theme": "A tech can express a buff",
-   "state": "proposed",
-   "opened_date": null,
-   "closed_date": null,
+   "state": "closed",
+   "opened_date": "2026-08-19",
+   "closed_date": "2026-08-19",
    "goal": "Widen tech_gate's one-field effect into a closed tagged union: unlock_structure (existing) plus modify_scalar. Then author the closed modifier-subject vocabulary — every scalar a tech OR A LAW may move. (Lane D — unblocked by rulings 4 and 5, both taken 2026-08-18.)",
    "planned": [
     "Closed tagged union effect type on tech_gate",
     "The modifier-subject vocabulary, shared between tech and law — the reason tech and law belong in one lane"
    ],
-   "notes": "Proposed, not opened. Before rulings 4/5 this lane was illegal twice over: every item was parked:true under a ROADMAP line saying 'do not build against them while parked', and nations were forbidden actors under BL-054. Sprint 26 clears both. Direct answer to Ben's 'how each tech maps to a direct unlock or existing system buff' — today the unlock is the only expressible half."
+   "notes": "Proposed, not opened. Before rulings 4/5 this lane was illegal twice over: every item was parked:true under a ROADMAP line saying 'do not build against them while parked', and nations were forbidden actors under BL-054. Sprint 26 clears both. Direct answer to Ben's 'how each tech maps to a direct unlock or existing system buff' — today the unlock is the only expressible half. OPENED 2026-08-19 (Ben, version-alignment form): D1 and D3 run as one batch, D1's vocabulary first. Build item: BL-479 (tech effect union) — the union plus the shared modifier-subject vocabulary in src/world/modifier_set.hpp; Lane D owns the one-appender-per-batch rule for serialised enums. Rider per Fall-arc amendment 5: BL-443 (debt floor), pending the N1 audit's confirmation it is genuinely unbuilt. RETRO (2026-08-19): goal met same-day. BL-479 complete — the union, the shared vocabulary (modifier_set.hpp, collapse_strain included for BL-477), extraction_rate wired end-to-end; 35/35 new harness, tech_gate 33/33 unmodified, cross-build bit-identity measured against a genuine pre-change build. The BL-443 rider was deliberately NOT taken: the N1 audit confirmed it unbuilt but gated on NR-296 (the lever is Ben's) and colliding with D3 on budget_system.cpp. Slipped: nothing. Feedback: the one-appender rule worked — D3 never touched the vocabulary header."
   },
   {
    "id": "D2",
@@ -795,8 +812,8 @@
   {
    "id": "D3",
    "theme": "A law has an author, and a tax is a transfer",
-   "state": "proposed",
-   "opened_date": null,
+   "state": "open",
+   "opened_date": "2026-08-19",
    "closed_date": null,
    "goal": "Add an enacting-nation id and applicability scope to struct law — BL-155 names this as non-deferrable, 'a law with no author is not migratable later'. Give nation_component a treasury so the levy stops DESTROYING money. (Lane D.)",
    "planned": [
@@ -805,13 +822,13 @@
     "Wages as a lever above a legal floor",
     "Enactment moved off the player's ledger — replacing a debug checkbox that currently lets a corporation flip world law, the exact inversion of the settled ruling that the player is a law SUBJECT"
    ],
-   "notes": "Proposed, not opened. Per adversarial-pass finding 7, condition_subject is entirely corp-scoped and self-measuring — BL-155's own worked examples (a wartime tax, a levy past a density threshold) are inexpressible until the CONDITION side is widened (nation, body, hostility subjects) alongside the modifier side. Per amendment 5, BL-443 (debt floor) should ride inside this sprint rather than waiting for its own — interest is 98.8% of every benchmark deficit."
+   "notes": "Proposed, not opened. Per adversarial-pass finding 7, condition_subject is entirely corp-scoped and self-measuring — BL-155's own worked examples (a wartime tax, a levy past a density threshold) are inexpressible until the CONDITION side is widened (nation, body, hostility subjects) alongside the modifier side. Per amendment 5, BL-443 (debt floor) should ride inside this sprint rather than waiting for its own — interest is 98.8% of every benchmark deficit. OPENED 2026-08-19, same batch as D1 (Ben's verdict: \"D1 then D3 in one batch\"). Build item: BL-480 (law has an author) — enacting-nation id + scope, nation treasury, levy becomes a conserved transfer, enactment off the player's ledger. Wages lever severable, taken only if BL-479's vocabulary names wage_floor in time. STATUS (2026-08-19): BL-480 LANDED (merge c00bba8) — author+scope+treasury+conserved transfer all green (14/14, 24/24), checkbox and its dictionary entry gone. Sprint stays OPEN on two Ben calls: the NR-382 levy-rate ruling (the placeholder 1.0/unit rate, biting now the law ships enacted, drives every rival insolvent — bands left red-and-attributed, unblessed, the NR-269 precedent honoured) and the R3 live look at the read-only levy line."
   },
   {
    "id": "D4",
    "theme": "The border costs something (the international half)",
-   "state": "proposed",
-   "opened_date": null,
+   "state": "open",
+   "opened_date": "2026-08-20",
    "closed_date": null,
    "goal": "The clause of Ben's brief nothing else owns. market_component.centre_tile already resolves through w.tile_to_nation to a nation, so the hook exists and is unused. Give a market a nation, give a nation a tariff rate set by its own law, and make a cross-border sale debit the buyer and CREDIT THE ENACTING NATION'S TREASURY. (Lane D.)",
    "planned": [
@@ -819,7 +836,27 @@
     "A tariff rate set by the nation's own law",
     "Cross-border sale debits buyer, credits the enacting nation's treasury"
    ],
-   "notes": "Proposed, not opened. Depends on D3 for the treasury and on Lane B's route work for the lane a good crosses. This is the first flow in the game where money moves between two named actors rather than appearing or vanishing — what makes 'international trade' a mechanic rather than a description. Per adversarial-pass finding 9: if Lane D touches procurement, BL-392 (procurement debits the buyer per tick and credits goods with NO SUPPLIER, minting goods and destroying money) must be added/fixed BEFORE BL-445, or not at all."
+   "notes": "Proposed, not opened. Depends on D3 for the treasury and on Lane B's route work for the lane a good crosses. This is the first flow in the game where money moves between two named actors rather than appearing or vanishing — what makes 'international trade' a mechanic rather than a description. Per adversarial-pass finding 9: if Lane D touches procurement, BL-392 (procurement debits the buyer per tick and credits goods with NO SUPPLIER, minting goods and destroying money) must be added/fixed BEFORE BL-445, or not at all. OPENED 2026-08-20 as part of the four-lane batch (REFINED.md)."
+  },
+  {
+   "id": "P1",
+   "theme": "The province becomes a thing you can see, and then a thing worth seeing",
+   "state": "open",
+   "opened_date": "2026-08-20",
+   "closed_date": null,
+   "goal": "Written retroactively on 2026-08-21, mid-arc, because the work had already outgrown the batch it started in. The province went from an unrendered data structure to the grain the player clicks — and then, on Ben looking at it, to a partition that has to be REDESIGNED rather than resized. That reversal is the sprint's actual content, not a detour from it.",
+   "planned": [
+    "BL-466 (province partition) — landed 2026-08-20 as the Lane C foundation: 2x2 blocks, derived ids, three serialisation properties proved.",
+    "BL-511 (province as render unit) — the blend, province selection, and a per-lens reduction decided for all thirteen overlay modes.",
+    "BL-511 seam half — march_unit retargets from a tile to a province; province id 0 turns out to be REAL, forcing a 0xFFFFFFFF sentinel.",
+    "BL-513 (province building ceiling) — type-agnostic, from area/infrastructure/habitability/population, k pinned by measurement at 12.6468.",
+    "Repartition to 7-12 tiles (3x3 blocks + a fragment merge) — 97.90% in band, superseded within the hour by the ruling below.",
+    "BL-517 (retain the heightmap) — IN FLIGHT. Prerequisite for the redesign: landform classes carry no usable ordering and a watershed is a shape.",
+    "BL-515 (organic province borders) — NEXT. Grow from population centres, bounded by rivers, elevation and roads, with roads BINDING rather than dividing."
+   ],
+   "done_when": "Provinces are grown from settlement and stopped by terrain, with ids derived from the lowest member tile, hinterland provinces for centreless country, and a size distribution reported against the 3x3 partition it replaces rather than asserted to match it.",
+   "risk": "The partition has now been rebuilt twice in one day and BL-515 rebuilds it a third time. Each rebuild invalidates fixtures downstream — the last one took unit_march_harness from green to 8 failures, and exposed a segfault that had been hiding two whole sections. Expect BL-515 to break province_partition_harness's land-only rows by design (NR-428 rules they are NARROWED, never deleted) and to move every province id in the world.",
+   "notes": "THE METHOD NOTE THIS SPRINT EXISTS TO RECORD. Every ruling that stuck was made against a RENDER, not against a spec. Ben ruled ~4 tiles from the design form, saw it drawn and ruled 7-12; saw THAT drawn and ruled the packed lattice out entirely — 'packing each province perfectly looks nice, but it is scarcely how borders were defined in history'. The two superseded rulings were not wasted: each cost roughly an hour of agent time and bought a decision that would otherwise have been made on a guess and discovered much later, on top of BL-467's battle records and BL-513's ceiling. Build it, look at it, then rule — and file the reversal rather than quietly reshaping the old design to match the new one. Follow-ons deliberately NOT in this sprint: BL-516 (water kinds + sea provinces) and BL-518 (the Era -1 sim redrawing borders as its wars resolve), both of which want BL-515 landed first. BL-514 (blend ALL tiles, not only within provinces) is HELD at Ben's instruction until he sees the organic borders drawn — the third time in this arc that a decision has been sequenced behind evidence rather than taken on a guess."
   }
  ],
  "status_table": [
@@ -937,6 +974,21 @@
    "id": "C1",
    "theme": "Stance, and the first cut of Logistic Points",
    "state": "Open 2026-08-18 — BL-448+449+461 build, BL-464 design-only"
+  },
+  {
+   "id": "W1",
+   "theme": "The watch — an agent plays, a human watches",
+   "state": "Open 2026-08-19 — all three items LANDED same day; first watch session ran (local model attached); open on the live-check rows + BL-481/BL-306"
+  },
+  {
+   "id": "D1",
+   "theme": "A tech can express a buff",
+   "state": "Closed 2026-08-19 — BL-479 complete same-day, 35/35; BL-443 rider deliberately not taken (NR-296 is Ben's)"
+  },
+  {
+   "id": "D3",
+   "theme": "A law has an author, and a tax is a transfer",
+   "state": "Open 2026-08-19 — BL-480 LANDED, harnesses green; open on the NR-382 rate ruling + the live levy-line look"
   }
  ]
 }

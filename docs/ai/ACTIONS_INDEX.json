@@ -298,10 +298,6 @@
    "History ledger, view tab strip"
   ],
   [
-   "ledger.law_enact_toggle",
-   "Balance Ledger (Budget), 'Laws' section beneath the two policy-tier stubs"
-  ],
-  [
    "ledger.market_body_selector",
    "Market Ledger, 'Body' combo"
   ],
@@ -478,6 +474,10 @@
    "System menu popup, top button"
   ],
   [
+   "chrome.sysmenu_god_view",
+   "System menu popup, spectate-only checkbox"
+  ],
+  [
    "chrome.tech_tree_era_tab",
    "Tech-tree viewer (F9), era tab strip"
   ],
@@ -532,6 +532,26 @@
   [
    "gameplay.return_to_neutral",
    "Corporation panel, Stance column. Shown whenever the row is currently Hostile or Friend."
+  ],
+  [
+   "gameplay.march_unit",
+   "No player-facing surface yet. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode). There is NO UI surface for it yet: BL-471 (unit marker + command surface) is the item that adds one, and it is deliberately sequenced after BL-511's canvas rewrite. Until then this verb is reachable only through the seam."
+  ],
+  [
+   "gameplay.halt_unit",
+   "No player-facing surface yet. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode). There is NO UI surface for it yet: BL-471 (unit marker + command surface) is the item that adds one, and it is deliberately sequenced after BL-511's canvas rewrite. Until then this verb is reachable only through the seam."
+  ],
+  [
+   "gameplay.disband_unit",
+   "No player-facing surface yet. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode). There is NO UI surface for it yet: BL-471 (unit marker + command surface) is the item that adds one, and it is deliberately sequenced after BL-511's canvas rewrite. Until then this verb is reachable only through the seam."
+  ],
+  [
+   "ledger.strategy_readout_open",
+   "Navigation rail slot 12, \"Strategy readout\""
+  ],
+  [
+   "ledger.strategy_readout_select_corp",
+   "Strategy readout, corporation selector"
   ]
  ]
 }

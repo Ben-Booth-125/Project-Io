@@ -15,10 +15,10 @@
 > compress — strategies and culminations are defined at full markdown fidelity here, not as
 > a card schema. If the sim later needs a compact encoding, derive it from this doc.
 >
-> **Promoted 2026-08-20** into nineteen backlog items, all v0.1.16: **BL-476** (strain
-> accumulator) → **BL-477** (fragmentation verb) → **BL-478** (hegemony measure), **BL-479**
-> (Release verb), **BL-480** (readable strain), **BL-481** (strain transfer on conquest),
-> **BL-482** (reach-fed slow strain), **BL-483**–**BL-486** (the E4/E5/E6/E7 culminations),
+> **Promoted 2026-08-20** into nineteen backlog items, all v0.1.16: **BL-504** (strain
+> accumulator) → **BL-505** (fragmentation verb) → **BL-506** (hegemony measure), **BL-507**
+> (Release verb), **BL-508** (readable strain), **BL-509** (strain transfer on conquest),
+> **BL-510** (reach-fed slow strain), **BL-483**–**BL-486** (the E4/E5/E6/E7 culminations),
 > **BL-487** (creed axes), **BL-488** (strategy weightings), **BL-489** (narration bank),
 > **BL-490** (attractor sweep), and the perf ladder **BL-491**–**BL-493** closing in
 > **BL-494** (the 4000-year ladder itself). This doc stays the design conversation's home;
@@ -53,7 +53,7 @@ differently in their light.
 - **Reach feeds strain (resolves NR-356).** *"Logistics should be capable of determining
   reach. By that I mean reach feeds strain."* The Metropole's inevitability hole (§ 5) is
   closed by option A — a second, slower inflow on the same accumulator, reading the same
-  logistics/reach substrate per BL-325 ruling 3 (one reach field). Filed as **BL-482**
+  logistics/reach substrate per BL-325 ruling 3 (one reach field). Filed as **BL-510**
   (reach-fed slow strain).
 - **The story surfaces in the history tab, quietly.** Telling the story is secondary to
   *seeing it in the game*; don't overload the player with easy-access information on
@@ -166,7 +166,7 @@ holdings, so reach-based power carries no strain — and economic reach *is* mil
   holdings-fed accumulator. Ben ruled the lean: reach feeds a *separate, slower* strain
   inflow on the same accumulator (over-commitment abroad), read from the logistics network
   itself per BL-325 ruling 3 — so the Metropole is the longest-lived shape and still
-  breaks. Filed as BL-482 (reach-fed slow strain); HISTORY.md Stage 5 becomes a
+  breaks. Filed as BL-510 (reach-fed slow strain); HISTORY.md Stage 5 becomes a
   parameterisation of it, not a second system.
 - **Culmination:** Devolution (§ E2) or the Slow Fade (§ E6).
 

@@ -369,6 +369,55 @@
     "src/ui/corporation_panel.cpp"
    ],
    "status": "settled"
+  },
+  "god_view_readouts": {
+   "surface": "God-view corp/rival readouts (Selection facts column, rival Status rows, rival hover detail) + the survey tell on the Planetary canvas",
+   "answers": "What does this corp actually know, hold, and run — and where is its own blindness?",
+   "because": "A spectator otherwise sees LESS than the AI being watched; the lift makes a rival's decisions auditable without touching what the AI reads. Sight, never hands: the action grid stays disabled; the survey tell (lock-wash on unsurveyed tiles) keeps the corp's own blindness visible so the watcher is not misled into judging a decision against information the corp never had.",
+   "backlog_item": [
+    "BL-408"
+   ],
+   "files": [
+    "src/ui/selection_panel.cpp",
+    "src/ui/hover_content.cpp",
+    "src/ui/body_surface_canvas.cpp"
+   ],
+   "status": "drafted"
+  },
+  "god_view_toggle": {
+   "surface": "System menu — God view checkbox (spectate only)",
+   "answers": "Am I watching honestly or omnisciently?",
+   "because": "The lift must be a visible, deliberate state, never ambient — a watcher who forgets which mode they are in draws wrong conclusions about what the AI could see. Rendered only under spectate, so a played session cannot reach it by construction.",
+   "backlog_item": [
+    "BL-408"
+   ],
+   "files": [
+    "src/ui/time_panel.cpp"
+   ],
+   "status": "drafted"
+  },
+  "strategy_readout": {
+   "surface": "Strategy readout (nav slot 12)",
+   "answers": "What strategy is emerging from each corporation's run — what mix of verbs is it taking, which spending priorities dominate, and which reasons keep firing?",
+   "because": "The decision feed (BL-407) shows the moves; nothing showed the SHAPE across a run — the thing Ben asked for (2026-08-14: watch AI play \"and discover what strategies emerge\"). The scorer has no strategy object, so an emergent strategy IS a distribution over decisions: the verb mix separates an expander from a consolidator; the must/should/nice bucket split is the most legible health signal in the stream; the reason tally is where a pathology like § 10h's idle/resume oscillation shows as two reciprocal codes. Score/margin figures deliberately absent (NR-226); no strategy is ever named (STRATEGIES.md's discovered-not-authored position).",
+   "backlog_item": [
+    "BL-411"
+   ],
+   "files": [
+    "src/ui/strategy_readout.cpp"
+   ],
+   "status": "drafted"
+  },
+  "province_card": {
+   "surface": "Province card (Selection element, Planetary rung)",
+   "answers": "The canvas just blended four tiles into one shape — what is actually IN it, and what can I do there?",
+   "because": "BL-511 removed the tile as a click target, so the mixture, the deposits and the buildings of a locality became unreachable by the gesture that used to reach them. The card is where they go: the mixture bar is specifically the BLEND LEGEND (it says what the gradient is made of, which the gradient itself deliberately smooths away), the member-tile list keeps the tile visible as the data grain Ben ruled it remains, and the summed deposits answer the question a player actually asks of a locality rather than of one hex. Without it the render change would have been a net loss of information.",
+   "status": "drafted",
+   "backlog_item": "BL-511",
+   "files": [
+    "src/ui/selection_panel.cpp",
+    "src/ui/body_surface_canvas.cpp"
+   ]
   }
  }
 }

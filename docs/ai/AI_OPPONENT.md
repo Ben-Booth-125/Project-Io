@@ -1065,6 +1065,49 @@ Still owed: player-press affordances are not yet disabled under spectate (the it
 the spectated viewpoint still inherits whichever corp the player would have been — which on
 seed 0 is insolvent and asset-less (NR-231).
 
+### 10j. The live agent control seam (BL-412, landed 2026-08-19)
+
+BL-278's `--serve` is headless-only by construction: `main.cpp` branches to the line-protocol
+loop *instead of* `app::run`, so an MCP-attached agent plays invisibly and the only way to
+observe its play is to read a transcript afterwards. Spectating the deterministic scorer
+(§ 10i) and spectating a *language model* were therefore different jobs. BL-412 is the second
+one: the **rendered app can now host an agent**, so a human watches an external model play a
+corp on the live canvas.
+
+**Transport.** `ProjectIo --host-agent [port]` (default 7717, composes with
+`--autostart-play`) opens a loopback TCP listener once a campaign is running —
+`src/core/agent_seam.{hpp,cpp}`, polled non-blocking from the frame loop, no worker thread.
+The engine only **listens**: no outbound connection, no HTTP client, no API key — the § 10
+invariant, untouched. The protocol is `--serve`'s line protocol *verbatim*: the opcode
+handlers moved to `src/core/agent_protocol.{hpp,cpp}` and both hosts (`run_serve`, which
+stays for headless use, and the seam) call the same parser, the same BL-396 field
+validation, the same BL-387/BL-397 actor gate. The session actor is the player corp — the
+seat the agent occupies (this is *not* BL-409's no-seat mode; the seat is occupied, just not
+by a human). Client side, `tools/mcp/server.js --attach <port>` connects to a live session
+instead of spawning a child.
+
+**Clock ownership — the agent gates the clock.** Attaching pauses the sim; a `TICK` request
+releases exactly one econ tick (`sim_loop::advance_days(90)` through the same
+day/econ-boundary crossings live play uses). The session stalls while the model thinks —
+honest, and right for watching. The human keeps override: the speed keys still work, and
+with the clock running a `TICK` waits for the next natural boundary instead.
+
+**Determinism — commands land at tick boundaries only.** A wall-clock session where commands
+apply on whichever *day* the bytes arrive is not replayable, which forfeits § 10h's central
+property. So the seam defers every `COMMAND` to the econ boundary: applied there in arrival
+order, against the post-step world of the tick just completed, stamped with that tick, and
+**recorded** — `(tick, corp, verb, args, result)` in memory and `agent_transcript.log` on
+detach/exit. `tools/verify/agent_seam_harness.cpp` proves the contract headless: a
+socket-delivered schedule hashes identically to the same schedule applied in-process, the
+transcript replays to the same `state_hash`, and an out-of-domain command is rejected whole
+with the hash untouched. Request order is preserved on the wire (reads answer immediately
+only while nothing is deferred ahead of them; `TICK` is a sequence point), so a lockstep
+client frames responses exactly as it does against `--serve`.
+
+**Scope.** § 10g stands: the deterministic scorer remains the shipped rival's action
+generator. This seam is the research and diagnostics configuration § 10h argues for —
+frontier-or-local models playing a corp interactively, now watchable.
+
 ### 10f. Sources added 2026-08-03
 
 - Vox Deorum — hybrid LLM architecture for 4X, 2,327 games, open-weight parity, per-game token cost. https://arxiv.org/abs/2512.18564 · https://github.com/CIVITAS-John/vox-deorum

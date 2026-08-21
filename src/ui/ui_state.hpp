@@ -6,6 +6,7 @@
 #include "world/entity.hpp"
 
 #include <imgui.h>
+#include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -106,16 +107,8 @@ struct construction_state
     /// draw pass is iterating it would invalidate the iteration.
     entity_id     pending_demolish = null_entity;
 
-    /// Pending law enact/repeal request (BL-343) — the index into `world::laws`
-    /// whose `enacted` flag the Budget ledger's law list asked to flip, or -1 for
-    /// none. Takes the same deferred path as `pending_tile` for the same reason
-    /// (UI surfaces hold only `const world&`), and is executed by `app::render`.
-    ///
-    /// This is the DEBUG TOGGLE BL-343 scopes in, deliberately not an enactment
-    /// UI: a law you cannot turn on is indistinguishable from an unimplemented
-    /// one, but the politics of *how* a law gets enacted is BL-186 (laws ledger)
-    /// and BL-345 (the relationship axis), not this item.
-    int           pending_law_toggle = -1;
+    // (BL-343's pending_law_toggle lived here until BL-480: enactment is the
+    // author nation's act now, so no player surface enqueues a law flip.)
 
     /// Last construction outcome, set by app after executing a request — a short
     /// human string shown by the build UI ("Built.", "Can't afford it.", …).
@@ -204,6 +197,19 @@ struct ui_state
     /// value. Held as int so "all" has a home the enum does not have to invent.
     int decision_feed_reason = -1;
 
+    // --- Strategy readout (BL-411) ---
+    // The aggregate companion to the feed above: verb mix, spend split across
+    // the priority buckets, and reason tally per corp over a rolling window.
+    // Score/margin fields are deliberately absent from it (NR-226 fence).
+    // Like every ledger it starts closed. See ui/strategy_readout.hpp.
+
+    bool show_strategy_readout = false; ///< Whether the Strategy readout is open.
+
+    /// Corp selector: null_entity = the all-corporations comparison view,
+    /// otherwise one corp's full profile. Same persistence rationale as
+    /// decision_feed_corp — canvas selection never clears it.
+    entity_id strategy_readout_corp = null_entity;
+
     // --- Building Selection card accordion (supersedes BL-431's three toggles) ---
     // The building card now takes the tile card's 3-column band shape: Profitability /
     // Method / Chain / Depth (whichever apply) each get a PAGE rather than a
@@ -219,13 +225,55 @@ struct ui_state
     /// role for the new Soldier card) — Strength / Roster, whichever apply.
     int selection_unit_page = 0;
 
+    /// Province Selection accordion page index (same role again) — Tiles /
+    /// Deposits / Buildings. BL-511's refold (2026-08-21) moved the province off
+    /// its own card and onto the shared Selection element's three-column band, so
+    /// its three readings page exactly as every other selection's do. Clamped at
+    /// the draw site, like the others.
+    int selection_province_page = 0;
+
+    /// The province (BL-511) the player single-clicked, or 0 for none. The
+    /// province is the SELECTED unit on the Planetary canvas — a click that hits
+    /// no marker lands here rather than on a tile — while the tile stays the data
+    /// grain the Selection element then lists (deposits, terrain, buildings all remain
+    /// tile-keyed). Province ids are derived, never allocated (world/province.hpp),
+    /// so this is a plain id, not an entity: `selected_entity` and this field are
+    /// mutually exclusive, and whichever is set last clears the other. The
+    /// Selection element dispatches on this BEFORE `selection_kind_of`, so the
+    /// band's "substitute the player corp when nothing is selected" rule (BL-266)
+    /// cannot swallow a province selection. See SELECTION.md § Province.
+    uint32_t selected_province = 0;
+
+    /// The province under the cursor this frame, or 0. Written by the Planetary
+    /// canvas draw pass from the hovered tile; drives the province hover outline.
+    uint32_t hovered_province = 0;
+
+    /// The value of `selected_entity` the Planetary canvas last wrote, so the
+    /// canvas can tell "the player clicked a province" from "some OTHER surface
+    /// — a ledger row, a corp list, a just-built building — moved the entity
+    /// selection". The canvas is the only writer of `selected_province`, so
+    /// without this the two fields could both read as set at once and the
+    /// Selection element would have two things to draw. On a mismatch the entity
+    /// selection wins and the province clears; see body_surface_canvas.cpp.
+    entity_id province_sync_entity = null_entity;
+
     // --- Tile repeat-click selection cycle (placeholder unit-loop scaffolding) ---
     // Which tile the loop is currently anchored to, and which of the three fixed
-    // stages (0 = unit, 1 = building, 2 = tile) the selection currently sits on.
+    // stages (0 = unit, 1 = building, 2 = province) the selection currently sits
+    // on. BL-511 moved the terminal stage from the tile to its province; a tile is
+    // reached from the Selection element's Tiles page instead.
     // A click on hovered_tile == selection_cycle_tile advances the stage
     // (skipping stages with nothing there); a click elsewhere reseeds both.
     // Mirrors card_resource_page's per-selection reset idiom rather than adding a
     // separate "is this a repeat click" flag.
+    ///
+    /// Stage numbering is the cycle order Ben ruled on 2026-08-21:
+    /// **0 = unit, 1 = province, 2 = building, 3 = tile.** Four rungs, not the
+    /// three BL-511 shipped, where the province and the tile shared rung 2 —
+    /// they are separate now, so a repeat click walks all the way down to the
+    /// bare tile. This is the CYCLE order only; the canvas hit-test still
+    /// resolves most-specific-first, so a first click on a building selects the
+    /// building rather than its province.
     entity_id selection_cycle_tile  = null_entity;
     int       selection_cycle_stage = 0;
 
@@ -233,6 +281,18 @@ struct ui_state
     /// `world/*` never reads it; the sim's copy travels as corp_ai_params
     /// .spectating through run_economy_step's defaulted argument.
     bool spectating = false;
+
+    /// Spectator god view (BL-408): lift the survey mask and the BL-068
+    /// rival-internals redaction — in the UI layer ONLY. The flag is read at
+    /// the draw call, never at the source: `world/*`, `survey_tile_visible`,
+    /// the activity-fog store and `export_corp_blackboard` never see it, so
+    /// the AI stays exactly as visibility-honest while the watcher does not.
+    /// Meaningful only under `spectating` — every read-site tests the PAIR
+    /// (`spectating && god_view`), and the toggle (system menu, time_panel.cpp)
+    /// only renders while spectating, so a played session cannot reach it.
+    /// Defaults false: with it off, every gated surface renders byte-identical
+    /// to the pre-BL-408 build.
+    bool god_view = false;
 
     // --- Budget ledger stubbed policy levers (BL-171 UI; mechanics owed to BL-155) ---
     // The Tax and Wages tier selectors are drawn and selectable, but have NO economic

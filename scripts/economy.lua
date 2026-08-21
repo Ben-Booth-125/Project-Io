@@ -278,6 +278,12 @@ economy = {
         reputation_floor       = -5.0, -- request_quote declines below this; 0 for an unseen pair
         reputation_on_complete = 1.0,
         reputation_on_cancel   = -2.0,
+        -- BL-392: what a commitment buys, and what the distance costs. The
+        -- discount is asymptotic in the order size; the freight is paid to the
+        -- supplier (a transfer), and only when the goods cross bodies.
+        volume_discount_max           = 0.15,
+        volume_discount_half_quantity = 100.0,
+        offbody_freight_fraction      = 0.05,
     },
 
     -- BL-430: switching a processing_facility's recipe through the player-grade

@@ -34,9 +34,46 @@ generated world and prints the `ceil_mult` that follows. Report-only apart from 
 re-run it and re-derive `economy.price_band.ceil_mult` whenever the logistics cost table, the map
 scale, or the `base_price` table changes.
 
+`agent_seam_harness` (BL-412) is CMake-only for a third reason: it links two **`src/core`** TUs
+the world superset deliberately excludes — `agent_protocol.cpp` (the `--serve` line protocol,
+shared with `run_serve`) and `agent_seam.cpp` (the rendered app's loopback listener + tick-boundary
+drain) — plus `ws2_32` on Windows. Still SDL/Lua/ImGui-free; it proves the live agent control
+seam's two contracts headless (socket schedule ≡ in-process schedule by `state_hash`, transcript
+replays to the same hash; out-of-domain commands rejected whole with the hash untouched).
+
+**`build_gen_harness.bat <name>`** (repo root) is the CMake-free route for any world-superset
+harness: it derives its TU list by globbing `src\world\*.cpp` minus the four sol2/Lua TUs, exactly
+as `io_world_obj` does, so unlike the hand-written `cl` recipes below it **cannot drift stale**.
+Output lands in `build_gen\verify\<name>.exe` with the compiler log beside it. Use it when a
+worktree has no configured `build\` tree and a full CMake configure (SDL + Lua FetchContent) is not
+worth paying for one harness.
+
+`road_reach_census` (Sprint B2) is the road-network reach instrument: it counts, over the 8-seed
+census set, how many nations end generation with **no roaded tile in their territory**, splits that
+count by whether the nation has a single population centre, and asserts the no-ocean-roads
+invariant plus determinism (identical `road_level` field *and* `state_hash` across two generations
+of one seed). Report-first — the road-less count is a number to watch, not a pinned band. Re-run it
+after any change to `road_generation.cpp`, to nation/population placement, or to the logistics
+traversal costs the road MST is laid out against.
+
+`tile_height_retention` (BL-517) guards the retained per-tile heightmap. Its assertions are shaped
+around the item's negative scope — height must be **captured**, never recomputed: H1 asserts every
+`tile_component::height` is bit-identical to `generation_record::height`, H3 that the value is the
+same when generation is asked for **no** record (the shipped path passes none), H4 that composition,
+landform and deposits stay byte-identical across two same-seed runs (the capture perturbed no RNG
+draw order), and H5 that landform is still **not** a function of height. It also prints the measured
+`sizeof(tile_component)` and the field's real byte cost. Re-run it after any change to Pass 1 or to
+the tile assembly block in `tile_generation.cpp`.
+
 Use that route for anything linking the world superset — `world_audit`, `ai_skill_harness`,
 `history_ladder_harness`, **`settlement_harness`**, `data_creep_harness`, `corp_terrain_matrix`,
-`trade_routes_harness` — and for `font_glyph_harness`, which links ImGui and is hand-declared in
+`trade_routes_harness`, `tech_effect_union_harness` (BL-479: the tech effect union — a fixture
+modify_scalar tech moves the named scalar for the earning corp only, the stack-taper pre-pass
+prices the modified rate, and the no-effect real world's `state_hash` marks stay bit-identical
+to the pre-change build), `trade_routes_harness`, **`province_partition_harness`** (BL-466 — the
+province partition's invariants plus the three serialisation-seam properties over the HISTORY-LOG
+stream: the pre-BL-466 stream is a byte-exact prefix, an older stream still loads, and the round
+trip is bit-identical) — and for `font_glyph_harness`, which links ImGui and is hand-declared in
 `CMakeLists.txt` above the glob. These have deliberately **no** `cl` recipe below: writing one
 would be inventing a TU list with a short shelf life — which is exactly how `trade_routes_harness`
 stopped linking when BL-170 landed rivers (fixed 2026-08-02 by deleting its hand-declaration, not
@@ -90,6 +127,34 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\military_capability_harness.cpp 
    /Fo:build_gen\verify\military_capability_harness\ /Fe:build_gen\verify\military_capability_harness.exe
 .\build_gen\verify\military_capability_harness.exe
 
+:: Laws MVP (BL-343, reshaped by BL-480) — the law record, per-tick resolution
+:: (evaluate_laws) and the enforcement seam in apply_budget: a repealed law is
+:: inert, an enacted levy charges exactly rate x in-jurisdiction units on its
+:: own `levies` line, no other flow moves, repeal is bit-identical reversal,
+:: scoping/stacking/conditions work, processing output is never levied. Since
+:: BL-480 the fixture owns a nation (laws carry an author; jurisdiction bounds
+:: the levy) and the seed ships ENACTED by the player's home nation.
+cl /nologo /std:c++20 /EHsc /I src tools\verify\law_harness.cpp ^
+   src\world\world.cpp src\world\budget_system.cpp src\world\law.cpp ^
+   src\world\condition_set.cpp src\world\unit_roster.cpp ^
+   /Fo:build_gen\verify\law_harness\ /Fe:build_gen\verify\law_harness.exe
+.\build_gen\verify\law_harness.exe
+
+:: Law author + treasury transfer (BL-480, group "law-author-and-treasury") —
+:: the levy is a TRANSFER: sum debited from in-jurisdiction corps == sum
+:: credited to the enacting nation's treasury, bit-exact over a tick span (R1);
+:: out-of-jurisdiction corps (foreign territory, unclaimed tiles) pay zero;
+:: repeal returns the arithmetic bit-identical to the never-enacted baseline
+:: (R2); a no-enactment world is bit-identical to a no-law world; author choice
+:: is deterministic (player home nation, else largest territory/lowest id, else
+:: no law) and an authorless record is inert. R3's live half (read-only ledger
+:: line) is a UI check outside this harness.
+cl /nologo /std:c++20 /EHsc /I src tools\verify\law_author_harness.cpp ^
+   src\world\world.cpp src\world\budget_system.cpp src\world\law.cpp ^
+   src\world\condition_set.cpp src\world\unit_roster.cpp ^
+   /Fo:build_gen\verify\law_author_harness\ /Fe:build_gen\verify\law_author_harness.exe
+.\build_gen\verify\law_author_harness.exe
+
 :: Procurement/contract seam (BL-350) — one contract quoted, accepted, paced
 :: and delivered end to end with the treasury debited in the split shape
 :: (deposit at accept, remainder paced across lead time), plus one decline
@@ -104,6 +169,33 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\procurement_harness.cpp ^
    src\world\unit_roster.cpp ^
    /Fo:build_gen\verify\procurement_harness\ /Fe:build_gen\verify\procurement_harness.exe
 .\build_gen\verify\procurement_harness.exe
+
+:: BL-392 (procurement contracts destroy value) + the Sprint D4 import tariff.
+:: Money and goods conservation across BOTH flows: every credit a contract
+:: debits from the buyer arrives at the supplier (deposit, instalments and
+:: freight alike), and every credit the tariff debits arrives in the enacting
+:: nation's treasury. Also re-measures the round-trip economics the item was
+:: filed on (the -0.14-credit 20-unit iron round trip), asserts the lead time
+:: now tracks the SUPPLIER's throughput, and asserts that with no tariff law
+:: enacted the world is bit-identical to a control carrying no law record.
+::
+:: NOTE ON WHAT IT DOES *NOT* CLAIM: the wider economy is not a closed system —
+:: the market is a buyer of last resort and pays sellers with nobody's money —
+:: so the conservation spans are run against the seam in isolation, or against a
+:: law-free control world. See the harness's own header comment.
+::
+:: A batch wrapper lives at build_money_conservation.bat (repo root) for the
+:: same reason run_harness.bat does.
+cl /nologo /std:c++20 /EHsc /I src tools\verify\money_conservation.cpp ^
+   src\world\world.cpp src\world\economy_system.cpp ^
+   src\world\market_clearing.cpp src\world\budget_system.cpp ^
+   src\world\corp_command.cpp src\world\construction.cpp src\world\placement_rules.cpp ^
+   src\world\condition_set.cpp src\world\survey_system.cpp src\world\logistics.cpp ^
+   src\world\unit_roster.cpp src\world\law.cpp src\world\building_profit.cpp ^
+   src\world\corp_ai.cpp src\world\stance.cpp src\world\supply_system.cpp ^
+   src\world\tech_gate.cpp src\world\river_generation.cpp ^
+   /Fo:build_gen\verify\money_conservation\ /Fe:build_gen\verify\money_conservation.exe
+.\build_gen\verify\money_conservation.exe
 
 :: Corp stance (BL-448) — the directed hostility map + canonicalised friendship
 :: map + pending-offer table, and the four corp_command verbs that mutate them
@@ -495,4 +587,45 @@ suite to remove (NR-259).
 cmake --build build --target substrate_census    # from a vcvars shell
 build_app.bat substrate_census                   # or via the pinned script
 IO_RUN_SWEEPS=1 ctest --test-dir build -R substrate_census
+```
+
+## unit_march_harness (BL-470, retargeted by BL-511)
+
+The unit-march seam: the three `corp_verb`s BL-470 added (`march_unit` /
+`halt_unit` / `disband_unit`) plus the per-tick resolution pass
+`run_unit_march`. Never had a README entry when it landed; added 2026-08-21
+alongside BL-511's grain change.
+
+**BL-511 moved `march_unit`'s payload from a TILE to a PROVINCE** (Ben's
+2026-08-21 ruling; NR-405). The verb kept its value — the enum is serialised and
+append-only — and only the field it reads changed, so M7 asserts the values
+directly (`march_unit == 21`, `halt_unit == 22`, `disband_unit == 23`,
+`corp_verb_count == disband_unit + 1`). A renumber is a save-format break and
+this is the row that catches it.
+
+**M7 is the untrusted-input-boundary row** and the reason to re-run this harness
+after any change to the seam or the partition. A province id can arrive over
+`--serve`, and there are TWO gates that are not interchangeable: the wire gate
+(`agent_protocol.cpp`) proves the value FITS uint32 without a narrowing cast
+re-aiming it, and the seam gate (`province_partition::find`) proves it EXISTS.
+M7 sweeps ~123 in-range-but-absent ids — `no_province`, near-miss neighbours,
+and every single-bit flip of a valid id — and asserts each rejects
+`rejected_invalid` with the unit byte-identical afterwards.
+
+**Two measured facts the fixtures encode, both of which bit during BL-511:**
+province id **0 is a REAL province** (body rank 0 | block 0 | component 0), so it
+cannot be an absent-value sentinel — `corp_command::province` defaults to
+`no_province` (0xFFFFFFFF), which is structurally unreachable because it needs
+component index 7 and a 2x2 block yields at most 4. And the body grid is a
+**cylinder**: on a 7-wide row the coastal-merge pass folds col 6 into col 0's
+province, and on a 10-wide row the wrap route to col 8 is shorter than the
+direct one. Fixture rows assert their own preconditions rather than trusting the
+geometry.
+
+Links the world superset; CMake target via the generic glob.
+
+```
+cmake --build build --target unit_march_harness   # from a vcvars shell
+build_gen_harness.bat unit_march_harness          # or the CMake-free route
+ctest --test-dir build -R unit_march_harness
 ```

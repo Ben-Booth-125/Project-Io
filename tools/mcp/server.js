@@ -28,9 +28,20 @@
 
 const { spawn } = require('child_process');
 const fs = require('fs');
+const net = require('net');
 const path = require('path');
 const readline = require('readline');
 const { execFileSync } = require('child_process');
+
+// --attach <port> (BL-412): instead of spawning a headless `--serve` child,
+// connect to a RENDERED app hosting the live agent control seam
+// (`ProjectIo --host-agent [port]`, default 7717) and speak the same line
+// protocol over loopback TCP. The engine side only listens; this process is
+// the one that dials. Under attach the live session's clock is agent-gated,
+// so issue_command rides its own TICK release (see sendRequest's callers).
+const attachIdx = process.argv.indexOf('--attach');
+const ATTACH_PORT = attachIdx !== -1 && process.argv[attachIdx + 1]
+  ? Number(process.argv[attachIdx + 1]) : null;
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const ACTIONS_QUERY = path.join(ROOT, 'tools', 'session', 'actions_query.js');
@@ -100,42 +111,62 @@ async function sessionActor() {
 
 let child = null;
 let childRl = null;
-let pending = null; // {resolve, reject, lines: string[]} for the in-flight request
+let sock = null;    // --attach transport (BL-412): a loopback TCP connection
+let sockRl = null;  // to a rendered app hosting the seam, instead of a child.
+let pending = null; // {resolve, reject, lines: string[], multi, expect} for the in-flight request
 
-function ensureChild() {
+function onResponseLine(line) {
+  if (line.startsWith('[Lua]')) return; // world-build startup banner, not a response
+  if (!pending) return;
+  pending.lines.push(line);
+  // Multi-line ops (BLACKBOARD / CORPS / BODIES) stream rows then END, and
+  // since BL-397 a refused BLACKBOARD is `ERR ... END` — so END alone is
+  // their terminator. Resolving on the ERR line (the old rule) would leave
+  // the trailing END to be read as the NEXT request's response. Every other
+  // op answers exactly one line — except an attach-mode command+tick pair,
+  // whose `expect` is 2 (RESULT then OK).
+  if (pending.multi ? line === 'END' : pending.lines.length >= pending.expect) {
+    const p = pending;
+    pending = null;
+    p.resolve(p.lines);
+  }
+}
+
+function ensureTransport() {
+  if (ATTACH_PORT) {
+    if (sock) return;
+    sock = net.createConnection({ host: '127.0.0.1', port: ATTACH_PORT });
+    sock.on('error', (e) => {
+      const p = pending;
+      pending = null;
+      if (p) p.reject(new Error(`live seam connection failed: ${e.message}`));
+    });
+    sock.on('close', () => { sock = null; sockRl = null; });
+    sockRl = readline.createInterface({ input: sock });
+    sockRl.on('line', onResponseLine);
+    return;
+  }
   if (child) return;
   child = spawn(resolveExe(),
                 ['--serve', '--ticks', '12', ...(AS_ARG ? ['--as', AS_ARG] : [])],
                 { cwd: ROOT });
   childRl = readline.createInterface({ input: child.stdout });
   child.on('exit', () => { child = null; childRl = null; });
-  childRl.on('line', (line) => {
-    if (line.startsWith('[Lua]')) return; // world-build startup banner, not a response
-    if (!pending) return;
-    pending.lines.push(line);
-    // Multi-line ops (BLACKBOARD / CORPS / BODIES) stream rows then END, and
-    // since BL-397 a refused BLACKBOARD is `ERR ... END` — so END alone is
-    // their terminator. Resolving on the ERR line (the old rule) would leave
-    // the trailing END to be read as the NEXT request's response. Every other
-    // op answers exactly one line.
-    if (pending.multi ? line === 'END' : true) {
-      const p = pending;
-      pending = null;
-      p.resolve(p.lines);
-    }
-  });
+  childRl.on('line', onResponseLine);
 }
 
 const MULTI_LINE_OPS = /^(BLACKBOARD|CORPS|BODIES)\b/;
 
-/// Send one request line to the --serve process; resolve with its response
-/// lines (the terminator line included).
-function sendRequest(line) {
-  ensureChild();
+/// Send one request (or an embedded-newline batch of them) to the seam;
+/// resolve with the response lines (terminator included). `expect` is how
+/// many single-line responses complete the request (default 1); multi-line
+/// ops resolve on END regardless.
+function sendRequest(line, expect = 1) {
+  ensureTransport();
   return new Promise((resolve, reject) => {
     if (pending) { reject(new Error('a request is already in flight')); return; }
-    pending = { resolve, reject, lines: [], multi: MULTI_LINE_OPS.test(line) };
-    child.stdin.write(line + '\n');
+    pending = { resolve, reject, lines: [], multi: MULTI_LINE_OPS.test(line), expect };
+    (ATTACH_PORT ? sock : child.stdin).write(line + '\n');
   });
 }
 
@@ -254,7 +285,13 @@ async function callTool(name, args) {
     const actor = await sessionActor();
     const wire = { ...args, verb: verbIdx };
     if (actor !== null) wire.corp = actor;
-    const lines = await sendRequest(`COMMAND ${kv(wire)}`);
+    // BL-412: a live (attached) session's clock is agent-gated and a COMMAND
+    // resolves only at a tick boundary — so under --attach the command rides
+    // its own TICK release, answering RESULT then OK as one exchange. The
+    // spawned headless child applies commands immediately; no TICK needed.
+    const lines = ATTACH_PORT
+      ? await sendRequest(`COMMAND ${kv(wire)}\nTICK`, 2)
+      : await sendRequest(`COMMAND ${kv(wire)}`);
     const resultLine = lines.find((l) => l.startsWith('RESULT '));
     const m = /result=(\S+) building=(-?\d+)/.exec(resultLine || '');
     return { result: m ? m[1] : 'unknown', building: m ? Number(m[2]) : -1 };
@@ -339,6 +376,7 @@ rl.on('line', async (raw) => {
       reply(id, await readResource(params.uri));
     } else if (method === 'shutdown') {
       if (child) { child.stdin.write('SHUTDOWN\n'); }
+      if (sock) { sock.write('SHUTDOWN\n'); } // detaches the agent; the app keeps running
       reply(id, {});
     } else if (id !== undefined) {
       replyError(id, -32601, `method not found: ${method}`);
@@ -349,4 +387,7 @@ rl.on('line', async (raw) => {
   }
 });
 
-process.on('exit', () => { if (child) child.kill(); });
+process.on('exit', () => {
+  if (child) child.kill();
+  if (sock) sock.destroy(); // just this agent's connection — never the app
+});

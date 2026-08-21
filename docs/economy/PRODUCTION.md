@@ -89,6 +89,67 @@ block reports the count, the ceiling, this site's rank and its share. Extraction
 verified by `tools/verify/stack_capacity_harness.cpp`; the BL-366 non-extraction cap and urban
 transform by `tools/verify/multi_building_tile_harness.cpp`.
 
+### The province building ceiling (BL-513, 2026-08-21; implemented)
+
+A **second, independent limit**, at province grain. It does not replace the stack caps above —
+both must pass — because the two answer different questions:
+
+| Limit | Grain | Asks | Answers from |
+|---|---|---|---|
+| Stack capacity (§ above) | tile | may this **deposit** support another site? | deposit richness |
+| **Province ceiling** | **province** | how much can this **land** sustain? | area + infrastructure + habitability + population |
+
+**It is type-agnostic, by ruling.** Ben, 2026-08-21: *"Building limits do not determine between
+different types of building. So it does not matter if you can build 60 buildings, whether they are
+5 of one type and 5 of another, or 10 of one type."* It bounds the **total** standing in the
+province — extraction sites included, since they occupy land like anything else — and says nothing
+about the mix. That is what makes it a statement about land rather than a balance dial on
+building types.
+
+**The shape**, with each of the four inputs in its natural role:
+
+```
+sustain_units = pop_factor × Σ over the province's land tiles of
+                                habitability_t × (1 + road_level_t / 3)
+
+ceiling       = max(1, round(k × sustain_units)),   k = 12.6468
+```
+
+* **Area** is the number of terms in the sum — a bigger province sustains more by being bigger.
+* **Habitability** is each tile's weight. Land nobody can live on sustains nothing.
+* **Infrastructure** is the per-tile road multiplier, spanning exactly `[1, 2]` across the road
+  ladder's **own** domain (0 = none … 3 = Highway). Structural, not tuned.
+* **Population** is the province-level multiplier, `1 + Σ(centre scale) / 5`, again over the
+  scale's own domain (1 = village … 5 = metropolis).
+
+Every band is read off a domain the codebase already defines, which leaves exactly **one** free
+coefficient — `k` — and it is **pinned by measurement**, following BL-463's discipline. It is set
+so the new ceiling's world total matches the capacity the world already grants under the pooled
+per-tile cap: the ceiling is a *redistribution* of existing capacity onto the four sustaining
+inputs, not a new tighter or looser regime. Across 8 seeds, `pooled per-tile cap ÷ sustain units`
+measured **11.4694 … 15.2588, aggregate 12.6468** (spread 28.36% of the mean); `k` is that
+aggregate, and at it the ceilings total **100.01%** of the pooled per-tile capacity.
+
+**It refuses nothing today, and that is the expected outcome.** Measured post-background-firms
+across 8 seeds: 1049 buildings against 909,245 ceiling slots — **0.115% used**, and **zero**
+provinces at their ceiling on any seed. Its value is forward: it is the ceiling that makes
+"pack more productivity into a smaller space" a real trade-off once density rises, and the
+natural place for infrastructure to pay off into.
+
+**It is computed on demand, never cached, and adds no persistent field** — the flat-binary
+save/load path is untouched by it. That matters because roads are built during play, so this
+ceiling **moves during play** — the first placement bound in the game that is not fixed at
+generation. Whether that dynamism is intended is an open question for Ben (NR-406); computing on
+demand keeps either answer cheap.
+
+Implementation: `measure_province_sustain` / `province_building_ceiling` /
+`province_buildings_standing` in `src/world/province.{hpp,cpp}` (the constants and the pinning
+evidence live beside them in the header); the gate is the last check in
+`placement_rules::can_place_in_world`, refusing with `placement_reason::province_full`.
+Generation does not go through that entry point — it uses `can_place` directly — so generation
+output is unchanged. Measured by `tools/verify/province_capacity_probe.cpp`, which prints the
+ceiling alongside the capacity and re-derives the pin on every run.
+
 ### Extraction buildings
 
 > **Design targets, not enum values (recorded 2026-07-31).** The named building types below are

@@ -4,6 +4,7 @@
 
 #include "detail_level.hpp"   // disclosure_controls — the drill-through idiom (BL-214/BL-265)
 #include "foldout_column.hpp" // shell fold-out column host (shared with the ledgers)
+#include "format.hpp"         // fmt::credits — the god-view corp readout (BL-408)
 #include "hex_render.hpp"      // draw_tile_neighbourhood — the card's zoomed tile view
 #include "icons.hpp"
 #include "presentation.hpp"
@@ -13,6 +14,7 @@
 
 #include "world/budget_system.hpp"    // compute_building_opex / body_mean_habitability (BL-162 estimate)
 #include "world/building_profit.hpp" // per-building profitability estimate (BL-074)
+#include "world/corp_ai.hpp"         // corp_reserve_floor / corp_should_have_buffer — god-view corp readout (BL-408)
 #include "world/economy_system.hpp" // economy_report (workforce cap, BL-069)
 #include "world/market_clearing.hpp"
 #include "world/construction.hpp"    // demolish path (the building element's Demolish)
@@ -352,7 +354,14 @@ const char* selection_title(const world& w, selection_kind kind, entity_id id)
 // withheld channels (production, stockpile) as visible 'private' placeholders, so
 // the asymmetry is legible rather than a silent omission. The panel never leaks
 // more than the hover card's facts; markets remain the sanctioned public channel.
-void draw_rival_building_summary(const world& w, entity_id id)
+//
+// BL-408: under spectator god view (@p god_view) the two 'private' rows open into
+// the real values — same rows, real numbers — so the lift reads as exactly the
+// redaction coming off, not as a different panel. Everything shown is plain world
+// state the UI already holds a const ref to; the blackboard export never runs
+// through here.
+void draw_rival_building_summary(const world& w, const recipe_registry& reg,
+                                 entity_id id, bool god_view)
 {
     const auto it = w.buildings.find(id);
     if (it == w.buildings.end())
@@ -363,7 +372,8 @@ void draw_rival_building_summary(const world& w, entity_id id)
     const building_component& b = it->second;
 
     // Owner corporation (public) — the building type already heads the panel.
-    const auto cit = w.corporations.find(owner_corp_of(w, id));
+    const entity_id owner = owner_corp_of(w, id);
+    const auto cit = w.corporations.find(owner);
     if (cit != w.corporations.end())
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
                            "Owner: %s", cit->second.name.c_str());
@@ -373,6 +383,37 @@ void draw_rival_building_summary(const world& w, entity_id id)
     if (tile_it != w.tiles.end())
         ImGui::Text("Tile [%d, %d]  %s", tile_it->second.grid_x, tile_it->second.grid_y,
                     composition_name(tile_it->second.composition));
+
+    if (god_view)
+    {
+        // Production: what it runs and at what staffing.
+        if (b.type == building_type::extraction_site)
+            ImGui::Text("Production:  %s \xc2\xb7 workforce %.0f%%",
+                        resource_name(b.target_resource),
+                        static_cast<double>(b.workforce_assigned) * 100.0);
+        else if (const recipe* r = reg.get_recipe(b.recipe); r != nullptr)
+            ImGui::Text("Production:  %s \xc2\xb7 workforce %.0f%%",
+                        r->display_name.c_str(),
+                        static_cast<double>(b.workforce_assigned) * 100.0);
+        else
+            ImGui::Text("Production:  workforce %.0f%%",
+                        static_cast<double>(b.workforce_assigned) * 100.0);
+
+        // Stockpile: the owner's (corp, body) pool this building feeds — pools
+        // are corp-per-body (world::corp_body_pools), not per building, and the
+        // label says so rather than implying a per-site hoard.
+        if (tile_it != w.tiles.end())
+        {
+            const auto pit = w.corp_body_pools.find({owner, tile_it->second.body});
+            float total = 0.0f;
+            if (pit != w.corp_body_pools.end())
+                for (const float q : pit->second.quantities)
+                    total += q;
+            ImGui::Text("Stockpile:   %.1f pooled on this body", static_cast<double>(total));
+        }
+        ImGui::TextDisabled("Competitor \xe2\x80\x94 god view");
+        return;
+    }
 
     // Withheld channels as explicit 'private' teaching rows: the grey value makes
     // the asymmetry legible rather than a silent omission. Markets stay the
@@ -954,6 +995,96 @@ void draw_production_method_section(world& w, const recipe_registry& reg, entity
     }
 }
 
+// BL-408 spectator god view: the full internals readout for a selected
+// corporation — the readout BL-068 exists to withhold, drawn ONLY when the
+// caller has already checked `ui.spectating && ui.god_view`. Cash, the
+// solvency reserve floor and Should-Have buffer the scorer actually holds
+// itself to, the per-body stockpile pools, and each asset's running
+// production — all plain reads over world state and the same public helpers
+// (corp_reserve_floor / corp_should_have_buffer) the harnesses use. Strictly
+// presentational: the blackboard export and the scorer never route through
+// here, so what the AI knows is untouched by what the watcher sees.
+void draw_corporation_god_facts(const world& w, const recipe_registry& reg,
+                                const economy_report& report, entity_id id)
+{
+    const auto cit = w.corporations.find(id);
+    if (cit == w.corporations.end())
+    {
+        ImGui::TextDisabled("\xe2\x80\x94");
+        return;
+    }
+    const corporation_component& c = cit->second;
+
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "God view");
+
+    ImGui::Text("Cash: %s", fmt::credits(c.balance).c_str());
+    ImGui::Text("Reserve floor: %s", fmt::credits(corp_reserve_floor(w, reg, id)).c_str());
+    ImGui::Text("Should-have buffer: %s",
+                fmt::credits(corp_should_have_buffer(w, reg, report, id)).c_str());
+
+    // Per-body stockpile pools. corp_body_pools is a std::map, so this walk is
+    // deterministic; only bodies actually holding stock get a row.
+    bool any_pool = false;
+    for (const auto& [key, pool] : w.corp_body_pools)
+    {
+        if (key.first != id)
+            continue;
+        float total = 0.0f;
+        std::size_t top = 0;
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            total += pool.quantities[r];
+            if (pool.quantities[r] > pool.quantities[top])
+                top = r;
+        }
+        if (total <= 0.0f)
+            continue;
+        if (!any_pool)
+        {
+            ImGui::Spacing();
+            ImGui::TextDisabled("Pools");
+            any_pool = true;
+        }
+        const auto body_it = w.bodies.find(key.second);
+        ImGui::Text("%s: %.1f (most: %s %.1f)",
+                    body_it != w.bodies.end() ? body_it->second.name.c_str() : "?",
+                    static_cast<double>(total),
+                    resource_name(static_cast<resource_type>(top)),
+                    static_cast<double>(pool.quantities[top]));
+    }
+
+    // Running production: one compact row per asset — what it runs, at what
+    // staffing, and whether the tick-level agency has idled it.
+    bool any_bld = false;
+    for (const entity_id bid : c.assets)
+    {
+        const auto bit = w.buildings.find(bid);
+        if (bit == w.buildings.end())
+            continue;
+        const building_component& b = bit->second;
+        if (!any_bld)
+        {
+            ImGui::Spacing();
+            ImGui::TextDisabled("Buildings");
+            any_bld = true;
+        }
+        const char* what = "";
+        if (b.type == building_type::extraction_site)
+            what = resource_name(b.target_resource);
+        else if (const recipe* r = reg.get_recipe(b.recipe); r != nullptr)
+            what = r->display_name.c_str();
+        const char* state = b.ticks_remaining > 0 ? " \xc2\xb7 constructing"
+                          : b.decommissioned      ? " \xc2\xb7 idled"
+                                                  : "";
+        ImGui::Text("%s%s%s \xc2\xb7 wf %.0f%%%s%s",
+                    building_type_name(b.type),
+                    *what ? " \xc2\xb7 " : "", what,
+                    static_cast<double>(b.workforce_assigned) * 100.0,
+                    b.workforce_auto ? " (auto)" : "",
+                    state);
+    }
+}
+
 // The facts: only what informs the action (BL-093) — slim and muted. Everything
 // encyclopedic (orbit, composition, deposits, prices) lives in the ledgers, one
 // 'go to' away.
@@ -969,6 +1100,13 @@ void draw_selection_facts(world& w, const recipe_registry& reg,
             break;
         // selection_kind::building no longer routes here — see
         // draw_building_selection_body.
+        case selection_kind::corporation:
+            // BL-408: a corp's facts column is empty today (its detail lives in
+            // the ledgers). Under spectator god view it carries the internals
+            // readout BL-068 withholds; with the flag off, empty as ever.
+            if (ui.spectating && ui.god_view)
+                draw_corporation_god_facts(w, reg, report, sel);
+            break;
         default:
             break;
     }
@@ -1161,7 +1299,8 @@ bool tile_icon_button(const char* id, ImVec2 sz, bool enabled, const char* tip,
 // full-canvas takeover read, so they cannot show different pages for the
 // same building.
 std::vector<building_page> building_pages(const world& w, const recipe_registry& reg,
-                                          const economy_report& report, entity_id id)
+                                          const economy_report& report, entity_id id,
+                                          bool god_view)
 {
     std::vector<building_page> pages;
     const auto bit = w.buildings.find(id);
@@ -1170,10 +1309,20 @@ std::vector<building_page> building_pages(const world& w, const recipe_registry&
     const building_component& b = bit->second;
 
     // Rivals: intel only (BL-068) — a single read-only Status page, nothing
-    // that would reveal recipe choice or internals.
+    // that would reveal recipe choice or internals. Under spectator god view
+    // (BL-408) the Status page opens its internals AND the read-only
+    // Profitability page joins it; Method and Workforce stay off the rival
+    // card even then, deliberately — they carry CONTROLS (recipe switch,
+    // workforce slider), and god view grants sight, never hands.
     if (!is_player_owned(w, id))
     {
         pages.push_back({"Status", building_page_kind::status});
+        if (god_view && b.ticks_remaining <= 0)
+        {
+            const building_profit p = estimate_building_profit(w, reg, report, id);
+            if (p.has_data)
+                pages.push_back({"Profitability", building_page_kind::profitability});
+        }
         return pages;
     }
 
@@ -1209,11 +1358,13 @@ std::vector<building_page> building_pages(const world& w, const recipe_registry&
 // A minimal facts/status page: construction progress when still building,
 // or the rival's public-only summary (BL-068) — the fallback content for
 // whichever building has no other page, plus the whole story for a rival.
-void draw_building_status_page(const world& w, const recipe_registry& reg, entity_id id)
+// @p god_view (BL-408): spectator god view — opens the rival summary's rows.
+void draw_building_status_page(const world& w, const recipe_registry& reg, entity_id id,
+                               bool god_view)
 {
     if (!is_player_owned(w, id))
     {
-        draw_rival_building_summary(w, id);
+        draw_rival_building_summary(w, reg, id, god_view);
         return;
     }
     const auto bit = w.buildings.find(id);
@@ -1287,13 +1438,14 @@ void draw_building_workforce_page(building_component& b)
 // the signature — building_page_expanded's caller and the tile-card precedent
 // both pass ui_state& through the dispatch, and a future page may need it.
 void draw_building_page(world& w, const recipe_registry& reg, const economy_report& report,
-                        entity_id id, building_page_kind kind, ui_state& /*ui*/)
+                        entity_id id, building_page_kind kind, ui_state& ui)
 {
     switch (kind)
     {
         case building_page_kind::profitability: draw_building_profit(w, reg, report, id); break;
         case building_page_kind::method:        draw_production_method_section(w, reg, id); break;
-        case building_page_kind::status:        draw_building_status_page(w, reg, id); break;
+        case building_page_kind::status:
+            draw_building_status_page(w, reg, id, ui.spectating && ui.god_view); break;
         case building_page_kind::workforce:
             if (const auto bit = w.buildings.find(id); bit != w.buildings.end())
                 draw_building_workforce_page(bit->second);
@@ -1594,7 +1746,8 @@ void draw_building_selection_body(world& w, const recipe_registry& reg,
 
     // ── Centre half: paged accordion over building_pages() ──
     {
-        const std::vector<building_page> pages = building_pages(w, reg, report, sel);
+        const std::vector<building_page> pages =
+            building_pages(w, reg, report, sel, ui.spectating && ui.god_view);
 
         ImGui::BeginChild("##building_accordion", {center_w, total_h}, true,
                           ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
@@ -1650,6 +1803,9 @@ void draw_building_selection_body(world& w, const recipe_registry& reg,
         const float  bh  = (total_h - 2.0f * spacing) / 3.0f;
         const ImVec2 bsz = {bw, bh};
 
+        // Deliberately NOT lifted by spectator god view (BL-408): god view
+        // grants sight, never hands — a rival's Mothball/Dismantle/Auto stay
+        // disabled under it, so the lift stays strictly presentational.
         const bool owned = is_player_owned(w, sel);
 
         // Manage is GONE (2026-08-15 playtest rework, NR-245's queue-only
@@ -2031,26 +2187,322 @@ void draw_tile_selection(world& w, ui_state& ui)
 }
 
 
+// ---------------------------------------------------------------------------
+// The province body (BL-511; refolded 2026-08-21)
+// ---------------------------------------------------------------------------
+// Ben, 2026-08-21: "We don't need another selection element, we can just use the
+// same one as we used for tiles." So a province is NOT a card of its own — it is
+// one more thing the single polymorphic Selection element can be showing. This
+// function is a BODY, not a card: it is called from draw_selection_content after
+// the shared header (icon / title / 'go to' / separator), exactly as the building
+// and unit bodies are, and it takes the same three-column band those two use —
+// a left-quarter render of the thing, a centre-half paged accordion, a
+// right-quarter 2x3 action grid.
+//
+// What stays province-SPECIFIC is only the content, which is the part that earns
+// the surface. The canvas blends the member tiles into one soft shape; this body
+// un-blends them: the mixture bar is the blend's legend, and the three accordion
+// pages give the tile back — member tiles as presses, deposits summed, buildings
+// rolled up. Deposits, terrain and buildings all remain TILE-keyed (Ben's ruling:
+// tiles "are just going to be rendered differently, but still instrumental unit
+// values"); this reads over them, it does not move them.
+//
+// Nothing here assumes a province SIZE: `pv.tiles` is walked and divided by, never
+// indexed against a constant, so a repartition that changes the member count
+// changes only how many bands the mixture bar has.
+void draw_province_selection_body(world& w, ui_state& ui, const province& pv)
+{
+    const ImGuiStyle& style    = ImGui::GetStyle();
+    ImDrawList*       dl       = ImGui::GetWindowDrawList();
+    const float       avail    = ImGui::GetContentRegionAvail().x;
+    const float       total_h  = ImGui::GetContentRegionAvail().y;
+    const float       frame_h  = ImGui::GetFrameHeight();
+    const float       spacing  = style.ItemSpacing.x;
+    const float       left_w   = avail * 0.25f;
+    const float       right_w  = avail * 0.25f;
+    const float       center_w = std::max(80.0f, avail - left_w - right_w - 2.0f * spacing);
+
+    // -- Left quarter: the province in situ, over its mixture bar --
+    // The same slot the tile card gives the zoomed hex neighbourhood and the unit
+    // card its portrait glyph - "what does this thing look like". The
+    // neighbourhood centres on the anchor tile, so the province is shown where it
+    // sits; the mixture bar runs along the bottom of the same panel, always
+    // visible rather than buried on an accordion page (it is the legend for the
+    // gradient the player is looking at, so it has to be readable beside it).
+    {
+        const ImVec2 p     = ImGui::GetCursorScreenPos();
+        const ImVec2 mx    = {p.x + left_w, p.y + total_h};
+        const float  bar_h = frame_h * 0.8f;
+        const float  pad   = 3.0f;
+        dl->AddRectFilled(p, mx, IM_COL32(16, 18, 24, 255), 3.0f);
+        draw_tile_neighbourhood(dl, w, pv.tiles.front(), p,
+                                {left_w, std::max(24.0f, total_h - bar_h - pad * 2.0f)},
+                                /*radius=*/2);
+
+        // One segment per member tile, in the province's own ascending-tile-id
+        // order, each drawn in exactly the colour the canvas gives that tile
+        // (composition hue composited with the landform relief). The canvas
+        // averages these together; the bar un-averages them, so "what did that
+        // gradient just blend?" is one glance away rather than a zoom and a count.
+        const float  strip_w = left_w - pad * 2.0f;
+        const float  seg_w   = strip_w / static_cast<float>(pv.tiles.size());
+        const ImVec2 b0      = {p.x + pad, mx.y - bar_h - pad};
+        for (std::size_t i = 0; i < pv.tiles.size(); ++i)
+        {
+            const auto tit = w.tiles.find(pv.tiles[i]);
+            if (tit == w.tiles.end())
+                continue;
+            const ImU32 c = ui::landform_relief(ui::terrain_colour(tit->second.composition),
+                                                tit->second.landform);
+            dl->AddRectFilled({b0.x + seg_w * static_cast<float>(i), b0.y},
+                              {b0.x + seg_w * static_cast<float>(i + 1), b0.y + bar_h}, c);
+        }
+        dl->AddRect(b0, {b0.x + strip_w, b0.y + bar_h}, IM_COL32(0, 0, 0, 120));
+
+        // Hover target over the bar only - the panel around it stays inert.
+        ImGui::SetCursorScreenPos(b0);
+        ImGui::Dummy({strip_w, bar_h});
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Mixture: one band per tile in this province, in the\n"
+                              "colour the map gives that tile. The map blends them.");
+
+        dl->AddRect(p, mx, IM_COL32(90, 90, 100, 255), 3.0f);
+        ImGui::SetCursorScreenPos(p);
+        ImGui::Dummy({left_w, total_h});
+    }
+    ImGui::SameLine();
+
+    // -- Centre half: paged accordion - Tiles / Deposits / Buildings --
+    // Same pager chrome as the tile, building and unit accordions (prev arrow,
+    // centred "Label (i/N)", next arrow), so the three province readings are
+    // paged exactly the way every other selection's readings are.
+    {
+        static const char* const k_pages[] = {"Tiles", "Deposits", "Buildings"};
+        const int                n         = 3;
+
+        ImGui::BeginChild("##prov_accordion", {center_w, total_h}, true,
+                          ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
+
+        int& page = ui.selection_province_page;
+        page      = std::clamp(page, 0, n - 1);
+
+        const float aw    = ImGui::GetContentRegionAvail().x;
+        const float right = ImGui::GetCursorPosX() + aw;
+        ImGui::BeginDisabled(page == 0);
+        if (ImGui::ArrowButton("##prov_prev", ImGuiDir_Left)) --page;
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered() && page > 0)
+            ImGui::SetTooltip("Previous");
+
+        char hdr[64];
+        std::snprintf(hdr, sizeof hdr, "%s  (%d/%d)", k_pages[page], page + 1, n);
+        const float name_w = ui::fit_width(hdr);
+        ImGui::SameLine(std::max(frame_h + style.ItemSpacing.x, (aw - name_w) * 0.5f));
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", hdr);
+
+        ImGui::SameLine(right - 2.0f * frame_h - style.ItemSpacing.x);
+        ImGui::BeginDisabled(page == n - 1);
+        if (ImGui::ArrowButton("##prov_next", ImGuiDir_Right)) ++page;
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered() && page < n - 1)
+            ImGui::SetTooltip("Next");
+
+        ImGui::Spacing();
+        ImGui::BeginChild("##prov_page_body", {0.0f, 0.0f}, false,
+                          ImGuiWindowFlags_NoSavedSettings);
+
+        if (page == 0)
+        {
+            // Member tiles: the tile is not retired, it is one press away. Each row
+            // selects the TILE, which clears the province and hands the player the
+            // full tile card - deposits, the neighbourhood hex view, the Construct
+            // door. Building placement did NOT move to province grain, so this list
+            // is also the route to building anywhere.
+            for (std::size_t i = 0; i < pv.tiles.size(); ++i)
+            {
+                const entity_id tid = pv.tiles[i];
+                const auto      tit = w.tiles.find(tid);
+                if (tit == w.tiles.end())
+                    continue;
+                const tile_component& tc = tit->second;
+
+                const bool plain = (tc.landform == terrain_landform::plains);
+                char label[160];
+                std::snprintf(label, sizeof label, "[%d, %d]  %s%s%s##prov_tile_%d",
+                              tc.grid_x, tc.grid_y,
+                              ui::composition_name(tc.composition),
+                              plain ? "" : " \xc2\xb7 ",
+                              plain ? "" : ui::landform_name(tc.landform),
+                              static_cast<int>(i));
+                if (ImGui::Selectable(label))
+                {
+                    ui.selected_entity   = tid;
+                    ui.selected_province = 0; // entity and province selection are exclusive
+                }
+            }
+        }
+        else if (page == 1)
+        {
+            // Deposits, summed across the province. Deposits stay TILE-keyed (Ben's
+            // ruling); this is a read over them, not a move of them. Summing is the
+            // right reduction because a deposit is a stock: several tiles each
+            // holding a little iron is, for a player deciding whether this locality
+            // is worth a mine, one province holding that much iron.
+            std::array<float, resource_count> dep{};
+            for (entity_id tid : pv.tiles)
+                if (const auto tit = w.tiles.find(tid); tit != w.tiles.end())
+                    for (std::size_t r = 0; r < resource_count; ++r)
+                        dep[r] += tit->second.resource_deposit[r];
+
+            std::vector<std::pair<float, std::size_t>> ranked;
+            for (std::size_t r = 0; r < resource_count; ++r)
+                if (dep[r] > 0.0f)
+                    ranked.push_back({dep[r], r});
+            std::sort(ranked.begin(), ranked.end(),
+                      [](const std::pair<float, std::size_t>& a,
+                         const std::pair<float, std::size_t>& b) { return a.first > b.first; });
+
+            if (ranked.empty())
+                ImGui::TextDisabled("none");
+            ImDrawList* pdl = ImGui::GetWindowDrawList();
+            for (std::size_t i = 0; i < ranked.size(); ++i)
+            {
+                const resource_type rt = static_cast<resource_type>(ranked[i].second);
+                const ImVec2 pc = ImGui::GetCursorScreenPos();
+                const float  pr = ImGui::GetTextLineHeight() * 0.30f;
+                pdl->AddCircleFilled({pc.x + pr, pc.y + ImGui::GetTextLineHeight() * 0.5f},
+                                     pr, ui::presentation_of(rt).colour);
+                ImGui::Dummy({pr * 2.0f + style.ItemSpacing.x, ImGui::GetTextLineHeight()});
+                ImGui::SameLine();
+                ImGui::Text("%s  %.1f", ui::resource_name(rt),
+                            static_cast<double>(ranked[i].first));
+            }
+        }
+        else
+        {
+            // Buildings standing in the province. Placement did NOT move to province
+            // grain, so a building still belongs to a tile. What the province adds is
+            // the roll-up: "what is already here?" is a locality question, and
+            // answering it used to mean clicking every hex in turn.
+            std::vector<entity_id> here;
+            for (const auto& kv : w.buildings)
+                if (w.provinces.province_of(kv.second.tile) == pv.id)
+                    here.push_back(kv.first);
+            std::sort(here.begin(), here.end()); // w.buildings is unordered - pin the order
+
+            // A building carries no owner field; ownership is the corporation's
+            // `assets` list (the canvas resolves it the same way). Built once per
+            // draw over the province's handful of buildings, not per row.
+            std::unordered_map<entity_id, entity_id> bld_owner;
+            if (!here.empty())
+                for (const auto& ckv : w.corporations)
+                    for (entity_id aid : ckv.second.assets)
+                        bld_owner[aid] = ckv.first;
+
+            if (here.empty())
+                ImGui::TextDisabled("none");
+            for (std::size_t i = 0; i < here.size(); ++i)
+            {
+                const auto bit = w.buildings.find(here[i]);
+                if (bit == w.buildings.end())
+                    continue;
+                const char* owner = "";
+                if (const auto oit = bld_owner.find(here[i]); oit != bld_owner.end())
+                    if (const auto cit = w.corporations.find(oit->second);
+                        cit != w.corporations.end())
+                        owner = cit->second.name.c_str();
+                char label[200];
+                std::snprintf(label, sizeof label, "%s  %s##prov_bld_%d",
+                              building_type_name(bit->second.type), owner,
+                              static_cast<int>(i));
+                if (ImGui::Selectable(label))
+                {
+                    ui.selected_entity   = here[i];
+                    ui.selected_province = 0;
+                }
+            }
+        }
+
+        ImGui::EndChild();
+        ImGui::EndChild();
+    }
+    ImGui::SameLine();
+
+    // -- Right quarter: 2x3 action grid - only "Go to" is real today, exactly as
+    // on the unit card. Construction is deliberately NOT here: placement is
+    // tile-grain, so the Construct door stays on the tile card and the Tiles page
+    // is the route to it. --
+    {
+        ImGui::BeginChild("##prov_actions", {right_w, total_h}, false,
+                          ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
+        const float  bw  = (right_w - spacing) / 2.0f;
+        const float  bh  = (total_h - 2.0f * spacing) / 3.0f;
+        const ImVec2 bsz = {bw, bh};
+
+        if (tile_icon_button("##prov_goto", bsz, /*enabled=*/true, "Go to", glyph_goto))
+            focus_on_entity(w, ui, pv.tiles.front());
+        ImGui::SameLine();
+        tile_icon_button("##prov_reserved1", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
+
+        tile_icon_button("##prov_reserved2", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
+        ImGui::SameLine();
+        tile_icon_button("##prov_reserved3", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
+
+        tile_icon_button("##prov_reserved4", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
+        ImGui::SameLine();
+        tile_icon_button("##prov_reserved5", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
+
+        ImGui::EndChild();
+    }
+}
+
+
 } // namespace
 
 void draw_selection_content(world& w, const recipe_registry& reg,
                             const economy_report& report, ui_state& ui)
 {
-    const selection_kind kind = selection_kind_of(w, ui.selected_entity);
+    // BL-511, refolded 2026-08-21 (Ben: "We don't need another selection element,
+    // we can just use the same one as we used for tiles"). A province is resolved
+    // BEFORE selection_kind_of - it has to be: a province is not an entity, so the
+    // kind resolution cannot see it, and the band substitutes the player
+    // corporation whenever the entity selection is empty (BL-266), which is exactly
+    // the state a province selection leaves behind. But resolving it early only
+    // chooses WHAT the one element is showing; the header, the separator and the
+    // three-column band below are the same code every other kind runs. The canvas
+    // guarantees the two selections are mutually exclusive (province_sync_entity).
+    const province* pv = (ui.selected_province != 0)
+                             ? w.provinces.find(ui.selected_province)
+                             : nullptr;
+    if (pv && pv->tiles.empty())
+        pv = nullptr;
+    if (ui.selected_province != 0 && pv == nullptr)
+        ui.selected_province = 0; // stale id (regenerated world) - fall back cleanly
 
-    // Nothing valid selected — draw nothing. (The band frame never lets this
-    // happen: with no valid selection it substitutes the player corporation
-    // before calling here, BL-266. This guard covers other callers only.)
-    if (kind == selection_kind::none)
-        return;
+    // A province borrows the TILE kind for its header icon: it is a cluster of
+    // tiles, not a new kind of thing, so the tile primitive is the honest glyph.
+    // Its title and trailing label are supplied below rather than by
+    // selection_title / selection_kind_name, which key off an entity id.
+    const selection_kind kind = (pv != nullptr) ? selection_kind::tile
+                                                : selection_kind_of(w, ui.selected_entity);
 
-    // A selected tile owns its WHOLE card layout, header included (Ben's 2026-07-23
-    // three-region design: header / zoomed hex neighbourhood + action strip / graphs),
-    // so it is dispatched before the generic header the other kinds share.
-    if (kind == selection_kind::tile)
+    if (pv == nullptr)
     {
-        draw_tile_selection(w, ui);
-        return;
+        // Nothing valid selected - draw nothing. (The band frame never lets this
+        // happen: with no valid selection it substitutes the player corporation
+        // before calling here, BL-266. This guard covers other callers only.)
+        if (kind == selection_kind::none)
+            return;
+
+        // A selected tile owns its WHOLE card layout, header included (Ben's
+        // 2026-07-23 three-region design: header / zoomed hex neighbourhood +
+        // action strip / graphs), so it is dispatched before the generic header
+        // the other kinds share.
+        if (kind == selection_kind::tile)
+        {
+            draw_tile_selection(w, ui);
+            return;
+        }
     }
 
     // Frame-agnostic: this draws into whatever window the caller opened (the sticky
@@ -2062,23 +2514,47 @@ void draw_selection_content(world& w, const recipe_registry& reg,
     const ImGuiStyle& style   = ImGui::GetStyle();
     ImDrawList*       dl      = ImGui::GetWindowDrawList();
 
+    // The entity the header's icon and 'go to' act on. A province is not an entity,
+    // so it borrows its ANCHOR tile - the lowest-id member - for both. Province ids
+    // are derived and opaque (body rank | block raster | component), so the raw id
+    // is not a name a player can hold; the anchor tile's grid position is.
+    const entity_id head_id = (pv != nullptr) ? pv->tiles.front() : ui.selected_entity;
+
+    char prov_title[64] = {};
+    char prov_sub[32]   = {};
+    if (pv != nullptr)
+    {
+        int anchor_x = 0, anchor_y = 0;
+        if (const auto ait = w.tiles.find(head_id); ait != w.tiles.end())
+        {
+            anchor_x = ait->second.grid_x;
+            anchor_y = ait->second.grid_y;
+        }
+        std::snprintf(prov_title, sizeof prov_title, "Province [%d, %d]", anchor_x, anchor_y);
+        std::snprintf(prov_sub, sizeof prov_sub, "%d tiles",
+                      static_cast<int>(pv->tiles.size()));
+    }
+
     // ── Header: [icon] Name · type ............................. [>] [x] ──
     {
         const ImVec2 hc = ImGui::GetCursorScreenPos();
         const float  ir = frame_h * 0.40f;
-        draw_selection_icon(w, dl, kind, ui.selected_entity,
+        draw_selection_icon(w, dl, kind, head_id,
                             {hc.x + ir, hc.y + frame_h * 0.5f}, ir);
         ImGui::SetCursorScreenPos({hc.x + ir * 2.0f + style.ItemSpacing.x, hc.y});
 
-        const char* title = selection_title(w, kind, ui.selected_entity);
-        const char* kname = selection_kind_name(kind);
+        const char* title = (pv != nullptr) ? prov_title
+                                            : selection_title(w, kind, ui.selected_entity);
+        // The muted trailing label: the KIND for an entity, the member-tile count
+        // for a province (whose "type" is already the coordinate in its title).
+        const char* sub = (pv != nullptr) ? prov_sub : selection_kind_name(kind);
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", title);
         // Suppress the redundant type label when the title is already the kind name
         // (e.g. a tile titles as "Tile"), avoiding "Tile · Tile".
-        if (std::strcmp(title, kname) != 0)
+        if (pv != nullptr || std::strcmp(title, sub) != 0)
         {
             ImGui::SameLine();
-            ImGui::TextDisabled("%s", kname);
+            ImGui::TextDisabled("%s", sub);
         }
 
         // Right-align the 'go to' button at the content region's right edge.
@@ -2088,12 +2564,21 @@ void draw_selection_content(world& w, const recipe_registry& reg,
         const float btn = frame_h;
         ImGui::SameLine(bar_w - btn);
         if (ImGui::Button(">", {btn, btn}))
-            focus_on_entity(w, ui, ui.selected_entity);
+            focus_on_entity(w, ui, head_id);
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Go to");
     }
 
     ImGui::Separator();
+
+    // A province takes the same three-column band the building and unit bodies do,
+    // under the shared header above - it is a body of this element, not a card of
+    // its own (BL-511 refold).
+    if (pv != nullptr)
+    {
+        draw_province_selection_body(w, ui, *pv);
+        return;
+    }
 
     // A selected player building used to BYPASS this layout and render the full
     // management view as its card (2026-07-22). Reversed 2026-08-08 (Ben: "selection
@@ -2146,7 +2631,8 @@ void draw_selection_content(world& w, const recipe_registry& reg,
 void draw_building_page_expanded(world& w, const recipe_registry& reg,
                                  const economy_report& report, ui_state& ui)
 {
-    const std::vector<building_page> pages = building_pages(w, reg, report, ui.selected_entity);
+    const std::vector<building_page> pages =
+        building_pages(w, reg, report, ui.selected_entity, ui.spectating && ui.god_view);
     if (pages.empty())
     {
         ImGui::TextDisabled("\xe2\x80\x94");

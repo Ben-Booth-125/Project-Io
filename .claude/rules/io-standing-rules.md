@@ -71,7 +71,10 @@ rule has a fuller authority, it is cited — this file does not redefine it.
   degrading to a camera/ledger anchor with no ownership meaning. Two properties keep
   this honest, both asserted by `tools/verify/spectator_determinism.cpp`: the flag
   **defaults false**, so an ordinary played session is byte-identical (verified against
-  the genuine pre-BL-409 build, `state_hash 3CBAD1D44EE71EDE`), and admitting one more
+  the genuine pre-BL-409 build, `state_hash 3CBAD1D44EE71EDE` — that was the value AT
+  THE TIME; the golden has since been re-blessed as the world legitimately changed, and
+  `spectator_determinism` carries the dated provenance log, so read the harness for the
+  current constant and this line as the historical claim it is), and admitting one more
   corp **shifts no rival's cadence slot**, since the index is over the sorted corp set.
   Outside spectate the prohibition is unchanged and absolute.
   **Nation and polity behaviour is GRANTED (Ben, 2026-08-18, ruling 4 of NR-331), in the
@@ -142,6 +145,16 @@ rule has a fuller authority, it is cited — this file does not redefine it.
   documentation — a narrow, well-scoped agent is the unit that pays back. Integration, build, and
   commit stay in the main session (see DELIVERY.md
   § Sub-agents & worktrees).
+- **An agent blocks on its own long waits and stops once it has a decision (2026-08-19).** A
+  sub-agent running a long build or harness checks the result itself rather than yielding control
+  mid-wait; once it reaches a stated conclusion it stops, rather than continuing to re-investigate
+  a question it already answered. Brief this explicitly — it does not happen by default (see
+  DELIVERY.md § Sub-agents & worktrees).
+- **A UI requirement needs a live check (2026-08-19).** A scripted `verifier-visual` capture
+  proves a surface renders; it does not prove a press on it is reachable. Before marking any
+  `visual` requirement on an interactive surface `complete`, open the built app, click the thing,
+  and look — a clean compile and a green harness are not sufficient on their own (see DELIVERY.md
+  § The Delivery lifecycle, step 4).
 - **Raise the novelty flag (Ben, 2026-08-20).** If the task in hand feels **novel** — no
   authority doc owns it, no saved role or established pattern fits, or it would quietly grow
   the project's scope — file a `kind: "novel-work"` entry in

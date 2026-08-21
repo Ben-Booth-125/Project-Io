@@ -301,6 +301,7 @@ void app::reset_verify_transients()
     m_tracked_tiles.clear();
     m_resource_hist_days.clear();
     m_resource_sample_index = 0;
+    m_strategy_readout = {};
     m_prev_selection = null_entity;
     m_last_orbit_days = 0.0;
     m_last_survey_day = 0;
@@ -645,6 +646,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         else if (name == "frame_hud")    m_ui.show_frame_hud = open;    // frame-budget HUD (BL-249)
         else if (name == "tech_tree")    m_ui.show_tech_tree = open;    // F9 mock viewer (BL-087)
         else if (name == "decisions")    m_ui.show_decision_feed = open; // AI decision feed (BL-407)
+        else if (name == "strategy")     m_ui.show_strategy_readout = open; // Strategy readout (BL-411)
     });
 
     // Spectator mode (BL-409). Set BEFORE econ_step: step_economy reads
@@ -652,6 +654,22 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // flipping it after the ticks have run would capture a feed populated by an
     // ordinary played session while claiming to show a spectated one.
     v.set_function("spectate", [this](bool on) { m_ui.spectating = on; });
+
+    // Spectator god view (BL-408). Pure ui_state, read at the draw call only —
+    // it never feeds the sim, so unlike spectate() there is no before/after
+    // ordering constraint against econ_step. Meaningful only when spectate(true)
+    // is also set: every read-site gates on the PAIR, exactly as the live
+    // system-menu toggle (time_panel.cpp) does.
+    v.set_function("god_view", [this](bool on) { m_ui.god_view = on; });
+
+    // Select a corporation entity, so a capture can show the Selection band's
+    // corp card (BL-408's god-facts readout lives there). Ids come from
+    // verify.buildings()' `corp` field; an unknown id is a no-op, matching
+    // select_building's silent-miss behaviour.
+    v.set_function("select_corp", [this](unsigned id) {
+        if (m_world.corporations.count(static_cast<entity_id>(id)))
+            m_ui.selected_entity = static_cast<entity_id>(id);
+    });
 
     // Park the AI decision feed's filters (BL-407 R2) so a capture can show a
     // FILTERED list — the resting state is "all", and a filter that only ever
@@ -665,6 +683,16 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     v.set_function("decision_filter", [this](int reason, sol::optional<int> corp) {
         m_ui.decision_feed_reason = reason;
         m_ui.decision_feed_corp   = static_cast<entity_id>(corp.value_or(0));
+    });
+
+    // Park the Strategy readout's corp selector (BL-411) so a capture can show
+    // the single-corp profile view — the resting state is the all-corporations
+    // comparison. `corp` takes an entity id, 0 for "all", or -1 for the player
+    // corp: a script cannot know a generated corp's id, but the player entity
+    // always exists and (under spectate) always has decisions to show.
+    v.set_function("strategy_filter", [this](int corp) {
+        m_ui.strategy_readout_corp =
+            (corp == -1) ? m_world.player_entity : static_cast<entity_id>(corp);
     });
 
     // Park a fold-out ledger on one of its button-strip views (BL-117 sweep), so a
@@ -1117,11 +1145,38 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             if (tc.body == m_ui.active_body && tc.grid_x == col && tc.grid_y == row)
             { m_ui.selected_entity = tid; break; }
     });
+    // BL-511: select the PROVINCE containing the tile at (col,row) on the active
+    // surface body — the province is what a canvas click now lands on, and no
+    // click injection exists headless. Mirrors select_tile's shape and is equally
+    // non-mutating. Sets province_sync_entity too, so the canvas's next-frame
+    // reconciliation (which clears the province when some other surface moved the
+    // entity selection) does not immediately undo this. Returns the province id,
+    // or 0 when the tile is ocean / unpartitioned / absent.
+    v.set_function("select_province", [this](int col, int row) -> unsigned int {
+        for (const auto& [tid, tc] : m_world.tiles)
+        {
+            if (tc.body != m_ui.active_body || tc.grid_x != col || tc.grid_y != row)
+                continue;
+            const uint32_t pid = m_world.provinces.province_of(tid);
+            m_ui.selected_entity      = null_entity;
+            m_ui.province_sync_entity = null_entity;
+            m_ui.selected_province    = pid;
+            return pid;
+        }
+        return 0u;
+    });
     v.set_function("clear_selection", [this]() {
         // Deselect (BL-266): the band never hides — with no selection it rests on
         // the player's own corporation. This is the empty-space-click equivalent;
         // no click/key injection exists in the headless harness.
-        m_ui.selected_entity = null_entity;
+        //
+        // BL-511: clears the PROVINCE too. An empty-space click on the real canvas
+        // resolves no hovered tile, so it writes both fields null; leaving the
+        // province set here would make this shortcut diverge from the gesture it
+        // stands in for, and a capture after it would show a stale province card.
+        m_ui.selected_entity      = null_entity;
+        m_ui.selected_province    = 0;
+        m_ui.province_sync_entity = null_entity;
     });
     v.set_function("card_drill", [this]() {
         // Drive the Selection band's resource drill-down (BL-196) for the currently
@@ -1258,9 +1313,18 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         sol::state& s = m_lua.state();
         sol::table  out = s.create_table();
         int idx = 0;
-        for (const auto& [corp_id, corp] : m_world.corporations)
+        // Sorted corp order (review 2026-08-19 #11): corporations is an
+        // unordered_map, and which rival a script's "first non-player row"
+        // lands on must not vary by platform or stdlib.
+        std::vector<entity_id> sorted_corp_ids;
+        sorted_corp_ids.reserve(m_world.corporations.size());
+        for (const auto& [cid, c] : m_world.corporations)
+            sorted_corp_ids.push_back(cid);
+        std::sort(sorted_corp_ids.begin(), sorted_corp_ids.end());
+        for (entity_id corp_id : sorted_corp_ids)
         {
-            const bool player = (corp_id == m_world.player_entity);
+            const auto& corp   = m_world.corporations.at(corp_id);
+            const bool  player = (corp_id == m_world.player_entity);
             for (entity_id bld_id : corp.assets)
             {
                 const auto bld_it = m_world.buildings.find(bld_id);

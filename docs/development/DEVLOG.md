@@ -10,7 +10,146 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — the corpus gets delegated: saved roles and scoped instructions (BL-497) (2026-08-20, latest)
+## Session — The province becomes a thing you can see (BL-458, BL-513, BL-511, BL-466, BL-515, BL-517, BL-392, BL-463; Sprints 27/B2/B3/C3/D4 + P1) (2026-08-20 → 08-21, latest)
+
+Full mode, two Batch Deliveries and a design arc: nine worktree build agents, one cold
+static reviewer, and a long tail of rulings made against renders rather than specs.
+Ben's brief opened as *"deliver a few sprints in parallel"* and ended as a tile-model
+redesign, by way of the province being drawn for the first time.
+
+**Batch one — four lanes, one blocker caught by the gate.** BL-458 (supply lines can be
+cut: `convoy_tile_at` lifted out of the renderer, interdiction on a declared hostile
+stance — the act that finally earns *pirate* its first mechanic since 2026-08-07),
+BL-513 (the province building ceiling, k=12.6468 pinned by measurement), BL-511's seam
+half (`march_unit` retargets tile → province), and the sprint-B2/B3 generation cuts
+(road-less nations 14 → 0; settlements 31-flat → 44-77, derived from land area and
+nation count rather than a 180x84-era constant). The pre-compile static review caught a
+**blocker of my own making**: my hand-resolution of a `law.hpp` conflict kept BOTH
+sides' author fields, and only `nation_tariff_rate` read the dead one — so in the
+shipped binary every tariff resolved to zero and the whole clearing-tick tariff pass was
+a no-op. The harness passed 25/25 because it built laws in the shape only the harness
+used. Fixed at `bd238d5`; the lesson is that a green harness can be evidence of nothing.
+
+**Batch two — the province gets rendered, and the rulings start reversing.** BL-511
+landed the blend, province selection, the `march_unit` payload change and a per-lens
+reduction decided for all thirteen overlay modes. Then Ben looked at it. Three rulings
+followed, each superseding the last and each made against a picture: **~4 tiles** (from
+a design form, before any render) → **7-12** (after seeing it drawn) → **the packed
+lattice ruled out entirely** (after seeing THAT drawn) — *"packing each province
+perfectly looks nice, but it is scarcely how borders were defined in history."*
+
+**BL-515, the third partition of the day.** Provinces grown from population centres by
+cost-weighted fill: river edges and elevation gradients expensive, a road link cheap
+because a road BINDS. Both coefficients pinned by measurement rather than picked — the
+height cost against the p90 of adjacent-land steepness over 653,910 edges, the road
+divisor by a published sweep whose lift the agent honestly described as concave with no
+knee. Prerequisite BL-517 landed first (height retained; `sizeof(tile_component)` 336 →
+340, no RNG stream perturbed). Ben then retracted *"don't reject tiny provinces"* on
+seeing the result, and a singleton-absorption pass took sub-3 provinces from 3,008 to
+911 — leaving 51 true islands, each verified to have zero land neighbours rather than
+assumed.
+
+**Identity moved twice and landed better than it started.** Allocated-and-serialised →
+**derived from the lowest member tile**, which removes the determinism hazard instead of
+guarding it (an id that is never handed out cannot be handed out in the wrong order) and
+serialises nothing new. Safe only because Ben ruled borders move during **generation
+only** — so ids churn while the Era -1 sim redraws them and are frozen before anything
+outside generation can hold one.
+
+**Lane 0 settled the determinism question that was blocking trust.** No leak:
+`spectator_determinism` reproduces across two independently built worlds; the single
+failure was byte-identity against a golden pinned before four deliberate world changes.
+Re-blessed with provenance. Provinces stay OUT of `state_hash` — that hash folds what a
+*tick* mutates and the partition never moves after generation — and the real gap, that
+nothing checked it at all, closed in `determinism_harness` instead.
+
+**Design work, unbuilt:** BL-514 (blend all tiles — HELD at Ben's instruction until he
+sees the organic borders; the A/B capture exists), BL-516 (lake/coast/ocean tile kinds
+and sea provinces, ocean capped at 80 tiles), BL-518 (the Era -1 sim redrawing borders as
+its wars resolve), BL-519 (the tile axis split) and BL-520 (texturing).
+
+**The axis-split finding.** A mountain WITH a forest is already expressible
+(`composition=forest` x `landform=mountain`); what cannot be said is a *rocky* mountain
+that happens to be forested, because the composition slot is spent on the forest.
+`terrain_composition` is doing three jobs — substrate, cover, state — and `urban` is the
+proof rather than the exception: it is a one-way transform that OVERWRITES the
+composition, so paving a metallic tile destroys the fact that it was metallic (NR-442,
+filed separately as live data loss). The split un-mixes an overload rather than adding a
+concept, and it costs 330 call sites across 49 files with no save migration, because
+there is no save format at all.
+
+**Corrections I made to my own reports, recorded rather than quietly fixed:** my
+"81/81" verification of `unit_march_harness` was hollow — M6 indexed an empty path on a
+refused order and segfaulted mid-M5, so M6 and M7 never ran and the process exited 139
+while I read the printed pass count (NR-425). My claim that a one-row body always
+collapses to one province was false above 19 tiles (NR-426). My BL-517 brief asserted a
+tile serialisation seam that does not exist (NR-430). And two `tools/verify/README.md`
+conflict resolutions spliced a sentence into the middle of another one, which a later
+agent spotted and correctly declined to guess at (NR-432).
+
+**Runtime:** ~12 h wall across two days, largely autonomous; refinement → four-lane
+batch → design forms → province redesign → tile design. Nine build agents, one review
+agent, ~40 commits, NR-384 through NR-444 filed.
+
+---
+
+## Session — The watch + meta open: an AI plays the rendered game (BL-412, BL-408, BL-411, BL-479, BL-480, BL-335; Sprints W1/D1/D3) (2026-08-19 → 08-20)
+
+Full mode, Batch Delivery: a six-agent research workflow, five worktree build agents, an audit
+agent, a static reviewer and a harness runner. Ben's brief: map sprints onto versioned releases,
+align versions with his real aim — *"developing meta, and finding a way to observe AI playing
+the game — even if that means downloading a local model"* — then batch-deliver in parallel.
+
+**The version map realigned first** (form verdicts → `0303800`): the 36-item v0.1.16 holding
+pen split five ways — v0.1.16 re-themed **The watch**, v0.1.19 ancient conflict & seams,
+v0.1.20 stance & force, v0.1.21 the credible rival, v0.1.22 harness truth; v0.1.18 defined as
+economy truth; four stale version goals re-homed; BL-306/BL-335 un-parked; BL-477 (era collapse
+defines meta — Ben's paradigm verbatim), BL-478 (ancient research spend, extracted from parked
+BL-087), BL-479 and BL-480 filed; Sprints W1/D1/D3 opened.
+
+**The batch: five slices, all landed same-day.** BL-412 (live agent control seam — the rendered
+app gains a loopback *listen* socket drained at tick boundaries into `apply_corp_command`;
+transcript = replay artifact; 22/22), BL-408 (god view — sight never hands; 7 captures),
+BL-411 (strategy readout — counts not credits, the NR-226 fence held), BL-479 (tech effect
+union + the shared modifier vocabulary, `collapse_strain` included; 35/35; no-effect world
+bit-identical vs a genuine pre-change build), BL-480 (a law has an author; the levy became a
+conserved transfer into the author nation's treasury; the enact checkbox and its dictionary
+entry removed; 14/14 + 24/24). verifier-review: **GO COMPILE, zero criticals**, 13 findings
+applied or filed. Integrating build BUILD_OK; 9/10 harness families green.
+
+**The first watch session happened.** Ollama + `qwen2.5:3b-instruct` (installed this session)
+attached to the rendered app through the seam: the gated clock released ticks 1–8; the actor
+gate refused a wrong-corp read live; and on the corrected fact filter the model issued a
+grounded command — **march unit 46816 toward tile 41647**, both ids read from its own
+blackboard slice. BL-335's measurement closed the loop's economics: the ~300-token *output*
+assumption holds 5×, the *input* premise fails 60× (18.5K tokens per raw blackboard read) —
+BL-481 (compact encoding) filed as the fix.
+
+**The one red, left red on purpose:** the levy's placeholder rate (1.0 cr/unit, all resources)
+never bit while the law shipped un-enacted; enacted, it drives every rival insolvent
+(−3.6M…−5.2M, 30/30 below zero). Blessing that would record bankruptcy as expected — the
+NR-269 shape — so `ai_skill`'s bands stay red-and-attributed pending the NR-382 rate ruling.
+Also this session: the N1 audit (BL-437 flipped complete on evidence; five holds bounded;
+BL-443 confirmed unbuilt but gated on NR-296), four stale IN FLIGHT markers flipped with
+hashes, BL-482 (pools leak) filed from a BL-408 side-finding.
+
+**The session ended inside a two-machine merge.** The mobile design session (entry below) and
+this one both minted BL-476..482 and NR-356..362 from opposite sides of origin; Ben's merge
+`97c12bb` renumbered origin's BL ids (→ BL-504..510) and local's committed NR ids
+(→ NR-373..379), with this session's late entries landing as NR-377..382 — the full record is
+NR-383. Board verified post-merge: zero duplicate ids, lint clean, every cross-reference
+reconciled.
+
+**Open at close:** four live-check rows (Ben at the keyboard — relaunch:
+`build/ProjectIo.exe --autostart-play --host-agent`); Ben's calls NR-380 (aggregate
+visibility), NR-382 (levy rate), NR-296 (debt lever), NR-269 (BL-439 bands); verifier-skill
+listings for three new harnesses + two scripts (permission owed); BL-481/BL-306 as the watch
+minor's remainder.
+
+**Runtime:** ~6 h wall, largely autonomous; research → board surgery → five-lane batch →
+review → integrating build → first live demo → merge reconciliation.
+
+## Session — the corpus gets delegated: saved roles and scoped instructions (BL-497) (2026-08-20)
 
 Light/doc-config mode, remote session, no `src/` logic touched. Ben's brief: the folder is too
 large for a session to consume cheaply — *let's have different sessions be prompted differently*.
@@ -58,7 +197,7 @@ as extract-as-you-touch hygiene, deliberately not filed.
 
 ---
 
-## Session — COLLAPSE.md: the Era −1 collapse metagame, decomposed (BL-476–BL-496) (2026-08-20)
+## Session — COLLAPSE.md: the Era −1 collapse metagame, decomposed (BL-483–BL-496, BL-504–BL-510) (2026-08-20)
 
 Design mode, mobile doc session, no code touched. Ben's brief: *consider high-level strategies /
 metagames for surpassing the Era −1 Collapse* — extended in-session three times, each extension a
@@ -80,14 +219,14 @@ surfaces in the **history tab, quietly** — seeing beats telling; deep-dig opti
 optimisation is designed in the doc as a five-rung ladder (kill the O(provinces) scans → quiet-
 province fast path → deterministic banded year grain → record-on-change → never parallelise).
 
-**The decomposition.** Nineteen items, BL-476–BL-494, all v0.1.16, on Ben's steer *many specific
+**The decomposition.** Nineteen items (BL-483–BL-494, BL-504–BL-510 — renumbered on merge from BL-476–BL-494 after an id collision with the 2026-08-19 local session), all v0.1.16, on Ben's steer *many specific
 items over a few hard ideas*: the strain accumulator (digestion retires strain, loss does not),
 the fragmentation and Release verbs, the hegemony measure, readable/transferable/reach-fed strain,
 the E4–E7 culminations, creed axes, strategy weightings, the narration bank, the attractor sweep,
 and the perf ladder closing in BL-494 (the 4000-year extension itself).
 
 **Queue close-out.** The review queue's four open *questions* were put to Ben and resolved in one
-pass: NR-356 (reach feeds strain — BL-482 confirmed, per BL-325's one-reach-field ruling), NR-317
+pass: NR-356 (reach feeds strain — BL-510 confirmed, per BL-325's one-reach-field ruling), NR-317
 (held convoy cargo stays visible to the price signal, BL-422's convention — filed BL-495), NR-321
 (ordnance rate rides Lane C's engagement trigger — tripwire filed BL-496), NR-343 (LP is a
 per-tick rate, not a stock — BL-464's prose amended in place). NR-357 (run-length tension) was

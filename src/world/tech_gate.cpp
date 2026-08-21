@@ -29,8 +29,10 @@ std::vector<tech_gate> build_gates()
     // BL-094's test asks of this item is that the UNLOCK reaches military
     // outcomes, and it does.
     tech_gate garrison;
-    garrison.id                = "E0-ML-01";
-    garrison.unlocks_structure = building_type::military_base;
+    garrison.id = "E0-ML-01";
+    // Authored through the union (BL-479): add_effect keeps the
+    // `unlocks_structure` mirror true, so every pre-union reader is unchanged.
+    garrison.add_effect(tech_effect::unlock(building_type::military_base));
     {
         condition c;
         c.subject    = condition_subject::structure;
@@ -67,28 +69,41 @@ const tech_gate* find_tech_gate(const std::string& tech_id)
     return nullptr;
 }
 
-int advance_tech_gates(world& w)
+int advance_tech_gates(world& w, const std::vector<tech_gate>& gates)
 {
     int earned = 0;
     // w.corporations is an unordered_map, but the OUTCOME here does not depend
     // on visit order: each corp's gates are evaluated against a world this pass
-    // never mutates in a way another corp's predicate can read (`earned_techs`
-    // is the only write, and no gate has a `research` condition today). The
-    // gate table order is fixed. Should a gate ever depend on another corp's
-    // earned set, this loop must be re-keyed to ascending corp id first.
+    // never mutates in a way another corp's predicate can read (the writes are
+    // `earned_techs` and `corp_modifiers`, both keyed to the corp being
+    // visited; a `research` condition reads only the SUBJECT corp's own earned
+    // set). The gate table order is fixed, so each corp's modifier append order
+    // is fixed too. Should a gate ever depend on ANOTHER corp's earned set,
+    // this loop must be re-keyed to ascending corp id first.
     for (const auto& [corp, cc] : w.corporations)
     {
-        for (const tech_gate& g : prototype_tech_gates())
+        for (const tech_gate& g : gates)
         {
             if (w.has_tech(corp, g.id))
                 continue; // monotonic: never re-earned, never un-earned
             if (!evaluate(g.condition, w, corp))
                 continue;
             w.earned_techs[corp].insert(g.id);
+            // BL-479: the earn moment is when modify_scalar effects land — for
+            // the EARNING corp only (research is not a world fact), in stored
+            // effect order, exactly once (guarded by the monotonic earn above).
+            for (const tech_effect& e : g.effects)
+                if (e.kind == tech_effect_kind::modify_scalar)
+                    w.corp_modifiers[corp].push_back(e.modifier);
             ++earned;
         }
     }
     return earned;
+}
+
+int advance_tech_gates(world& w)
+{
+    return advance_tech_gates(w, prototype_tech_gates());
 }
 
 bool structure_unlocked(const world& w, entity_id corp, building_type type)

@@ -44,15 +44,18 @@ async loading screen, and the startup-hang fix. SPRINTS.md § Sprint 15 is the r
   mercenary company's core loop is built entirely on Conflict), **BL-378** (the minimap becomes a
   fixed max-zoom render of the player's base), and **BL-398** (persona counsel's ~1 s/tick cost).
   Cut by **Sprint 16**; done-definition owed at the cut, per NR-103.
-- **v0.1.16 — Ancient conflict & seams.** *Theme: the Era −1 machinery graduates from generator
-  to gameplay.* The whole Era −1 cluster, pulled from v0.3.0 on Ben's 2026-08-12 ruling (the
-  sandbox's "groundwork" is now the live product's substance): era-keyed rosters (**BL-274**),
-  the strategic layer (**BL-277**), the ancient tech ladder (**BL-296**), the diplomacy seam and
-  its test battery (**BL-297**, **BL-298**), the great-power seed (**BL-299**), myth & theology
-  (**BL-300**), the unit verb family (**BL-314**), Era −1 logistics (**BL-316**), the
-  shared-currency scorer (**BL-318**), sim perf (**BL-320**), the works roster (**BL-321**), and
-  voice/unit calibration (**BL-337**). A holding assignment — sprints will promote and likely
-  split it; the theme is the claim, not the item count.
+- **v0.1.16 — The watch.** *(Re-themed 2026-08-19 — the split Sprint 26 owed, executed in the
+  version-alignment session. Ben's stated aim: developing meta, and observing AI playing the
+  game, a downloaded local model included.)* *Theme: an agent plays, a human watches.* The live
+  agent control seam (**BL-412** — `--serve` stops being an exclusive branch; an MCP-attached
+  agent plays a rendered session), the spectator god view (**BL-408**), the emergent-strategy
+  readout (**BL-411**), disable-presses-under-spectate (**BL-413**), the attention director
+  (**BL-410**), the spectate viewpoint default (**BL-418**), spectate verb-family assertions
+  (**BL-451**), plus the un-parked client loop (**BL-306**) and token-cost measurement
+  (**BL-335**). Cut by **Sprint W1**. The old "Ancient conflict & seams" roster moved to
+  v0.1.19–v0.1.22 below, with the ancient tech ladder (BL-296) and the debt floor (BL-443) to
+  v0.1.11; Era −1 logistics (BL-316), the shared-currency scorer (BL-318) and the works roster
+  (BL-321) had already landed.
 - **v0.1.17 — Economy breadth.** *Theme: the chain is the growth track.* Named 2026-08-15 on Ben's
   steer that the economy needs "robust and expansive building options, production methods, and an
   implied growth track that we can refine tech and politics around". Four rulings settle its shape:
@@ -65,6 +68,33 @@ async loading screen, and the startup-hang fix. SPRINTS.md § Sprint 15 is the r
   ancient tech ladder (**BL-296**) and the politics stub then *refine* this spine rather than
   replace it — which is the whole reason a second unlock system was rejected. Cut by **Sprint 17**;
   done-definition owed at the cut, per NR-103.
+- **v0.1.18 — The economy tells the truth.** *(Defined 2026-08-19 — Ben chose define over
+  dissolve; the version had existed in the backlog since the Sprint 25a era while the Sprint-26
+  split that owed its ROADMAP entry was dropped, NR-377.)* *Theme: the measured economy
+  pathologies, fixed.* Sprint 19 closed goal-not-met; these four are its remainder as diagnoses:
+  processing underearns extraction (**BL-436**), the economy mines one resource (**BL-437**),
+  co-extraction is invisible (**BL-438**), and intra-catchment distance is free (**BL-465**).
+  The benchmark is `ai_skill_harness`'s final net worth, per the Fall arc's amendment 5.
+- **v0.1.19 — Ancient conflict & seams.** *(The old v0.1.16 theme, re-homed whole in the
+  2026-08-19 split.)* *Theme: the Era −1 machinery graduates from generator to gameplay.*
+  Era-keyed rosters (**BL-274**), the Era −1 strategic layer (**BL-277**), the diplomacy seam
+  and its battery (**BL-297**, **BL-298**), the great-power seed (**BL-299**), myth & theology
+  (**BL-300**), sim perf (**BL-320**) and voice/unit calibration (**BL-337**). Lane A of the
+  Fall arc feeds it.
+- **v0.1.20 — Stance & force.** *Theme: who may fight whom, and the verbs to do it.* The unit
+  verb family (**BL-314**), company answerability (**BL-399**), the stance surface (**BL-449**),
+  rivals reasoning about stance (**BL-450**), Logistic Points (**BL-464**), unit formations
+  (**BL-472**, moved from v0.1.18 for theme coherence), and the parked diplomacy pair
+  (**BL-474**, **BL-475**). Lane C's home; C2/C3 cut toward it.
+- **v0.1.21 — The credible rival.** *Theme: the scorer behaves like a competitor, and every verb
+  is reachable.* The AI build-score quadratic (**BL-417**), decision-feed rebuild cost
+  (**BL-419**), the AI never building processors (**BL-439**), mines targeting only the richest
+  tile (**BL-440**), the procurement UI (**BL-445**), and the scorer procuring (**BL-446**) and
+  demolishing/roading (**BL-447**). Sprint 22's reachability set lands here.
+- **v0.1.22 — Harness truth.** *Theme: the instruments measure the sim that ships.* The Ages
+  lazy-sim cost (**BL-425**), the stale-exe gate guard (**BL-426**), the verify world-snapshot
+  cache (**BL-427**), harnesses measuring a different sim than ships (**BL-462**), and
+  settlement count being seed-invariant (**BL-463**).
 - **Still live from the old band, arc-agnostic:** v0.1.5's remainder (BL-325 unit supply decay),
   v0.1.6 (politics stub), v0.1.7 (generation visibility — generation is shared by both arcs),
   v0.1.13's infra tail (BL-107 save format and friends), and the v0.1.2 UI leftovers.
@@ -78,6 +108,16 @@ async loading screen, and the startup-hang fix. SPRINTS.md § Sprint 15 is the r
   not an output of their agency. It is Lane D of § Sprints 26–33 in
   [`SPRINTS.md`](SPRINTS.md), and it is legal only because the same ruling set granted
   nation-grain behaviour — see `.claude/rules/io-standing-rules.md`, 2026-08-18.
+
+  **Lane D opened 2026-08-19** (Ben's version-alignment verdicts): Sprints **D1** and **D3** run
+  as one batch, carried by two new build items — **BL-479** (tech effect union + the shared
+  modifier vocabulary) and **BL-480** (law author + nation treasury; the levy becomes a conserved
+  transfer, enactment off the player's ledger). The roster also grew in the same-day split:
+  **BL-296** (ancient tech ladder — D2's substrate), **BL-443** (debt floor, the Fall arc's
+  cheapest economy-truth unblock), **BL-392** (procurement destroys value — D4's guard),
+  **BL-477** (era collapse state defines meta — Ben's paradigm, design-owed) and **BL-478**
+  (ancient research spend, extracted from parked BL-087 on Ben's ruling). BL-264 (wizard layout)
+  moved out to v0.1.7 — UI alignment, not *who enacts*.
 - **Owed, recorded in NR-177 and not yet items:** the mercenary *sell* side beyond BL-377's
   seam (win/lose consequences, reputation), the product's **name** (Io is a moon of Jupiter),
   and the commercial cut's own done-definition.
@@ -119,6 +159,8 @@ where one is likely.
 
 > **Overtaken 2026-08-12 (NR-177):** the section below is the 2026-08-10 status, kept as
 > record. The live status is § The two arcs above — the ancient product, Sprint 16, v0.1.15.
+> One cut happened between the status date and this banner: **v0.1.14** was tagged 2026-08-11,
+> so the latest tag is `v0.1.14`, not the `v0.1.4` the paragraph below names.
 
 *Status 2026-08-10. Latest tag `v0.1.4`. **Eight minors are cut**: v0.1.0 (2026-08-03), then
 v0.1.1, v0.1.2, v0.1.8, v0.1.9 (all 2026-08-09) and v0.1.10, v0.1.3, v0.1.4 (all 2026-08-10) —
@@ -247,6 +289,9 @@ everything after it by one.*
 | ~~14~~ | ~~v0.2.0~~ | **Superseded 2026-08-12** — the AI opponent parked with the space arc after its third deferral. Never opened. |
 | 15 | *(no tag)* | **The 0 CE refocus.** ✅ Retro-recorded 2026-08-12 — the tangent that became the product; see SPRINTS.md § Sprint 15. |
 | 16 | **v0.1.15** | **The mercenary vertical slice** — BL-377 (contract seam) playable end-to-end, BL-315 (conflict spine) on the critical path. |
+| 17 | **v0.1.17** | **Economy breadth** — named in the minor's own bullet; row added 2026-08-19 so the table covers the live arc. |
+| W1 | **v0.1.16** | **The watch** — BL-412 (agent seam), BL-408 (god view), BL-411 (strategy readout). Opened 2026-08-19. |
+| D1+D3 | **v0.1.11** | **Meta opens** — BL-479 (tech effect union), BL-480 (law author + treasury), one batch. Opened 2026-08-19. |
 
 **Why the living world was inserted (2026-08-10, Ben's call).** *"Replace the substrate entirely."*
 The saturation the economic premise assumes is currently an abstraction injected once per tick —
@@ -808,7 +853,10 @@ concrete, and the tail was named when `post-v0.1.0` was swept (NR-101, below).
 > work nobody has started would be inventing a test for *finished* before knowing what finishing
 > looks like.
 
-- **v0.1.11 — Policy surfaces, and the band's own leftovers.** *Theme: the levers stubbed across
+- **v0.1.11 — Policy surfaces, and the band's own leftovers.** **[Superseded 2026-08-18/19 —
+  the live v0.1.11 block is in § The two arcs above (un-parked by ruling 5 of NR-331, re-themed
+  *who enacts*, Lane D opened). Of this roster: BL-332 and BL-341 are complete, BL-264 moved to
+  v0.1.7. Kept as record.]** *Theme: the levers stubbed across
   v0.1.3–v0.1.6 get the surfaces they were promised.* v0.1.3 and v0.1.4 shipped one working law
   and one earnable tech and deliberately excluded the surfaces around them, so this is where those
   land: the laws ledger and enactment politics (**BL-186**), the negotiated tax rate (**BL-280**),
@@ -858,7 +906,8 @@ concrete, and the tail was named when `post-v0.1.0` was swept (NR-101, below).
   **The dependency that decides this minor's size.** BL-340 is difficulty 4 and still
   `design-owed`. It is the largest unknown in the near sequence, and the most likely thing to spill
   a sprint. **Where this minor sits in the numbering is a convenience, not a claim** — it is
-  sequenced *ninth to tenth in build order* (Sprint 10), well ahead of v0.1.11–v0.1.13, and follows
+  sequenced *ninth to tenth in build order* (Sprint 11, after the living-world insertion shifted
+  the table), well ahead of v0.1.11–v0.1.13, and follows
   the band's established habit of numbering by naming date rather than cut order.
 
 ### v0.2.0 — The AI opponent

@@ -293,6 +293,60 @@ int app::run(autostart_mode autostart)
             continue;
         }
 
+        // BL-412: the live agent control seam. Opens once a campaign exists
+        // (the session actor is the player corp — the seat the agent
+        // occupies), then pumps the loopback socket once per frame. The
+        // agent GATES THE CLOCK: attaching pauses the sim, and each TICK
+        // request releases exactly one econ tick — so the schedule of
+        // boundaries is agent-driven, not wall-clock-driven, and the command
+        // transcript is a replay artifact. The human keeps override: the
+        // speed keys still work, and with the clock running a TICK simply
+        // waits for the next natural boundary. Commands never apply here —
+        // only at the econ boundary drain below.
+        if (m_agent_port != 0)
+        {
+            if (!m_agent_seam.listening())
+            {
+                std::string err;
+                if (m_agent_seam.listen(m_agent_port, m_world.player_entity,
+                                        /*as_any=*/false, &err))
+                {
+                    std::printf("[agent-seam] listening on 127.0.0.1:%u\n",
+                                static_cast<unsigned>(m_agent_seam.port()));
+                    std::fflush(stdout);
+                }
+                else
+                {
+                    std::fprintf(stderr, "[agent-seam] %s — not hosting\n", err.c_str());
+                    m_agent_port = 0; // report once, then stay a normal session
+                }
+            }
+            if (m_agent_seam.listening())
+            {
+                m_agent_seam.set_actor(m_world.player_entity);
+                const agent_seam::pump_events ev =
+                    m_agent_seam.pump(m_world, m_registry,
+                                      static_cast<int>(m_last_econ_tick));
+                if (ev.attached)
+                {
+                    // The agent takes the clock. Remember the speed so the
+                    // pause keys behave as they always have.
+                    if (m_sim_loop.speed() > 0)
+                        m_prev_speed = m_sim_loop.speed();
+                    m_sim_loop.set_speed(0);
+                }
+                if (ev.detached)
+                {
+                    // Stay paused — a world that starts moving the moment its
+                    // player process dies is a surprise, not a convenience.
+                    // Keep the replay artifact next to the exe.
+                    m_agent_seam.write_transcript("agent_transcript.log");
+                }
+                if (ev.tick_requested && m_sim_loop.paused())
+                    m_sim_loop.advance_days(sim_loop::econ_tick_days);
+            }
+        }
+
         m_sim_loop.tick();
 
         // Advance orbital motion by the in-game days elapsed this frame. Freezes
@@ -325,8 +379,17 @@ int app::run(autostart_mode autostart)
         const uint64_t econ = m_sim_loop.econ_tick();
         while (m_last_econ_tick < econ)
         {
+            // BL-412: agent commands land HERE and only here — at the econ
+            // boundary, in arrival order, against the post-step world of the
+            // tick just completed, each stamped with that tick and recorded.
+            // Mid-interval application would tie the outcome to the wall-clock
+            // day the bytes arrived, which is the property the transcript
+            // exists to exclude.
+            m_agent_seam.drain_boundary(m_world, m_registry,
+                                        static_cast<int>(m_last_econ_tick));
             step_economy();
             ++m_last_econ_tick;
+            m_agent_seam.on_tick_stepped(static_cast<int>(m_last_econ_tick));
         }
 
         // Windowed autostart: the impatient-player click. During the seconds
@@ -384,6 +447,12 @@ int app::run(autostart_mode autostart)
     // Persist any free drag-resize captured this session (toggles/presets already
     // saved on change). Fullscreen: keep the last windowed size, don't overwrite it.
     save_settings();
+
+    // BL-412: leave the replay artifact behind before the session ends (also
+    // written on client detach; both writes carry the same full transcript).
+    if (!m_agent_seam.transcript().empty())
+        m_agent_seam.write_transcript("agent_transcript.log");
+    m_agent_seam.shutdown();
     return 0;
 }
 
@@ -1199,6 +1268,11 @@ void app::step_economy()
             m_resource_sample_index };
         session_history::record_histories(m_world, m_registry, m_last_econ_report,
                                           flows, m_ui, h);
+        // Strategy readout (BL-411): consume this tick's new decision-ring
+        // entries and advance the rolling window one quarter. Same recorder
+        // pattern as record_histories — once per econ tick, never per frame —
+        // so the ledger's draw path only ever reads prebuilt aggregates.
+        ui::record_strategy_readout(m_world, m_strategy_readout);
     }
     lap(8); // history recorders
 }
@@ -1781,6 +1855,12 @@ void app::render()
     // carry neither reason nor score. See NR-227.
     // Read-only: const world in, and it writes nothing but its own ui_state filters.
     ui::draw_decision_feed(m_world, m_ui, &m_ui.show_decision_feed);
+    // Strategy readout (BL-411) — the feed's aggregate companion: verb mix,
+    // spend buckets and reason tally per corp over the rolling window kept by
+    // record_strategy_readout (step_economy). Read-only over world and state;
+    // score/margin fields are deliberately absent from it (NR-226 fence).
+    ui::draw_strategy_readout(m_world, m_strategy_readout, m_ui,
+                              &m_ui.show_strategy_readout);
     {
         const ui::player_plot_history phist{m_balance_history, m_income_history, m_expenditure_history};
         ui::draw_economy_panel(m_world, m_registry, m_last_econ_report, phist, m_ui, &m_ui.show_economy_panel);
@@ -1994,21 +2074,9 @@ void app::render()
         m_ui.construction.pending_demolish = null_entity; // consume the request
     }
 
-    // Execute a law enact/repeal queued this frame by the Budget ledger (BL-343).
-    // The flip takes effect on the NEXT economy tick, not retroactively on the one
-    // already accounted — apply_budget resolves the enacted set once per tick.
-    if (m_ui.construction.pending_law_toggle >= 0)
-    {
-        const std::size_t idx = static_cast<std::size_t>(m_ui.construction.pending_law_toggle);
-        if (idx < m_world.laws.size())
-        {
-            law& l = m_world.laws[idx];
-            l.enacted = !l.enacted;
-            m_ui.construction.last_message =
-                l.name + (l.enacted ? " enacted." : " repealed.");
-        }
-        m_ui.construction.pending_law_toggle = -1; // consume the request
-    }
+    // (BL-343's law enact/repeal executor lived here until BL-480: a law has an
+    // author, and enactment is the author nation's act — no player surface
+    // enqueues a law flip any more.)
 
     // Execute any survey dispatch queued this frame by the Selection-panel Survey
     // button. Centralised here (like construction) so the const-world UI surfaces

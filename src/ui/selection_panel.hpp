@@ -68,8 +68,14 @@ struct building_page
 /// the in-band accordion (draw_building_selection_body) and the full-canvas
 /// takeover (selection_card.cpp) read, so they cannot show different pages for
 /// the same building — the same shared-list precedent as `tile_metrics`.
+///
+/// @p god_view (BL-408): spectator god view — a rival building additionally
+/// offers the read-only Profitability page (pages carrying controls stay off
+/// the rival card even then). Defaults false so every existing caller keeps
+/// today's BL-068 page set unchanged.
 std::vector<building_page> building_pages(const world& w, const recipe_registry& reg,
-                                          const economy_report& report, entity_id id);
+                                          const economy_report& report, entity_id id,
+                                          bool god_view = false);
 
 /// Draw one accordion page's content, dispatched by kind. Shared by the in-band
 /// accordion and the full-canvas takeover so the two cannot drift apart. Takes

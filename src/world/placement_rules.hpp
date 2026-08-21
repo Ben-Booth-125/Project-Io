@@ -45,6 +45,7 @@ enum class placement_reason : uint8_t
     deposit_present,   ///< Hydroponics Bay (BL-166): tile already carries the terrain deposit a Farm would use.
     out_of_logistics_range, ///< BL-323 S2: too far from any city / port / logistics hub to be supplied.
     tech_locked,       ///< BL-344: the corporation has not earned the tech that unlocks this type.
+    province_full,     ///< BL-513: the province is at the total-buildings ceiling its land sustains.
 };
 
 /// Human-readable one-line explanation for a placement reason, for surfacing on

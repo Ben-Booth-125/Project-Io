@@ -4363,6 +4363,519 @@
     }
    ],
    "notes": "Design settled 2026-08-19 by Ben in elicitation form (see backlog.json BL-470 design field for full text, including the two later-settled overturns: per-class march speed, and the war-flips-the-queue NR-344 resolution). Absorbs BL-393s open half (blackboard export). CLOSED 2026-08-19 - full scope landed, tools/verify/unit_march_harness.cpp authored (53/53 PASS), MILITARY.md updated with a new Marching section and corrected Build status / What is absent lists."
+  },
+  {
+   "brief": "diplomatic-lens",
+   "batch": "2026-08-19-bl474-475",
+   "title": "BL-474 - a Diplomatic lens shows stance geographically, on the bar, tile-fill",
+   "status": "open",
+   "promoted_from": "backlog.json BL-474 DIPLOMATIC_LENS",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "open",
+     "requirement": "ITEM-SPANNING (visual): a diplomatic overlay_mode exists on the lens bar; selecting it tints each discovered rival corp's owned tiles by the player's stance (Hostile red / Friend green / Neutral grey / Unknown dashed-outline grey, never a blank tile per NR-350), gated on the same BL-068 corp_is_discovered check BL-449 used."
+    },
+    {
+     "id": "R2",
+     "status": "open",
+     "requirement": "Clicking a tinted tile selects the owning corp via the existing canvas click-to-select path and the Selection panel opens on it (BL-475's surface)."
+    },
+    {
+     "id": "R3",
+     "status": "open",
+     "requirement": "A legend/key for the four states renders while the lens is active, matching the convention every other lens follows."
+    }
+   ],
+   "notes": "Design settled 2026-08-19 by Ben in elicitation form (backlog.json BL-474 design field) - tile fill and on-bar placement both deliberately overrule the filed recommendation (marker/ring, off-bar). Live UI check required before any row here flips complete (io-standing-rules.md, 2026-08-19) - this is an interactive, click-driven surface."
+  },
+  {
+   "brief": "corp-ledger-stance-detail",
+   "batch": "2026-08-19-bl474-475",
+   "title": "BL-475 - the per-corporation Selection ledger carries stance detail and the three transition presses",
+   "status": "open",
+   "promoted_from": "backlog.json BL-475 CORP_LEDGER_STANCE_DETAIL",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "open",
+     "requirement": "ITEM-SPANNING (visual): selecting a rival corp (via BL-474's lens or the existing canvas/list paths) shows its stance and, if discovered, the three legal transition presses (Declare Hostile with confirm popup, Offer/Accept Friendship, Return to Neutral) in the Selection panel - re-hosted from BL-449's retired table column, same corp_command verbs, same rejection handling."
+    },
+    {
+     "id": "R2",
+     "status": "open",
+     "requirement": "ACTIONS.json/question_log.json entries retitled from BL-449's retired corporation_panel entries to this surface, not duplicated; both generated mirrors re-rendered clean."
+    },
+    {
+     "id": "R3",
+     "status": "open",
+     "requirement": "BL-449's Stance column and press blocks are removed from corporation_panel.cpp once this surface is live - no dead second copy of the same interaction."
+    }
+   ],
+   "notes": "Companion to diplomatic-lens. Live UI check required before R1 flips complete (io-standing-rules.md, 2026-08-19)."
+  },
+  {
+   "brief": "rivals-start-armed",
+   "batch": "2026-08-19-bl476",
+   "title": "BL-476 - every corporation starts with an army, not just the player",
+   "status": "complete",
+   "promoted_from": "backlog.json BL-476 RIVALS_START_UNARMED",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "ITEM-SPANNING (headless): every non-background corp (player + named rivals) ends generation owning exactly one military_base and one unit_component (roster index 0, 50 manpower), placed on the nearest valid land tile to its HQ. A BL-365 background firm owns neither.",
+     "result_metric": "tools/verify/rival_military_seeding_harness.cpp R1, canonical world (Kepler, no_prehistory): 8/8 non-background corps seeded exactly 1 military_base + 1 generation-seeded unit each (seeded=8/8, land-poor-skips=0), 0 background firms present in this world so the exclusion is vacuously satisfied here but covered structurally (corp_ids never includes a background firm - see NR-376). Counting excludes hard_coded_world.cpp's separate pre-existing 'Kepler player stub' unit (no muster_base, predates BL-476). corp_terrain_matrix re-run clean: 8 corps, 4 assets each (was 3 pre-BL-476), tier-1 FAILs=0."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "Deterministic: two same-seed generation runs produce identical seeding (same tiles, same unit fields) for every corp.",
+     "result_metric": "tools/verify/rival_military_seeding_harness.cpp R2: non-background corp id sets, every military_base tile, and every starting unit's fields (count/type/supply_factor_permille/position) identical across two independent make_hard_coded_world(no_prehistory()) generations. Also re-ran the project's own determinism_harness.cpp (25/25 checks PASS) to confirm nothing else regressed."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "A land-poor nation with no valid placement tile is skipped gracefully (no crash), matching the existing player-only behavior.",
+     "result_metric": "tools/verify/rival_military_seeding_harness.cpp R3: synthetic single-corp world with one nation whose only tile is ocean, run through the real generate_corporations entry point. No throw/crash; the corp is still created; 0 military_base and 0 units authored."
+    }
+   ],
+   "notes": "Scope settled directly with Ben, 2026-08-19: player + named rivals only, not background filler firms. No UI surface, so the live-UI-check rule does not apply here - a headless harness is sufficient for this item. Player's own tile pick verified byte-identical: seed_starting_military is now called for the player FIRST (before any rival), against the same w.buildings-derived occupied_tiles snapshot the pre-BL-476 code used, so no rival can claim the tile the player would previously have picked - see the code comment in corporation_generation.cpp and NR-376."
+  },
+  {
+   "brief": "live-agent-control-seam",
+   "batch": "2026-08-19-watch-and-meta",
+   "title": "BL-412 - live agent control seam",
+   "status": "partial",
+   "promoted_from": "backlog.json BL-412 LIVE_AGENT_CONTROL_SEAM",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "ITEM-SPANNING (headless): with the rendered app replaced by a headless drain loop, a command stream delivered over the new local listen socket at tick boundaries produces a world state_hash identical to the same schedule applied in-process through apply_corp_command. Arrival order is application order; the transcript (tick, corp, verb, args) is recorded and REPLAYS to the same hash.",
+     "result_metric": "agent_seam_harness 22/22 on the integrated tree: pipelined socket schedule state_hash == in-process apply_corp_command schedule; transcript (tick,corp,verb,args) replays on a fresh world to the same hash with every result reproduced."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "Untrusted boundary (headless): a command with any out-of-domain field (non-finite double, out-of-range id, unknown verb) is rejected WHOLE with a typed reason; world state_hash before == after rejection. No clamp, no truncation.",
+     "result_metric": "Same harness: out-of-range verb, wrap integer, workforce=250, malformed lexeme, NaN, finite-double/infinite-float each rejected whole (rejected_invalid); actor gate rejected_not_owner; state_hash before==after with no step between; explicit no-clamp assertion. ALSO PROVEN LIVE: the first watch session read as a non-actor corp and was refused rejected_not_owner over the real socket."
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "LIVE check (human): the built app runs windowed; an external MCP client connects, issues a build/hire command; the effect appears on canvas within one tick and the app remains interactive. A clean compile and a green harness are not sufficient (2026-08-19 rule).",
+     "result_metric": "PARTIAL: external client attached to the rendered app, gated clock released ticks 1..8 on TICK, app stayed interactive (watch-session transcript). The canvas-eyeball half is Ben's — app left open with --host-agent."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "requirement": "The engine only LISTENS: no outbound connection code, no HTTP client, no API key (AI_OPPONENT.md section 10 invariant) - asserted by grep-level review in verifier-review, not by a harness.",
+     "result_metric": "verifier-review (the named authority): only listen-side socket code in src/ (::socket/bind/listen/accept); the sole connect/http hits are comments asserting the invariant; the one dialling process is tools/mcp/server.js, outside src/."
+    }
+   ]
+  },
+  {
+   "brief": "spectator-god-view",
+   "batch": "2026-08-19-watch-and-meta",
+   "title": "BL-408 - spectator god view",
+   "status": "partial",
+   "promoted_from": "backlog.json BL-408 SPECTATOR_GOD_VIEW",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING (visual + live): under spectate with god view on, a rival corp's internals (stockpile/production detail the competitor-visibility rule normally hides) are readable on its Selection/hover surfaces; with the flag off, the BL-068 visibility rule is byte-identical to today. Live click-through required before completion.",
+     "result_metric": "Capture half done: scripts/verify/spectator_god_view.lua, 7 captures, ON/OFF/ON-again legs eyeballed by the build agent. Live click-through owed (spectate needs a live entry path — noted in the item)."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "Ordinary (non-spectate) play is unaffected: god view unreachable, default off, no new always-on cost in the frame path.",
+     "result_metric": "By construction (flag default false, control rendered only under spectate, every read-site tests the pair) + verifier-review confirmation + world_determinism 11/11 and determinism_harness 26/26 green on the integrated tree."
+    }
+   ]
+  },
+  {
+   "brief": "emergent-strategy-readout",
+   "batch": "2026-08-19-watch-and-meta",
+   "title": "BL-411 - emergent strategy readout",
+   "status": "partial",
+   "promoted_from": "backlog.json BL-411 EMERGENT_STRATEGY_READOUT",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING (visual + live): a per-corp readout aggregating verb mix, spend buckets and reason codes over a rolling window renders and updates as the sim ticks; score/margin fields are ABSENT from the aggregation (NR-226 fence - runner_up can exceed winning_score by bucket-before-score sorting).",
+     "result_metric": "Built + 3 captures eyeballed; verifier-review confirmed no score/margin field crosses into the aggregation. \"Spend buckets\" in this row means DECISION-COUNT buckets (review finding 5). Live click on nav slot 12 owed."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "question_log.json pair authored for the new surface (question answered + earning item BL-411), drafted status acceptable pending Ben's wording.",
+     "result_metric": "question_log.json entry strategy_readout added, status drafted (wording is Ben's per convention); mirror regenerated."
+    }
+   ]
+  },
+  {
+   "brief": "tech-effect-union",
+   "batch": "2026-08-19-watch-and-meta",
+   "title": "BL-479 - tech effect union + modifier vocabulary (Sprint D1)",
+   "status": "complete",
+   "promoted_from": "backlog.json BL-479 TECH_EFFECT_UNION",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "ITEM-SPANNING (headless): a tech carrying modify_scalar, once earned by corp X, moves exactly the named scalar for X and no other corp; a world where no tech carries an effect beyond unlock_structure is bit-identical (state_hash) to the pre-change build.",
+     "result_metric": "tech_effect_union_harness 35/35: fixture modify_scalar moves the earning corp only, rivals bit-identical, fold order = earn order, monotonic; no-effect world state_hash identical measured against a genuine pre-change build (harness v0 at 0303800), two seeds, three marks each — not baked as goldens."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "The modifier-subject vocabulary lives in one shared header (modifier_set.hpp), is a closed enum, and names at least one strain/cohesion-adjacent subject so BL-477's collapse-coupled meta is expressible.",
+     "result_metric": "modifier_set.hpp: one shared closed enum, positions 0-5 (extraction_rate wired; processing_yield, unit_upkeep, logistics_cost, wage_floor, collapse_strain named) — collapse_strain is the BL-477 subject."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "requirement": "The E0-ML-01 gate (Standing Garrison Doctrine -> military_base) behaves identically through the union - the existing tech_gate harness assertions still pass unmodified.",
+     "result_metric": "tech_gate_harness 33/33 built UNMODIFIED from the integrated tree; E0-ML-01 authors through add_effect with the mirror field preserved."
+    }
+   ]
+  },
+  {
+   "brief": "law-author-and-treasury",
+   "batch": "2026-08-19-watch-and-meta",
+   "title": "BL-480 - law author + nation treasury (Sprint D3)",
+   "status": "partial",
+   "promoted_from": "backlog.json BL-480 LAW_HAS_AN_AUTHOR",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "requirement": "ITEM-SPANNING (headless): with the levy enacted by nation N, sum(levy debited from corps in N's scope) == sum(credited to N's treasury) over any tick span - money conserved, the BL-392-class destruction gone from this flow. An out-of-scope corp pays zero.",
+     "result_metric": "law_author_harness 14/14 on the integrated tree: conservation bit-exact over an 8-tick span INCLUDING the post-review sorted (corp,nation) credit application; scope exclusion for foreign-territory and unclaimed-tile corps."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "requirement": "Repeal returns the world bit-identical to the never-enacted baseline (the v0.1.3 done-definition's inertness rule, now with an author).",
+     "result_metric": "Repeal returns bit-identical to the never-enacted baseline; no-enactment world bit-identical to a no-law world (same harness)."
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "No player-reachable enact/repeal control remains (balance_ledger.cpp checkbox removed); enactment is generation-seeded by the author nation this sprint, seam shaped for the granted nation-grain scorer. LIVE check: the balance ledger renders its levy line read-only.",
+     "result_metric": "PARTIAL: checkbox + pending_law_toggle + executor + dictionary entry all removed (verifier-review: no orphan); ledger Laws section browse-only by code. The live look at the read-only levy line is Ben's. NOTE: the seeded 1.0/unit rate is a placeholder now biting — NR-382 holds the rate ruling; ai_skill bands left red-and-attributed, deliberately unblessed."
+    }
+   ]
+  },
+  {
+   "brief": "era-minus1-conquest-assertion",
+   "batch": "2026-08-20-four-lane",
+   "title": "BL-384 - conquest assertion half (Sprint 27)",
+   "status": "pending",
+   "promoted_from": "backlog.json BL-384 ERA_MINUS1_SIM_CONQUERS_NOTHING",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING (headless): history_sim_harness asserts a nonzero conquest count over the standard seed set, and reports elimination and dominance-share counters alongside it. The assertion is EXPECTED RED against today build - a red result is the requirement met, not failed.",
+     "result_metric": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "The measured conquest, elimination and dominance numbers are recorded verbatim as the Sprint 28 baseline. No constant, seed or scorer term is changed to move them.",
+     "result_metric": null
+    }
+   ]
+  },
+  {
+   "brief": "road-network-cuts",
+   "batch": "2026-08-20-four-lane",
+   "title": "Sprint B2 - the three road_generation cuts",
+   "status": "pending",
+   "promoted_from": "sprints.json B2 (road_generation.cpp:65,:90,:195)",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING (headless): every nation with at least one population centre participates in road generation - the <2-centre early return no longer silently drops nations. Count of road-less nations reported before and after.",
+     "result_metric": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "A road may cross water and cross-water adjacency is honoured, so a coastal or island nation is reachable. Generation stays deterministic: same seed, same road set, verified by state_hash over two runs.",
+     "result_metric": null
+    }
+   ]
+  },
+  {
+   "brief": "settlement-density-clamp",
+   "batch": "2026-08-20-four-lane",
+   "title": "Sprint B3 + BL-463 - density clamp against the current map",
+   "status": "pending",
+   "promoted_from": "sprints.json B3; backlog.json BL-463 SETTLEMENT_COUNT_IS_SEED_INVARIANT",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING (headless): substrate_census reports settlement counts scaled to the 312x145 map rather than the 180x84-era clamp(tiles/1000,20,40). Before/after counts recorded.",
+     "result_metric": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "BL-463: settlement count VARIES with seed across the census seed set - the count is no longer seed-invariant - while remaining deterministic per seed (same seed, same count, two runs).",
+     "result_metric": null
+    }
+   ]
+  },
+  {
+   "brief": "province-partition",
+   "batch": "2026-08-20-four-lane",
+   "title": "BL-466 - province partition (Lane C foundation)",
+   "status": "pending",
+   "promoted_from": "backlog.json BL-466 PROVINCE_PARTITION",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING (headless): every land tile belongs to exactly one province; provinces carry stable sorted ids; the partition is identical across two runs of the same seed.",
+     "result_metric": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "Serialisation seam: the province record is appended, no existing record reordered; a save written before this item still loads, and a round-trip is bit-identical.",
+     "result_metric": null
+    }
+   ]
+  },
+  {
+   "brief": "battle-state-in-world",
+   "batch": "2026-08-20-four-lane",
+   "title": "BL-467 + BL-315 remainder - battle state, trigger, losses",
+   "status": "pending",
+   "promoted_from": "backlog.json BL-467 BATTLE_STATE_IN_WORLD",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING (headless): two corps with units in one province and a directed hostile stance OPEN a battle; rounds resolve; losses land on unit_component. A resolver result is now read by production code.",
+     "result_metric": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "Order independence: battle discovery walks provinces in sorted (province id, corp-pair) order, and a corp pair holds at most one battle per province. Same seed, same battles, same losses over two runs.",
+     "result_metric": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "Nothing crosses a tick boundary but the record itself - the per-round trace is retained for the battle span and discarded at end. No stance is acquired ambiently; hostility stays a declared state.",
+     "result_metric": null
+    }
+   ]
+  },
+  {
+   "brief": "tariff-and-money-conservation",
+   "batch": "2026-08-20-four-lane",
+   "title": "BL-392 then Sprint D4 - procurement conservation + the tariff",
+   "status": "pending",
+   "promoted_from": "backlog.json BL-392 PROCUREMENT_CONTRACTS_DESTROY_VALUE; sprints.json D4",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING (headless): MONEY AND GOODS ARE CONSERVED across procurement. No contract credits goods with no supplier, and no tick debits a buyer without an equal credit somewhere. Asserted over an 8-tick span.",
+     "result_metric": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "A cross-border sale debits the buyer by the tariff and credits the ENACTING NATION treasury by the same amount, to the credit. A same-nation sale is charged nothing.",
+     "result_metric": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "The tariff rate comes from the nation own law (BL-480 author field), not a constant. With no tariff law enacted, the world is bit-identical to a pre-item baseline (state_hash).",
+     "result_metric": null
+    }
+   ]
+  },
+  {
+   "brief": "province-render-and-selection",
+   "batch": "2026-08-21-province-grain",
+   "title": "BL-511 - province as rendered and selected unit (Lane R)",
+   "status": "pending",
+   "promoted_from": "backlog.json BL-511 PROVINCE_AS_RENDER_UNIT",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING (visual + LIVE): the Planetary canvas draws provinces, not bare hexes, with borders softened by a blend across each province real tile mixture. A click selects the PROVINCE. LIVE CHECK REQUIRED - open the app and click, a capture does not prove a press is reachable.",
+     "result_metric": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "The tile is not retired: selecting a province shows its tiles in the Selection panel, and deposits/terrain/buildings still read per tile.",
+     "result_metric": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "Every lens still renders. Each of the eleven overlay modes has a stated per-province reduction (mean, dominant, or a deliberate refusal) rather than silently showing one tile value for the whole province.",
+     "result_metric": null
+    }
+   ]
+  },
+  {
+   "brief": "unit-position-province-grain",
+   "batch": "2026-08-21-province-grain",
+   "title": "BL-511 seam half - march_unit retargets to province (Lane U)",
+   "status": "pending",
+   "promoted_from": "backlog.json BL-511; NR-405",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING (headless): march_unit takes a PROVINCE and a unit marches to it across ticks. The corp_verb enum is unchanged in value and order (append-only rule); only the field read changes.",
+     "result_metric": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "UNTRUSTED INPUT BOUNDARY: a province id arriving over --serve is range-checked against the real domain before any narrowing cast; an invalid one rejects the WHOLE command and mutates nothing.",
+     "result_metric": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "ACTIONS.json march_unit entry matches the seam exactly - the dictionary is transcribed from corp_command.hpp, so a disagreement means the dictionary is wrong.",
+     "result_metric": null
+    }
+   ]
+  },
+  {
+   "brief": "province-building-limit",
+   "batch": "2026-08-21-province-grain",
+   "title": "BL-513 - province building limit (Lane B)",
+   "status": "pending",
+   "promoted_from": "backlog.json BL-513 PROVINCE_BUILDING_LIMIT",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING (headless): a province has a total-buildings ceiling derived from area, infrastructure, habitability and population; placement refuses at the ceiling with a stated reason, and the per-tile deposit cap still applies independently.",
+     "result_metric": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "TYPE-AGNOSTIC by ruling: the ceiling bounds the total only. Sixty buildings may be any mix of types.",
+     "result_metric": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "Any coefficient is PINNED BY MEASUREMENT against province_capacity_probe across the seed set, and the measured spread is recorded in the item. No number is picked. Generation output is unchanged where the ceiling does not bind (state_hash).",
+     "result_metric": null
+    }
+   ]
+  },
+  {
+   "brief": "supply-interdiction",
+   "batch": "2026-08-21-province-grain",
+   "title": "BL-458 - supply lines can be cut (Lane M)",
+   "status": "pending",
+   "promoted_from": "backlog.json BL-458 SUPPLY_LINES_CANNOT_BE_CUT",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING (headless): a hostile unit standing on a convoy route interdicts it - the convoy is stopped or taken, deterministically and identically across two runs of the same seed.",
+     "result_metric": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "convoy_tile_at lives in logistics.hpp and the canvas CONSUMES it rather than owning a private copy. The shared function owns the path-orientation rule (intra_body_path caches on a canonicalised key), proven by a harness that a convoy head is at the correct end for both route directions.",
+     "result_metric": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "BL-315 third reading is earned: there is now an act that makes pirate the honest description of a company.",
+     "result_metric": null
+    }
+   ]
+  },
+  {
+   "brief": "retain-heightmap",
+   "batch": "2026-08-21-province-redesign",
+   "title": "BL-517 - retain the generation heightmap (Sprint P1, H1)",
+   "status": "pending",
+   "promoted_from": "backlog.json BL-517 RETAIN_HEIGHTMAP",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING (headless): every tile carries the height its generation pass computed, and the retained value is IDENTICAL to the one generate_body_tiles reports through generation_record - captured, never recomputed.",
+     "result_metric": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "Serialisation: the field is APPENDED, no existing tile field moves or renumbers, and a tile record round-trips bit-identical.",
+     "result_metric": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "Determinism unchanged: same seed, same heights, two runs. Capturing the value perturbs NO RNG stream - world_determinism and determinism_harness stay green, and if spectator_determinism's pinned golden moves that is reported and explained rather than re-blessed by the implementer.",
+     "result_metric": null
+    }
+   ]
+  },
+  {
+   "brief": "organic-province-borders",
+   "batch": "2026-08-21-province-redesign",
+   "title": "BL-515 - provinces grown from settlement, stopped by terrain (Sprint P1, O1)",
+   "status": "pending",
+   "promoted_from": "backlog.json BL-515 ORGANIC_PROVINCE_BORDERS",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING (headless): provinces are grown from population centres by cost-weighted fill, where a river edge and an elevation difference are expensive to cross and a road link is CHEAP (a road binds). Every land tile belongs to exactly one province; country no centre reaches forms hinterland provinces under the same rules.",
+     "result_metric": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "Identity is the LOWEST-ID MEMBER TILE, derived not allocated. Same seed, same partition, same ids, two runs - proven by determinism_harness's province comparison. The body walk stays explicitly sorted.",
+     "result_metric": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "Size: 7-12 is a soft target and 3-12 the hard one, boundaries winning ties. Tiny provinces are KEPT, never merged away to satisfy a floor. The measured distribution is REPORTED against the 3x3 partition's (21,161 provinces, mean 9.11, 97.90% in band) as a comparison, not a target to match.",
+     "result_metric": null
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "requirement": "The land-only invariant is NARROWED to land provinces rather than deleted (NR-428); ocean stays out of scope and belongs to BL-516. Serialisation properties the partition already proved stay green: one appender, no record reordered, an older stream still loads, round-trip bit-identical.",
+     "result_metric": null
+    }
+   ]
   }
  ]
 }

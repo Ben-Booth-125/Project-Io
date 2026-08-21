@@ -1,6 +1,7 @@
 #pragma once
 
 #include <SDL3/SDL.h>
+#include "agent_seam.hpp"
 #include "sim_loop.hpp"
 #include "scripting/lua_state.hpp"
 #include "ui/ui_state.hpp"
@@ -16,6 +17,7 @@
 #include "scripting/persona_pack.hpp"
 #include "ui/chat_panel.hpp"
 #include "ui/plot_history.hpp"
+#include "ui/strategy_readout.hpp"
 #include "world/market_clearing.hpp"
 #include "world/planetology.hpp"
 #include "world/standing.hpp"
@@ -58,6 +60,13 @@ public:
     enum class autostart_mode : std::uint8_t { none = 0, smoke, play };
 
     int run(autostart_mode autostart = autostart_mode::none);
+
+    /// BL-412: ask run() to host the live agent control seam on
+    /// 127.0.0.1:@p port (0 = don't host, the default). The listener opens
+    /// once a campaign is actually running (in_game); the session actor is
+    /// pinned to the player corp — the seat the agent occupies. Call before
+    /// run().
+    void host_agent(uint16_t port) { m_agent_port = port; }
 
     /// Run a non-interactive visual-verification session: set up a deterministic
     /// world (seeded, sim paused), expose the `verify` Lua API (which drives view
@@ -409,6 +418,7 @@ private:
     ui::resource_history          m_tile_resource_hist;  ///< Remaining deposit per tile per resource, recorded only for tracked (drilled) tiles.
     std::unordered_set<entity_id> m_tracked_tiles;       ///< Tiles whose per-tile series is being recorded (seeded by card drill-downs).
     std::vector<std::uint64_t>    m_resource_hist_days;  ///< In-game day per resource-history sample; the chart's shared X axis (capped in lockstep).
+    ui::strategy_readout_state    m_strategy_readout;    ///< Rolling per-corp decision aggregation (BL-411) — verb mix / spend buckets / reason tally over the last 64 quarters. Same lifetime rules as the histories above: presentation-only, unserialised, advanced once per econ tick.
     std::uint64_t                 m_resource_sample_index = 0; ///< Monotonic count of resource-history samples taken. Each econ tick is a quarter, so sample i is dated i·econ_tick_days — equal to day_tick in live play (econ ticks are quarterly) but also progressing when the harness steps the economy without the sim clock.
     entity_id   m_prev_selection = null_entity; ///< selected_entity last frame; a change to a new selection closes any open ledger so the Selection element takes the shared fold-out column.
 
@@ -427,6 +437,12 @@ private:
 
     double m_last_orbit_days = 0.0; ///< elapsed_days at the previous orbit advance; gives the per-frame delta.
     int    m_last_survey_day = 0;   ///< Whole in-game day at the previous survey advance; drives the per-day survey crossing (BL-067).
+
+    // --- Live agent control seam (BL-412) -----------------------------------
+    /// 0 = not hosting (the default — an interactive session grows a network
+    /// listener only when --host-agent asks for one). Set via host_agent().
+    uint16_t   m_agent_port = 0;
+    agent_seam m_agent_seam; ///< The loopback listener + tick-boundary drain.
 };
 
 namespace ui { class frame_stats; }

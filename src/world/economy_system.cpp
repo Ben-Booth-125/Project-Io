@@ -87,7 +87,8 @@ struct stack_draw
 // (building_profit.cpp) sizes a stack's combined draw from the same figure the tick
 // draws, rather than re-deriving it. The anonymous namespace re-opens below.
 float extraction_nominal(const world& w, const recipe_registry& reg,
-                         const building_component& b, float contention)
+                         const building_component& b, float contention,
+                         entity_id corp)
 {
     const auto tile_it = w.tiles.find(b.tile);
     if (tile_it == w.tiles.end())
@@ -97,11 +98,16 @@ float extraction_nominal(const world& w, const recipe_registry& reg,
     // Apply the player's workforce target (0–200 % of nominal capacity).
     const float wt_scalar = std::clamp(b.workforce_target / 100.0f, 0.0f, 2.0f);
     const building_economics& e = reg.economics(building_type::extraction_site);
-    return e.base_rate
+    const float nominal = e.base_rate
          * richness_rate_scalar(e, tc.resource_deposit[ri])
          * (b.workforce_assigned * contention)
          * wt_scalar
          * (1.0f - tc.hazard_level);
+    // BL-479: fold the owning corp's earned extraction_rate modifiers into the
+    // single definition of the draw. `null_entity` (or a corp with none) hands
+    // back `nominal` untouched — no arithmetic — so a world with no
+    // modify_scalar tech stays bit-identical to the pre-BL-479 build.
+    return w.modified_scalar(corp, modifier_subject::extraction_rate, nominal);
 }
 
 namespace {
@@ -154,7 +160,7 @@ building_report run_extraction(world& w, const recipe_registry& reg,
     // yields 0.8 of the first, the third 0.64, and so on. Stacking therefore pays
     // sub-linearly — and there is no clamp under the curve, because the curve is
     // the economics.
-    const float nominal = extraction_nominal(w, reg, b, contention)
+    const float nominal = extraction_nominal(w, reg, b, contention, corp)
                         * placement_rules::stack_output_scalar(stack != nullptr ? stack->rank : 1);
     if (nominal <= 0.0f)
     {
@@ -800,10 +806,28 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // the remainder from the BUYER's balance (a simplification of BL-095's own
     // market-gated stretch/pause rate: a contract paces on a fixed schedule
     // rather than the supplier's live throughput, a known first-cut cut — see
-    // BL-350's item resolution). On completion the full quantity is credited
-    // to the buyer's (buyer, body) pool and reputation moves up. Ascending
-    // contract id (insertion order — the vector is appended-to, never
-    // reordered) keeps this deterministic without an extra sort.
+    // BL-350's item resolution). Ascending contract id (insertion order — the
+    // vector is appended-to, never reordered) keeps this deterministic without
+    // an extra sort.
+    //
+    // BL-392 changed two things about what that instalment IS and where the
+    // goods go:
+    //
+    //   MONEY IS A TRANSFER. Each instalment now leaves the buyer AND ARRIVES
+    //   AT THE SUPPLIER, the same magnitude in the same statement. Before this,
+    //   the buyer's balance was debited and no balance anywhere was credited:
+    //   every contract in flight was quietly burning credits out of the economy.
+    //   The freight rides in the same total — the supplier arranges the
+    //   carriage, so paying them for it keeps the flow closed.
+    //
+    //   GOODS LAND ON `delivery_body`, the buyer's own body, not on the
+    //   supplier's. Crediting the supplier's body put the stock where the buyer
+    //   held no processor reservation, and the auto-surplus path liquidated it
+    //   in the tick it landed — a player ran twenty contracts and never saw a
+    //   single pool fact. Where the supplier holds the good in stock at the
+    //   fulfilment body it is DRAWN from their pool (a real move, not a copy);
+    //   any shortfall is built to order, which is what a build order placed with
+    //   someone else means.
     {
         const auto& pp = reg.procurement();
         std::vector<std::size_t> completed;
@@ -813,13 +837,30 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
             const auto bit = w.corporations.find(c.buyer);
             if (bit == w.corporations.end())
                 continue; // buyer no longer exists — leave the contract inert
-            const float remaining_total = c.quantity * c.unit_price * (1.0f - pp.deposit_fraction);
+            const auto sit = w.corporations.find(c.supplier);
+            if (sit == w.corporations.end())
+                continue; // supplier gone — there is nobody to pay, so charge nothing
+
+            const float contract_total  = c.quantity * c.unit_price + c.freight_cost;
+            const float remaining_total = contract_total * (1.0f - pp.deposit_fraction);
             const float per_tick = (c.lead_time_ticks > 0) ? remaining_total / static_cast<float>(c.lead_time_ticks) : remaining_total;
             bit->second.balance -= per_tick;
+            sit->second.balance += per_tick;
             ++c.ticks_elapsed;
             if (c.ticks_elapsed >= c.lead_time_ticks)
             {
-                w.pool_for(c.buyer, c.body).quantities[static_cast<std::size_t>(c.resource)] += c.quantity;
+                const std::size_t ri = static_cast<std::size_t>(c.resource);
+                // Draw what the supplier actually holds at the fulfilment body
+                // before building the rest to order, so a contract served out of
+                // existing stock moves goods rather than inventing them.
+                const auto skit = w.corp_body_pools.find(std::make_pair(c.supplier, c.body));
+                if (skit != w.corp_body_pools.end())
+                {
+                    float& sq = skit->second.quantities[ri];
+                    sq -= std::min(sq, c.quantity); // a pool never goes negative
+                }
+                const entity_id land_on = (c.delivery_body != null_entity) ? c.delivery_body : c.body;
+                w.pool_for(c.buyer, land_on).quantities[ri] += c.quantity;
                 w.corp_reputation[{c.buyer, c.supplier}] += pp.reputation_on_complete;
                 completed.push_back(i);
             }
@@ -1111,8 +1152,12 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                 const entity_id body = building_body(w, b);
                 if (body == null_entity)
                     continue;
+                // BL-479: the member's own owner, so a modified corp's rate
+                // sizes the shared taper at the figure that member will draw.
+                const entity_id member_owner = owner_of(sites[i].id);
                 const float n =
-                    extraction_nominal(w, reg, b, contention_for(owner_of(sites[i].id), body))
+                    extraction_nominal(w, reg, b, contention_for(member_owner, body),
+                                       member_owner)
                     * placement_rules::stack_output_scalar(static_cast<int>(i - first) + 1);
                 if (n > 0.0f)
                     combined += n;
@@ -1695,7 +1740,8 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg)
                     break;
                 }
                 movement_order mo;
-                mo.dest = u.order.dest;
+                mo.dest          = u.order.dest;
+                mo.dest_province = u.order.dest_province; // BL-511: a recompute must not silently drop the grain
                 mo.path = rp.tiles;
                 if (mo.path.front() != u.position)
                     std::reverse(mo.path.begin(), mo.path.end());
@@ -1714,6 +1760,19 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg)
                 points -= step_cost;
                 u.position = next_id;
                 ++u.order.next_index;
+
+                // BL-511: the march ends on ENTERING the destination province,
+                // not on reaching the member tile the path was solved to. A
+                // unit's position IS a province under Ben's 2026-08-21 grain
+                // ruling, so walking on to a particular hex inside a province
+                // the unit already occupies would be movement with no
+                // meaning. Legacy / harness-built orders carry
+                // dest_province == 0 and keep the pure tile behaviour.
+                if (u.order.dest_province != 0
+                    && w.provinces.province_of(u.position) == u.order.dest_province)
+                {
+                    break; // the arrival check below clears the order and counts it
+                }
             }
             else
             {
@@ -1722,7 +1781,11 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg)
             }
         }
 
-        if (u.order.dest != null_entity && u.order.next_index >= u.order.path.size())
+        const bool in_dest_province =
+            u.order.dest_province != 0
+            && w.provinces.province_of(u.position) == u.order.dest_province;
+        if (u.order.dest != null_entity
+            && (in_dest_province || u.order.next_index >= u.order.path.size()))
         {
             u.order = movement_order{}; // arrived — order clears itself
             ++out.arrived;

@@ -16,7 +16,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*133 entries — 21 gameplay · 24 canvas · 15 lens · 44 ledger · 29 chrome.*
+*138 entries — 24 gameplay · 24 canvas · 15 lens · 45 ledger · 30 chrome.*
 
 ---
 
@@ -423,6 +423,61 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** The universal de-escalation press — the only one of the four verbs usable from every non-neutral state, and the one that lets a corp exit hostility unilaterally even though it could not enter friendship unilaterally.
 
+### `gameplay.march_unit` — No player-facing surface yet. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode). There is NO UI surface for it yet: BL-471 (unit marker + command surface) is the item that adds one, and it is deliberately sequenced after BL-511's canvas rewrite. Until then this verb is reachable only through the seam.
+
+**Press.** No press exists. Over the seam: COMMAND corp=<id> verb=21 subject=<unit id> province=<province id>. The command is applied through apply_corp_command, which recomputes every precondition itself — a stale destination or a unit that has since been disbanded is refused, not applied.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id` | The unit to order. Must exist in world.units and be owned by the acting corporation. NOTE the field: units use `subject`, not `tile` — `tile` is the build/place_road/hire_unit convention and this verb does not read it at all. |
+| `province` | `uint32 (province::id)` | The DESTINATION PROVINCE (BL-511, 2026-08-21 — this replaced a destination tile; the verb kept its value 21 because the enum is serialised and append-only, only the field it reads changed). A province id is NOT an entity_id: it is derived from (body rank | block raster index | component index), so it lives in its own uint32 domain. The default is `no_province` (0xFFFFFFFF) and an omitted field is rejected — id 0 is a REAL province (the first block of the first body), so it cannot serve as an absent-value sentinel. |
+
+**Valid when:**
+- `subject` names a real unit (rejected_invalid otherwise).
+- That unit is owned by the acting corporation (rejected_not_owner otherwise).
+- `province` is a province in the world's built partition — checked with province_partition::find, which is the authoritative domain test. Any uint32 that is not a built province, including the `no_province` default, is rejected (rejected_invalid otherwise). A wire range gate proves the value FITS; it does not prove it EXISTS, and both checks run.
+- That province is on the SAME BODY as the unit's current tile — intra-body path march only, BL-470's ruling 1 (rejected_invalid otherwise).
+- The unit is not already in that province — marching to where you already stand is not a move; halt_unit is the stop verb (rejected_state otherwise).
+- At least one member tile of the province is reachable from the unit's current tile by intra_body_path (rejected_invalid otherwise).
+- Water needs no separate check: the province partition covers LAND ONLY by construction, so no province id can ever name ocean.
+
+**Expected output.** The unit's movement_order is REPLACED (not queued behind an existing one): dest_province is the commanded province, dest is the province's lowest-id reachable member tile, path is the solved intra-body route with path[0] the tile the unit already occupies, next_index is 1 and progress is 0. The route is computed ONCE, here — never re-Dijkstra'd per tick, only on an actual block. Movement then resolves across ticks in run_unit_march, spending the unit's per-class march_points_per_class against the shared terrain traversal cost and banking the fractional remainder. The order CLEARS ITSELF the tick the unit enters the destination province — it does not walk on to `dest` once it is already inside. A rejection mutates nothing at all.
+
+**Reason to select.** The only verb that moves a unit. Until it is issued, a hired unit is pinned to its muster tile forever. Two things an agent should weigh. First, movement is not free of the economy: a unit beyond the reach field loses supply_factor_permille each tick in the upkeep pass, which lowers its derived strength in the resolver — marching away from your road network makes an army measurably weaker, not merely further away. Second, there is still no engagement trigger in this codebase (MILITARY.md's 'what is absent' list), so arriving somewhere does not yet cause a battle. Position is real; consequence is not, yet.
+
+### `gameplay.halt_unit` — No player-facing surface yet. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode). There is NO UI surface for it yet: BL-471 (unit marker + command surface) is the item that adds one, and it is deliberately sequenced after BL-511's canvas rewrite. Until then this verb is reachable only through the seam.
+
+**Press.** No press exists. Over the seam: COMMAND corp=<id> verb=22 subject=<unit id>. No other field is read.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id` | The unit whose standing movement order is to be cleared. |
+
+**Valid when:**
+- `subject` names a real unit (rejected_invalid otherwise).
+- That unit is owned by the acting corporation (rejected_not_owner otherwise).
+- That unit currently holds a live order — order.dest is not null (rejected_state otherwise). Halting an already-halted unit is a no-op and is reported as such rather than answering applied.
+
+**Expected output.** The unit's movement_order is reset to its default: no destination, no province, no path, no banked progress. The unit stays exactly where it is, on the tile it had reached. Nothing else about the unit changes.
+
+**Reason to select.** You gave an order you no longer want, and the alternative — waiting for arrival — costs supply every tick out of reach. Note there is no 'resume': halting discards the path, so restarting means a fresh march_unit and a fresh route solve.
+
+### `gameplay.disband_unit` — No player-facing surface yet. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode). There is NO UI surface for it yet: BL-471 (unit marker + command surface) is the item that adds one, and it is deliberately sequenced after BL-511's canvas rewrite. Until then this verb is reachable only through the seam.
+
+**Press.** No press exists. Over the seam: COMMAND corp=<id> verb=23 subject=<unit id>. No other field is read.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id` | The unit to erase. Irreversible. |
+
+**Valid when:**
+- `subject` names a real unit (rejected_invalid otherwise) — including a unit already disbanded, which is simply gone.
+- That unit is owned by the acting corporation (rejected_not_owner otherwise).
+
+**Expected output.** The unit entity is erased from world.units outright. NO REFUND — neither the credit hire cost nor the gated resource draw comes back; manpower walks away (BL-470). Nothing else is touched.
+
+**Reason to select.** The only way to stop paying a unit's upkeep. Since BL-454 a unit draws upkeep goods every tick and weakens when that draw goes unmet, so a force you cannot supply is a running cost with a falling return. Weigh it against the sunk hire cost, which you do not get back — and against the fact that hiring again means a completed military_base and the full gate chain a second time.
+
 ---
 
 ## Canvas — looking around: navigation, selection, hover, time
@@ -644,18 +699,18 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 ### `canvas.select` — The primary canvas (Solar, Circumplanetary, or Planetary rung — whichever fills the window).
 
-**Press.** Single left-click on an entity: a body on the Solar/Circumplanetary rungs, a tile or marker on the Planetary surface.
+**Press.** Single left-click on an entity: a body on the Solar/Circumplanetary rungs, a PROVINCE or marker on the Planetary surface (BL-511, 2026-08-21 — a plain click on the Planetary ground now selects the province, not the bare tile).
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `target` | `entity` | The entity under the cursor. Overlapping candidates resolve to one entity: the stack building > market > unit > tile > body is walked most-specific first, the active lens filters validity, and nearest-to-cursor (entity id breaking ties) picks a single stable winner. |
+| `target` | `entity` | The entity under the cursor. Overlapping candidates resolve to one entity: the stack building > market > unit > PROVINCE > body is walked most-specific first, the active lens filters validity, and nearest-to-cursor (entity id breaking ties) picks a single stable winner. On the Planetary rung the ground itself resolves to the province containing the hovered tile (BL-511): the tile is still the data grain and the Selection card lists the province member tiles, their terrain and their summed deposits, but it is no longer what a plain click addresses. |
 
 **Valid when:**
 - The app is in-game (not the main menu or New World wizard).
 - The pointer is over the primary canvas, not over the minimap inset or any ImGui panel (panels capture the mouse).
 - An entity is under the cursor (empty space is a different press — see canvas.deselect).
 
-**Expected output.** selected_entity becomes the target and the Selection band (fixed strip at the bottom of the screen) appears or re-points, showing that kind's action and facts; a new selection resets any drill-down stack in the band. Nothing else changes: same rung, same pan, same zoom, active_body untouched, no lens change, the canvas is not re-skinned, and any open fold-out ledger stays open. A single click never navigates.
+**Expected output.** selected_entity becomes the target and the Selection band (fixed strip at the bottom of the screen) appears or re-points, showing that kind's action and facts; a new selection resets any drill-down stack in the band. Nothing else changes: same rung, same pan, same zoom, active_body untouched, no lens change, the canvas is not re-skinned, and any open fold-out ledger stays open. A single click never navigates. PROVINCE GRAIN (BL-511, 2026-08-21): selecting Planetary ground shows the PROVINCE in the same Selection element every other kind uses (refolded 2026-08-21 on Ben's ruling that there should not be a second selection element) — header, then the shared three-column band: the province rendered over its mixture bar (the blend legend) on the left, a Tiles / Deposits / Buildings pager in the centre (member tiles with terrain, deposits summed across the province, the buildings standing in it), a Go to action grid on the right. The canvas outlines the province OUTER boundary. REPEAT-CLICK CYCLE (Ben, 2026-08-21): clicking the same spot again walks UNIT > PROVINCE > BUILDING > TILE, skipping any rung with nothing on it. The hit-test itself is unchanged and still resolves most-specific-first, so the FIRST click on a building selects the building, not its province.
 
 **Reason to select.** Inspect a thing and surface its one primary move — Dispatch Survey on an unsurveyed body, Manage on your building, the construct/manage grid on a tile — without losing your current framing.
 
@@ -1226,22 +1281,6 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Story answers 'what is this body's biography?'; Chain answers 'how do the bodies compare through the generation stages?' - the two halves of how this world came to be.
 
-### `ledger.law_enact_toggle` — Balance Ledger (Budget), 'Laws' section beneath the two policy-tier stubs
-
-**Press.** Click the checkbox beside a law's name to enact it, or click it again to repeal it (the standing toggle rule)
-
-| Arg | Type | Meaning |
-|---|---|---|
-| `law_index` | `int index into world::laws` | Which law on the books to flip. The prototype ships one: Extraction Levy. |
-
-**Valid when:**
-- Balance Ledger is open
-- At least one law is on the books (seed_prototype_laws appends the Extraction Levy at world setup, un-enacted)
-
-**Expected output.** The law's enacted flag flips on the next mutable pass, and a toast names it ('Extraction Levy enacted.' / '... repealed.'). It takes effect from the NEXT economy tick, never retroactively on the quarter already accounted. While enacted, every unit of RAW output the corporation extracts is charged rate x units and the total appears on the Levies bar of the Corporations dashboard's Finance card. Prices do not move: a law is a modifier over the market, never an override of it, so the levy is a separate accounted cost rather than a worse sale price. Repeal restores the previous arithmetic exactly. Unlike ledger.budget_tax_tier and ledger.budget_wage_tier, this control is NOT a stub.
-
-**Reason to select.** The only law lever that does anything today, and the one press that demonstrates the governing-body seam end to end. For a corporation SUBJECT to the levy it is pure cost, so a corp-side agent has no reason to enact it; it is here because the pivot's legislator needs the instrument to exist and to be observable before it can be negotiated (BL-280) or politicked over (BL-186, BL-345).
-
 ### `ledger.market_body_selector` — Market Ledger, 'Body' combo
 
 **Press.** Open the Body combo and pick a body
@@ -1558,6 +1597,32 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** To ask a specific question of the run rather than scroll it. 'Every solvency-defence idle' and 'every build' are different questions, and the reason code is what separates them.
 
+### `ledger.strategy_readout_open` — Navigation rail slot 12, "Strategy readout"
+
+**Press.** Click nav rail slot 12 to open the Strategy readout; click it again to close
+
+**Valid when:**
+- In game (not the menu or the generation screen)
+
+**Expected output.** The Strategy readout opens in the shell fold-out column, closing whatever ledger was open (the column holds one occupant). It aggregates each corporation's strategic decisions over a rolling 64-quarter window: with no corp selected, one must-have/should-have/nice-to-have bucket-split bar per corporation; with a corp selected, its bucket split quarter by quarter (a stacked band), its verb mix, and its reason tally. Score and margin figures are deliberately absent (candidates sort by priority bucket before score, so raw margins do not aggregate honestly). Clicking the slot while the readout is already open closes it (standing toggle rule).
+
+**Reason to select.** To see WHAT STRATEGY IS EMERGING rather than the individual moves - the decision feed lists the moves; this shows the shape of a run. A corp living in must-have is defending its solvency; one living in nice-to-have is expanding unopposed.
+
+### `ledger.strategy_readout_select_corp` — Strategy readout, corporation selector
+
+**Press.** Select a corporation from the readout's corp selector, or "All"
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `corp` | `entity id or "all"` | "all" shows the per-corp bucket-split comparison; a corporation shows its full profile (bucket band by quarter, verb mix, reason tally) |
+
+**Valid when:**
+- Strategy readout is open
+
+**Expected output.** The view switches between the all-corporations comparison and one corporation's full profile. The selection persists across selection changes elsewhere in the game - clicking a tile does not clear it.
+
+**Reason to select.** The comparison answers 'who is winning the run and how'; the single-corp profile answers 'what is this corp's strategy made of'. Two different questions over the same window.
+
 ---
 
 ## Chrome — startup, the system menu, settings, F-keys
@@ -1831,6 +1896,17 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Expected output.** Toggles simulation pause via the same pause_toggle path as the Space hotkey. Resuming restores the previous speed tier. The button label flips accordingly.
 
 **Reason to select.** To halt or resume the simulation clock from the mouse-driven session menu.
+
+### `chrome.sysmenu_god_view` — System menu popup, spectate-only checkbox
+
+**Press.** Toggle the God view checkbox. Rendered only while spectating (corp_ai_params::spectating); unreachable in a played session by construction.
+
+**Valid when:**
+- App is in game; the system menu popup is open; the session is spectating (BL-409).
+
+**Expected output.** While on, competitor-visibility redactions lift for the WATCHER only: rival building internals (production, stockpile, profitability read-only page), corp cash/reserve facts, and the survey tell (unsurveyed tiles render through a lock-colour wash so the corp's own blindness stays visible). Off restores the BL-068 redactions with no residue. Never changes what any AI reads; the rival action grid stays disabled - sight, never hands.
+
+**Reason to select.** To audit a watched corp's decisions against what it actually knew, held and ran - honest watching vs omniscient watching is a deliberate, visible state (BL-408).
 
 ### `chrome.tech_tree_era_tab` — Tech-tree viewer (F9), era tab strip
 

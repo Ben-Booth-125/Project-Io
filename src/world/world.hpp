@@ -3,6 +3,8 @@
 #include "components.hpp"
 #include "corp_command.hpp" // corp_decision_ring (BL-202 strategic decision log)
 #include "law.hpp"          // law (BL-343 enacted-law list, below)
+#include "modifier_set.hpp" // scalar_modifier (BL-479 per-corp tech effects, below)
+#include "province.hpp"     // province_partition (BL-466 province partition, below)
 
 #include <cstdint>
 #include <map>
@@ -235,6 +237,29 @@ struct world
     /// ring, this is meant to grow for the life of a campaign.
     std::vector<world_history_entry> history_log;
 
+    /// The province partition (BL-466) — every body's land tiles carved into
+    /// small, contiguous, purely spatial cells. Built once at the end of
+    /// `make_hard_coded_world` from the world seed and the finished tile map;
+    /// derived, but STORED, because BL-467 folds a province id into a battle's
+    /// seed stream and a battle must not be re-identified by a lazy rebuild.
+    /// Walk it in ascending `province::id` — that order is the contract, not an
+    /// implementation detail (see province.hpp). It joins the flat-binary
+    /// serialisation seam as the TRAILING section of the history-log stream, so
+    /// a stream written before BL-466 is still a valid prefix.
+    /// NOT folded into `state_hash`, and that is deliberate rather than an
+    /// oversight (the omission corp_modifiers documents, documented here too
+    /// after NR-401 asked). `state_hash` folds the fields a TICK may mutate, so a
+    /// divergence in it means the simulation diverged; the partition is
+    /// generation output and never moves once built, so including it would make
+    /// every tick hash carry a constant. Its determinism is checked where it
+    /// belongs — `determinism_harness` compares the partition field-for-field
+    /// across two generations of the same seed, and
+    /// `province_partition_harness` P6/P7 recompute it from the stored seed.
+    /// This matters more than it reads: BL-467 folds a province id into a
+    /// battle seed, so a silent partition regression would move battle
+    /// outcomes.
+    province_partition provinces;
+
     /// Proximity-glimpse stamps (BL-099) — the sim day tick at which a player convoy
     /// last passed within `glimpse_radius_au_default` (AU) of this body while completing
     /// an inter-body lane. Sampled once at the discrete completion tick by
@@ -292,6 +317,46 @@ struct world
     {
         const auto it = earned_techs.find(corp);
         return it != earned_techs.end() && it->second.count(tech_id) != 0;
+    }
+
+    /// Scalar modifiers each corporation has been granted by earned techs'
+    /// `modify_scalar` effects (BL-479; laws join via BL-480). Per-corp and
+    /// append-ordered: `advance_tech_gates` appends a tech's effects at the
+    /// earn moment, in gate-table order, so the fold order below is the earn
+    /// order and is deterministic. DERIVED state — recomputable from
+    /// `earned_techs` × the gate table — so it is deliberately NOT folded into
+    /// `state_hash`: the canonical fact is the earned set, and hashing a cache
+    /// of it would only double-count. `std::map` for deterministic iteration
+    /// (the `corp_body_pools` rationale). Empty at world setup, and stays
+    /// empty for the life of any world whose techs carry only
+    /// unlock_structure — which is what keeps such a world bit-identical to
+    /// the pre-BL-479 build.
+    std::map<entity_id, std::vector<scalar_modifier>> corp_modifiers;
+
+    /// `base` with every modifier `corp` holds on `subject` folded in, in
+    /// stored (earn) order. THE single read point for the effect side, as
+    /// `has_tech` is for the earned set — an economy read site asks this and
+    /// nothing else, so two sites cannot fold differently.
+    ///
+    /// Returns `base` UNTOUCHED — the same bits, no arithmetic performed —
+    /// when `corp` is `null_entity`, holds no modifiers, or holds none on this
+    /// subject. That is the R1 guarantee: a world with no modify_scalar tech
+    /// pays nothing and drifts nowhere.
+    ///
+    /// @param corp    Corporation whose modifiers apply (`null_entity` = none).
+    /// @param subject The scalar being read.
+    /// @param base    The unmodified value the call site computed.
+    /// @return        The modified value (== `base` when nothing applies).
+    float modified_scalar(entity_id corp, modifier_subject subject, float base) const
+    {
+        const auto it = corp_modifiers.find(corp);
+        if (it == corp_modifiers.end())
+            return base;
+        float v = base;
+        for (const scalar_modifier& m : it->second)
+            if (m.subject == subject)
+                v = apply_scalar_modifier(v, m);
+        return v;
     }
 
     /// Per-body market index (BL-356): body -> its markets in ascending id order.

@@ -65,10 +65,11 @@ struct corp_budget
     float interest    = 0.0f; ///< BL-073: charged only while balance < 0.
 
     /// BL-343: levies charged by enacted laws this tick — today, the extraction
-    /// levy (a per-unit charge on raw output). Zero unless a law is enacted that
-    /// reaches this corp, which is the shipped default. This is the line that
-    /// makes a law OBSERVABLE: a law the player cannot see working is
-    /// indistinguishable from an unimplemented one.
+    /// levy (a per-unit charge on raw output). Since BL-480 the charge is a
+    /// TRANSFER into the enacting nation's treasury, bounded by that nation's
+    /// jurisdiction — zero for a corp whose extraction stands outside it. This
+    /// is the line that makes a law OBSERVABLE: a law the player cannot see
+    /// working is indistinguishable from an unimplemented one.
     float levies      = 0.0f;
 
     /// BL-454: standing-force upkeep — the CREDIT half of what it costs to keep
@@ -342,13 +343,26 @@ recipe_switch_result try_switch_recipe(world& w, const recipe_registry& reg,
 ///
 /// Exported for the estimator; the taper and the stack decay are NOT in it.
 ///
+/// BL-479: the owning corp's earned `extraction_rate` modifiers are folded in
+/// HERE (`world::modified_scalar`), inside the single definition, so the taper
+/// sizing and the draw cannot disagree about a modified corp's rate. `corp` is
+/// defaulted to `null_entity` = "apply no corp's modifiers" — the pre-BL-479
+/// figure, byte for byte — which is what the estimator call sites (the Build
+/// door's stack-member pricing, generation's body-production census) still
+/// pass: no shipped tech carries a modifier yet, and pricing a PROSPECT under
+/// another owner's buff would be wrong anyway. The two live tick sites
+/// (run_extraction, the stack taper pre-pass) pass the real owner.
+///
 /// @param w          Read-only world state.
 /// @param reg        Loaded recipe/economy registry.
 /// @param b          The extraction site (its tile supplies richness and hazard).
 /// @param contention The (corp, body) labour-contention scalar to apply.
+/// @param corp       Owning corp, for its earned extraction_rate modifiers;
+///                   `null_entity` applies none (every estimator's default).
 /// @return           Units per tick, before stack decay and before depletion taper.
 float extraction_nominal(const world& w, const recipe_registry& reg,
-                         const building_component& b, float contention);
+                         const building_component& b, float contention,
+                         entity_id corp = null_entity);
 
 /// The BL-181 per-building workforce-dial solver: the workforce target (0–200,
 /// step 10) that maximises this building's estimated net this tick against the

@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*127 entries — 79 open, 48 resolved.*
+*209 entries — 151 open, 58 resolved.*
 
 ---
 
@@ -38,20 +38,20 @@ Ben wants to re-stress-test world generation and the staged-generation time-laps
 *Files: `docs/ui/STARTUP.md`*
 
 ### NR-237 — BL-286 added eleven resource_type values the Lua loader could not parse, and nothing noticed for eleven days
-*observation · raised 2026-08-15 · from BL-429's ancient chain — the first authored recipe to reference a BL-286 good.*
+*observation · raised 2026-08-15 · from BL-429's ancient chain â€” the first authored recipe to reference a BL-286 good.*
 
 recipe_registry.cpp's resource_from_name table claims in its own comment to cover 'the full enum so recipes outside the prototype subset load without a retrofit'. It did not: grain, fodder, salt, transport_capacity, charcoal, iron_blooms, bullion and trade_goods_misc were all missing, so ANY recipe naming one threw 'Unknown resource' at load. Added them while landing BL-429.
 
-**Why it matters.** The defect was invisible because it needed an authored recipe to trigger it, and BL-286 deliberately shipped enum + serialisation + base-price wiring with the behaviours 'unfiled' — so nothing consumed the new goods and nothing exercised the parse path. The failure mode is the one this project keeps meeting from a different direction: a data layer that is only ever validated by the data currently authored against it. Note the loader DID behave correctly once reached (it threw and named the value); the gap was that nothing reached it.
+**Why it matters.** The defect was invisible because it needed an authored recipe to trigger it, and BL-286 deliberately shipped enum + serialisation + base-price wiring with the behaviours 'unfiled' â€” so nothing consumed the new goods and nothing exercised the parse path. The failure mode is the one this project keeps meeting from a different direction: a data layer that is only ever validated by the data currently authored against it. Note the loader DID behave correctly once reached (it threw and named the value); the gap was that nothing reached it.
 
-> **Recommendation:** No action needed on the fix itself — it landed with BL-429. The question worth your call is whether BL-432's roster harness should assert the parse map covers resource_count, which would catch the next such gap at the moment the enum grows rather than whenever someone first authors against it. Cheap, and it is the same shape as BL-432's existing 'no orphan resources' row.
+> **Recommendation:** No action needed on the fix itself â€” it landed with BL-429. The question worth your call is whether BL-432's roster harness should assert the parse map covers resource_count, which would catch the next such gap at the moment the enum grows rather than whenever someone first authors against it. Cheap, and it is the same shape as BL-432's existing 'no orphan resources' row.
 
 *Files: `src/world/recipe_registry.cpp`*
 
-### NR-238 — A slow gate looked like a regression twice in one session — the two-line diagnostic that settled it
+### NR-238 — A slow gate looked like a regression twice in one session â€” the two-line diagnostic that settled it
 *observation · raised 2026-08-15 · from Trying to get a full-suite green before opening PR #39 (Sprint 17).*
 
-Three generation sweeps (earthlike_lean_trace, notable_worlds, mediterranean_sweep) ran past 15 minutes without finishing and looked like a performance regression from BL-428/BL-429. They were not. Two cheap checks settled it: (1) build/Testing/Temporary/CTestCostData.txt records ctest's per-test durations from previous runs — the missing baseline, showing these three at 16.5s / 22.2s / 20.1s; (2) world_audit.exe, a STALE binary dated 16:55 that predates the work entirely and could not contain the change, took 14s against its own 0.92s baseline. A ~15x slowdown on an untouched binary is environmental, not a regression.
+Three generation sweeps (earthlike_lean_trace, notable_worlds, mediterranean_sweep) ran past 15 minutes without finishing and looked like a performance regression from BL-428/BL-429. They were not. Two cheap checks settled it: (1) build/Testing/Temporary/CTestCostData.txt records ctest's per-test durations from previous runs â€” the missing baseline, showing these three at 16.5s / 22.2s / 20.1s; (2) world_audit.exe, a STALE binary dated 16:55 that predates the work entirely and could not contain the change, took 14s against its own 0.92s baseline. A ~15x slowdown on an untouched binary is environmental, not a regression.
 
 **Why it matters.** The same wrong conclusion nearly got drawn twice in one session, each time for a different reason - first because two ctest instances were left contending (the exact failure Sprint 6's retro already recorded), then because the box itself was slow. Both times the tempting response was to go hunting in the diff. The general lesson is cheaper than any of that: BEFORE attributing a slowdown to a change, time something the change cannot possibly have touched. If that is slow too, stop looking at the diff. CTestCostData.txt is worth knowing about independently - the gate had no trusted baseline time until it turned up, which is why a slow run and a hung run were indistinguishable.
 
@@ -59,25 +59,25 @@ Three generation sweeps (earthlike_lean_trace, notable_worlds, mediterranean_swe
 
 *Files: `build/Testing/Temporary/CTestCostData.txt`, `.claude/skills/verifier-headless/SKILL.md`*
 
-### NR-240 — BL-429 slice 2's C++ changes were authored and reviewed but never compiled — remote session network policy
+### NR-240 — BL-429 slice 2's C++ changes were authored and reviewed but never compiled â€” remote session network policy
 *observation · raised 2026-08-15 · from BL-429 slice 2, run in a Claude Code remote/cloud session rather than the usual Windows dev box.*
 
-cmake -B build's SDL3/sol2/ImGui FetchContent steps all pull from codeload.github.com, which this session's outbound network policy returns a 403 for (confirmed an organization policy denial via /root/.ccr/README.md, not a transient TLS fault — retrying or routing around it is explicitly the wrong move). Lua changes (recipes.lua) were syntax-checked with luac5.4 -p and pass; the C++ changes (recipe_registry.hpp/.cpp, placement_rules.hpp, selection_panel.cpp, construction_panel.cpp) were manually re-read against every call site of the touched fields (recipe::name vs the new recipe::display_name; k_extractable's size assertions) but no compiler ever saw them.
+cmake -B build's SDL3/sol2/ImGui FetchContent steps all pull from codeload.github.com, which this session's outbound network policy returns a 403 for (confirmed an organization policy denial via /root/.ccr/README.md, not a transient TLS fault â€” retrying or routing around it is explicitly the wrong move). Lua changes (recipes.lua) were syntax-checked with luac5.4 -p and pass; the C++ changes (recipe_registry.hpp/.cpp, placement_rules.hpp, selection_panel.cpp, construction_panel.cpp) were manually re-read against every call site of the touched fields (recipe::name vs the new recipe::display_name; k_extractable's size assertions) but no compiler ever saw them.
 
-**Why it matters.** This is the first time a Project Io session has landed C++ source changes with zero compiler verification. The manual review was as thorough as a human diff review gets, but it cannot catch what a compiler catches — a typo'd member name, a missing include, an ambiguous overload. The next session with real toolchain access should treat this diff as unverified until `cmake --build` and the relevant headless harnesses (chain_depth, buildings_rework_harness, resource_chain_harness) run clean against it.
+**Why it matters.** This is the first time a Project Io session has landed C++ source changes with zero compiler verification. The manual review was as thorough as a human diff review gets, but it cannot catch what a compiler catches â€” a typo'd member name, a missing include, an ambiguous overload. The next session with real toolchain access should treat this diff as unverified until `cmake --build` and the relevant headless harnesses (chain_depth, buildings_rework_harness, resource_chain_harness) run clean against it.
 
-> **Recommendation:** At the next native/Windows session: build ProjectIo, run buildings_rework_harness and chain_depth at minimum (both exercise k_extractable / recipe additions directly), and open the Build door on an ancient-band tile to confirm the new names render. Fix on sight if anything fails — this is expected verification work, not a surprise.
+> **Recommendation:** At the next native/Windows session: build ProjectIo, run buildings_rework_harness and chain_depth at minimum (both exercise k_extractable / recipe additions directly), and open the Build door on an ancient-band tile to confirm the new names render. Fix on sight if anything fails â€” this is expected verification work, not a surprise.
 
 *Files: `src/world/recipe_registry.hpp`, `src/world/recipe_registry.cpp`, `src/world/placement_rules.hpp`, `src/ui/selection_panel.cpp`, `src/ui/construction_panel.cpp`*
 
-### NR-241 — BL-429's 14 new glyphs are geometrically reasoned but visually unverified — same root cause as NR-240
+### NR-241 — BL-429's 14 new glyphs are geometrically reasoned but visually unverified â€” same root cause as NR-240
 *observation · raised 2026-08-15 · from Closing BL-429's glyph gap (NR-239) in the same remote session as slice 2, same network limitation.*
 
 14 new icons::building() shapes (quarry_stone, woodcutter_timber, sand_pit, clay_pit, peat_cutting, iron_mine, copper_mine, water_extractor, farm, charcoal_kiln, bloomery, smithy_ingot, goods_bundle, ration_pack) were authored against ImGui's AddConvexPolyFilled/AddLine/AddCircleFilled primitives, with vertex lists hand-checked for angular ordering (a simple, non-self-intersecting perimeter) but never rendered. Silhouette-distinctness from each other and from the existing vocabulary (ore_chunk, square, triangle, hub_node, shield, research) was reasoned by shape family (boulder vs crystal vs dune vs sack vs ...), not by looking at them side by side, which is the actual bar ICONS.md's own 'Adding a new glyph' process sets ('a glance should disambiguate').
 
-**Why it matters.** Vector icon code is exactly the kind of change where 'compiles' and 'looks right' are different questions — a convex-poly vertex list can be syntactically fine and still render as a squashed or overlapping mess at real icon size (r as small as 9px in the Build door). Geometric review from source alone cannot catch that; only rendering can.
+**Why it matters.** Vector icon code is exactly the kind of change where 'compiles' and 'looks right' are different questions â€” a convex-poly vertex list can be syntactically fine and still render as a squashed or overlapping mess at real icon size (r as small as 9px in the Build door). Geometric review from source alone cannot catch that; only rendering can.
 
-> **Recommendation:** At the next session with a real GUI build: open the Build door on an ancient-band tile (all 14 shapes appear across extraction/processing rows), the Buildings tab identity plate, and the Planetary canvas marker for a built ancient building. Check each shape reads at its actual on-screen size, not just at a zoomed mental model of the coordinates. Fix proportions on sight — nothing here is expected to be exactly right first try.
+> **Recommendation:** At the next session with a real GUI build: open the Build door on an ancient-band tile (all 14 shapes appear across extraction/processing rows), the Buildings tab identity plate, and the Planetary canvas marker for a built ancient building. Check each shape reads at its actual on-screen size, not just at a zoomed mental model of the coordinates. Fix proportions on sight â€” nothing here is expected to be exactly right first try.
 
 *Files: `src/ui/icons.cpp`, `src/ui/icons.hpp`*
 
@@ -86,7 +86,7 @@ cmake -B build's SDL3/sol2/ImGui FetchContent steps all pull from codeload.githu
 
 corp_ai.cpp's dial_recipe margin-chase (run_corp_strategic_step) scores a recipe switch purely on projected margin gain; it does not subtract economy.recipe_switch's switch_cost, and does not check the target building's recipe_switch_cooldown before proposing a candidate. The decision taken: do NOT build cost/cooldown-aware AI scoring in this pass. The seam itself (corp_command's set_recipe verb, through try_switch_recipe in economy_system.cpp) still enforces both at apply time -- a candidate that would be rejected on cooldown or insufficient funds is simply refused, mutating nothing, exactly as the seam already handles every other reason a corp_ai candidate can fail. So the AI is not exploitable and nothing is unsafe; it just occasionally proposes (and loses a decision slot to) a switch that will bounce.
 
-**Why it matters.** Scoped explicitly per BL-430 design ruling �-- widening corp_ai.cpp scoring to price in the switch cost/cooldown is real new planner scope (a projected-gain-minus-cost comparison, plus a cooldown pre-filter), not a small follow-on to this item. Left as a stated call rather than a silent gap.
+**Why it matters.** Scoped explicitly per BL-430 design ruling ï¿½-- widening corp_ai.cpp scoring to price in the switch cost/cooldown is real new planner scope (a projected-gain-minus-cost comparison, plus a cooldown pre-filter), not a small follow-on to this item. Left as a stated call rather than a silent gap.
 
 - A) Leave as-is: the seam-level gate is the safety property that matters; a slightly wasteful candidate is cheap.
 - B) File a small follow-on backlog item scoped to pricing dial_recipe candidates against switch_cost and pre-filtering on recipe_switch_cooldown > 0.
@@ -110,47 +110,47 @@ The guard groups recipes by (primary output, era band) -- the set genuinely inte
 
 *Files: `tools/verify/recipe_switch_harness.cpp`, `scripts/recipes.lua`*
 
-### NR-244 — BL-431 production method/chain/depth UI has no executable check yet — visual read owed live
-*decision taken on your behalf · raised 2026-08-15 · from BL-431 delivery session — sub-agent had no display access, so the C++ was built and verified by compile only.*
+### NR-244 — BL-431 production method/chain/depth UI has no executable check yet â€” visual read owed live
+*decision taken on your behalf · raised 2026-08-15 · from BL-431 delivery session â€” sub-agent had no display access, so the C++ was built and verified by compile only.*
 
-Three new Selection-panel surfaces landed (src/ui/selection_panel.cpp: draw_production_method_section, draw_chain_trace_section/draw_chain_trace, draw_depth_readout, plus the ui_state toggles selection_method_open/selection_chain_open/selection_chain_target/selection_depth_open). The GUI target (ProjectIo.exe) built clean with no new warnings from selection_panel.cpp. A requirement group was filed (req/requirements.json, brief production-method-chain-ui, 3 rows, status active) but no scripts/verify/*.lua or tools/verify/*.cpp was authored to back it — the sub-agent had no way to run either kind of check in its context.
+Three new Selection-panel surfaces landed (src/ui/selection_panel.cpp: draw_production_method_section, draw_chain_trace_section/draw_chain_trace, draw_depth_readout, plus the ui_state toggles selection_method_open/selection_chain_open/selection_chain_target/selection_depth_open). The GUI target (ProjectIo.exe) built clean with no new warnings from selection_panel.cpp. A requirement group was filed (req/requirements.json, brief production-method-chain-ui, 3 rows, status active) but no scripts/verify/*.lua or tools/verify/*.cpp was authored to back it â€” the sub-agent had no way to run either kind of check in its context.
 
 **Why it matters.** The three rows are exactly the kind of thing Rule 0b and the standing verifier skills exist for: R1 (method selector layout doesn't push the profitability/workforce controls off screen) needs verifier-visual against a live capture; R2 (chain trace never disagrees with depth_of) and R3 (corp_reached_depth <= max_depth()) are both cheap headless assertions over recipe_registry, straightforward for verifier-headless. Landing the UI without landing its own check leaves BL-431 the one item in the recent BL-428/429/430/431 cluster without an automated guard.
 
 - A) Open the live app (per the standing 'open the app after visual questions' practice), eyeball the Method/Chain/Depth sections on a stacked ancient-band tile, then author scripts/verify/selection_method_chain.lua + a small tools/verify/chain_trace_agreement.cpp and flip both requirement rows to complete.
 - B) Accept the compile-only verification for this session and file the two harnesses as their own small backlog items instead of blocking on them now.
 
-> **Recommendation:** A — the surfaces are dense (three toggles stacked in an already-tight Facts column) and are exactly the case Rule 0b calls out as needing real numbers, not a guess.
+> **Recommendation:** A â€” the surfaces are dense (three toggles stacked in an already-tight Facts column) and are exactly the case Rule 0b calls out as needing real numbers, not a guess.
 
 *Files: `src/ui/selection_panel.cpp`, `docs/development/req/requirements.json`, `docs/ui/SELECTION.md`*
 
-### NR-248 — Profitability chart's Revenue/Expenses split is as fine as building_profit.hpp gets — no revenue sub-breakdown exists
+### NR-248 — Profitability chart's Revenue/Expenses split is as fine as building_profit.hpp gets â€” no revenue sub-breakdown exists
 *observation · raised 2026-08-15 · from Playtest-driven building-card rework (2026-08-15): Ben asked for a Revenue-vs-Expenses bar chart on the Profitability page.*
 
-building_profit (src/world/building_profit.hpp) tracks exactly four numbers: revenue (one pooled valuation of this tick's output at market price), input_cost, maintenance, wages. There is no per-resource or per-line revenue breakdown to chart — the pooled market resists exact per-building attribution even for the ONE revenue figure that exists, per the struct's own doc comment. draw_building_profit's new chart therefore plots Revenue against Expenses := input_cost + maintenance + wages, the finest real split the data supports, rather than inventing sub-categories.
+building_profit (src/world/building_profit.hpp) tracks exactly four numbers: revenue (one pooled valuation of this tick's output at market price), input_cost, maintenance, wages. There is no per-resource or per-line revenue breakdown to chart â€” the pooled market resists exact per-building attribution even for the ONE revenue figure that exists, per the struct's own doc comment. draw_building_profit's new chart therefore plots Revenue against Expenses := input_cost + maintenance + wages, the finest real split the data supports, rather than inventing sub-categories.
 
-**Why it matters.** Flagged per Rule 0b/the standing 'measure before reshaping' practice — this is a real data-availability ceiling, not an implementation shortcut. A finer revenue/expense breakdown (e.g. per-resource revenue, wages vs maintenance as separate bars) would need building_profit itself to track more, not just a UI change.
+**Why it matters.** Flagged per Rule 0b/the standing 'measure before reshaping' practice â€” this is a real data-availability ceiling, not an implementation shortcut. A finer revenue/expense breakdown (e.g. per-resource revenue, wages vs maintenance as separate bars) would need building_profit itself to track more, not just a UI change.
 
 - A) Leave as-is: Revenue vs Expenses is honest and matches the finest split building_profit tracks.
-- B) Extend building_profit to keep wages/maintenance/input_cost as a genuinely separate 3-bar expense breakdown alongside Revenue, if a future pass wants it (input_cost and maintenance+wages are already separate fields, so this is a small UI change, not a data change — only a true revenue sub-breakdown needs new tracking).
+- B) Extend building_profit to keep wages/maintenance/input_cost as a genuinely separate 3-bar expense breakdown alongside Revenue, if a future pass wants it (input_cost and maintenance+wages are already separate fields, so this is a small UI change, not a data change â€” only a true revenue sub-breakdown needs new tracking).
 
 > **Recommendation:** A for now. If the Profitability page's 2-bar chart reads as too coarse once played more, B's expense 3-way split is cheap (the fields already exist); a revenue sub-breakdown is not.
 
 *Files: `src/world/building_profit.hpp`, `src/ui/selection_panel.cpp`*
 
-### NR-249 — No per-building profit history exists — the Profitability page's 6-month net-profit line is a placeholder series, same constraint as the old Workforce trend graph
+### NR-249 — No per-building profit history exists â€” the Profitability page's 6-month net-profit line is a placeholder series, same constraint as the old Workforce trend graph
 *observation · raised 2026-08-15 · from Playtest-driven building-card rework (2026-08-15): Ben asked for a line chart of net profit over the last 6 months.*
 
 No time-series profit history is recorded per building anywhere in the simulation (the same gap draw_building_workforce_page's pre-existing placeholder trend graph already lived with). draw_building_profit's new 'Net, 6 mo.' PlotLines chart reuses that same honest-placeholder idiom: a smooth deterministic series anchored to the live net-profit estimate, 6 points rather than the workforce graph's 9, with no claim to be real history.
 
 **Why it matters.** Two placeholder trend graphs now exist on the same card (Profitability's Net line, Workforce's target trend) for the identical reason: nothing records per-building history over time. If BL-something eventually adds a real per-building time series (the way body/corp-level history is tracked elsewhere), both should switch to it together rather than one getting fixed and the other staying a placeholder.
 
-> **Recommendation:** No action needed now — noted so a future per-building-history item knows to sweep both graphs, not just the one it was written against.
+> **Recommendation:** No action needed now â€” noted so a future per-building-history item knows to sweep both graphs, not just the one it was written against.
 
 *Files: `src/ui/selection_panel.cpp`*
 
 ### NR-250 — Profitability page vertical budget for the Inputs chart is a fixed judgment-call clamp, not a measured fit
-*decision taken on your behalf · raised 2026-08-15 · from Playtest reflow (2026-08-15): Ben asked the Profitability page to fit one screen — bars+line row left 1/3 / right 2/3, Inputs chart below.*
+*decision taken on your behalf · raised 2026-08-15 · from Playtest reflow (2026-08-15): Ben asked the Profitability page to fit one screen â€” bars+line row left 1/3 / right 2/3, Inputs chart below.*
 
 draw_building_profit budgets vertical space as: inputs_h = clamp(total_h*0.24, 46, 70) when a recipe applies, top_h = max(70, total_h - inputs_h - label_h - spacing). These numbers were picked to look right at typical accordion heights, not measured against the worst case (a recipe with many inputs widens draw_input_basket_chart's columns down to a floor, but the STRIP HEIGHT stays fixed regardless of item count).
 
@@ -189,18 +189,18 @@ economy.recipe_switch.cooldown_ticks changed from 6 to 1 (one econ tick, ~90 day
 ### NR-254 — Build door passed a BROWSE recipe index where construct_building expects an ABSOLUTE id
 *observation · raised 2026-08-16 · from Found while wiring BL-428 chain-depth gate, which needed candidate.recipe to mean what it says.*
 
-selection_panel.cpp built its processing candidates with `static_cast<uint16_t>(ri)`, where `ri` is the loop index over reg.recipe_count()/recipe_at() — the BL-433 era-MASKED browse path. That value flowed unchanged into ui.construction.pending_recipe and from there into construct_building, whose `recipe` parameter is indexed ABSOLUTELY (the get_recipe/recipe_id space). Two sibling call sites in the same file (the Method selector, ~line 847/894) already did the right thing via reg.recipe_id(ri.name); the build door did not. Fixed this pass: candidate.recipe now stores reg.recipe_id(browsed.name), and the two readers that indexed it as a browse position (the group lookup and the output-pip lookup) were moved onto get_recipe.
+selection_panel.cpp built its processing candidates with `static_cast<uint16_t>(ri)`, where `ri` is the loop index over reg.recipe_count()/recipe_at() â€” the BL-433 era-MASKED browse path. That value flowed unchanged into ui.construction.pending_recipe and from there into construct_building, whose `recipe` parameter is indexed ABSOLUTELY (the get_recipe/recipe_id space). Two sibling call sites in the same file (the Method selector, ~line 847/894) already did the right thing via reg.recipe_id(ri.name); the build door did not. Fixed this pass: candidate.recipe now stores reg.recipe_id(browsed.name), and the two readers that indexed it as a browse position (the group lookup and the output-pip lookup) were moved onto get_recipe.
 
-**Why it matters.** The two id spaces coincide exactly while the era mask is the identity, which is every any-band campaign — so this was invisible in normal play and would have stayed invisible. In an ANCIENT campaign the mask hides the industrial recipes, browse index k names a different recipe than absolute id k, and placing a building from the Build door seeds it with the wrong recipe. Ancient campaigns are precisely the content BL-429/BL-430/BL-431 have been building out. No harness caught it because no harness drives the Build door under a non-identity mask.
+**Why it matters.** The two id spaces coincide exactly while the era mask is the identity, which is every any-band campaign â€” so this was invisible in normal play and would have stayed invisible. In an ANCIENT campaign the mask hides the industrial recipes, browse index k names a different recipe than absolute id k, and placing a building from the Build door seeds it with the wrong recipe. Ancient campaigns are precisely the content BL-429/BL-430/BL-431 have been building out. No harness caught it because no harness drives the Build door under a non-identity mask.
 
-> **Recommendation:** Fixed. The residual question is whether the browse/absolute split wants a TYPE (a distinct browse_index struct) rather than two uint16_t spaces that convert silently — this is the second time the split has bitten (BL-433 called it out in recipe_registry.hpp and still shipped a raw uint16_t). Worth a small backlog item if a third instance appears.
+> **Recommendation:** Fixed. The residual question is whether the browse/absolute split wants a TYPE (a distinct browse_index struct) rather than two uint16_t spaces that convert silently â€” this is the second time the split has bitten (BL-433 called it out in recipe_registry.hpp and still shipped a raw uint16_t). Worth a small backlog item if a third instance appears.
 
 *Files: `src/ui/selection_panel.cpp`, `src/world/recipe_registry.hpp`*
 
 ### NR-256 — --autostart-play still terminates unattended, cause not established
 *observation · raised 2026-08-16 · from Three unattended launches while adding the flag (commit e4a087a).*
 
---autostart-play removes --autostart-windowed's 120-frame cap so the window stays open for a human to look at. It works interactively — Ben used it and reported on what he saw. But launched unattended from a background shell it has terminated on its own three times, at roughly 20s, 34s and ~60s: exit code 0, no crash log, no exception, output simply ending after the warm-start timings. The frame cap is definitely not the cause (it is gated on autostart_mode::smoke and the variable timing rules it out anyway). run()'s loop has only three exits: SDL_EVENT_QUIT, SDL_EVENT_WINDOW_CLOSE_REQUESTED, and m_quit_requested, so something is delivering a close.
+--autostart-play removes --autostart-windowed's 120-frame cap so the window stays open for a human to look at. It works interactively â€” Ben used it and reported on what he saw. But launched unattended from a background shell it has terminated on its own three times, at roughly 20s, 34s and ~60s: exit code 0, no crash log, no exception, output simply ending after the warm-start timings. The frame cap is definitely not the cause (it is gated on autostart_mode::smoke and the variable timing rules it out anyway). run()'s loop has only three exits: SDL_EVENT_QUIT, SDL_EVENT_WINDOW_CLOSE_REQUESTED, and m_quit_requested, so something is delivering a close.
 
 **Why it matters.** Two candidate causes and I could not separate them from this session: (a) a genuine stray quit/window-close event in the autostart path, which would be a real defect, or (b) the background-shell environment reaping a GUI process whose launching shell is not interactive, which would make the flag fine in real use and only untestable the way I was testing it. The interactive evidence points at (b), but 'it worked when a human was watching' is not a diagnosis. Worth settling before anyone relies on this flag for an unattended soak or a long-running capture.
 
@@ -235,7 +235,7 @@ The axis did not need inventing: scripts/recipes.lua already states it twice in 
 
 *Files: `tools/verify/chain_depth.cpp`, `tools/verify/recipe_switch_harness.cpp`, `scripts/recipes.lua`*
 
-### NR-259 — player_seed_sweep had never once passed under ctest — a 60s timeout on a 69s tool, silent because a Timeout looks like nothing
+### NR-259 — player_seed_sweep had never once passed under ctest â€” a 60s timeout on a 69s tool, silent because a Timeout looks like nothing
 *observation · raised 2026-08-16 · from The full 78-test ctest run done to verify NR-257's resource_type removal.*
 
 player_seed_sweep was added 2026-08-15/16 and registered in CMakeLists.txt's IO_TEST_SCRIPT_ROOTED_HARNESSES (so it gets the repo root as its working directory) but NOT in IO_TEST_LONG_HARNESSES, so it inherited the 60 s default timeout. It generates one full world per seed, 24 by default, and takes ~69 s on this box. It therefore timed out on every ctest run from the day it was added, while passing perfectly standalone - which is how it was used, and why nobody noticed. Fixed by adding it to IO_TEST_LONG_HARNESSES (240 s, ~3.5x headroom); it now passes at 71.8 s.
@@ -246,12 +246,12 @@ player_seed_sweep was added 2026-08-15/16 and registered in CMakeLists.txt's IO_
 
 *Files: `CMakeLists.txt`, `.claude/skills/verifier-headless/SKILL.md`*
 
-### NR-261 — BL-422: held stock stays visible to the price signal, against the item's own stated default — the alternative is a fixed point
-*decision taken on your behalf · raised 2026-08-16 · from BL-422 design: "Decide whether the supply-side price signal should still see held stock (an argument exists both ways) — default to NOT visible, matching the reservation semantics BL-386 established."*
+### NR-261 — BL-422: held stock stays visible to the price signal, against the item's own stated default â€” the alternative is a fixed point
+*decision taken on your behalf · raised 2026-08-16 · from BL-422 design: "Decide whether the supply-side price signal should still see held stock (an argument exists both ways) â€” default to NOT visible, matching the reservation semantics BL-386 established."*
 
 The default was NOT adopted, and the reason is mechanical rather than a preference. Whether an order holds is decided by comparing its floor to the RESOLVED price; the resolved price is computed FROM market_component::supply (resolve_price(price, base, supply, demand)). Removing held quantity from supply raises the resolved price, which can un-hold the very order that was removed, which puts its stock back into supply. Reaching a consistent answer means iterating to a fixed point inside clear_markets. So the two arrays are now deliberately asymmetric and MARKETS.md says so in as many words: supply is the OFFER (listed stock is a real offer at a price), inventory is the DELIVERY (only what actually changed hands). Only the inventory half of BL-422 was implemented.
 
-**Why it matters.** The phantom-BUYING defect is fully fixed — no processor can draw stock a seller never released. What remains is a pricing nicety: a held order still depresses the resolved price by appearing as supply, which in a thin market can hold the price below the floor that caused the hold, so an order can hold itself down. That is a real (if second-order) feedback loop and Ben may judge it worth the iteration cost; it is not worth spending determinism risk on unmeasured.
+**Why it matters.** The phantom-BUYING defect is fully fixed â€” no processor can draw stock a seller never released. What remains is a pricing nicety: a held order still depresses the resolved price by appearing as supply, which in a thin market can hold the price below the floor that caused the hold, so an order can hold itself down. That is a real (if second-order) feedback loop and Ben may judge it worth the iteration cost; it is not worth spending determinism risk on unmeasured.
 
 > **Recommendation:** Leave as implemented. If it is to be revisited, the cheap first step is a measurement rather than a fix: count how often a held order is the marginal supply that keeps the price below its own floor. File as a follow-on to BL-422 if that count is non-trivial.
 
@@ -262,16 +262,16 @@ The default was NOT adopted, and the reason is mechanical rather than a preferen
 
 In clear_markets, a matched explicit trade debits the seller pool and charges the buyer expenditure, but never credits the BUYER stockpile. The goods land in market_component::inventory (true before BL-422 via the listing-time credit, and still true after it via the matched-trade credit). Any corp on that body can then draw them through the ordinary processor path. So a buy order is closer to "pay to put stock on the local shelf" than to "acquire these goods".
 
-**Why it matters.** It is currently invisible because nothing writes world::buy_orders in play — MARKETS.md § Known limitations records the buy-order book as engine-only, waiting on BL-160. The moment BL-160 derive_exchange_orders becomes the first live emitter, a player who wins a matched trade will pay for goods a competitor on the same body can consume. BL-422 deliberately did NOT change this: routing matched fills to the buyer pool is a behaviour change to the buy side, outside a fix scoped to phantom supply. order_book_harness R7.12 pins the current behaviour as conservation (pool loss == inventory gain), so a future correction will fail that row loudly rather than silently.
+**Why it matters.** It is currently invisible because nothing writes world::buy_orders in play â€” MARKETS.md Â§ Known limitations records the buy-order book as engine-only, waiting on BL-160. The moment BL-160 derive_exchange_orders becomes the first live emitter, a player who wins a matched trade will pay for goods a competitor on the same body can consume. BL-422 deliberately did NOT change this: routing matched fills to the buyer pool is a behaviour change to the buy side, outside a fix scoped to phantom supply. order_book_harness R7.12 pins the current behaviour as conservation (pool loss == inventory gain), so a future correction will fail that row loudly rather than silently.
 
-> **Recommendation:** Fold into BL-160 (auto-exchange policy) rather than filing separately — that is the item that makes the buy side reachable, and the delivery question has to be answered there anyway.
+> **Recommendation:** Fold into BL-160 (auto-exchange policy) rather than filing separately â€” that is the item that makes the buy side reachable, and the delivery question has to be answered there anyway.
 
 *Files: `src/world/market_clearing.cpp`, `tools/verify/order_book_harness.cpp`*
 
-### NR-263 — BL-422 moves nothing in the five AI benchmark seeds — the defect it fixes is unreached by the benchmark
+### NR-263 — BL-422 moves nothing in the five AI benchmark seeds â€” the defect it fixes is unreached by the benchmark
 *observation · raised 2026-08-16 · from Before/after measurement on ai_skill_harness and spectator_determinism, 2026-08-16.*
 
-ai_skill_harness reports byte-identical net worth, solvency, survival and action counts on all five seeds before and after the fix (final = 499896.2 / -115203.9 / 183828.8 / 306437.4 / 396557.7 in both runs), and spectator_determinism is unchanged. The AI places standing sell orders in these worlds (action[place_sell_order] = 9-10 per seed), so orders exist; either none of them hold, or no processor ever drew the phantom stock they created. order_book_harness R7.2/R7.3/R7.10 DO fail against the pre-fix code, so the guard is real — it is the benchmark that does not reach the case.
+ai_skill_harness reports byte-identical net worth, solvency, survival and action counts on all five seeds before and after the fix (final = 499896.2 / -115203.9 / 183828.8 / 306437.4 / 396557.7 in both runs), and spectator_determinism is unchanged. The AI places standing sell orders in these worlds (action[place_sell_order] = 9-10 per seed), so orders exist; either none of them hold, or no processor ever drew the phantom stock they created. order_book_harness R7.2/R7.3/R7.10 DO fail against the pre-fix code, so the guard is real â€” it is the benchmark that does not reach the case.
 
 **Why it matters.** Two things follow. First, the fix is safe to land: provably behaviour-neutral in the benchmark worlds while provably corrective in the case that produces the defect. Second, and more useful, the AI benchmark does not exercise a held order at all, which means corp_ai trade_floor_multiple currently prices its orders low enough to always clear. That is worth knowing before BL-436 calibration moves prices under it: a re-tune that pushes resolved prices down turns the AI standing orders into holds, and the benchmark has never measured that regime.
 
@@ -279,14 +279,14 @@ ai_skill_harness reports byte-identical net worth, solvency, survival and action
 
 *Files: `tools/verify/ai_skill_harness.cpp`, `src/world/corp_ai.cpp`*
 
-### NR-264 — A remote Linux session CAN build and run the headless suite — CMake configure is what is blocked, not compilation
+### NR-264 — A remote Linux session CAN build and run the headless suite â€” CMake configure is what is blocked, not compilation
 *observation · raised 2026-08-16 · from This session, working around the NR-240 symptom (BL-429 slice 2 authored but never compiled because of the remote network policy).*
 
 cmake configure fails outright in the remote container: SDL3 and Lua come in by FetchContent and the download is refused by the network policy, so no target is ever generated and every harness looks unbuildable. But the 43 src/world/*.cpp sources (the io_world_obj set, minus the four registry TUs) need neither, and every harness in the CMake glob batch links io_world_obj ALONE. Compiling them directly works: build the 43 objects once with xargs -P8 (~14 s), ar them into a static lib, then link each harness against it (~5 s each). 63 of the 77 harnesses build and run this way. The exceptions are the 8 Lua-linked ones (chain_depth, tier_margin, era_roster, player_seed_sweep, recipe_switch_harness, interbody_pull_harness, pregame_balance_harness, persona_counsel_harness), font_glyph_harness (ImGui), and the long sweeps.
 
-**Why it matters.** NR-240 and NR-241 record work that shipped uncompiled and visually unverified because a remote session believed it could not build. It can — for two thirds of the gate, including every economy, determinism and generation harness that does not read a Lua script. That is the difference between a remote session that verifies its own work and one that hands Ben unverified changes.
+**Why it matters.** NR-240 and NR-241 record work that shipped uncompiled and visually unverified because a remote session believed it could not build. It can â€” for two thirds of the gate, including every economy, determinism and generation harness that does not read a Lua script. That is the difference between a remote session that verifies its own work and one that hands Ben unverified changes.
 
-> **Recommendation:** Worth saving as a tool rather than a note (CLAUDE.md § Tool creation is skill creation): a tools/verify/build_linux.sh doing the lib-then-link build, named in the verifier-headless skill as the fallback when cmake configure fails. Creating or modifying a skill needs Ben permission, so it is proposed here rather than done. Vendoring Lua would close the remaining 8.
+> **Recommendation:** Worth saving as a tool rather than a note (CLAUDE.md Â§ Tool creation is skill creation): a tools/verify/build_linux.sh doing the lib-then-link build, named in the verifier-headless skill as the fallback when cmake configure fails. Creating or modifying a skill needs Ben permission, so it is proposed here rather than done. Vendoring Lua would close the remaining 8.
 
 *Files: `CMakeLists.txt`, `.claude/skills/verifier-headless/SKILL.md`*
 
@@ -327,22 +327,22 @@ BL-417's design calls step 1 a "no-op refactor, zero behavioural change". In flo
 
 *Files: `src/world/corp_ai.cpp`, `tools/verify/ai_skill_harness.cpp`*
 
-### NR-269 — BL-439 landed and the AI immediately bankrupted itself on processors — the bands FELL where Sprint 19 predicted they would rise
+### NR-269 — BL-439 landed and the AI immediately bankrupted itself on processors â€” the bands FELL where Sprint 19 predicted they would rise
 *decision taken on your behalf · raised 2026-08-17 · from Landing BL-439 (the processing_facility build candidate), 2026-08-17.*
 
 With a processor candidate in the scorer, rivals build 10-16 processors per seed across the benchmark set (69 total, against 0 before). Three of five seeds then go insolvent: seed 0 final net worth 498k -> -295k, seed 1 -> -89k, seed 4 -> -272k, each sitting below zero for 27-29 of 30 samples. Seeds 2 and 3 stay positive. ai_skill_harness is 18 rows red.
 
-The estimator is NOT the culprit, and that was tested rather than assumed. The candidate was first scored with an inline revenue-minus-wages sum, then switched to estimate_prospective_profit (BL-162, the model done properly — habitability-scaled wages, real input cost, BL-193 stack decay). Same recipes chosen, same build counts, net worth moved only on seed 0 (-315k -> -295k). So the scorer is not mispricing the cost side; it is being promised a full run and handed a starved one.
+The estimator is NOT the culprit, and that was tested rather than assumed. The candidate was first scored with an inline revenue-minus-wages sum, then switched to estimate_prospective_profit (BL-162, the model done properly â€” habitability-scaled wages, real input cost, BL-193 stack decay). Same recipes chosen, same build counts, net worth moved only on seed 0 (-315k -> -295k). So the scorer is not mispricing the cost side; it is being promised a full run and handed a starved one.
 
 The new per-building diagnostic reads: processor realised -6.24 to -11.70 per tick against a PREDICTED -0.38 to +0.08, on the same buildings, with extraction realised +22.80 where it sampled at all. Read the n: estimate_building_profit has no row for an idle or starved building, so the sample is biased toward the WORKING processors and the realised figure is the optimistic end.
 
-AMENDED 2026-08-17 after integration: the count above (18 red rows) was true when written and is now 23. Net-worth final/min and solvency are red on all five seeds, dial-action thrash ceilings on seeds 0/2/3/4, build-action on seed 3; survival still passes everywhere. The extra five rows come from BL-406/BL-404 moving outpost prices, not from further AI change — see NR-278. The finding and the decision not to bless are unchanged.
+AMENDED 2026-08-17 after integration: the count above (18 red rows) was true when written and is now 23. Net-worth final/min and solvency are red on all five seeds, dial-action thrash ceilings on seeds 0/2/3/4, build-action on seed 3; survival still passes everywhere. The extra five rows come from BL-406/BL-404 moving outpost prices, not from further AI change â€” see NR-278. The finding and the decision not to bless are unchanged.
 
-**Why it matters.** This is the measurement Sprint 19 was opened to get, with the AI actually exposed to the economy for the first time. Its success criterion was written down in advance: the ai_skill_harness bands re-blessed DOWNWARD on 2026-08-16 should RISE, and a bless that does not raise them means the fix did not work. They fell, hard. Under that rule these numbers are a finding, not a bless — so the goldens are deliberately LEFT RED rather than re-blessed, and BL-439 task C is not done.
+**Why it matters.** This is the measurement Sprint 19 was opened to get, with the AI actually exposed to the economy for the first time. Its success criterion was written down in advance: the ai_skill_harness bands re-blessed DOWNWARD on 2026-08-16 should RISE, and a bless that does not raise them means the fix did not work. They fell, hard. Under that rule these numbers are a finding, not a bless â€” so the goldens are deliberately LEFT RED rather than re-blessed, and BL-439 task C is not done.
 
 The -295k figure is also bigger than processor losses can explain on their own: 12 processors x 300 ticks x ~11/tick is ~40k, not 800k. The likely amplifier is BL-073 debt interest compounding once a corp crosses zero, which would make insolvency self-deepening rather than self-correcting. Not measured, and named here so it is not assumed either way.
 
-> **Recommendation:** Ben owns the next call, because every lever here is cost-side calibration (the same boundary NR-266 stopped at). Three distinct options, which should not be conflated: (a) accept it as the honest finding, land BL-439 with the goldens red and a written reason, and let BL-436 fix the substrate — the bands re-bless once processing pays; (b) gate the candidate harder (a cash floor, a cap per corp) so rivals build processors without dying, which BUYS a green harness by hiding the defect the harness just found; (c) treat the debt-interest amplifier as its own item first, since a corp that cannot recover from one bad quarter makes every economy measurement noisier. My call taken in the meantime: do (a) and stop — nothing is tuned, nothing is blessed.
+> **Recommendation:** Ben owns the next call, because every lever here is cost-side calibration (the same boundary NR-266 stopped at). Three distinct options, which should not be conflated: (a) accept it as the honest finding, land BL-439 with the goldens red and a written reason, and let BL-436 fix the substrate â€” the bands re-bless once processing pays; (b) gate the candidate harder (a cash floor, a cap per corp) so rivals build processors without dying, which BUYS a green harness by hiding the defect the harness just found; (c) treat the debt-interest amplifier as its own item first, since a corp that cannot recover from one bad quarter makes every economy measurement noisier. My call taken in the meantime: do (a) and stop â€” nothing is tuned, nothing is blessed.
 
 *Files: `src/world/corp_ai.cpp`, `tools/verify/ai_skill_harness.cpp`, `docs/development/backlog.json`*
 
@@ -351,37 +351,37 @@ The -295k figure is also bigger than processor losses can explain on their own: 
 
 Every BL-436 measurement to date was taken on a world where the only processors were generated or warm-start ones, because the scorer could not build any (NR-265/NR-266). The benchmark set now carries 69 AI-built processors across five seeds, chosen by the AI on its own margin estimate.
 
-**Why it matters.** It changes what the calibration sweep is measuring. NR-266 warned that the old narrative — corps spending income on processors that lose more at scale — described a mechanism that could not happen. It can happen now, so the sweep is worth re-running rather than re-derived on paper, and the three levers NR-266 named (the ~133:1 richness rate ratio, the 30.9% starvation rate, the three never-produced inputs) can each be measured with rivals responding to them.
+**Why it matters.** It changes what the calibration sweep is measuring. NR-266 warned that the old narrative â€” corps spending income on processors that lose more at scale â€” described a mechanism that could not happen. It can happen now, so the sweep is worth re-running rather than re-derived on paper, and the three levers NR-266 named (the ~133:1 richness rate ratio, the 30.9% starvation rate, the three never-produced inputs) can each be measured with rivals responding to them.
 
 > **Recommendation:** Re-run BL-436 calibration_sweep and tier_margin after BL-439 lands, before any cost-side number moves. Also resolves NR-267: BL-428 chain depth now has an AI player in principle, though whether a rival actually climbs a rung is unmeasured and the depth-gated recipes remain ancient-only.
 
 *Files: `tools/verify/tier_margin.cpp`, `docs/development/backlog.json`*
 
-### NR-271 — richness_reference enabled at the MEDIAN, not the mean — and the cost side still cannot be rescaled into a fix, because processing gross margin is negative before any upkeep
+### NR-271 — richness_reference enabled at the MEDIAN, not the mean â€” and the cost side still cannot be rescaled into a fix, because processing gross margin is negative before any upkeep
 *decision taken on your behalf · raised 2026-08-17 · from Ben's call to enable richness_reference and rescale the cost side, 2026-08-17.*
 
-ENABLED, and corrected while enabling it. The authored intent is "a typical deposit lands at ~1.0", and the value that delivers that is the MEDIAN richness, not the mean. tier_margin now prints the distribution (new R6b): p10 10.58 / p25 15.76 / MEDIAN 24.92 / p75 45.09 / p90 98.34 / p99 360.91, mean 53.34, max 72,321. The mean sits at the 78th percentile, so referencing against it ran the median tile at 0.47 and clamped 18% of all deposits flat at the richness_min floor — halving raw supply across the whole map. Set to 24.9.
+ENABLED, and corrected while enabling it. The authored intent is "a typical deposit lands at ~1.0", and the value that delivers that is the MEDIAN richness, not the mean. tier_margin now prints the distribution (new R6b): p10 10.58 / p25 15.76 / MEDIAN 24.92 / p75 45.09 / p90 98.34 / p99 360.91, mean 53.34, max 72,321. The mean sits at the 78th percentile, so referencing against it ran the median tile at 0.47 and clamped 18% of all deposits flat at the richness_min floor â€” halving raw supply across the whole map. Set to 24.9.
 
-The ratio defect is FIXED. Extraction went from 1666.69 revenue / 1659.18 net per building-tick to 14.63 / 7.89, and its capex payback from 0 ticks (instant, i.e. meaningless) to 12. Processing revenue is now 12.66 against extraction 14.63 — comparable, where it was 16.60 against 1666.69.
+The ratio defect is FIXED. Extraction went from 1666.69 revenue / 1659.18 net per building-tick to 14.63 / 7.89, and its capex payback from 0 ticks (instant, i.e. meaningless) to 12. Processing revenue is now 12.66 against extraction 14.63 â€” comparable, where it was 16.60 against 1666.69.
 
 THE COST SIDE IS NOT THE REMAINING BLOCKER, and that is measured rather than argued. Processing reads revenue 12.66, input$ 12.87, maintenance 7.73, wage 1.14, net -9.08. Gross margin is -0.21 BEFORE any upkeep, so cutting maintenance and wages to ZERO still leaves a loss-maker. No rescale of the cost side can fix a negative value-add.
 
 Separately, the -3M net worth figures are almost entirely COMPOUNDING, not operations. k_debt_interest_per_quarter is 0.02 and the rollout is 300 ticks: 1.02^300 = 380x. Per-building extraction nets +5 to +11 across every seed, so a corp cannot lose millions by operating; it dips a few thousand negative on processor upkeep and the interest multiplies that by 380. This confirms the amplifier hypothesis raised in NR-269.
 
-**Why it matters.** It relocates the lever, and it lands on the option Ben raised first. Before the ratio was fixed, repricing could not close a 100:1 gap and was correctly ruled out. With the ratio fixed, price IS the binding constraint — processing revenue must rise 1.72x to break even at current upkeep (12.87 input + 8.87 opex = 21.74 needed against 12.66 earned).
+**Why it matters.** It relocates the lever, and it lands on the option Ben raised first. Before the ratio was fixed, repricing could not close a 100:1 gap and was correctly ruled out. With the ratio fixed, price IS the binding constraint â€” processing revenue must rise 1.72x to break even at current upkeep (12.87 input + 8.87 opex = 21.74 needed against 12.66 earned).
 
 It also means the two levers now compose, where before neither worked alone: refined-good prices +40% AND processing upkeep halved gives 17.72 - 12.87 - 4.44 = +0.41, i.e. break-even. Matching extraction at +7.89 needs more than that.
 
-> **Recommendation:** Ben's call, three sized options, not mutually exclusive: (a) refined-good base prices +72% alone; (b) prices +40% with processing maintenance 10 -> 5 and base_wage 12 -> 8, which is the 'rescale the cost side' half actually doing work once it has a positive margin to protect; (c) cut recipe input quantities ~70%, which is a content change to recipes.lua rather than a price one. I have enabled the conversion at the median and stopped there — no price and no upkeep number has been touched, because tuning any of them against an unexplained -3M was the exact mistake NR-266 warns about, and the -3M is now explained.
+> **Recommendation:** Ben's call, three sized options, not mutually exclusive: (a) refined-good base prices +72% alone; (b) prices +40% with processing maintenance 10 -> 5 and base_wage 12 -> 8, which is the 'rescale the cost side' half actually doing work once it has a positive margin to protect; (c) cut recipe input quantities ~70%, which is a content change to recipes.lua rather than a price one. I have enabled the conversion at the median and stopped there â€” no price and no upkeep number has been touched, because tuning any of them against an unexplained -3M was the exact mistake NR-266 warns about, and the -3M is now explained.
 
-Worth noting for whichever is chosen: 30.0% of processing building-ticks STARVE and 20.3% run with NO RECIPE SET. Half of all processor ticks earn nothing while paying maintenance. That is a defect to fix before, not after, calibrating against these means — the no-recipe share in particular looks like a generation or default-recipe gap rather than an economic outcome.
+Worth noting for whichever is chosen: 30.0% of processing building-ticks STARVE and 20.3% run with NO RECIPE SET. Half of all processor ticks earn nothing while paying maintenance. That is a defect to fix before, not after, calibrating against these means â€” the no-recipe share in particular looks like a generation or default-recipe gap rather than an economic outcome.
 
 *Files: `scripts/economy.lua`, `tools/verify/tier_margin.cpp`, `tools/verify/ai_skill_harness.cpp`*
 
 ### NR-272 — The no-recipe defect was real, was in the LIVE game, and fixing it uncovered the actual blocker: coal has 1,671 tiles and zero mines
 *decision taken on your behalf · raised 2026-08-17 · from Ben's call to fix the no-recipe defect before calibrating, 2026-08-17.*
 
-FIXED, and it was not a harness artefact. author_building cannot set a recipe (ids are indices into a registry that does not exist yet at world-gen time), so processors are authored with no_recipe and backfilled later. That backfill lived INLINE IN app::load_economy, which made a world-generation invariant depend on the UI startup sequence — every path building a world without app (headless harnesses, --serve, --verify) ran processors that could never produce.
+FIXED, and it was not a harness artefact. author_building cannot set a recipe (ids are indices into a registry that does not exist yet at world-gen time), so processors are authored with no_recipe and backfilled later. That backfill lived INLINE IN app::load_economy, which made a world-generation invariant depend on the UI startup sequence â€” every path building a world without app (headless harnesses, --serve, --verify) ran processors that could never produce.
 
 Worse, and this one hit the live game: load_economy runs the pass at app.cpp:955 and generate_background_firms authors MORE processors at :965. Every background firm processor kept no_recipe for the whole campaign, paying maintenance every tick, producing nothing, and reporting as ordinary idleness. tier_margin had already measured the shape of this in its own comment (26.5% recipe-less with no pass, 11.3% with the pre-firms pass only) and left the 11.3% standing as expected.
 
@@ -391,9 +391,9 @@ IT DID NOT IMPROVE THE ECONOMICS, and that is the finding. Processing net went 9
 
 **Why it matters.** The starvation now names one culprit. Coal (resource id 1) is the binding input on 54.0% of all starved processor ticks. It has 1,671 tiles carrying deposits and ZERO extraction sites targeting it, supplying 6.1 units/tick from ambient sources alone.
 
-The cause is siting, not price and not upkeep: an extraction site targets richest_extractable(tile), and coal is the richest extractable on only 1.1% of the tiles that carry it. It is always out-ranked, so no mine — generated or AI-built — ever targets it, while the steel chain needs it. This is the same failure mode as R5s three never-produced inputs (ids 8/9/10), which NR-266 flagged as siting/reach rather than margin.
+The cause is siting, not price and not upkeep: an extraction site targets richest_extractable(tile), and coal is the richest extractable on only 1.1% of the tiles that carry it. It is always out-ranked, so no mine â€” generated or AI-built â€” ever targets it, while the steel chain needs it. This is the same failure mode as R5s three never-produced inputs (ids 8/9/10), which NR-266 flagged as siting/reach rather than margin.
 
-> **Recommendation:** Do NOT reprice yet. Repricing refined goods against a chain whose second input is unobtainable would tune around the shortage rather than fix it, and would have to be undone once coal is mined. The siting rule is the next item: an extraction site should be able to target a resource that is WANTED rather than merely richest — the demand signal already exists (the recipe input demand tier_margin R4 prints), and richest_extractable is a tile-local heuristic with no knowledge of it. Worth filing as its own backlog item; it is a corp_ai and generation change, not a calibration one.
+> **Recommendation:** Do NOT reprice yet. Repricing refined goods against a chain whose second input is unobtainable would tune around the shortage rather than fix it, and would have to be undone once coal is mined. The siting rule is the next item: an extraction site should be able to target a resource that is WANTED rather than merely richest â€” the demand signal already exists (the recipe input demand tier_margin R4 prints), and richest_extractable is a tile-local heuristic with no knowledge of it. Worth filing as its own backlog item; it is a corp_ai and generation change, not a calibration one.
 
 Once coal is actually mined, re-run tier_margin and re-derive the price options in NR-271 (a/b/c) from the new numbers. The 1.72x revenue figure was measured on a starved chain and will move.
 
@@ -404,7 +404,7 @@ Once coal is actually mined, re-run tier_margin and re-derive the price options 
 
 build_corp_choices was correct only because of WHEN it runs: the stage opens in the one frame before generate_background_firms, so m_world.corporations still held exactly the 8 specialists. That is a positional guarantee, one refactor away from silently becoming false - and it also blocked any verify hook, since a re-entered screen on a started world would have listed all 25-37 corps. Decision taken: skip is_background explicitly in build_corp_choices (a no-op on the live path, load-bearing everywhere else), and assert the split per seed in player_seed_sweep --guard G2 rather than trusting the ordering.
 
-**Why it matters.** The pool being the specialist set is Ben’s own 2026-08-16 call and requirement R2. It was being upheld by an ordering nobody would notice breaking.
+**Why it matters.** The pool being the specialist set is Benâ€™s own 2026-08-16 call and requirement R2. It was being upheld by an ordering nobody would notice breaking.
 
 *Files: `src/core/app.cpp`, `tools/verify/player_seed_sweep.cpp`*
 
@@ -413,7 +413,7 @@ build_corp_choices was correct only because of WHEN it runs: the stage opens in 
 
 BL-435 task B recorded specialists-with-a-processor at 2.96/8 before and 5.83/8 after its focus_asset_pattern fix. The same population measured today reads 6.92/8 over the same 24 seeds (166 of 192), with 0 seeds having none. Nothing in tasks E-F touches generation, so the extra ~1.1 came from work landed between - most plausibly BL-436's option-B extraction change or the dead-start trade holdings_range fix (2->3 draws reach the trade pattern's processing slot). Not investigated further: the guard's floor is 4.00/8 and the direction is the intended one.
 
-**Why it matters.** The number quoted in BL-435’s own progress note is now stale, and coverage drifting upward without an item claiming it means the openings are being reshaped by side effects. Worth knowing which change owns it before anyone tunes against 5.83.
+**Why it matters.** The number quoted in BL-435â€™s own progress note is now stale, and coverage drifting upward without an item claiming it means the openings are being reshaped by side effects. Worth knowing which change owns it before anyone tunes against 5.83.
 
 *Files: `tools/verify/player_seed_sweep.cpp`, `src/world/corporation_generation.cpp`*
 
@@ -453,7 +453,7 @@ Every off-home market's demand for a pulled resource changes size this tick and 
 ### NR-279 — Two parallel agents both allocated NR-273/274/275 - the BL-406/BL-404 set was renumbered to NR-276/277/278, and its own commit message still quotes the old ids
 *decision taken on your behalf · raised 2026-08-17 · from Integrating the three sprint19-bl417 sub-agent branches. Both the BL-435 worktree and the BL-406/BL-404 worktree branched from 5527984, where the highest id was NR-272, and each independently minted 273/274/275 for entirely different entries.*
 
-Merge order decided it. BL-435 landed first and KEEPS NR-273 (specialists-only pool by timing), NR-274 (processor coverage 6.92/8) and NR-275 (clipped corp-choice cell). The BL-406/BL-404 set was renumbered: NR-273 -> NR-276 (the dep-cache seeding bug), NR-274 -> NR-277 (pull_fraction not re-tuned), NR-275 -> NR-278 (outpost prices move, nothing re-blessed). Cross-references were rewritten in backlog.json (BL-406 design), docs/economy/MARKETS.md and src/world/recipe_registry.hpp. THE ONE THING THAT COULD NOT BE FIXED is commit cab181b’s own message, which still reads "pull_fraction is NOT re-tuned - NR-274" and "No golden or band re-blessed - NR-275". Read against today’s file those point at two BL-435 entries. Substitute 277 and 278.
+Merge order decided it. BL-435 landed first and KEEPS NR-273 (specialists-only pool by timing), NR-274 (processor coverage 6.92/8) and NR-275 (clipped corp-choice cell). The BL-406/BL-404 set was renumbered: NR-273 -> NR-276 (the dep-cache seeding bug), NR-274 -> NR-277 (pull_fraction not re-tuned), NR-275 -> NR-278 (outpost prices move, nothing re-blessed). Cross-references were rewritten in backlog.json (BL-406 design), docs/economy/MARKETS.md and src/world/recipe_registry.hpp. THE ONE THING THAT COULD NOT BE FIXED is commit cab181bâ€™s own message, which still reads "pull_fraction is NOT re-tuned - NR-274" and "No golden or band re-blessed - NR-275". Read against todayâ€™s file those point at two BL-435 entries. Substitute 277 and 278.
 
 **Why it matters.** A naive merge would have silently dropped three entries - the exact failure the parallel-worktree notes warn about. It did not happen, but the near-miss is the point: id allocation off a stale local file is not safe once more than one worktree is open, and next_id.js only helps if it is actually run at authoring time rather than at landing time.
 
@@ -468,29 +468,29 @@ spectator_determinism fails one assertion - R2 byte-identity against the pinned 
 
 **Why it matters.** NR-278 states that any world hash downstream of an outpost price will read differently. On this rollout it does not, which is a fact worth having before anyone treats a moved hash as evidence the pull change reached something. The likely reason is that the seed-0 300-tick spectator rollout does not exercise an off-home market enough for the pull to register - if so, the harness is blind to exactly the change BL-406 made, and that is a coverage gap rather than a reassurance.
 
-> **Recommendation:** Do not bless. When the goldens are eventually re-blessed as one deliberate pass (NR-269 owns that call), re-blessing spectator_determinism’s R2 golden is a one-line change and should ride along. Separately worth checking whether the rollout reaches an off-home market at all.
+> **Recommendation:** Do not bless. When the goldens are eventually re-blessed as one deliberate pass (NR-269 owns that call), re-blessing spectator_determinismâ€™s R2 golden is a one-line change and should ride along. Separately worth checking whether the rollout reaches an off-home market at all.
 
 *Files: `tools/verify/spectator_determinism.cpp`, `src/world/market_clearing.cpp`*
 
-### NR-281 — BL-441: the want registered is NET of the corp's own pool, not the gross full-run need — a deliberate narrowing of the item's wording
+### NR-281 — BL-441: the want registered is NET of the corp's own pool, not the gross full-run need â€” a deliberate narrowing of the item's wording
 *decision taken on your behalf · raised 2026-08-17 · from Implementing BL-441 in run_processing (economy_system.cpp), reading the item's design against what mc.demand means to resolve_price.*
 
-BL-441's design says the demand to register is 'the full-run need per input'. Taken literally that is the GROSS need — 2 units per batch times the full batch count — regardless of how much of it the corp already holds in its own (corp, body) pool. I registered `max(0, need_full - pool_on_hand)` instead: the want the corp has OF THE MARKET. In the item's own worked example the two are identical, because a starved processor's pool is empty by construction, and the guard (order_book_harness R8) is written on an empty pool so it cannot tell them apart.
+BL-441's design says the demand to register is 'the full-run need per input'. Taken literally that is the GROSS need â€” 2 units per batch times the full batch count â€” regardless of how much of it the corp already holds in its own (corp, body) pool. I registered `max(0, need_full - pool_on_hand)` instead: the want the corp has OF THE MARKET. In the item's own worked example the two are identical, because a starved processor's pool is empty by construction, and the guard (order_book_harness R8) is written on an empty pool so it cannot tell them apart.
 
-**Why it matters.** They differ for a corp that is NOT starved. mc.supply is an offer made to the market and mc.inventory is a delivery to it — BL-422's distinction. resolve_price compares supply against demand, so demand has to be the BID to the market for the comparison to be apples-to-apples. Under the gross reading, a vertically integrated corp that feeds its smelter entirely from its own mine would register full market demand for an input it never intends to buy, permanently inflating that input's price for everyone else. That is BL-422's defect in a third direction: crediting a transaction nobody made. Under the net reading, demand appears exactly when the buffer drains, which is when the corp actually competes for the good.
+**Why it matters.** They differ for a corp that is NOT starved. mc.supply is an offer made to the market and mc.inventory is a delivery to it â€” BL-422's distinction. resolve_price compares supply against demand, so demand has to be the BID to the market for the comparison to be apples-to-apples. Under the gross reading, a vertically integrated corp that feeds its smelter entirely from its own mine would register full market demand for an input it never intends to buy, permanently inflating that input's price for everyone else. That is BL-422's defect in a third direction: crediting a transaction nobody made. Under the net reading, demand appears exactly when the buffer drains, which is when the corp actually competes for the good.
 
-> **Recommendation:** Keep the net reading; it is the one that makes demand the counterpart of supply. If Ben wants gross — a defensible alternative if mc.demand is meant to express total CONSUMPTION of a good rather than market pressure on it — it is a one-line change at the same site, but the two meanings should not be mixed and MARKETS.md should then say which it is.
+> **Recommendation:** Keep the net reading; it is the one that makes demand the counterpart of supply. If Ben wants gross â€” a defensible alternative if mc.demand is meant to express total CONSUMPTION of a good rather than market pressure on it â€” it is a one-line change at the same site, but the two meanings should not be mixed and MARKETS.md should then say which it is.
 
 *Files: `src/world/economy_system.cpp`, `docs/economy/MARKETS.md`*
 
-### NR-282 — BL-441 necessarily pulled run_construction into scope — otherwise the fix would have silently ZEROED construction's market demand
+### NR-282 — BL-441 necessarily pulled run_construction into scope â€” otherwise the fix would have silently ZEROED construction's market demand
 *decision taken on your behalf · raised 2026-08-17 · from Tracing every writer of economy_report::purchases before splitting the demand read in market_clearing.cpp.*
 
-BL-441's design names run_processing only. But run_construction (economy_system.cpp, BL-095 pay-as-you-build) is the OTHER writer of report.purchases, and market_clearing's single demand loop was reading both. Had I pointed demand at a new `wants` map fed only by processing, construction sites would have gone from registering their drawn materials as demand to registering NOTHING — a regression introduced by the fix. So run_construction now records its want too: the full-rate material need, registered BEFORE the `rate <= 0` continue, so a build paused for want of steel finally says so. This is the same defect in the same file, and arguably the starker case: a fully stalled build site previously registered zero demand for the exact material stalling it.
+BL-441's design names run_processing only. But run_construction (economy_system.cpp, BL-095 pay-as-you-build) is the OTHER writer of report.purchases, and market_clearing's single demand loop was reading both. Had I pointed demand at a new `wants` map fed only by processing, construction sites would have gone from registering their drawn materials as demand to registering NOTHING â€” a regression introduced by the fix. So run_construction now records its want too: the full-rate material need, registered BEFORE the `rate <= 0` continue, so a build paused for want of steel finally says so. This is the same defect in the same file, and arguably the starker case: a fully stalled build site previously registered zero demand for the exact material stalling it.
 
 **Why it matters.** It widens the diff beyond the item's stated file scope while a parallel worktree (BL-442, price band as data) is editing the same two files. Worth Ben knowing it was forced by coherence rather than chosen, and worth knowing that construction demand is now a want and will read higher than before across the whole economy.
 
-> **Recommendation:** Accept as part of BL-441. If it should have been its own item, the split point is clean — the construction want is one added block in run_construction.
+> **Recommendation:** Accept as part of BL-441. If it should have been its own item, the split point is clean â€” the construction want is one added block in run_construction.
 
 *Files: `src/world/economy_system.cpp`*
 
@@ -688,55 +688,55 @@ The unit Selection card's Strength page now shows a derived figure with its coun
 ### NR-325 — Two fold-out ledgers open at once overlap in the same column slot rather than one replacing the other
 *observation · raised 2026-08-18 · from Post-merge visual run, BL-453 Convoys tab capture (2026-08-18).*
 
-With the Corporations dashboard already open, verify.show_panel('market', true) drew the Market Ledger INTO THE SAME shell fold-out column, both windows compositing on top of each other — the Corps/Holdings/Markets strip legible over the ghosted Prices/Sell Orders/Convoys strip. Closing the other panels first produced a clean Convoys capture. Knock-on: verify.scroll_panel targets an ImGui WINDOW name, so with two panels stacked it scrolls the invisible one and the capture silently shows an unscrolled panel.
+With the Corporations dashboard already open, verify.show_panel('market', true) drew the Market Ledger INTO THE SAME shell fold-out column, both windows compositing on top of each other â€” the Corps/Holdings/Markets strip legible over the ghosted Prices/Sell Orders/Convoys strip. Closing the other panels first produced a clean Convoys capture. Knock-on: verify.scroll_panel targets an ImGui WINDOW name, so with two panels stacked it scrolls the invisible one and the capture silently shows an unscrolled panel.
 
 **Why it matters.** The fold-out column hosts one ledger at a time by design (LAYOUT.md / the toggle rule), so this is either a missing mutual-exclusion in the panel open flags or an accepted state nobody has looked at. Either way it makes verify captures order-dependent in a way no script declares, which is a quiet source of misleading goldens.
 
 ### NR-326 — Three stale cloud branches merged to main; their app.cpp changes were re-ported, not merged
 *decision taken on your behalf · raised 2026-08-18 · from Merge of claude/ui-documentation-json-1566f7, claude/ecstatic-hofstadter-80f1d6 and claude/elated-mclean-7dd61c into main (2026-08-18).*
 
-All three branched from a base predating the verify-API carve-out, so each still had run_verify and its helpers inside src/core/app.cpp, which main has since split into src/core/verify_api.cpp. Merging their app.cpp hunks would have re-created deleted code. Resolution taken: app.cpp took HEAD wholesale in both conflicts, and the intent was re-ported by hand — the lens branch needed nothing (main's verify_api.cpp already maps reach and supply_routes), and elated-mclean's verify.scroll_panel binding was moved into verify_api.cpp beside panel_view, with the SKILL.md pointer corrected from app.cpp to verify_api.cpp. Also: every golden PNG the three branches carried was DROPPED rather than merged, since main's curated set is the two icon_silhouettes files after the 2026-08-15 demotion. For the lens-cycle conflict, the branch's overlay_mode::count sentinel was taken over main's last-enumerator + static_assert, because the enum now carries the sentinel and it needs no hand maintenance.
+All three branched from a base predating the verify-API carve-out, so each still had run_verify and its helpers inside src/core/app.cpp, which main has since split into src/core/verify_api.cpp. Merging their app.cpp hunks would have re-created deleted code. Resolution taken: app.cpp took HEAD wholesale in both conflicts, and the intent was re-ported by hand â€” the lens branch needed nothing (main's verify_api.cpp already maps reach and supply_routes), and elated-mclean's verify.scroll_panel binding was moved into verify_api.cpp beside panel_view, with the SKILL.md pointer corrected from app.cpp to verify_api.cpp. Also: every golden PNG the three branches carried was DROPPED rather than merged, since main's curated set is the two icon_silhouettes files after the 2026-08-15 demotion. For the lens-cycle conflict, the branch's overlay_mode::count sentinel was taken over main's last-enumerator + static_assert, because the enum now carries the sentinel and it needs no hand maintenance.
 
-**Why it matters.** This is the stale-base failure mode again — worktrees isolate writes, not history — and it is the third recorded instance. A clean textual merge here would have compiled and silently reverted a refactor. Recording it so the re-port is visible as a decision rather than looking like the branches merged cleanly.
+**Why it matters.** This is the stale-base failure mode again â€” worktrees isolate writes, not history â€” and it is the third recorded instance. A clean textual merge here would have compiled and silently reverted a refactor. Recording it so the re-port is visible as a decision rather than looking like the branches merged cleanly.
 
 ### NR-327 — Two presentation issues visible in the BL-453 Convoys tab on its first real render
 *observation · raised 2026-08-18 · from Post-merge visual pass, first time the Convoys tab has been rendered on a machine that can build ImGui (2026-08-18).*
 
-First, route labels are clipped mid-word — rows read "Huhaidar -> Kai Sa..." and "Huhaidar -> Huhai..." with the destination cut off, which is the one field distinguishing otherwise identical rows. Second, two of five rows show a quantity of x0 ("Agricultural Produce x0"), each with a live progress bar, an ETA and a non-zero haul cost paid.
+First, route labels are clipped mid-word â€” rows read "Huhaidar -> Kai Sa..." and "Huhaidar -> Huhai..." with the destination cut off, which is the one field distinguishing otherwise identical rows. Second, two of five rows show a quantity of x0 ("Agricultural Produce x0"), each with a live progress bar, an ETA and a non-zero haul cost paid.
 
-**Why it matters.** The clipping defeats the tab's purpose: with several Agricultural Produce convoys in flight, the destination is what tells them apart, and it is the part being truncated. The x0 rows are either a real defect (a convoy dispatched with nothing aboard, still paying haulage) or a legitimate empty return leg that the tab does not distinguish from a laden one — from the surface alone a player cannot tell which, and neither could I.
+**Why it matters.** The clipping defeats the tab's purpose: with several Agricultural Produce convoys in flight, the destination is what tells them apart, and it is the part being truncated. The x0 rows are either a real defect (a convoy dispatched with nothing aboard, still paying haulage) or a legitimate empty return leg that the tab does not distinguish from a laden one â€” from the surface alone a player cannot tell which, and neither could I.
 
 ### NR-329 — tier_margin was already red before Sprint 19 - dated by the bisect
 *observation · raised 2026-08-18 · from Full ctest run of the merged tree (2026-08-18).*
 
-tier_margin reports: 3 recipe inputs that have deposits are never produced; 7 wanted recipe inputs sit on 200+ tiles with no site naming them; and a processing facility does not out-earn an extraction site per tick. The third is already known — the verifier-headless notes on player_seed_sweep record BL-436 measuring exactly that, and warn its G4 depth floor must never be re-read as a profitability gate. The first two rows I have not traced.
+tier_margin reports: 3 recipe inputs that have deposits are never produced; 7 wanted recipe inputs sit on 200+ tiles with no site naming them; and a processing facility does not out-earn an extraction site per tick. The third is already known â€” the verifier-headless notes on player_seed_sweep record BL-436 measuring exactly that, and warn its G4 depth floor must never be re-read as a profitability gate. The first two rows I have not traced.
 
-**Why it matters.** Not merge damage — tier_margin links only world/*, and nothing merged today touches world logic. It is either inherited from Sprint 25a (which added ordnance and a Fabricator recipe consuming steel + machinery, plausibly moving the sited/produced sets) or older still. Worth knowing which, because the second row — a wanted input on 200+ tiles that nothing sites for — is the shape of a good the economy asks for and cannot get.
+**Why it matters.** Not merge damage â€” tier_margin links only world/*, and nothing merged today touches world logic. It is either inherited from Sprint 25a (which added ordnance and a Fabricator recipe consuming steel + machinery, plausibly moving the sited/produced sets) or older still. Worth knowing which, because the second row â€” a wanted input on 200+ tiles that nothing sites for â€” is the shape of a good the economy asks for and cannot get.
 
 ### NR-333 — Two independent notions of era have drifted apart, and each stranded something
 *observation · raised 2026-08-18 · from Sprint 26b doc truth pass, 2026-08-18.*
 
 The recipe registry has era_band_for_epoch (recipe_registry.hpp:36-38), derived from epoch_year. The unit roster has campaign_roster_band (unit_roster.hpp:61), a hard constant set to industrial with a comment still reading 1960s. Neither consults the other. BL-460 is the recipe side stranding ordnance; BL-461 is the roster side offering industrial units in a 0 CE campaign.
 
-### NR-335 — BL-384's filed premise does not reproduce — 267 battles / 0 conquests is stale
+### NR-335 — BL-384's filed premise does not reproduce â€” 267 battles / 0 conquests is stale
 *observation · raised 2026-08-18 · from Sprint 27 assertion agent, 2026-08-18, over seeds 0-7 with real terrain; independently confirmed against an unmodified history_sweep run.*
 
 Where a world fights at all it converts nearly every battle into ground taken (137/144, 272/272, 272/272, 27/27). The transfer branch at history_sim.cpp:996-1027 is NOT the bottleneck, which is what BL-384 was filed against. The real shape is bimodal: 4 of 8 worlds fight nothing whatsoever across the whole run. The 267/0 figure appears descended from the pre-fix w_cult era recorded in the scorer's own comment.
 
-### NR-336 — The era pass costs 1.2-1.8 s in Release, not ~23 s — BL-320's urgency drops by an order of magnitude
+### NR-336 — The era pass costs 1.2-1.8 s in Release, not ~23 s â€” BL-320's urgency drops by an order of magnitude
 *decision taken on your behalf · raised 2026-08-18 · from Sprint 26a determinism agent, 2026-08-18, MSVC 14.44 pinned, both configurations measured.*
 
-The ~23 s per-world cost of the Era -1 pass is quoted unqualified in CMakeLists.txt, hard_coded_world.hpp and harness_params.hpp, and it is a DEBUG number. At /O2 /DNDEBUG the same pass costs 1.2-1.8 s per world; the whole world_determinism harness runs 10.3 s Release against 128 s Debug. Cost also tracks the province table rather than combat — seed B ran 3x longer with FEWER battles (193 vs 365) and more foundings (994 vs 765).
+The ~23 s per-world cost of the Era -1 pass is quoted unqualified in CMakeLists.txt, hard_coded_world.hpp and harness_params.hpp, and it is a DEBUG number. At /O2 /DNDEBUG the same pass costs 1.2-1.8 s per world; the whole world_determinism harness runs 10.3 s Release against 128 s Debug. Cost also tracks the province table rather than combat â€” seed B ran 3x longer with FEWER battles (193 vs 365) and more foundings (994 vs 765).
 
-### NR-337 — The determinism digest would have passed while comparing nothing — the agent caught it, no check would have
+### NR-337 — The determinism digest would have passed while comparing nothing â€” the agent caught it, no check would have
 *observation · raised 2026-08-18 · from Sprint 26a determinism agent, 2026-08-18.*
 
-world_determinism's existing digest is world_metrics, a tile-and-count digest. The Era -1 sim touches no tile: it moves provinces between owners and reaches the world only through the nation carve, derived character, names and charter placement. A prehistory-ON case compared on world_metrics alone would have gone green while asserting nothing about the pass it exists to cover. The agent built a deep_digest instead — world::state_hash folded with the political layer that state_hash deliberately omits (nations, tile_to_nation, population centres, corporations, history_log), because state_hash is a tick-boundary instrument and borders do not move on a tick.
+world_determinism's existing digest is world_metrics, a tile-and-count digest. The Era -1 sim touches no tile: it moves provinces between owners and reaches the world only through the nation carve, derived character, names and charter placement. A prehistory-ON case compared on world_metrics alone would have gone green while asserting nothing about the pass it exists to cover. The agent built a deep_digest instead â€” world::state_hash folded with the political layer that state_hash deliberately omits (nations, tile_to_nation, population centres, corporations, history_log), because state_hash is a tick-boundary instrument and borders do not move on a tick.
 
 ### NR-338 — The generic harness target links no sol2, so any harness measuring background firms sees a world with ZERO firms
 *observation · raised 2026-08-18 · from Sprint B1 substrate census agent, 2026-08-18. Verified, not assumed: seed_sweep_probe prints firms=0.*
 
-CMakeLists' generic glob target for tools/verify/*.cpp links io_world_obj only, which excludes the sol2 translation units. generate_background_firms sizes itself against economy.lua's population_demand and background_demand baskets, and those are all-zero on a default registry with no Lua loaded — so it places zero firms. A census built on the generic target would have described a world nobody plays. The agent added an explicit live-Lua target for substrate_census, mirroring chain_depth, tier_margin and haulage_measure.
+CMakeLists' generic glob target for tools/verify/*.cpp links io_world_obj only, which excludes the sol2 translation units. generate_background_firms sizes itself against economy.lua's population_demand and background_demand baskets, and those are all-zero on a default registry with no Lua loaded â€” so it places zero firms. A census built on the generic target would have described a world nobody plays. The agent added an explicit live-Lua target for substrate_census, mirroring chain_depth, tier_margin and haulage_measure.
 
 ### NR-345 — The unit card is unreachable to the verify harness - battle-visual work needs a unit-selection driver first
 *observation · raised 2026-08-18 · from Battle-visual design browse (2026-08-18 session): toured canvases and military surfaces via --verify captures.*
@@ -752,7 +752,7 @@ BL-466 (province partition) flipped design-owed -> designed with the three-pass 
 
 *Files: `docs/development/backlog.json`*
 
-### NR-349 — BL-448 (corp stance) skipped serialization.cpp — the file does not exist
+### NR-349 — BL-448 (corp stance) skipped serialization.cpp â€” the file does not exist
 *decision taken on your behalf · raised 2026-08-19 · from BL-448, corp stance data model + verbs delivery.*
 
 BL-448's file scope named src/world/serialization.cpp as a wiring target. No such file exists anywhere in the repo (confirmed by search); persistence is done per-subsystem (e.g. procurement.cpp's own write_procurement/read_procurement, never called from a production save path). The item's own design text says the harness must assert in-memory replay only because "no serialiser exists yet in this project; do not invent one." Read together with the empty file, this was taken as licence to land the whole substrate with no persistence path at all, matching the design's explicit framing ("Landing the substrate inert is deliberate").
@@ -761,28 +761,28 @@ BL-448's file scope named src/world/serialization.cpp as a wiring target. No suc
 
 *Files: `src/world/stance.hpp`, `src/world/stance.cpp`, `src/world/world.hpp`*
 
-### NR-351 — BL-384 (Era -1 sim conquers nothing) — hypothesis refuted, real cause is a scorer magnitude mismatch, no fix applied
-*decision taken on your behalf · raised 2026-08-19 · from BL-384 confirm-before-fix instrumentation this session — see backlog.json BL-384 design field, FINDING 2026-08-19 section, for full measurement detail.*
+### NR-351 — BL-384 (Era -1 sim conquers nothing) â€” hypothesis refuted, real cause is a scorer magnitude mismatch, no fix applied
+*decision taken on your behalf · raised 2026-08-19 · from BL-384 confirm-before-fix instrumentation this session â€” see backlog.json BL-384 design field, FINDING 2026-08-19 section, for full measurement detail.*
 
 Instrumented history_sim.cpp (temporarily) and measured a full 4000 BCE -> 0 CE run against the real Kepler world. The filed hypothesis (scorer/resolver terrain disagreement causes the sim to pick fights it then loses) is REFUTED: Campaign is never even selected as a polity-year's best_verb (0/1200 selections in the measured run), so no battle is ever fought for a terrain-blind estimate to lose. 372,660 of 524,800 scored campaign candidates clear the Campaign verb's own threshold, but Settle wins the shared-currency comparison in effectively every case (1188/1200), because Settle's score is a near-direct fraction of region value while Campaign's score is run through five multiplicative/subtractive discounts (campaign_gain_q, p_win_q, distance, culture, def_eff/supply cost) before competing on the same axis.
 
-**Why it matters.** I did NOT attempt a fix. Rebalancing a four-verb shared-currency scorer (BL-309) is a different and larger-scoped problem than BL-384 as filed, and the item's own text explicitly warns against blind-tuning combat constants ('that would be guessing'). It also risks moving the B318c/R3/R5/B299 assertions that currently pass against synthetic fixtures. Recommend this becomes its own scoped follow-up item — a shared-currency rebalance pass with its own before/after measurement — rather than a same-session patch riding on this confirmation.
+**Why it matters.** I did NOT attempt a fix. Rebalancing a four-verb shared-currency scorer (BL-309) is a different and larger-scoped problem than BL-384 as filed, and the item's own text explicitly warns against blind-tuning combat constants ('that would be guessing'). It also risks moving the B318c/R3/R5/B299 assertions that currently pass against synthetic fixtures. Recommend this becomes its own scoped follow-up item â€” a shared-currency rebalance pass with its own before/after measurement â€” rather than a same-session patch riding on this confirmation.
 
 - File a new backlog item for the shared-currency rebalance (Settle vs Campaign scoring magnitude), scoped and measured independently of BL-384
 - Leave BL-384 open as-is and let a future session pick up the rebalance under this same item
 
-> **Recommendation:** File a new item — the rebalance is a distinct, larger-scoped problem (four verbs, five discount terms) from what BL-384 described, and giving it its own before/after measurement keeps BL384a/b honest as the acceptance bar.
+> **Recommendation:** File a new item â€” the rebalance is a distinct, larger-scoped problem (four verbs, five discount terms) from what BL-384 described, and giving it its own before/after measurement keeps BL384a/b honest as the acceptance bar.
 
 *Files: `src/world/history_sim.cpp`, `src/world/combat.cpp`, `tools/verify/history_sim_harness.cpp`*
 
-### NR-352 — BL-470 (unit march seam) — three implementation judgment calls, none blocking
-*decision taken on your behalf · raised 2026-08-19 · from BL-470 implementation this session — the design left three specifics for the implementer to resolve.*
+### NR-352 — BL-470 (unit march seam) â€” three implementation judgment calls, none blocking
+*decision taken on your behalf · raised 2026-08-19 · from BL-470 implementation this session â€” the design left three specifics for the implementer to resolve.*
 
-Three calls made while building BL-470 (march/halt/disband): (1) NR-344 (war flips the queue) is implemented as a pure VISITATION reorder inside run_unit_march (mobilised corps first, ascending unit id within each group) — there is no shared logistics-point pool yet (BL-464) for a marching corp to actually contend with a convoy over, so the rule is currently observable only by inspecting corp_is_mobilised/visitation order, not by any different in-game outcome, mirroring how BL-454 shipped upkeep inert at rate zero. (2) The design says the pass runs "after battle discovery", but no battle-discovery phase exists yet (BL-467) — run_unit_march was placed immediately before run_unit_upkeep, with a comment naming the slot it will occupy once BL-467 lands. (3) march_points_per_class was authored with first-cut placeholder constants (infantry 1.0, cavalry 1.5, ranged 1.0, siege 0.5, naval 0.0 tiles/tick against the plains=1.0 traversal weight) — untuned by playtest, same status as BL-394/BL-454s hire/upkeep constants when they landed.
+Three calls made while building BL-470 (march/halt/disband): (1) NR-344 (war flips the queue) is implemented as a pure VISITATION reorder inside run_unit_march (mobilised corps first, ascending unit id within each group) â€” there is no shared logistics-point pool yet (BL-464) for a marching corp to actually contend with a convoy over, so the rule is currently observable only by inspecting corp_is_mobilised/visitation order, not by any different in-game outcome, mirroring how BL-454 shipped upkeep inert at rate zero. (2) The design says the pass runs "after battle discovery", but no battle-discovery phase exists yet (BL-467) â€” run_unit_march was placed immediately before run_unit_upkeep, with a comment naming the slot it will occupy once BL-467 lands. (3) march_points_per_class was authored with first-cut placeholder constants (infantry 1.0, cavalry 1.5, ranged 1.0, siege 0.5, naval 0.0 tiles/tick against the plains=1.0 traversal weight) â€” untuned by playtest, same status as BL-394/BL-454s hire/upkeep constants when they landed.
 
-**Why it matters.** None of these block the item — R1-R5 all pass their headless requirement — but (1) means Ben should not expect any visible consequence from declaring hostility yet (it only matters once BL-464 lands a contended resource), and (3) means the march speed numbers are a first guess, not a balance pass.
+**Why it matters.** None of these block the item â€” R1-R5 all pass their headless requirement â€” but (1) means Ben should not expect any visible consequence from declaring hostility yet (it only matters once BL-464 lands a contended resource), and (3) means the march speed numbers are a first guess, not a balance pass.
 
-> **Recommendation:** No action needed now. Revisit (1) when BL-464 (Logistic Points) lands — that is when the reorder gets something to actually contend over. Revisit (3) during a playtest/tuning pass, the same way BL-394s hire costs were.
+> **Recommendation:** No action needed now. Revisit (1) when BL-464 (Logistic Points) lands â€” that is when the reorder gets something to actually contend over. Revisit (3) during a playtest/tuning pass, the same way BL-394s hire costs were.
 
 *Files: `src/world/economy_system.cpp`, `src/world/economy_system.hpp`, `scripts/economy.lua`, `docs/military/MILITARY.md`*
 
@@ -804,7 +804,7 @@ corporation_panel.cpp's table lives inside ui::foldout_begin's shell fold-out co
 ### NR-354 — Batch Delivery scoped down to BL-460/BL-441/BL-442(step1); BL-439/BL-440(c)/BL-443 deferred
 *decision taken on your behalf · raised 2026-08-19 · from 2026-08-19 Batch Delivery session survey of the v0.1.16 economy-integrity cluster (BL-439 through BL-443, BL-460).*
 
-Surveyed BL-439 (AI never builds processors), BL-440 (mines only target richest), BL-441 (unmet demand never registered), BL-442 (price band is code not data), BL-443 (debt compounds with no floor) and BL-460 (ordnance unproducible at 0 CE) as a candidate batch. Chose to land only BL-460, BL-441, and BL-442's step 1 (behaviour-identical constant relocation) this pass, and deferred BL-439, BL-440's remaining part (c), and BL-443 entirely - no code touched for those three.
+Surveyed BL-439 (AI never builds processors), BL-440 (mines only target richest), BL-441 (unmet demand never registered), BL-442 (price band is code not data), BL-443 (debt compounds with no floor) and BL-460 (ordnance unproducible at 0 CE) as a candidate batch. Chose to land only BL-460, BL-441, and BL-442's step 1 (behaviour-identical constant relocation) this pass, and deferred BL-439, BL-440's remaining part (c), and BL-443 entirely - no code touched for those three. [CORRECTED 2026-08-19 by the N1 audit: the claim "no code touched for BL-439/BL-440(c)/BL-443" is wrong for BL-439 â€” its tasks A/B/D landed on main at debfa87 on 2026-08-17 (corp_ai.cpp:736-905 + the ai_skill_harness guard). Accurate only about task C (the re-bless). BL-440(c) and BL-443 statements stand.]
 
 **Why it matters.** BL-439 explicitly reshuffles every blessed golden and every ai_skill_harness band as its stated cost ('paid once, deliberately, re-blessed as part of landing it') - not something to fold into a multi-item batch pass without dedicated attention to the re-bless. BL-440(c) needs a design call between two named implementation shapes (a post-registry retarget pass vs a static demand hint) that BL-441's own design notes partially supersedes - clearer to resolve after BL-441 lands and its effect on the coal shortage can be measured, not before. BL-443 explicitly says 'MEASURE BEFORE CHANGING ANYTHING' and requires a game-design call (debt ceiling vs forced liquidation vs restructuring) that shapes the Conflict/Trade arc - not a mechanical fix. Landing all six in one pass risked a sprawling, under-verified batch; scoping down keeps each landed item independently verifiable.
 
@@ -837,6 +837,118 @@ spacecraft_components, propellant, clean_water, consumer_goods and medical_suppl
 > **Recommendation:** B for now, revisited as A once population centres (POPULATION.md) or the ancient-vs-industrial procurement question comes up on its own - filing five difficulty-2 items today would be scope creep on BL-460, which is a single-good fix. R1b's known-gap table is the durable record either way.
 
 *Files: `tools/verify/chain_depth.cpp`, `src/world/market_clearing.cpp`, `src/world/economy_system.cpp`, `scripts/recipes.lua`*
+
+### NR-373 — verb_coverage.js's first real run finds march_unit/halt_unit/disband_unit missing from the dictionary
+*observation · raised 2026-08-19 · from BL-444 (VERB_REACHABILITY_COVERAGE_TOOL) implementation - tools/session/verb_coverage.js, run for real against src/world/corp_command.hpp, docs/ai/ACTIONS.json and src/world/corp_ai.cpp.*
+
+The corp_verb enum carries 24 verbs; the ACTIONS.json gameplay family only has 21 gameplay.* entries. The three missing are march_unit, halt_unit and disband_unit - BL-470's unit march seam, appended to the enum 2026-08-19 (corp_command.hpp: 'Appended AFTER return_to_neutral, same append-only rule'). ACTIONS.md's own convention (CLAUDE.md: 'Any change to a control, binding, lens, ledger or panel must update its entry') was not followed for this landing, so the tool's exit code is currently 1 in an otherwise clean tree.
+
+**Why it matters.** This is exactly the drift class ACTIONS.md warns about ('a stale entry misleads the AI player the way a stale golden misleads a visual check') and the reason BL-444 was commissioned - a dictionary gap on a real, landed seam addition, caught on the tool's very first run rather than staying invisible.
+
+- A - author the three gameplay.march_unit / gameplay.halt_unit / gameplay.disband_unit entries now (small, mechanical - corp_command.hpp's own comments already state each verb's contract) and re-run render_actions.js
+- B - file a small backlog item scoped to closing this one dictionary gap, so it goes through Delivery rather than being patched ad hoc
+- C - leave open until the next session that touches ACTIONS.json, since verb_coverage.js now makes the gap visible and self-documenting
+
+> **Recommendation:** A - this is the exact kind of small, mechanical dictionary-catch-up the tool exists to surface quickly; the three verbs' contracts are already fully specified in corp_command.hpp's comments, so authoring the entries is transcription, not design.
+
+*Files: `tools/session/verb_coverage.js`, `docs/ai/ACTIONS.json`, `docs/ai/ACTIONS.md`, `src/world/corp_command.hpp`*
+
+### NR-374 — presentation.cpp still carries three unauthored resource rows (charcoal, iron_blooms, trade_goods_misc) after BL-414
+*observation · raised 2026-08-19 · from BL-414 (RESOURCE_NAME_TABLE_TRIPLE_DESYNC) implementation this session - consolidating the world-layer Lua-name lookup tables in recipe_registry.cpp and world_gen_config.cpp into src/world/resource_names.{hpp,cpp}.*
+
+src/ui/presentation.cpp's resource_table (enum -> display name/abbreviation/colour, a separate concern from the Lua-name parser BL-414 consolidated) still carries three explicit { nullptr, nullptr, 0 } rows for charcoal, iron_blooms and trade_goods_misc (BL-286 logistics goods). presentation_of() falls back to "(unnamed resource)" for these. Left untouched by BL-414 deliberately - it is content authoring (picking a name/abbreviation/colour), not the structural desync BL-414 was scoped to fix, and src/world/ must not depend on src/ui/ so the two tables cannot simply merge.
+
+**Why it matters.** If any code path ever surfaces one of these three resources with a positive quantity (a recipe naming them, a market listing), the player sees "(unnamed resource)" / "?" rather than a real name. Today they stay unreached because nothing produces them (per the existing comment in presentation.cpp), so this is latent, not live.
+
+- A - author the three rows now (small, mechanical - display name + abbreviation + a colour distinct from neighbours) next time presentation.cpp is open for other reasons
+- B - file a small backlog item scoped to authoring BL-286's remaining presentation rows
+- C - leave as documented technical debt until one of the three resources gets a real producer/consumer (at which point it stops being latent)
+
+> **Recommendation:** C for now - authoring display data for resources nothing produces or consumes yet is premature; revisit when BL-287-290 (or successors) give them behaviour.
+
+*Files: `src/ui/presentation.cpp`*
+
+### NR-375 — Batch Delivery this session built a fresh low-collision batch (BL-414/420/444) rather than resuming NR-354's deferred economy cluster
+*decision taken on your behalf · raised 2026-08-19 · from Survey step of this Batch Delivery session, reading NR-354 (previous session's scoping decision) before picking a batch.*
+
+The session brief suggested resuming BL-439/440/443 (deferred by the immediately-prior session per NR-354, for reasons specific to each - BL-439's golden re-bless cost, BL-440(c)'s design call, BL-443's measure-first requirement). Re-surveyed the open v0.1.16 set instead and picked three independent, low-risk, non-economy items: BL-414 (resource name table dedup), BL-420 (decision-feed label dedup), BL-444 (verb reachability coverage tool) - all designed, priority A, small (d1-d3), no shared files. Ran each in an isolated worktree agent, merged cleanly (no conflicts, stale-base checked against merge-base), independently re-verified (rebuilt, re-ran corp_ai_harness/econ_harness myself rather than trusting agent self-reports, confirmed econ_harness's one failure - WF.R4 - is pre-existing on main and unrelated), and did the live UI check for BL-420 (the only one touching src/ui) myself since the sub-agent had no GUI access in its sandbox.
+
+**Why it matters.** NR-354's three deferred items still need their own dedicated attention (BL-439 especially, for the golden re-bless) - this session did not advance them, so they remain exactly where NR-354 left them. Recording this explicitly so a future session does not read "a Batch Delivery session ran" as progress on that cluster.
+
+> **Recommendation:** Next session should pick up NR-354's option A (re-run tier_margin/ai_skill_harness against BL-441/442's landing before deciding BL-440(c)'s shape) or option C (BL-439 as its own dedicated pass) - both are still live and unaddressed.
+
+*Files: `docs/development/backlog.json`*
+
+### NR-376 — BL-476 rival military seeding: iteration order and shared-occupancy threading, plus the is_background exclusion mechanism
+*decision taken on your behalf · raised 2026-08-19 · from Implementing BL-476 (RIVALS_START_UNARMED) in src/world/corporation_generation.cpp.*
+
+Two calls made while extending the player-only military seeding block to every corp: (1) iterated `corp_ids` in its existing generation-order sequence (player + rivals, no BL-365 background firms - they are created by a separate, later pass and never appear in this vector) rather than re-sorting by entity_id first, since corp_ids is already deterministic and re-sorting would add a step with no behavioural difference; (2) threaded ONE shared `occupied_tiles` set across every corp's seed_starting_military call (rebuilt once from w.buildings before the loop, then mutated in place by author_building each iteration) so two corps can never be placed on the same tile - this widens the original player-only rebuild-from-w.buildings pattern to a loop without changing its semantics for the player's own case.
+
+**Why it matters.** Both calls are load-bearing for determinism: a different iteration order or a per-corp-rebuilt occupancy set could change which tile a given rival lands on, or (worse) let two corps collide on one tile. The is_background exclusion is implicit (corp_ids never contains a background firm) rather than an explicit filter - correct today because generate_background_firms runs strictly after generate_corporations, but a future refactor that reorders those two passes would silently arm background firms again with no compile error.
+
+> **Recommendation:** If the two generation passes are ever reordered or merged, add an explicit `!cc.is_background` guard in the seeding loop rather than relying on the passes' current call order - noted here so that refactor does not quietly reintroduce armed background firms.
+
+*Files: `src/world/corporation_generation.cpp`*
+
+### NR-377 — The v0.1.16 split executed: destination mapping chosen on Ben's behalf
+*decision taken on your behalf · raised 2026-08-19 · from Version-alignment session 2026-08-19: six-agent research workflow + 27-verdict contradiction audit + Ben's form verdicts.*
+
+Ben ruled "split the 36-item v0.1.16 holding pen now" but not the destinations. Mapping chosen: v0.1.16 keeps The watch (BL-408/410/411/412/413/418/451 + un-parked BL-306/BL-335); v0.1.19 Ancient conflict & seams (BL-274/277/297/298/299/300/320/337); v0.1.20 Stance & force (BL-314/399/449/450/464/474/475 + BL-472 from v0.1.18); v0.1.21 The credible rival (BL-417/419/439/440/445/446/447); v0.1.22 Harness truth (BL-425/426/427/462/463); BL-296 + BL-443 to v0.1.11 (meta). Rationale: theme coherence per the roadmap grain; the watch keeps the number because its items were already there and Sprint W1 cuts it.
+
+### NR-378 — Stale-goal re-homing destinations chosen (BL-372/375/391/392, BL-264)
+*decision taken on your behalf · raised 2026-08-19 · from Version-alignment session 2026-08-19: six-agent research workflow + 27-verdict contradiction audit + Ben's form verdicts.*
+
+BL-372 (lens-keyed selection) -> v0.1.7 (UI alignment); BL-375 (time-to-space pacing, parked) -> v0.2.0; BL-391 (reputation floor deadlock) -> v0.1.15 (the contract/pay loop owns reputation); BL-392 (procurement destroys value) -> v0.1.11 (Lane D guard: D4 says fix before BL-445); BL-264 (wizard layout, orphaned by the v0.1.11 supersession) -> v0.1.7. BL-341 found complete, untouched.
+
+### NR-379 — BL-087 piece 2 extracted as BL-478 rather than un-parking the whole item
+*decision taken on your behalf · raised 2026-08-19 · from Version-alignment session 2026-08-19: six-agent research workflow + 27-verdict contradiction audit + Ben's form verdicts.*
+
+Ben's verdict said "Un-park BL-087 piece 2 into the live arc". Executed as an EXTRACTION: new item BL-478 (ancient research spend, v0.1.11, design-owed) carries the research-state + spend mechanism; BL-087 itself stays parked with the space arc, its design noting the extraction.
+
+### NR-364 — BL-186 laws-ledger design amended to the who-enacts model without a fresh ask
+*decision taken on your behalf · raised 2026-08-19 · from Version-alignment session 2026-08-19: six-agent research workflow + 27-verdict contradiction audit + Ben's form verdicts.*
+
+BL-186's Â§ Settled 2026-07-19 (player enact/repeal fast-path on the Budget ledger) struck with a dated note: ledger is browse-only, extraction tax surfaces BL-280's negotiation, enactment belongs to the nation actor (BL-480).
+
+### NR-365 — Sizing note: the Fall arc's "12-20 sessions / two-month" line left standing as a ceiling
+*observation · raised 2026-08-19 · from Version-alignment session 2026-08-19: six-agent research workflow + 27-verdict contradiction audit + Ben's form verdicts.*
+
+Measured cadence: median sprint closes in 1 day (14 dated sprints across 29 days); the two design-heavy sprints ran 8-10 days. Honest range for the arc: ~3 weeks (median-like) to ~2 months (design-heavy-like). The risk line is denominated in sessions, which dates cannot measure; not edited.
+
+### NR-366 — Worktree/branch debt named, not swept: 29 merged worktree-agent branches, ~15 stale mounts, one superseded rename branch
+*observation · raised 2026-08-19 · from Version-alignment session 2026-08-19: six-agent research workflow + 27-verdict contradiction audit + Ben's form verdicts.*
+
+Cleanup NOT run this session (deletion is destructive and was not on the form). The rename branch worktree-agent-ac68172a carries a9f1e52, superseded 42 minutes later by main's 70b2470 - eyeball-diff owed before deletion per the stale-base memory. The two unmerged branches: that one, plus the deliberate BL-474/475 paused WIP.
+
+### NR-367 — N1 audit complete: BL-437 flipped; five holds bounded; BL-443 confirmed open but gated on your NR-296 lever pick
+*observation · raised 2026-08-19 · from Read-only N1 audit agent over the seven un-flipped Sprint-26 items, evidence file:line + hashes; item-commits.json regenerated (350 entries â€” the seven were missing because the generator had not been re-run).*
+
+BL-437 (co-extraction) complete at 2884f6c. Held with bounded remainders: BL-417 (step 2 = your NR-265/268 call), BL-429 (one GUI look), BL-439 (task C re-bless = your NR-269 pick; sequence after the debt lever), BL-440 (task D doc + re-run tier_margin R4b), BL-453 (build + capture + live Hold press; do not re-build). BL-443 genuinely unbuilt; the audit resolved the item's own existing-guard worry (econ_bankruptcy asserts nothing).
+
+### NR-368 — BL-335 measured: the 300-token assumption holds on output, fails ~60x on input â€” BL-481 filed as the fix
+*observation · raised 2026-08-19 · from BL-335 one-off measurement over build/ProjectIo.exe --serve (pre-batch binary; the MCP surface is unchanged by the in-flight work). Raw table in the item summary; script + raw output preserved in the session scratchpad.*
+
+A MINIMAL decision round is ~19-20K input tokens, a NAIVE one ~26K, against LANGUAGE_POLICY_FEASIBILITY's compact-blackboard premise; output stays under 300 tokens with margin. 96% of input bulk is the market and rival-building triples with a repeated 70-byte envelope. BL-481 (compact encoding, v0.1.16, designed) carries the fix: fuse + hoist + filter = ~1.5-5K tokens per round for the BL-306 client loop.
+
+### NR-369 — BL-480 delegated call: the seeded levy's author nation is the player's home nation
+*decision taken on your behalf · raised 2026-08-19 · from BL-480 build agent (worktree branch worktree-agent-a9ac4a6bca1072bf3 @ 95a68d8), barred from board files; entry filed by the main session per Rule 0c.*
+
+The generation-seeded extraction levy needs an enacting nation. Chosen: the PLAYER corp's home_nation â€” consumes no RNG, and makes the ledger's read-only levy line non-vacuous from turn one (the law binds the player). Fallback: largest territory, ties to lowest entity id; no nations, no law. Asserted deterministic in law_author_harness (14/14). Consequence stated plainly: the levy now charges the player from turn one by design â€” the item's stated shape, not a side effect.
+
+### NR-370 — BL-408 findings: a pre-existing BL-068 leak (filed as BL-482) and a dead module its design named
+*observation · raised 2026-08-19 · from BL-408 build agent report (branch worktree-agent-aa5fd296e1318e86e @ 701cba5); entries filed by the main session.*
+
+(1) economy_panel.cpp draw_pools already shows every corp's pool quantities to a PLAYED session â€” past the competitor-visibility rule, predating god view; filed as BL-482 (economy panel pools leak, v0.1.7, B). (2) entity_summary.cpp's draw_corporation_summary â€” which BL-408's own design named as a lift site â€” is dead code; nothing calls the module. The live corp surface is the Selection band's facts column, where the lift was implemented instead. (3) The comms-redaction lift (BL-408 lift 2) was deliberately deferred: post_nation_agency_comms is a post-time store, and flag-gating it would latch state â€” it needs a small read-time-filter design of its own, recorded in DISCOVERY.md's new god-view section.
+
+### NR-371 — BL-479 delegated calls: mirror field, earn-time accumulation (BL-107 debt), fixture seam, modifier-blind estimators, skill listing owed
+*decision taken on your behalf · raised 2026-08-19 · from BL-479 build agent report (branch worktree-agent-ac0ff6e87868aed58 @ 8c62fe1); filed by the main session per Rule 0c.*
+
+Five calls: (1) unlocks_structure kept as a mirror field maintained solely by add_effect, so the existing tech-gate harness compiles unmodified (R3) with one authoring point. (2) Modifiers accumulate on world.corp_modifiers at earn time â€” derived, unhashed, unserialised; BL-107 now carries the recompute-on-load debt as a dated design note. (3) The gate-table overload of advance_tech_gates is the fixture seam â€” the shipped table carries NO modify_scalar tech, because authoring live buff content is yours, not a test's; it is also the natural sharing shape for law. (4) Estimator sites (Build-door stack pricing, generation census, workforce solver, corp_ai scorer) stay modifier-blind â€” exact today with no shipped buff, but the FIRST authored buff tech makes them approximations; revisit then. (5) The new harness is in README.md + the CMake glob but NOT in verifier-headless SKILL.md â€” skill edits need your permission; the listing is owed.
+
+### NR-372 — BL-412 delegated calls: agent-gated clock semantics, boundary drain, detach/second-client policy, MCP lockstep pairing
+*decision taken on your behalf · raised 2026-08-19 · from BL-412 build agent report (branch worktree-agent-a51c6af46393ea9de @ 8d092a7); filed by the main session per Rule 0c.*
+
+Six calls: (1) attach PAUSES the sim and TICK releases one econ tick (agent gates the clock per the REFINED brief); human speed keys still override, and even free-running, commands land only at tick boundaries â€” the transcript stays a replay artifact either way. (2) Commands drain at the boundary BEFORE the next step, stamped with the completed tick â€” run_serve's exact tick-tag contract. (3) SHUTDOWN on the live seam closes the CONNECTION, never the app. (4) Detach discards never-answered commands and leaves the world paused. (5) One client at a time; a second connection is refused outright. (6) The MCP --attach transport sends COMMAND+TICK as one exchange so a lockstep client cannot deadlock against the gated clock. Also observed: server.js's hand-maintained VERBS array is stale (missing stance + unit-march) â€” noted on BL-306, whose loop should derive verbs from ACTIONS_INDEX.json.
 
 ### NR-359 — DEVLOG.md rebuilt from its last clean commit - merge 0677f7a had re-imported 81 pre-rollover sessions in chimeric form
 *decision taken on your behalf · raised 2026-08-20 · from PR-45 review session, 2026-08-20. The COLLAPSE session's index regen exposed it (168 -> 251 rows, mass duplicates).*
@@ -878,6 +990,278 @@ Data-model restructuring is free today and expensive the day the snapshot serial
 - B) Do one deliberate reshaping pass (fold parallel side-tables into their components) first, then serialise.
 - C) Defer both - accept that later reshaping pays the serialiser tax.
 
+### NR-380 — Your call: the batch ships two visibility positions at once — gated god view vs ungated strategy readout
+*question · raised 2026-08-19 · from verifier-review of the integrated batch (verdict GO COMPILE, finding #1).*
+
+BL-408 gates rival internals behind spectating && god_view; BL-411's strategy readout (nav slot 12) shows every rival's decision-mix aggregates UNGATED in a played session. The reviewer ruled it not a BL-068 regression — the decision feed (slot 11, strictly more revealing: per-decision verb, target, tile, scores) has been ungated since BL-407, and the readout leaks no credits or stockpiles (counts only). But the two positions now coexist undeclared. Options: (A) declare decision-stream aggregates a PUBLIC channel — one paragraph in DISCOVERY.md beside the BL-068 rule, no code change (consistent with the feed precedent; my recommendation); (B) gate slots 11+12's rival rows on spectating — restores strict BL-068 but takes the feed away from played sessions that have had it since BL-407.
+
+### NR-381 — Review fixes applied at integration; two process findings from the verifier-review
+*decision taken on your behalf · raised 2026-08-19 · from verifier-review findings #2,3,4,5,8,9,10,11,12 applied by the main session before the integrating build.*
+
+Applied without a fresh ask: treasury credits now applied post-loop in sorted (corp,nation) order (float-order stability, #2); treasury doc states not-serialised/not-hashed (#3); SYSTEMS.md levy prose corrected (#4); readout header says decision-count not spend (#5); --autostart now honours --host-agent instead of ignoring it silently (#9 — wired, not rejected, matching every sibling path); transcript doc says truncate (#10); verify.buildings() iterates sorted corp ids (#11); the god-view checkbox joined ACTIONS.json, 135 entries (#12). The spectate x seam collision (#8) is recorded on BL-413 as a refuse-the-second-press rule. PROCESS findings for the retro: the batch's collision map was wrong in both directions (named collisions that did not exist, missed app.cpp/verify_api.cpp/ui_state.hpp ones that did — clean merges were worktree isolation plus luck), and no symbol-level provides/consumes contract was written (#13); the levy shipping enacted moves every generated-world state_hash structurally (#6) — the harness re-run must bless deliberately, not absorb.
+
+### NR-382 — Your call: the enacted levy's placeholder rate (1.0 cr/unit, all resources) sends every rival insolvent — rate ruling before any bless
+*question · raised 2026-08-19 · from Integrated harness verification: ai_skill_harness 17 PASS / 19 FAIL, all 19 in the golden-band families; determinism rows and BL-439's processor row green. Nothing blessed.*
+
+BL-480 ships the extraction levy ENACTED (your who-enacts model), which exposes that its rate was a placeholder that never bit while the law shipped un-enacted: seed_prototype_laws defaults rate=1.0 cr per raw unit, scope all_resources. Result vs the 2026-08-16 bands: net-worth finals 78K..499K -> −3.6M..−5.2M, solvency 30/30 below zero on all five seeds, min==final everywhere (monotonic decline; BL-073 interest compounds once corps cross zero — the BL-443 spiral doing the multiplying). The 2026-08-17 record was already red at −1.9M..−3.4M (Sprint 19, left red and attributed), so this deepens an attributed red rather than breaking a green.
+
+### NR-383 — Merge of the mobile design session: dual id-collision renumbered (origin BL-476..482 -> BL-504..510; local NR-356..362 -> NR-373..379; uncommitted NR-373..375 -> NR-380..382)
+*decision taken on your behalf · raised 2026-08-20 · from origin/main merge (mobile COLLAPSE.md session + repo-delegation strategy), merge commit 97c12bb.*
+
+Both machines minted BL-476..482 and NR-356..362 independently. Local BL ids are baked into src/ code comments and harnesses (corporation_generation.cpp, law.hpp, tech_gate, five tools/verify harnesses), so the ORIGIN side moved: the mobile session's BL-476..482 (strain accumulator, culminating events, etc.) became BL-504..510, remapped through backlog.json, COLLAPSE.md, DEVLOG, DEVLOG_INDEX and the origin NR entries. On the NR side the origin ids were woven into COLLAPSE.md rulings, so the LOCAL side moved: committed NR-356..362 became NR-373..379 (refs updated in backlog.json, requirements.json, ROADMAP.md, REFINED.md), and the still-uncommitted NR-373..375 from the 2026-08-19 session became NR-380..382. backlog.json was resolved as a JSON three-way merge; BL-464 (logistic points) keeps origin's authored design plus local's v0.1.20 retarget. No duplicate ids remain; all four JSON stores validate.
+
+**Why it matters.** Commit messages on both sides still cite pre-renumber ids (immutable); anything you remember as BL-476-the-strain-accumulator is now BL-504 (STRAIN_ACCUMULATOR), and the COLLAPSE decomposition is BL-483..496 + BL-504..510. next_id.js should now mint from BL-511 / NR-384.
+
+### NR-384 — Lane C could not start: BL-467 (battle state) needs BL-466 (province partition), which is unbuilt
+*observation · raised 2026-08-20 · from Four-lane batch refinement (Sprints 27/B2/B3/C3/D4), REFINED.md 2026-08-20.*
+
+BL-467 rules the PROVINCE as the engagement envelope (your 2026-08-19 elicitation, ruling 1), but src/world/province.{hpp,cpp} does not exist and BL-466 is still designed-not-built. Sprint C3 as written (battle store + trigger + losses) therefore has no envelope to draw. Refined as two sequential tasks, C1 = BL-466 alone as the foundation, C2 = BL-467 after C1 merges. This costs Lane C its parallelism inside the lane but not across lanes.
+
+### NR-387 — Deferred: Sprint D2 (research becomes a currency) wants a design pass, not an implementer
+*observation · raised 2026-08-20 · from Four-lane batch refinement (Sprints 27/B2/B3/C3/D4), REFINED.md 2026-08-20.*
+
+BL-478 (ancient research spend) is design-owed and the debit mechanism has no design. NR-315 records that condition_subject::science shipped as a LEVEL, picked by reading BL-344 shape rather than by choice - so the spend model is an open design question, not a build task. Held out of this batch. It is the natural next design session, and it gates the 92-object ancient_tech_ladder.json becoming reachable.
+
+### NR-388 — Six items are landed-awaiting a live GUI check and none can flip without one session at the app
+*observation · raised 2026-08-20 · from Four-lane batch refinement (Sprints 27/B2/B3/C3/D4), REFINED.md 2026-08-20.*
+
+BL-412 (live agent seam), BL-408 (spectator god view), BL-411 (strategy readout), BL-480 (law author read-only levy line), BL-429 (ancient roster), BL-453 (convoy ledger). The code is in the tree; every held requirement row is a LIVE check. Promoted as Lane M, main session, ahead of the four build lanes - it is the cheapest six flips on the board.
+
+### NR-389 — BL-408 spectator god view has NO reachable entry in a played session - only a verify script can turn spectate on
+*observation · raised 2026-08-20 · from Lane M live check, four-lane batch. Build ce7e9f7, fresh build_app.bat run.*
+
+The god-view checkbox renders only while corp_ai_params::spectating is set (ACTIONS.json chrome.sysmenu_god_view: "unreachable in a played session"). The ONLY writer of ui_state.spectating in the whole tree is verify_api.cpp:656, the Lua binding verify.spectate(on). There is no menu item, no checkbox, no CLI flag (main.cpp parses --bless, --export-blackboard, --serve, --verify, --verify-all - no --spectate). So BL-408 cannot be live-checked, and more to the point a player or a watcher cannot enter spectate mode at all outside a verify script. This is exactly the gap the 2026-08-19 live-check rule was written for: the code compiles, the harness is green, and the press does not exist. Needs a decision - either an entry point (a CLI flag and/or a main-menu option) is in BL-408 scope and was missed, or spectate is deliberately harness-only for now and BL-408 requirement rows should say so rather than claiming a surface.
+
+### NR-390 — kMaxCrossingTiles = 3 is an unpinned number, and cut 2 REMOVES roads as well as adding them
+*decision taken on your behalf · raised 2026-08-20 · from Lane B1 (Sprint B2, road cuts), agent report + main-session diff review, merged at 530eb87.*
+
+The agent chose kMaxCrossingTiles = 3 with no doc pinning it. It governs two things at once: what counts as a strait worth stamping shore-to-shore, and how wide an unowned gap territorial adjacency tolerates. Consequence worth seeing: cut 2 does not only add reach, it DELETES road that used to generate - an edge whose route crosses open ocean is now not stamped at all, which removed 6 Tracks on the home body (234 -> 228) that were disconnected fragments on distant shores. That is a deliberate reading (fragmented shores are noise, not reach) and it is defensible, but it is a design call taken on your behalf. The larger call NOT taken: making roads bridge straits by stamping the water tiles themselves, so the corridor is continuous for the logistics A*. That would overturn the stated roads-are-a-land-feature invariant and collides with BL-188 (coastal ports).
+
+### NR-391 — The 26-of-43 road-less nation figure did not reproduce - two different definitions were in play
+*observation · raised 2026-08-20 · from Lane B1 (Sprint B2, road cuts), agent report + main-session diff review, merged at 530eb87.*
+
+BL-463 design cites 26 of 43 nations with no road network on seed 0. The new road_reach_census measures 14 road-less of 161 nations across the 8-seed set (8.7%), seed 0 contributing 2. The agent believes the older figure counted nations with no intra-nation road EDGE (which includes every single-centre nation whether or not a border link roads it), where the census counts nations with no roaded TILE in territory. Both are defensible; only one is now instrumented and inspectable. Worth ruling which definition the civilised-world argument should be tracked against, because the two differ by nearly 2x and one of them is quoted in a priority-A item.
+
+### NR-392 — novel-work: a worktree agent had no sanctioned way to build a harness, so it authored build_gen_harness.bat
+*novel-work · raised 2026-08-20 · from Lane B1 (Sprint B2, road cuts), agent report + main-session diff review, merged at 530eb87.*
+
+Nothing in the reading list owns the question how does a worktree agent build a harness. A fresh worktree has no configured build tree and a CMake configure pulls SDL + Lua over FetchContent, which is not worth paying for one harness. The agent wrote build_gen_harness.bat at the repo root: it globs srcworld*.cpp minus the four sol2 TUs exactly as io_world_obj does, so unlike the README hand-written cl recipes it cannot drift stale - which is the standing complaint against those recipes. Merged with the lane. Two things owed and both need your permission: folding this into the verifier-headless skill, and naming road_reach_census there so it becomes a permanent asset rather than a loose tool.
+
+### NR-393 — MAJOR: the Era -1 sim now conquers on half the seed set - the filed 267-battles/0-conquests premise is gone, and Sprint 28 framing is wrong
+*observation · raised 2026-08-20 · from Lane A (Sprint 27, BL-384 assertion half), agent report verified against main by the main session.*
+
+Fresh 8-world sweep on real terrain, measured today against the current build: 4 of 8 seeds fight AND take ground, at a near-1:1 conquest:battle ratio (144/137, 272/272, 272/272, 27/27). The other 4 seeds see zero battles. So Campaign is not universally unreachable - it is SEED-DEPENDENT and bimodal. Sprint 28 plans its fix on the premise that Settle always outscores Campaign under the shared currency; that premise does not hold on half the set, and a fix tuned against it would be tuning away a behaviour that already works on seeds 1, 2, 4 and 6. Sprint 27 own risk clause named exactly this outcome and instructed that it be reported rather than absorbed. Also unchanged and still red: 0 polities eliminated and 0 hegemonies anywhere in the set - BL-308 spiral still does not end.
+
+### NR-394 — Refinement error: Sprint 27 assertion half was already delivered before I promoted it
+*decision taken on your behalf · raised 2026-08-20 · from Lane A (Sprint 27, BL-384 assertion half), agent report verified against main by the main session.*
+
+I promoted Task A1 (author the BL-384 conquest assertion) into the four-lane batch. It was already committed on main at 610e276 and f4a0c18 - the BL384a/BL384b assertions, the elimination counter and the dominance-share counter all exist, reusing history_sweep hegemony_threshold_q verbatim. I checked BL-384 status (designed) but not whether the assertion HALF specifically had landed, and the item stays open because the FIX half is outstanding. The agent correctly authored nothing, changed nothing, and made no commit; the lane still paid for itself by re-measuring (NR-393). Method note worth taking: a half-delivered item reads as designed in the backlog index, so status alone does not answer has this part shipped - the item dated notes or git log do.
+
+### NR-395 — The R7 perf assertion is still live and failing although the backlog says it was dropped
+*observation · raised 2026-08-20 · from Lane A (Sprint 27, BL-384 assertion half), agent report verified against main by the main session.*
+
+history_sim_harness R7 (a perf budget) fails at 16679 ms on the primary Kepler run. The backlog records this budget as DROPPED in favour of BL-320, but the assertion was never removed from the harness, so it reds every run and adds noise to a harness whose reds are supposed to mean something. Either the drop did not happen and the budget is real, or the assertion should go. Small, but a permanently-red assertion trains everyone to ignore the harness.
+
+### NR-396 — A FOURTH procurement fault, unfiled: the deposit and every instalment left the buyer and arrived nowhere
+*observation · raised 2026-08-20 · from Lane D (BL-392 + Sprint D4 tariff), agent report + main-session diff review, merged at 9b75621.*
+
+BL-392 filed three faults. The agent found a fourth while satisfying the conservation requirement: the deposit and every paced instalment were debited from the buyer and credited to NOBODY - every contract in flight was burning credits out of the economy. The supplier is now credited exactly what the buyer is debited. This is a real behaviour change that no item asked for, admitted because the conservation requirement made it unfixable-around. Worth knowing that the money supply has been quietly shrinking in every session where a contract was live.
+
+### NR-397 — A small cross-body contract still loses to spot, on purpose - two dials if you disagree
+*decision taken on your behalf · raised 2026-08-20 · from Lane D (BL-392 + Sprint D4 tariff), agent report + main-session diff review, merged at 9b75621.*
+
+Re-measured after the BL-392 fix, contracted parcel vs the same parcel at spot (positive = contract wins): 20 units -1.2500, 100 units +6.2500, 500 units +93.7500. The -0.14 break-even-by-construction is gone - the discount is real and monotone in size, and the goods now arrive somewhere usable. But at 20 units the 5% freight still exceeds the 1.7% discount, so a small cross-body order is a bad deal. The agent took the reading that freight is an honest cost and that vs-spot-on-the-suppliers-market is the wrong comparison for goods the buyer cannot reach anyway. If you want small orders to win too, the dials are offbody_freight_fraction (0.05) and volume_discount_half_quantity (100), both in scripts/economy.lua.
+
+### NR-398 — novel-work: a nation now holds and receives money, and conservation is NOT a global property of this economy
+*novel-work · raised 2026-08-20 · from Lane D (BL-392 + Sprint D4 tariff), agent report + main-session diff review, merged at 9b75621.*
+
+Two things earn the flag. First, nation treasury is the first money a non-corporate actor has ever held, and no doc owns what a nations balance is FOR - the tariff credits it, and nothing spends it. Second and more important: money conservation was never a property of this economy and still is not globally - the market is a buyer of last resort that pays sellers with nobody money. The new money_conservation harness asserts conservation across these two items own flows against control worlds, and its header says so at length so nobody later reads it as a global claim. Someone will eventually have to decide whether global conservation is a goal or whether the market is deliberately an infinite counterparty.
+
+### NR-399 — The procurement save seam rejects old saves outright on a version bump - pre-existing, but now exercised
+*observation · raised 2026-08-20 · from Lane D (BL-392 + Sprint D4 tariff), agent report + main-session diff review, merged at 9b75621.*
+
+read_procurement gates on version != procurement_version and returns false, so bumping 1 -> 2 (which this work did, for delivery_body and freight_cost on both records) makes every pre-existing save unreadable rather than upgradable. That strict-equality check is PRE-EXISTING and not introduced here, but this is the first bump to actually exercise it. Related gap the agent flagged and did not introduce: nation_component::treasury and law::author_nation have no serialiser at all - nations and laws are not saved, so a treasury survives nothing. BL-107 is the item that owns picking those up. AMENDED 2026-08-20, same session: this overstates the risk. There is NO game save/load path at all - app.cpp persists settings only, and neither read_procurement nor read_history_log has a caller anywhere in src/. So no player save exists to be rejected, and the version bump costs nothing today. The seam correctness still matters for the day a save lands; the urgency does not.
+
+### NR-400 — The D4 import tariff has NO authoring path - nothing in src/ can enact one
+*observation · raised 2026-08-20 · from Pre-compile static review of the integrated four-lane batch, 2026-08-20; blocker fixed at bd238d5.*
+
+Outside law.{hpp,cpp} and market_clearing.cpp there is not one reference to law_effect_kind::import_tariff anywhere in src/. No corp_verb, no UI control, no generation seeding, no agent-seam command creates a tariff law; seed_prototype_laws seeds only the extraction levy. So in a real campaign any_import_tariff_enacted is permanently false and the entire tariff pass is unreachable. The mechanism is built, proved and conserved - in a harness fixture. If D4 acceptance is a cross-border sale pays a duty into the market nation treasury, that is NOT met in the shipped binary. Deliberately not fixed here: seeding a tariff at generation changes every generated world and is a design call, and the granted nation-grain scorer enacting one mid-campaign is the seam the work was shaped for. Your call which of the two it should be.
+
+### NR-402 — Six new harnesses joined the routine ctest gate at the 60s default, two of them census-class
+*observation · raised 2026-08-20 · from Pre-compile static review of the integrated four-lane batch, 2026-08-20; blocker fixed at bd238d5.*
+
+The CMake GLOB registers tools/verify/*.cpp automatically, so this batch six new harnesses entered the routine gate silently. road_reach_census (3x make_hard_coded_world) and rival_military_seeding_harness (4x) are the exposure. substrate_census own CMake note records ~62s per world in a Debug tree and parked itself in IO_TEST_SWEEP_HARNESSES for exactly this reason; road_reach_census is by name the same category and is not in that list. Expect a Debug-tree Timeout, which NR-259 calls a silent failure. Also: rival_military_seeding_harness has never been named in tools/verify/README.md - it arrived undocumented in an earlier commit, not in this batch.
+
+### NR-403 — Decision: world_audit now skips the BL-476 seeded military base rather than raising its ceiling
+*decision taken on your behalf · raised 2026-08-20 · from Full CTest suite over the integrated four-lane batch, 2026-08-20 (96 tests, 1474s).*
+
+B4 R1 failed on the integrated tree and passed in every agent worktree, because BL-476 (ce0e5cc) landed after their common base and seeds a military_base into EVERY corp assets. holdings_range governs ECONOMIC holdings and never counted that base, so the audit was comparing against a ceiling one too low for every corp - it only reds when a draw lands at the top of its range, and this batch settlement-density change made one do so. Two ways to fix: raise every ceiling by 1, or stop counting the base. I took the second, because the first would hide a real +1 and would make the audit assert something holdings_range does not promise. Verified: every corp drops by exactly one and all sit inside the declared ranges. If you would rather the audit tracked TOTAL footprint including military, say so and it inverts. Note the file own comment now records this as the FOURTH drift of a hand-mirrored table - the pattern, not this instance, is the thing worth fixing.
+
+### NR-405 — RULING: unit position moves to province grain, overturning the 2026-08-13 tile-token ruling
+*decision taken on your behalf · raised 2026-08-21 · from BL-511 design form, Ben 2026-08-21.*
+
+Recorded because it is the third dated position on the same question and the previous two are still quoted in authority docs. 2026-08-13 (BL-315 ruling 2): units are tokens on the TILE map, explicitly not armies at province grain. 2026-08-19 (BL-467): grains SPLIT - command at the tile, engagement at the province. 2026-08-21 (this): units move and are selected at PROVINCE grain, collapsing that split. It is a simplification - BL-467 engagement rule no longer needs a tile-to-province reduction because a unit position IS a province - and the ~4-tile province keeps it modest. Costs, all named in BL-511: march_unit payload changes tile -> province (BL-470 landed that verb 2026-08-19), unit_component is tile-canonical in MILITARY.md, and BL-471/BL-469 should follow the render change rather than precede it. MILITARY.md and BL-315 still assert the OLD ruling and must be corrected as part of landing the work, not ahead of it (authority time-slice).
+
+### NR-406 — The province building limit would be the first ceiling in the game that MOVES during play
+*question · raised 2026-08-21 · from BL-513 design, from Ben four-input heuristic.*
+
+Ben named infrastructure as one of the four inputs to the province building limit (area, infrastructure, habitability, population). Roads and hubs are built during play, so the ceiling would RISE as a player invests - unlike the per-tile deposit cap and every other placement bound, all fixed at generation. That coupling looks intended and desirable (BL-325 ruling 3 makes economic reach and military reach one field, so infrastructure paying off into capacity is consistent), but it is worth an explicit yes: a dynamic ceiling means a building can become legal later, and any UI that shows remaining capacity has to recompute rather than cache. If it should instead be read once at generation, that is a smaller item.
+
+### NR-407 — BL-458 shipped SILENT: interdiction works, but nothing tells the player it happened
+*observation · raised 2026-08-21 · from Lane M (BL-458 supply interdiction), agent report + main-session verification, merged and MSVC-confirmed.*
+
+The mechanic is real and proven - a hostile unit on a convoy head tile takes the cargo into its own pool and the convoy never arrives (interdiction_harness 49/49 under MSVC). But all three surfaces the item asks for are absent: the comms-dock message, the Convoys-tab row leaving with a stated cause, and the canvas mark. All three need somewhere to keep an interception_record, which means a field on world - a file other lanes in this batch hold open - so intercept_convoys RETURNS its records and credit_arrived_convoys discards them. As shipped a convoy vanishes with no explanation, which the item explicitly says it must not do. This is the honest incomplete of an otherwise complete lane: the requirement group supply-interdiction R3 is PARTIAL, not met. The surfaces are a small follow-up once the province-grain batch stops holding world.hpp.
+
+### NR-408 — Decision: the interdiction trigger sits INSIDE credit_arrived_convoys, which reads surprising
+*decision taken on your behalf · raised 2026-08-21 · from Lane M (BL-458 supply interdiction), agent report + main-session verification, merged and MSVC-confirmed.*
+
+intercept_convoys is called from the top of credit_arrived_convoys rather than from the four call sites (app.cpp, main.cpp twice, harnesses). The agent took this on my behalf because those files are outside its ownership and this is the only seam all four share. It is defensible - a convoy that was intercepted must not then be credited, so the two belong in one ordered step - but it reads oddly against the function name, and a future reader looking for the trigger will not look there. It carries a loud comment. Worth confirming, or renaming the function to say what it now does.
+
+### NR-409 — convoy_tile_at takes world&, not const world& - the A* cache forces it
+*observation · raised 2026-08-21 · from Lane M (BL-458 supply interdiction), agent report + main-session verification, merged and MSVC-confirmed.*
+
+The item specified entity_id convoy_tile_at(const world&, const convoy_component&). It shipped as world& because intra_body_path POPULATES the A* cache, so const is unreachable without paying for a second uncached path solve. Documented at the declaration. Minor, but recorded because the item text will otherwise read as unimplemented, and because a non-const read-shaped function is the kind of thing a later reviewer flags as a mistake when it was a measured trade.
+
+### NR-410 — The province ceiling coefficient has a 28% spread across seeds, and that is reported not hidden
+*Lane B (BL-513 province building ceiling), merged and verified 2026-08-21. · raised 2026-08-21 · from k = 12.6468 is pinned as the aggregate of pooled-per-tile-capacity / sustain-units across 8 seeds, so the ceiling REDISTRIBUTES the capacity the world already grants onto Ben four inputs rather than inventing a new regime. The per-seed ratios run 11.4694 .. 15.2588 - a 28.36% spread of the mean, because seeds genuinely differ in habitable-land share. Consequence: a low-habitability seed gets a ceiling slightly above the capacity it already had, a high one slightly below. Neither binds today (0.115% used, zero provinces at ceiling), so nothing is affected yet - but if the ceiling ever binds, it will bind unevenly across seeds. Worth knowing before density rises. The agent first draft used an invented k of 2.213 and the probe caught it immediately (15-26 provinces already over ceiling); the pinning discipline worked exactly as BL-463 intended.*
+
+### NR-411 — Perf: province_buildings_standing is an O(all buildings) scan inside can_place_in_world
+*Lane B (BL-513 province building ceiling), merged and verified 2026-08-21. · raised 2026-08-21 · from The ceiling gate runs last and only for otherwise-valid tiles, and spectator_determinism still completes in 14s, so it is not a problem today. But it is a linear scan over every building in the world on a placement path that the AI scorer hits every tick. If placement checks get hotter - more corps, more density, or a scorer that evaluates more candidates - this wants a per-province building index rather than a scan. Recorded now so it is a known cost rather than a future mystery.*
+
+### NR-412 — Province id 0 is a REAL province, so the march seam needed a different sentinel
+*Lane U (BL-511 seam half, march_unit to province), merged and verified 2026-08-21. · raised 2026-08-21 · from Measured, not assumed: body rank 0 | block 0 | component 0 is a reachable id, so 0 cannot mean absent. corp_command::province and the wire province= field default to no_province (0xFFFFFFFF), which is structurally unreachable because it would need component index 7 and a 2x2 block yields at most 4. This matters more than it reads: a 0 default would have given an OMITTED wire field a real destination and answered applied - a silent order substitution, exactly what the untrusted-input-boundary rule forbids. The rejection sweep covers 123 in-range-but-absent ids including every single-bit flip of a valid one, against a unit carrying a LIVE order so that mutates nothing cannot pass vacuously. 81/81.*
+
+### NR-413 — BL-470 never added its three verbs to ACTIONS.json - the dictionary has been misrepresenting the seam since 2026-08-19
+*Lane U (BL-511 seam half, march_unit to province), merged and verified 2026-08-21. · raised 2026-08-21 · from march_unit, halt_unit and disband_unit were ALL absent from the action dictionary the AI player reads, from the day BL-470 landed them. The standing rule is that any change to a control or binding updates its entry, and ACTIONS.json is transcribed FROM corp_command.hpp - so the dictionary was simply two days stale on three verbs. The Lane U agent authored all three rather than only the march_unit entry its task named, which was the right call: leaving two absent would keep the dictionary lying about the seam it had just been asked to correct. Flagged because it is the second dictionary-drift finding this week and the enforcement model here is authorship, not machinery (Ben, 2026-08-01) - which only works if it is noticed.*
+
+### NR-414 — Scope taken in Lane U: blackboard facts for unit province and order destination
+*Lane U (BL-511 seam half, march_unit to province), merged and verified 2026-08-21. · raised 2026-08-21 · from The agent added unit_province and unit_order_dest_province to corp_ai.cpp blackboard export, beyond the literal task. Reason given, and it holds: without them an agent over the wire reads its unit position as a TILE but must name its destination as a PROVINCE, so the word interface would be unusable - it could not describe the move it is being asked to make. Small, in the spirit of the ruling, and stated rather than slipped in. Confirm or revert.*
+
+### NR-415 — novel-work: the per-lens reduction table is a NEW STANDING DESIGN ARTIFACT nobody has agreed to
+*novel-work · raised 2026-08-21 · from Lane R (BL-511 province render + selection), merged and verified 2026-08-21.*
+
+Province-grain rendering forces every lens to state how it reduces from tile to province - a blend, a sum, or a reasoned refusal. The agent decided all thirteen and wrote the table into PLANETARY.md. That table is the scope growth worth choosing deliberately: it is a CONTRACT every FUTURE lens now inherits, and neither LENSES.md nor PLANETARY.md previously had a slot for such a thing. Two calls for you. (1) Where does it live - LENSES.md has the better claim on lens-wide obligations, PLANETARY.md is where it landed. (2) Do you accept that adding a lens now means answering it? The refusals are the interesting content: Country and Continent refuse because the MEAN OF TWO NATION COLOURS IS A THIRD NATION COLOUR - a blended political map would draw borders that do not exist. Industry is the only computed reduction (a province sum, filled uniformly).
+
+### NR-416 — BL-511 R1 is PARTIAL: the live click is owed, and the agent was right not to take it
+*observation · raised 2026-08-21 · from Lane R (BL-511 province render + selection), merged and verified 2026-08-21.*
+
+The agent declined to drive your desktop unattended to satisfy the LIVE half of requirement R1, which was the correct call for a non-interactive sub-agent session. What it did instead is real coverage rather than a dodge: it added verify.mouse plus two-frame hover captures so the canvas OWN distance-to-hex-centre hit-test resolves a province from a cursor position, and the click handler consumes exactly that hovered_tile. The resolution path is proven; the PRESS is not. Per the 2026-08-19 standing rule a scripted capture does not prove a press is reachable, so R1 stays partial until someone clicks. The app is open on your machine now.
+
+### NR-417 — The map now mixes two visual languages, and the edge alpha is the one dial
+*question · raised 2026-08-21 · from Lane R (BL-511 province render + selection), merged and verified 2026-08-21.*
+
+Blended provinces read as continuous painted ground; ocean and BUILT tiles stay crisp hexes by construction. In the integrated capture the result is a map that is soft in some regions and hard-edged in others, which may or may not be what you pictured. Also relevant: the first pass had province edges at alpha 70 and they were INVISIBLE - the map read as one field with no cells at all. The committed version is 105, with the stroke moved onto the blended vertices so two neighbours strokes coincide rather than sitting a pixel apart. Soft by design, since you ruled softened borders, with the crisp affordance being the on-demand selection outline. If the gradient reads too blurry at close zoom, edge alpha is the dial to move first and the blur radius second.
+
+### NR-418 — Three small findings from the render work, all fixed or noted in place
+*observation · raised 2026-08-21 · from Lane R (BL-511 province render + selection), merged and verified 2026-08-21.*
+
+(1) verify.clear_selection had DIVERGED from the gesture it stands in for - it cleared selected_entity but left the province set, so a capture taken after it showed a stale province card. Fixed to match a real empty-space click. This is the harness-lies-quietly class of defect, and it was found by using the harness. (2) building_component has no owner field; ownership is corporation.assets, and the province card resolves it the way the canvas does. (3) dl->_Data->TexUvWhitePixel does not compile outside imgui_internal.h - ImGui::GetFontTexUvWhitePixel() is the public route, noted in a comment for the next person reaching for Prim*.
+
+### NR-419 — Repartition result: 97.90% of provinces in the 7-12 band, and every miss is explained
+*observation · raised 2026-08-21 · from Province repartition to 7-12 tiles, merged and verified 2026-08-21.*
+
+21,161 provinces across 6 seeds. Mean 9.11, min 1, max 18. Under floor: 109 (0.52%). Over ceiling: 336 (1.59%). The two misses have different characters and both were reported rather than clamped, which is the right instinct. UNDER-FLOOR ARE ALL TRUE ISLANDS - the agent added assertion P5c which walks every sub-floor province neighbourhood and asserts none had an adjacent province to merge into; it reports 0 stranded. A merge cannot invent land for a 2-tile island, so that is the honest floor, not a failure. OVER-CEILING (max 18) come from a merge piling onto a crowded coast; reported, not clamped, per your standing preference for honest constraints over clamping.
+
+### NR-420 — BL-513 k survives the repartition, as predicted - 0.74% move
+*observation · raised 2026-08-21 · from Province repartition to 7-12 tiles, merged and verified 2026-08-21.*
+
+k was pinned at 12.6468 as (pooled per-tile capacity / sustain units) aggregated over the world. Both sides are sums over TILES, so the prediction was that province size cannot move the aggregate. Measured after repartition: 12.5535, a 0.74% move, well inside the pre-existing 28.59% per-seed spread, with ceilings totalling 100.75% of pooled per-tile capacity. k was NOT adjusted. What did change completely is the per-province distribution: ceilings now run 1..262 per province against a previously narrow spread. Worth knowing if the ceiling ever starts to bind.
+
+### NR-421 — The per-province firm cap is inert by ORDERS OF MAGNITUDE, not by a near miss
+*question · raised 2026-08-21 · from Province repartition to 7-12 tiles, merged and verified 2026-08-21.*
+
+BL-512 per_province_firm_cap = 2 was measured as nearly inert against 4-tile provinces, and the hope was that 9-tile provinces would make the spatial half of the two-level firm budget do real work. It does not. Measured across 8 seeds after repartition: 296 background firms anchored across 295 DISTINCT provinces; the busiest province holds ONE firm on 7 of 8 seeds; exactly one province in the entire sweep reaches the cap of 2. The reason is structural, not a tuning miss - there are ~24-50 background firms per world against ~3,500 provinces. A per-province cap cannot bind at that ratio at any plausible value. So the two-level budget is really a one-level budget: the per-RESOURCE cap carries the entire result (it took every seed to its coverage target), and the per-province cap is decoration. Three options: drop it as dead weight, keep it as a bound that only matters once player density arrives, or move the spatial constraint to the grain where firms actually compete. It costs nothing today either way, which is why this is a question and not a defect.
+
+### NR-422 — The march harness fixtures could not survive the repartition, and that is information
+*observation · raised 2026-08-21 · from Province repartition to 7-12 tiles, merged and verified 2026-08-21.*
+
+unit_march_harness went from 81/81 to 8 failures the moment provinces changed, all of them fixture-shape rather than product defects. Root cause worth recording: make_row_body builds a body of grid_height 1, and on a one-row body EVERY 3x3 block is a 3-tile fragment, so the merge cascades and the entire row becomes one province however long it is - widening the fixture from 8 to 24 tiles changed nothing. A row fixture can no longer express march from one province to another at all. I added make_grid_body/grid_tile_at helpers and converted M1; the remaining fixtures went back to the agent that wrote them, with instructions not to weaken any assertion and to stop and report if any assertion turns out to be genuinely impossible under the new partition. The general lesson: a synthetic fixture encodes assumptions about world SHAPE, and a generation change can invalidate it silently - here it failed loudly, which is the good case.
+
+### NR-423 — The province selection fold is a conformance win, and it removed a real behaviour divergence
+*observation · raised 2026-08-21 · from Selection fold agent, merged and verified 2026-08-21.*
+
+Ben read draw_province_selection as a second selection element and he was right about the cause: it was dispatched first and drew its own header, chrome and linear layout rather than being a body of the one polymorphic panel. It is now shaped exactly like draw_building_selection_body and draw_unit_selection_body - shared header block, shared three-column band, shared pager chrome, shared 2x3 action grid. Two details worth keeping: the icon borrows the TILE kind deliberately (a province is a cluster of tiles, not a new kind of thing), and Construct is absent from the action grid because placement is still tile-grain and the Tiles page is the route to it. The stale-id fallback also IMPROVED as a side effect - it now falls through to ordinary kind resolution and renders a normal selection, where the old card drew a bare dash. Nothing in the code assumes a province size, so the 7-12 repartition only changes how many bands the mixture bar has.
+
+### NR-424 — The live click on a province is STILL owed - two agents in a row could not take it
+*observation · raised 2026-08-21 · from Selection fold agent; follows NR-416.*
+
+The second agent to touch this surface also could not satisfy the standing live-check rule: the verify API has no click injection, and computer-use has no granted applications in a non-interactive sub-agent session. So the press remains as untested by harness as it was before the fold - the hit-test resolution path is proven, the press is not. Recording it a second time because that is now a PATTERN rather than an incident: any interactive surface built by a sub-agent will arrive with its live half owed, by construction. Two ways out worth considering - give the verify API a click-injection hook so the press becomes scriptable, or accept that live checks are Ben work and batch them. The first is a small item and would close this class permanently.
+
+### NR-425 — CORRECTION: my 81/81 verification of unit_march_harness was hollow - M6 was segfaulting and M6/M7 never ran
+*observation · raised 2026-08-21 · from March fixture rebuild, 2026-08-21. Correcting my own earlier report.*
+
+I reported unit_march_harness as 81 passed, 0 failed and treated that as verification of Lane U. It was not. M6 discarded apply_corp_command result and then indexed u.order.path[u.order.next_index] on a REFUSED order, so it indexed an empty vector and SEGFAULTED the process mid-M5. M6 and M7 reported nothing because they never ran, and the exit code was 139 with output ending mid-word. I grepped for passed/failed and never checked the exit code, so the crash was invisible to me. Now fixed: the setup asserts instead of discarding, so a refused order fails loudly, and the harness is 88 passed 0 failed with EXIT_CODE=0 confirmed explicitly. The method lesson is mine, not the agent: a harness that prints a pass count can still have died before the end, and a pass count is not an exit code. Worth adding an exit-code check to how the verifier-headless skill reports.
+
+### NR-426 — CORRECTION: a one-row body does NOT always collapse to one province - it splits above 19 tiles
+*observation · raised 2026-08-21 · from March fixture rebuild, 2026-08-21. Correcting my own earlier instruction to the agent.*
+
+I told the agent that on a one-row body the merge cascades so the whole row becomes one province HOWEVER LONG it is, having observed 8 and 24 tiles both giving one province. That generalisation was wrong. Measured: rows of 1-12 tiles give 1 province, 20 and 24 give 2, and 30 gives 3. My 24-tile test appeared to fail for a different reason - 24 was too short to give two REACHABLE provinces for what M1 needed, not too short to split at all. Consequence: M2 20-wide row fixture is honest and was correctly left alone rather than converted. Recording because the false generalisation is the sort of thing that gets quoted back later as a property of the partition.
+
+### NR-430 — CORRECTION: my BL-517 brief claimed a tile serialisation seam that does not exist
+*observation · raised 2026-08-21 · from BL-517 (retain the heightmap), merged and verified 2026-08-21.*
+
+I briefed the agent to append height to the tile record because 'the tile record already carries a round-trip proof - extend it, do not replace it'. There IS no tile serialiser. The only flat-binary streams in the project are the history log (which carries the province section), the order book and procurement. Tiles are never written; they are regenerated from the seed, and province_partition_harness's round-trip proof is over the HISTORY-LOG stream, not a tile record. The agent correctly did nothing rather than inventing a tile serialiser to satisfy the instruction, and said so plainly. Requirement retain-heightmap R2 is therefore N/A rather than complete. Worth carrying forward: the same wrong assumption is easy to make again, because several items talk about 'the serialisation seam' as though tiles were in it.
+
+### NR-431 — The Generation Ledger field overlay BL-517 was told to feed does not exist yet
+*observation · raised 2026-08-21 · from BL-517 (retain the heightmap), merged and verified 2026-08-21.*
+
+BL-517's scope included exposing height to the Generation Ledger's field overlay, 'where it is already designed'. It is designed and not built: GENERATION_LEDGER.md's own status table reads 'Field lenses ... Partial substrate - the generation_record seam exists and is filled on demand; no lens built'. So there was nothing to expose it to, and no UI change was made (src/ui was outside the agent's file scope in any case). The retained field is exactly what such a lens would read without regenerating, so the item still paid for the lens - it just did not build it. Not a gap to fix now; a note so the scope line in BL-517 is not read later as unfinished work.
+
+### NR-432 — I damaged tools/verify/README.md with a keep-both conflict resolution, and an agent spotted it
+*decision taken on your behalf · raised 2026-08-21 · from BL-517 (retain the heightmap), merged and verified 2026-08-21.*
+
+Resolving tools/verify/README.md conflicts twice today by keeping both sides spliced a sentence into the middle of another one - the clause 'and for font_glyph_harness, which links ImGui and is hand-declared in' appeared twice with trade_routes_harness / province_partition_harness wedged between. The BL-517 agent noticed it, correctly left it alone rather than guessing at the intended text, and reported it. Repaired now, and the province-partition clause corrected while I was in there: its three serialisation properties are over the HISTORY-LOG stream, which the old wording left ambiguous and which NR-430 shows is easy to misread. The method lesson is mine: keep-both is safe for two ADDITIONS to a list and unsafe inside a paragraph, and I applied it without reading the surrounding prose.
+
+### NR-433 — 12% of provinces are below the HARD 3-tile floor, and that needs your eye
+*question · raised 2026-08-21 · from BL-515 (organic province borders), merged and verified 2026-08-21.*
+
+Distribution against the 3x3 partition it replaces: 24,498 provinces (was 21,161), mean 7.87 (was 9.11), max 12 and now ABSOLUTE (was 18 overshoot), min 1, 74.71% in the 7-12 band (was 97.90%). The band drop is expected and was explicitly not chased - organic borders are supposed to be irregular. What I want your eye on is a different number: 6,195 provinces under 7, of which 3,008 are under 3 - i.e. roughly 12% sit below the HARD 3-12 target you set. You also ruled 'do not reject tiny provinces', so keeping them is correct per the ruling and the agent was right not to merge them away. But the two rulings pull against each other at this volume, and the visible consequence is in the alpha-220 capture: in places the map reads as a hex lattice again, because a 1-2 tile province is a hex with a border drawn round it. That is the look you moved away from. Options if it bothers you: raise the seed density so fewer pockets are enclosed, let a sub-floor pocket join a neighbour (a softer rule than the merge pass you removed), or accept it and let the blend hide it at play zoom.
+
+### NR-434 — The agent corrected its own mechanism mid-task, and the correction is the interesting part
+*observation · raised 2026-08-21 · from BL-515 (organic province borders), merged and verified 2026-08-21.*
+
+Its first implementation followed BL-515's literal wording - past the size budget, only cross a cheap edge. That produced 3,860 provinces at EXACTLY 7 tiles and 616 singletons: a de-facto clamp wearing the costume of a growth rule, which is the precise failure mode the organic redesign existed to remove. It replaced that with hinterland seeds chosen up front at spacing, plus a self-referential soft brake - past its budget a region annexes only ground no harder to reach than what it already holds - which needs no threshold constant at all. Worth recording because it correctly distinguished FIXING AN ARTEFACT from CHASING THE BASELINE SPREAD, which is the line the brief drew, and it stated the distinction rather than quietly retuning.
+
+### NR-435 — Both coefficients were pinned against measurement, and one pin is genuinely elegant
+*observation · raised 2026-08-21 · from BL-515 (organic province borders), merged and verified 2026-08-21.*
+
+k_province_height_cost = 683: pinned so that a gradient at the p90 of adjacent-land steepness costs the same as crossing a river, measured over 653,910 adjacent land edges (mean 0.0270, p50 0.0186, p90 0.0586, p99 0.1406, so 40/0.0586 = 682.7). Measured on TERRAIN ALONE, so re-pinning it cannot chase its own tail - that property is what makes it re-derivable later. k_province_road_bind_divisor = 4: the smallest divisor at which a road link binds harder than plain ground EVEN ACROSS A RIVER, with a swept table showing roaded-internal share 56.85% at divisor 1 (no binding at all) rising to 74.81% at 4. The agent noted the lift is concave with no knee - the table confirms the choice rather than picking it, which is an honest thing to say about a sweep that does not hand you an answer. k_province_seed_spacing = 3 is structural, not tuned: seeds at separation d tile a plane in (sqrt3/2)d^2 tiles, and d=3 gives 7.79, the only integer whose ideal cell lands inside 7-12.
+
+### NR-436 — BL-513's k confirmed size-independent a second time; the agent declined to re-pin and was right
+*observation · raised 2026-08-21 · from BL-515 (organic province borders), merged and verified 2026-08-21.*
+
+Measured after the organic repartition: 12.5047 aggregate (spread 11.3391..15.1435, 28.73% of mean) against the pinned 12.6468 - a 1.1% drift, far inside the seed spread. That is the second independent confirmation that the ceiling coefficient does not depend on province size, which was predicted from its shape (both sides of its ratio are sums over tiles). The residual is real and explicable: the population factor multiplies per-province, so which tiles sit with a centre moves the total slightly. The agent did NOT re-pin, on the grounds that it is BL-513's contract, the ceiling binds on nothing (0.114% used) and the brief did not authorise it. Correct call, and it flagged it as delegated rather than silently leaving it.
+
+### NR-437 — Two id-scheme comments went stale the moment BL-515 landed; one was fixed by an agent outside its scope, one by me
+*decision taken on your behalf · raised 2026-08-21 · from BL-515 (organic province borders), merged and verified 2026-08-21.*
+
+BL-511's seam work justified corp_command::province defaulting to no_province by the fact that province id 0 was a REAL id under the block layout. BL-515 makes ids the lowest member tile, and P8d now asserts no id is 0 - so that justification is false, hours after it was written. Two places carried it. (1) unit_march_harness asserted 'province id 0 IS a real province here' and went red; the BL-515 agent made the minimal narrowing edit with a dated reason, flagged that the file was outside its list, and got 88/88 - the right way to touch someone else's file. (2) corp_command.hpp's rationale, which I have now rewritten: it records the original argument as history, states that 0 is unreachable today, and keeps the default for a reason that does NOT depend on the id scheme - no_province is refused by the seam, so an omitted wire field is rejected rather than interpreted. A default of 0 would only be safe for as long as 0 happens to be unreachable, which is exactly the kind of accidental safety that stops being safe silently.
+
+### NR-440 — Absorption improved the distribution on every axis except the ceiling
+*observation · raised 2026-08-21 · from Singleton absorption pass on BL-515, merged and verified 2026-08-21.*
+
+6-seed sweep, before -> after: provinces 24,498 -> 22,401 (exactly 2,097 absorbed, so the counts reconcile against the pre-pass baseline); mean 7.87 -> 8.61; under 3 tiles 3,008 -> 911; under 7 6,195 -> 4,098; in the 7-12 band 74.71% -> 76.80%. 2,148 singletons existed, 2,097 were absorbed, and 51 remain as TRUE ISLANDS with zero land neighbours - each one verified by a new harness row rather than asserted. Ben's retraction of 'do not reject tiny provinces' bought roughly a two-thirds cut in sub-3 provinces. The residual 911 under 3 are two-tile provinces, which the pass deliberately does not touch: the ruling said one tile, and reinstating a merge-to-floor rule would rebuild the de-facto clamp BL-515 existed to escape.
+
+### NR-441 — BL-513's pin drifted 0.06% and was again left alone
+*observation · raised 2026-08-21 · from Singleton absorption pass on BL-515, merged and verified 2026-08-21.*
+
+province_capacity_probe's BL-513 ratio moved 12.2546 -> 12.2477 across the absorption (0.06%), measured by running the probe at HEAD and again after rather than reasoned about. k_province_buildings_per_sustain_unit stays at 12.6468, un-re-pinned. That is now the third independent confirmation that the ceiling coefficient is insensitive to how the partition is drawn, which is what its shape predicted - both sides of its ratio are sums over tiles.
+
+### NR-442 — urban already destroys the geology under a city, and the axis split fixes it as a side effect
+*observation · raised 2026-08-21 · from BL-519 / BL-520 design work, 2026-08-21.*
+
+BL-366's urban transform is documented as one-way and it OVERWRITES terrain_composition. So today, when a metallic tile's building stack fills, the tile stops being metallic - the fact is gone, not hidden. Nothing reads it afterwards, so nothing has broken visibly, but it means a city can never know what it was built on, and any future rule that wants to (a mine under a city, subsidence, resource exhaustion, a lens showing what the land WAS) has no data to read. BL-519 fixes this incidentally: with substrate separate from state, paving a tile leaves the substrate intact. Recorded separately from the item because it is a live data-loss bug, not merely a design awkwardness, and because if BL-519 is ever deferred this should be fixed on its own.
+
+### NR-443 — Texture and the province blend are in direct tension, and BL-514 sits in the middle of it
+*question · raised 2026-08-21 · from BL-519 / BL-520 design work, 2026-08-21.*
+
+The canvas blends colour across a province's tiles (BL-511) to smooth the lattice away. A texture does the opposite - it asserts where one tile ends. Run both naively and they fight. The resolution in BL-520 is to texture the SUBSTRATE (which the blend already averages) and pattern the COVER (which is per-tile and should read as per-tile), so a forest edge is information and a rock-to-rock seam is not. But this collides with BL-514 (blend ALL tiles, not just within provinces), which is HELD pending your look at the organic borders. If texture becomes the thing that makes the map read as terrain, the global blend may be unnecessary - or may be exactly what lets texture stay subtle. Worth deciding BL-514 and BL-520 together rather than in sequence, since each changes what the other is for.
+
+### NR-444 — The composition migration is 330 references across 49 files, and the accessor decision shapes it
+*question · raised 2026-08-21 · from BL-519 / BL-520 design work, 2026-08-21.*
+
+Measured rather than estimated: 330 references to composition in src/, concentrated in tile_generation.cpp (60), terrain_combat.cpp (32), placement_rules.cpp (32), corporation_generation (18), nation_generation (15) and the UI (hex_render 14, presentation 13, generation_ledger 12). There is NO save format, so none of this is a data migration - it is call sites only, which is why the item is landable at all. BL-519 proposes a derived composition() accessor so every call site keeps working while the axes land underneath, then migrating by MEANING in batches. The question for you is whether that accessor is permanent or deleted last. Permanent is a much smaller diff and a lasting lie - the codebase would keep asking a question the data model no longer answers. Deleted is honest and a longer migration. The interesting part is that a call site asking 'is this forest?' usually means either 'is there timber here?' (cover) or 'can I build on it?' (substrate), and which it meant is precisely the information the overloaded enum has been losing.
+
 ---
 
 ## Resolved
@@ -885,16 +1269,16 @@ Data-model restructuring is free today and expensive the day the snapshot serial
 Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
 answer has landed in an authority doc.
 
-### NR-239 — BL-429 slice 2: named buildings shipped without per-building glyphs — decision taken, not asked
-*decision taken on your behalf · raised 2026-08-15 · from BL-429 slice 2 (ancient building roster, Sprint 17) — continuing the item after slice 1 landed the production chains.*
+### NR-239 — BL-429 slice 2: named buildings shipped without per-building glyphs â€” decision taken, not asked
+*decision taken on your behalf · raised 2026-08-15 · from BL-429 slice 2 (ancient building roster, Sprint 17) â€” continuing the item after slice 1 landed the production chains.*
 
-R5 asks for 20+ named buildings "each with its placement rule and glyph". This slice built the names (recipe::display_name), confirmed placement rules stay generic per BL-325's minting test, and got an ancient-band Build door past 20 named rows — but did NOT give any of the 16 new ancient buildings its own icon. Every extraction building still renders icons::building's shared ore_chunk glyph; every processing building the shared square. Farm, Smelter and Hydroponics Bay already share glyphs this way today, so nothing regressed — but R5's glyph clause is still open.
+R5 asks for 20+ named buildings "each with its placement rule and glyph". This slice built the names (recipe::display_name), confirmed placement rules stay generic per BL-325's minting test, and got an ancient-band Build door past 20 named rows â€” but did NOT give any of the 16 new ancient buildings its own icon. Every extraction building still renders icons::building's shared ore_chunk glyph; every processing building the shared square. Farm, Smelter and Hydroponics Bay already share glyphs this way today, so nothing regressed â€” but R5's glyph clause is still open.
 
 **Why it matters.** Hand-authoring 16 silhouette-distinct vector icons (ICONS.md's own per-glyph process: declare, implement, keep the silhouette distinct from its family, catalogue it) is real asset-design work, not a code change riding along with the recipe roster. Folding it into this slice would have meant either rushing 16 icons past the "distinct silhouette" bar ICONS.md itself sets, or blocking the roster's actual game-economy value on icon authoring. The call taken: ship the content now, file the glyphs as their own follow-on rather than let R5 read as fully met when it is not.
 
-> **Recommendation:** File a follow-on backlog item (e.g. under BL-431's UI umbrella, or standalone) scoped explicitly to per-building glyphs for the ancient roster, and leave requirements.json's R5 at 'pending' until it lands — already done this pass.
+> **Recommendation:** File a follow-on backlog item (e.g. under BL-431's UI umbrella, or standalone) scoped explicitly to per-building glyphs for the ancient roster, and leave requirements.json's R5 at 'pending' until it lands â€” already done this pass.
 
-> **RESOLVED.** Closed same session (2026-08-15), not deferred: icons::building() gained a resource_type identity parameter and 14 new hand-drawn glyphs cover the 9 extraction + 5 processing resource keys the ancient roster reaches. R5 in requirements.json's ancient-chain-roster group is now complete. Still open: NR-240's compile/visual-verification gap applies to this work too — nobody has actually SEEN these glyphs render yet.
+> **RESOLVED.** Closed same session (2026-08-15), not deferred: icons::building() gained a resource_type identity parameter and 14 new hand-drawn glyphs cover the 9 extraction + 5 processing resource keys the ancient roster reaches. R5 in requirements.json's ancient-chain-roster group is now complete. Still open: NR-240's compile/visual-verification gap applies to this work too â€” nobody has actually SEEN these glyphs render yet.
 
 *Files: `src/ui/icons.cpp`, `src/ui/icons.hpp`, `docs/ui/ICONS.md`, `docs/development/req/requirements.json`*
 
@@ -910,7 +1294,7 @@ The building Selection card's Manage action (src/ui/selection_panel.cpp, draw_bu
 
 > **Recommendation:** A for now - removing/repurposing Manage is a UI-vocabulary change that deserves its own look rather than a side effect of this delivery; flag for the next Selection-card pass.
 
-> **RESOLVED.** B, taken 2026-08-15 in the playtest rework: Ben played the card and asked for Manage gone outright (its destination was already redundant with the card, per option B above). The action-grid slot it freed, plus one former reserved slot, now hold Mothball and Dismantle (the former Lifecycle page's two controls, moved onto the action grid — see NR-246 for the pager-order fallout).
+> **RESOLVED.** B, taken 2026-08-15 in the playtest rework: Ben played the card and asked for Manage gone outright (its destination was already redundant with the card, per option B above). The action-grid slot it freed, plus one former reserved slot, now hold Mothball and Dismantle (the former Lifecycle page's two controls, moved onto the action grid â€” see NR-246 for the pager-order fallout).
 
 ### NR-246 — building_management_shell.lua verify script targets the deleted Buildings tab
 *observation · raised 2026-08-15 · from Same BL-431-follow-on delivery that deleted the construction panel's Buildings tab.*
@@ -919,9 +1303,9 @@ scripts/verify/building_management_shell.lua calls verify.show_panel('constructi
 
 **Why it matters.** The script still runs (construction_view(1) just sets an int nobody reads for dispatch anymore) but its capture no longer shows what its own comment says it verifies - the workforce/profit UI shell now lives on the building Selection card's Workforce/Profitability pages instead, reached via selection + verify.fold('building_metric', page) rather than construction_view.
 
-> **Recommendation:** Rewrite building_management_shell.lua to select a player building and use the Selection card's pager (building_pages() order, as of the 2026-08-15 playtest rework: Profitability/Method/Workforce — Chain/Depth/Lifecycle are gone, folded into Profitability or moved to the action grid) instead of construction_view(1), or fold its intent into a new selection-card-focused check and retire this one.
+> **Recommendation:** Rewrite building_management_shell.lua to select a player building and use the Selection card's pager (building_pages() order, as of the 2026-08-15 playtest rework: Profitability/Method/Workforce â€” Chain/Depth/Lifecycle are gone, folded into Profitability or moved to the action grid) instead of construction_view(1), or fold its intent into a new selection-card-focused check and retire this one.
 
-> **RESOLVED.** Resolved 2026-08-16 with BL-428 slice 2. building_management_shell.lua rewritten: it now selects a player PROCESSING building (falling back to any player building) and walks the Selection card's pager, capturing all three pages separately. It also needed a new verify verb — verify.building_page(n) — because fold('building_metric', k) sets the drill KEY, not the page, so the first rewrite still captured page 1 three times. Confirmed by capture: the Method page now shows 'Method (2/3)' with both alternates and the Switch control. That first honest photograph immediately surfaced a real layout defect, filed as NR-255.
+> **RESOLVED.** Resolved 2026-08-16 with BL-428 slice 2. building_management_shell.lua rewritten: it now selects a player PROCESSING building (falling back to any player building) and walks the Selection card's pager, capturing all three pages separately. It also needed a new verify verb â€” verify.building_page(n) â€” because fold('building_metric', k) sets the drill KEY, not the page, so the first rewrite still captured page 1 three times. Confirmed by capture: the Method page now shows 'Method (2/3)' with both alternates and the Switch control. That first honest photograph immediately surfaced a real layout defect, filed as NR-255.
 
 *Files: `scripts/verify/building_management_shell.lua`, `src/ui/selection_panel.cpp`*
 
@@ -959,15 +1343,15 @@ recipe_switch_params::cross_group_multiplier defaults to 6.0, putting a cross-gr
 
 The Method page's rows draw the method name left-aligned and the profit figure right-aligned to a profit column, but at the Selection card's current width the two collide: the capture shows 'Food Rations' with '7/tick' printed through it and 'Miller' with '4.4/tick' through it. The profit column offset (profit_col_w) is computed against a row width that the narrow Selection band does not actually provide.
 
-**Why it matters.** This is the surface BL-430/BL-431 built to make alternate production methods choosable, and its two load-bearing numbers are the ones being overprinted — the player cannot read either the method name or its profit cleanly. It went unseen because the old verify script captured the deleted Buildings tab (NR-246) and the new one had no golden, so nothing was comparing this page to anything. Found the first time the page was actually photographed.
+**Why it matters.** This is the surface BL-430/BL-431 built to make alternate production methods choosable, and its two load-bearing numbers are the ones being overprinted â€” the player cannot read either the method name or its profit cleanly. It went unseen because the old verify script captured the deleted Buildings tab (NR-246) and the new one had no golden, so nothing was comparing this page to anything. Found the first time the page was actually photographed.
 
 > **Recommendation:** Either right-align the profit into a reserved column measured off the ACTUAL child width, or drop the profit to a second line on narrow layouts. Worth a golden on all three building pages once the layout is settled, so the next regression is caught by comparison rather than by eye.
 
-> **RESOLVED.** Fixed 2026-08-16, same session it was raised. Two causes, both real. (1) DRAW ORDER: the name drew at full length and the right-aligned profit was painted over it. The row now measures the profit FIRST (at its own 1.1x scale — a width taken at 1.0x would under-reserve) and fits the name to what is genuinely left, routed through ui::fit_text (box 9, table_cell) so an over-long name elides with the full string one hover away and is recorded in BL-215's overflow ledger rather than clipping silently. (2) WIDTH: fixing the draw order alone just turned the name into '...', because the row was `avail * 0.62` = 160 px trying to hold 248 px of content — measured: pip 27.8 + name 103 ('Food Rations') + gap 8 + profit 70 + Switch 33 + pad 6, leaving the name 16 px. The 0.62 factor was arbitrary; the 2026-08-15 'slimmer strip, not a denser fit' call was about row HEIGHT (1.5 button-heights, against the square tiles it replaced) and explicitly argues against cramming. Row is now full available width capped at 280. Verified by capture: both rows read name + profit cleanly.
+> **RESOLVED.** Fixed 2026-08-16, same session it was raised. Two causes, both real. (1) DRAW ORDER: the name drew at full length and the right-aligned profit was painted over it. The row now measures the profit FIRST (at its own 1.1x scale â€” a width taken at 1.0x would under-reserve) and fits the name to what is genuinely left, routed through ui::fit_text (box 9, table_cell) so an over-long name elides with the full string one hover away and is recorded in BL-215's overflow ledger rather than clipping silently. (2) WIDTH: fixing the draw order alone just turned the name into '...', because the row was `avail * 0.62` = 160 px trying to hold 248 px of content â€” measured: pip 27.8 + name 103 ('Food Rations') + gap 8 + profit 70 + Switch 33 + pad 6, leaving the name 16 px. The 0.62 factor was arbitrary; the 2026-08-15 'slimmer strip, not a denser fit' call was about row HEIGHT (1.5 button-heights, against the square tiles it replaced) and explicitly argues against cramming. Row is now full available width capped at 280. Verified by capture: both rows read name + profit cleanly.
 
 *Files: `src/ui/selection_panel.cpp`, `scripts/verify/building_management_shell.lua`*
 
-### NR-260 — A processing facility earns LESS than the extraction site it replaces — so BL-435's 'better opening' is deeper, not richer
+### NR-260 — A processing facility earns LESS than the extraction site it replaces â€” so BL-435's 'better opening' is deeper, not richer
 *decision taken on your behalf · raised 2026-08-16 · from BL-435 task B (focus_asset_pattern fix), measured with player_seed_sweep and ai_skill_harness before and after.*
 
 Ben's call was to raise how many of the 8 selectable specialists open with a processing facility. Root cause was not tuning: focus_asset_pattern's own comment promises extraction corps 'a single processor', but the processor sat at slot 3 while extraction holdings draw 3-4, so only a 4-draw ever got one. Moving it to slot 2 makes the code match its documentation and works exactly as intended - specialists with a processor went 2.96/8 (37%) to 5.83/8 (73%) across 24 seeds, and the one seed in 24 where NOT ONE specialist had a processor is gone. The player's own generator-assigned corp went 11/24 to 18/24 'playable'. THE SIDE EFFECT IS THE PROBLEM: every measured net worth fell. Player corp, seed 0: 3 extraction/0 processing = 55,179 cr, becomes 2 extraction/1 processing = 28,288 cr - HALVED, same corp, same seed, one building swapped. ai_skill_harness's five seeds all fell too: -71%, -37%, -9%, -20%, -38% on final net worth (only seed 0 fell outside its golden band).
@@ -994,7 +1378,7 @@ BL-436's design says corp_ai's build scorer "is being asked to prefer processors
 
 > **Recommendation:** Treat BL-439 as the item that actually addresses "the AI prefers mines", and re-scope BL-417 step 2 to what it really is: a choice about how extraction sites are ranked relative to one another and to the flat-scored military base. Do not tune the curve expecting a processor to appear.
 
-> **RESOLVED.** Confirmed independently 2026-08-17 and acted on. corp_verb::build was emitted from exactly two sites in corp_ai.cpp — the ranked_sites loop (extraction_site) and one military_base — with no processing_facility candidate anywhere. BL-439 adds one: sited on the corp own asset tiles, recipe chosen from the browse space and crossed to the absolute id, gated on chain depth and on real input access (pool + local market inventory against the tick own coverage threshold), priced by estimate_prospective_profit, on the same score curve and the same solvency/glut/reserve gates as extraction. Guarded by ai_skill_harness R5, which was run against the PRE-change build first and failed by construction there (processors_gained = 0 on all five seeds). What the change then revealed is NR-269.
+> **RESOLVED.** Confirmed independently 2026-08-17 and acted on. corp_verb::build was emitted from exactly two sites in corp_ai.cpp â€” the ranked_sites loop (extraction_site) and one military_base â€” with no processing_facility candidate anywhere. BL-439 adds one: sited on the corp own asset tiles, recipe chosen from the browse space and crossed to the absolute id, gated on chain depth and on real input access (pool + local market inventory against the tick own coverage threshold), priced by estimate_prospective_profit, on the same score curve and the same solvency/glut/reserve gates as extraction. Guarded by ai_skill_harness R5, which was run against the PRE-change build first and failed by construction there (processors_gained = 0 on all five seeds). What the change then revealed is NR-269.
 
 *Files: `src/world/corp_ai.cpp`, `docs/development/backlog.json`*
 
@@ -1015,14 +1399,14 @@ The integrator's report that the FETCHCONTENT_SOURCE_DIR_* variable NAMES were a
 
 *Files: `CMakeLists.txt`*
 
-### NR-283 — NR-276's dependency-cache fix does not reach a git WORKTREE — the default cache path resolves inside the worktree, where there is no cache
+### NR-283 — NR-276's dependency-cache fix does not reach a git WORKTREE â€” the default cache path resolves inside the worktree, where there is no cache
 *observation · raised 2026-08-17 · from Cold-configuring build/ in the BL-441 worktree at .claude/worktrees/agent-ae85f8b7ecd01345e.*
 
-CMakeLists.txt defaults IO_DEPS_CACHE to ${CMAKE_CURRENT_SOURCE_DIR}/_deps_cache. In the main checkout that is C:/Users/benbo/Project-Io/_deps_cache and the fix works. In a worktree, CMAKE_CURRENT_SOURCE_DIR is the worktree root, which has no _deps_cache — so a cold configure there finds nothing to seed from and falls through to downloading. I got a zero-download configure only by exporting IO_DEPS_CACHE=C:/Users/benbo/Project-Io/_deps_cache by hand.
+CMakeLists.txt defaults IO_DEPS_CACHE to ${CMAKE_CURRENT_SOURCE_DIR}/_deps_cache. In the main checkout that is C:/Users/benbo/Project-Io/_deps_cache and the fix works. In a worktree, CMAKE_CURRENT_SOURCE_DIR is the worktree root, which has no _deps_cache â€” so a cold configure there finds nothing to seed from and falls through to downloading. I got a zero-download configure only by exporting IO_DEPS_CACHE=C:/Users/benbo/Project-Io/_deps_cache by hand.
 
-**Why it matters.** Worktrees are the project's primary sub-agent isolation mechanism (DELIVERY.md), so the case where the cache matters most — several agents each cold-configuring at once — is exactly the case the default misses. Each pays the ~120 MB download NR-276 exists to prevent.
+**Why it matters.** Worktrees are the project's primary sub-agent isolation mechanism (DELIVERY.md), so the case where the cache matters most â€” several agents each cold-configuring at once â€” is exactly the case the default misses. Each pays the ~120 MB download NR-276 exists to prevent.
 
-> **Recommendation:** Make the default cache path resolve against the main repository rather than the source dir — `git rev-parse --path-format=absolute --git-common-dir` gives the shared .git, whose parent is the main checkout, and it degrades to the current behaviour outside a worktree. Small change to CMakeLists.txt; not done here because it is outside BL-441 and touching the build config mid-flight would disturb the parallel worktrees.
+> **Recommendation:** Make the default cache path resolve against the main repository rather than the source dir â€” `git rev-parse --path-format=absolute --git-common-dir` gives the shared .git, whose parent is the main checkout, and it degrades to the current behaviour outside a worktree. Small change to CMakeLists.txt; not done here because it is outside BL-441 and touching the build config mid-flight would disturb the parallel worktrees.
 
 > **RESOLVED.** Already fixed on the integration branch before this entry merged in. Commit 10b0e5c (2026-08-17) took exactly the recommended route: when the default IO_DEPS_CACHE path does not exist, CMakeLists.txt asks git for --path-format=absolute --git-common-dir and uses the main checkout's _deps_cache. It is a no-op in a normal checkout. Verified in an actual worktree with a zero-download configure in 13.4s.
 
@@ -1204,7 +1588,7 @@ The brief asked what to build to pad out both systems. The obvious readings are 
 ### NR-310 — Interdiction: is intercepted cargo captured or destroyed?
 *question · raised 2026-08-17 · from Sprint 25 rescope, filing BL-458 (supply lines cannot be cut).*
 
-Cargo leaves the source pool at dispatch (SUPPLY.md § Convoy entity), so the goods are already committed and both answers conserve correctly. DESTROY erases the convoy and the cargo - simple, symmetric, pure denial, and it pays the interceptor nothing. CAPTURE credits the cargo to the interceptor's (corp, body) pool at the interception body - it pays for itself, creates a raiding economy, and needs one guard (an interceptor with no market access holds goods it cannot sell, which is a fine outcome and should not be special-cased away).
+Cargo leaves the source pool at dispatch (SUPPLY.md Â§ Convoy entity), so the goods are already committed and both answers conserve correctly. DESTROY erases the convoy and the cargo - simple, symmetric, pure denial, and it pays the interceptor nothing. CAPTURE credits the cargo to the interceptor's (corp, body) pool at the interception body - it pays for itself, creates a raiding economy, and needs one guard (an interceptor with no market access holds goods it cannot sell, which is a fine outcome and should not be special-cased away).
 
 **Why it matters.** It decides whether interdiction is a mechanic a rival will ever CHOOSE. The corp AI is a deterministic scored-utility layer: it prices candidates by payoff. Destroy-only gives an interception a payoff of zero to the interceptor and a cost in exposure, so BL-450's stance scorer would correctly never rank it - interdiction would exist and never fire outside player use, which is the same unreachable-capability defect this whole sprint is about. It also decides whether BL-315's third derived reading is earned: 'pirate' is a company that TAKES cargo. A company that only burns it is reading closer to a saboteur.
 
@@ -1256,11 +1640,11 @@ BL-454's goods draw ships with every rate at ZERO - my instruction, so the item 
 ### NR-324 — verify_api's resource-slug mapper is a FIFTH transcription of resource_type, and it is 20 of 37 stale
 *observation · raised 2026-08-18 · from Post-merge run of the Sprint 25a work on a machine that can build SDL/ImGui (2026-08-18).*
 
-resource_from_name in src/core/verify_api.cpp maps only 20 of the 37 resource_type values, and falls back to iron_ore for anything it does not know. A verify script naming ordnance therefore seeds an IRON ORE convoy and the capture reads 'Iron Ore x8' — silently, with no error. Confirmed live: verify.seed_convoy(...,'ordnance',...) rendered as Iron Ore in the BL-453 Convoys tab. tools/session/resource_table_check.js passes (38 values agree) because it joins components.hpp, recipe_registry.cpp, world_gen_config.cpp and presentation.cpp — it does not know about this fifth table.
+resource_from_name in src/core/verify_api.cpp maps only 20 of the 37 resource_type values, and falls back to iron_ore for anything it does not know. A verify script naming ordnance therefore seeds an IRON ORE convoy and the capture reads 'Iron Ore x8' â€” silently, with no error. Confirmed live: verify.seed_convoy(...,'ordnance',...) rendered as Iron Ore in the BL-453 Convoys tab. tools/session/resource_table_check.js passes (38 values agree) because it joins components.hpp, recipe_registry.cpp, world_gen_config.cpp and presentation.cpp â€” it does not know about this fifth table.
 
 **Why it matters.** BL-457's own guard was written precisely to stop a resource roster drifting across hand-maintained copies, and it reports OK while a fifth copy is missing 17 goods including the sprint's headline one. The silent iron_ore fallback is the bad part: a visual check that MEANT to exercise ordnance exercises iron ore and still passes, so the check certifies the wrong thing. This is the same class of defect as the '(unnamed resource)' bug that guard was built to catch.
 
-> **RESOLVED.** Fixed 2026-08-18. resource_from_name now resolves against k_resource_slugs, a POSITIONAL array indexed by the enum value, carrying all 38 slugs; a static_assert on its length fails the translation unit if resource_type grows. The iron_ore fallback is kept (a script naming a non-existent good should not abort a capture run) but now SDL_Logs the name, so the silence that made this dangerous is gone. resource_table_check.js gained verify_api.cpp as a fifth table and checks slug ORDER, which the static_assert cannot. Both failure modes negative-tested: a dropped slug and a shifted one each fail the guard. Verified live — the same seeded convoy that rendered "Iron Ore x8" now renders "Ordnance x8" in its own identity colour, and a bogus name prints the warning.
+> **RESOLVED.** Fixed 2026-08-18. resource_from_name now resolves against k_resource_slugs, a POSITIONAL array indexed by the enum value, carrying all 38 slugs; a static_assert on its length fails the translation unit if resource_type grows. The iron_ore fallback is kept (a script naming a non-existent good should not abort a capture run) but now SDL_Logs the name, so the silence that made this dangerous is gone. resource_table_check.js gained verify_api.cpp as a fifth table and checks slug ORDER, which the static_assert cannot. Both failure modes negative-tested: a dropped slug and a shifted one each fail the guard. Verified live â€” the same seeded convoy that rendered "Iron Ore x8" now renders "Ordnance x8" in its own identity colour, and a bogus name prints the warning.
 
 ### NR-328 — The bankrupt AI economy is a KNOWN deliberately-unblessed state from Sprint 19, not a new regression
 *question · raised 2026-08-18 · from First full ctest run of the merged tree on a machine that can build everything (2026-08-18). 82 of 85 pass.*
@@ -1280,39 +1664,39 @@ Neither golden was blessed. NR-328 originally said the hash move should be expla
 
 > **RESOLVED.** Hold vindicated by the bisect. The two commits that caused the red both refused the same bless explicitly and for the same stated reason, so blessing would have overridden a deliberate hand-off, not corrected a stale golden. No bless was made; the standing rule was left alone. Its stale hash (3CBAD1D44EE71EDE vs the constant 855E07DE529684EC) remains worth fixing on its own, and is the only part of the original instruction still actionable.
 
-### NR-331 — Eight rulings settling the Era −1 collapse arc (Sprints 26–33, The Fall)
-*decision taken on your behalf · raised 2026-08-18 · from Ben, 2026-08-18, elicitation form. Brief: plan a series of sprints to the inevitable Era −1 outcome — empire collapse for one of two hegemons, played out in real time in the 0 CE sandbox, as part of generation.*
+### NR-331 — Eight rulings settling the Era âˆ’1 collapse arc (Sprints 26â€“33, The Fall)
+*decision taken on your behalf · raised 2026-08-18 · from Ben, 2026-08-18, elicitation form. Brief: plan a series of sprints to the inevitable Era âˆ’1 outcome â€” empire collapse for one of two hegemons, played out in real time in the 0 CE sandbox, as part of generation.*
 
-Put to Ben before any sprint was written, because each ruling changes which sprint opens first and three amend a standing authority. All eight answered same session. (1) REAL TIME = watched replay — no steppable sim, no agent seat, no determinism amendment. (2) HANDOFF = borders plus character — the collapse writes posture, creed and grudges onto surviving nations, which forces the Era −1 record to cross from generation_report into world as a save-format payload (file against BL-107). (3) SURVIVOR = dominant but not hegemonic — share threshold pinned by measurement; HISTORY.md claim 2 survives, only Stage 2 narrows; BL-224 stays a reported tuning target. (4) NATION BEHAVIOUR = granted for Era −1 AND campaign nations — a dated exception to BL-054 in the BL-202/BL-203 shape (pure, seeded, replayable, legal verbs, no planner), to be written into .claude/rules/io-standing-rules.md in Sprint 26 before Lane D builds on it. (5) UN-PARK v0.1.11 whole — BL-155, BL-156, BL-186, BL-280 move to the ancient arc; ROADMAP edit. (6) RESEARCH = spent, not reached — overturns what shipped 2026-08-17 by default rather than by choice (NR-315); needs a debit mechanism. (7) STANCE FIRST — confirms Lane C order and resolves the standing contradiction where NR-312 settled 25a→21→23 while Sprint 23 own block says it must precede 21. (8) PREHISTORY SPAN = keep 400 — the code is right, HISTORY.md and ERAS.md are wrong and get corrected.
+Put to Ben before any sprint was written, because each ruling changes which sprint opens first and three amend a standing authority. All eight answered same session. (1) REAL TIME = watched replay â€” no steppable sim, no agent seat, no determinism amendment. (2) HANDOFF = borders plus character â€” the collapse writes posture, creed and grudges onto surviving nations, which forces the Era âˆ’1 record to cross from generation_report into world as a save-format payload (file against BL-107). (3) SURVIVOR = dominant but not hegemonic â€” share threshold pinned by measurement; HISTORY.md claim 2 survives, only Stage 2 narrows; BL-224 stays a reported tuning target. (4) NATION BEHAVIOUR = granted for Era âˆ’1 AND campaign nations â€” a dated exception to BL-054 in the BL-202/BL-203 shape (pure, seeded, replayable, legal verbs, no planner), to be written into .claude/rules/io-standing-rules.md in Sprint 26 before Lane D builds on it. (5) UN-PARK v0.1.11 whole â€” BL-155, BL-156, BL-186, BL-280 move to the ancient arc; ROADMAP edit. (6) RESEARCH = spent, not reached â€” overturns what shipped 2026-08-17 by default rather than by choice (NR-315); needs a debit mechanism. (7) STANCE FIRST â€” confirms Lane C order and resolves the standing contradiction where NR-312 settled 25aâ†’21â†’23 while Sprint 23 own block says it must precede 21. (8) PREHISTORY SPAN = keep 400 â€” the code is right, HISTORY.md and ERAS.md are wrong and get corrected.
 
-### NR-332 — Ordnance has no ancient route — does the 0 CE arc get one, or a different military good?
+### NR-332 — Ordnance has no ancient route â€” does the 0 CE arc get one, or a different military good?
 *question · raised 2026-08-18 · from Sprint 26b doc truth pass, 2026-08-18; confirmed against scripts/recipes.lua:450 and recipe_registry.hpp:36-38.*
 
 The only military terminal good in the game is tagged era = industrial, and a 0 CE campaign resolves to era_band::ancient, so ordnance cannot be produced in the shipped product. The recipe author deferred an ancient route to BL-429 (ancient building roster) in a source comment and no item was filed, so the deferral went invisible. Filed as BL-460 (ordnance unproducible at 0 CE), priority A.
 
-- (a) Give ordnance an iron_blooms + charcoal ancient route now — small, and it unblocks the rate rollout.
+- (a) Give ordnance an iron_blooms + charcoal ancient route now â€” small, and it unblocks the rate rollout.
 - (b) Give the ancient arc a DIFFERENT military terminal good, and leave ordnance industrial for the parked space arc.
 
-### NR-334 — Ruling 8 has a second half — does the HARNESS follow production to 400 years, or production follow the struct to 4000?
+### NR-334 — Ruling 8 has a second half â€” does the HARNESS follow production to 400 years, or production follow the struct to 4000?
 *question · raised 2026-08-18 · from Sprint 27 (BL-384 assertion agent) and Sprint 26b (doc truth pass) reported contradictory spans on 2026-08-18. Both were right; the configurations differ.*
 
 history_sim_params defaults to 4000 BCE -> 0 CE on a six-band clock (136 decision rounds). make_hard_coded_world overrides it to 400 BCE -> 0 CE on one 4-year band (100 rounds). Every harness and the Ages view use the struct default; only generation uses the override. Filed as BL-462 (harnesses measure a different sim than ships), priority A.
 
-- (a) Harness follows production — 400 years, one band. Sprint 27's findings get re-measured; the six-band ladder becomes dead default and should be deleted.
-- (b) Production follows the struct — restore 4000 years and six bands in generation. Contradicts ruling 8 and needs BL-320's perf work first.
-- (c) Both are deliberate — a long sandbox config and a short shipped one. Then every harness row must name which config it measured, and the docs must describe both.
+- (a) Harness follows production â€” 400 years, one band. Sprint 27's findings get re-measured; the six-band ladder becomes dead default and should be deleted.
+- (b) Production follows the struct â€” restore 4000 years and six bands in generation. Contradicts ruling 8 and needs BL-320's perf work first.
+- (c) Both are deliberate â€” a long sandbox config and a short shipped one. Then every harness row must name which config it measured, and the docs must describe both.
 
-### NR-339 — Two generation features are authored and never produced — valley landform and Highway roads
+### NR-339 — Two generation features are authored and never produced â€” valley landform and Highway roads
 *observation · raised 2026-08-18 · from Sprint B1 substrate census, 2026-08-18, three seeds.*
 
-The landform valley reports 0.0% on the home body on all three seeds. Road tier 3 (Highway) is never generated — seed 0 produced Track 195 / Road 269 / Highway 0. Both are authored values with rendering and, in the road case, a distinct logistics cost.
+The landform valley reports 0.0% on the home body on all three seeds. Road tier 3 (Highway) is never generated â€” seed 0 produced Track 195 / Road 269 / Highway 0. Both are authored values with rendering and, in the road case, a distinct logistics cost.
 
 ### NR-340 — Eight delivery rulings, and the Logistic Points instruction
 *decision taken on your behalf · raised 2026-08-18 · from Ben, 2026-08-18, second elicitation form of the session.*
 
 (1) NR-334 - the HARNESS follows production: 400 years, one band. Sprint 27's findings get re-measured on the shipped config and the six-band ladder becomes dead default. (2) NR-332 - ordnance stays industrial; the ancient arc gets a DIFFERENT military terminal good. (3) NR-321 - upkeep rates go live AFTER that good is producible, then measure pool and golden movement. (4) BL-463 - settlements are BOTH too few and too evenly spread; raise the target AND cluster. (5) The hub reads as ROADS CONVERGING, not a marker or a bigger settlement. (6) NR-339 - make valley landform and Highway roads actually generate. (7) NR-320 - permission granted to register the new harnesses in the verifier-headless skill. (8) Next delivery is Lane C1 (stance). Plus: begin codifying Logistic Points this sprint.
 
-### NR-341 — Logistic Points takes the Shadow Empire model — BL-464's four-way fork closed
+### NR-341 — Logistic Points takes the Shadow Empire model â€” BL-464's four-way fork closed
 *decision taken on your behalf · raised 2026-08-18 · from Ben, 2026-08-18: "I'm thinking we can lean heavily on the shadow empire system, and change things if a strong need arrives."*
 
 BL-464 (Logistic Points) was filed with four materially different readings: per-node capacity, per-nation budget pool, per-corp allowance, or the Shadow Empire stock-and-distance model. Ben chose the Shadow Empire model - LP as a stock generated by infrastructure, spent by both goods movement and unit supply, with distance as the multiplier.
@@ -1348,21 +1732,28 @@ Filed BL-470 (unit march seam), BL-471 (unit marker and command surface), BL-472
 
 *Files: `docs/development/backlog.json`, `docs/military/MILITARY.md`*
 
-### NR-350 — BL-449 (stance surface) — does a hostile declaration announce itself, or is it discovered on contact?
+### NR-350 — BL-449 (stance surface) â€” does a hostile declaration announce itself, or is it discovered on contact?
 *question · raised 2026-08-19 · from BL-449 design field, flagged as "a second question for Ben" when BL-448 (corp stance model) landed and unblocked BL-449 this session.*
 
-BL-449 gates the Corporation panel's stance column on BL-068 competitor-visibility: a stance toward a corp the player has not discovered is not shown. That leaves two readings for how a declare_hostile against the player becomes visible to them — (A) it announces itself immediately, e.g. surfaced on the comms dock the moment it is declared, or (B) it stays silent and is only discovered on contact (matching a market/building becoming visible through normal BL-068 discovery). BL-449's own design notes it rides naturally on the comms dock if it announces, but does not settle which.
+BL-449 gates the Corporation panel's stance column on BL-068 competitor-visibility: a stance toward a corp the player has not discovered is not shown. That leaves two readings for how a declare_hostile against the player becomes visible to them â€” (A) it announces itself immediately, e.g. surfaced on the comms dock the moment it is declared, or (B) it stays silent and is only discovered on contact (matching a market/building becoming visible through normal BL-068 discovery). BL-449's own design notes it rides naturally on the comms dock if it announces, but does not settle which.
 
-**Why it matters.** This decides whether an ambush is truly a surprise (reading B — the player learns they are at war only when something happens to them) or a declared-but-silent-delivery state (reading A — always immediately known, just not necessarily acted on). BL-458 (interdiction) leans on the ambush property ("a convoy belonging to a corp that does not yet know it is at war"), so picking A would partially undercut that design intent for player-facing hostility, though rival-on-rival hostility could still use B for AI purposes.
+**Why it matters.** This decides whether an ambush is truly a surprise (reading B â€” the player learns they are at war only when something happens to them) or a declared-but-silent-delivery state (reading A â€” always immediately known, just not necessarily acted on). BL-458 (interdiction) leans on the ambush property ("a convoy belonging to a corp that does not yet know it is at war"), so picking A would partially undercut that design intent for player-facing hostility, though rival-on-rival hostility could still use B for AI purposes.
 
-- A — announces immediately (comms dock entry the moment a hostile corp declares against the player, regardless of discovery state)
-- B — silent, discovered on contact (matches ordinary BL-068 visibility; the player learns only when they next interact with or are affected by the hostile corp)
+- A â€” announces immediately (comms dock entry the moment a hostile corp declares against the player, regardless of discovery state)
+- B â€” silent, discovered on contact (matches ordinary BL-068 visibility; the player learns only when they next interact with or are affected by the hostile corp)
 
-> **Recommendation:** B, to keep the ambush property BL-458 (interdiction) explicitly relies on — a corp "does not yet know it is at war" only works if hostility is not always broadcast on declaration.
+> **Recommendation:** B, to keep the ambush property BL-458 (interdiction) explicitly relies on â€” a corp "does not yet know it is at war" only works if hostility is not always broadcast on declaration.
 
-> **RESOLVED.** RESOLVED 2026-08-19 (Ben): reading B — hostility toward the player stays silent and is discovered on contact, matching ordinary BL-068 visibility rather than announcing on the comms dock. Preserves the ambush property BL-458 (interdiction) relies on. BL-449 (stance surface) is unblocked to promote: the Corporation panel's stance column shows a hostile row only once the corp is otherwise discovered, same gate as every other BL-068-visible fact.
+> **RESOLVED.** RESOLVED 2026-08-19 (Ben): reading B â€” hostility toward the player stays silent and is discovered on contact, matching ordinary BL-068 visibility rather than announcing on the comms dock. Preserves the ambush property BL-458 (interdiction) relies on. BL-449 (stance surface) is unblocked to promote: the Corporation panel's stance column shows a hostile row only once the corp is otherwise discovered, same gate as every other BL-068-visible fact.
 
 *Files: `src/ui/corporation_panel.cpp`, `docs/ui/question_log.json`*
+
+### NR-363 — BL-477 filed: "each era has a collapse state to avoid - that defines meta" - wording is yours to confirm
+*question · raised 2026-08-19 · from Version-alignment session 2026-08-19: six-agent research workflow + 27-verdict contradiction audit + Ben's form verdicts.*
+
+Your form note is now BL-477 (design-owed, A, v0.1.11), quoted verbatim, with the reading: ancient era's collapse state = imperial collapse (Fall arc Sprint 30 strain machinery); industrial/space = nuclear rupture (BL-333, parked); meta systems must couple levers to the era's collapse pressure. Open question filed in the item: is the collapse state always avoidable at a price, or genuinely reachable in campaign play as it is in generation?
+
+> **RESOLVED.** Ben, 2026-08-20: "genuinely reachable" — the collapse state is a real campaign fail-state, never fully buyable-off. Recorded in BL-477's design with its two binding consequences (shared Era −1/campaign machinery; meta moves the brink but cannot wall it off).
 
 ### NR-356 — The Metropole strategy dodges Sprint 30's 'inevitable' collapse as currently framed
 *question · raised 2026-08-20 · from COLLAPSE.md authoring session (Era -1 strategy roster + culminating-events taxonomy), 2026-08-20.*
@@ -1377,7 +1768,7 @@ A reach-based hegemon (trade lanes and dependency, few owned provinces) never tr
 
 > **Recommendation:** A - one accumulator concept with two inflow rates keeps the mechanic legible; Stage 5 can later be expressed as a parameterisation of it rather than a second system.
 
-> **RESOLVED.** Ben, 2026-08-20: option A - 'Logistics should be capable of determining reach. By that I mean reach feeds strain.' Coheres with BL-325 ruling 3 (one reach field): the strain inflow reads the logistics network itself. Filed as BL-482 (reach-fed slow strain), which already encodes this.
+> **RESOLVED.** Ben, 2026-08-20: option A - 'Logistics should be capable of determining reach. By that I mean reach feeds strain.' Coheres with BL-325 ruling 3 (one reach field): the strain inflow reads the logistics network itself. Filed as BL-510 (reach-fed slow strain), which already encodes this.
 
 *Files: `docs/lore/COLLAPSE.md`, `docs/lore/HISTORY.md`, `src/world/history_sim.hpp`*
 
@@ -1397,4 +1788,67 @@ The shipped Era -1 sim runs ~400 years in one band, and the Sprint 26b doc-truth
 > **RESOLVED.** Ben, 2026-08-20: the 400-year band was a placeholder; the aim is the 4000-year ladder (option A). Generating over 4000 years is acknowledged hard - the optimisation task is designed in COLLAPSE.md (section 'The 4000-year problem'): spatial index + incremental aggregates, event-driven quiet provinces, deterministic banded year grain, record-on-change; option C (2-3 arcs per world) retained as the honest fallback if the budget still misses.
 
 *Files: `docs/lore/COLLAPSE.md`, `docs/lore/HISTORY.md`, `src/world/history_sim.hpp`*
+
+### NR-385 — Decision: BL-392 (procurement destroys value) built BEFORE the D4 tariff, in the same lane
+*decision taken on your behalf · raised 2026-08-20 · from Four-lane batch refinement (Sprints 27/B2/B3/C3/D4), REFINED.md 2026-08-20.*
+
+D4 adversarial finding 9 already says procurement must be fixed before anything else touches it, or not at all. The tariff is a money-flow change through the same budget seam, so I read that as binding here and ordered BL-392 first inside Lane D rather than filing it separately. Effect: Lane D is one agent doing conservation-then-tariff, and the lane-spanning requirement is conservation. If you would rather ship the tariff alone and leave BL-392 for v0.1.11 proper, say so and the lane splits.
+
+> **RESOLVED.** RULED 2026-08-20, Ben: keep BL-392 in Lane D ahead of the tariff, as refined. Noted at ruling time that BL-392 is three economics changes (buyer-body delivery, a contract price that differs from spot, supplier-derived lead time), not a conservation patch - so Lane D is two items and is the largest lane in the batch.
+
+### NR-386 — Decision: BL-463 (settlement count is seed-invariant) folded into Sprint B3 rather than left for v0.1.22
+*decision taken on your behalf · raised 2026-08-20 · from Four-lane batch refinement (Sprints 27/B2/B3/C3/D4), REFINED.md 2026-08-20.*
+
+B3 re-tunes clamp(tiles/1000,20,40) in population_generation.cpp; BL-463 says the resulting count does not vary with seed. Same file, same census harness, and a clamp fixed once for map size and again for seed-invariance is the same edit done twice if they are scheduled apart. Folded. Its v0.1.22 version goal now lands early - flag if that disturbs the version cut.
+
+> **RESOLVED.** RULED 2026-08-20, Ben: fold BL-463 into Lane B as refined. Its v0.1.22 version goal lands early. Basis: BL-463 own design names road_generation.cpp early-return-below-two-centres as a downstream effect of the clamp, which is the same cut Sprint B2 makes - one defect seen from two ends.
+
+### NR-401 — The province partition reaches no real save, and is not in state_hash
+*observation · raised 2026-08-20 · from Pre-compile static review of the integrated four-lane batch, 2026-08-20; blocker fixed at bd238d5.*
+
+world::provinces is documented as the trailing section of the history-log stream, and the appender/reader pair is correct field-for-field with a clean-EOF path that loads a pre-BL-466 prefix. But write_history_log / read_history_log have NO callers in src/ - only two harnesses - so nothing in the game persists it. Separately, provinces is stored state excluded from state_hash without the documented reason corp_modifiers carries. Consequence worth acting on BEFORE BL-467: a determinism regression in build_province_partition would be caught only by the same lane own P6 assertion, and BL-467 is about to fold a province id into a battle seed. Either fold provinces into state_hash or document the exclusion the way corp_modifiers does.
+
+> **RESOLVED.** RESOLVED 2026-08-21 (Lane 0). Provinces are NOT folded into state_hash, and on inspection that exclusion is correct rather than an oversight: state_hash folds the fields a TICK may mutate, and the partition is generation output that never moves once built - including it would make every tick hash carry a constant. The real gap was that nothing checked it at all. determinism_harness now compares the partition across two generations of the same seed, field-for-field and tile-for-tile, alongside its existing rows (PASS). The exclusion is documented on world::provinces the way corp_modifiers documents its own, naming BL-467 folding a province id into a battle seed as the reason it matters. The unsaved half stands and is unchanged: there is still no game save path at all (see NR-399 amendment).
+
+### NR-404 — Suite state after the batch: 96 tests, 3 real failures, all confirmed pre-existing
+*observation · raised 2026-08-20 · from Full CTest suite over the integrated four-lane batch, 2026-08-20 (96 tests, 1474s).*
+
+Full CTest on the integrated tree: 95% pass, 5 failures. Two are resolved - world_audit (NR-403) and debt_decomposition, which is a MEASUREMENT-ONLY harness that exits 0 standalone and timed out only under suite load (the NR-402 exposure, now demonstrated rather than predicted). The three that remain are ai_skill_harness (Timeout), spectator_determinism (Failed) and tier_margin (Failed); two independent agents each stashed their work, rebuilt on the untouched base and reproduced all three identically, so none is this batch. spectator_determinism deserves its own attention: its pinned golden 3CBAD1D44EE71EDE is stale, and the two agents measured DIFFERENT clean-base hashes for it (3CC37947C8662F71 and 2ABF4700B2DF9251), which is either two different build configurations or a determinism leak in the thing whose entire job is asserting determinism. Worth one deliberate look before it is re-blessed - and it must not be re-blessed without that look.
+
+> **RESOLVED.** RESOLVED 2026-08-21 (Lane 0). No determinism leak. spectator_determinism run on the integrated tree: played=344A9FE48306E93A twice, two INDEPENDENTLY BUILT worlds, same seed - the reproducibility row passes. The only failure was the byte-identity row against a golden pinned on 2026-08-14. The two different clean-base hashes the agents reported resolve as each having measured a differently-generated world, not a fault. Re-blessed to 344A9FE48306E93A per the harness own documented convention (bless on a deliberate world change, after confirming the move is intended and reproducible), with a provenance entry naming all four changes responsible: BL-463 settlement density, Sprint B2 road cuts, BL-466 provinces, and the two-level firm budget. ALL PASS (0 failures). The other three suite failures - ai_skill_harness timeout, tier_margin - are untouched by this and remain open.
+
+### NR-427 — An allocated province id must still be allocated DETERMINISTICALLY - the ruling removes the derivation, not the replay guarantee
+*decision taken on your behalf · raised 2026-08-21 · from BL-515 design, from the 2026-08-21 elicitation form.*
+
+Ben ruled province identity is an allocated id, created once and serialised. Read literally that ends the derived-id property BL-466 was built on. But it must NOT end the replay property: the same seed has to produce the same ids, or determinism_harness province comparison (added today) fails and every id held across a boundary - a battle record, an agent march order, a save - becomes seed-unstable. So the rule I have written into BL-515 is: allocate in a fixed walk order, never from a hash map iteration order. This is the same class of leak already caught once in build_province_partition, where world::bodies being an unordered_map fed province ids. Flagging as a decision-taken rather than an assumption because Ben did not say it and a reasonable implementer could read allocated as a licence to hand out ids in encounter order.
+
+> **RESOLVED.** RULED 2026-08-21, Ben: identity becomes the LOWEST-ID MEMBER TILE, revising his allocated-id answer. This does not work around the determinism hazard, it removes it: a derived id cannot be handed out in the wrong order because it is not handed out at all, so an allocator assigning ids in hash-map encounter order stops being possible. It also serialises nothing new - no allocator state, no next-id counter, no save-format surface - and is unique by construction since every tile belongs to exactly one province. The cost, a derived id changing when the province changes shape, is acceptable precisely because Ben ruled borders move during GENERATION ONLY: ids churn while the Era -1 sim redraws them (BL-518) and are frozen before anything outside generation can hold one. Consequence carried into BL-518: on a split, each half derives a fresh id from its own lowest tile and the original survives only on whichever half kept that tile. BL-515 updated. One constraint survives unchanged - the partition WALK must still be sorted, since world::bodies is an unordered_map and iterating it unsorted already fed province ids in container order once.
+
+### NR-428 — Ocean provinces overturn a stated invariant, and the harness rows must be rewritten rather than deleted
+*observation · raised 2026-08-21 · from BL-516 design, from Ben notes on the 2026-08-21 form.*
+
+province.hpp states, and province_partition_harness asserts, that a province is a contiguous run of LAND tiles that never spans water. Drawing provinces over ocean overturns both. The risk is the easy path: an assertion that stops being true gets deleted, and the file quietly loses a guarantee nobody notices is gone. It should become a WATER-AWARE assertion instead - a province is single-kind, land provinces hold no water tiles, ocean provinces hold no land, coastal provinces are bounded at 3-12 and ocean ones at 80. Also worth carrying forward: province_of returns 0 for ocean today and 0 is a real province id; ocean membership must use the no_province sentinel discipline BL-511 seam work already established.
+
+> **RESOLVED.** RULED 2026-08-21, Ben: ocean is a special case. So the land invariant is not deleted and not weakened - it is narrowed to land provinces, and ocean provinces get their own rules alongside it. That is the outcome this entry asked for: a province is single-kind, a land province holds no water tiles, an ocean province holds no land, coastal provinces are bounded 3-12 and ocean provinces at 80. The province_of sentinel discipline still applies to water membership, since 0 is a real province id and only no_province (0xFFFFFFFF) means absent. Recorded in BL-516.
+
+### NR-429 — Retaining the heightmap contradicts GENERATION_LEDGER own stated data lifetime, deliberately
+*decision taken on your behalf · raised 2026-08-21 · from BL-517 design, from the 2026-08-21 form.*
+
+GENERATION_LEDGER.md sets a deliberate lifetime for per-pass intermediates: regenerate on demand, do not persist. BL-517 retains one of them. The justification is that height stops being an intermediate the moment a downstream system reads it - BL-515 makes it an input to the partition, so it becomes world state rather than a breadcrumb. That reasoning needs to be written INTO GENERATION_LEDGER.md as part of landing BL-517, or a later reader will find a persisted field contradicting the doc and delete it as an oversight. Recorded because doc-truth drift of exactly this shape is what the 2026-07-31 sweep existed to clean up.
+
+> **RESOLVED.** RESOLVED 2026-08-21, Ben: update GENERATION_LEDGER.md to match this session's work - done. The DISPOSABLE bullet no longer lists height, and a new paragraph records why: height was a breadcrumb until BL-515 made it an INPUT to the province partition, and a field a live system reads is world state whatever pass first computed it. The paragraph also states the rule that stops this becoming a loophole - an intermediate graduates out of the disposable set only when a system outside the ledger reads it, and it graduates by being named there. Nothing else in that list has a reader today. Written AHEAD of BL-517 landing, deliberately: the doc previously asserted something the design had already overturned, and a silent doc is the thing the authority time-slice protects, not a wrong one.
+
+### NR-438 — THE 12-TILE CEILING NO LONGER HOLDS: 4.9% of provinces exceed it, max 16 — and the alternative is costed
+*question · raised 2026-08-21 · from Singleton absorption pass on BL-515, merged and verified 2026-08-21.*
+
+Absorbing singletons into their cheapest neighbour means a province already at 12 can take one and become 13. Measured across 6 seeds: 1,099 of 22,401 provinces (4.9%) exceed 12, largest is 16, and every excess tile arrived by absorption - the harness now asserts that identity exactly (excess tiles == absorptions into full regions, 206 == 206 on the default world), so GROWTH's own clamp is still proven separately and is not the thing that slipped. The agent did not clamp it and did not invent a rule, which was right. It also costed the obvious alternative rather than describing it: preferring a neighbour WITH ROOM and falling back to a full one only when all six are full gives 241 over the ceiling, max 14, 80.63% in band, with identical absorbed and island counts. That variant is compiled out behind IO_ABSORB_PREFER_ROOM so the number is reproducible rather than taken on trust. The trade is real and it is yours: prefer-room is a better distribution, but it means deliberately choosing a COSTLIER neighbour, which contradicts the cheapest-edge rule the growth model is expressed in. Three ways: keep cheapest-edge and accept 13-16 tile provinces, switch to prefer-room, or raise the stated ceiling to 16 so the docs match the behaviour.
+
+> **RESOLVED.** RULED 2026-08-21, Ben: raise the ceiling. 12 tiles is now a PREFERENCE, 20 a hard cap, and larger-than-12 is permitted in rare cases. So cheapest-edge absorption stays as shipped, and the prefer-room variant behind IO_ABSORB_PREFER_ROOM can go - the case for it was the breach itself. Worth carrying to whoever implements: the shipped behaviour ALREADY satisfies this. Max is 16, inside the new cap, so the work is saying it (province.hpp still calls 12 a clamp), asserting it (a hard-cap row at 20 replacing the absolute-12 row) and REPORTING the over-12 share rather than asserting a rareness threshold nobody has chosen. Currently 4.9%. Ben has handed the implementation to the next session alongside BL-519 and BL-520.
+
+### NR-439 — No authority doc owns whether a 13-16 tile province is acceptable DOWNSTREAM
+*question · raised 2026-08-21 · from Singleton absorption pass on BL-515, merged and verified 2026-08-21.*
+
+The agent flagged this as novel and it is the sharper half of NR-438. province.hpp described the 12-tile ceiling as 'the one size rule in this file that is a clamp' and province_section_max_tiles documented 'a built province is 1-12 tiles'. Both are now conditionally false; the comments and two harness rows were rewritten to say what is actually true. But nothing owns the QUESTION, and two landed systems read province size: BL-513's building ceiling (sustain units are summed per province, so a 16-tile province simply gets a larger ceiling - benign) and BL-467's battle envelope (units in the same province are drawn into one fight, so a larger province widens the engagement radius - not obviously benign, and BL-467 is not built yet). Worth deciding before BL-467 lands rather than discovering that battles pull in units from further away on 4.9% of the map.
+
+> **RESOLVED.** RESOLVED 2026-08-21 by the same ruling. The question was whether a 13-16 tile province is acceptable downstream, since BL-513's ceiling and BL-467's battle envelope both read province size. Ben's answer sets the bound explicitly at 20, which answers it for both: BL-513 simply scales (sustain units are summed per province, so a bigger province gets a bigger ceiling - benign), and BL-467 now has a stated worst-case engagement radius to design against instead of an unbounded one. That was the reason this wanted settling BEFORE BL-467 rather than after, and it now is.
 
