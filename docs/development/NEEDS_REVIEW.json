@@ -3052,6 +3052,33 @@
    "title": "BL-521's click_tile PANS the view as a side effect, and verify.mouse was deliberately left in place beside the new verify.hover",
    "source": "BL-521, two calls taken by the implementing agent.",
    "what": "(1) `verify.click_tile(col,row)` and `verify.tile_screen(col,row)` ask the canvas where a tile is, which CENTRES it — so clicking a tile moves the camera. Accepted because the alternative is a second copy of the canvas transform living in the verify API, which would drift. The fix, if you want one, is the canvas publishing tile screen rects without moving. (2) `verify.mouse` moves only the canvases' cursor; the new `verify.hover` moves ImGui's too. Unifying them would be cleaner but would re-bless every existing hover golden, so `mouse` was left untouched. Both are reasonable; both are the agent's calls rather than yours."
+  },
+  {
+   "id": "NR-456",
+   "title": "BL-520: texture SURVIVES the lenses at 0.45 rather than being replaced by them — a decision taken on your behalf",
+   "raised": "2026-08-21",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-520 (basic tile texturing), open question 1. src/ui/body_surface_canvas.cpp.",
+   "what": "The item asked whether texture survives the map lenses or whether lenses replace it — 'a texture underneath a Country-lens fill either reads as depth or as dirt'. I picked SURVIVES, at 0.45 strength, and implemented it. Reasons: (1) the precedent is one channel over — BL-231's landform relief is composited AFTER the lens tint on the argument that terrain facts stay true under an overlay, and 'this is closed-canopy forest' is the same class of fact as 'this is a mountain'; (2) replacing it would make each lens a different MAP rather than the same map read differently, which is what the lens bar depends on. The thing that actually keeps it from reading as dirt is not the 0.45 — it is that every mark's ink is derived from the tile's OWN drawn fill (pushed 55% toward a per-cover target), so under Country a mark is that nation's colour darkened, i.e. shading on the block rather than a second competing colour. Same derivation makes the fog and survey dim free. THE FRAME THAT FALSIFIES IT is texture_lens_country in scripts/verify/tile_texture.lua — if the marks read as unrelated speckle there, the answer was 'replace' and the fix is one constant (k_texture_lens_strength -> 0) plus deleting the attenuation branch.\n\n[ID NOTE: filed by the BL-520 agent as NR-452 while a concurrent lane was filing entries in the same range; renumbered on merge. The BL-520 commit message and any doc comment written by that agent cite the OLD id.]"
+  },
+  {
+   "id": "NR-457",
+   "title": "BL-520's texture pass is COMPILE-CHECKED ONLY — never rendered, and its verify script has never been run",
+   "raised": "2026-08-21",
+   "kind": "observation",
+   "status": "open",
+   "source": "BL-520, src/ui/hex_render.cpp + src/ui/body_surface_canvas.cpp.",
+   "what": "Same container limitation as NR-451: SDL3/ImGui come from FetchContent, the proxy blocks the downloads, and there is no display, so ProjectIo could not be built or run and no scripts/verify/*.lua could execute. What IS verified: `g++ -std=c++20 -fsyntax-only` is clean on both changed files, and every number quoted in the code comments and in PLANETARY.md was computed independently (LOD ramp 0/0.25/0.5/1 at r=14/16/18/22; density 75/150/205/255 -> 2/3/4/5 marks at alpha 123/157/182/204 of 255; grain alphas 36-76 of 255 at full strength, 16-34 under a lens). What is NOT verified: how ANY of it looks — whether the grain is too loud to let the province blend read as one shape, whether the cover marks are distinguishable from each other, and whether the lens attenuation in NR-452 is right. scripts/verify/tile_texture.lua was written and named in the verifier-visual skill for you to run; it is deliberately capture-only with NO golden blessed, since blessing an unseen frame pins whatever got built.\n\n[ID NOTE: filed by the BL-520 agent as NR-453 while a concurrent lane was filing entries in the same range; renumbered on merge. The BL-520 commit message and any doc comment written by that agent cite the OLD id.]"
+  },
+  {
+   "id": "NR-458",
+   "kind": "novel-work",
+   "status": "open",
+   "raised": "2026-08-21",
+   "title": "BL-520 created a NEW VISUAL VOCABULARY that no authority owns - thirteen mark kinds deliberately not icons, and a third always-on render channel",
+   "source": "BL-520 (basic tile texturing), merged 2026-08-21. Flagged by the implementing agent.",
+   "what": "Two parts, and the agent was right to raise both.\n\n(1) THE MARK VOCABULARY. Nine cover patterns and four substrate grain kinds, none of which existed before. ICONS.md owns the `ui::icons` glyph namespace under a `(dl, centre, r, colour)` contract; these marks are in NEITHER that namespace NOR on that contract. The agent put them in hex_render and documented them in PLANETARY.md, arguing that a hashed FIELD of marks is not an icon. That reads right - an icon is a symbol you look up, a grain is a texture you look through - but it is a boundary judgement that leaves two visual vocabularies where there was one, and ICONS.md currently says nothing about it.\n\n(2) A THIRD RENDER CHANNEL. Texture now composites on every tile forever, alongside hue (substrate x cover) and BL-231's landform relief. Small in code, permanent in consequence: every future overlay, lens and capture inherits it, and the LOD gate makes it the first channel that appears and disappears with zoom."
   }
  ]
 }
