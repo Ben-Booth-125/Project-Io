@@ -32,20 +32,25 @@ Stockpile readouts, market state, and workforce indicators are added in later la
 
 ## Terrain types
 
-A tile's character has **two axes** (the two-axis model, [TILES.md](../economy/TILES.md)):
+A tile's character has **three axes** (BL-519's axis split, [TILES.md](../economy/TILES.md)):
 
-- **Composition** — what the tile is made of. **Eleven values** (`terrain_composition`,
-  `src/world/components.hpp`): barren, rocky, volcanic, icy, tundra, grassland, forest,
-  wetland, ocean, regolith, metallic. Composition owns the hex's **hue** —
-  `ui::terrain_colour` (`src/ui/hex_render.{hpp,cpp}`) is the single colour source of
-  truth; the palette is not duplicated here (an earlier five-terrain RGB table in this
-  section drifted and is superseded).
+- **Substrate** — what the ground is made of, and never transformed. Eight values
+  (`terrain_substrate`, `src/world/components.hpp`): barren, rocky, sedimentary,
+  volcanic, metallic, regolith, icy, ocean.
+- **Cover** — what sits on it, and `none` is a first-class answer. Ten values
+  (`terrain_cover`): none, grass, scrub, forest, marsh, snow, dunes, ash, salt, urban,
+  each graded by `cover_density` (0–255; 0 iff cover is `none`).
 - **Landform** — the tile's physical shape. Seven values (`terrain_landform`): plains,
   highland, mountain, canyon, valley, crater, rift. Landform renders on its **own
   channels** — a subtle relief tint (`ui::landform_relief`) plus stroke-only glyphs for
   the dramatic set, inked by luminance (`ui::contrast_ink`) — never in the hue. The full
   render spec is [CANVASES.md](CANVASES.md) § Terrain channels (BL-231/BL-232), shared
   with the Selection band's neighbourhood view via `hex_render`.
+
+Substrate and cover **share** the hex's hue: `ui::terrain_colour` (`src/ui/hex_render.{hpp,cpp}`)
+is the single colour source of truth, and it blends the substrate's own colour toward a
+per-cover endpoint by that tile's density. Sharing one channel is what makes the texture pass
+below necessary rather than decorative — two different tiles can arrive at the same green.
 
 > **Superseded — water coverage (2026-07-31).** The old rule here — ~60% water flooded
 > outward by BFS as one contiguous region, a single preferred continent — is superseded
@@ -238,6 +243,108 @@ difference is that the far-zoom grid texture is brick-laid rather than hex-dotte
 
 `build_ms` (~9 ms, ImGui draw-list construction) is untouched and is the next thing
 to look at if this view is still short of budget on low-spec hardware.
+
+### Terrain texture — substrate grain and cover pattern (BL-520, 2026-08-21)
+
+Two procedural passes over each hex, drawn from `ImDrawList` primitives —
+**no atlas, no art assets**, the same hand-drawn vector idiom
+[ICONS.md](ICONS.md) establishes for the glyph vocabulary. Implementation:
+`ui::draw_tile_texture` / `ui::texture_lod_scale` (`src/ui/hex_render.{hpp,cpp}`),
+called from the Planetary fill loop and from the Selection band's neighbourhood view
+so the two surfaces cannot drift.
+
+**The split is the whole design, and it follows the axis split.** The substrate is the
+axis BL-511's province blend already averages across a province; the cover is per tile
+and must read as per tile. So:
+
+| Pass | Keyed on | Character | Why |
+|---|---|---|---|
+| **Substrate grain** | `terrain_substrate` | 2–5 tiny marks, alpha 0.14–0.30 | Material, not a boundary. A rock-to-rock seam is not information, so the grain must not draw one — it stays quiet enough that the province blend still reads as one shape. |
+| **Cover pattern** | `terrain_cover` × `cover_density` | 1–5 marks, alpha 0.35–0.80 | A forest edge **is** information. The pattern asserts where one tile ends. |
+
+Grain kinds by substrate: a **dot stipple** (barren, regolith), **bedding strokes**
+(sedimentary, icy) and **angular fracture chips** (rocky, volcanic, metallic — metallic
+in pale ink rather than dark, so it reads as specular rather than as dirt).
+**Ocean draws nothing**: a flat sea is a correct reading of open water, and any mark on
+it would be read as the animated water this item explicitly excludes.
+
+Cover marks: a **canopy tick** (forest), the same silhouette at ~60 % (scrub — so a
+forest line *grades* instead of snapping to an edge), a **three-blade tuft** (grass),
+**stacked level dashes** (marsh), a **stipple** (snow and ash — both are *fall*, not a
+growth form), a **crossed crust tick** (salt), a **windward crest** (dunes) and a
+**block plan** (urban — built form, not growth).
+
+**Density drives both channels**, which is the argument for the pattern reading it at
+all: `cover_density` already means biotic yield to the economy, so a sparse wood both
+*looks* thin and *cuts* thin off one scalar.
+
+```
+f     = cover_density / 255
+marks = clamp(1 + round(f × 4), 1, 5)
+alpha = (0.35 + 0.45 × f) × strength
+```
+
+| cover @ density | f | marks | alpha (full strength) |
+|---|---|---|---|
+| scrub @ 75 | 0.294 | 2 | 0.482 (123/255) |
+| grass @ 150 | 0.588 | 3 | 0.615 (157/255) |
+| forest @ 205 | 0.804 | 4 | 0.712 (182/255) |
+| any @ 255 | 1.000 | 5 | 0.800 (204/255) |
+
+(The four densities are BL-519's calibration points — the ones at which the split model
+reproduces each pre-split composition's colour exactly.)
+
+Mark placement is **hashed from the tile's grid coordinate**, never from screen
+position: the grid is a cylinder that draws several wrap copies of one tile, and the
+canvas pans continuously, so a screen-space hash would make the ground crawl and would
+disagree between two copies of the same tile.
+
+#### Texture and the lenses — texture survives, attenuated
+
+**Decision (BL-520 open question 1, taken on delivery): texture survives every lens at
+`0.45` strength.** Two reasons it survives rather than being replaced. The precedent is
+one channel over — BL-231's landform relief is composited *after* the lens tint on the
+argument that terrain facts stay true under an overlay, and "this ground is
+closed-canopy forest" is the same class of fact as "this ground is a mountain". And
+replacing it would make each lens a *different map* rather than the same map read
+differently, which is the property the lens bar depends on.
+
+It is attenuated rather than left at full because a lens fill is a **categorical claim**
+and must stay the loudest thing on the tile. The mechanism that keeps it from reading as
+dirt is not the attenuation, though — it is that **each mark's ink is derived from the
+tile's own drawn fill**, pushed 55 % toward a per-cover target. Under the Country lens a
+mark is that nation's colour darkened, so it reads as shading *on* the block. The same
+derivation makes the fog wash and the survey dim free: as the ground darkens, so does
+its grain.
+
+> This is a decision taken on Ben's behalf, not a ruling — see `NEEDS_REVIEW.json`.
+> The frame that falsifies it is `texture_lens_country` in the check below.
+
+#### Texture level-of-detail — its own, stricter bound
+
+Texture is gated on **`draw_r > 14 px`**, ramping to full strength at **22 px**
+(`texture_lod_scale`). This is deliberately **stricter than BL-269's 7 px coarse-fill
+threshold above**, and for a different reason. The fill LOD asks *is the corner cut
+still drawable*. A sampled pattern asks a harder question: at hex scale it is not
+merely invisible when too small, it is **moiré** — adjacent tiles' marks beat against
+the pixel grid and the map crawls under a pan.
+
+**The bound is derived.** A cover mark is drawn at `0.20 × draw_r` and needs ~2 px of
+extent before it is a shape rather than a stipple of aliasing: `2 / 0.20 = 10 px`, plus
+headroom for the five marks a closed canopy draws without them merging → **14 px**. It
+then ramps linearly rather than popping in, because a texture that appears between one
+zoom notch and the next reads as a rendering fault. So `texture_lod_scale` is 0 at
+`r ≤ 14`, 0.25 at 16, 0.5 at 18, and 1 at `r ≥ 22` — and the whole-grid view
+(`draw_r ≈ 5–7`) is **pixel-identical to the pre-BL-520 build**.
+
+Two further gates, both in the canvas call site: texture is skipped on **survey-masked**
+tiles (a cover pattern is terrain information, and drawing it through the mask would leak
+the shape of unsurveyed ground — [DISCOVERY.md](DISCOVERY.md)) and on **built** tiles
+(whose hex is swapped wholesale for the owner plate as an identity signal). It is drawn
+after the fill and **before** the province edge stroke, so a province border is never
+broken up by a canopy tick.
+
+**Check:** `scripts/verify/tile_texture.lua` (`verifier-visual`).
 
 ## Cell sizing and coordinate mapping
 

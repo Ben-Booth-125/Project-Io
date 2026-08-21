@@ -75,6 +75,19 @@ the "authorising a new check = naming it" convention:
   real capture immediately earned its keep — the Holdings cell was clipped to "/ 1 otl" behind the
   Choose button.
 
+- **`tile_texture.lua`** (BL-520, 2026-08-21) — the substrate grain and the cover pattern on
+  the Planetary canvas. Four claims, and the captures are grouped by which one they test:
+  the two passes are distinguishable (cover reads per tile, grain does not draw a seam); the
+  pattern scales with `cover_density`; texture survives every lens attenuated to 0.45; and the
+  LOD bound fires — **no texture at all below 14 px of drawn circumradius**, stricter than
+  BL-269's 7 px coarse-fill threshold because a sampled pattern at hex scale is moiré rather
+  than merely invisible. Captures Kepler (the biotic covers on sedimentary ground) and Cinder
+  (dunes / ash / snow / salt over rocky, regolith, volcanic and metallic grain), plus the
+  ocean-is-flat and unsurveyed-is-blank negatives. **No golden yet**: the pass was written in a
+  container that could neither build nor display the app, so nothing about it has been seen —
+  bless only after eyeballing `texture_lens_country` and `texture_lod_*`, which are the two
+  frames carrying decisions taken on Ben's behalf.
+
 ## Text-overflow floor check (BL-215)
 
 **`text_overflow_floor.lua`** — the render-precision audit's saved check. Every measured text

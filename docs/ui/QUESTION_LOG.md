@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**28 surfaces** — 4 settled, 24 awaiting Ben's wording.
+**29 surfaces** — 4 settled, 25 awaiting Ben's wording.
 
 ---
 
@@ -211,6 +211,14 @@ alphabetical order.
 **Because:** Terrain is two axes plus a deposit profile, none of which is fully legible from the canvas colour alone. Siting is the player's central recurring decision and this is where its inputs are read.
 
 *Demanded by BL-122, BL-144 · `src/ui/tile_inspector.cpp` · id `tile_inspector`*
+
+### Terrain texture (Planetary canvas ground pass)
+
+**Answers:** What is this ground made of, and how heavily is it covered?
+
+**Because:** Colour alone could not carry both halves once BL-519 split the terrain axes. The substrate and the cover blend into ONE fill, so a rocky slope with a thin wood and a sedimentary plain with a thin wood arrive at neighbouring greens and the player cannot tell which they are siting on. Texture separates the two readings onto separate channels: a faint substrate grain that says what the ground is, and a per-tile cover pattern whose mark count and weight scale with cover_density, so a sparse wood LOOKS thin exactly where the economy already CUTS it thin. It earns its space by being free of any: it adds no chrome, no legend and no control, and it is the only way a cover boundary reads as a boundary now that BL-511's province blend deliberately smooths the fills.
+
+*Demanded by BL-520, BL-519 · `src/ui/hex_render.cpp`, `src/ui/body_surface_canvas.cpp` · id `tile_texture`*
 
 ---
 
