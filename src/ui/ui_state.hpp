@@ -225,10 +225,17 @@ struct ui_state
     /// role for the new Soldier card) — Strength / Roster, whichever apply.
     int selection_unit_page = 0;
 
+    /// Province Selection accordion page index (same role again) — Tiles /
+    /// Deposits / Buildings. BL-511's refold (2026-08-21) moved the province off
+    /// its own card and onto the shared Selection element's three-column band, so
+    /// its three readings page exactly as every other selection's do. Clamped at
+    /// the draw site, like the others.
+    int selection_province_page = 0;
+
     /// The province (BL-511) the player single-clicked, or 0 for none. The
     /// province is the SELECTED unit on the Planetary canvas — a click that hits
     /// no marker lands here rather than on a tile — while the tile stays the data
-    /// grain the province card then lists (deposits, terrain, buildings all remain
+    /// grain the Selection element then lists (deposits, terrain, buildings all remain
     /// tile-keyed). Province ids are derived, never allocated (world/province.hpp),
     /// so this is a plain id, not an entity: `selected_entity` and this field are
     /// mutually exclusive, and whichever is set last clears the other. The
@@ -254,7 +261,7 @@ struct ui_state
     // Which tile the loop is currently anchored to, and which of the three fixed
     // stages (0 = unit, 1 = building, 2 = province) the selection currently sits
     // on. BL-511 moved the terminal stage from the tile to its province; a tile is
-    // reached from the province card's member-tile list instead.
+    // reached from the Selection element's Tiles page instead.
     // A click on hovered_tile == selection_cycle_tile advances the stage
     // (skipping stages with nothing there); a click elsewhere reseeds both.
     // Mirrors card_resource_page's per-selection reset idiom rather than adding a
