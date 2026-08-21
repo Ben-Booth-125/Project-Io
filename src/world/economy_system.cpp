@@ -1,5 +1,6 @@
 #include "economy_system.hpp"
 
+#include "battle_system.hpp"   // run_battles (BL-467 engagement trigger)
 #include "budget_system.hpp"   // compute_building_opex, body_mean_habitability (BL-181 solver)
 #include "building_profit.hpp" // estimate_building_profit (BL-079 corp agency)
 #include "corp_ai.hpp"         // run_corp_strategic_step (BL-202 strategic tier)
@@ -1500,10 +1501,9 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
 
     // BL-470: the march pass. Runs where BL-467's battle-discovery phase will
     // sit once it exists — "a unit that marched into a hostile province this
-    // tick fights before it can march out next tick" (the item's own design)
-    // — but there IS no battle-discovery phase yet (MILITARY.md's "what is
-    // absent": no engagement trigger, no battle state on unit_component), so
-    // today marching units simply advance with nothing to precede them here.
+    // tick fights before it can march out next tick" (the item's own design).
+    // BL-467 landed the battle-discovery phase this comment used to say was
+    // absent; `run_battles` is the call, immediately below.
     // Runs BEFORE run_unit_upkeep so a unit that arrives at a new tile THIS
     // tick is already upkept/reach-checked from its new position, not its
     // stale one.
@@ -1518,6 +1518,19 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // the march pass. See run_unit_march's doc comment for why this is
     // currently a written rule with no observable effect (no shared
     // logistics-point pool exists yet to contend over).
+    //
+    // BL-467 (2026-08-21): the battle-discovery phase the comment above says does
+    // not exist NOW EXISTS, and it runs immediately before this line — which is
+    // what makes the sentence "a unit in contact this tick fights before it can
+    // march out next tick" true rather than aspirational.
+    {
+        const battle_tick bt = run_battles(w, reg, w.current_day_tick);
+        // Carried out on the report, not dropped: a concluded battle is erased
+        // inside the pass, so this is the only chance the aftermath has to reach
+        // a surface. See economy_report::battle_dispatches.
+        report.battle_dispatches = std::move(bt.dispatches);
+    }
+
     run_unit_march(w, reg);
 
     // BL-454: the unit pass — goods draw, the decay rule, orphan cleanup. LAST,
@@ -1561,6 +1574,23 @@ unit_upkeep_tick run_unit_upkeep(world& w, const recipe_registry& reg)
         // A unit whose owner, tile, or muster base has been erased has nothing
         // holding it in the world. `muster_base == null_entity` means "no base
         // recorded" (a unit that predates the muster rule) and never orphans.
+        //
+        // BL-467 ADDED THE FIRST CONDITION: a unit ground to zero men. Before the
+        // battle pass existed nothing could reduce a count to zero, so the case
+        // could not arise and the cleanup had no reason to test for it. It can
+        // now, and without this a destroyed unit would persist forever — holding
+        // a tile, pinning its province, and folded into state_hash as a force
+        // that no longer exists.
+        //
+        // It belongs HERE rather than in the battle pass, and that is BL-467's
+        // aftermath ruling rather than convenience: disbanding is this pass's
+        // job, and a second disband site would be a second place to forget. The
+        // battle pass removes MEN; this removes the unit when there are none.
+        if (u.count <= 0)
+        {
+            disband.push_back(id);
+            continue;
+        }
         if (w.corporations.find(u.owner) == w.corporations.end())
         {
             disband.push_back(id);

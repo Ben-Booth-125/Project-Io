@@ -72,7 +72,7 @@ commit timestamps rather than reviving an unstarted timer.)
 | D3 | A law has an author, and a tax is a transfer | **Open 2026-08-19** — BL-480 LANDED, harnesses green; open on the NR-382 rate ruling + the live levy-line look |
 | B2 | Roads that reach, ports that mean something | **Open 2026-08-20** — Lane B; the three road_generation cuts, then BL-188 un-parked |
 | B3 | Density, and corporations stop all being the same thing | **Open 2026-08-20** — Lane B; the density clamp is still sized for the 180×84 map |
-| C3 | The engagement trigger, and the fight you can watch | **Open 2026-08-20** — BL-467; both resolvers still return results NOTHING READS. Unblocked 2026-08-21 by NR-439 |
+| C3 | The engagement trigger, and the fight you can watch | **Open 2026-08-21** — BL-467 **LANDED** (26/26; a fight now happens through the real tick). Rider MEASURED not taken (NR-467); open on the rate ruling |
 | D4 | The border costs something (the international half) | **Open 2026-08-20** — depends on D3's treasury and Lane B's routes |
 | P1 | The province becomes a thing you can see, and then a thing worth seeing | **Closed 2026-08-21** — done_when met by BL-515, then overshot by five: the NR-438/439 ceiling ruling, BL-519 axis split, BL-520 texturing, BL-516 water kinds, BL-521 click injection. **Owed: nothing was rendered** |
 

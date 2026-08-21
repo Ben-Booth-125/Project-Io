@@ -48,6 +48,23 @@ struct history_stores
 void post_nation_agency_comms(const world& w, const economy_report& report,
                               ui::chat_state& chat, int day_tick);
 
+/// Battle dispatches (BL-468): one comms line per battle per tick, posted to the
+/// standing **Field** channel (index `k_field_channel`).
+///
+/// The world already reported these — `economy_report::battle_dispatches`, filled
+/// in sorted (province, attacker, defender) order and INCLUDING battles that
+/// concluded this tick, which `world::battles` no longer holds. This turns them
+/// into words. It draws nothing, decides nothing and touches no simulation state;
+/// the wording itself lives in `core/battle_dispatch_text.{hpp,cpp}`, in its own
+/// translation unit so it can be harnessed (this file cannot — it reaches
+/// <SDL3/SDL.h> through app.hpp).
+///
+/// DO NOT re-sort or re-key the records. They arrive deterministic, and routing
+/// them through an unordered container is exactly the trap
+/// `post_nation_agency_comms` has to work around with its own explicit sort.
+void post_battle_dispatches(const world& w, const economy_report& report,
+                            ui::chat_state& chat, int day_tick);
+
 /// Persona counsel (BL-207 slice 1): every corp due at this strategic-eval
 /// boundary gets its seated bench's read of its own blackboard, posted to a
 /// per-corp Counsel channel (lazily created on first use). Advisory only.

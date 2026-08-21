@@ -552,6 +552,10 @@
   [
    "ledger.strategy_readout_select_corp",
    "Strategy readout, corporation selector"
+  ],
+  [
+   "gameplay.withdraw_from_battle",
+   "The BATTLE CARD in the Selection element (BL-469, landed 2026-08-21): select a live battle and its 'Break off' press sits under the withdrawal price, with a confirm popup. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the card."
   ]
  ]
 }

@@ -19,6 +19,13 @@ enum class selection_kind
     unit,     ///< A unit / unit stack.
     nation,   ///< A generated nation (political territory).
     corporation, ///< A generated corporation (faction entity).
+    /// A battle in progress (BL-469). NOT resolved by `selection_kind_of`, and
+    /// that is the point rather than an omission: a battle has no entity id to
+    /// probe for. It is keyed by (province, attacker, defender) exactly as
+    /// `active_battle` is, and it lives in its own `ui_state` fields the way
+    /// `selected_province` does — the precedent BL-511 set for a selection whose
+    /// subject is not an entity.
+    battle,
     // Future kinds (logistics vessel, …) slot in here once their component
     // stores exist; see SELECTION.md (§ Polymorphism).
 };

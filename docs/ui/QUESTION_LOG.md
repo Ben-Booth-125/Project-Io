@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**29 surfaces** — 4 settled, 25 awaiting Ben's wording.
+**32 surfaces** — 4 settled, 28 awaiting Ben's wording.
 
 ---
 
@@ -27,6 +27,22 @@ alphabetical order.
 **Because:** apply_budget nets six flows into one number; a single balance tells the player they are losing without telling them what to change. Itemising income, expenditure, maintenance, wages, interest and levies is what makes bankruptcy something to act on rather than discover. BL-343 added the Laws section beneath the policy levers: the first law that is not a stub sits directly under the two that are, so the difference between a drawn lever and a working one is visible in one glance.
 
 *Demanded by BL-074, BL-112, BL-122, BL-343 · `src/ui/balance_ledger.cpp` · id `balance_ledger`*
+
+### Battle card (Selection element, battle kind)
+
+**Answers:** Am I winning this fight, and what does it cost me to walk away right now?
+
+**Because:** A battle is the only thing in the game that spends an asset the player cannot re-buy this tick — men — while they watch. Every other Selection kind answers a standing question about a thing that will still be there next tick; this one answers a decision that expires. It earns its space by carrying the two numbers no other surface can: the phase, which is the world's own reading of whether the fight has turned (read_battle_phase, derived once in the world layer precisely so the card and the dispatch stream cannot disagree), and the WITHDRAWAL PRICE with its three terms separated — base, per-round, pursuit — quoted from the resolver's own arithmetic rather than recomputed here, so what the card says leaving costs is what leaving charges. Per-unit strength bars sit under both sides of a fight that is YOURS - on a rival-vs-rival battle each side reads 'Composition unknown' and the Withdraw press is disabled with a reason rather than hidden, so BL-068's rule reads as a rule instead of as a missing button. The bars are there because because 'I am at 60%' does not tell you whether that is one broken formation or five even ones.
+
+*Demanded by BL-469, BL-467 · `src/ui/selection_panel.cpp`, `src/ui/ui_state.hpp`, `src/world/battle_system.hpp` · id `battle_card`*
+
+### Battle marker (Planetary canvas, province anchor tile)
+
+**Answers:** Where on this body is someone actually fighting?
+
+**Because:** A battle is a province-grain event drawn on a tile-grain canvas, so without a mark it has no position at all — the units are visible but nothing says they are in contact rather than merely adjacent. Drawn on the province anchor tile only, once per battle, because the fight IS the province envelope (BL-467 ruling 1) and scattering a glyph across every participating tile would say the opposite. The glyph is two crossed blades with cross-guards, deliberately not an X: X is already the 'close this' affordance everywhere else in the chrome, and a mark meaning 'a fight is here' must not read as a button meaning 'dismiss this'.
+
+*Demanded by BL-469, BL-467 · `src/ui/body_surface_canvas.cpp`, `src/ui/icons.cpp`, `src/ui/icons.hpp` · id `battle_marker`*
 
 ### Comms dock
 
@@ -67,6 +83,14 @@ alphabetical order.
 **Because:** The shared per-entity content builder feeding the Selection element, the Tile Ledger and the hover card. It exists once so those three cannot drift into describing the same entity differently.
 
 *Demanded by BL-031, BL-145 · `src/ui/entity_summary.cpp` · id `entity_summary`*
+
+### Field channel (comms dock)
+
+**Answers:** What happened in my fights while I was looking somewhere else?
+
+**Because:** A battle resolves several rounds per tick and a concluded one is ERASED at the end of the tick it ends — so the aftermath, which is the single line a player most needs (who held the ground, what it cost), is unreachable from any state-reading surface by the time they could look. The dispatch stream is the only place it can live. It is a SEPARATE channel rather than more traffic in Public because its volume is driven by simulation intensity, not by scripted events: a war is several lines a tick, and mixing that into Public would bury everything else. The phase vocabulary is shared verbatim with the battle card (battle_phase_word), so the two surfaces cannot drift into describing the same fight differently.
+
+*Demanded by BL-468 · `src/core/battle_dispatch_text.cpp`, `src/core/session_history.cpp`, `src/ui/chat_panel.hpp` · id `field_channel`*
 
 ### Generation Ledger - Body view (histograms, thresholds, profile echo)
 

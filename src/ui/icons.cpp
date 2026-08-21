@@ -421,6 +421,26 @@ void convoy(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
     dl->AddLine({centre.x + hw, centre.y},       {centre.x - hw, centre.y + hh}, colour, 2.0f);
 }
 
+void battle(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // Two crossed blades. Each is a line with a short cross-guard near the hilt,
+    // so at marker size it still reads as a weapon rather than as an X — an X is
+    // the "closed" affordance elsewhere in this vocabulary and must not collide
+    // with it.
+    const float a = r * 0.80f;
+    const float g = r * 0.30f;   // cross-guard half-length
+    const float t = 2.0f;
+
+    // Blade one: top-left to bottom-right.
+    dl->AddLine({centre.x - a, centre.y - a}, {centre.x + a, centre.y + a}, colour, t);
+    dl->AddLine({centre.x + a - g, centre.y + a - g * 1.6f},
+                {centre.x + a - g * 1.6f, centre.y + a - g}, colour, t);
+    // Blade two: top-right to bottom-left.
+    dl->AddLine({centre.x + a, centre.y - a}, {centre.x - a, centre.y + a}, colour, t);
+    dl->AddLine({centre.x - a + g, centre.y + a - g * 1.6f},
+                {centre.x - a + g * 1.6f, centre.y + a - g}, colour, t);
+}
+
 void market(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
 {
     // Three ascending bars, outlined, sharing a common baseline — a price chart.

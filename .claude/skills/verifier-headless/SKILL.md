@@ -383,6 +383,59 @@ in `tools/verify/README.md`.
   population centre*, was written, measured and **fails at 64%**; it is deliberately non-gating and
   is the acceptance test for BL-463 (settlement count is seed-invariant).
 
+- **`battle_engagement_harness`** — The engagement trigger and the per-tick battle step (BL-467,
+  Sprint C3, 2026-08-21). **45 checks** — 26 for the trigger and the step, plus B12b–B14f for the two surfaces (BL-468/BL-469, same day). **B1 is the row that could not have been written before the
+  item**: it stands two hostile forces in one province and runs `run_economy_step` — the REAL tick
+  entry point, never a resolver call — then asserts men died. B1c asserts the negative that makes
+  it mean something: two NEUTRAL corps sharing a province do not fight, so the trigger is stance,
+  not proximity.
+
+  The rest guard the ways a trigger silently goes wrong: order-independent discovery from unordered
+  containers (B2), one battle per corp pair per province under mutual hostility (B3), the seed
+  folding the province with role order preserved (B4), EXACT loss conservation — men removed equals
+  losses reported (B5), in-memory replay determinism including `state_hash` (B6), the terrain pair
+  as the defender's argmax with ties by ascending tile id (B7), a rejected withdrawal leaving the
+  world byte-identical (B8), and `march_unit` refused for a unit in contact (B9).
+
+  **B12b–B14f cover the surfaces** (BL-468 dispatches, BL-469 card), and they exist because
+  `src/core/battle_dispatch_text.cpp` was deliberately made its own translation unit so it COULD be
+  linked headlessly — its natural home, `session_history.cpp`, drags in `<SDL3/SDL.h>`. Link it
+  explicitly alongside the world objects:
+
+  ```bash
+  g++ -std=c++20 -O1 -Isrc -Itools/verify tools/verify/battle_engagement_harness.cpp \
+      src/core/battle_dispatch_text.cpp build_gen/obj/*.o -o build_gen/verify/battle_engagement_harness
+  ```
+
+  B12b asserts the quoted withdrawal price equals the charged one, in all three terms — the card
+  renders `quote_withdrawal()` rather than recomputing it, and this is the row that keeps that true.
+  B13a–B13e reach every one of the six `battle_phase` values including both terminal ones. B14a–B14f
+  cover the phrase banks: no bank empty, no `%`-token unsubstituted, a missing corp degrading to a
+  noun rather than an empty string, replay-identity, and — the row that proves the seed fold is live
+  rather than degenerate — wording actually varying across one fight (10 dispatches, 6 distinct
+  lines).
+
+- **`tile_axes_harness`** — The substrate/cover terrain split (BL-519, 2026-08-21). 13 checks over
+  the two-axis replacement for `terrain_composition`: the density invariant (density is 0 **iff**
+  cover is `none`), `cover_fraction` monotonicity, `is_biotic_cover` membership, and — the rows that
+  make the 522-reference refactor falsifiable — that `terrain_combat`'s split defence/attrition
+  reproduce all 11 pre-split compositions EXACTLY. Pair it with the 120-seed census when touching
+  Pass 4: the split was held RNG-identical draw-for-draw, so any census movement is a real
+  regression rather than expected drift.
+
+- **`unit_upkeep_rates`** — What turning the upkeep rates off zero would actually cost (Sprint C3's
+  rider, 2026-08-21). **A REPORT, and deliberately almost assertion-free.** BL-454 landed every
+  rate at zero so pricing could be "tuned by playtest against a measured baseline rather than
+  guessed"; this is that baseline. It sweeps five candidate rate sets and prints the wage bill, the
+  ordnance draw, ticks-to-collapse unsupplied and ticks-to-recover — the last being what BL-458
+  (supply lines cannot be cut) is really waiting on, since it decides whether cutting a lane is a
+  threat or a gesture.
+
+  Its four assertions are invariants, never tuning: the SHIPPED rates are still zero (it measures,
+  it does not change), a zero rate still costs nothing, and the draw is linear in heads on both the
+  credits and the goods half. **Picking a rate stays Ben's** — the harness prints numbers and says
+  so in its own closing line.
+
   **Live-Lua, and this is the same trap `haulage_measure` documents above.** On the generic glob
   target it links `io_world_obj` only, no sol2 — so `economy.lua`'s demand baskets read all-zero,
   `generate_background_firms` places **zero firms**, and the census describes a world nobody plays.

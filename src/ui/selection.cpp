@@ -32,6 +32,7 @@ const char* selection_kind_name(selection_kind k)
         case selection_kind::unit:     return "Unit";
         case selection_kind::nation:      return "Nation";
         case selection_kind::corporation: return "Corporation";
+        case selection_kind::battle:      return "Battle";
     }
     return "?";
 }

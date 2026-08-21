@@ -81,6 +81,15 @@ text policy.
 ## Channels
 
 - **Public** — channel 0, always present. Since the BL-212 slice (nation-voiced comms, landed 2026-07-28) the only speakers ever posted here are **nations**, never corporations. Opens with a deterministic epoch line (now a **nation** count) so the panel is never an empty shell.
+- **Field** — channel 1, always present (BL-468, landed 2026-08-21). Battle traffic: one dispatch
+  line per battle per tick, plus the aftermath line of any that concluded — which is the only place
+  the aftermath *can* live, since a concluded battle is erased at the end of the tick it ends.
+  Restricted to the **player's own fights**, on this doc's own BL-212 precedent: a line naming two
+  rivals' strengths would leak internals through comms by another route (open, NR-470). It is a
+  channel of its own rather than more Public traffic because its volume is driven by **simulation
+  intensity** rather than by scripted events. **Appended, never inserted** — `app::m_counsel_channel`
+  caches channel indices, so a new standing channel anywhere but the end silently repoints them.
+  Named as `chat_state::k_field_channel` so posters do not spell the index. No mute yet (NR-471).
 - **Groups** — arbitrary player-created channels over any corp subset (the `+` tab: name + member checkboxes; the creator is an implicit member). Session-local in slice 1.
 - Later: AI-created groups (plan-forming between AI corps, unreadable by the player unless a future intelligence mechanic exposes intercepts — a Discovery-model extension).
 
@@ -90,6 +99,7 @@ text policy.
 |---|---|---|
 | Epoch system line (d0) | 1 (live) | Pure function of generation |
 | **Nation-voiced agency comms** (BL-212 slice, landed 2026-07-28) — the old per-corp/per-building BL-079 reflex lines were a standing violation of `DISCOVERY.md`'s competitor-visibility rule (they leaked rival internals); `step_economy` now aggregates **one heaviest event per (nation, tick)** and posts it under the corp's `home_nation`, phrased in first person, with **no building or corp specifics** | 1 (live) | Templated from `economy_report::agency_events`, deterministic aggregation |
+| **Battle dispatches** (BL-468, landed 2026-08-21) — one line per the player's own battle per tick to the **Field** channel, phrased from six seeded banks in `src/core/battle_dispatch_text.cpp` | 1 (live) | Pure function of `economy_report::battle_dispatches`. **Consumes no draw**: phrase selection folds `stream_seed` with the round index (the BL-290 tongue-bank idiom), so the dispatch layer is structurally unable to move the simulation rather than merely disciplined not to |
 | Player input (message box, active channel) | 1 (live) | No mechanical effect yet — the AI C-route hook |
 | BL-202 corp-command stream (strategic AI decisions) | with BL-202 | Templated from the decision log |
 | In-character LLM chat (C-route personality layer) | post-utility-core | Out-of-process, coarse-grained, replay-logged (AI_OPPONENT.md § 2C) |

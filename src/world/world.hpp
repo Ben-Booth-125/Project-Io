@@ -1,6 +1,7 @@
 #pragma once
 
 #include "components.hpp"
+#include "campaign_battle.hpp" // active_battle (BL-467 battle state, below)
 #include "corp_command.hpp" // corp_decision_ring (BL-202 strategic decision log)
 #include "law.hpp"          // law (BL-343 enacted-law list, below)
 #include "modifier_set.hpp" // scalar_modifier (BL-479 per-corp tech effects, below)
@@ -259,6 +260,32 @@ struct world
     /// battle seed, so a silent partition regression would move battle
     /// outcomes.
     province_partition provinces;
+
+    /// Battles in progress (BL-467) — the record that makes a fight a thing in
+    /// the world rather than an answer someone computed. Until this existed both
+    /// resolvers were compiled, harnessed and CALLED BY NOTHING.
+    ///
+    /// KEPT SORTED by (province, attacker, defender) — `battle_order_less`. That
+    /// is the contract, not an implementation detail, and it is load-bearing for
+    /// exactly the reason the province partition's ascending-id walk is: the
+    /// containers battles are DISCOVERED from (`units`, `corporations`) are
+    /// unordered, so the sorted record is where order-independence is recovered.
+    ///
+    /// FOLDED INTO `state_hash`, unlike `provinces` — and the two decisions are
+    /// the same rule applied to different things, not an inconsistency. The rule
+    /// is "state_hash folds the fields a TICK may mutate". The partition is
+    /// generation output and never moves once built, so folding it would make
+    /// every tick hash carry a constant; a battle is created, stepped and ended
+    /// BY ticks, so a divergence in it is exactly the kind of divergence the hash
+    /// exists to catch. The fold contributes nothing when the list is empty, so a
+    /// world that never fights hashes as it always did.
+    ///
+    /// NOT SERIALISED, deliberately and on precedent: no battle serialiser exists,
+    /// so determinism is asserted by IN-MEMORY REPLAY only, never a save
+    /// round-trip (the BL-448 precedent, which BL-467's design cites verbatim). A
+    /// save taken mid-battle therefore drops the fight — acceptable while nothing
+    /// can save mid-tick, and the thing to revisit first if that changes.
+    std::vector<active_battle> battles;
 
     /// Proximity-glimpse stamps (BL-099) — the sim day tick at which a player convoy
     /// last passed within `glimpse_radius_au_default` (AU) of this body while completing

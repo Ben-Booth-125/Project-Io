@@ -3,13 +3,14 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 174 entries across 2 volume(s).
+One line per session, newest first — 175 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
+| 2026-08-21 | [Tiles gain a third axis, and a fight finally happens (NR-438/439, BL-519, BL-521, BL-520, BL-516, BL-467; Sprints P1 closed + C3)](DEVLOG.md) | BL-467 BL-516 BL-519 BL-520 BL-521 | DEVLOG.md |
 | 2026-08-20 | [The province becomes a thing you can see (BL-458, BL-513, BL-511, BL-466, BL-515, BL-517, BL-392, BL-463; Sprints 27/B2/B3/C3/D4 + P1)](DEVLOG.md) | BL-392 BL-458 BL-463 BL-466 BL-511 BL-513 BL-514 BL-515 BL-516 BL-517 BL-518 BL-519 BL-520 | DEVLOG.md |
 | 2026-08-20 | [the corpus gets delegated: saved roles and scoped instructions (BL-497)](DEVLOG.md) | BL-497 BL-498 BL-503 | DEVLOG.md |
 | 2026-08-20 | [COLLAPSE.md: the Era −1 collapse metagame, decomposed (BL-483–BL-496, BL-504–BL-510)](DEVLOG.md) | BL-325 BL-422 BL-464 BL-476 BL-483 BL-494 BL-495 BL-496 BL-504 BL-510 | DEVLOG.md |

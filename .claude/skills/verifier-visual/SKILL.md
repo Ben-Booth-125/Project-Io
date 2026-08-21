@@ -231,3 +231,23 @@ runs capture-only.
 - To author a new check: add `scripts/verify/<feature>.lua` (lean on the `lib.lua`
   helpers), confirm it captures what the requirement needs, then run it through
   this skill — that is how a check becomes a permanent, reusable asset.
+
+- **`battle_card.lua`** (BL-468/BL-469, 2026-08-21) — the battle card and the Field
+  dispatch channel. **Read it before writing any check that needs a simulation state
+  the script must CREATE rather than find.** Most checks here open a panel and look;
+  this one has to stage a fight: identify the player corp from the buildings table's
+  own `player` flag (never a hard-coded corp id), declare hostility in both
+  directions, march the player's unit into a rival's province, and step to contact.
+  It hard-codes no grid coordinate, so a generation change moves the fight instead of
+  silently invalidating the check.
+
+  It became writable only with the generic `verify.corp_command{…}` binding: before
+  that, `verify_api` could issue exactly one verb (`place_sell_order`), so no script
+  could declare hostility, so no battle could exist in a verify run at all — every
+  visual requirement on the surface was green-but-blind by construction (NR-345,
+  NR-472). If a surface you are checking has no reachable path from a script, that is
+  the bug to fix first; a capture of a state the script could not produce proves
+  nothing.
+
+  **Not yet run** — authored 2026-08-21 in a container with no SDL3, so it awaits a
+  Windows/Linux-with-SDL run plus the live click the standing rule requires.

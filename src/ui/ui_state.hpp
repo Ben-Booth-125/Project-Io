@@ -107,6 +107,17 @@ struct construction_state
     /// draw pass is iterating it would invalidate the iteration.
     entity_id     pending_demolish = null_entity;
 
+    /// Pending withdraw-from-battle request (BL-469) — set by the battle card's
+    /// Withdraw press and executed by `app::render` via `apply_corp_command`'s
+    /// `withdraw_from_battle` verb. Same deferred path as `pending_tile`, for the
+    /// same reason (UI surfaces hold only `const world&`).
+    ///
+    /// Both fields are needed: a corp can be in more than one battle in one
+    /// province, so the counterparty NAMES which fight is being left. 0 / null =
+    /// nothing pending.
+    uint32_t      pending_withdraw_province = 0;
+    entity_id     pending_withdraw_against  = null_entity;
+
     // (BL-343's pending_law_toggle lived here until BL-480: enactment is the
     // author nation's act now, so no player surface enqueues a law flip.)
 
@@ -248,6 +259,43 @@ struct ui_state
     /// canvas draw pass from the hovered tile; drives the province hover outline.
     uint32_t hovered_province = 0;
 
+    // --- The selected battle (BL-469) ------------------------------------
+    // Keyed by (province, attacker, defender), exactly as `active_battle` is,
+    // because a battle HAS NO ENTITY ID to select. `selected_province` is the
+    // precedent: BL-511 established that a selection whose subject is not an
+    // entity lives in its own fields rather than being forced through
+    // `selected_entity`.
+    //
+    // All three are needed, not just the province: a corp can be in more than one
+    // battle in one province, since a third corp arriving opens its OWN battles
+    // against each participant rather than joining theirs. Keying on the province
+    // alone would silently select whichever sorted lowest.
+    //
+    // MUTUALLY EXCLUSIVE with `selected_entity` and `selected_province`, on the
+    // same "whichever is set last clears the others" rule — and the Selection
+    // element dispatches on the battle FIRST, because a fight on ground you are
+    // looking at is the most urgent thing that ground has to say.
+    uint32_t  selected_battle_province = 0;
+    entity_id selected_battle_attacker = null_entity;
+    entity_id selected_battle_defender = null_entity;
+
+    /// True iff a battle is currently selected — all three key fields set.
+    bool has_battle_selection() const
+    {
+        return selected_battle_province != 0
+            && selected_battle_attacker != null_entity
+            && selected_battle_defender != null_entity;
+    }
+
+    /// Clear the battle selection. Called by every other selection path, so the
+    /// Selection element never has two things to draw.
+    void clear_battle_selection()
+    {
+        selected_battle_province = 0;
+        selected_battle_attacker = null_entity;
+        selected_battle_defender = null_entity;
+    }
+
     /// The value of `selected_entity` the Planetary canvas last wrote, so the
     /// canvas can tell "the player clicked a province" from "some OTHER surface
     /// — a ledger row, a corp list, a just-built building — moved the entity
@@ -267,11 +315,17 @@ struct ui_state
     // Mirrors card_resource_page's per-selection reset idiom rather than adding a
     // separate "is this a repeat click" flag.
     ///
-    /// Stage numbering is the cycle order Ben ruled on 2026-08-21:
-    /// **0 = unit, 1 = province, 2 = building, 3 = tile.** Four rungs, not the
-    /// three BL-511 shipped, where the province and the tile shared rung 2 —
-    /// they are separate now, so a repeat click walks all the way down to the
-    /// bare tile. This is the CYCLE order only; the canvas hit-test still
+    /// Stage numbering, after BL-469 (2026-08-21) put the battle on the front:
+    /// **0 = battle, 1 = unit, 2 = province, 3 = building, 4 = tile.** Five rungs.
+    ///
+    /// Ben ruled the four-rung order (unit, province, building, tile) earlier the
+    /// same day; BL-469's own design says the cycle "extends to battle -> unit ->
+    /// building -> tile", which OMITS the province because the item was written
+    /// before that ruling. Merged rather than chosen between: the battle goes
+    /// first as BL-469 asks, and the province stays where Ben put it. Stage 0 is
+    /// skipped when no battle stands here, as every empty stage is.
+    ///
+    /// This is the CYCLE order only; the canvas hit-test still
     /// resolves most-specific-first, so a first click on a building selects the
     /// building rather than its province.
     entity_id selection_cycle_tile  = null_entity;

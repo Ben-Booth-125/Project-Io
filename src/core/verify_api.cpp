@@ -717,6 +717,12 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["hovered_province"]  = static_cast<unsigned int>(m_ui.hovered_province);
         out["selected_province"] = static_cast<unsigned int>(m_ui.selected_province);
         out["has_selection"]     = (m_ui.selected_entity != null_entity);
+        // BL-469: the battle selection is a third channel into the same element,
+        // so the assertion half needs it too — without these every expect() about
+        // a battle card would be a proxy for something else.
+        out["selected_battle_province"] = static_cast<unsigned int>(m_ui.selected_battle_province);
+        out["selected_battle_attacker"] = static_cast<unsigned int>(m_ui.selected_battle_attacker);
+        out["selected_battle_defender"] = static_cast<unsigned int>(m_ui.selected_battle_defender);
         // The hover half of the same seam: dwell is reached by frame COUNT
         // (hover(x, y, frames)), and these say whether the glance card came up
         // and whether it has stuck. Booleans, not contents.
@@ -1234,6 +1240,100 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // player's standing orders, so a script can assert the order registered — and
     // a REJECTED order now returns the unchanged count rather than silently
     // registering, which the old vector path could not express at all.
+    // THE BINDING THAT MAKES A BATTLE REACHABLE AT ALL (BL-469's rider, NR-345).
+    //
+    // Before this, `verify_api` called `apply_corp_command` exactly once, hard-
+    // wired to `place_sell_order`. There was NO path from a script to a fight:
+    // battle discovery is gated on `corp_hostile_pairs`, which only
+    // `declare_hostile` writes, which only the live corporation panel reaches —
+    // and `corp_ai` never declares. So every visual requirement on the battle
+    // card was green-but-blind by construction, which is precisely the failure
+    // NR-345 records. One generic binding subsumes hostility, hiring, marching
+    // and withdrawal rather than growing four narrow ones.
+    //
+    // IT IS AN AI-FACING-SEAM-SHAPED SURFACE, so it follows that standing rule
+    // even though it is only reachable from a local script: every field is
+    // validated as the value that LANDS in the destination, the whole command is
+    // rejected on violation, and a rejection mutates nothing. The verb is range-
+    // gated against `corp_verb_count` exactly as `run_serve` gates the wire.
+    //
+    // Returns the corp_command_result as a string, so a script asserts the
+    // OUTCOME rather than inferring it from a side effect.
+    v.set_function("corp_command", [this](sol::table t) -> std::string {
+        const int verb_i = t.get_or("verb", -1);
+        if (verb_i < 0 || verb_i >= static_cast<int>(corp_verb_count))
+            return "rejected_invalid"; // out of range: never narrow-cast it into a real verb
+
+        corp_command cmd;
+        cmd.tick = static_cast<int>(m_sim_loop.day_tick());
+        cmd.corp = static_cast<entity_id>(t.get_or("corp",
+                       static_cast<unsigned int>(m_world.player_entity)));
+        cmd.verb = static_cast<corp_verb>(verb_i);
+
+        cmd.subject      = static_cast<entity_id>(t.get_or("subject", 0u));
+        cmd.counterparty = static_cast<entity_id>(t.get_or("counterparty", 0u));
+        cmd.tile         = static_cast<entity_id>(t.get_or("tile", 0u));
+        cmd.province     = static_cast<uint32_t>(t.get_or("province",
+                               static_cast<unsigned int>(no_province)));
+        cmd.unit_type    = static_cast<uint16_t>(t.get_or("unit_type", 0));
+
+        // Range-check BEFORE the narrowing cast, not after — a value that fits a
+        // Lua number can still be outside the destination's domain.
+        const int wf = t.get_or("workforce", 100);
+        if (wf < 0 || wf > 200) return "rejected_invalid";
+        cmd.workforce = wf;
+
+        const auto r = apply_corp_command(m_world, m_registry, cmd);
+        switch (r)
+        {
+            case corp_command_result::applied:              return "applied";
+            case corp_command_result::rejected_no_corp:     return "rejected_no_corp";
+            case corp_command_result::rejected_not_owner:   return "rejected_not_owner";
+            case corp_command_result::rejected_invalid:     return "rejected_invalid";
+            case corp_command_result::rejected_placement:   return "rejected_placement";
+            case corp_command_result::rejected_funds:       return "rejected_funds";
+            case corp_command_result::rejected_state:       return "rejected_state";
+            case corp_command_result::rejected_tech_locked: return "rejected_tech_locked";
+            case corp_command_result::rejected_era_locked:  return "rejected_era_locked";
+            case corp_command_result::rejected_depth_locked:return "rejected_depth_locked";
+            case corp_command_result::rejected_cooldown:    return "rejected_cooldown";
+            case corp_command_result::rejected_embargo:     return "rejected_embargo";
+            case corp_command_result::rejected_no_capacity: return "rejected_no_capacity";
+            case corp_command_result::rejected_no_input_access: return "rejected_no_input_access";
+            case corp_command_result::rejected_reputation:  return "rejected_reputation";
+        }
+        return "rejected_invalid";
+    });
+
+    // Where every unit stands, as ids only — the read half NR-345 also names.
+    // Without it a script can inject a click but cannot find a unit to click at,
+    // so the battle card stays unreachable however good the injection is.
+    v.set_function("units", [this]() {
+        sol::state& st = m_lua.state();
+        sol::table  out = st.create_table();
+        int i = 1;
+        std::vector<entity_id> ids;
+        ids.reserve(m_world.units.size());
+        for (const auto& kv : m_world.units) ids.push_back(kv.first);
+        std::sort(ids.begin(), ids.end()); // ascending: w.units is unordered
+        for (const entity_id uid : ids)
+        {
+            const unit_component& u = m_world.units.at(uid);
+            sol::table row = st.create_table();
+            row["id"]    = static_cast<unsigned int>(uid);
+            row["owner"] = static_cast<unsigned int>(u.owner);
+            row["count"] = u.count;
+            row["type"]  = static_cast<int>(u.type);
+            if (const auto tit = m_world.tiles.find(u.position); tit != m_world.tiles.end())
+            {
+                row["col"] = tit->second.grid_x;
+                row["row"] = tit->second.grid_y;
+            }
+            out[i++] = row;
+        }
+        return out;
+    });
+
     v.set_function("place_sell_order",
         [this](const std::string& res, double qty, double floor) -> int {
             corp_command cmd;
@@ -1379,6 +1479,31 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         }
         return 0u;
     });
+    v.set_function("select_battle", [this](int col, int row) -> bool {
+        // BL-469's rider (NR-345). BL-521's click injection CAN reach a battle
+        // now that rung 0 exists — a click on any envelope tile lands on it — so
+        // this is a shortcut rather than the only road. It earns its place the
+        // way select_province does: it writes the whole selection tuple itself,
+        // including province_sync_entity, so the next planetary frame's
+        // reconciliation does not immediately undo it.
+        for (const auto& [tid, tc] : m_world.tiles)
+        {
+            if (tc.body != m_ui.active_body || tc.grid_x != col || tc.grid_y != row)
+                continue;
+            const uint32_t pid = m_world.provinces.province_of(tid);
+            const active_battle* b = (pid != 0) ? first_battle_in(m_world, pid) : nullptr;
+            if (b == nullptr)
+                return false;
+            m_ui.selected_entity      = null_entity;
+            m_ui.selected_province    = 0;
+            m_ui.province_sync_entity = null_entity;
+            m_ui.selected_battle_province = b->province;
+            m_ui.selected_battle_attacker = b->attacker;
+            m_ui.selected_battle_defender = b->defender;
+            return true;
+        }
+        return false;
+    });
     v.set_function("clear_selection", [this]() {
         // Deselect (BL-266): the band never hides — with no selection it rests on
         // the player's own corporation. This is the empty-space-click equivalent,
@@ -1392,6 +1517,10 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         m_ui.selected_entity      = null_entity;
         m_ui.selected_province    = 0;
         m_ui.province_sync_entity = null_entity;
+        // BL-469, same reason BL-511 had to add the province: a shortcut that
+        // leaves one of the three selection channels set diverges from the
+        // gesture it stands in for, and a capture after it shows a stale card.
+        m_ui.clear_battle_selection();
     });
     v.set_function("card_drill", [this]() {
         // Drive the Selection band's resource drill-down (BL-196) for the currently

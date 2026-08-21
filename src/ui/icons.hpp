@@ -88,6 +88,29 @@ void supply(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param colour Stroke colour.
 void convoy(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
+/// Draw a BATTLE-IN-PROGRESS glyph — two crossed blades — in @p colour, over the
+/// province a fight is being fought in (BL-469).
+///
+/// WHY IT EARNS ITS PLACE, since the deleted unit chevron (BL-294) is the
+/// cautionary precedent for a marker that did not: this one is an ALERT, not a
+/// label. A battle is the only thing on the map that is both time-limited and
+/// reversible by a decision — the withdrawal window is open for about two ticks
+/// — so a fight the player does not notice is a decision they never got to make.
+/// A marker that pulls the eye is the difference.
+///
+/// Crossed blades rather than a flame or a burst: the vocabulary is hand-drawn
+/// and literal everywhere else (a chart for a market, a chevron for a convoy),
+/// and two things meeting at an angle is the plainest possible drawing of two
+/// forces in contact.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Marker centre, screen pixels.
+/// @param r      Half-extent of the marker, screen pixels.
+/// @param colour Stroke colour. Identity colours live in presentation.hpp, never
+///               here — the caller tints, so a player's own fight and a rival's
+///               can read differently without this glyph knowing about either.
+void battle(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
 /// Draw the Market-lens glyph — a three-bar ascending chart outline — in
 /// @p colour. For the overlay-lens control strip.
 ///

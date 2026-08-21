@@ -778,10 +778,10 @@
    "closed_date": null,
    "goal": "BL-315 (armed house conflict spine)'s actual remainder — a world-side battle store, the trigger, and losses applied to unit_component. Both resolvers currently return results NOTHING READS.",
    "planned": [
-    "BL-315's remainder: world-side battle store, engagement trigger, losses applied to unit_component",
-    "Rider: turn the upkeep rates off zero and measure the movement — what BL-458 (supply lines cannot be cut) has been waiting on"
+    "BL-467 (battle state in world) — LANDED 2026-08-21. The trigger, the world-held record, several rounds per tick, losses applied to unit_component, the withdraw verb, and a unit in contact refused a march.",
+    "Rider: the upkeep rates — MEASURED, not turned on (NR-467). New tools/verify/unit_upkeep_rates.cpp sweeps five candidate rate sets; picking one stays Ben's, per economy.lua's own 'tuned against a measured baseline rather than guessed here'."
    ],
-   "notes": "Proposed, not opened. Part of Lane C — force and stance. OPENED 2026-08-20 as part of the four-lane batch (REFINED.md)."
+   "notes": "Proposed, not opened. Part of Lane C — force and stance. OPENED 2026-08-20 as part of the four-lane batch (REFINED.md).\n\nPROGRESS 2026-08-21. BL-467 landed and the rider is measured. The sprint's own framing — 'both resolvers currently return results NOTHING READS' — is no longer true: run_battles is the production caller, and battle_engagement_harness B1 proves it through the REAL tick rather than a resolver call (1000 men -> 648 in one tick).\n\nTHE METHOD NOTE THIS SPRINT ADDS, and it is the counterpart to P1's. P1's was 'build it, look at it, then rule' — a rule about RENDERS. This one is about CODE: an adversarial scout read BL-467 after it compiled and passed 26 checks, and found FOUR real defects (NR-463), one of which — a withdrawal that cost no men — my own harness row had passed over, because it asserted the request was accepted rather than that it cost anything. Compiling and going green is not evidence a thing works; it is evidence it does not crash. What found the defects was an agent told to REFUTE rather than confirm, and to default to 'unverified' when it could not confirm from what it actually read.\n\nThe rider is deliberately NOT taken: turning the rates on is a design choice the flat per-head shape hides — at 'light' the same rate costs a large corp 7.8% of income and a small one 155%. That is not a tuning number, it is a decision about who may field an army."
   },
   {
    "id": "D1",
@@ -1000,6 +1000,11 @@
    "id": "P1",
    "theme": "The province becomes a thing you can see, and then a thing worth seeing",
    "state": "Closed 2026-08-21 — done_when met, then overshot by five items; owed: nothing was rendered"
+  },
+  {
+   "id": "C3",
+   "theme": "The engagement trigger, and the fight you can watch",
+   "state": "Open 2026-08-21 — BL-467 LANDED (26/26); rider MEASURED not taken (NR-467). Open on the rate ruling"
   }
  ]
 }

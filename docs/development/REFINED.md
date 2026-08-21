@@ -1,6 +1,38 @@
 # Project Io — REFINED (active worklist)
 
-**Empty between work blocks.** Sprint P1 is open; the entries below are its live arc.
+**Empty between work blocks.** Sprint P1 closed 2026-08-21; Sprint C3 is now active.
+
+## Sprint C3 — BL-467 LANDED 2026-08-21
+
+Both resolvers now have a production caller. `src/world/battle_system.{hpp,cpp}` runs
+from `run_economy_step` immediately before `run_unit_march`. All ten tasks done;
+`battle_engagement_harness` 26/26.
+
+**Its B1 is the row that could not have been written before the item**: it runs the
+REAL tick rather than calling a resolver, and asserts men died — 1000 → 648 in one
+tick. B1c asserts the negative that makes it mean something: two NEUTRAL corps
+sharing a province do not fight.
+
+**Four defects were found AFTER it compiled and passed 26 checks** (NR-463), by a
+scout told to refute rather than confirm — a withdrawal that cost no men, a dedup
+that silently no-oped with three corps, an unscreened all-naval false victory, and
+zero-count units that were never reaped because the item's own aftermath ruling was
+false about the code. All four fixed.
+
+**The rider is measured, not taken** (NR-467): `tools/verify/unit_upkeep_rates.cpp`
+sweeps five candidate rate sets. Picking one stays Ben's, per `economy.lua`'s own
+"tuned against a measured baseline rather than guessed here".
+
+### Owed on C3
+
+- **The rate ruling** (NR-467). The finding that should drive it: a flat per-head
+  rate is regressive to the point of being a different rule at different corp sizes
+  — "light" costs a large corp 7.8% of income and a small one **155%**.
+- **Four named stubs** (NR-465): doctrine is all-zeros, season is hardcoded to
+  summer, membership is snapshotted at open, and holding the field has no
+  consequence because no territorial-control concept exists. R9 is **partial**.
+- **BL-468** (battle dispatches) and **BL-469** (the battle card) are the surfaces
+  that make the fight watchable — C3's theme names them and neither is built.
 
 ## Landed this session (2026-08-21)
 

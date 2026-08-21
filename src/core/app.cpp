@@ -1251,6 +1251,11 @@ void app::step_economy()
         const int day = static_cast<int>(m_sim_loop.day_tick());
         session_history::post_nation_agency_comms(m_world, m_last_econ_report, m_chat, day);
         lap(6); // agency comms
+        // BL-468: battle traffic to the Field channel. Suppressed through the
+        // warm start for the same reason counsel is — a pre-game battle would
+        // post lines the player never saw, all stamped on the same day.
+        if (!m_warm_starting)
+            session_history::post_battle_dispatches(m_world, m_last_econ_report, m_chat, day);
         // Persona counsel is suppressed through the pre-game warm start
         // (2026-08-12): measured at ~1.05 s/tick — 93% of the AppHangB1 stall —
         // against ~80 ms for everything else combined, and what it buys there
@@ -2007,6 +2012,27 @@ void app::render()
     // Execute any road-placement request queued this frame by the build front door's Track/Road/
     // Highway affordances (BL-147 core, BL-172 tier). A road is a per-tile mutation (raises
     // road_level, lowers A* cost), not a building, so it routes through place_road.
+    // BL-469: the battle card's Withdraw press. Deferred like every other press,
+    // because UI surfaces hold only `const world&` — and additionally because the
+    // request is HONOURED at the next tick boundary rather than applied here, so
+    // the withdrawal window stays a window (battle_system.cpp).
+    if (m_ui.construction.pending_withdraw_province != 0)
+    {
+        corp_command cmd;
+        cmd.tick         = static_cast<int>(m_sim_loop.day_tick());
+        cmd.corp         = m_world.player_entity;
+        cmd.verb         = corp_verb::withdraw_from_battle;
+        cmd.province     = m_ui.construction.pending_withdraw_province;
+        cmd.counterparty = m_ui.construction.pending_withdraw_against;
+        const auto r = apply_corp_command(m_world, m_registry, cmd);
+        m_ui.construction.last_message =
+            (r == corp_command_result::applied)
+                ? "Breaking off — it takes effect next tick."
+                : "Cannot break off from that battle.";
+        m_ui.construction.pending_withdraw_province = 0; // consume the request
+        m_ui.construction.pending_withdraw_against  = null_entity;
+    }
+
     if (m_ui.construction.pending_road_tile != null_entity)
     {
         const construction_result r = place_road(

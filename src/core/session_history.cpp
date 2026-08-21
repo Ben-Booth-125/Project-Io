@@ -5,6 +5,7 @@
 #include "core/session_history.hpp"
 
 #include "core/app.hpp"      // step_economy_phase_ms — the shared phase accumulators
+#include "core/battle_dispatch_text.hpp" // BL-468: the phrase bank (own TU, so it can be harnessed)
 #include "core/sim_loop.hpp"
 #include "ui/balance_ledger.hpp"
 #include "ui/ui_state.hpp"
@@ -19,6 +20,35 @@
 #include <utility>
 
 namespace session_history {
+
+void post_battle_dispatches(const world& w, const economy_report& report,
+                            ui::chat_state& chat, int day_tick)
+{
+    if (report.battle_dispatches.empty())
+        return;
+
+    // Channel 1 is the standing Field channel (chat_panel.hpp). Guarded rather
+    // than assumed: a chat_state built before BL-468 has one channel, and posting
+    // to an index that does not exist would be worse than posting to Public.
+    const int field = (static_cast<int>(chat.channels.size()) > ui::chat_state::k_field_channel)
+                          ? ui::chat_state::k_field_channel
+                          : ui::chat_state::k_public_channel;
+
+    for (const battle_dispatch& d : report.battle_dispatches)
+    {
+        // VOICED BY THE ATTACKER'S CORP, and only for fights the player is in.
+        // BL-212 keeps corporations out of Public precisely so a rival's
+        // internals never leak through comms; a dispatch naming two rivals'
+        // strengths would be that leak by another route. Rival-vs-rival fights
+        // are seen on the canvas marker instead, which says WHERE without saying
+        // how it is going. Flagged for Ben — see the review log.
+        const bool players = (d.attacker == w.player_entity || d.defender == w.player_entity);
+        if (!players)
+            continue;
+        ui::chat_post(chat, day_tick, w.player_entity, field,
+                      battle_dispatch_line(w, d));
+    }
+}
 
 void post_nation_agency_comms(const world& w, const economy_report& report,
                               ui::chat_state& chat, int day_tick)
