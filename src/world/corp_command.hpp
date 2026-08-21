@@ -151,12 +151,22 @@ struct corp_command
     /// allocated from the entity pool, so it is its own uint32 domain and
     /// must not be conflated with `tile`.
     ///
-    /// The default is `no_province`, NOT 0 — measured, not assumed. Province
-    /// id 0 is a REAL id (body rank 0, block 0, component 0), and on every
-    /// fixture and generated world it names the first block of the first
-    /// body. A 0 default would therefore make an OMITTED `province=` on the
-    /// wire resolve to a real destination and answer `applied` — precisely
-    /// the silent order-substitution the untrusted-input rule forbids.
+    /// The default is `no_province`, NOT 0. The ORIGINAL reason (2026-08-21,
+    /// BL-511's seam half) was that province id 0 was a REAL id under the
+    /// block-derived layout `body_rank | block | component`, where it named
+    /// the first block of the first body on every fixture and generated
+    /// world — so a 0 default would have made an OMITTED `province=` on the
+    /// wire resolve to a real destination and answer `applied`, precisely the
+    /// silent order-substitution the untrusted-input rule forbids.
+    ///
+    /// BL-515 (same day) replaced that layout: an id is now the province's
+    /// LOWEST-ID MEMBER TILE, and `province_partition_harness` P8d asserts no
+    /// id is 0. So 0 is unreachable today and the original argument no longer
+    /// holds — but the DEFAULT IS UNCHANGED AND SHOULD STAY, for a reason that
+    /// does not depend on the id scheme: `no_province` is refused by the seam,
+    /// so an omitted field is rejected rather than silently interpreted. That
+    /// property is the one worth keeping, and a default of 0 would only be safe
+    /// for as long as 0 happens to be unreachable.
     ///
     /// `no_province` is refused by the seam because
     /// `province_partition::find` returns nullptr for it, which is the

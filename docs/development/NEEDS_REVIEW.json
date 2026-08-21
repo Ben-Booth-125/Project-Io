@@ -2841,6 +2841,51 @@
    "status": "open",
    "source": "BL-517 (retain the heightmap), merged and verified 2026-08-21.",
    "what": "Resolving tools/verify/README.md conflicts twice today by keeping both sides spliced a sentence into the middle of another one - the clause 'and for font_glyph_harness, which links ImGui and is hand-declared in' appeared twice with trade_routes_harness / province_partition_harness wedged between. The BL-517 agent noticed it, correctly left it alone rather than guessing at the intended text, and reported it. Repaired now, and the province-partition clause corrected while I was in there: its three serialisation properties are over the HISTORY-LOG stream, which the old wording left ambiguous and which NR-430 shows is easy to misread. The method lesson is mine: keep-both is safe for two ADDITIONS to a list and unsafe inside a paragraph, and I applied it without reading the surrounding prose."
+  },
+  {
+   "id": "NR-433",
+   "title": "12% of provinces are below the HARD 3-tile floor, and that needs your eye",
+   "raised": "2026-08-21",
+   "kind": "question",
+   "status": "open",
+   "source": "BL-515 (organic province borders), merged and verified 2026-08-21.",
+   "what": "Distribution against the 3x3 partition it replaces: 24,498 provinces (was 21,161), mean 7.87 (was 9.11), max 12 and now ABSOLUTE (was 18 overshoot), min 1, 74.71% in the 7-12 band (was 97.90%). The band drop is expected and was explicitly not chased - organic borders are supposed to be irregular. What I want your eye on is a different number: 6,195 provinces under 7, of which 3,008 are under 3 - i.e. roughly 12% sit below the HARD 3-12 target you set. You also ruled 'do not reject tiny provinces', so keeping them is correct per the ruling and the agent was right not to merge them away. But the two rulings pull against each other at this volume, and the visible consequence is in the alpha-220 capture: in places the map reads as a hex lattice again, because a 1-2 tile province is a hex with a border drawn round it. That is the look you moved away from. Options if it bothers you: raise the seed density so fewer pockets are enclosed, let a sub-floor pocket join a neighbour (a softer rule than the merge pass you removed), or accept it and let the blend hide it at play zoom."
+  },
+  {
+   "id": "NR-434",
+   "title": "The agent corrected its own mechanism mid-task, and the correction is the interesting part",
+   "raised": "2026-08-21",
+   "kind": "observation",
+   "status": "open",
+   "source": "BL-515 (organic province borders), merged and verified 2026-08-21.",
+   "what": "Its first implementation followed BL-515's literal wording - past the size budget, only cross a cheap edge. That produced 3,860 provinces at EXACTLY 7 tiles and 616 singletons: a de-facto clamp wearing the costume of a growth rule, which is the precise failure mode the organic redesign existed to remove. It replaced that with hinterland seeds chosen up front at spacing, plus a self-referential soft brake - past its budget a region annexes only ground no harder to reach than what it already holds - which needs no threshold constant at all. Worth recording because it correctly distinguished FIXING AN ARTEFACT from CHASING THE BASELINE SPREAD, which is the line the brief drew, and it stated the distinction rather than quietly retuning."
+  },
+  {
+   "id": "NR-435",
+   "title": "Both coefficients were pinned against measurement, and one pin is genuinely elegant",
+   "raised": "2026-08-21",
+   "kind": "observation",
+   "status": "open",
+   "source": "BL-515 (organic province borders), merged and verified 2026-08-21.",
+   "what": "k_province_height_cost = 683: pinned so that a gradient at the p90 of adjacent-land steepness costs the same as crossing a river, measured over 653,910 adjacent land edges (mean 0.0270, p50 0.0186, p90 0.0586, p99 0.1406, so 40/0.0586 = 682.7). Measured on TERRAIN ALONE, so re-pinning it cannot chase its own tail - that property is what makes it re-derivable later. k_province_road_bind_divisor = 4: the smallest divisor at which a road link binds harder than plain ground EVEN ACROSS A RIVER, with a swept table showing roaded-internal share 56.85% at divisor 1 (no binding at all) rising to 74.81% at 4. The agent noted the lift is concave with no knee - the table confirms the choice rather than picking it, which is an honest thing to say about a sweep that does not hand you an answer. k_province_seed_spacing = 3 is structural, not tuned: seeds at separation d tile a plane in (sqrt3/2)d^2 tiles, and d=3 gives 7.79, the only integer whose ideal cell lands inside 7-12."
+  },
+  {
+   "id": "NR-436",
+   "title": "BL-513's k confirmed size-independent a second time; the agent declined to re-pin and was right",
+   "raised": "2026-08-21",
+   "kind": "observation",
+   "status": "open",
+   "source": "BL-515 (organic province borders), merged and verified 2026-08-21.",
+   "what": "Measured after the organic repartition: 12.5047 aggregate (spread 11.3391..15.1435, 28.73% of mean) against the pinned 12.6468 - a 1.1% drift, far inside the seed spread. That is the second independent confirmation that the ceiling coefficient does not depend on province size, which was predicted from its shape (both sides of its ratio are sums over tiles). The residual is real and explicable: the population factor multiplies per-province, so which tiles sit with a centre moves the total slightly. The agent did NOT re-pin, on the grounds that it is BL-513's contract, the ceiling binds on nothing (0.114% used) and the brief did not authorise it. Correct call, and it flagged it as delegated rather than silently leaving it."
+  },
+  {
+   "id": "NR-437",
+   "title": "Two id-scheme comments went stale the moment BL-515 landed; one was fixed by an agent outside its scope, one by me",
+   "raised": "2026-08-21",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-515 (organic province borders), merged and verified 2026-08-21.",
+   "what": "BL-511's seam work justified corp_command::province defaulting to no_province by the fact that province id 0 was a REAL id under the block layout. BL-515 makes ids the lowest member tile, and P8d now asserts no id is 0 - so that justification is false, hours after it was written. Two places carried it. (1) unit_march_harness asserted 'province id 0 IS a real province here' and went red; the BL-515 agent made the minimal narrowing edit with a dated reason, flagged that the file was outside its list, and got 88/88 - the right way to touch someone else's file. (2) corp_command.hpp's rationale, which I have now rewritten: it records the original argument as history, states that 0 is unreachable today, and keeps the default for a reason that does NOT depend on the id scheme - no_province is refused by the seam, so an omitted wire field is rejected rather than interpreted. A default of 0 would only be safe for as long as 0 happens to be unreachable, which is exactly the kind of accidental safety that stops being safe silently."
   }
  ]
 }
