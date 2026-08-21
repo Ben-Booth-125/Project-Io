@@ -837,6 +837,26 @@
     "Cross-border sale debits buyer, credits the enacting nation's treasury"
    ],
    "notes": "Proposed, not opened. Depends on D3 for the treasury and on Lane B's route work for the lane a good crosses. This is the first flow in the game where money moves between two named actors rather than appearing or vanishing — what makes 'international trade' a mechanic rather than a description. Per adversarial-pass finding 9: if Lane D touches procurement, BL-392 (procurement debits the buyer per tick and credits goods with NO SUPPLIER, minting goods and destroying money) must be added/fixed BEFORE BL-445, or not at all. OPENED 2026-08-20 as part of the four-lane batch (REFINED.md)."
+  },
+  {
+   "id": "P1",
+   "theme": "The province becomes a thing you can see, and then a thing worth seeing",
+   "state": "open",
+   "opened_date": "2026-08-20",
+   "closed_date": null,
+   "goal": "Written retroactively on 2026-08-21, mid-arc, because the work had already outgrown the batch it started in. The province went from an unrendered data structure to the grain the player clicks — and then, on Ben looking at it, to a partition that has to be REDESIGNED rather than resized. That reversal is the sprint's actual content, not a detour from it.",
+   "planned": [
+    "BL-466 (province partition) — landed 2026-08-20 as the Lane C foundation: 2x2 blocks, derived ids, three serialisation properties proved.",
+    "BL-511 (province as render unit) — the blend, province selection, and a per-lens reduction decided for all thirteen overlay modes.",
+    "BL-511 seam half — march_unit retargets from a tile to a province; province id 0 turns out to be REAL, forcing a 0xFFFFFFFF sentinel.",
+    "BL-513 (province building ceiling) — type-agnostic, from area/infrastructure/habitability/population, k pinned by measurement at 12.6468.",
+    "Repartition to 7-12 tiles (3x3 blocks + a fragment merge) — 97.90% in band, superseded within the hour by the ruling below.",
+    "BL-517 (retain the heightmap) — IN FLIGHT. Prerequisite for the redesign: landform classes carry no usable ordering and a watershed is a shape.",
+    "BL-515 (organic province borders) — NEXT. Grow from population centres, bounded by rivers, elevation and roads, with roads BINDING rather than dividing."
+   ],
+   "done_when": "Provinces are grown from settlement and stopped by terrain, with ids derived from the lowest member tile, hinterland provinces for centreless country, and a size distribution reported against the 3x3 partition it replaces rather than asserted to match it.",
+   "risk": "The partition has now been rebuilt twice in one day and BL-515 rebuilds it a third time. Each rebuild invalidates fixtures downstream — the last one took unit_march_harness from green to 8 failures, and exposed a segfault that had been hiding two whole sections. Expect BL-515 to break province_partition_harness's land-only rows by design (NR-428 rules they are NARROWED, never deleted) and to move every province id in the world.",
+   "notes": "THE METHOD NOTE THIS SPRINT EXISTS TO RECORD. Every ruling that stuck was made against a RENDER, not against a spec. Ben ruled ~4 tiles from the design form, saw it drawn and ruled 7-12; saw THAT drawn and ruled the packed lattice out entirely — 'packing each province perfectly looks nice, but it is scarcely how borders were defined in history'. The two superseded rulings were not wasted: each cost roughly an hour of agent time and bought a decision that would otherwise have been made on a guess and discovered much later, on top of BL-467's battle records and BL-513's ceiling. Build it, look at it, then rule — and file the reversal rather than quietly reshaping the old design to match the new one. Follow-ons deliberately NOT in this sprint: BL-516 (water kinds + sea provinces) and BL-518 (the Era -1 sim redrawing borders as its wars resolve), both of which want BL-515 landed first. BL-514 (blend ALL tiles, not only within provinces) is HELD at Ben's instruction until he sees the organic borders drawn — the third time in this arc that a decision has been sequenced behind evidence rather than taken on a guess."
   }
  ],
  "status_table": [

@@ -1,70 +1,67 @@
 # Project Io — REFINED (active worklist)
 
-## The province-grain batch (promoted 2026-08-21)
+## Sprint P1 — the province redesign (promoted 2026-08-21)
 
-Requirements: requirements.json § `province-render-and-selection`,
-§ `unit-position-province-grain`, § `province-building-limit`, § `supply-interdiction`.
+Requirements: requirements.json § `retain-heightmap`, § `organic-province-borders`.
 
-Follows Lane 0 (`10993ca`), which closed the determinism question: no leak, the
-golden re-blessed with provenance, and the partition now compared field-for-field
-across two generations. Ben's grain ruling is BL-511's design; NR-405 records what
-it overturns.
+Sprint P1 in `sprints.json` carries the arc and the method note. This is the
+remaining half: the partition gets rebuilt a third time, this time as shapes grown
+from settlement and stopped by terrain rather than a lattice packed over the map.
 
 **Main session owns** the board files and `question_log.json` — no agent touches them.
 
-### Lane R — BL-511, the province as the rendered and selected unit
+### [2] H1 — BL-517, retain the generation heightmap. **IN FLIGHT.**
 
-- **[5] R1 — blended province rendering + province selection.** Sub-agent, worktree.
-  Files: `src/ui/body_surface_canvas.cpp`, `src/ui/ui_state.hpp`,
-  `src/ui/selection_panel.cpp`, `docs/ui/PLANETARY.md`, `docs/ui/SELECTION.md`.
-  Province becomes the click target and the drawn unit, with borders softened by a
-  blend across the province's real tile mixture. The tile does **not** retire — it
-  stays the data grain and appears in the Selection panel as the detail of what was
-  clicked. **The blend has no precedent in this codebase**; expect a visual pass
-  with Ben rather than a spec that closes it.
+Files: `src/world/components.hpp`, `src/world/tile_generation.cpp`, the tile
+serialisation seam, harness. Height is computed in Pass 1 and discarded; BL-515
+needs it as a boundary signal, because `terrain_landform` is seven classes whose
+numeric order means nothing (`mountain = 2` and `canyon = 3` are not one step apart)
+and a watershed is a shape, not a class.
 
-### Lane U — unit position at province grain (BL-511's seam half)
+Narrow by design: capture the value, append it to the tile record, expose it to the
+Generation Ledger overlay. Do not re-derive landform from it, do not change a
+terrain rule, and do not perturb an RNG stream — if capturing it changes draw order
+that is a defect, not a cost.
 
-- **[4] U1 — `march_unit` retargets from tile to province.** Sub-agent, worktree.
-  Files: `src/world/corp_command.{hpp,cpp}`, `src/world/components.hpp`,
-  the unit movement step, `docs/ai/ACTIONS.json`, harness.
-  The verb enum is serialised and append-only, so the VERB stays and the field it
-  reads changes. Recommendation in BL-511: unit stores a tile and derives a
-  province — cheaper, and every existing reader keeps working. **Untrusted input
-  boundary**: a province id arriving over `--serve` is validated as the value that
-  lands, whole-command rejection, rejection mutates nothing.
+### [5] O1 — BL-515, organic province borders. **BLOCKED on H1.**
 
-### Lane B — BL-513, the province building limit
+Files: `src/world/province.{hpp,cpp}`, `tools/verify/province_partition_harness.cpp`,
+`tools/verify/province_capacity_probe.cpp`, `docs/generation/TILE_GENERATION.md`.
 
-- **[3] B1 — total-buildings ceiling per province.** Sub-agent, worktree.
-  Files: `src/world/placement_rules.{hpp,cpp}`, `src/world/province.{hpp,cpp}`,
-  `tools/verify/province_capacity_probe.cpp`, `docs/economy/PRODUCTION.md`.
-  Type-agnostic by ruling, from area + infrastructure + habitability + population,
-  alongside (never replacing) the per-tile deposit cap. Pin any coefficient by
-  measurement against the probe's spread — never pick one. **It will refuse nothing
-  today** (0.13% of capacity used); that is expected and is not a reason to inflate it.
+Grow from population centres (seed strength scaling with centre scale 1–5), by
+cost-weighted flood fill where a **river edge** is expensive (`river_edges` is
+already a per-side bitmask — the right shape for a border), an **elevation
+difference** is expensive in proportion to gradient, and a **road link is cheap,
+because a road binds**. Hinterland provinces for country no centre reaches, seeded
+from the least-accessible tile so they are shaped by terrain rather than left over.
 
-### Lane M — military, grain-independent
+- **Identity: the lowest-id member tile.** Derived, so determinism is free and
+  nothing new is serialised. Safe only because borders move during generation ONLY.
+- **Size: 7–12 soft, 3–12 hard, and tiny provinces are KEPT, not merged away.**
+- **The land-only invariant is NARROWED, never deleted** (NR-428) — ocean is a
+  special case and BL-516 owns it.
+- The partition walk stays explicitly sorted: `world::bodies` is an `unordered_map`
+  and iterating it unsorted already fed province ids in container order once.
 
-- **[4] M1 — BL-458, supply lines cannot be cut.** Sub-agent, worktree.
-  Files: `src/world/logistics.{hpp,cpp}`, `src/world/supply_system.cpp`,
-  `src/world/components.hpp`, `src/ui/body_surface_canvas.cpp` (consume-only),
-  `src/ui/market_ledger.cpp`.
-  Lift `convoy_tile_at` out of the renderer into `logistics.hpp` — the canvas
-  already derives the full convoy path and the shared function must own the
-  orientation rule, or a convoy's head lands at the wrong end half the time and
-  looks fine either way. Then interdiction: the act that finally earns BL-315's
-  third reading, **pirate**, which has had no mechanic since 2026-08-07.
-  Chosen for this batch because it is entirely tile-pathed and so untouched by
-  the grain ruling.
+Report the size distribution against the 3×3 partition it replaces — 21,161
+provinces, mean 9.11, 97.90% in the 7–12 band — as a comparison, not a target. The
+organic partition will not match that spread and is not meant to.
+
+### Expected breakage, so it is not mistaken for regression
+
+- `province_partition_harness`'s land-only and block-derived rows break **by design**.
+- **Every province id in the world moves.** Anything holding one across the change
+  is stale — including `province_capacity_probe`'s reported ids and any fixture that
+  names a province by id rather than by a member tile.
+- `unit_march_harness`'s grid fixtures assume provinces carved from 3×3 blocks
+  (ids 40/48/72/80 on a 9×9 body). They will need re-anchoring, and the last time
+  this happened it also surfaced a segfault that had hidden two whole sections.
 
 ### Held, with reasons
 
-- **BL-471 (unit marker + command surface), BL-469 (battle card), BL-449 (stance
-  surface).** All draw on the canvas Lane R rewrites, or collide with it on
-  `selection_panel.cpp`. They follow Lane R rather than run beside it.
-- **BL-467 (battle state).** Its engagement rule gets simpler once Lane U lands —
-  a unit's position becomes a province, so no tile-to-province reduction is needed.
-  Sequence it after U1.
-- **BL-512 (firm cap tunables).** Pin together with BL-513's coefficient against one
-  sweep, or the two get tuned against each other by accident.
+- **BL-516** (water kinds + sea provinces) — wants BL-515 landed; land-only first.
+- **BL-518** (war redraws borders) — no point redrawing borders about to be replaced.
+- **BL-514** (blend all tiles) — held at Ben's instruction until he sees the organic
+  borders drawn.
+- **BL-512** (firm cap tunables) — the per-province cap is inert by orders of
+  magnitude (NR-421); pin it against whatever BL-515 produces, not before.

@@ -4816,6 +4816,66 @@
      "result_metric": null
     }
    ]
+  },
+  {
+   "brief": "retain-heightmap",
+   "batch": "2026-08-21-province-redesign",
+   "title": "BL-517 - retain the generation heightmap (Sprint P1, H1)",
+   "status": "pending",
+   "promoted_from": "backlog.json BL-517 RETAIN_HEIGHTMAP",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING (headless): every tile carries the height its generation pass computed, and the retained value is IDENTICAL to the one generate_body_tiles reports through generation_record - captured, never recomputed.",
+     "result_metric": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "Serialisation: the field is APPENDED, no existing tile field moves or renumbers, and a tile record round-trips bit-identical.",
+     "result_metric": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "Determinism unchanged: same seed, same heights, two runs. Capturing the value perturbs NO RNG stream - world_determinism and determinism_harness stay green, and if spectator_determinism's pinned golden moves that is reported and explained rather than re-blessed by the implementer.",
+     "result_metric": null
+    }
+   ]
+  },
+  {
+   "brief": "organic-province-borders",
+   "batch": "2026-08-21-province-redesign",
+   "title": "BL-515 - provinces grown from settlement, stopped by terrain (Sprint P1, O1)",
+   "status": "pending",
+   "promoted_from": "backlog.json BL-515 ORGANIC_PROVINCE_BORDERS",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING (headless): provinces are grown from population centres by cost-weighted fill, where a river edge and an elevation difference are expensive to cross and a road link is CHEAP (a road binds). Every land tile belongs to exactly one province; country no centre reaches forms hinterland provinces under the same rules.",
+     "result_metric": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "Identity is the LOWEST-ID MEMBER TILE, derived not allocated. Same seed, same partition, same ids, two runs - proven by determinism_harness's province comparison. The body walk stays explicitly sorted.",
+     "result_metric": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "Size: 7-12 is a soft target and 3-12 the hard one, boundaries winning ties. Tiny provinces are KEPT, never merged away to satisfy a floor. The measured distribution is REPORTED against the 3x3 partition's (21,161 provinces, mean 9.11, 97.90% in band) as a comparison, not a target to match.",
+     "result_metric": null
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "requirement": "The land-only invariant is NARROWED to land provinces rather than deleted (NR-428); ocean stays out of scope and belongs to BL-516. Serialisation properties the partition already proved stay green: one appender, no record reordered, an older stream still loads, round-trip bit-identical.",
+     "result_metric": null
+    }
+   ]
   }
  ]
 }
