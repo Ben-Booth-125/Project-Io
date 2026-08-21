@@ -56,6 +56,19 @@ of one seed). Report-first — the road-less count is a number to watch, not a p
 after any change to `road_generation.cpp`, to nation/population placement, or to the logistics
 traversal costs the road MST is laid out against.
 
+`sea_leg_census` (Sprint B2, the BL-188 un-parking decision) is the **sea-mode** instrument, and
+the counterpart to the road census above: where that one measures the land raster, this measures
+what `logistics_path::crosses_ocean` — a single boolean over the whole route — actually selects.
+Over every reachable market pair on every body it reports S1 the share of routes in sea mode and
+how much of such a route is *really* water, S2 which water kind flipped the bit (BL-516 made water
+three things; `crosses_ocean` still reads the undifferentiated `is_water`, so a lake can flip a
+route to sea mode), and S3 the money delta between the whole-route sea rate the supply layer
+charges today and a per-leg split. Report-first: S1–S3 print distributions, and only the vacuity
+guard and a determinism row assert. It measures the shipped `scripts/economy.lua` rates by
+restating them as constants — it is deliberately Lua-free — so **if `logistics.base_cost_per_unit_distance`
+moves, move `kLandRate`/`kSeaRate` with it**. Re-run it before touching BL-188, the convoy mode
+selection, or the sea/land logistics rates.
+
 `tile_height_retention` (BL-517) guards the retained per-tile heightmap. Its assertions are shaped
 around the item's negative scope — height must be **captured**, never recomputed: H1 asserts every
 `tile_component::height` is bit-identical to `generation_record::height`, H3 that the value is the
