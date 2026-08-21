@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*182 entries — 180 open, 2 resolved.*
+*183 entries — 181 open, 2 resolved.*
 
 ---
 
@@ -1590,6 +1590,21 @@ Runners-up and why they lost:
 > **Recommendation:** Keep it, but treat it as cheap to change until BL-523 (equity data model) puts `syndicate_component` on the serialisation seam. That is the point at which the rename stops being a doc edit.
 
 *Files: `docs/GLOSSARY.md`, `docs/development/backlog.json`, `CLAUDE.md`, `README.md`*
+
+### NR-480 — apply_session_close.js reformats backlog.json and requirements.json wholesale (indent 2 vs stored 1)
+*observation · raised 2026-08-21 · from Checked at session close whether the tool applied to this session. It did not (design session — nothing delivered, no requirements closed), but reading it surfaced the mismatch.*
+
+`apply_session_close.js` writes all three of its targets with `JSON.stringify(obj, null, 2)` (lines 40, 61, 81). Measured stored indents: `backlog.json` = 1, `requirements.json` = 1, `golden_log.json` = 2. So two of the three are reformatted end-to-end on every run. `backlog.json` is ~700 KB and ~490 items; a run that ships three items would produce a diff touching every line of it.
+
+**Why it matters.** It buries the real change. The point of a session-close commit is to show what shipped, and a whole-file reformat makes the three status flips unreviewable — and makes any accidental edit inside that diff invisible. It also fights the ordinary tooling: `backlog_query.js`, `backlog_lint.js` and the hand-append path all round-trip at indent 1, so the next tool to touch the file flips it back and the churn alternates. Not urgent — the tool appears not to have been run recently (the file is still at indent 1) — but it is a trap for whoever runs it next, which is why it is recorded rather than left to be rediscovered.
+
+- Fix the tool: write indent 1 for backlog.json and requirements.json, keep 2 for golden_log.json.
+- Have the tool detect and preserve each file's existing indent.
+- Normalise all three stores to one indent and update every writer.
+
+> **Recommendation:** Option 2 — detect and preserve. It is a three-line change, it cannot drift again when a store is reformatted for another reason, and it does not require auditing every other writer. Option 1 works but re-encodes the same assumption that just broke.
+
+*Files: `tools/session/apply_session_close.js`*
 
 ---
 
