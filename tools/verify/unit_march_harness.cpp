@@ -147,6 +147,44 @@ bool order_equal(const movement_order& a, const movement_order& b)
 /// way, which is what M5/M6 rely on.
 constexpr uint32_t PARTITION_SEED = 0xB1511u;
 
+/// A gw x gh land body. Needed since the 2026-08-21 repartition: provinces are
+/// carved from 3x3 blocks with a merge pass that folds anything under
+/// `k_province_min_tiles` (7) into a neighbour. On a ONE-ROW body every block is
+/// a 3-tile fragment, so the merge cascades and the whole row becomes a single
+/// province however long it is — a row fixture simply cannot express "march from
+/// one province to another" any more. Two rows of blocks give real provinces.
+entity_id make_grid_body(world& w, int gw, int gh,
+                         terrain_landform lf = terrain_landform::plains)
+{
+    const entity_id body = w.create_entity();
+    body_component bc{};
+    bc.grid_width  = gw;
+    bc.grid_height = gh;
+    w.bodies[body] = bc;
+    for (int r = 0; r < gh; ++r)
+        for (int c = 0; c < gw; ++c)
+        {
+            const entity_id t = w.create_entity();
+            tile_component tc{};
+            tc.body        = body;
+            tc.grid_x      = c;
+            tc.grid_y      = r;
+            tc.composition = terrain_composition::grassland;
+            tc.landform    = lf;
+            w.tiles[t]     = tc;
+        }
+    return body;
+}
+
+/// Tile at (col,row) on a body built by make_grid_body.
+entity_id grid_tile_at(const world& w, entity_id body, int col, int row)
+{
+    for (const auto& [id, tc] : w.tiles)
+        if (tc.body == body && tc.grid_x == col && tc.grid_y == row)
+            return id;
+    return null_entity;
+}
+
 void partition(world& w) { build_province_partition(w, PARTITION_SEED); }
 
 /// The province owning @p tile, or 0. Fixtures name a DESTINATION by naming a
@@ -176,11 +214,19 @@ void m1_march_unit_legality()
     std::printf("\n-- M1  march_unit: sets a reachable path to a PROVINCE; a rejection mutates nothing --\n");
 
     world w;
-    const entity_id body = make_row_body(w, 8);
+    // A 12x6 GRID, not a row. The 2026-08-21 repartition put the province floor
+    // at k_province_min_tiles (7) with a merge pass that folds anything smaller
+    // into a neighbour. On a one-row body every 3x3 block is a 3-tile fragment,
+    // so the merge cascades and the entire row becomes ONE province however long
+    // it is — which made this test's premise (march from one province to
+    // another) unsatisfiable on the old fixture. The assertions below are
+    // unchanged; only the ground they stand on got tall enough to hold two
+    // provinces.
+    const entity_id body = make_grid_body(w, 12, 6);
     const entity_id a    = add_corp(w, "A");
     const entity_id b    = add_corp(w, "B");
-    const entity_id t0   = tile_at(w, body, 0);
-    const entity_id t5   = tile_at(w, body, 5);
+    const entity_id t0   = grid_tile_at(w, body, 0, 0);
+    const entity_id t5   = grid_tile_at(w, body, 10, 4);
     partition(w);
     const entity_id unit = add_unit(w, a, t0);
     recipe_registry reg  = registry_with_march(1.0f);
@@ -214,9 +260,11 @@ void m1_march_unit_legality()
     // actually moved rather than being read from two places.
     {
         world w2;
-        const entity_id b2 = make_row_body(w2, 8);
+        // Mirrors M1's own fixture exactly (12x6, (0,0) -> (10,4)) so the only
+        // difference between the two commands is the garbage `tile`.
+        const entity_id b2 = make_grid_body(w2, 12, 6);
         const entity_id c2 = add_corp(w2, "A");
-        const entity_id s2 = tile_at(w2, b2, 0), d2 = tile_at(w2, b2, 5);
+        const entity_id s2 = grid_tile_at(w2, b2, 0, 0), d2 = grid_tile_at(w2, b2, 10, 4);
         partition(w2);
         const entity_id u2 = add_unit(w2, c2, s2);
         corp_command c; c.corp = c2; c.verb = corp_verb::march_unit; c.subject = u2;
@@ -288,6 +336,12 @@ void m1_march_unit_legality()
     // -- rejected_invalid: province on a different body --
     {
         world w4;
+        // A ROW body is still the right shape HERE, and deliberately so: this
+        // row needs only ONE province per body, and since the 2026-08-21
+        // repartition a short row reliably yields exactly one (every 3x3 block
+        // over a one-row body is a 3-tile fragment, and the merge pass folds
+        // them together). What it must NOT be used for is any row asserting a
+        // march BETWEEN provinces — see make_grid_body's comment.
         const entity_id home  = make_row_body(w4, 6);
         const entity_id other = make_row_body(w4, 6);
         const entity_id c4    = add_corp(w4, "A");
@@ -408,10 +462,16 @@ void m3_halt_and_disband()
     std::printf("\n-- M3  halt_unit / disband_unit --\n");
 
     world w;
-    const entity_id body = make_row_body(w, 4);
+    // 9x9 (was a 4-wide row). Post-repartition a 4-wide row is ONE province,
+    // so the march below was rejected_state and there was no order to halt.
+    // 9x9 carves four clean interior provinces; (1,1) and (5,5) are in two of
+    // them, verified by the precondition below rather than assumed.
+    const entity_id body = make_grid_body(w, 9, 9);
     const entity_id a = add_corp(w, "A"), b = add_corp(w, "B");
-    const entity_id t0 = tile_at(w, body, 0), t3 = tile_at(w, body, 3);
+    const entity_id t0 = grid_tile_at(w, body, 1, 1), t3 = grid_tile_at(w, body, 5, 5);
     partition(w);
+    check(w.provinces.province_of(t0) != w.provinces.province_of(t3),
+          "start and march target are in different provinces (fixture precondition)");
     const entity_id unit = add_unit(w, a, t0);
     recipe_registry reg = registry_with_march(1.0f);
 
@@ -466,13 +526,17 @@ void m4_war_flips_the_queue()
     // see run_unit_march's own doc comment — so what this proves is
     // "runs cleanly and reaches the same destinations", not a contention
     // outcome that does not exist to observe yet.
-    // 10-wide (was 4): under BL-511 a destination in the SAME province as the
-    // unit's start is rejected_state, and a 4-wide row puts col 2 and col 3 in
-    // one 2x2 block. The fixture preconditions below assert the separation
-    // rather than assuming it.
-    const entity_id body = make_row_body(w, 10);
-    const entity_id tA = tile_at(w, body, 0), tC = tile_at(w, body, 3);
-    const entity_id destA = tile_at(w, body, 9), destC = tile_at(w, body, 9);
+    // 9x9 (was a 10-wide row). Under BL-511 a destination in the SAME province
+    // as the unit's start is rejected_state, and since the 2026-08-21
+    // repartition a 10-wide row is ONE province — so BOTH orders were refused
+    // and this row proved nothing about visitation. What this test needs is
+    // two units starting in DIFFERENT provinces and marching to a THIRD they
+    // share: (1,1) and (5,1) are two of 9x9's clean interior provinces, and
+    // (5,5) is a third. The preconditions below assert the separation rather
+    // than assuming it.
+    const entity_id body = make_grid_body(w, 9, 9);
+    const entity_id tA = grid_tile_at(w, body, 1, 1), tC = grid_tile_at(w, body, 5, 1);
+    const entity_id destA = grid_tile_at(w, body, 5, 5), destC = destA;
     partition(w);
     // b (mobilised) gets a HIGHER entity id than c (peaceful)'s unit below,
     // so ascending-unit-id order alone would visit c's unit first; the
@@ -507,15 +571,18 @@ struct twin_world
 twin_world build_twin(int tick0)
 {
     twin_world t;
-    // 12-wide (was 7). MEASURED: on a 7-wide cylinder the coastal-merge pass
-    // folds col 6's one-tile province into col 0's — they become the SAME
-    // province, and under BL-511 marching to the province you already occupy
-    // is rejected_state. The fixture preconditions below assert the separation
-    // rather than trusting the geometry.
-    t.body = make_row_body(t.w, 12);
+    // 9x9 (was a 12-wide row). MEASURED, twice over: the 2026-08-21
+    // repartition carves 3x3 blocks and then folds anything under
+    // k_province_min_tiles into a neighbour, and on a one-row body EVERY block
+    // is a 3-tile fragment — so a 12-wide row merges to a single province and
+    // marching within it is rejected_state. (Rows only start yielding two
+    // provinces at 20 tiles, which is why M2's 20-wide row still works.)
+    // 9x9 gives four clean interior provinces; (1,1) and (5,5) sit in two of
+    // them, and the preconditions below assert that rather than trusting it.
+    t.body = make_grid_body(t.w, 9, 9);
     t.corp = add_corp(t.w, "Replay Corp");
-    t.u_from = tile_at(t.w, t.body, 0);
-    t.u_to   = tile_at(t.w, t.body, 5);
+    t.u_from = grid_tile_at(t.w, t.body, 1, 1);
+    t.u_to   = grid_tile_at(t.w, t.body, 5, 5);
     partition(t.w); // BL-511: march_unit needs a built partition
     t.unit   = add_unit(t.w, t.corp, t.u_from);
     (void)tick0;
@@ -539,12 +606,20 @@ void m5_determinism_replay()
     check(pdest != prov_of(t1.w, t1.u_from), "start and destination provinces differ (fixture precondition)");
     corp_command m1; m1.corp = t1.corp; m1.verb = corp_verb::march_unit; m1.subject = t1.unit; m1.province = pdest;
     corp_command m2; m2.corp = t2.corp; m2.verb = corp_verb::march_unit; m2.subject = t2.unit; m2.province = pdest;
-    apply_corp_command(t1.w, reg, m1);
-    apply_corp_command(t2.w, reg, m2);
+    // The result is ASSERTED, not discarded. If the order is refused — which
+    // is exactly what the 2026-08-21 repartition did to this fixture's old
+    // one-row body — the loop below still runs eight ticks with nothing
+    // marching, and "state_hash agrees" passes while proving nothing at all.
+    check(apply_corp_command(t1.w, reg, m1) == corp_command_result::applied
+              && apply_corp_command(t2.w, reg, m2) == corp_command_result::applied,
+          "both replay orders were actually placed (fixture setup)");
 
     bool all_equal = true;
+    int  ticks_in_flight = 0; // ticks that BEGAN with a live order — see below
     for (int tick = 1; tick <= 8; ++tick)
     {
+        if (t1.w.units.at(t1.unit).order.dest != null_entity)
+            ++ticks_in_flight;
         run_unit_march(t1.w, reg);
         run_unit_march(t2.w, reg);
         run_unit_upkeep(t1.w, reg);
@@ -558,6 +633,13 @@ void m5_determinism_replay()
         }
     }
     check(all_equal, "state_hash agrees at every tick across two independent runs, marching units in flight");
+    // "IN FLIGHT" IS PART OF THE CLAIM, so it is asserted rather than assumed.
+    // A unit that arrives on tick 1 would leave seven of the eight hash
+    // checkpoints comparing two idle worlds — still true, but no longer a
+    // statement about marching. The bar is deliberately more than one tick.
+    std::printf("    unit held a live order for %d of 8 ticks\n", ticks_in_flight);
+    check(ticks_in_flight >= 3,
+          "the unit was genuinely mid-march across multiple hash checkpoints, not arrived on tick 1");
     check(prov_of(t1.w, t1.w.units.at(t1.unit).position) == pdest
               && prov_of(t2.w, t2.w.units.at(t2.unit).position) == pdest,
           "both units actually reached the destination province by the end of the replay");
@@ -574,15 +656,24 @@ void m5_determinism_replay()
 unit_march_tick run_corrupted_recompute(world& w, entity_id& out_unit, entity_id& out_dest,
                                         const recipe_registry& reg)
 {
-    const entity_id body = make_row_body(w, 6);
+    // 9x9 (was a 6-wide row). Post-repartition a 6-wide row is ONE province,
+    // so the order below was rejected_state, `order.path` stayed EMPTY, and
+    // the corruption line then indexed past the end of an empty vector — which
+    // segfaulted the process mid-M5 and meant M6 and M7 never ran at all.
+    // That is why the result is asserted now instead of discarded: a fixture
+    // whose setup silently fails is worse than one that fails loudly.
+    const entity_id body = make_grid_body(w, 9, 9);
     const entity_id corp = add_corp(w, "Corp");
-    const entity_id start = tile_at(w, body, 0), dest = tile_at(w, body, 5);
+    const entity_id start = grid_tile_at(w, body, 1, 1), dest = grid_tile_at(w, body, 5, 5);
     partition(w);
     const entity_id unit = add_unit(w, corp, start);
 
     corp_command cmd; cmd.corp = corp; cmd.verb = corp_verb::march_unit; cmd.subject = unit;
     cmd.province = w.provinces.province_of(dest);
-    apply_corp_command(w, reg, cmd);
+    check(apply_corp_command(w, reg, cmd) == corp_command_result::applied,
+          "the order to corrupt was actually placed (fixture setup)");
+    check(w.units.at(unit).order.path.size() > w.units.at(unit).order.next_index,
+          "  ...and its path has a next hop to corrupt (fixture setup)");
 
     // Corrupt the SECOND path step so it points at a tile on a DIFFERENT
     // body — a step the blocked-check rejects on sight. `dest` (and the
@@ -594,7 +685,6 @@ unit_march_tick run_corrupted_recompute(world& w, entity_id& out_unit, entity_id
 
     out_unit = unit;
     out_dest = dest;
-    (void)0;
     return run_unit_march(w, reg);
 }
 
@@ -662,10 +752,14 @@ void m7_untrusted_boundary_and_enum()
 
     // --- the rejection property ------------------------------------------
     world w;
-    const entity_id body = make_row_body(w, 12);
+    // 9x9 (was a 12-wide row). Post-repartition a 12-wide row is ONE province,
+    // so the "live order" this whole sweep is measured against could not be
+    // placed. The sweep is only meaningful against state that COULD be
+    // clobbered — see the comment at the order below.
+    const entity_id body = make_grid_body(w, 9, 9);
     const entity_id a    = add_corp(w, "A");
-    const entity_id t0   = tile_at(w, body, 0);
-    const entity_id t9   = tile_at(w, body, 9);
+    const entity_id t0   = grid_tile_at(w, body, 1, 1);
+    const entity_id t9   = grid_tile_at(w, body, 5, 5);
     partition(w);
     const entity_id unit = add_unit(w, a, t0);
     recipe_registry reg  = registry_with_march(1.0f);
