@@ -534,6 +534,18 @@
    "Corporation panel, Stance column. Shown whenever the row is currently Hostile or Friend."
   ],
   [
+   "gameplay.march_unit",
+   "No player-facing surface yet. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode). There is NO UI surface for it yet: BL-471 (unit marker + command surface) is the item that adds one, and it is deliberately sequenced after BL-511's canvas rewrite. Until then this verb is reachable only through the seam."
+  ],
+  [
+   "gameplay.halt_unit",
+   "No player-facing surface yet. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode). There is NO UI surface for it yet: BL-471 (unit marker + command surface) is the item that adds one, and it is deliberately sequenced after BL-511's canvas rewrite. Until then this verb is reachable only through the seam."
+  ],
+  [
+   "gameplay.disband_unit",
+   "No player-facing surface yet. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode). There is NO UI surface for it yet: BL-471 (unit marker + command surface) is the item that adds one, and it is deliberately sequenced after BL-511's canvas rewrite. Until then this verb is reachable only through the seam."
+  ],
+  [
    "ledger.strategy_readout_open",
    "Navigation rail slot 12, \"Strategy readout\""
   ],

@@ -4,7 +4,11 @@
 #include "construction.hpp"
 #include "economy_system.hpp" // BL-430: try_switch_recipe, the shared recipe-switch gate
 #include "logistics.hpp" // invalidate_logistics_caches (idle/resume flips the anchor set); intra_body_path (BL-470)
-#include "placement_rules.hpp" // BL-470: is_ocean_tile (march_unit's destination check)
+// BL-470 included placement_rules.hpp here for is_ocean_tile, march_unit's old
+// destination check. BL-511 retargeted the verb to a province, and the province
+// partition is LAND-ONLY by construction, so the water test — and the include —
+// have no remaining caller in this file.
+#include "province.hpp"       // BL-511: march_unit's destination is a province
 #include "recipe_registry.hpp"
 #include "stance.hpp" // BL-448: corp stance verbs (declare_hostile / offer_friendship / accept_friendship / return_to_neutral)
 #include "supply_system.hpp" // BL-452: the shared dispatch (price_convoy_leg / commit_convoy)
@@ -980,29 +984,57 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             // UNREACHABLE. Left as a named gap rather than invented state,
             // so BL-467 only has to add the flag and one `if`, not this verb.
 
-            const auto dit = w.tiles.find(cmd.tile);
-            if (dit == w.tiles.end())
-                return corp_command_result::rejected_invalid;
-            if (placement_rules::is_ocean_tile(dit->second.composition))
+            // BL-511: the destination is a PROVINCE, not a tile. THIS is the
+            // domain check the untrusted-input rule asks for and the one a
+            // wire range gate cannot stand in for: `find` binary-searches the
+            // built partition, so an id that merely FITS a uint32 — including
+            // the 0 default of an omitted field — is refused here rather than
+            // being coerced into some nearby province. Ocean needs no separate
+            // test any more: the partition covers LAND ONLY by construction
+            // (province.hpp), so a province id can never name water.
+            const province* dp = w.provinces.find(cmd.province);
+            if (dp == nullptr || dp->tiles.empty())
                 return corp_command_result::rejected_invalid;
 
             const auto sit = w.tiles.find(uit->second.position);
             if (sit == w.tiles.end())
                 return corp_command_result::rejected_invalid; // unit's own tile is gone
 
-            if (dit->second.body != sit->second.body)
+            if (dp->body != sit->second.body)
                 return corp_command_result::rejected_invalid; // BL-470's ruling 1: intra-body path march only
 
-            if (cmd.tile == uit->second.position)
+            if (w.provinces.province_of(uit->second.position) == cmd.province)
                 return corp_command_result::rejected_state; // already there — halt_unit is the stop verb
 
-            const logistics_path& p = intra_body_path(w, sit->second.body, uit->second.position, cmd.tile);
-            if (!p.reachable || p.tiles.empty())
-                return corp_command_result::rejected_invalid;
+            // Solve to the LOWEST-ID reachable member tile. `province::tiles`
+            // is ascending by contract, so first-reachable-wins is a stable,
+            // container-independent choice; and because the march ENDS on
+            // entering the province (run_unit_march), which member tile was
+            // picked only decides the route's tail, never where the unit
+            // stops. Every lookup below is read-only — nothing is written
+            // until the single `order` assignment at the end, so a rejection
+            // on any path here mutates nothing.
+            entity_id       chosen = null_entity;
+            std::vector<entity_id> chosen_path;
+            for (const entity_id cand : dp->tiles)
+            {
+                if (cand == uit->second.position)
+                    continue; // degenerate; the already-there test above covers the real case
+                const logistics_path& p = intra_body_path(w, sit->second.body, uit->second.position, cand);
+                if (p.reachable && !p.tiles.empty())
+                {
+                    chosen      = cand;
+                    chosen_path = p.tiles;
+                    break;
+                }
+            }
+            if (chosen == null_entity)
+                return corp_command_result::rejected_invalid; // no member tile is reachable
 
             movement_order mo;
-            mo.dest = cmd.tile;
-            mo.path = p.tiles; // canonical (lo->hi) order — see world.hpp's logistics_path comment
+            mo.dest          = chosen;
+            mo.dest_province = cmd.province;
+            mo.path = chosen_path; // canonical (lo->hi) order — see world.hpp's logistics_path comment
             if (mo.path.front() != uit->second.position)
                 std::reverse(mo.path.begin(), mo.path.end());
             mo.next_index = 1; // path[0] is the tile the unit already occupies

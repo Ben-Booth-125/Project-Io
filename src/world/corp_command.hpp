@@ -66,7 +66,13 @@ enum class corp_verb : uint8_t
     // --- BL-470: the unit march seam (2026-08-19) ---
     // Appended AFTER return_to_neutral, same append-only rule. One seam, one
     // dictionary family — NOT a parallel unit_command type (BL-470's ruling 2).
-    march_unit,    ///< Set/replace `subject`'s (a unit) movement order toward `tile`, path-marched across ticks.
+    // BL-511 (2026-08-21) RETARGETED march_unit's PAYLOAD from a tile to a
+    // PROVINCE. The verb keeps its value and its position — the enum is
+    // serialised and append-only, so nothing renumbers; only the field it
+    // reads changed, from `tile` to `province`. Ben's grain ruling (unit
+    // position and movement are province grain) collapses BL-467's
+    // command-at-tile / engagement-at-province split; see NR-405.
+    march_unit,    ///< Set/replace `subject`'s (a unit) movement order toward `province`, path-marched across ticks.
     halt_unit,     ///< Clear `subject`'s movement order. rejected_state if it has none.
     disband_unit,  ///< Erase `subject` (a unit) outright. No refund — manpower walks away.
 };
@@ -88,6 +94,14 @@ inline constexpr uint8_t corp_verb_count =
 /// `rejected_state` at the cap rather than silently dropping the order.
 inline constexpr std::size_t max_sell_orders_per_corp = 64;
 
+/// BL-511: "no province named" for `corp_command::province`. Deliberately
+/// UINT32_MAX and deliberately NOT 0 — 0 is a REAL province id under
+/// province.hpp's layout (body rank 0 | block 0 | component 0), so it cannot
+/// serve as an absent-value sentinel. UINT32_MAX is structurally unreachable
+/// instead: it requires component index 7, and a 2x2 block splits into at
+/// most 4 connected components, so the partition never assigns above 3.
+inline constexpr uint32_t no_province = 0xFFFFFFFFu;
+
 /// One serialisable intent: {tick, corp, verb, fixed-size args}. Which args are
 /// meaningful depends on the verb; unused args stay at their defaults so two
 /// commands with the same intent compare equal byte-for-byte.
@@ -104,7 +118,7 @@ struct corp_command
     /// and for remove_sell_order, whose subject is `order`.
     entity_id  subject = null_entity;
 
-    entity_id     tile      = null_entity;              ///< build / place_road target tile; march_unit's destination tile.
+    entity_id     tile      = null_entity;              ///< build / place_road / hire_unit target tile. NOT march_unit's — see `province` (BL-511).
     building_type type      = building_type::none;      ///< build only.
     resource_type target    = resource_type::iron_ore;  ///< build (extraction) AND place_sell_order: what to sell.
     uint16_t      recipe    = no_recipe;                ///< set_recipe (and build seed).
@@ -129,6 +143,26 @@ struct corp_command
     /// pays for. `subject` is the source market, `target` the cargo,
     /// `quantity` the units; `order` names the convoy for `hold_convoy`.
     entity_id counterparty = null_entity;
+
+    // --- BL-511: unit movement moves to province grain (2026-08-21) ---
+    /// `march_unit`'s DESTINATION PROVINCE (a `province::id`, world.hpp's
+    /// `province_partition`). Not an `entity_id`: a province id is DERIVED
+    /// from its body rank / block / component (province.hpp's layout), never
+    /// allocated from the entity pool, so it is its own uint32 domain and
+    /// must not be conflated with `tile`.
+    ///
+    /// The default is `no_province`, NOT 0 — measured, not assumed. Province
+    /// id 0 is a REAL id (body rank 0, block 0, component 0), and on every
+    /// fixture and generated world it names the first block of the first
+    /// body. A 0 default would therefore make an OMITTED `province=` on the
+    /// wire resolve to a real destination and answer `applied` — precisely
+    /// the silent order-substitution the untrusted-input rule forbids.
+    ///
+    /// `no_province` is refused by the seam because
+    /// `province_partition::find` returns nullptr for it, which is the
+    /// authoritative domain check — a wire caller's range gate only proves
+    /// the value fits, and fitting is not existing.
+    uint32_t province = no_province;
 };
 
 /// Outcome of applying a command. Only `applied` mutates the world; every

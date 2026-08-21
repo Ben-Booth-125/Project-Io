@@ -243,6 +243,23 @@ host_op service_line(const std::string& line, world& w, const recipe_registry& r
             kv, "order", 0, 0,
             static_cast<long long>(std::numeric_limits<uint32_t>::max()), &ok);
         const long long cp_v    = kv_get_checked(kv, "counterparty", 0, 0, id_max, &ok);
+        // BL-511: march_unit's destination province. A province id is NOT an
+        // entity_id — it is derived from (body rank | block | component)
+        // (province.hpp) and lives in its own uint32 domain, so it is gated
+        // against uint32's range and NOT against id_max. This gate only
+        // proves the value FITS its destination without a narrowing cast
+        // truncating or wrapping it into a different province; whether the
+        // id EXISTS is the seam's own check (province_partition::find), which
+        // is the only place that knows the built partition. Both are
+        // required — fitting is not existing.
+        //
+        // The DEFAULT is `no_province`, not 0: province id 0 is a real id
+        // (the first block of the first body), so defaulting an omitted
+        // `province=` to 0 would hand a march order a real destination the
+        // caller never named and answer `applied`.
+        const long long prov_v  = kv_get_checked(
+            kv, "province", static_cast<long long>(no_province), 0,
+            static_cast<long long>(std::numeric_limits<uint32_t>::max()), &ok);
 
         // Floats narrow FIRST, then test finiteness: 1e300 is a finite
         // double and an infinite float, and the seam stores floats.
@@ -280,6 +297,7 @@ host_op service_line(const std::string& line, world& w, const recipe_registry& r
         cmd.floor_price  = floor_v;
         cmd.order        = static_cast<uint32_t>(order_v);
         cmd.counterparty = static_cast<entity_id>(cp_v);
+        cmd.province     = static_cast<uint32_t>(prov_v);
 
         // BL-387: refuse to act as a corp the session is not. Before this
         // gate the only validation of `corp` was that the corp EXISTS, so
