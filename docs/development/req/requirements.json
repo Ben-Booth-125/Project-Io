@@ -5104,16 +5104,16 @@
    "brief": "growth-extinguishes-war",
    "batch": "2026-08-21-lane-a-sprint-28",
    "title": "Sprint 28 (re-scoped) - a quarter of worlds fight no war, and the scorer is why",
-   "status": "pending",
+   "status": "partial",
    "promoted_from": "backlog.json BL-384 (restated 2026-08-21), sprints.json Sprint 28",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "partial",
      "requirement": "ITEM-SPANNING (headless): NO WORLD IN THE SWEEP FIGHTS ZERO WARS. Across N seeds at the shipped tuning, every world produces at least one battle. RULED A BUG by Ben 2026-08-21, and the reason is content reachability rather than flavour: 'many ancient tech quests would not be unlockable'. A world where war never happens is a world where war-gated progression is dead. This is the row that fails today - 2 of 8 - and it is deliberately 'at least one', not a rate: the rate is R2's job, and one row asserting both would fail for two different reasons with one message.",
-     "result_metric": null,
+     "result_metric": "4000-yr config: 2/8 -> 0/8. Production 400-yr config: unchanged.",
      "verification": "headless - tools/verify/history_conquest_gap.cpp",
-     "notes": "FAILS TODAY: seeds 0 and 4 produce 0 battles across a full 0->1960 run. Note the shape of the failure - it is binary, not thin. A world fights hundreds of times or not at all."
+     "notes": "PARTIAL, and the split is the point. At the 4000-year configuration every harness had been measuring, the settle-feasibility fix takes zero-war worlds from 2/8 to 0/8 and flips four history_sim_harness rows red-to-green (B318c, BL384a, R5, B384a), breaking none. At PRODUCTION parameters (400 years, one band, step 4) the fix changes nothing at all - base and post-fix seed_sweep_probe are byte-identical - and 3 of 12 production seeds still fight zero wars. See NR-492: the harnesses and the game were running different sims."
     },
     {
      "id": "R2",
@@ -5125,43 +5125,43 @@
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "requirement": "THE FORK IS SEPARATED BEFORE ANY FIX. The instrument distinguishes 'campaign never cleared campaign_threshold_q' from 'campaign cleared it and lost the > comparison to another verb' - and where it loses, names the winning verb and the margin. Until this row passes, no fix may be written: the two cases need different fixes and the code cannot currently tell them apart.",
-     "result_metric": null,
+     "result_metric": "cleared=lost exactly in silent worlds; beaten by settle 92%, invest 8%",
      "verification": "headless - tools/verify/history_conquest_gap.cpp",
-     "notes": "This is the sprint's gate, T1+T2. Already known from the coarser funnel: seed 0 scores 9,945,420 campaign candidates and chooses NONE, so the stop is at the choice and not at discovery or adjacency."
+     "notes": "The fork is answered and it is not the threshold. In a silent world campaign CLEARS its threshold and LOSES every single time - 1006/1006 on seed 0, 913/913 on seed 4 at the long config; 1080/1080 at production params. Settle takes ~92% of those losses at the long config, ~63% at production with invest taking most of the rest."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "requirement": "A MARGIN OF 3 AND A MARGIN OF 3000 ARE DIFFERENT BUGS, and the report says which. If a cleared campaign loses to Settle by a small margin, the answer is a weighting nudge; if by orders of magnitude, it is BL-318 incommensurability - two scores authored on different scales. This file has been bitten by that twice already (w_cult as a flat 150 that vetoed every war; w_dist flat against a tripled map).",
-     "result_metric": null,
+     "result_metric": "margin mean 133-272, min 8 at production params",
      "verification": "headless - tools/verify/history_conquest_gap.cpp",
-     "notes": "Stated as its own row because the temptation on seeing 'campaign always loses' is to raise a weight, and that is the right fix for only one of the two cases."
+     "notes": "Answered: NOT incommensurability. Margins are mean 133-272 against scores bounded near 1000, with a minimum of 8 at production parameters - campaign comes within 8 points of winning and never does. So the two scores are on the same scale and the remaining gap is a genuine weighting question (NR-493), not the BL-318 class this file has twice been bitten by."
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "requirement": "THE INSTRUMENT STAYS INERT. Every counter and trace added this sprint is populated only under history_sim_params::trace_battles, and a traced run matches an untraced one in every other output. An instrument that perturbs what it measures is worse than no instrument.",
-     "result_metric": null,
+     "result_metric": "T1 inert across every added counter",
      "verification": "headless - tools/verify/history_conquest_gap.cpp",
-     "notes": "Already asserted as T1 in the existing harness and passing; restated here because this sprint ADDS counters and the property must survive them."
+     "notes": "Holds through the funnel counters, the campaign_funnel struct and the settle feasibility counters."
     },
     {
      "id": "R6",
      "status": "pending",
-     "requirement": "BL-321'S DEFENCE WORKS REACH A BATTLE, or the report says why not. work_defence_mod is non-zero in ZERO of 1226 traced battles today. The row is satisfied either by works appearing in fights, or by the harness reporting works_raised beside the built-works regions and the fought-over ones so the absence is explained rather than merely observed.",
+     "requirement": "WHETHER BL-321'S DEFENCE WORKS REACH A BATTLE IS MEASURED AT ALL, or the row is cancelled with its reason. The claim that they appear in zero battles was WITHDRAWN (NR-475): run_history_sim's `works` parameter defaults to nullptr and the harness passed nothing, so no work could be raised in any traced run. Measuring it needs the hand-built works fixture or the real Lua table, which every history harness deliberately avoids.",
      "result_metric": null,
      "verification": "headless - tools/verify/history_conquest_gap.cpp",
-     "notes": "T4, parallel with the rest. Deliberately admits an explanation as well as a fix: if the sim raises works on safe interior regions while fighting happens on frontiers, that is a finding about where investment goes, not a defect in the works roster."
+     "notes": "Downgraded from a finding to an open question (NR-491). Cancel this row rather than force it if the fixture is not cheap - the war-rate work T1-T3 does not depend on it, and a row kept alive by a fixture nobody trusts is worse than a cancelled one."
     },
     {
      "id": "R7",
-     "status": "pending",
+     "status": "complete",
      "requirement": "NO COMBAT CONSTANT IS TUNED IN THIS SPRINT. Measurement says the resolver and the scorer's odds estimate are calibrated (-0.0pp over 1215 battles, 99.8% of victories converting). Any change to combat tuning inside this sprint is out of scope and should be cancelled back to the backlog rather than taken.",
      "result_metric": null,
      "verification": "review - the sprint's own diff",
-     "notes": "A NEGATIVE requirement, and it earns its place: BL-384's design predicted exactly this temptation, and the sprint on the board was aimed at combat. Written down so the scope is checkable rather than remembered."
+     "notes": "Held. Nothing in this sprint touched a combat constant. The one change made is a FEASIBILITY GATE - an action that cannot be performed stops being offered - not a weight."
     }
    ]
   }

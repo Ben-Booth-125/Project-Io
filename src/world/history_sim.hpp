@@ -545,6 +545,62 @@ struct battle_trace
     bool conquered      = false;
 };
 
+/// THE VERB-COMPETITION FUNNEL (Sprint 28, T1/T2). Counted only under
+/// `history_sim_params::trace_battles`.
+///
+/// The coarse funnel established that a silent world's scorer SEES war — seed 0
+/// scores 9,945,420 campaign candidates and chooses none — so the stop is at the
+/// choice. This splits that choice into the two cases that need DIFFERENT fixes
+/// and which the code could not previously tell apart:
+///
+///   - **Never cleared.** `campaign_threshold_q` is never met, so Campaign is
+///     not even a candidate in the `>` comparison. The threshold is the gate,
+///     and `below_threshold_best` says by how much it misses.
+///   - **Cleared and lost.** Campaign is a live candidate and another verb
+///     outscores it every time. Then the MARGIN is the whole question: a margin
+///     of 3 is a weighting nudge, a margin of 3000 is BL-318 incommensurability —
+///     two scores authored on different scales. This file has been bitten by the
+///     second twice (`w_cult` as a flat 150 that vetoed every war; `w_dist` flat
+///     against a tripled map), so the distinction is not academic.
+///
+/// PURE OBSERVATION, like `battle_trace`: nothing here is read to make a decision
+/// and no field feeds a draw.
+struct campaign_funnel
+{
+    int64_t rounds_cleared      = 0; ///< Rounds where Campaign met its threshold.
+    int64_t rounds_lost         = 0; ///< ...and was then outscored by another verb.
+    int64_t rounds_below        = 0; ///< Rounds with a candidate that never met the threshold.
+
+    /// Which verb beat a cleared Campaign, indexed by `sim_verb`.
+    int64_t lost_to[6] = {0, 0, 0, 0, 0, 0};
+
+    /// Margin (winner's score − Campaign's best) when Campaign cleared and lost.
+    int64_t margin_sum = 0;
+    int     margin_min = 0;
+    int     margin_max = 0;
+
+    /// How far short the best candidate fell when it never cleared. Answers
+    /// "is the threshold nearly reachable, or nowhere near".
+    int64_t below_shortfall_sum = 0;
+    int     below_shortfall_min = 0;
+    int     below_shortfall_max = 0;
+
+    /// SETTLE'S FEASIBILITY, which its SCORE does not consider (Sprint 28 T3).
+    ///
+    /// Campaign is discounted by `p_win_q` — the scorer prices its own odds of
+    /// succeeding. Settle is not: it scores on pressure and daughter value and
+    /// asks nothing about whether an empty cell exists to settle INTO. Only the
+    /// execution finds out, by widening a ring six times and giving up
+    /// ("Neighbourhood full - no room to expand here").
+    ///
+    /// So the two verbs are compared on different bases, which is the same class
+    /// of error this file has twice been bitten by. These two count how often
+    /// that matters: a Settle that wins the round and then cannot execute has
+    /// beaten a Campaign that could have.
+    int64_t settle_chosen = 0;
+    int64_t settle_failed = 0; ///< ...and found no free cell.
+};
+
 struct history_sim_state
 {
     std::vector<polity> polities;
@@ -565,6 +621,10 @@ struct history_sim_state
     int64_t campaign_contacts = 0; ///< (own region, foreign-owned neighbour) pairs examined.
     int64_t campaign_scored   = 0; ///< Candidates that reached the score comparison.
     int64_t campaign_chosen   = 0; ///< Rounds where Campaign won the verb choice.
+
+    /// The fork inside `campaign_chosen == 0`: never cleared, or cleared and
+    /// beaten. See `campaign_funnel`.
+    campaign_funnel funnel;
 
     /// Per-battle observation, empty unless `params.trace_battles`. See
     /// `battle_trace` for why it exists and why it cannot move the run.

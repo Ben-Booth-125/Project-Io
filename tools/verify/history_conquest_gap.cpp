@@ -101,6 +101,9 @@ int main()
     int  peaceful_worlds = 0;
     int  worlds = 0;
 
+    struct seed_row { int seed; campaign_funnel funnel; };
+    std::vector<seed_row> seed_rows;
+
     for (int i = 0; i < seeds; ++i)
     {
         world_params wp;
@@ -121,11 +124,15 @@ int main()
         {
             settlement_state ss_off = k->settlement;
             history_sim_params p_off;
+            p_off.start_year = -400; p_off.stop_year = 0;
+            p_off.tick_bands[0] = {0, 4}; p_off.tick_band_count = 1;
             const history_sim_state off =
                 run_history_sim(ss_off, nullptr, terr.view(), kgw, kgh, p_off, wp.seed);
 
             settlement_state ss_chk = k->settlement;
             history_sim_params p_chk;
+            p_chk.start_year = -400; p_chk.stop_year = 0;
+            p_chk.tick_bands[0] = {0, 4}; p_chk.tick_band_count = 1;
             p_chk.trace_battles = true;
             const history_sim_state chk =
                 run_history_sim(ss_chk, nullptr, terr.view(), kgw, kgh, p_chk, wp.seed);
@@ -139,6 +146,26 @@ int main()
         settlement_state ss_on = k->settlement;
         history_sim_params p_on;
         p_on.trace_battles = true;
+
+        // PRODUCTION PARAMETERS, NOT THE STRUCT DEFAULTS — and this is the whole
+        // reason the harness was measuring a world the game does not generate.
+        //
+        // `history_sim_params`'s defaults are a 4000-year run (-4000 -> 0) on the
+        // six-band ladder, 136 decision rounds. `make_hard_coded_world` runs
+        // something else entirely: `prehistory_years = 400`, so -400 -> 0, on ONE
+        // band with step 4 — 100 rounds over a tenth of the span. Every history
+        // harness in the repo, this one included until now, took the defaults and
+        // therefore measured a sim production never runs.
+        //
+        // Mirrored from hard_coded_world.cpp rather than shared, because a
+        // constant restated in a harness is a known cost while a harness reaching
+        // into generation's private setup is a worse one. If that block changes,
+        // this must change with it — the same contract sea_leg_census carries for
+        // its rate constants.
+        p_on.start_year      = -400;
+        p_on.stop_year       = 0;
+        p_on.tick_bands[0]   = {0, 4};
+        p_on.tick_band_count = 1;
         const history_sim_state on =
             run_history_sim(ss_on, nullptr, terr.view(), kgw, kgh, p_on, wp.seed);
 
@@ -157,6 +184,7 @@ int main()
                     static_cast<long long>(on.campaign_scored),
                     static_cast<long long>(on.campaign_chosen));
 
+        seed_rows.push_back({i, on.funnel});
         all.insert(all.end(), on.battle_traces.begin(), on.battle_traces.end());
     }
 
@@ -175,10 +203,57 @@ int main()
                 peaceful_worlds, worlds,
                 worlds > 0 ? 100.0 * peaceful_worlds / worlds : 0.0);
 
+    // ---- T1/T2. THE FORK: never cleared, or cleared and beaten? -----------
+    // Sprint 28's gate. Everything downstream is conditional on this, and the
+    // two cases need different fixes.
+    std::printf("\n  --- T1/T2. Inside the choice: why Campaign is not taken ---\n");
+    {
+        const char* verb_name[6] = {"none", "settle", "campaign", "invest",
+                                    "consolidate", "build_work"};
+        for (const seed_row& r : seed_rows)
+        {
+            const campaign_funnel& f = r.funnel;
+            std::printf("    seed %d: cleared %8lld  (lost %8lld)   below-threshold %8lld\n",
+                        r.seed,
+                        static_cast<long long>(f.rounds_cleared),
+                        static_cast<long long>(f.rounds_lost),
+                        static_cast<long long>(f.rounds_below));
+            if (f.rounds_lost > 0)
+            {
+                std::printf("             beaten by:");
+                for (int v = 0; v < 6; ++v)
+                    if (f.lost_to[v] > 0)
+                        std::printf("  %s x%lld", verb_name[v],
+                                    static_cast<long long>(f.lost_to[v]));
+                std::printf("\n             margin  mean %lld  min %d  max %d\n",
+                            static_cast<long long>(f.margin_sum / f.rounds_lost),
+                            f.margin_min, f.margin_max);
+            }
+            if (f.rounds_below > 0)
+                std::printf("             shortfall to threshold  mean %lld  min %d  max %d\n",
+                            static_cast<long long>(f.below_shortfall_sum / f.rounds_below),
+                            f.below_shortfall_min, f.below_shortfall_max);
+            std::printf("             settle chosen %8lld  of which FAILED (no free cell) %8lld\n",
+                        static_cast<long long>(f.settle_chosen),
+                        static_cast<long long>(f.settle_failed));
+        }
+        std::printf("\n    HOW TO READ IT. `cleared` means Campaign met campaign_threshold_q and\n"
+                    "    entered the > comparison; `lost` means another verb then outscored it.\n"
+                    "    A silent world with cleared=0 is a THRESHOLD problem and the shortfall\n"
+                    "    says how far off. A silent world with cleared>0 and lost=cleared is a\n"
+                    "    WEIGHTING problem, and the margin decides which kind: small is a nudge,\n"
+                    "    enormous is two scores on different scales (BL-318), which this file has\n"
+                    "    been bitten by twice.\n\n"
+                    "    The settle line is the SPECIFIC form of that suspicion. Campaign\n"
+                    "    discounts itself by p_win_q; Settle does not ask whether an empty cell\n"
+                    "    exists at all, so a FAILED settle is a round where the sim preferred an\n"
+                    "    impossible action to a possible one.\n");
+    }
+
     if (all.empty())
     {
-        std::printf("\n  No battles across %d worlds — the gap is UPSTREAM of the resolver:\n"
-                    "  the scorer never selects Campaign at all. Nothing below applies.\n", seeds);
+        std::printf("\n  No battles across %d worlds. The per-battle sections below cannot\n"
+                    "  apply — but the T1/T2 fork above is exactly the reading for this case.\n", seeds);
         std::printf("\n%d checks, %d failures\n%s\n", 2, g_failures,
                     g_failures == 0 ? "ALL PASS (0 failures)" : "FAILURES");
         return g_failures == 0 ? 0 : 1;

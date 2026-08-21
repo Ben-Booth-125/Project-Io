@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*192 entries — 191 open, 1 resolved.*
+*195 entries — 193 open, 2 resolved.*
 
 ---
 
@@ -1528,19 +1528,6 @@ Worth noting WHY it went stale: the world has changed a great deal since 2026-08
 
 *Files: `docs/development/backlog.json`, `tools/verify/history_conquest_gap.cpp`, `src/world/history_sim.cpp`*
 
-### NR-475 — BL-321's defence works appear in ZERO of 1245 battles
-*observation · raised 2026-08-21 · from Same measurement run as NR-474 (history_conquest_gap Q3).*
-
-`work_defence_mod` is non-zero in 0 of 1226 traced battles across 8 worlds. The plumbing is live and correct on BOTH sides — works_roster.cpp:72 writes it, history_sim.cpp reads it at :634 (where it raises the defender's scored strength) and :965 (where it becomes readiness on the defender's stack), and the code comment reasons carefully about a Bastion Fort at +640 tilting a fight without deciding it — but no battle in eight full runs was ever fought against a region carrying one. Terrain defence is genuinely live: non-zero in 488/1226 (40%).
-
-CORRECTION to a claim I made in passing: the scorer is NOT blind to works. It carries `def_works` in the value term at :634. What it omits works from is the p_win_q odds estimate specifically, which uses raw manpower_stock. The narrow statement was right and the broad one ('the scorer never sees works') was wrong.
-
-**Why it matters.** A defence work that never defends is indistinguishable from one that was never built. Two readings, and they need different fixes: either the works roster rarely fires at all (the `works_raised` counter would say), or works are raised on safe interior regions while fighting happens on frontiers that have none. The second would be the more interesting finding — it would mean the sim invests in defence exactly where defence is not needed.
-
-> **Recommendation:** Cheap to settle: report `works_raised` alongside the battle traces, and cross the built-works regions against the fought-over ones. Worth doing before anyone tunes a combat constant, since it means one of the defender's two advantages is currently inert in practice.
-
-*Files: `src/world/history_sim.cpp`, `src/world/works_roster.cpp`, `tools/verify/history_conquest_gap.cpp`*
-
 ### NR-476 — Ben's read that Lane A depends on Lane C — the ingredients already exist, at the other grain
 *decision taken on your behalf · raised 2026-08-21 · from Ben, 2026-08-21: 'A relies on C, or at least some pseudo war in provinces, using defense buffs and possibly buildings.'*
 
@@ -1758,12 +1745,82 @@ So today no content anywhere is gated on a war HAPPENING. The dependency is real
 
 *Files: `scripts/tech_tree.lua`, `src/world/tech_gate.cpp`, `docs/development/req/requirements.json`*
 
+### NR-491 — Do BL-321's defence works ever reach a battle? Still unmeasured, and needs a works fixture
+*question · raised 2026-08-21 · from Replaces the withdrawn NR-475. Sprint 28 T4.*
+
+The original question stands and its apparent answer did not: does a region carrying a defence work ever get attacked? `work_defence_mod` feeds both the scorer (history_sim.cpp:634, raising the defender's scored strength) and the resolver (:965, as readiness on the defender's stack), so if works are raised on safe interior regions while fighting happens on frontiers, the sim invests in defence exactly where defence is not needed — and neither number would ever show it.
+
+It cannot be measured with the Lua-free convention every history harness follows, because the works table is Lua. Two routes: the hand-built fixture the BL-321 sweep already uses, or accept that this one check needs the real table.
+
+**Why it matters.** It is a question about where a polity's investment goes, which is the kind of thing that is invisible until someone looks. But it is NOT currently blocking anything and should not be confused with the war-rate defect Sprint 28 is fixing — those were briefly conflated when the artifact-zero made works look inert.
+
+> **Recommendation:** Fold into Sprint 28's T4 only if the fixture is cheap; otherwise defer. The war-rate work (T1-T3) does not depend on it.
+
+*Files: `tools/verify/history_conquest_gap.cpp`, `src/world/history_sim.cpp`, `src/world/works_roster.cpp`*
+
+### NR-492 — EVERY history harness measures a 4000-year sim the game never runs — production is 400 years
+*observation · raised 2026-08-21 · from Sprint 28 T3, found when a verified fix changed nothing in production.*
+
+`history_sim_params`'s DEFAULTS are a 4000-year run (-4000 -> 0) on the six-band ladder, 136 decision rounds. `make_hard_coded_world` runs something else entirely: `prehistory_years = 400`, so -400 -> 0, on ONE band with step 4 — 100 rounds over a tenth of the span. It also passes creeds and a works registry, and seeds the sim with `params.seed ^ 0x415C1E17u` rather than the raw seed.
+
+Every history harness in the repo takes the struct defaults, `history_sim_harness`'s own B384 outcome sweep included. So the sweep that BL-384 was filed from, the sweep that asserts B384a/B384b, and my own conquest-gap instrument were all measuring a configuration production does not generate.
+
+It was caught only because a fix that was verified to work — 2 of 8 zero-war worlds down to 0 of 8, four harness rows flipping red to green — produced a BYTE-IDENTICAL production sweep. Base and post-fix `seed_sweep_probe` output match exactly, seed for seed.
+
+**Why it matters.** Three things follow. (1) BL-384's original numbers, my restated numbers, and the existing B384 assertions are all about a sim the player never sees — the direction of every finding survives, but no magnitude should be quoted as if it described a generated world. (2) A green harness here is weak evidence about the game, which is the property that makes this worth fixing rather than noting. (3) The 400-year run is a tenth of the span with roughly three quarters of the decision rounds, so it is not a scaled-down version of the same thing — the neighbourhood never fills, which is exactly why the settle-feasibility fix bites in one and not the other.
+
+- Point the harnesses at production parameters (mirrored constants, like sea_leg_census does with its rates).
+- Export a `production_history_params()` from hard_coded_world so there is ONE definition.
+- Keep both: assert on production params, and keep a long-run sweep explicitly labelled as such.
+
+> **Recommendation:** Option 2 then 3. A mirrored constant is a known cost but this one has already caused a day of measuring the wrong thing, and the span is not a tuning knob a harness should be free to pick.
+
+*Files: `src/world/hard_coded_world.cpp`, `tools/verify/history_sim_harness.cpp`, `tools/verify/history_conquest_gap.cpp`*
+
+### NR-493 — Sprint 28 T3: at PRODUCTION parameters campaign loses by as little as 8 points and never wins
+*question · raised 2026-08-21 · from Sprint 28 T3, re-measured at production parameters.*
+
+With the harness pointed at the real 400-year configuration, a silent world's funnel reads: campaign CLEARED its threshold 1080 times and LOST all 1080 — beaten by settle x682 and invest x398 — with a margin of mean 205 and MINIMUM 8. Settle failures are zero at this span, so the settle-feasibility defect that dominates the 4000-year run is not what is happening here.
+
+So the production defect is a genuine weighting question, and a narrow one: campaign comes within 8 points of winning and never does.
+
+**Why it matters.** Ben has ruled a zero-war world is a bug, so this must change. But the change is a TUNING call on the verb weights, and the sprint's own R2 says the target is a rate inside a stated band reported and never clamped — which makes the band Ben's to sanction rather than mine to pick. A margin of 8 says a small, defensible adjustment would flip these worlds; it also says the current balance is finely poised, so whatever is chosen should be measured across seeds, not fitted to the two that fail.
+
+- Adjust the campaign/settle weighting to a measured band (a tune, wants Ben's number).
+- Find a second structural asymmetry the way T3 found the first — invest x398 is a large share and has not been examined.
+- Accept a lower floor than 'every world fights' if the tech-gate reachability Ben cited is satisfied by fewer.
+
+> **Recommendation:** Look at INVEST before tuning anything. It takes 398 of seed 4's 1080 losses and nobody has examined whether it has the same scorer/executor gap Settle had — a second structural finding would be worth more than a weight.
+
+*Files: `src/world/history_sim.cpp`, `tools/verify/history_conquest_gap.cpp`*
+
 ---
 
 ## Resolved
 
 Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
 answer has landed in an authority doc.
+
+### NR-475 — WITHDRAWN: 'BL-321's defence works appear in zero battles' was my harness, not the sim
+*observation · raised 2026-08-21 · from Same measurement run as NR-474 (history_conquest_gap Q3).*
+
+`work_defence_mod` is non-zero in 0 of 1226 traced battles across 8 worlds. The plumbing is live and correct on BOTH sides — works_roster.cpp:72 writes it, history_sim.cpp reads it at :634 (where it raises the defender's scored strength) and :965 (where it becomes readiness on the defender's stack), and the code comment reasons carefully about a Bastion Fort at +640 tilting a fight without deciding it — but no battle in eight full runs was ever fought against a region carrying one. Terrain defence is genuinely live: non-zero in 488/1226 (40%).
+
+CORRECTION to a claim I made in passing: the scorer is NOT blind to works. It carries `def_works` in the value term at :634. What it omits works from is the p_win_q odds estimate specifically, which uses raw manpower_stock. The narrow statement was right and the broad one ('the scorer never sees works') was wrong.
+
+**Why it matters.** A defence work that never defends is indistinguishable from one that was never built. Two readings, and they need different fixes: either the works roster rarely fires at all (the `works_raised` counter would say), or works are raised on safe interior regions while fighting happens on frontiers that have none. The second would be the more interesting finding — it would mean the sim invests in defence exactly where defence is not needed.
+
+> **Recommendation:** Cheap to settle: report `works_raised` alongside the battle traces, and cross the built-works regions against the fought-over ones. Worth doing before anyone tunes a combat constant, since it means one of the defender's two advantages is currently inert in practice.
+
+> **RESOLVED.** WITHDRAWN 2026-08-21, same day it was raised. THE FINDING WAS AN ARTIFACT OF THE INSTRUMENT. `run_history_sim`'s `works` parameter defaults to nullptr and history_conquest_gap passes nothing — so no work could be raised in any traced run, so `work_defence_mod` was necessarily 0 in every battle. I measured a sim I had switched the works roster off in.
+
+The convention is not wrong and is not a trap: history_sim_harness states it explicitly at line 772 ('No works registry, which is this harness's standing convention - the real table is Lua and every check here is Lua-free'). I inherited the call shape without reading the parameter I was leaving defaulted, then read the resulting zero as evidence.
+
+WHAT IS ACTUALLY UNKNOWN, and now honestly so: whether works reach battles in a REAL run is unmeasured, because measuring it needs either the Lua table or the hand-built fixture the sweep already has. Filed as the corrected question rather than left as a false answer.
+
+The generalisable bit, and the second instrument error in one day (the other was a 312x145 grid against a real 261x121): BOTH were defaulted parameters I did not pass. A zero from an instrument deserves the same suspicion as a surprising non-zero.
+
+*Files: `src/world/history_sim.cpp`, `src/world/works_roster.cpp`, `tools/verify/history_conquest_gap.cpp`*
 
 ### NR-489 — Sprint 28's real subject is verb competition — the scorer discards ~10M campaign candidates to reach zero wars
 *observation · raised 2026-08-21 · from Sprint 28 decomposition. history_conquest_gap campaign funnel, 8 worlds.*
