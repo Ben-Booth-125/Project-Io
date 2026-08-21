@@ -377,7 +377,9 @@ world make_hard_coded_world(world_params params, generation_report* report,
 
     // -----------------------------------------------------------------------
     // Kepler — temperate home planet (Earth analogue, ~1.0 AU)
-    // 312×145 tile grid (home_grid_width/height). Full climate gradient, 60% ocean, grassland and forest
+    // 261×121 tile grid (home_grid_width/height — this comment said 312×145 until 2026-08-21,
+    // which BL-424 stopped being true when it took the homeworld to 70% area).
+    // Full climate gradient, 60% ocean, grassland and forest
     // belts. Two installations and a market authored after tile generation.
     // -----------------------------------------------------------------------
 

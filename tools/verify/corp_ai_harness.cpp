@@ -27,6 +27,7 @@
 #include "world/unit_roster.hpp"
 #include "world/world.hpp"
 
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -524,6 +525,135 @@ int main()
             check(r == corp_command_result::applied && s.w.units.size() == 1 &&
                   s.w.pool_for(s.ai_corp, s.body).quantities[ri(resource_type::steel)] == 7.0f,
                   "BL-352 R4: an ungated row hires without touching the pools");
+        }
+    }
+
+
+    // =====================================================================
+    // R5 — BL-498: the hire GATE and the hire DEBIT read ONE shared table
+    // =====================================================================
+    //
+    // THE BUG CLASS. Until 2026-08-21 `debit_hire_cost` (corp_command.cpp)
+    // hand-mirrored `campaign_gate_input`'s (unit_roster.cpp) three axis
+    // preference lists, guarded by nothing but a comment saying they must
+    // match. The failure mode is asymmetric and nasty in BOTH directions:
+    // a resource on the GATE's list but not the DEBIT's is a FREE HIRE
+    // (BL-394's own defect); one on the DEBIT's but not the GATE's is a
+    // silently unhireable row. Both lists now come from
+    // `unit_roster.hpp § hire_axis_table`.
+    //
+    // The assertion the item asks for, stated behaviourally: for EVERY axis
+    // and EVERY candidate resource on it, a corp holding exactly that one
+    // resource at exactly the axis cost gates the row open AND pays for it
+    // in exactly that resource. If the two lists ever drift, some candidate
+    // fails one half of that sentence.
+    {
+        const recipe_registry reg  = make_registry();
+        const roster_band     band = campaign_roster_band_for(reg.era());
+
+        auto add_bldg = [&](scene& s, building_type bt) {
+            const entity_id b = s.w.create_entity();
+            building_component bc{};
+            bc.tile            = s.t_rich;
+            bc.type            = bt;
+            bc.ticks_remaining = 0;
+            s.w.buildings[b] = bc;
+            s.w.corporations[s.ai_corp].assets.push_back(b);
+        };
+
+        // The axes are disjoint by construction; assert it, because the
+        // per-axis probes below rely on endowing one axis without
+        // accidentally satisfying another.
+        {
+            bool disjoint = true;
+            for (std::size_t a = 0; a < hire_axis_count; ++a)
+                for (std::size_t b = a + 1; b < hire_axis_count; ++b)
+                    for (const resource_type x : hire_axis_resources(static_cast<hire_axis>(a)))
+                        for (const resource_type y : hire_axis_resources(static_cast<hire_axis>(b)))
+                            if (x == y) disjoint = false;
+            check(disjoint, "BL-498 R5: the three hire axes share no resource");
+        }
+
+        // Every axis names at least one resource — an empty axis would make
+        // its row unhireable while still reading as gated.
+        {
+            bool populated = true;
+            for (std::size_t a = 0; a < hire_axis_count; ++a)
+                if (hire_axis_resources(static_cast<hire_axis>(a)).count == 0) populated = false;
+            check(populated, "BL-498 R5: no axis on the shared table is empty");
+        }
+
+        // A resource on NO axis opens NO axis — the gate reads the table and
+        // nothing else, so it cannot acquire a candidate the debit lacks.
+        {
+            scene s = make_scene(1000.0f);
+            s.w.pool_for(s.ai_corp, s.body).quantities[ri(resource_type::machinery)] = 1000.0f;
+            const campaign_roster_gate_input g = campaign_gate_input(s.w, s.ai_corp);
+            check(g.ore_q == 0 && g.farm_q == 0 && g.energy_q == 0,
+                  "BL-498 R5: a resource absent from the table opens no axis");
+        }
+
+        // The per-axis, per-candidate probe.
+        for (std::size_t ax = 0; ax < hire_axis_count; ++ax)
+        {
+            const hire_axis axis = static_cast<hire_axis>(ax);
+
+            // Pick a row this campaign band actually offers that gates on
+            // THIS axis, using a fully-endowed corp to enumerate.
+            std::size_t probe_row = SIZE_MAX;
+            {
+                scene s = make_scene(1000.0f);
+                for (std::size_t a = 0; a < hire_axis_count; ++a)
+                    for (const resource_type r : hire_axis_resources(static_cast<hire_axis>(a)))
+                        s.w.pool_for(s.ai_corp, s.body).quantities[ri(r)] = 1000.0f;
+                add_bldg(s, building_type::port);
+                const auto  rows  = available_rows(s.w, s.ai_corp, band);
+                const auto& table = unit_roster_table();
+                for (const roster_row* r : rows)
+                {
+                    if (gate_axis_q(r->gate, axis) <= 0) continue;
+                    for (std::size_t i = 0; i < table.size(); ++i)
+                        if (&table[i] == r) { probe_row = i; break; }
+                    if (probe_row != SIZE_MAX) break;
+                }
+            }
+            check(probe_row != SIZE_MAX,
+                  ("BL-498 R5: axis " + std::to_string(ax) +
+                   " has a gated row this band offers (the probe is not vacuous)").c_str());
+            if (probe_row == SIZE_MAX) continue;
+
+            const roster_row& row = unit_roster_table()[probe_row];
+
+            for (const resource_type cand : hire_axis_resources(axis))
+            {
+                scene s = make_scene(1000.0f);
+                add_bldg(s, building_type::military_base);
+                if (row.gate.port_q > 0) add_bldg(s, building_type::port);
+
+                // Every OTHER gated axis endowed generously; THIS axis holds
+                // exactly one candidate at exactly the axis cost.
+                for (std::size_t a = 0; a < hire_axis_count; ++a)
+                {
+                    if (a == ax) continue;
+                    const resource_type other =
+                        hire_axis_resources(static_cast<hire_axis>(a)).candidates[0];
+                    s.w.pool_for(s.ai_corp, s.body).quantities[ri(other)] = 1000.0f;
+                }
+                s.w.pool_for(s.ai_corp, s.body).quantities[ri(cand)] = hire_axis_cost;
+
+                corp_command cmd{};
+                cmd.tick = 1; cmd.corp = s.ai_corp; cmd.verb = corp_verb::hire_unit;
+                cmd.tile = s.t_rich; cmd.unit_type = static_cast<uint16_t>(probe_row);
+                const auto r = apply_corp_command(s.w, reg, cmd);
+
+                const float left = s.w.pool_for(s.ai_corp, s.body).quantities[ri(cand)];
+                const std::string label =
+                    "BL-498 R5: axis " + std::to_string(ax) + " candidate " +
+                    std::to_string(static_cast<int>(cand)) +
+                    " gates row '" + row.name + "' open AND pays for it in that resource";
+                check(r == corp_command_result::applied && s.w.units.size() == 1 && left == 0.0f,
+                      label.c_str());
+            }
         }
     }
 

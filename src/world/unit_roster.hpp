@@ -36,6 +36,7 @@
 #include "entity.hpp"
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 
@@ -127,6 +128,85 @@ struct campaign_roster_gate_input
 {
     int ore_q = 0, farm_q = 0, port_q = 0, energy_q = 0;
 };
+
+// ---------------------------------------------------------------------------
+// The shared hire-axis resource table (BL-498)
+// ---------------------------------------------------------------------------
+//
+// ONE definition of "which resources satisfy which gated axis", consumed by
+// BOTH sides of a hire: the availability gate (`campaign_gate_input`, below)
+// and the cost debit (`debit_hire_cost`, corp_command.cpp). Until 2026-08-21
+// these were two hand-written lists guarded only by a comment saying they must
+// match — the BL-394 free-hire bug class, waiting to recur the day one side
+// gained a resource and the other did not.
+//
+// Order is LOAD-BEARING for the debit (it spends the first candidate it holds
+// enough of) and irrelevant to the gate (which asks only "any of these"), so
+// it is defined here once rather than at either call site.
+//
+// `port_q` is deliberately absent: it is a building check (`corp_owns_port`),
+// not a resource, so it gates a hire but never costs one.
+/// What one gated axis costs a hire, flat, in units of whichever candidate
+/// resource the corp actually spends. Lives here beside the table rather than
+/// in corp_command.cpp so the cost and the resources it is paid in are one
+/// contract, readable by the harness that checks them together (BL-498).
+inline constexpr float hire_axis_cost = 5.0f;
+
+enum class hire_axis : std::uint8_t
+{
+    ore    = 0, ///< Metallurgy access: refined steel, then either raw ore.
+    farm   = 1, ///< PROXY FOR PASTURE — food access stands in.
+    energy = 2, ///< PROXY FOR SALTPETRE/FUEL.
+};
+inline constexpr std::size_t hire_axis_count = 3;
+
+/// One axis's candidate resources, in preference order. Fixed-capacity and
+/// constexpr — no allocation, no iteration order that depends on layout.
+struct hire_axis_entry
+{
+    std::array<resource_type, 3> candidates{};
+    std::size_t                  count = 0;
+
+    constexpr const resource_type* begin() const { return candidates.data(); }
+    constexpr const resource_type* end()   const { return candidates.data() + count; }
+};
+
+inline constexpr std::array<hire_axis_entry, hire_axis_count> hire_axis_table = {{
+    {{resource_type::steel, resource_type::iron_ore, resource_type::iron_nickel_ore}, 3},
+    {{resource_type::food_rations, resource_type::agricultural_produce}, 2},
+    {{resource_type::coal, resource_type::refined_fuel, resource_type::petroleum}, 3},
+}};
+
+/// @return @p axis's candidate resources in preference order.
+constexpr const hire_axis_entry& hire_axis_resources(hire_axis axis)
+{
+    return hire_axis_table[static_cast<std::size_t>(axis)];
+}
+
+/// @return the quantity @p g demands on @p axis. Lets both sides walk the
+/// axes in one loop instead of naming ore/farm/energy three times each.
+constexpr int gate_axis_q(const roster_gate& g, hire_axis axis)
+{
+    switch (axis)
+    {
+    case hire_axis::ore:    return g.ore_q;
+    case hire_axis::farm:   return g.farm_q;
+    case hire_axis::energy: return g.energy_q;
+    }
+    return 0;
+}
+
+/// The mutable sibling of `gate_axis_q`, for filling a gate input axis-wise.
+constexpr int& gate_axis_q(campaign_roster_gate_input& g, hire_axis axis)
+{
+    switch (axis)
+    {
+    case hire_axis::farm:   return g.farm_q;
+    case hire_axis::energy: return g.energy_q;
+    case hire_axis::ore:    break;
+    }
+    return g.ore_q;
+}
 
 /// Sum @p corp's holding of @p res across its (corp, body) pools — the live
 /// L3 store (world.hpp § corp_body_pools). Exported so both the gate above and

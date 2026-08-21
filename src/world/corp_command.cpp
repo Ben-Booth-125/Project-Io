@@ -56,18 +56,27 @@ bool owns(const world& w, entity_id corp, entity_id building)
 // military_capability_params) and debited from the corp's balance.
 // ---------------------------------------------------------------------------
 
-constexpr float hire_axis_cost = 5.0f;
-
-/// The resource (in preference order) each gated axis draws from — mirrors
-/// unit_roster.cpp's campaign_gate_input exactly, so a hire never spends a
-/// resource the gate didn't already confirm access to.
-resource_type hire_axis_resource(const world& w, entity_id corp,
-                                 std::initializer_list<resource_type> candidates)
+/// The resource an axis actually spends: the first candidate on the SHARED
+/// table (unit_roster.hpp § hire_axis_table) the corp holds enough of. The
+/// gate reads the same table, so a hire can never spend a resource the gate
+/// didn't already confirm access to — BL-498 made that structural rather than
+/// a comment asking two hand-written lists to stay in step.
+resource_type hire_axis_resource(const world& w, entity_id corp, hire_axis axis)
 {
-    for (const resource_type r : candidates)
+    const hire_axis_entry& e = hire_axis_resources(axis);
+    for (const resource_type r : e)
         if (corp_stockpile_total(w, corp, r) >= hire_axis_cost)
             return r;
-    return candidates.begin()[0]; // unreachable if the gate already passed; a safe fallback.
+    return e.candidates[0]; // unreachable if affordability already passed; a safe fallback.
+}
+
+/// Can @p corp cover one axis's hire cost from a SINGLE candidate resource?
+bool corp_can_afford_axis(const world& w, entity_id corp, hire_axis axis)
+{
+    for (const resource_type r : hire_axis_resources(axis))
+        if (corp_stockpile_total(w, corp, r) >= hire_axis_cost)
+            return true;
+    return false;
 }
 
 /// Debit @p amount of @p res from @p corp's (corp, body) pools, draining in
@@ -92,38 +101,23 @@ void debit_from_corp(world& w, entity_id corp, resource_type res, float amount)
 /// checks every gated axis is affordable before debiting any of them.
 bool debit_hire_cost(world& w, entity_id corp, const roster_row& row)
 {
-    const bool need_ore    = row.gate.ore_q    > 0;
-    const bool need_farm   = row.gate.farm_q   > 0;
-    const bool need_energy = row.gate.energy_q > 0;
-    // port_q is a building check (corp_owns_port), not a resource — nothing to debit.
+    // Walk the axes in table order — ore, farm, energy — checking every gated
+    // one is affordable BEFORE debiting any, so a part-paid hire is impossible.
+    // port_q is a building check (corp_owns_port), not a resource: it is not on
+    // the table and there is nothing to debit for it.
+    for (std::size_t i = 0; i < hire_axis_count; ++i)
+    {
+        const hire_axis axis = static_cast<hire_axis>(i);
+        if (gate_axis_q(row.gate, axis) > 0 && !corp_can_afford_axis(w, corp, axis))
+            return false;
+    }
 
-    if (need_ore && corp_stockpile_total(w, corp, resource_type::steel) < hire_axis_cost &&
-        corp_stockpile_total(w, corp, resource_type::iron_ore) < hire_axis_cost &&
-        corp_stockpile_total(w, corp, resource_type::iron_nickel_ore) < hire_axis_cost)
-        return false;
-    if (need_farm && corp_stockpile_total(w, corp, resource_type::food_rations) < hire_axis_cost &&
-        corp_stockpile_total(w, corp, resource_type::agricultural_produce) < hire_axis_cost)
-        return false;
-    if (need_energy && corp_stockpile_total(w, corp, resource_type::coal) < hire_axis_cost &&
-        corp_stockpile_total(w, corp, resource_type::refined_fuel) < hire_axis_cost &&
-        corp_stockpile_total(w, corp, resource_type::petroleum) < hire_axis_cost)
-        return false;
-
-    if (need_ore)
-        debit_from_corp(w, corp,
-            hire_axis_resource(w, corp, {resource_type::steel, resource_type::iron_ore,
-                                         resource_type::iron_nickel_ore}),
-            hire_axis_cost);
-    if (need_farm)
-        debit_from_corp(w, corp,
-            hire_axis_resource(w, corp, {resource_type::food_rations,
-                                         resource_type::agricultural_produce}),
-            hire_axis_cost);
-    if (need_energy)
-        debit_from_corp(w, corp,
-            hire_axis_resource(w, corp, {resource_type::coal, resource_type::refined_fuel,
-                                         resource_type::petroleum}),
-            hire_axis_cost);
+    for (std::size_t i = 0; i < hire_axis_count; ++i)
+    {
+        const hire_axis axis = static_cast<hire_axis>(i);
+        if (gate_axis_q(row.gate, axis) > 0)
+            debit_from_corp(w, corp, hire_axis_resource(w, corp, axis), hire_axis_cost);
+    }
     return true;
 }
 

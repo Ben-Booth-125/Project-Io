@@ -95,20 +95,20 @@ async loading screen, and the startup-hang fix. SPRINTS.md § Sprint 15 is the r
   lazy-sim cost (**BL-425**), the stale-exe gate guard (**BL-426**), the verify world-snapshot
   cache (**BL-427**), harnesses measuring a different sim than ships (**BL-462**), and
   settlement count being seed-invariant (**BL-463**).
-- **v0.1.23 — Who owns whom.** *(Named 2026-08-21 on Ben's ruling, resolving NR-476.)* *Theme:
+- **v0.1.23 — Who owns whom.** *(Named 2026-08-21 on Ben's ruling, resolving NR-494.)* *Theme:
   ownership separates from identity, and profit becomes a position rather than a payroll.*
-  **BL-522** (syndicate tier) splits the two jobs `corporation_component` does at once: a
+  **BL-524** (syndicate tier) splits the two jobs `corporation_component` does at once: a
   **corporation** keeps the operating sense — buildings, recipes, stockpiles, orders — and a
   **syndicate** is the new tier above it that holds equity, allocates capital, and owns no
-  buildings at all — **seven of them, the player one of the seven** (NR-475). **Equity confers
-  operating control above a > 50% majority** (NR-473, Ben overturning an earlier call taken on
+  buildings at all — **seven of them, the player one of the seven** (NR-493). **Equity confers
+  operating control above a > 50% majority** (NR-491, Ben overturning an earlier call taken on
   his behalf that it never did), so a controlled corporation is the player's corp for the
   standing rule while a minority holding stays purely financial. Control therefore **costs
   attention**, and that trade — spread thin and stay financial, or concentrate and take the
-  wheel — is the tier's central question. Carried by the equity data model (**BL-523**), the syndicate carve +
-  ownership class (**BL-524**), corporation valuation (**BL-525**), dividends and the payout
-  dial (**BL-526**), rival syndicate behaviour (**BL-527**) and the portfolio ledger
-  (**BL-528**).
+  wheel — is the tier's central question. Carried by the equity data model (**BL-525**), the syndicate carve +
+  ownership class (**BL-526**), corporation valuation (**BL-527**), dividends and the payout
+  dial (**BL-528**), rival syndicate behaviour (**BL-529**) and the portfolio ledger
+  (**BL-530**).
 
   **Why the minor is affordable:** the self-running layer it needs is already shipped. Since
   **BL-365** every background firm runs the *full* `corp_ai` scored-utility layer, identical to
@@ -117,7 +117,7 @@ async loading screen, and the startup-hang fix. SPRINTS.md § Sprint 15 is the r
   and valuation plus the profit split; the rest reuses `resolve_price`, FINANCE profitability,
   BL-350's negotiation seam and BL-218's industrialisation-timing scalar.
 
-  **Sequencing — RULED (Ben, 2026-08-21, NR-477): hold BL-523 until v0.1.15 is cut.** The design
+  **Sequencing — RULED (Ben, 2026-08-21, NR-495): hold BL-525 until v0.1.15 is cut.** The design
   is settled ahead of the build, which is permitted; the build waits. This is the *fourth*
   framing to touch player identity and the mercenary vertical slice has not yet proved the
   *third*, so the foundation does not go in until it has. The design costs nothing sitting in the

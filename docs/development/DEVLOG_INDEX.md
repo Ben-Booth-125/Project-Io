@@ -10,7 +10,7 @@ the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
-| 2026-08-21 | [Ownership separates from identity: the syndicate tier (BL-522–BL-528, NR-473–NR-479)](DEVLOG.md) | BL-094 BL-218 BL-219 BL-350 BL-365 BL-409 BL-522 BL-523 BL-524 BL-525 BL-526 BL-527 BL-528 BL-529 | DEVLOG.md |
+| 2026-08-21 | [Ownership separates from identity: the syndicate tier (BL-524–BL-530, NR-491–NR-497)](DEVLOG.md) | BL-094 BL-218 BL-219 BL-350 BL-365 BL-409 BL-524 BL-525 BL-526 BL-527 BL-528 BL-529 BL-530 BL-531 | DEVLOG.md |
 | 2026-08-21 | [Tiles gain a third axis, and a fight finally happens (NR-438/439, BL-519, BL-521, BL-520, BL-516, BL-467; Sprints P1 closed + C3)](DEVLOG.md) | BL-467 BL-516 BL-519 BL-520 BL-521 | DEVLOG.md |
 | 2026-08-20 | [The province becomes a thing you can see (BL-458, BL-513, BL-511, BL-466, BL-515, BL-517, BL-392, BL-463; Sprints 27/B2/B3/C3/D4 + P1)](DEVLOG.md) | BL-392 BL-458 BL-463 BL-466 BL-511 BL-513 BL-514 BL-515 BL-516 BL-517 BL-518 BL-519 BL-520 | DEVLOG.md |
 | 2026-08-20 | [the corpus gets delegated: saved roles and scoped instructions (BL-497)](DEVLOG.md) | BL-497 BL-498 BL-503 | DEVLOG.md |

@@ -2320,31 +2320,315 @@
    "resolution": null
   },
   {
-   "id": "NR-473",
+   "id": "NR-474",
+   "title": "BL-384's premise is REFUTED — the sim conquers heavily, but a quarter of worlds fight no war at all",
+   "raised": "2026-08-21",
+   "kind": "observation",
+   "status": "open",
+   "source": "Sprint 28 gate. tools/verify/history_conquest_gap.cpp, 8 real 0→1960 runs.",
+   "what": "BL-384 records '267 battles and ZERO conquests' and reads it as a global property of the sim. Measured today over 8 worlds, it is not: seeds 1,2,3,5,6,7 produce 43–435 conquests each, 1199 conquests over 1226 battles. What IS true, and is a different defect, is that seeds 0 and 4 fight ZERO battles — not few, none. So the outcome is close to BINARY: a world is either warlike or perfectly peaceful, and BL-384 was written against one of the peaceful ones (seed 0, the default world).\n\nAll three mechanisms the item names as candidates are refuted by measurement rather than argued away. (1) The scorer is NOT systematically optimistic by the terrain factor: bucketed against realised outcomes it is off by −0.0pp in the bucket holding 1215 of 1226 battles. (2) The scored staging hub differs from the levying hub in 0 of 1226 battles. (3) The transfer bar is not the constraint — 99.8% of victories convert to a conquest.\n\nCORRECTION, same day: the first run of this harness hardcoded a 312x145 grid against a real 261x121 (BL-424 took the homeworld to 70% area). build_sim_terrain fills an oversized grid with defaults, so region anchors outside the real bounds read as flat grassland and region_distance's cylinder wrapped at the wrong width. Every figure above is the CORRECTED one. The zero-war headline and all three refutations survived; the scorer's error moved from -2.5pp to -0.0pp and terrain defence from 20% of battles to 40%.",
+   "why_it_matters": "Sprint 28's goal is 'a province changes hands'. Provinces change hands 1199 times. The sprint as written would have been spent tuning combat constants that measurement says are calibrated — which is precisely the outcome BL-384's own design warned about ('if it is not, the cause is elsewhere and tuning combat constants would be tuning the wrong thing'). The item needs restating around the real defect before any of it is built.\n\nWorth noting WHY it went stale: the world has changed a great deal since 2026-08-13 — the 3× map, BL-519's terrain axis split (which moved the settlement map, NR-447), BL-515's province ids and BL-516's water kinds. A single-seed observation from before all of that could not have survived it.",
+   "recommendation": "Restate BL-384 as 'a quarter of worlds fight no war at all' and re-scope Sprint 28 to that. The open question is whether a peaceful world is a BUG or a legitimate outcome — a world with room to expand choosing Settle over Campaign is arguably correct, and BL-224's non-hegemony invariant wants some worlds to stay multipolar. That is Ben's call, not a tuning decision.",
+   "files": [
+    "docs/development/backlog.json",
+    "tools/verify/history_conquest_gap.cpp",
+    "src/world/history_sim.cpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-475",
+   "title": "BL-321's defence works appear in ZERO of 1245 battles",
+   "raised": "2026-08-21",
+   "kind": "observation",
+   "status": "open",
+   "source": "Same measurement run as NR-474 (history_conquest_gap Q3).",
+   "what": "`work_defence_mod` is non-zero in 0 of 1226 traced battles across 8 worlds. The plumbing is live and correct on BOTH sides — works_roster.cpp:72 writes it, history_sim.cpp reads it at :634 (where it raises the defender's scored strength) and :965 (where it becomes readiness on the defender's stack), and the code comment reasons carefully about a Bastion Fort at +640 tilting a fight without deciding it — but no battle in eight full runs was ever fought against a region carrying one. Terrain defence is genuinely live: non-zero in 488/1226 (40%).\n\nCORRECTION to a claim I made in passing: the scorer is NOT blind to works. It carries `def_works` in the value term at :634. What it omits works from is the p_win_q odds estimate specifically, which uses raw manpower_stock. The narrow statement was right and the broad one ('the scorer never sees works') was wrong.",
+   "why_it_matters": "A defence work that never defends is indistinguishable from one that was never built. Two readings, and they need different fixes: either the works roster rarely fires at all (the `works_raised` counter would say), or works are raised on safe interior regions while fighting happens on frontiers that have none. The second would be the more interesting finding — it would mean the sim invests in defence exactly where defence is not needed.",
+   "recommendation": "Cheap to settle: report `works_raised` alongside the battle traces, and cross the built-works regions against the fought-over ones. Worth doing before anyone tunes a combat constant, since it means one of the defender's two advantages is currently inert in practice.",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/works_roster.cpp",
+    "tools/verify/history_conquest_gap.cpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-476",
+   "title": "Ben's read that Lane A depends on Lane C — the ingredients already exist, at the other grain",
+   "raised": "2026-08-21",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Ben, 2026-08-21: 'A relies on C, or at least some pseudo war in provinces, using defense buffs and possibly buildings.'",
+   "what": "Checked against the code rather than the docs, and the ingredients Ben names ALL already exist in the Era −1 sim — at polity grain, not campaign grain. `resolve_battle` is called with the full terrain quadruple (substrate, cover, density, landform) so terrain defence buffs are in; `work_defence_mod` is the buildings term and is read at history_sim.cpp:634 and :965; and history_sim.cpp's own comment says TERRITORY MOVES AT PROVINCE GRANULARITY, NEVER TILE. So Lane A already has its pseudo-war in provinces with defence buffs and buildings.\n\nTAKEN: sequenced Lane A independently of Lane C rather than behind it. The two resolvers are separate by explicit design — combat.hpp states resolve_battle is era-agnostic and knows nothing about walls or campaigns — and BL-467's campaign resolver runs in the economy tick on a different actor grain (corps, not polities).",
+   "why_it_matters": "If Ben's read had been right, Lane C would gate Lane A and the whole arc would serialise. It does not, so the lanes can run in parallel — which is what they were doing when this was written. But it is worth him overturning if what he actually meant is that the two war models should CONVERGE rather than that one blocks the other; that would be a real design direction and a large one.",
+   "options": [
+    "Keep the two resolvers separate — nation-scale history vs corp-scale campaign, as combat.hpp designs them.",
+    "Converge them: one resolver, one war model, both grains."
+   ],
+   "recommendation": "Keep them separate. They answer different questions and BL-467 has just shown the campaign one working. But the fact that BL-321's defence works are inert in practice (NR-475) means the sim's half is less real than it looks, which may be what prompted the read.",
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/combat.hpp",
+    "src/world/battle_system.hpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-477",
+   "title": "The sea haulage rate contradicts BL-188's own ruling, and must NOT be flipped on its own",
+   "raised": "2026-08-21",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Sprint B2 (Lane B). tools/verify/sea_leg_census.cpp, 16 seeds, 1230 routes.",
+   "what": "`scripts/economy.lua` has `land = 0.02, sea = 0.05` — sea is 2.5x DEARER than land, contradicting BL-188's settled ruling 1 that 'sea's advantage is a lower per-unit RATE'. TAKEN: left it alone. `path.cost` does double duty — it is the A* routing weight (`sea_leg_cost = 2.5` deliberately prices water above any landform so routes prefer land) AND the haul price. Flipping the rate in that one number sends every convoy to sea.",
+   "why_it_matters": "It is a visible contradiction with a tempting one-line fix, and the one-line fix is wrong. Recorded so the next reader does not reach for it. Untangling the routing weight from the price is part of BL-522 (the per-leg split), not a tune that can precede it — and the resulting calibration constant is Ben's call, not an agent's.",
+   "recommendation": "Settle the rate as part of BL-522, once price and routing weight are separate numbers.",
+   "files": [
+    "scripts/economy.lua",
+    "src/world/logistics.cpp",
+    "docs/economy/SUPPLY.md"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-478",
+   "title": "85.8% of nations are single-centre, but only 3.4% end stranded — so no new mechanism was built",
+   "raised": "2026-08-21",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Sprint B2 (Lane B). tools/verify/road_reach_census.cpp row C5, 8 seeds, 386 nations.",
+   "what": "Sprint B2's plan floated giving single-centre nations 'a short local network'. The measurement says don't. 331 of 386 nations (85.8%) are single-centre — the number the sprint asked for and which the landed fix never reported — but after the per-centre Track plus the cross-strait border links, only 13 (3.4%) end STRANDED, meaning roaded with no roaded neighbour anywhere. TAKEN: added the measurement as harness row C5 and built no new generation mechanism.",
+   "why_it_matters": "A new generation mechanism aimed at a 3.4% residue is the thing to avoid, and the 85.8% figure is exactly the kind of number that makes a problem look enormous when the actual failure is small. Flagged because the sprint plan said to do it and I did not.",
+   "recommendation": "Leave it. If the 13 stranded nations turn out to matter visually, they are a targeted fix, not a mechanism.",
+   "files": [
+    "tools/verify/road_reach_census.cpp",
+    "src/world/road_generation.cpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-479",
+   "title": "BL-188 stays parked, and the reason moved: the blocker is in the logistics leg, not the road raster",
+   "raised": "2026-08-21",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Sprint B2 (Lane B).",
+   "what": "Sprint B2's plan was 'the three structural cuts, then BL-188 un-parked'. The cuts had already landed (commit 5305d25, then adapted by BL-516's water kinds), and they do NOT unblock BL-188 — not marginally. They change the road raster; BL-188's blocker is in `logistics.cpp` / `supply_system.cpp`, where `crosses_ocean` is a route-wide boolean. TAKEN: left BL-188 parked, appended the finding to its design field, and filed the real blocker as BL-522 (whole-route mispricing) at priority A.",
+   "why_it_matters": "BL-188 has now been parked twice for reasons that turned out to be elsewhere. Naming the actual blocker as its own item is what stops that happening a third time — and BL-522 is worth doing on its own merits, since it mispricess 64.5% of hauls today whether or not a port is ever built.",
+   "recommendation": "Keep BL-188 parked until BL-522 lands, then re-read it against a per-leg cost model.",
+   "files": [
+    "docs/development/backlog.json"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-480",
+   "title": "Concurrent agents get worktrees at the SESSION base again — B2 was five commits behind",
+   "raised": "2026-08-21",
+   "kind": "observation",
+   "status": "open",
+   "source": "Sprint B2 (Lane B), which caught it because the brief told it to check.",
+   "what": "The B2 worktree was created at 4a504d7, FIVE commits behind the branch tip, and the agent fast-forwarded itself before reading any code. This is NR-459 recurring. It mattered concretely: at the stale base the three road cuts looked unlanded and BL-516's water kinds were absent, so the agent would have rebuilt work that already existed against an enum that had changed.",
+   "why_it_matters": "NR-459 recorded this once and the mechanism has not changed. What DID work is the mitigation: briefing every agent to verify its base and fast-forward before reading anything, as its first action. That is now worth making standing practice rather than a per-brief habit — three agents launched today, and the one that was told to check, caught it.",
+   "recommendation": "Add the base-check to DELIVERY.md's sub-agent section so it is not a thing each brief has to remember.",
+   "files": [
+    "docs/development/DELIVERY.md"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-481",
+   "title": "Sprint B3's stated premise is stale in all three of its parts",
+   "raised": "2026-08-21",
+   "kind": "observation",
+   "status": "open",
+   "source": "Sprint B3 Lane B agent, 2026-08-21. Verified against the tree at origin/main 269049d, not assumed.",
+   "what": "B3's goal line reads: \"The population-centre clamp is still clamp(tiles/1000, 20, 40) from the 180x84 era, against a 312x145 map.\" Every clause of that is now false.\n\n(1) THE CLAMP IS GONE. BL-463 (settlement count is seed-invariant) landed 2026-08-21 and replaced it with `land_tiles / k_land_tiles_per_centre` (410), clamped only structurally to [1, placeable_tiles].\n\n(2) THE MAP IS NOT 312x145. BL-424 took the homeworld to 70% area; `home_grid_width/height` have been 261x121 = 31,581 since commit efe1ff0. A comment in hard_coded_world.cpp still said 312x145 and has been corrected in this change.\n\n(3) THE PER-BODY FIRM CAP IS ALREADY REPLACED, and NOT by a per-nation bound. B3's plan for BL-374 (corp density target) was to swap the per-BODY firm cap for a per-NATION one. That work landed 2026-08-20: `max_firms_per_body` is now 200 (anti-runaway only) and shaping moved to a per-RESOURCE cap (8) and a per-PROVINCE cap (2), on Ben's own dated words: \"we should have two levels, per resource caps, and per province caps.\" Building a per-nation bound now would contradict that ruling, so it was NOT done.\n\n[RENUMBERED ON MERGE from NR-473: three lanes ran concurrently and two of them minted the same review ids. The other NR-473 was already pushed. Cross-references inside this entry are remapped to match.]",
+   "why_it_matters": "Three of the sprint's three planned actions were already taken by other lanes between the sprint being written (2026-08-20) and being worked (2026-08-21). An agent briefed on the sprint text alone would have re-derived a constant that had just been derived, or reversed a dated ruling. The sprint goal lines are snapshots and go stale within a day at this pace; the code is the authority.",
+   "options": [
+    "Rewrite B3's goal to what actually remains (the density DECISION below, and BL-522).",
+    "Close B3 as overtaken and open its remainder as a fresh sprint."
+   ],
+   "recommendation": "Rewrite the goal. The remaining question is real and is the entry below."
+  },
+  {
+   "id": "NR-482",
+   "title": "Settlement density: 86% of nations hold exactly ONE centre, and raising it triples the labour pool",
+   "raised": "2026-08-21",
+   "kind": "question",
+   "status": "open",
+   "source": "Sprint B3 Lane B agent, 2026-08-21. Measured by the new tools/verify/settlement_density.cpp over 3 seeds x 8 divisors, at the shipped 400-year prehistory. NOT TUNED - reported.",
+   "what": "BL-463 fixed the defect it was written against (the count no longer being seed-invariant) and deliberately pinned the divisor at the shipped generator's OWN measured density, so the CENTRAL density was never re-derived. This measures what that central density produces, and the number that matters is per-NATION, not per-world.\n\nSHIPPED TODAY (divisor 410), 3 seeds, 39,543 land tiles, 168 nations:\n  200 centres | 197.7 land tiles/centre | 1.19 centres per nation | median 1 | max 4\n  centres-per-nation histogram: 0 nations with none, 145 with one, 15 with two, 7 with three, 1 with four\n  => 145 of 168 nations (86.3%) hold FEWER THAN TWO centres.\n\nWHY <2 IS THE THRESHOLD THAT MATTERS: road_generation.cpp's per-nation backbone skips any nation with `n < 2` centres. Sprint B2 gave a single-centre nation a Track on its own centre tile, so it is no longer road-LESS - but it has one roaded tile and no internal network. 86% of the world's nations are in that state. That is a far more direct reading of \"does not appear physically civilised\" than the world-level count is.\n\nA SECOND STRUCTURAL SIGNAL: at 410 the coverage pass (one seat per uncovered nation) places MORE centres than the primary geographic pass does - 104 vs 96. Over half the settled world is a structural top-up at an argmax tile rather than a geography. As the divisor tightens the primary pass takes over: 74% of centres at 200, 83% at 150, 91% at 100.\n\nTHE SWEEP (aggregate over the same 3 seeds):\n  divisor | centres | land/centre | centres/nation | nations with <2 centres\n      410 |     200 |       197.7 |           1.19 |  145 (86.3%)   <- shipped\n      300 |     219 |       180.6 |           1.30 |  136 (81.0%)\n      200 |     264 |       149.8 |           1.57 |  119 (70.8%)\n      150 |     316 |       125.1 |           1.88 |  101 (60.1%)\n      120 |     373 |       106.0 |           2.22 |   87 (51.8%)\n      100 |     431 |        91.7 |           2.57 |   78 (46.4%)\n       80 |     521 |        75.9 |           3.10 |   64 (38.1%)\n       60 |     681 |        58.1 |           4.05 |   52 (31.0%)\n\nTHE REASON THIS WAS NOT TUNED, and it is the whole point of the entry: THE DIVISOR IS NOT A GENERATION KNOB, IT IS AN ECONOMY KNOB. economy_system.cpp derives each body's entire workforce supply as a sum over its centres (`labour_by_scale[scale]`), so halving the divisor roughly doubles the labour pool the whole prototype economy runs on. Measured headcount over the 3 seeds: 27,580k at 410; 71,570k at 150; 90,980k at 100 - 2.6x and 3.3x. Workforce is one of the few binding constraints in the shipped economy. Picking a divisor here would be choosing the size of the labour market without pricing it, which is exactly the move BL-463's own \"Direction, not a chosen number\" section forbids.\n\n[RENUMBERED ON MERGE from NR-474: three lanes ran concurrently and two of them minted the same review ids. The other NR-474 was already pushed. Cross-references inside this entry are remapped to match.]",
+   "why_it_matters": "Two defensible structural criteria point at different divisors, and BOTH more than double the labour pool:\n  * \"the MEDIAN nation is internally connected\" (>=2 centres) => divisor ~100-120\n  * \"geography places more centres than the structural top-up does\" (primary >=80% of centres) => divisor ~150\nNeither is a taste number, but neither can be adopted without deciding whether the economy should run on 2.6-3.3x today's workforce. There is also a third option nobody has costed: raise the centre COUNT while shifting the scale distribution DOWN (k_scale_weight is currently 40/30/20/8/2), so the map reads as more settled without the labour pool moving. That decouples \"looks civilised\" from \"has more workers\" and may be what the complaint actually wants.",
+   "options": [
+    "Divisor ~150: geography dominates the top-up; ~2.6x headcount; 60% of nations still under 2 centres.",
+    "Divisor ~100-120: the median nation gets a road backbone; ~3.3x headcount.",
+    "Hold the divisor and re-weight k_scale_weight downward instead - more places, same people.",
+    "Hold everything; accept that 86% of nations are one-town nations and close the complaint elsewhere."
+   ],
+   "recommendation": "Do not pick from a table. The third option is the one worth costing first, because it is the only one that changes what the map LOOKS like without changing what the economy RUNS on - and the complaint was about how the world looks. Costing it needs a run of substrate_census/econ_harness in a Lua tree, which this container cannot do."
+  },
+  {
+   "id": "NR-483",
+   "title": "NOVEL WORK: no authority doc owns population-centre DENSITY as a tuning subject",
+   "raised": "2026-08-21",
+   "kind": "novel-work",
+   "status": "open",
+   "source": "Sprint B3 Lane B agent, 2026-08-21. Flagged at the moment the density re-derivation was attempted.",
+   "what": "docs/economy/POPULATION.md owns the population-centre MODEL (scale, agglomeration, habitability feedback). docs/generation/TILE_GENERATION.md owns the tile pipeline. Neither owns the question \"how many centres should a world have, and what is that number answerable to?\" BL-463 answered it once, by preserving the shipped generator's own historical density - which is a defensible way to avoid picking a number, but it means the density has never been derived from anything.\n\nThe measurement above shows why it needs an owner: the divisor is simultaneously a GENERATION constant (how settled the map looks), a ROAD constant (road_generation's `n < 2` gate), and an ECONOMY constant (the body's whole labour supply). Three docs have a claim on it and none states the constraint.\n\nThe same gap applies one level up: NOTHING in the corpus states what \"physically civilised\" means as a target. substrate_census (Sprint B1) measures it and explicitly refuses to threshold it, correctly, because thresholding it is a design act nobody has performed.\n\n[RENUMBERED ON MERGE from NR-475: three lanes ran concurrently and two of them minted the same review ids. The other NR-475 was already pushed. Cross-references inside this entry are remapped to match.]",
+   "why_it_matters": "Without an owner this constant gets re-derived by whoever next reads the complaint, against whatever criterion is in front of them. That is how the 180x84 clamp survived the map tripling and then the map shrinking.",
+   "options": [
+    "Give POPULATION.md a Density section that states the three constraints the divisor answers to.",
+    "Leave it to BL-463's successor item once the ruling above is made."
+   ],
+   "recommendation": "The former, as part of whatever change lands the ruling."
+  },
+  {
+   "id": "NR-484",
+   "title": "spectator_determinism's pinned golden is RED on origin/main in a Lua-free harness build",
+   "raised": "2026-08-21",
+   "kind": "observation",
+   "status": "open",
+   "source": "Sprint B3 Lane B agent, 2026-08-21. Run at origin/main 269049d, with this session's own change STASHED - so the failure is not attributable to this work.",
+   "what": "`spectator_determinism` R2 (\"the unspectated hash equals the pre-BL-409 golden\") fails:\n    golden=344A9FE48306E93A  observed=B4D09255AF346008\nThe observed hash is byte-identical with this session's change applied and with it stashed, which is also the proof that the change moved nothing.\n\nCAVEAT, stated rather than glossed: this was built with the container's prescribed Lua-free object set (recipe_registry / works_registry / tech_tree / world_gen_config excluded from the link, per the brief's build recipe). The harness hand-builds its own recipe_registry, so it is *designed* to run Lua-free - but I cannot rule out that the exclusion itself shifts the hash, and I have no Windows/CMake tree here to check against. NOT re-blessed, and deliberately left red.\n\n[RENUMBERED ON MERGE from NR-476: three lanes ran concurrently and two of them minted the same review ids. The other NR-476 was already pushed. Cross-references inside this entry are remapped to match.]",
+   "why_it_matters": "The standing rule is that goldens are contracts and movement is reported, never re-blessed without authorisation. Either the world legitimately moved on main since the golden was last blessed (the harness's own provenance log says it has been re-blessed before for exactly that reason) and it needs re-blessing with a dated note, or the Lua-free link is not hash-equivalent and the harness's build assumptions need stating. Both are worth knowing; neither should be settled by an agent.",
+   "options": [
+    "Run it in a full CMake tree to establish which of the two it is.",
+    "Re-bless with a dated provenance line, if the full-tree run confirms the world legitimately moved."
+   ],
+   "recommendation": "Run it in a full tree first. Do not re-bless off this container's result."
+  },
+  {
+   "id": "NR-485",
+   "title": "hire_axis_cost moved into unit_roster.hpp, slightly past BL-498's literal wording",
+   "raised": "2026-08-21",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Lane C, BL-498 (shared hire gate table).",
+   "what": "BL-498 asked for one shared table behind `campaign_gate_input`'s preference lists. TAKEN: moved `hire_axis_cost` into `unit_roster.hpp § hire_axis_table` alongside it, so the cost and the resources it is paid in are ONE contract rather than two that must agree. A small widening past the item's literal words.",
+   "why_it_matters": "The bug class BL-498 names is exactly 'two hand-mirrored lists drift apart'. Leaving the cost outside the table it is paid against would have fixed one instance and left the neighbouring one. But it is a scope widening on an audit-finding item, so it should be seen rather than assumed.",
+   "recommendation": "Keep it. The harness can now assert cost and candidates together, which was not possible before.",
+   "files": [
+    "src/world/unit_roster.hpp",
+    "src/world/corp_command.cpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-486",
+   "title": "An interception is reported, not stored — the out_cuts sink rather than a world field",
+   "raised": "2026-08-21",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Lane C, BL-458 / NR-407.",
+   "what": "`supply_system.cpp:158` read `(void)intercept_convoys(w, tick);` — the interception records were computed and dropped, AND the cut convoy is erased inside that same call, so an interception existed for one statement and then did not exist at all. No UI work was possible against that. TAKEN: `credit_arrived_convoys` gained an optional `out_cuts` sink, so an interception rides the tick's report the way `agency_events` does. NOT state: nothing serialised, nothing folded into `state_hash`.",
+   "why_it_matters": "It is the same call BL-467's `battle_dispatch` made two commits earlier, for the same reason — an event that is erased in the tick it happens can only reach a surface by being reported. Worth Ben seeing as a pattern forming rather than as two isolated choices. Reversible; a `world` field would have touched `state_hash` and needed a serialisation seam that does not exist (NR-349).",
+   "options": [
+    "Keep it reported (no state, no hash, no save format).",
+    "Promote interceptions to world state if something later needs to read them across ticks."
+   ],
+   "recommendation": "Keep it reported. An interception is an event, not state.",
+   "files": [
+    "src/world/supply_system.hpp",
+    "src/world/supply_system.cpp",
+    "src/world/economy_system.hpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-487",
+   "title": "Two goldens are RED on origin/main, independently confirmed by two lanes",
+   "raised": "2026-08-21",
+   "kind": "observation",
+   "status": "open",
+   "source": "Lanes B3 and C, each reverting to base and rebuilding to confirm it was not their change.",
+   "what": "`spectator_determinism` R2: golden 344A9FE48306E93A against observed B4D09255AF346008. `ai_skill_harness`: 28 failures, and it self-declares its bands 'blessed 2026-08-09 (GCC - STALE since 2026-08-14/BL-386)'. Both fail identically on the untouched base. NEITHER RE-BLESSED.",
+   "why_it_matters": "Two independent lanes measured the same observed spectator hash (B4D09255AF346008), which is the corroboration that makes it a real world change rather than a container artifact. B3 caveats that it built with the container's Lua-free object set and cannot fully rule out that the exclusion itself shifts the hash — so the re-bless wants one run on Ben's toolchain before the number is pinned.",
+   "recommendation": "Re-bless both, on Ben's machine, once he is satisfied the world changes behind them were intended (BL-519's terrain split and BL-424's map area are the obvious candidates). Goldens are contracts; this is his signature, not an agent's.",
+   "files": [
+    "tools/verify/spectator_determinism.cpp",
+    "tools/verify/ai_skill_harness.cpp",
+    ".claude/rules/io-standing-rules.md"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-488",
+   "title": "A mutation test passed when it should have failed, and the agent caught itself",
+   "raised": "2026-08-21",
+   "kind": "observation",
+   "status": "open",
+   "source": "Lane C, BL-498. Reported by the agent against its own work.",
+   "what": "The first mutation probe written for the shared hire table PASSED — it had no teeth, because `hire_axis_resource`'s `return e.candidates[0]` fallback masked the mutation. Re-run with a mutation modelling the real drift (the debit stops recognising the table's LAST candidate), R5 then failed on exactly that candidate on all three axes, as it should.",
+   "why_it_matters": "This is the failure mode that makes a green harness worthless, and it is invisible unless someone deliberately tries to make the check fail. Worth recording as method: a new assertion should be proven to FAIL against a deliberate break before it is trusted to pass — the same discipline as BL-384's 'a row that would pass before the change proves nothing'.",
+   "recommendation": "Consider making mutation-proving a stated step for new harness rows in DELIVERY.md. Not filed as work; Ben's call whether it is worth the ceremony.",
+   "files": [
+    "tools/verify/corp_ai_harness.cpp",
+    "docs/development/DELIVERY.md"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-489",
+   "title": "Sprint 28's real subject is verb competition — the scorer discards ~10M campaign candidates to reach zero wars",
+   "raised": "2026-08-21",
+   "kind": "observation",
+   "status": "resolved",
+   "source": "Sprint 28 decomposition. history_conquest_gap campaign funnel, 8 worlds.",
+   "what": "Added three funnel counters (contacts / scored / chosen) because a world with zero battles has zero battle_traces, so the per-battle record was mute about exactly the case needing explanation. The result rules out the two cheap explanations outright.\n\nSeed 0: 4,972,710 contacts, 9,945,420 candidates scored, ZERO chosen. Seed 4: 4,089,264 / 8,178,528 / ZERO. It is not adjacency and not candidate discovery — the scorer looks at a war it could start ten million times and picks something else on every single one.\n\nA second observation with no obvious reading yet: CONTACTS DO NOT PREDICT WAR, and if anything predict it inversely. Seed 7 has the fewest contacts (1.58M) and fights 184 times; seed 0 has the most (4.97M) and never fights at all.",
+   "why_it_matters": "It makes Sprint 28 a much smaller and more specific sprint than the one on the board — verb competition inside the scorer, not combat tuning. And it is the difference between a fix and a guess: the remaining fork (never cleared the threshold, versus cleared it and lost to Settle) needs different fixes, and the code still cannot tell them apart. That fork is T1, and R7 is written as a NEGATIVE requirement forbidding any combat-constant tuning in the sprint, because that is the temptation the measurement has already ruled out.",
+   "recommendation": "Worth your eye on one thing before T3: whether a world that never fights is a BUG at all. A polity with room to expand preferring Settle to Campaign is defensible behaviour, and BL-224 wants some worlds multipolar. The target should be a rate inside a stated band, reported and never clamped.",
+   "files": [
+    "src/world/history_sim.cpp",
+    "tools/verify/history_conquest_gap.cpp",
+    "docs/development/REFINED.md"
+   ],
+   "resolution": "RULED 2026-08-21 (Ben): A WORLD THAT DOES NOT FIGHT IS A BUG. His reason, and it is the part that shapes the requirement rather than merely answering the question: 'many ancient tech quests would not be unlockable'. So the floor on the war rate is not aesthetic and not about the Era -1 premise reading well - it is CONTENT REACHABILITY. A world where war never happens is a world where war-gated progression is dead, and that is a different and harder failure than a quiet era.\n\nR2 is amended: the band's FLOOR is set by what war-gated content needs to be reachable, not chosen for distribution shape. The ceiling stays governed by BL-224's non-hegemony invariant, so the requirement is now bounded from both ends by a stated reason rather than one.\n\nACCURACY NOTE, recorded so nobody goes looking for a gate that is not built yet: the dependency Ben names is DESIGNED, not yet live. Checked today - the campaign tech tree has 150 nodes and exactly ONE earnable gate (E0-ML-01 Standing Garrison Doctrine, whose predicate lives in tech_gate.cpp); the other 149 are authored stubs the F9 viewer draws. Nothing currently gates on battles or conquest, and the Era -1 works roster gates on capacity BAND (materials), not on war. So the ruling is forward-looking, and that is an argument FOR fixing the war rate now rather than against it: the tech design is being built on top of a war rate that is zero in a quarter of worlds."
+  },
+  {
+   "id": "NR-490",
+   "title": "War-gated progression is designed but not yet live — one earnable gate in 150 tech nodes",
+   "raised": "2026-08-21",
+   "kind": "observation",
+   "status": "open",
+   "source": "Checking Ben's stated reason for the 2026-08-21 zero-war ruling.",
+   "what": "Ben ruled a world that never fights is a bug because 'many ancient tech quests would not be unlockable'. Checking what exists: `scripts/tech_tree.lua` holds 150 nodes and the file says in its own comment that E0-ML-01 is 'THE ONE LIVE GATE... Every other node in this file is authored data the F9 viewer draws'. Its predicate is in tech_gate.cpp, and it reads corp military_units/military_strength - not battles and not conquest. The Era -1 works roster gates on capacity band (materials), also not on war.\n\nSo today no content anywhere is gated on a war HAPPENING. The dependency is real as design intent and absent as mechanism.",
+   "why_it_matters": "Two things follow, pointing the same way. First, the ruling is sound but its stated justification cannot yet be verified by running anything - worth knowing before someone tries. Second, and more useful: the tech design is being drawn on top of a war rate that is ZERO in a quarter of worlds. Fixing the rate before the gates are authored is much cheaper than discovering, once 149 stubs become live gates, that a quarter of campaigns start with a dead branch.",
+   "recommendation": "No action beyond noting it. But when the ancient tech quests are authored (BL-478 and the tech-effect work), the war-rate band from Sprint 28's R2 should be the number their reachability is checked against - otherwise the two are designed independently and meet only in a bug report.",
+   "files": [
+    "scripts/tech_tree.lua",
+    "src/world/tech_gate.cpp",
+    "docs/development/req/requirements.json"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-491",
    "title": "Equity confers NO operating control, at any fraction — including 100%",
    "raised": "2026-08-21",
    "kind": "decision-taken",
-   "source": "BL-522 (ownership tier) — Ben's 2026-08-21 framing idea. The standing rule \"the player's own corp is never auto-acted on strategically\" needed a subject, because the whole proposal is that companies the player owns keep running themselves.",
-   "what": "TAKEN: equity is a claim on profit, never a control seam. The player's CORPORATION (the holding actor) is never auto-acted on — unchanged and absolute. The COMPANIES it holds equity in always self-run on their own corp_ai scorer, at any ownership fraction up to and including 100%. The holder's levers are which companies to hold and (pending BL-526) the payout ratio — never the build order.",
+   "source": "BL-524 (ownership tier) — Ben's 2026-08-21 framing idea. The standing rule \"the player's own corp is never auto-acted on strategically\" needed a subject, because the whole proposal is that companies the player owns keep running themselves.",
+   "what": "TAKEN: equity is a claim on profit, never a control seam. The player's CORPORATION (the holding actor) is never auto-acted on — unchanged and absolute. The COMPANIES it holds equity in always self-run on their own corp_ai scorer, at any ownership fraction up to and including 100%. The holder's levers are which companies to hold and (pending BL-528) the payout ratio — never the build order.",
    "why_it_matters": "This qualifies a standing rule, which is why it is recorded rather than assumed. The precedent shape is BL-409 (spectator mode): the prohibition protects a corp BECAUSE a human owns it, so a changed ownership relation changes the precondition rather than carving an exception. The rejected alternative — a control threshold above which the holder inherits the build queue — was turned down on three grounds: it reintroduces the ~80-build-queue micromanagement the economic premise exists to prevent; it forks corp_ai.cpp's uniform iteration, which is the property making the whole design affordable; and it makes the prohibition's subject ambiguous again, which is what BL-409 spent a ruling to fix.",
    "options": [
     "Keep: equity is purely financial, no control at any fraction.",
     "Add a control threshold (e.g. >50% grants operating control of that company)."
    ],
-   "recommendation": "Keep it. The threshold version buys thematic realism and costs the economic premise, the uniform scorer, and a settled rule's clarity. BL-526's payout dial is the cheaper way to make majority ownership mean something.",
+   "recommendation": "Keep it. The threshold version buys thematic realism and costs the economic premise, the uniform scorer, and a settled rule's clarity. BL-528's payout dial is the cheaper way to make majority ownership mean something.",
    "files": [
     "docs/development/backlog.json",
     ".claude/rules/io-standing-rules.md"
    ],
    "status": "resolved",
-   "resolution": "RULED BY BEN, 2026-08-21: \"Above a majority threshold\" — OVERTURNING the call taken on his behalf that equity never confers operating control. A corporation's CONTROLLING HOLDER is the syndicate above > 50%; a corporation controlled by the player's syndicate is the player's corp for the standing rule and is never auto-acted on. Below the threshold a holding stays purely financial, so both readings survive, split by the line rather than one replacing the other. The three costs the \"never\" position defended against do not vanish and are now designed against in BL-522 § The three costs: micromanagement is BOUNDED BY MAJORITIES HELD rather than corporations in the world (and that bound is the mechanic's central trade-off — control costs attention); corp_ai's uniform iteration genuinely forks on a control gate, owned by BL-527, which must not shift any other corp's cadence slot per BL-409 and has no subject under spectate; and the prohibition's subject is kept crisp by deriving control from the equity relation (BL-523) rather than storing a flag, with the threshold a single named constant. BL-526's open payout question is answered as a side effect — majority takes financial policy too. One new question raised BY the ruling: NR-481, control changing hands mid-campaign."
+   "resolution": "RULED BY BEN, 2026-08-21: \"Above a majority threshold\" — OVERTURNING the call taken on his behalf that equity never confers operating control. A corporation's CONTROLLING HOLDER is the syndicate above > 50%; a corporation controlled by the player's syndicate is the player's corp for the standing rule and is never auto-acted on. Below the threshold a holding stays purely financial, so both readings survive, split by the line rather than one replacing the other. The three costs the \"never\" position defended against do not vanish and are now designed against in BL-524 § The three costs: micromanagement is BOUNDED BY MAJORITIES HELD rather than corporations in the world (and that bound is the mechanic's central trade-off — control costs attention); corp_ai's uniform iteration genuinely forks on a control gate, owned by BL-529, which must not shift any other corp's cadence slot per BL-409 and has no subject under spectate; and the prohibition's subject is kept crisp by deriving control from the equity relation (BL-525) rather than storing a flag, with the threshold a single named constant. BL-528's open payout question is answered as a side effect — majority takes financial policy too. One new question raised BY the ruling: NR-499, control changing hands mid-campaign."
   },
   {
-   "id": "NR-474",
+   "id": "NR-492",
    "title": "Terminology fork — \"corporation\" currently means the OPERATING firm, not the holder",
    "raised": "2026-08-21",
    "kind": "question",
-   "source": "BL-522 (ownership tier). Ben's framing uses corporation = the ~7 decision-making bodies and company = the ~80 self-running operators. Today corporation_component means the OPERATOR.",
+   "source": "BL-524 (ownership tier). Ben's framing uses corporation = the ~7 decision-making bodies and company = the ~80 self-running operators. Today corporation_component means the OPERATOR.",
    "what": "The new design was written in Ben's own words (corporation = holder, company = operator) because he stated them. But \"corporation\" is the most-used term in the project: corporation_component, generate_corporations, the Corporation lens, corp_ai, corp_command, GLOSSARY § Corporation, and 483 backlog items all use it to mean the operating firm. Adopting the new sense inverts it.",
    "why_it_matters": "Rule: use the canonical GLOSSARY terms consistently; if a term is defined there, do not substitute an alternative. Two live senses of \"corporation\" would break exactly that. The three ways out are not equal in cost, and none is mine to pick.",
    "options": [
@@ -2358,16 +2642,16 @@
     "docs/development/backlog.json"
    ],
    "status": "resolved",
-   "resolution": "RULED BY BEN, 2026-08-21: option 2 — \"Keep corporation as the operator, name the holding tier something else.\" The operating sense of `corporation` is unchanged across code and docs, so no migration is owed. Ben delegated the actual word; it is SYNDICATE, taken on his behalf and recorded separately as NR-479 so the word stays overturnable independently of the fork he settled. BL-522..BL-528 rewritten to the settled terms."
+   "resolution": "RULED BY BEN, 2026-08-21: option 2 — \"Keep corporation as the operator, name the holding tier something else.\" The operating sense of `corporation` is unchanged across code and docs, so no migration is owed. Ben delegated the actual word; it is SYNDICATE, taken on his behalf and recorded separately as NR-497 so the word stays overturnable independently of the fork he settled. BL-524..BL-530 rewritten to the settled terms."
   },
   {
-   "id": "NR-475",
+   "id": "NR-493",
    "title": "\"7 corporations\" against today's corporation_count = 8 — which slot is the player?",
    "raised": "2026-08-21",
    "kind": "question",
-   "source": "BL-522 (ownership tier). Ben proposed \"7 corporations\"; corporation_generation.hpp:26 sets corporation_count = 8.",
+   "source": "BL-524 (ownership tier). Ben proposed \"7 corporations\"; corporation_generation.hpp:26 sets corporation_count = 8.",
    "what": "Today: 8 named corps = the player plus 7 rivals, and separately ~80 background firms placed on a MEASURED stop condition (~90% of demand), bounded at 200/body — not the \"roughly 40\" the proposal assumed. So \"7 corporations\" may mean (a) 7 AI holders plus the player as an 8th of the same type, which is exactly today's 8; or (b) 7 holders total including the player; or (c) 7 AI holders plus the player as a DIFFERENT type — the mercenary company of the live ancient arc, which is BL-094's shape.",
-   "why_it_matters": "Reading (a) means the tier count needs no change at all and the item is purely additive. Readings (b) and (c) change generation. Worth settling before BL-523 lands, because the equity items were written assuming (a) — the cheapest reading, and the one that matches the running code.",
+   "why_it_matters": "Reading (a) means the tier count needs no change at all and the item is purely additive. Readings (b) and (c) change generation. Worth settling before BL-525 lands, because the equity items were written assuming (a) — the cheapest reading, and the one that matches the running code.",
    "options": [
     "(a) 7 AI holders + player as the 8th, same type — no generation change.",
     "(b) 7 holders total including the player.",
@@ -2378,14 +2662,14 @@
     "src/world/corporation_generation.hpp"
    ],
    "status": "resolved",
-   "resolution": "RULED BY BEN, 2026-08-21: option (b) — SEVEN syndicates in total, the player one of them. Taken literally from his original \"instead we have 7 corporations\", against the recommendation to keep 8 as the no-generation-change option. Consequence: `corporation_count` drops 8 → 7 and BL-524's carve runs over seven named corps, not eight. Propagated through BL-522, BL-524, GLOSSARY, CLAUDE.md, README and the ROADMAP entry."
+   "resolution": "RULED BY BEN, 2026-08-21: option (b) — SEVEN syndicates in total, the player one of them. Taken literally from his original \"instead we have 7 corporations\", against the recommendation to keep 8 as the no-generation-change option. Consequence: `corporation_count` drops 8 → 7 and BL-526's carve runs over seven named corps, not eight. Propagated through BL-524, BL-526, GLOSSARY, CLAUDE.md, README and the ROADMAP entry."
   },
   {
-   "id": "NR-476",
+   "id": "NR-494",
    "title": "The equity cluster carries a proposed v0.1.23 that ROADMAP does not name",
    "raised": "2026-08-21",
    "kind": "decision-taken",
-   "source": "BL-522..BL-528 needed a version goal. ROADMAP's ancient arc names v0.1.15 through v0.1.22; v0.1.22 is the last.",
+   "source": "BL-524..BL-530 needed a version goal. ROADMAP's ancient arc names v0.1.15 through v0.1.22; v0.1.22 is the last.",
    "what": "TAKEN: filed all seven items with version_goal v0.1.23 and did NOT edit ROADMAP.md. Naming a new minor and stating its theme is a scope decision that belongs to Ben and to the roadmap's own authority, and the time-slice says a design lives in the item until the work lands.",
    "why_it_matters": "It leaves a small incoherence on purpose: seven items point at a minor the roadmap has never heard of. The alternative was to invent a minor and its theme unilaterally, which is worse. If Ben would rather these sit inside an existing minor — v0.1.17 (economy breadth) is the nearest fit — it is a field edit, not a rewrite.",
    "options": [
@@ -2399,35 +2683,35 @@
     "docs/development/backlog.json"
    ],
    "status": "resolved",
-   "resolution": "RULED BY BEN, 2026-08-21: name it. ROADMAP.md now carries v0.1.23 - Who owns whom, themed \"ownership separates from identity, and profit becomes a position rather than a payroll\", carrying BL-522 through BL-528. The entry also records why the minor is affordable (BL-365 already shipped the self-running layer) and carries the NR-477 sequencing caution forward, so a reader of the roadmap alone sees both the theme and the hold recommendation."
+   "resolution": "RULED BY BEN, 2026-08-21: name it. ROADMAP.md now carries v0.1.23 - Who owns whom, themed \"ownership separates from identity, and profit becomes a position rather than a payroll\", carrying BL-524 through BL-530. The entry also records why the minor is affordable (BL-365 already shipped the self-running layer) and carries the NR-495 sequencing caution forward, so a reader of the roadmap alone sees both the theme and the hold recommendation."
   },
   {
-   "id": "NR-477",
+   "id": "NR-495",
    "title": "Novelty flag — the ownership tier is a framing change, and it is the fourth on player identity",
    "raised": "2026-08-21",
    "kind": "novel-work",
-   "source": "BL-522 (ownership tier), raised per io-standing-rules § \"Raise the novelty flag\".",
-   "what": "Flagging that this session settled a framing change no authority doc owned. It reads as the fourth identity framing in seven weeks: corporation, then governing body (2026-08-03), then national private militia (2026-08-10), now an ownership tier. I argued in BL-522 that it is NOT a fourth pivot — BL-094 already made companies arm's-length counterparties, and explicitly left \"the exact shape of the militia's non-mandate revenue\" open, which equity income answers. That argument is honest but it is mine, and Ben should test it rather than inherit it.",
+   "source": "BL-524 (ownership tier), raised per io-standing-rules § \"Raise the novelty flag\".",
+   "what": "Flagging that this session settled a framing change no authority doc owned. It reads as the fourth identity framing in seven weeks: corporation, then governing body (2026-08-03), then national private militia (2026-08-10), now an ownership tier. I argued in BL-524 that it is NOT a fourth pivot — BL-094 already made companies arm's-length counterparties, and explicitly left \"the exact shape of the militia's non-mandate revenue\" open, which equity income answers. That argument is honest but it is mine, and Ben should test it rather than inherit it.",
    "why_it_matters": "Ben was told the recommendation was to save the idea to the backlog rather than work it, precisely because BL-094 is parked and unlanded and a fourth framing settled on paper is how churn compounds. He chose to work it, which is his call and was carried out in full. The flag records that the concern was real and was overridden deliberately, not forgotten. The scope growth is bounded — seven items, all doc-only so far, none started.",
    "options": [
     "Accept: the ownership tier funds the militia/mercenary identity rather than replacing it.",
-    "Treat it as a genuine fourth pivot and re-open BL-094 before building any of BL-523..BL-528.",
+    "Treat it as a genuine fourth pivot and re-open BL-094 before building any of BL-525..BL-530.",
     "Park the cluster with the space arc until the mercenary slice proves the current identity."
    ],
-   "recommendation": "Accept, but do not start BL-523 until the mercenary vertical slice (v0.1.15) is cut. The design costs nothing sitting in the backlog; building it before the current identity is proven in play is what the concern was actually about.",
+   "recommendation": "Accept, but do not start BL-525 until the mercenary vertical slice (v0.1.15) is cut. The design costs nothing sitting in the backlog; building it before the current identity is proven in play is what the concern was actually about.",
    "files": [
     "docs/development/backlog.json",
     "docs/CONCEPT.md"
    ],
    "status": "resolved",
-   "resolution": "RULED BY BEN, 2026-08-21: hold BL-523 (equity data model) until the mercenary vertical slice (v0.1.15) is cut. The design is settled ahead of the build, which the time-slice permits; the build waits until the third identity framing is proved in play before the fourth is built on top of it. Recorded in the ROADMAP v0.1.23 entry as a ruling rather than a recommendation — the minor is designed and deliberately not started."
+   "resolution": "RULED BY BEN, 2026-08-21: hold BL-525 (equity data model) until the mercenary vertical slice (v0.1.15) is cut. The design is settled ahead of the build, which the time-slice permits; the build waits until the third identity framing is proved in play before the fourth is built on top of it. Recorded in the ROADMAP v0.1.23 entry as a ruling rather than a recommendation — the minor is designed and deliberately not started."
   },
   {
-   "id": "NR-478",
+   "id": "NR-496",
    "title": "CLAUDE.md and README.md both still carried the superseded \"governing body\" framing",
    "raised": "2026-08-21",
    "kind": "observation",
-   "source": "Found while updating both files for BL-522 (ownership tier).",
+   "source": "Found while updating both files for BL-524 (ownership tier).",
    "what": "BL-094's 2026-08-10 rewrite replaced \"governing body\" with \"national private militia\" outright, and ROADMAP's 2026-08-12 two-arcs split then parked that whole arc for DLC and put a MERCENARY COMPANY in the live seat. CONCEPT.md and GLOSSARY.md were both updated. CLAUDE.md's opening paragraph and README.md's opening still described the pivot as being to a governing body — nine days and two supersessions stale. Corrected in this session's edits.",
    "why_it_matters": "These two files are the first thing a fresh session and a fresh reader see. A stale framing there propagates into every session that starts from it, which is more costly than the same staleness in a subject doc that only gets read on traversal. Worth a habit: when an identity or framing item lands, CLAUDE.md and README.md are part of its propagation set, not an afterthought.",
    "options": [],
@@ -2440,19 +2724,19 @@
    "resolution": "No action was owed beyond the correction already made in-session: CLAUDE.md and README.md were updated off the superseded governing-body framing, and README's pre-NR-177 1960 epoch was corrected to 0 CE. Closed as an observation. The habit it argues for — that an identity or framing item's propagation set INCLUDES CLAUDE.md and README.md, because they are what a fresh session and a fresh reader start from — stands on the record without needing a rule built around it."
   },
   {
-   "id": "NR-479",
+   "id": "NR-497",
    "title": "The holding tier is named SYNDICATE — the word, chosen on Ben's behalf",
    "raised": "2026-08-21",
    "kind": "decision-taken",
-   "source": "Ben resolved NR-474 (\"keep corporation as the operator, name the holding tier something else\") but delegated the word itself.",
+   "source": "Ben resolved NR-492 (\"keep corporation as the operator, name the holding tier something else\") but delegated the word itself.",
    "what": "TAKEN: the holding tier is a SYNDICATE — `syndicate_component`, `generate_syndicates`, GLOSSARY § Syndicate. A syndicate holds equity in operating corporations, allocates capital and decides; it owns no buildings and runs no recipes.",
-   "why_it_matters": "It is a new canonical term, and the standing rule requires canonical terms be used consistently — so the word propagates into seven backlog items, GLOSSARY, CLAUDE.md and README the moment it is chosen. Cheap to overturn NOW (a rename across doc prose); expensive once `syndicate_component` is on the serialisation seam.\n\nCandidates were scored on three axes: semantic fit (does it mean an OWNER rather than an operator), grep-cleanliness, and whether it reads in BOTH arcs — the live ancient one at 0 CE and the parked near-future space one. Syndicate wins all three: it means a body of pooled interests that owns rather than operates; it has zero hits in `src/` and zero real hits in `docs/` (the only two are NR-474 itself); and a merchant syndicate at 0 CE and a corporate syndicate in near-future space are both natural.\n\nRunners-up and why they lost:\n  - HOUSE — reads best in both eras, but loses on grep noise (`greenhouse` in planetology, `warehouse` as a building type in CORPORATION_GENERATION Pass 2, `household`) and on promising a noble-family politics the game does not model.\n  - TRUST — the historically exact word for a holding entity, but collides head-on with the standing rules' own untrusted-input-boundary language (23 hits in `src/`, 92 in `docs/`).\n  - CHARTER — already taken twice: HISTORY.md's Charter Age and BL-094's chartered corp.\n  - CONSORTIUM — semantically right, but stiff, awkward in the plural, and reads poorly at 0 CE.\n  - ESTATE — implies land, which the game already means something else by.\n  - DYNASTY — promises inheritance and succession the game does not model.",
+   "why_it_matters": "It is a new canonical term, and the standing rule requires canonical terms be used consistently — so the word propagates into seven backlog items, GLOSSARY, CLAUDE.md and README the moment it is chosen. Cheap to overturn NOW (a rename across doc prose); expensive once `syndicate_component` is on the serialisation seam.\n\nCandidates were scored on three axes: semantic fit (does it mean an OWNER rather than an operator), grep-cleanliness, and whether it reads in BOTH arcs — the live ancient one at 0 CE and the parked near-future space one. Syndicate wins all three: it means a body of pooled interests that owns rather than operates; it has zero hits in `src/` and zero real hits in `docs/` (the only two are NR-492 itself); and a merchant syndicate at 0 CE and a corporate syndicate in near-future space are both natural.\n\nRunners-up and why they lost:\n  - HOUSE — reads best in both eras, but loses on grep noise (`greenhouse` in planetology, `warehouse` as a building type in CORPORATION_GENERATION Pass 2, `household`) and on promising a noble-family politics the game does not model.\n  - TRUST — the historically exact word for a holding entity, but collides head-on with the standing rules' own untrusted-input-boundary language (23 hits in `src/`, 92 in `docs/`).\n  - CHARTER — already taken twice: HISTORY.md's Charter Age and BL-094's chartered corp.\n  - CONSORTIUM — semantically right, but stiff, awkward in the plural, and reads poorly at 0 CE.\n  - ESTATE — implies land, which the game already means something else by.\n  - DYNASTY — promises inheritance and succession the game does not model.",
    "options": [
     "Keep SYNDICATE.",
     "Pick another word — HOUSE and CONSORTIUM are the live runners-up.",
     "Defer the word and use a placeholder until the tier is built."
    ],
-   "recommendation": "Keep it, but treat it as cheap to change until BL-523 (equity data model) puts `syndicate_component` on the serialisation seam. That is the point at which the rename stops being a doc edit.",
+   "recommendation": "Keep it, but treat it as cheap to change until BL-525 (equity data model) puts `syndicate_component` on the serialisation seam. That is the point at which the rename stops being a doc edit.",
    "files": [
     "docs/GLOSSARY.md",
     "docs/development/backlog.json",
@@ -2460,10 +2744,10 @@
     "README.md"
    ],
    "status": "resolved",
-   "resolution": "CONFIRMED BY BEN, 2026-08-21: keep SYNDICATE. The term is now canonical — GLOSSARY § Syndicate, seven backlog items, CLAUDE.md, README and the ROADMAP v0.1.23 entry. Still cheap to change until BL-523 puts `syndicate_component` on the serialisation seam, which under NR-477's ruling does not happen until v0.1.15 is cut."
+   "resolution": "CONFIRMED BY BEN, 2026-08-21: keep SYNDICATE. The term is now canonical — GLOSSARY § Syndicate, seven backlog items, CLAUDE.md, README and the ROADMAP v0.1.23 entry. Still cheap to change until BL-525 puts `syndicate_component` on the serialisation seam, which under NR-495's ruling does not happen until v0.1.15 is cut."
   },
   {
-   "id": "NR-480",
+   "id": "NR-498",
    "title": "apply_session_close.js reformats backlog.json and requirements.json wholesale (indent 2 vs stored 1)",
    "raised": "2026-08-21",
    "kind": "observation",
@@ -2480,25 +2764,46 @@
     "tools/session/apply_session_close.js"
    ],
    "status": "resolved",
-   "resolution": "Filed as work: BL-529 (session-close indent preservation), version goal v0.1.22 (Harness truth — the tooling-truth minor). Recommendation carried into the item: detect and preserve each store's existing indent rather than hardcoding the other number, so it cannot drift again when a store is reformatted for an unrelated reason."
+   "resolution": "Filed as work: BL-531 (session-close indent preservation), version goal v0.1.22 (Harness truth — the tooling-truth minor). Recommendation carried into the item: detect and preserve each store's existing indent rather than hardcoding the other number, so it cannot drift again when a store is reformatted for an unrelated reason."
   },
   {
-   "id": "NR-481",
+   "id": "NR-499",
    "title": "Control changing hands mid-campaign — what happens at the moment a majority flips",
    "raised": "2026-08-21",
    "kind": "question",
-   "source": "Raised BY Ben's NR-473 ruling. The \"never confers control\" design had no such moment; a threshold design necessarily does.",
+   "source": "Raised BY Ben's NR-491 ruling. The \"never confers control\" design had no such moment; a threshold design necessarily does.",
    "what": "Crossing > 50% turns a corporation the scorer was running into one the player drives, and dropping below hands it back. Four things are undefined: (1) whether reversion is immediate or lagged; (2) what happens to a build order already in flight at the moment control flips; (3) whether the corp_ai scorer, on regaining a corporation, resumes cleanly or needs its state rebuilt; (4) whether a rival syndicate can take control OF A CORPORATION THE PLAYER CONTROLS by buying past them.",
-   "why_it_matters": "Item (4) is the one that needs a ruling rather than a design. It is a relational action by a rival against a corp a human owns — the same threshold BL-450 (rivals score stance) needed its own dated grant to cross, and the standing rules treat that class of widening as requiring an explicit, dated grant rather than an inference. The other three are ordinary state-transition design, but they are the kind that is cheap now and expensive after BL-523 fixes the data model. All four are downstream of a ruling that only landed today, so none of them is a gap in the original design.",
+   "why_it_matters": "Item (4) is the one that needs a ruling rather than a design. It is a relational action by a rival against a corp a human owns — the same threshold BL-450 (rivals score stance) needed its own dated grant to cross, and the standing rules treat that class of widening as requiring an explicit, dated grant rather than an inference. The other three are ordinary state-transition design, but they are the kind that is cheap now and expensive after BL-525 fixes the data model. All four are downstream of a ruling that only landed today, so none of them is a gap in the original design.",
    "options": [
-    "Rule now, before BL-523 is written.",
-    "Defer to BL-527 (rival syndicate behaviour), where the acquisition-contest question naturally lands.",
-    "Rule (4) now — it is a standing-rule grant — and defer (1)-(3) to BL-527."
+    "Rule now, before BL-525 is written.",
+    "Defer to BL-529 (rival syndicate behaviour), where the acquisition-contest question naturally lands.",
+    "Rule (4) now — it is a standing-rule grant — and defer (1)-(3) to BL-529."
    ],
-   "recommendation": "Option 3. The three mechanical questions are genuinely BL-527's to answer with the scorer in front of it. But a rival taking control of the player's corporation is a grant, not a mechanism, and the standing rules are explicit that such widenings are dated and scoped rather than inferred — so it should not arrive as an implementation detail inside a scoring item.",
+   "recommendation": "Option 3. The three mechanical questions are genuinely BL-529's to answer with the scorer in front of it. But a rival taking control of the player's corporation is a grant, not a mechanism, and the standing rules are explicit that such widenings are dated and scoped rather than inferred — so it should not arrive as an implementation detail inside a scoring item.",
    "files": [
     "docs/development/backlog.json",
     ".claude/rules/io-standing-rules.md"
+   ],
+   "status": "open",
+   "resolution": null
+  },
+  {
+   "id": "NR-500",
+   "title": "BL-523 (corp kind axis) and BL-529 (control gate) both add a filter to corp_ai's candidate loop",
+   "raised": "2026-08-21",
+   "kind": "question",
+   "source": "Found while resolving the merge conflict between this session's branch and main. The two items were authored in parallel branches on the same day and neither references the other.",
+   "what": "BL-523 makes `corp_ai.cpp` read a corporation KIND (today the file contains no reference to `is_background` at all, so a background filler firm evaluates military_base and hire_unit exactly like a named rival). BL-529 makes it read CONTROL (skip any corporation the player's syndicate majority-holds, per Ben's NR-491 ruling). They are orthogonal axes rather than duplicates, but they gate the same loop. Separately, BL-526's carve splits named corps into operating corporations and does not say whether a carved corporation is background or named — which is precisely the input BL-523's axis needs.",
+   "why_it_matters": "Two independently-added filters on one candidate loop is how that loop stops being explainable — the same argument BL-219 won when it retired a second mechanism deciding one field. Cheap to reconcile now, while both are unbuilt and BL-523 is still design-owed; expensive once one has shipped and the other is written around it. The carve ambiguity is the sharper half: BL-523 cannot be specified against a kind axis whose value for carved corporations is undefined.",
+   "options": [
+    "Reconcile now: one gating mechanism reading both axes, specified across BL-523 and BL-529.",
+    "Build BL-523 first (it is v0.1.22, ahead of v0.1.23) and have BL-529 extend its gate rather than add one.",
+    "Keep them independent and accept two filters."
+   ],
+   "recommendation": "Option 2. BL-523 is already the earlier minor and is design-owed, so it can absorb the requirement cheaply; BL-529 then extends a gate that exists rather than inventing a parallel one. Either way BL-526 owes an answer on whether a carved corporation is background or named — that is a gap in my item, not in BL-523.",
+   "files": [
+    "src/world/corp_ai.cpp",
+    "docs/development/backlog.json"
    ],
    "status": "open",
    "resolution": null

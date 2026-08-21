@@ -10,7 +10,7 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — Ownership separates from identity: the syndicate tier (BL-522–BL-528, NR-473–NR-479) (2026-08-21, latest)
+## Session — Ownership separates from identity: the syndicate tier (BL-524–BL-530, NR-491–NR-497) (2026-08-21, latest)
 
 Full mode, **design only** — no `src/` change, nothing started. Ben raised a framing idea; it
 became seven backlog items, a new canonical term, a named minor, and six review entries.
@@ -30,18 +30,18 @@ scored-utility layer, identical to a rival, with no separate code path.
 
 So the self-running AI layer the brief asked for was **already built**. The item stopped being
 "give companies autonomy" and became "hang **ownership** on autonomy that already exists" — which
-is what made a framing change of this reach affordable, and which is now the first thing BL-522
+is what made a framing change of this reach affordable, and which is now the first thing BL-524
 says.
 
 **Recommendation given, and overridden.** The advice was to save the idea to the backlog rather
 than work it: BL-094 (player-identity pivot) is parked and unlanded, this reads as the *fourth*
 framing on player identity in seven weeks, and settling a fourth on paper before the third ships
-is how churn compounds. Ben chose to work it. Recorded as **NR-477** (novelty flag) rather than
+is how churn compounds. Ben chose to work it. Recorded as **NR-495** (novelty flag) rather than
 buried — the concern was real and was overridden deliberately, and the counter-argument (BL-094
 explicitly left non-mandate revenue open; equity income *answers* that rather than replacing the
 identity) is on file as mine to be tested, not inherited.
 
-**The ruling that made it designable (NR-473).** `io-standing-rules`: *"the player's own corp is
+**The ruling that made it designable (NR-491).** `io-standing-rules`: *"the player's own corp is
 never auto-acted on strategically."* Corporations that self-run while the player owns them puts
 that rule's **subject** in question. Taken on Ben's behalf, on **BL-409 (spectator mode)**'s
 precedent — the prohibition protects a corp *because a human owns it*, so a changed ownership
@@ -60,20 +60,20 @@ taking the wheel. That is a real strategic question; "never" had only one answer
 
 The three costs the "never" position defended against were not deleted from the design, because
 they did not stop existing — they became costs with owners. Micromanagement is bounded by the
-carve (which makes BL-524's carve count load-bearing against *attention*, not just portfolio
-interest). `corp_ai`'s uniform iteration genuinely forks, and BL-527 now owns that control gate
+carve (which makes BL-526's carve count load-bearing against *attention*, not just portfolio
+interest). `corp_ai`'s uniform iteration genuinely forks, and BL-529 now owns that control gate
 under two constraints from BL-409: it must not shift any other corp's cadence slot, and it has no
 subject under spectate. And the prohibition's subject stays crisp by **deriving** control from the
 equity relation rather than storing a flag. One question fell out of the ruling that the "never"
-design could not have had — NR-481, what happens the moment a majority flips — and its fourth part
+design could not have had — NR-499, what happens the moment a majority flips — and its fourth part
 (can a rival take control of a corporation the player controls) is a standing-rule *grant*, not a
 mechanism, so it is flagged rather than assumed.
 
-The ruling also answered BL-526's open question for free: if a majority confers *operating*
+The ruling also answered BL-528's open question for free: if a majority confers *operating*
 control it plainly confers *financial* policy, so the majority holder sets the payout ratio and
 the financial-versus-operating carve that item proposed collapses.
 
-**Ben's terminology ruling, and what it surfaced (NR-474 → NR-479).** His framing used
+**Ben's terminology ruling, and what it surfaced (NR-492 → NR-497).** His framing used
 *corporation* for the holder and *company* for the operator — inverted from the settled terms.
 His call: **keep `corporation` as the operator, name the holding tier something else.** The word
 chosen on his behalf is **syndicate**, scored on semantic fit, grep-cleanliness (zero hits in
@@ -84,29 +84,29 @@ head-on collision with the standing rules' own untrusted-boundary language.
 The rename then **surfaced a design hole that the original vocabulary had hidden**. Under Ben's
 wording the named corps simply *became* the holders, so nothing needed carving. Keeping
 "corporation" for the operator breaks that — today's ~8 named corporations own buildings, and a
-pure holder cannot take them along. Resolution, now in BL-524: each named corp **splits** into a
+pure holder cannot take them along. Resolution, now in BL-526: each named corp **splits** into a
 syndicate plus one or more operating corporations carved from its holdings, the syndicate seeded
 with a majority stake, carved corps inheriting the parent's `industrial_focus` so the specialists
 premise survives. The payoff is that every syndicate opens with a **portfolio** rather than an
 empty balance sheet, so the mechanic is live from turn one. A naming decision paying for itself in
 mechanism is worth recording as such.
 
-It also sharpened NR-473: with two type names the standing rule's subject is readable straight off
+It also sharpened NR-491: with two type names the standing rule's subject is readable straight off
 the type — a **syndicate** is never auto-acted on, a **corporation** always is. Under one word
 that sentence needed a qualifier at every citation.
 
-**What landed.** BL-522 (syndicate tier) parent plus six children — BL-523 (equity data model,
+**What landed.** BL-524 (syndicate tier) parent plus six children — BL-525 (equity data model,
 integer shares never floats, because repeated float ownership arithmetic drifts a replay),
-BL-524 (the carve + ownership class, derived from the history ladder on BL-219's
-derive-don't-author precedent), BL-525 (valuation through `resolve_price`, not a parallel
-engine), BL-526 (dividends as a sixth `apply_budget` flow), BL-527 (rival syndicate behaviour —
-the one the symmetry rule makes mandatory), BL-528 (portfolio ledger). Three genuinely new
+BL-526 (the carve + ownership class, derived from the history ladder on BL-219's
+derive-don't-author precedent), BL-527 (valuation through `resolve_price`, not a parallel
+engine), BL-528 (dividends as a sixth `apply_budget` flow), BL-529 (rival syndicate behaviour —
+the one the symmetry rule makes mandatory), BL-530 (portfolio ledger). Three genuinely new
 mechanics; the rest reuses `resolve_price`, FINANCE profitability, BL-350's negotiation seam and
-BL-218's timing scalar. **v0.1.23 — Who owns whom** named in ROADMAP on Ben's ruling (NR-476),
-carrying the affordability argument and the NR-477 hold recommendation forward so a roadmap-only
+BL-218's timing scalar. **v0.1.23 — Who owns whom** named in ROADMAP on Ben's ruling (NR-494),
+carrying the affordability argument and the NR-495 hold recommendation forward so a roadmap-only
 reader sees both.
 
-**Doc drift found in passing (NR-478).** CLAUDE.md and README both still described the pivot as
+**Doc drift found in passing (NR-496).** CLAUDE.md and README both still described the pivot as
 being to a **governing body** — superseded twice over, first by BL-094's 2026-08-10 militia
 rewrite and then by the 2026-08-12 two-arcs split that put a mercenary company in the live seat.
 README also still carried the pre-NR-177 1960 epoch. Both corrected. The lesson worth keeping:
@@ -114,16 +114,16 @@ these two files are what a fresh session and a fresh reader start from, so a sta
 propagates further than the same staleness in a subject doc nobody reads without traversing to it.
 
 **Review queue closed out.** All seven entries put to Ben and answered in-session: he overturned
-NR-473 (control at majority), took NR-475 literally (**seven** syndicates total, the player one of
-them — `corporation_count` drops 8 → 7), confirmed NR-479 (*syndicate*), and ruled NR-477 —
-**hold BL-523 until v0.1.15 is cut.** So the minor is designed and deliberately not started, which
-is the outcome the novelty flag was arguing for. NR-478 closed as an observation; NR-480 became
-BL-529 (session-close indent preservation), per the standing pattern that an answer creating work
+NR-491 (control at majority), took NR-493 literally (**seven** syndicates total, the player one of
+them — `corporation_count` drops 8 → 7), confirmed NR-497 (*syndicate*), and ruled NR-495 —
+**hold BL-525 until v0.1.15 is cut.** So the minor is designed and deliberately not started, which
+is the outcome the novelty flag was arguing for. NR-496 closed as an observation; NR-498 became
+BL-531 (session-close indent preservation), per the standing pattern that an answer creating work
 becomes an item rather than a longer review entry.
 
 **Runtime.** ~2.5h, Full mode (design/refinement only, remote, no build). Eight backlog items, one
-new GLOSSARY term, one named minor, nine review entries — NR-473 → NR-481, eight resolved in
-session, one (NR-481) newly raised by Ben's own ruling.
+new GLOSSARY term, one named minor, nine review entries — NR-491 → NR-499, eight resolved in
+session, one (NR-499) newly raised by Ben's own ruling.
 
 ---
 
