@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*206 entries — 150 open, 56 resolved.*
+*209 entries — 153 open, 56 resolved.*
 
 ---
 
@@ -1256,6 +1256,21 @@ The agent flagged this as novel and it is the sharper half of NR-438. province.h
 *observation · raised 2026-08-21 · from Singleton absorption pass on BL-515, merged and verified 2026-08-21.*
 
 province_capacity_probe's BL-513 ratio moved 12.2546 -> 12.2477 across the absorption (0.06%), measured by running the probe at HEAD and again after rather than reasoned about. k_province_buildings_per_sustain_unit stays at 12.6468, un-re-pinned. That is now the third independent confirmation that the ceiling coefficient is insensitive to how the partition is drawn, which is what its shape predicted - both sides of its ratio are sums over tiles.
+
+### NR-442 — urban already destroys the geology under a city, and the axis split fixes it as a side effect
+*observation · raised 2026-08-21 · from BL-519 / BL-520 design work, 2026-08-21.*
+
+BL-366's urban transform is documented as one-way and it OVERWRITES terrain_composition. So today, when a metallic tile's building stack fills, the tile stops being metallic - the fact is gone, not hidden. Nothing reads it afterwards, so nothing has broken visibly, but it means a city can never know what it was built on, and any future rule that wants to (a mine under a city, subsidence, resource exhaustion, a lens showing what the land WAS) has no data to read. BL-519 fixes this incidentally: with substrate separate from state, paving a tile leaves the substrate intact. Recorded separately from the item because it is a live data-loss bug, not merely a design awkwardness, and because if BL-519 is ever deferred this should be fixed on its own.
+
+### NR-443 — Texture and the province blend are in direct tension, and BL-514 sits in the middle of it
+*question · raised 2026-08-21 · from BL-519 / BL-520 design work, 2026-08-21.*
+
+The canvas blends colour across a province's tiles (BL-511) to smooth the lattice away. A texture does the opposite - it asserts where one tile ends. Run both naively and they fight. The resolution in BL-520 is to texture the SUBSTRATE (which the blend already averages) and pattern the COVER (which is per-tile and should read as per-tile), so a forest edge is information and a rock-to-rock seam is not. But this collides with BL-514 (blend ALL tiles, not just within provinces), which is HELD pending your look at the organic borders. If texture becomes the thing that makes the map read as terrain, the global blend may be unnecessary - or may be exactly what lets texture stay subtle. Worth deciding BL-514 and BL-520 together rather than in sequence, since each changes what the other is for.
+
+### NR-444 — The composition migration is 330 references across 49 files, and the accessor decision shapes it
+*question · raised 2026-08-21 · from BL-519 / BL-520 design work, 2026-08-21.*
+
+Measured rather than estimated: 330 references to composition in src/, concentrated in tile_generation.cpp (60), terrain_combat.cpp (32), placement_rules.cpp (32), corporation_generation (18), nation_generation (15) and the UI (hex_render 14, presentation 13, generation_ledger 12). There is NO save format, so none of this is a data migration - it is call sites only, which is why the item is landable at all. BL-519 proposes a derived composition() accessor so every call site keeps working while the axes land underneath, then migrating by MEANING in batches. The question for you is whether that accessor is permanent or deleted last. Permanent is a much smaller diff and a lasting lie - the codebase would keep asking a question the data model no longer answers. Deleted is honest and a longer migration. The interesting part is that a call site asking 'is this forest?' usually means either 'is there timber here?' (cover) or 'can I build on it?' (substrate), and which it meant is precisely the information the overloaded enum has been losing.
 
 ---
 
