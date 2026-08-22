@@ -3280,7 +3280,7 @@
    "raised": "2026-08-22",
    "kind": "question",
    "source": "Phantom-scan documentation pass, 2026-08-22. Ben asked for a review item per doc: \"I'll read them in full and let you know where I would want to change things.\"",
-   "what": "New 322-line authority, split from SUPPLY.md on the line \"Logistics is the road; Supply is the traffic\". Ben, 2026-08-22: \"Pay extra attention to the logistic system, as that is the most substantial part which I feel I haven't given a firm authority on.\" Owns BL-325 ruling 3 in general form, the shared traversal-cost function, reach as the placement constraint, roads and tiers, physical scale and travel time, cache invalidation, interdiction, and the whole BL-464 Logistic Points design - two rulings, three settled rules, and the seven findings that rejected its first cut. Five open questions at the end.",
+   "what": "New 322-line authority, split from SUPPLY.md on the line \"Logistics is the road; Supply is the traffic\". Ben, 2026-08-22: \"Pay extra attention to the logistic system, as that is the most substantial part which I feel I haven't given a firm authority on.\" Owns BL-325 ruling 3 in general form, the shared traversal-cost function, reach as the placement constraint, roads and tiers, physical scale and travel time, cache invalidation, interdiction, and the whole BL-464 Logistic Points design - two rulings, three settled rules, and the seven findings that rejected its first cut. Five open questions at the end. | ANSWER FORM: https://claude.ai/code/artifact/debe7b8f-7315-429a-a805-0e295e9405bc - this doc's open questions are a section of the design register, with the evidence, the options and a free-text field. Answers copy back as one block.",
    "why_it_matters": "Ben asked to read each new authority doc in full and mark what he wants changed. This entry is the place to record his verdict; resolve it with the changes made, or with \"accepted as written\".",
    "options": [],
    "recommendation": "Read § Logistic Points first - it is the largest section and the one carrying settled rulings that were only ever inside a backlog item. The finding worth your attention is the last one: goods-vs-force priority is currently decided invisibly by tick phase order, so \"the army goes unsupplied\" is an inherited default nobody chose.",
@@ -3296,7 +3296,7 @@
    "raised": "2026-08-22",
    "kind": "question",
    "source": "Phantom-scan documentation pass, 2026-08-22. Ben asked for a review item per doc: \"I'll read them in full and let you know where I would want to change things.\"",
-   "what": "New 217-line authority for the province as a game object, gathered from province.hpp, TILE_GENERATION.md, PLANETARY.md and SELECTION.md. Owns the four partition rulings, the three size constants (7 soft / 12 preferred / 20 hard) and why the hard cap is asserted rather than imposed, the three domains, unit position at province grain (NR-405), and your 2026-08-22 ruling that every lens blends. Four open questions, two of which are your existing unruled review entries (NR-433 on the 3-tile floor, NR-421 on the inert ceiling).",
+   "what": "New 217-line authority for the province as a game object, gathered from province.hpp, TILE_GENERATION.md, PLANETARY.md and SELECTION.md. Owns the four partition rulings, the three size constants (7 soft / 12 preferred / 20 hard) and why the hard cap is asserted rather than imposed, the three domains, unit position at province grain (NR-405), and your 2026-08-22 ruling that every lens blends. Four open questions, two of which are your existing unruled review entries (NR-433 on the 3-tile floor, NR-421 on the inert ceiling). | ANSWER FORM: https://claude.ai/code/artifact/debe7b8f-7315-429a-a805-0e295e9405bc - this doc's open questions are a section of the design register, with the evidence, the options and a free-text field. Answers copy back as one block.",
    "why_it_matters": "Ben asked to read each new authority doc in full and mark what he wants changed. This entry is the place to record his verdict; resolve it with the changes made, or with \"accepted as written\".",
    "options": [],
    "recommendation": "The open question worth deciding is 3 - whether a province ever gains an OWNER. Every use so far is spatial, and BL-518 (war redraws borders) is where that pressure first arrives.",
@@ -3312,7 +3312,7 @@
    "raised": "2026-08-22",
    "kind": "question",
    "source": "Phantom-scan documentation pass, 2026-08-22. Ben asked for a review item per doc: \"I'll read them in full and let you know where I would want to change things.\"",
-   "what": "New 250-line authority carving procurement and the mercenary contract out of MARKETS.md, where the game's income loop had been a subsection of the market document. Records BL-377's full design - the condition_set spine, offers derived from history_sim's campaign scorer, the four settled answers, three terminal states - plus what the nations session changed: the client is now a nation with a treasury, and the relationship rides sentiment's Trust dimension rather than a parallel axis.",
+   "what": "New 250-line authority carving procurement and the mercenary contract out of MARKETS.md, where the game's income loop had been a subsection of the market document. Records BL-377's full design - the condition_set spine, offers derived from history_sim's campaign scorer, the four settled answers, three terminal states - plus what the nations session changed: the client is now a nation with a treasury, and the relationship rides sentiment's Trust dimension rather than a parallel axis. | ANSWER FORM: https://claude.ai/code/artifact/debe7b8f-7315-429a-a805-0e295e9405bc - this doc's open questions are a section of the design register, with the evidence, the options and a free-text field. Answers copy back as one block.",
    "why_it_matters": "Ben asked to read each new authority doc in full and mark what he wants changed. This entry is the place to record his verdict; resolve it with the changes made, or with \"accepted as written\".",
    "options": [],
    "recommendation": "Open question 1 is the one that needs you: a contract fee is an actor-to-actor transfer, which NATIONS.md says must conserve - so a nation that cannot afford a contract must not be able to offer it. That couples offer generation to BL-537 budget and is not stated anywhere yet.",
@@ -3328,7 +3328,7 @@
    "raised": "2026-08-22",
    "kind": "question",
    "source": "Phantom-scan documentation pass, 2026-08-22. Ben asked for a review item per doc: \"I'll read them in full and let you know where I would want to change things.\"",
-   "what": "New 196-line design-owed doc from your 2026-08-22 ask. Everything past § Precedent is a PROPOSAL, not settled design. Builds on BL-207 (persona counsel packs, already fully designed) and BL-370 (corp leader figure, your own 2026-08-11 ask) rather than inventing a rival. Proposes: a person is a name, a role, a seat, a tenure and AT MOST ONE bias; a cast not a population; and mortality, because a person who never leaves is a permanent modifier wearing a name. Six open questions. Filed as BL-547.",
+   "what": "New 196-line design-owed doc from your 2026-08-22 ask. Everything past § Precedent is a PROPOSAL, not settled design. Builds on BL-207 (persona counsel packs, already fully designed) and BL-370 (corp leader figure, your own 2026-08-11 ask) rather than inventing a rival. Proposes: a person is a name, a role, a seat, a tenure and AT MOST ONE bias; a cast not a population; and mortality, because a person who never leaves is a permanent modifier wearing a name. Six open questions. Filed as BL-547. | ANSWER FORM: https://claude.ai/code/artifact/debe7b8f-7315-429a-a805-0e295e9405bc - this doc's open questions are a section of the design register, with the evidence, the options and a free-text field. Answers copy back as one block.",
    "why_it_matters": "Ben asked to read each new authority doc in full and mark what he wants changed. This entry is the place to record his verdict; resolve it with the changes made, or with \"accepted as written\".",
    "options": [],
    "recommendation": "Question 2 is the cheapest to overturn now and the most likely to be wrong: one bias, or several. Question 1 sets the order - company head is your own earlier ask and needs no other system; minister is the highest value because it gives lobbying a target.",
@@ -3344,7 +3344,7 @@
    "raised": "2026-08-22",
    "kind": "question",
    "source": "Phantom-scan documentation pass, 2026-08-22. Ben asked for a review item per doc: \"I'll read them in full and let you know where I would want to change things.\"",
-   "what": "New 212-line design-owed doc from your 2026-08-22 ask. The interesting problem is the word \"random\": Io is deterministic, so the doc reuses YOUR OWN BL-315 ruling 4 - uncertain to the player, deterministic to the engine, drawn from a seeded stream folded from the subject's identity. Second finding: the meta layer already supplies two thirds of an event (condition_set = predicate, modifier_set = effect), so only the trigger is new - and it is the consumer collapse_strain has been waiting for. Filed as BL-548.",
+   "what": "New 212-line design-owed doc from your 2026-08-22 ask. The interesting problem is the word \"random\": Io is deterministic, so the doc reuses YOUR OWN BL-315 ruling 4 - uncertain to the player, deterministic to the engine, drawn from a seeded stream folded from the subject's identity. Second finding: the meta layer already supplies two thirds of an event (condition_set = predicate, modifier_set = effect), so only the trigger is new - and it is the consumer collapse_strain has been waiting for. Filed as BL-548. | ANSWER FORM: https://claude.ai/code/artifact/debe7b8f-7315-429a-a805-0e295e9405bc - this doc's open questions are a section of the design register, with the evidence, the options and a free-text field. Answers copy back as one block.",
    "why_it_matters": "Ben asked to read each new authority doc in full and mark what he wants changed. This entry is the place to record his verdict; resolve it with the changes made, or with \"accepted as written\".",
    "options": [],
    "recommendation": "Question 4 decides how large this system is: do events DRIVE the collapse metagame or merely express it. Question 2 - how often is an event - is the single number separating texture from chaos, and nothing has established a target rhythm.",
@@ -3360,7 +3360,7 @@
    "raised": "2026-08-22",
    "kind": "question",
    "source": "Phantom-scan documentation pass, 2026-08-22. Ben asked for a review item per doc: \"I'll read them in full and let you know where I would want to change things.\"",
-   "what": "Your words, 2026-08-22: \"we really want interconnectivity, so a player only progresses so far using one system before the next becomes a natural consequence.\" Written into SYSTEMS.md as a named principle - EACH SYSTEM'S CEILING IS THE NEXT SYSTEM'S DOOR - and as a three-part design test every system must answer: what forces a player in, what does it open, what does it cap them at. A table applies it to six rungs and names each rung's current ceiling. Every new doc written this session carries a § Where this sits in the chain section against it.",
+   "what": "Your words, 2026-08-22: \"we really want interconnectivity, so a player only progresses so far using one system before the next becomes a natural consequence.\" Written into SYSTEMS.md as a named principle - EACH SYSTEM'S CEILING IS THE NEXT SYSTEM'S DOOR - and as a three-part design test every system must answer: what forces a player in, what does it open, what does it cap them at. A table applies it to six rungs and names each rung's current ceiling. Every new doc written this session carries a § Where this sits in the chain section against it. | ANSWER FORM: https://claude.ai/code/artifact/debe7b8f-7315-429a-a805-0e295e9405bc - this doc's open questions are a section of the design register, with the evidence, the options and a free-text field. Answers copy back as one block.",
    "why_it_matters": "Ben asked to read each new authority doc in full and mark what he wants changed. This entry is the place to record his verdict; resolve it with the changes made, or with \"accepted as written\".",
    "options": [],
    "recommendation": "Two claims in it are mine rather than yours and worth checking. First: the chain CLOSES rather than ending, because force's ceiling is supply, which is the logistics rung again - which makes BL-464 a bigger item than its size suggests. Second: a staircase is a solved sequence, which is the argument for EVENTS.md cutting across it.",
@@ -3386,6 +3386,23 @@
    ],
    "status": "resolved",
    "resolution": "Self-corrected 2026-08-22 at the moment it was found. PHANTOMS.md § Class 1 marks the row as a false positive with the reason."
+  },
+  {
+   "id": "NR-532",
+   "title": "The design register is live — 41 open calls across ten sections, as a form",
+   "raised": "2026-08-22",
+   "kind": "observation",
+   "source": "Ben, 2026-08-22: \"now please revisit each one and open forms for answering the open questions.\"",
+   "what": "Published at https://claude.ai/code/artifact/debe7b8f-7315-429a-a805-0e295e9405bc. Every open question across the eight new authority docs plus SYSTEMS.md § The progression chain plus four cross-cutting calls, gathered into one form: 41 questions in 10 sections. Each carries its evidence, 3-5 options with one marked as suggested, and a free-text field that overrides the options. Progress is tracked per section; \"Copy all answers\" puts everything on the clipboard in one block. It is a LIVE DOC - radios and contenteditable fields are captured as edits, so answers reach a watching session directly; deliberately no <textarea> and no <select>, neither of which is captured. Answers also persist to localStorage as a per-viewer draft.\n\nThe generator is committed rather than being a one-off (CLAUDE.md § Tool creation is skill creation): tools/session/register/questions.js is the canonical question set and build.js emits the HTML. Verified to regenerate byte-identically. Republish to the same URL to keep answers in place.",
+   "why_it_matters": "The open questions were the point of writing the docs as capture rather than design, and they were spread across ten files. A form is the difference between 41 questions that get answered and 41 that get skimmed. It also means the answers arrive in one structured block that can be propagated in a single pass, the way the six nations rulings were.",
+   "options": [],
+   "recommendation": "Answer in any order. The four that change the most downstream: LOGISTICS Q1 (what generates LP), EVENTS Q4 (drive the collapse metagame or express it - it decides the system's size), PEOPLE Q2 (one bias or several - cheapest to overturn now), and NATIONS Q1 (whether the grant reaches a rival, which blocks the player-facing halves of two items).",
+   "files": [
+    "tools/session/register/questions.js",
+    "tools/session/register/build.js"
+   ],
+   "status": "open",
+   "resolution": null
   }
  ]
 }

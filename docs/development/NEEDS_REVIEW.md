@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*233 entries — 211 open, 22 resolved.*
+*234 entries — 212 open, 22 resolved.*
 
 ---
 
@@ -1980,7 +1980,7 @@ modifier_subject has six entries and ONE is wired: extraction_rate, applied in e
 ### NR-525 — REVIEW: docs/economy/LOGISTICS.md — the network authority (Ben flagged this one as the priority)
 *question · raised 2026-08-22 · from Phantom-scan documentation pass, 2026-08-22. Ben asked for a review item per doc: "I'll read them in full and let you know where I would want to change things."*
 
-New 322-line authority, split from SUPPLY.md on the line "Logistics is the road; Supply is the traffic". Ben, 2026-08-22: "Pay extra attention to the logistic system, as that is the most substantial part which I feel I haven't given a firm authority on." Owns BL-325 ruling 3 in general form, the shared traversal-cost function, reach as the placement constraint, roads and tiers, physical scale and travel time, cache invalidation, interdiction, and the whole BL-464 Logistic Points design - two rulings, three settled rules, and the seven findings that rejected its first cut. Five open questions at the end.
+New 322-line authority, split from SUPPLY.md on the line "Logistics is the road; Supply is the traffic". Ben, 2026-08-22: "Pay extra attention to the logistic system, as that is the most substantial part which I feel I haven't given a firm authority on." Owns BL-325 ruling 3 in general form, the shared traversal-cost function, reach as the placement constraint, roads and tiers, physical scale and travel time, cache invalidation, interdiction, and the whole BL-464 Logistic Points design - two rulings, three settled rules, and the seven findings that rejected its first cut. Five open questions at the end. | ANSWER FORM: https://claude.ai/code/artifact/debe7b8f-7315-429a-a805-0e295e9405bc - this doc's open questions are a section of the design register, with the evidence, the options and a free-text field. Answers copy back as one block.
 
 **Why it matters.** Ben asked to read each new authority doc in full and mark what he wants changed. This entry is the place to record his verdict; resolve it with the changes made, or with "accepted as written".
 
@@ -1991,7 +1991,7 @@ New 322-line authority, split from SUPPLY.md on the line "Logistics is the road;
 ### NR-526 — REVIEW: docs/generation/PROVINCES.md — the spatial unit of consequence
 *question · raised 2026-08-22 · from Phantom-scan documentation pass, 2026-08-22. Ben asked for a review item per doc: "I'll read them in full and let you know where I would want to change things."*
 
-New 217-line authority for the province as a game object, gathered from province.hpp, TILE_GENERATION.md, PLANETARY.md and SELECTION.md. Owns the four partition rulings, the three size constants (7 soft / 12 preferred / 20 hard) and why the hard cap is asserted rather than imposed, the three domains, unit position at province grain (NR-405), and your 2026-08-22 ruling that every lens blends. Four open questions, two of which are your existing unruled review entries (NR-433 on the 3-tile floor, NR-421 on the inert ceiling).
+New 217-line authority for the province as a game object, gathered from province.hpp, TILE_GENERATION.md, PLANETARY.md and SELECTION.md. Owns the four partition rulings, the three size constants (7 soft / 12 preferred / 20 hard) and why the hard cap is asserted rather than imposed, the three domains, unit position at province grain (NR-405), and your 2026-08-22 ruling that every lens blends. Four open questions, two of which are your existing unruled review entries (NR-433 on the 3-tile floor, NR-421 on the inert ceiling). | ANSWER FORM: https://claude.ai/code/artifact/debe7b8f-7315-429a-a805-0e295e9405bc - this doc's open questions are a section of the design register, with the evidence, the options and a free-text field. Answers copy back as one block.
 
 **Why it matters.** Ben asked to read each new authority doc in full and mark what he wants changed. This entry is the place to record his verdict; resolve it with the changes made, or with "accepted as written".
 
@@ -2002,7 +2002,7 @@ New 217-line authority for the province as a game object, gathered from province
 ### NR-527 — REVIEW: docs/economy/CONTRACTS.md — the income loop, out of the market doc
 *question · raised 2026-08-22 · from Phantom-scan documentation pass, 2026-08-22. Ben asked for a review item per doc: "I'll read them in full and let you know where I would want to change things."*
 
-New 250-line authority carving procurement and the mercenary contract out of MARKETS.md, where the game's income loop had been a subsection of the market document. Records BL-377's full design - the condition_set spine, offers derived from history_sim's campaign scorer, the four settled answers, three terminal states - plus what the nations session changed: the client is now a nation with a treasury, and the relationship rides sentiment's Trust dimension rather than a parallel axis.
+New 250-line authority carving procurement and the mercenary contract out of MARKETS.md, where the game's income loop had been a subsection of the market document. Records BL-377's full design - the condition_set spine, offers derived from history_sim's campaign scorer, the four settled answers, three terminal states - plus what the nations session changed: the client is now a nation with a treasury, and the relationship rides sentiment's Trust dimension rather than a parallel axis. | ANSWER FORM: https://claude.ai/code/artifact/debe7b8f-7315-429a-a805-0e295e9405bc - this doc's open questions are a section of the design register, with the evidence, the options and a free-text field. Answers copy back as one block.
 
 **Why it matters.** Ben asked to read each new authority doc in full and mark what he wants changed. This entry is the place to record his verdict; resolve it with the changes made, or with "accepted as written".
 
@@ -2013,7 +2013,7 @@ New 250-line authority carving procurement and the mercenary contract out of MAR
 ### NR-528 — REVIEW: docs/PEOPLE.md — named people and roles (NEW system, proposal not design)
 *question · raised 2026-08-22 · from Phantom-scan documentation pass, 2026-08-22. Ben asked for a review item per doc: "I'll read them in full and let you know where I would want to change things."*
 
-New 196-line design-owed doc from your 2026-08-22 ask. Everything past § Precedent is a PROPOSAL, not settled design. Builds on BL-207 (persona counsel packs, already fully designed) and BL-370 (corp leader figure, your own 2026-08-11 ask) rather than inventing a rival. Proposes: a person is a name, a role, a seat, a tenure and AT MOST ONE bias; a cast not a population; and mortality, because a person who never leaves is a permanent modifier wearing a name. Six open questions. Filed as BL-547.
+New 196-line design-owed doc from your 2026-08-22 ask. Everything past § Precedent is a PROPOSAL, not settled design. Builds on BL-207 (persona counsel packs, already fully designed) and BL-370 (corp leader figure, your own 2026-08-11 ask) rather than inventing a rival. Proposes: a person is a name, a role, a seat, a tenure and AT MOST ONE bias; a cast not a population; and mortality, because a person who never leaves is a permanent modifier wearing a name. Six open questions. Filed as BL-547. | ANSWER FORM: https://claude.ai/code/artifact/debe7b8f-7315-429a-a805-0e295e9405bc - this doc's open questions are a section of the design register, with the evidence, the options and a free-text field. Answers copy back as one block.
 
 **Why it matters.** Ben asked to read each new authority doc in full and mark what he wants changed. This entry is the place to record his verdict; resolve it with the changes made, or with "accepted as written".
 
@@ -2024,7 +2024,7 @@ New 196-line design-owed doc from your 2026-08-22 ask. Everything past § Preced
 ### NR-529 — REVIEW: docs/EVENTS.md — random events (NEW system, proposal not design)
 *question · raised 2026-08-22 · from Phantom-scan documentation pass, 2026-08-22. Ben asked for a review item per doc: "I'll read them in full and let you know where I would want to change things."*
 
-New 212-line design-owed doc from your 2026-08-22 ask. The interesting problem is the word "random": Io is deterministic, so the doc reuses YOUR OWN BL-315 ruling 4 - uncertain to the player, deterministic to the engine, drawn from a seeded stream folded from the subject's identity. Second finding: the meta layer already supplies two thirds of an event (condition_set = predicate, modifier_set = effect), so only the trigger is new - and it is the consumer collapse_strain has been waiting for. Filed as BL-548.
+New 212-line design-owed doc from your 2026-08-22 ask. The interesting problem is the word "random": Io is deterministic, so the doc reuses YOUR OWN BL-315 ruling 4 - uncertain to the player, deterministic to the engine, drawn from a seeded stream folded from the subject's identity. Second finding: the meta layer already supplies two thirds of an event (condition_set = predicate, modifier_set = effect), so only the trigger is new - and it is the consumer collapse_strain has been waiting for. Filed as BL-548. | ANSWER FORM: https://claude.ai/code/artifact/debe7b8f-7315-429a-a805-0e295e9405bc - this doc's open questions are a section of the design register, with the evidence, the options and a free-text field. Answers copy back as one block.
 
 **Why it matters.** Ben asked to read each new authority doc in full and mark what he wants changed. This entry is the place to record his verdict; resolve it with the changes made, or with "accepted as written".
 
@@ -2035,13 +2035,26 @@ New 212-line design-owed doc from your 2026-08-22 ask. The interesting problem i
 ### NR-530 — REVIEW: SYSTEMS.md § The progression chain — your interconnectivity ask, written as a design test
 *question · raised 2026-08-22 · from Phantom-scan documentation pass, 2026-08-22. Ben asked for a review item per doc: "I'll read them in full and let you know where I would want to change things."*
 
-Your words, 2026-08-22: "we really want interconnectivity, so a player only progresses so far using one system before the next becomes a natural consequence." Written into SYSTEMS.md as a named principle - EACH SYSTEM'S CEILING IS THE NEXT SYSTEM'S DOOR - and as a three-part design test every system must answer: what forces a player in, what does it open, what does it cap them at. A table applies it to six rungs and names each rung's current ceiling. Every new doc written this session carries a § Where this sits in the chain section against it.
+Your words, 2026-08-22: "we really want interconnectivity, so a player only progresses so far using one system before the next becomes a natural consequence." Written into SYSTEMS.md as a named principle - EACH SYSTEM'S CEILING IS THE NEXT SYSTEM'S DOOR - and as a three-part design test every system must answer: what forces a player in, what does it open, what does it cap them at. A table applies it to six rungs and names each rung's current ceiling. Every new doc written this session carries a § Where this sits in the chain section against it. | ANSWER FORM: https://claude.ai/code/artifact/debe7b8f-7315-429a-a805-0e295e9405bc - this doc's open questions are a section of the design register, with the evidence, the options and a free-text field. Answers copy back as one block.
 
 **Why it matters.** Ben asked to read each new authority doc in full and mark what he wants changed. This entry is the place to record his verdict; resolve it with the changes made, or with "accepted as written".
 
 > **Recommendation:** Two claims in it are mine rather than yours and worth checking. First: the chain CLOSES rather than ending, because force's ceiling is supply, which is the logistics rung again - which makes BL-464 a bigger item than its size suggests. Second: a staircase is a solved sequence, which is the argument for EVENTS.md cutting across it.
 
 *Files: `docs/SYSTEMS.md`*
+
+### NR-532 — The design register is live — 41 open calls across ten sections, as a form
+*observation · raised 2026-08-22 · from Ben, 2026-08-22: "now please revisit each one and open forms for answering the open questions."*
+
+Published at https://claude.ai/code/artifact/debe7b8f-7315-429a-a805-0e295e9405bc. Every open question across the eight new authority docs plus SYSTEMS.md § The progression chain plus four cross-cutting calls, gathered into one form: 41 questions in 10 sections. Each carries its evidence, 3-5 options with one marked as suggested, and a free-text field that overrides the options. Progress is tracked per section; "Copy all answers" puts everything on the clipboard in one block. It is a LIVE DOC - radios and contenteditable fields are captured as edits, so answers reach a watching session directly; deliberately no <textarea> and no <select>, neither of which is captured. Answers also persist to localStorage as a per-viewer draft.
+
+The generator is committed rather than being a one-off (CLAUDE.md § Tool creation is skill creation): tools/session/register/questions.js is the canonical question set and build.js emits the HTML. Verified to regenerate byte-identically. Republish to the same URL to keep answers in place.
+
+**Why it matters.** The open questions were the point of writing the docs as capture rather than design, and they were spread across ten files. A form is the difference between 41 questions that get answered and 41 that get skimmed. It also means the answers arrive in one structured block that can be propagated in a single pass, the way the six nations rulings were.
+
+> **Recommendation:** Answer in any order. The four that change the most downstream: LOGISTICS Q1 (what generates LP), EVENTS Q4 (drive the collapse metagame or express it - it decides the system's size), PEOPLE Q2 (one bias or several - cheapest to overturn now), and NATIONS Q1 (whether the grant reaches a rival, which blocks the player-facing halves of two items).
+
+*Files: `tools/session/register/questions.js`, `tools/session/register/build.js`*
 
 ---
 
