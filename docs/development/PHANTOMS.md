@@ -35,7 +35,7 @@ combined**. None of it is where a reader looks when asking "how does this work".
 
 ## Class 0 — the one that is not a doc problem
 
-### BL-377 (mercenary contract seam) is marked `complete` and was never built
+### BL-377 (mercenary contract seam) was marked `complete` and was never built — *resolved*
 
 This is the game's **income loop** — *be contracted, field force, be paid*. Under the ancient arc
 it is the product's spine, and MANUAL.md § 4.10 correctly marks it `[DESIGNED]`.
@@ -55,8 +55,9 @@ Meanwhile ROADMAP § The near sequence still names Sprint 16 as *"BL-377 (contra
 end-to-end"*, and SPRINTS.md § Sprint 16 is **open**. The item is closed inside the sprint that
 would deliver it.
 
-**Action: reopen it before anything else in this file.** Its design survives intact in the cold
-store, `archive/backlog-design-2026-Q3.json`.
+**REOPENED 2026-08-22** (Ben's call, same day). Status is `designed`, version goal **v0.1.15**,
+priority **A**. Its design was pulled back out of the cold store intact, and the item now carries a
+dated note recording the false close. Sprint 16 owes it.
 
 > **Same check, the rest of the roster.** Fifteen `complete` items name source paths that resolve
 > to nothing. Thirteen are stale renames and cost nothing — `src/app.cpp` (now `src/core/app.cpp`),

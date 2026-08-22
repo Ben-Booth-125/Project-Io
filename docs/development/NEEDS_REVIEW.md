@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*215 entries — 198 open, 17 resolved.*
+*215 entries — 197 open, 18 resolved.*
 
 ---
 
@@ -1822,17 +1822,6 @@ The Available buildings tab shipped and the very first province it rendered says
 
 *Files: `src/ui/selection_panel.cpp`, `src/world/province.hpp`*
 
-### NR-510 — BL-377 (mercenary contract seam) is marked complete and was NEVER BUILT — the game's income loop is filed as delivered
-*observation · raised 2026-08-22 · from Phantom-feature scan, 2026-08-22 (docs/development/PHANTOMS.md § Class 0).*
-
-BL-377 carries status 'complete'. Four independent checks say no code exists. (1) Its files name src/world/contracts.hpp, src/world/contracts.cpp and scripts/contracts.lua — `git log --all --diff-filter=A` finds NO creation commit for any of the three, on any branch. (2) A grep of src/ for 'BL-377' returns nothing. (3) corp_verb carries no contract verb; the design called for three appended verbs. (4) world.hpp holds procurement_quotes and procurement_contracts only — BL-350's BUY side. It was closed by commit bb4f612, 'Close BL-377 and BL-378 - two more landed items still listed as open'. BL-378 (minimap base render) genuinely HAD landed; BL-377 was swept up with it. MANUAL.md § 4.10 independently marks Contracts [DESIGNED] — the manual is right and the backlog is wrong.
-
-**Why it matters.** This is the player's INCOME under the ancient arc — be contracted, field force, be paid. BL-377's own design field calls it 'the item the refocused product stands on'. ROADMAP § The near sequence still names Sprint 16 as 'BL-377 (contract seam) playable end-to-end' and SPRINTS.md § Sprint 16 is OPEN, so the item is closed inside the sprint that would deliver it. Every status view — the dashboard, the roadmap's open count, any 'what's left' query — currently reads the mercenary loop as done. The design itself survives intact in archive/backlog-design-2026-Q3.json.
-
-> **Recommendation:** Reopen BL-377 as 'designed' with version goal v0.1.15, and re-check BL-378's sibling closures from the same sweep. Not done in this session: the scan was the ask, and flipping a status changes what every roadmap and sprint view reports. Ten minutes of work once you say go.
-
-*Files: `docs/development/backlog.json`, `docs/development/ROADMAP.md`, `docs/development/SPRINTS.md`, `docs/MANUAL.md`*
-
 ### NR-511 — docs/lore/COLLAPSE.md is named as authority by 19 open items and declares itself NOT authority
 *question · raised 2026-08-22 · from Phantom-feature scan, 2026-08-22 (PHANTOMS.md § Class 3).*
 
@@ -2139,4 +2128,17 @@ The new check presses the legend header, and the only way to say where that is i
 > **RESOLVED.** ACCEPTED Ben, 2026-08-22 (UI session) — Ben: "that's no problem." The pixel-aimed panel check stands as written. The underlying gap (panels publish no rect, so a check cannot ask where a control is) remains open as NR-454, which still wants a ruling before a target registry could be built; this entry is closed as an accepted cost rather than as a fixed problem.
 
 *Files: `scripts/verify/lens_legend.lua`*
+
+### NR-510 — BL-377 (mercenary contract seam) is marked complete and was NEVER BUILT — the game's income loop is filed as delivered
+*observation · raised 2026-08-22 · from Phantom-feature scan, 2026-08-22 (docs/development/PHANTOMS.md § Class 0).*
+
+BL-377 carries status 'complete'. Four independent checks say no code exists. (1) Its files name src/world/contracts.hpp, src/world/contracts.cpp and scripts/contracts.lua — `git log --all --diff-filter=A` finds NO creation commit for any of the three, on any branch. (2) A grep of src/ for 'BL-377' returns nothing. (3) corp_verb carries no contract verb; the design called for three appended verbs. (4) world.hpp holds procurement_quotes and procurement_contracts only — BL-350's BUY side. It was closed by commit bb4f612, 'Close BL-377 and BL-378 - two more landed items still listed as open'. BL-378 (minimap base render) genuinely HAD landed; BL-377 was swept up with it. MANUAL.md § 4.10 independently marks Contracts [DESIGNED] — the manual is right and the backlog is wrong.
+
+**Why it matters.** This is the player's INCOME under the ancient arc — be contracted, field force, be paid. BL-377's own design field calls it 'the item the refocused product stands on'. ROADMAP § The near sequence still names Sprint 16 as 'BL-377 (contract seam) playable end-to-end' and SPRINTS.md § Sprint 16 is OPEN, so the item is closed inside the sprint that would deliver it. Every status view — the dashboard, the roadmap's open count, any 'what's left' query — currently reads the mercenary loop as done. The design itself survives intact in archive/backlog-design-2026-Q3.json.
+
+> **Recommendation:** Reopen BL-377 as 'designed' with version goal v0.1.15, and re-check BL-378's sibling closures from the same sweep. Not done in this session: the scan was the ask, and flipping a status changes what every roadmap and sprint view reports. Ten minutes of work once you say go.
+
+> **RESOLVED.** RULED BY BEN, 2026-08-22: reopen it. Done the same session - BL-377 is back to status 'designed', priority A, version goal v0.1.15, with its design prose restored from archive/backlog-design-2026-Q3.json and a dated REOPENED note recording the false close and its four proofs. BL-378, the other half of the bb4f612 sweep, was re-checked and its files all exist - that closure was correct. backlog_lint reports no new warnings. Sprint 16 (the mercenary vertical slice) owes it, as ROADMAP already said.
+
+*Files: `docs/development/backlog.json`, `docs/development/ROADMAP.md`, `docs/development/SPRINTS.md`, `docs/MANUAL.md`*
 

@@ -2991,8 +2991,8 @@
     "docs/development/SPRINTS.md",
     "docs/MANUAL.md"
    ],
-   "status": "open",
-   "resolution": null
+   "status": "resolved",
+   "resolution": "RULED BY BEN, 2026-08-22: reopen it. Done the same session - BL-377 is back to status 'designed', priority A, version goal v0.1.15, with its design prose restored from archive/backlog-design-2026-Q3.json and a dated REOPENED note recording the false close and its four proofs. BL-378, the other half of the bb4f612 sweep, was re-checked and its files all exist - that closure was correct. backlog_lint reports no new warnings. Sprint 16 (the mercenary vertical slice) owes it, as ROADMAP already said."
   },
   {
    "id": "NR-511",
