@@ -93,6 +93,11 @@ runs, what is absent, and six open questions left for Ben rather than answered b
 generation doc's disclaimer is struck through and re-pointed, and SYSTEMS.md § Policy, MARKETS.md
 § Tariffs and FINANCE.md § Levies each carry a pointer at the half they do *not* own.
 
+**All six were settled the same day**, along with a system Ben raised alongside them — a two-way
+channel between corporations and nations, lobbying forward and the budget in reverse. That is the
+argument for capture-first in one line: **the questions were answerable once they were asked
+precisely**, and they had gone unasked for as long as no doc owned the subject.
+
 **Why MARKETS.md is overloaded.** It is 657 lines and carries three systems that are not markets —
 procurement (53 lines), the contract worth model (47), and tariffs (38). The income loop of the
 game is a subsection of the market doc.
@@ -204,7 +209,7 @@ Ordered by what unblocks the most. Each is one session; each ends with prose in 
 | # | Session | Settles | Lands in |
 |---|---|---|---|
 | **1** | **Reopen the income loop** | BL-377's status; what Sprint 16 actually owes | `backlog.json`, ROADMAP |
-| ~~**2**~~ | ~~**The nation as an actor**~~ | **Done 2026-08-22** — doc written; the four calls are now its § Open questions, 1–4 | `docs/politics/NATIONS.md` ✓ |
+| ~~**2**~~ | ~~**The nation as an actor**~~ | **Done 2026-08-22** — doc written, then all six questions settled by Ben the same day; seven items filed (BL-537–BL-543) | `docs/politics/NATIONS.md` ✓ |
 | **3** | **Contracts leave the market doc** | The mercenary sell side as its own subject | new `docs/economy/CONTRACTS.md` |
 | **4** | **Ownership** | Syndicate tier, control gate, dividends, portfolio | new `docs/economy/OWNERSHIP.md` |
 | **5** | **Relations** | Stance vs standing, what hostility permits, sentiment | new `docs/politics/RELATIONS.md` |

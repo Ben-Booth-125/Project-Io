@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*216 entries — 198 open, 18 resolved.*
+*220 entries — 201 open, 19 resolved.*
 
 ---
 
@@ -1878,6 +1878,49 @@ BL-377 was the false-complete. BL-480 is the opposite and is confirmed: commit c
 
 *Files: `docs/development/backlog.json`, `tools/session/backlog_lint.js`*
 
+### NR-516 — Delegated calls in the v0.1.24 filing: a new minor number, one version goal, and three shapes chosen on Ben's behalf
+*decision taken on your behalf · raised 2026-08-22 · from Filing the seven items from the 2026-08-22 nations design session.*
+
+Five calls taken so the items could be filed. (1) VERSION: the six channel items carry v0.1.24, the next free minor - v0.1.23 is 'Who owns whom' (the syndicate tier). The minor is unnamed and unnamed in ROADMAP; Ben should name it or fold the cluster elsewhere. (2) BL-543 (value anchor) put at v0.1.21 instead, with the economy-tuning items - it is a calibration that unblocks NR-382 and should not wait on a politics minor. (3) TARIFF SHAPE: recommended the tariff stay a `law` and gain a `target_nation` field with an `all_nations` sentinel, rather than moving rates onto a nation-pair table; the fork is stated in BL-541 rather than hidden. (4) TWO DIMENSIONS, not 'possibly multiple' - Access and Trust, each gating something, with a third resisted until it does. (5) LOBBYING FEE assumed CONSUMED rather than credited to the treasury; called out in BL-539 and left open below.
+
+**Why it matters.** A version goal is a sequencing commitment and a new minor number is Ben's to name. The tariff-record shape is the one call that is expensive to reverse later, since it lands on a serialised record.
+
+> **Recommendation:** Confirm or rename v0.1.24, and sanity-check the tariff record shape before BL-541 starts. The other three are cheap to overturn.
+
+*Files: `docs/development/backlog.json`, `docs/development/ROADMAP.md`*
+
+### NR-517 — Your ruling needed: does the nation grant reach a RIVAL acting politically against the player, and is a lobbying fee consumed or banked
+*question · raised 2026-08-22 · from Designing BL-539 (lobbying) and BL-540 (nation->corp stance), 2026-08-22.*
+
+TWO CALLS, both blocking the player-facing halves of those items.
+
+(1) THE GRANT'S REACH. A rival corporation lobbying to shift a law that binds the player's corp, and a nation's Access stance gating the player out of a territory, are both consequences imposed on A CORP A HUMAN OWNS by an actor the player does not control. Every widening of that prohibition to date has been explicit and dated - BL-079, BL-202/203, BL-293, BL-324, BL-181, BL-409, and BL-450 (rivals score stance), which is the closest precedent because it was the first RELATIONAL action against the player's corp. The 2026-08-18 grant (ruling 4 of NR-331) covers a NATION acting in a deterministic scored-utility shape. It does not obviously cover a rival corporation acting politically against the player, and reading it as though it does would set exactly the quiet precedent the standing rules exist to prevent.
+
+(2) THE LOBBYING FEE. Consumed, or credited to the lobbied nation's treasury? Consumed reads as influence-buying and keeps the treasury's inflows purely legal (levy, tariff, charter fees). Credited closes another money loop but makes lobbying a second tax, and means a nation profits from being lobbied - which would give BL-542's scorer an incentive to be corruptible.
+
+- Grant the rival half on the same terms as BL-450 - deterministic, seeded, scored-utility, legal verbs only.
+- Withhold it: nations may act politically, rivals may not, and lobbying is a player-only verb for now.
+- Grant it but gate it behind a visibility rule, so a lobbied law is always attributable to whoever bought it.
+
+> **Recommendation:** Option 1 for the grant, on the BL-450 precedent - a rival that cannot lobby while the player can is the unreachable-capability defect BL-458's design complains about, from the other side. But it is your call and the items are written to stop short of it. On the fee: CONSUMED, which is what BL-539 assumes; a nation that profits from lobbying is one the scorer will learn to invite.
+
+*Files: `.claude/rules/io-standing-rules.md`, `docs/politics/NATIONS.md`, `docs/development/backlog.json`*
+
+### NR-518 — Io has TWO clocks and the word 'tick' means both - harmless today, load-bearing the moment anything is priced per year
+*observation · raised 2026-08-22 · from Deriving BL-543's value anchor, which needed to know how many ticks a year is.*
+
+A DAY TICK is one in-game day (sim_loop::m_day_tick); the survey system counts these, and survey_system.hpp says 'one tick = one day'. An ECONOMY TICK is 90 of them - sim_loop::econ_tick_days = days_per_month(30) x months_per_econ(3) - so k_ticks_per_year = 4, and budget_system.hpp, corp_ai.cpp and construction_panel.cpp all say 'a tick is one quarter'. BOTH READINGS ARE CORRECT about different clocks, so this is not a defect. It is a naming collision that has already produced two apparently contradictory statements in the corpus, and it cost this session a detour to resolve.
+
+**Why it matters.** It stopped being cosmetic the moment a design was priced 'for that year' (Ben's value anchor). It happens to cancel there - both halves of the ratio are per-head-per-tick, so the factor of 4 disappears - but the next annualised quantity may not be so lucky. GLOSSARY.md defines neither term.
+
+- Add both terms to GLOSSARY.md and leave the code alone.
+- Rename one in code (econ_tick vs day_tick) so the ambiguity cannot be read.
+- Leave it; the comments are individually correct.
+
+> **Recommendation:** Option 1 - it is a doc gap, not a code defect, and GLOSSARY.md is exactly where a term with two live meanings should be pinned. Not done here: the glossary is a canonical-terms authority and adding two entries is a small design call of its own.
+
+*Files: `docs/GLOSSARY.md`, `src/core/sim_loop.hpp`, `src/world/budget_system.hpp`, `src/world/survey_system.hpp`*
+
 ---
 
 ## Resolved
@@ -2156,4 +2199,17 @@ BL-377 carries status 'complete'. Four independent checks say no code exists. (1
 > **RESOLVED.** RULED BY BEN, 2026-08-22: reopen it. Done the same session - BL-377 is back to status 'designed', priority A, version goal v0.1.15, with its design prose restored from archive/backlog-design-2026-Q3.json and a dated REOPENED note recording the false close and its four proofs. BL-378, the other half of the bb4f612 sweep, was re-checked and its files all exist - that closure was correct. backlog_lint reports no new warnings. Sprint 16 (the mercenary vertical slice) owes it, as ROADMAP already said.
 
 *Files: `docs/development/backlog.json`, `docs/development/ROADMAP.md`, `docs/development/SPRINTS.md`, `docs/MANUAL.md`*
+
+### NR-515 — NATIONS.md's six questions all settled by Ben in one session, plus a system he raised alongside them
+*decision taken on your behalf · raised 2026-08-22 · from Design session 2026-08-22, immediately after the nations doc was written.*
+
+All six § Open questions answered in Ben's own words, and a new system raised by him in the same message: a two-way channel between corporations and nations - lobbying forward, the national budget in reverse ('it is still fun to have our corporations funded directly via taxes'). Offered A) file to backlog or B) design now, per Rule 0a; Ben chose B. Seven items filed: BL-537 (national budget, the spine), BL-538 (priority lines), BL-539 (lobbying), BL-540 (nation->corp stance), BL-541 (directional tariffs), BL-542 (nation scorer), BL-543 (value anchor). The rulings are recorded in NATIONS.md § Settled; the mechanism design stays in the items until the work lands, per the authority time-slice.
+
+**Why it matters.** The channel closes a circuit that was open at one end - two flows filled a treasury nothing spent - and it gives the player its first lever on law without breaking the law-subject identity. Three of the rulings reach outside this doc: the value anchor sets the unit upkeep rate MILITARY.md lists as absent, the research budget lines are the debit mechanism BL-478 has been missing (NR-387), and BL-538's contracted-force line is BL-377's missing client.
+
+> **Recommendation:** No action - recorded so the rulings are attributable and the seven items' provenance is one place.
+
+> **RESOLVED.** RULED BY BEN, 2026-08-22, in his own words on all six. Recorded in NATIONS.md § Settled with his phrasing quoted per ruling.
+
+*Files: `docs/politics/NATIONS.md`, `docs/development/backlog.json`*
 

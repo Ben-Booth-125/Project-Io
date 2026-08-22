@@ -12,9 +12,11 @@ comes to exist** — territory, resource profile, political character, name. **T
 what it does afterwards.** Where they disagree about a field, generation wins on how it is set and
 this doc wins on what it means.
 
-> **Status: written 2026-08-22, as capture rather than design.** Everything in § Build status is
-> transcribed from the code and is true today. Everything in § What is absent is a named hole.
-> § Open questions are calls **nobody has made** — they are for Ben, not for a session to decide.
+> **Status: written 2026-08-22 as capture, then settled the same day.** Everything in § Build
+> status is transcribed from the code and is true today. § What is absent names the holes and, for
+> each, the item that now owns it. § Settled records Ben's rulings of 2026-08-22, which closed all
+> six questions this document originally posed and added a system — the lobbying/budget channel —
+> that he raised in the same session. Two questions remain, in § Still open.
 
 ---
 
@@ -193,12 +195,14 @@ Named so the absence is visible rather than discovered. Pattern borrowed from
 
 - **No nation actor.** There is no `nation_ai`, no `nation_verb`, no `nation_command` — a grep of
   `src/` returns nothing for all three. The grant above is a permission nobody has used. A nation
-  decides nothing, ever, on any tick.
+  decides nothing, ever, on any tick. → **BL-542 (nation scorer)** is the first use of it.
 - **No spend side.** The treasury only ever rises. Nothing anywhere debits it, so a nation's
-  balance is currently a scoreboard with no game attached.
+  balance is currently a scoreboard with no game attached. → **BL-537 (national budget)**,
+  **BL-538 (treasury priority lines)**.
 - **No authoring path for any law.** One law is seeded at generation and no actor can enact,
   repeal, or amend a law thereafter — not the player (correctly, they are a law subject), not a
-  nation (incorrectly, it is the legislator), not the agent seam.
+  nation (incorrectly, it is the legislator), not the agent seam. → **BL-541** enacts the first
+  tariff at generation; **BL-539 (lobbying)** is how a law subject reaches law at all.
 - **One effect family of four.** `law_effect_kind` has two enumerators and BL-155 (law/policy
   surface) settled a **four-family taxonomy**: margin modifiers *(shipped)*, production,
   permission, relationship. The enum is the extension point and adding one is a new enumerator
@@ -214,45 +218,170 @@ Named so the absence is visible rather than discovered. Pattern borrowed from
   pick up when there is one.
 - **No answerability.** BL-399 (company answerability) owns which law classes the company is
   *subject to* — an embargo it must route procurement around, basing rights it must be granted.
-  It is `design-owed`.
+  It is `design-owed`. → **BL-540 (nation→corp stance)** supplies the Access dimension it needs.
+- **No client for the mercenary loop.** BL-377 (mercenary contract seam) is the player's income and
+  has no counterparty with money. → **BL-538**'s contracted-force line is that counterparty, and
+  **BL-540**'s Trust dimension is the relationship it rides on.
 
 ---
 
-## Open questions
+## Settled — Ben's rulings, 2026-08-22
 
-For Ben. Each is a call nobody has made, with the entry that raised it.
+The six questions this document opened with were settled in one session, together with a system
+Ben raised in the same breath: **a two-way channel between corporations and nations.** The rulings
+are recorded here because they are settled; the **mechanism design lives in the backlog items**
+until the work lands (DELIVERY.md § Design state).
 
-1. **What is a treasury FOR?** (NR-398) It is the first money a non-corporate actor has ever held,
-   and nothing spends it. Until there is a spend side, the levy is a sink that happens to have a
-   name attached.
+### The channel — lobbying one way, the budget the other
 
-2. **Is money conservation a goal?** (NR-398) It is **not** a global property of this economy
-   today and never was: `clear_markets` makes the market a **buyer of last resort that pays sellers
-   with nobody's money**, so total corporate cash rises and falls every tick by design. The two
-   flows in this document conserve, and `money_conservation.cpp` says so at length precisely so
-   nobody reads it as a global claim. The open call is whether global
-   conservation is the target, or whether the market is deliberately an infinite counterparty.
+Ben: *"each corporation affects the national priorities, laws, and budget... lobbying should be an
+option, however it can also go completely in reverse — perhaps it is still fun to have our
+corporations funded directly via taxes."*
 
-3. **What rate should the levy be?** (NR-382) The shipped `1.0 cr/unit, all resources` was a
-   placeholder that never bit while the law was un-enacted. Enacted, it sends **every rival
-   insolvent**: net-worth finals move from 78K–499K to −3.6M–−5.2M, with solvency below zero on
-   30/30 corps across all five benchmark seeds. This deepens an already-attributed red rather than
-   breaking a green, but it needs a ruling before any golden is re-blessed.
+It closes a circuit that was open at one end. The levy and the tariff **fill** a treasury nothing
+spent; the budget is the outflow. Money now makes a full loop — corp → nation → corp — instead of
+draining into a field no reader could account for.
 
-4. **Who enacts a tariff, and when?** (NR-400) Seeding one at generation changes every generated
-   world, which is a design call and not a fix. The alternative is that the first nation actor
-   enacts it — which makes this question wait on question 5.
+It also fits the player identity rather than straining it. A mercenary company is a **law subject,
+never a legislator**, which since the pivot has left it with no lever at all on the rules it works
+inside. Lobbying is the one mechanism that changes that without changing what the player is: **you
+do not pass the law, you pay someone who does.**
 
-5. **What is the first nation verb?** The grant admits tax rates, law enactment and pair-state.
-   Nothing says which comes first, or what a nation's scorer would be *maximising*. A corporation
-   maximises profit; a nation's objective has never been stated.
+### 1. What a treasury is for — **a weighted budget over priority lines**
 
-6. **Does a nation have a stance toward a corporation?** `stance.cpp` is corp-to-corp only. A
-   mercenary company's whole business is polities hiring it, and BL-377 (mercenary contract seam)
-   needs a client. Whether that client relationship rides on stance, on standing, or on something
-   nation-specific is unsettled — and it is the question this document most immediately blocks.
+Ben: *"Treasury can be used for things that it is used for in the real world. Logistics
+maintenance, Schooling, Military research, Academic research, public space exploration."*
+
+A nation holds **weights, not amounts** — it states what it cares about, and the amounts follow
+from what it has. Four more lines were proposed at Ben's request and are marked as proposals in
+BL-538: **contracted force** (which is BL-377's client and its money source), **strategic reserve**,
+**public works**, and **charters and monopolies**.
+
+Every line spends through machinery Io already ships. Research in particular is the **debit
+mechanism BL-478 (ancient research spend) has been missing** — NR-387 records that item as blocked
+precisely because the spend model had no design.
+
+*Owned by BL-537 (national budget) and BL-538 (treasury priority lines).*
+
+### 2. Conservation — **actor-to-actor transfers conserve; the market does not, and that stays**
+
+Ben: *"Nations should be able to save up, and so should corps. Payment to corps is direct and not
+on the market."*
+
+Two rules follow. **Every nation↔corp flow is a direct transfer** — it debits one balance and
+credits another in the same float and the same tick, never bidding and never clearing. And **both
+sides accumulate**: a nation does not spend to zero, a reserve is held back, and an underspent line
+carries forward.
+
+The market is untouched. `clear_markets` remains a buyer of last resort that pays sellers with
+nobody's money, and total corporate cash still rises and falls every tick by design. The two
+standards are now explicitly different things, which is what BL-392's silent value destruction came
+from conflating.
+
+*One consequence, handled: the strategic-reserve line looks like it must buy on the market. It does
+not — it buys through BL-350's procurement seam from a named supplier, so the rule holds and a
+shipped mechanism is reused.*
+
+### 3. The levy rate — **not a number, an anchor**
+
+Ben: *"It really depends on the unit. We don't have a stable way to consider how valuable things
+are right now. Perhaps we can consider that the equipment needed to sustain a unit costs about 2x
+their salary for that year."*
+
+That is the right diagnosis and it is why the question could not be answered on its own terms.
+The anchor fixes **one ratio between two quantities a player already understands**, and every other
+price is argued against it.
+
+Both halves already exist in `scripts/economy.lua` § `unit_upkeep`, both at zero, both charged per
+head per tick. An economy tick is one quarter, so the annual factor of 4 appears on both sides and
+cancels — the anchor reduces to a per-tick identity with no calendar arithmetic:
+
+    Σ ( goods_per_head[r] × price[r] )  ==  2 × credits_per_head
+
+It also sets the **unit upkeep rate MILITARY.md lists as absent**, and turns the levy question into
+a legible one: *this nation's levy funds N units a year.*
+
+*Owned by BL-543 (value anchor). Land the anchor and upkeep first, re-measure, then rule on the
+levy — doing both at once makes the benchmark uninterpretable.*
+
+### 4. Tariffs — **directional, and seeded from the pre-history**
+
+Ben: *"This should be an emergent consequence of generation, wherein nations gain their tariffs as
+a directional mode of diplomacy."*
+
+A tariff stops being a posture toward the world and becomes a statement about a **specific
+relationship**: `(author, target, resource) → rate`, with an `all_nations` sentinel preserving
+today's blanket form. The initial map is derived at campaign setup from the Era −1 sim's pair
+outcomes — who invaded whom, who never touched whom — deterministically, and legibly enough that a
+player can read a tariff and find the war behind it.
+
+This also fixes NR-400 as a side effect: it is the first thing that can enact a tariff at all.
+
+*Owned by BL-541 (directional tariffs).*
+
+### 5. What a nation wants — **a positional objective, not an accumulative one**
+
+Ben: *"Nation objectives should be terrestrial diplomacy. Figuring out which economic niche can be
+well filled, and how to avoid conflict while respecting historical grudges."*
+
+A corporation maximises profit — unbounded, accumulative, identical for every firm. A nation does
+not want to be rich; it wants to be **needed and unthreatened**. Three terms: **niche fit** (produce
+what neighbours lack), **conflict avoidance** (a negative term on expected war cost), and
+**grudges** — which bias the first two rather than setting a goal of their own, so the pre-history
+stays load-bearing instead of becoming scenery.
+
+*"Terrestrial"* is doing work: a nation's horizon is its neighbours and its own ground, never the
+whole map. That is also what keeps the scorer cheap across ~43 of them.
+
+A well-played nation in Io mostly **stays out of fights**. That is unusual for a strategy game and
+is much of the point — nations avoiding each other leaves the Conflict pillar to the companies,
+which is where the player lives.
+
+*Owned by BL-542 (nation scorer). It is the first use anyone has made of the 2026-08-18 grant.*
+
+### 6. A nation's stance toward a corporation — **graded, multi-dimensional, derived**
+
+Ben: *"Nations should have a stance towards corporations, but this is more like a digital spectrum,
+possibly multiple dimensions, and mostly derived towards who can act internationally in their
+borders."*
+
+It is **not** BL-448's corp-to-corp stance, and differs on each axis Ben named:
+
+| | Corp → corp (BL-448) | Nation → corp (BL-540) |
+|---|---|---|
+| Shape | discrete tri-state | **graded** |
+| Dimensions | one | **two: Access and Trust** |
+| Origin | **declared** — a corp opts in | **derived** — nobody declares it |
+
+The last row is load-bearing. Hostility is a state a corp opts into and *"may never acquire
+ambiently"* (Ben, 2026-08-17). A nation's stance is the opposite by construction: a **read** of
+what a company has actually done inside the jurisdiction, recomputed from public facts, never
+stored as a flag.
+
+**Access** gates who may operate inside the borders — the dimension Ben named, and the first time
+anything in Io gates placement on a political fact rather than a physical one. **Trust** is the
+dimension **BL-377 needs**: a mercenary company's client relationship rides here rather than on a
+parallel axis invented for it.
+
+*Owned by BL-540 (nation→corp stance).*
 
 ---
+
+## Still open
+
+Two, both raised by the rulings above rather than left over from before.
+
+1. **Does the nation grant reach a rival acting politically against the player?** (NR-517) A rival
+   lobbying to shift a law that binds the player's corp, or a nation gating the player out of a
+   territory, is a consequence imposed on **a corp a human owns**. That is the BL-450 class of
+   widening, which needed an explicit dated grant. The 2026-08-18 grant covers a *nation* acting;
+   reading it as covering this would be exactly the quiet precedent the standing rules exist to
+   prevent. **The player-facing halves of BL-539 and BL-540 are blocked on this ruling**; the
+   nation-side machinery is not.
+
+2. **Is a lobbying fee consumed, or does it land in the treasury?** (NR-517) Consumed reads as
+   influence-buying and keeps the treasury's inflows to law. Transferred closes another loop but
+   makes lobbying a second tax. BL-539 assumes **consumed** and says so.
 
 ## Where the parts live
 
@@ -273,7 +402,13 @@ For Ben. Each is a call nobody has made, with the entry that raised it.
 (§ Tariffs, the clearing-tick half), `docs/SYSTEMS.md` (§ Policy, § Conditions),
 `.claude/rules/io-standing-rules.md` (the grant's exact terms).
 
-**Backlog.** BL-155 (law/policy surface) holds the four-family taxonomy and the ten-law list.
-BL-480 (law has an author) shipped and its item still reads `designed` — see NR-514.
+**Backlog — the v0.1.24 cluster** filed 2026-08-22 from Ben's rulings, in dependency order:
+**BL-537** (national budget, the spine) → **BL-538** (priority lines), **BL-539** (lobbying),
+**BL-540** (nation→corp stance), **BL-541** (directional tariffs), **BL-542** (nation scorer).
+**BL-543** (value anchor) is separate and nearer — v0.1.21, and it unblocks the levy rate and the
+unit upkeep rate at once.
+
+**Older neighbours.** BL-155 (law/policy surface) holds the four-family taxonomy and the ten-law
+list. BL-480 (law has an author) shipped and its item still reads `designed` — see NR-514.
 BL-186 (laws ledger UI), BL-399 (company answerability), BL-345 (politics relationship axis) and
-BL-158 (politics datamodel stub) are the open neighbours.
+BL-158 (politics datamodel stub) remain open.
