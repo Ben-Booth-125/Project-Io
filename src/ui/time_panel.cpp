@@ -62,7 +62,7 @@ const char* speed_quarter_label(int speed)
 
 namespace ui {
 
-void draw_time_panel(sim_loop& sim, int& prev_speed, const ImVec2& disp)
+void draw_time_panel(ui_state& state, sim_loop& sim, int& prev_speed, const ImVec2& disp)
 {
     // Time panel — top-right, same width as the minimap (BL-138 compact redesign,
     // proportions revised on Ben's 2026-07-10 review). REFLOWED (BL-313, Ben
@@ -102,6 +102,9 @@ void draw_time_panel(sim_loop& sim, int& prev_speed, const ImVec2& disp)
     const float ctrl_col_h     = time_btn_h + time_rate_h + time_spacing;
     const float time_content_h = time_line_h + std::max(prog_col_h, ctrl_col_h);
     const float time_h         = time_content_h + ImGui::GetStyle().WindowPadding.y * 2.0f;
+    // Publish it: the right chrome column below this panel needs to know where
+    // its ceiling is, and this is the only place the number exists (BL-533).
+    state.time_panel_h = time_h;
     {
         // Head of the right chrome column (BL-216: shell_metrics owns the edge).
         const ui::shell_rect tp = ui::time_panel_rect(disp, time_h);

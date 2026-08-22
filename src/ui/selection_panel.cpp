@@ -23,6 +23,7 @@
 #include "world/construction.hpp"    // demolish path (the building element's Demolish)
 #include "world/logistics.hpp"       // invalidate_logistics_caches (idle/resume flips the anchor set)
 #include "world/placement_rules.hpp" // buildable-type validity + stack capacity
+#include "world/province.hpp"        // BL-534: province membership + BL-513 building ceiling
 #include "world/recipe_registry.hpp" // recipe/economics lookups for the building element
 #include "world/survey_system.hpp"
 #include "world/unit_roster.hpp" // campaign hire gate + roster table (BL-324); also the Soldier card's Roster page name lookup
@@ -516,6 +517,107 @@ void draw_activity_section(const world& w, entity_id body_id)
     ImGui::Text("Market pulse: %s", level);
     if (av == activity_vis::visible)
         ImGui::TextDisabled("Live lane / your presence.");
+}
+
+} // namespace
+
+// BL-534: the three views the tile Selection accordion pages between. Ben named
+// this set on 2026-08-22 and did NOT pick Province or Ownership, which were both
+// offered — so the array is the ruling, not a starting point to grow.
+namespace { 
+constexpr const char* k_view_names[] = { "Terrain", "Resources", "Available buildings" };
+constexpr int         k_view_count   = 3;
+}
+
+// --- The province building-availability table (BL-534) -----------------------
+//
+// Ben ruled the grain explicitly on 2026-08-22: PER PROVINCE THROUGHOUT, not per
+// tile with a province figure in the footer. So every number here is a province
+// number, and the selected tile serves only to name which province is meant.
+//
+// "Maximum buildings" for a resource is the province's PLACEMENT CAPACITY for it:
+// summed stack_capacity over the member tiles that would actually accept an
+// extraction site targeting it. It is deliberately computed through the same
+// can_place_in_world / stack_capacity the placement seam uses, rather than
+// re-deriving "a deposit is here so a mine could go here" — the two would drift,
+// and a table that disagrees with what the build button will let you do is worse
+// than no table.
+namespace {
+
+struct province_build_row
+{
+    resource_type resource;
+    int           built = 0;   ///< Extraction sites in the province targeting it.
+    int           max   = 0;   ///< Placement slots the province has for it.
+};
+
+struct province_build_table
+{
+    bool  known    = false;    ///< False when the tile has no province at all.
+    int   standing = 0;        ///< Buildings of EVERY type standing (BL-513).
+    int   ceiling  = -1;       ///< The province total ceiling; -1 is UNKNOWN, not "full".
+    std::vector<province_build_row> rows;
+};
+
+province_build_table province_builds(const world& w, entity_id tile_id)
+{
+    province_build_table t;
+    const uint32_t pid = w.provinces.province_of(tile_id);
+    if (pid == 0) return t;
+    const province* pr = w.provinces.find(pid);
+    if (pr == nullptr) return t;
+
+    t.known    = true;
+    t.standing = province_buildings_standing(w, pid);
+    t.ceiling  = province_building_ceiling(w, pid);
+
+    std::array<int, resource_count> built{};
+    std::array<int, resource_count> cap{};
+    built.fill(0);
+    cap.fill(0);
+
+    // What stands. Extraction sites only: this table answers "what can I dig
+    // here", and a port or a hub has no target resource to file under.
+    for (const auto& [bid, bc] : w.buildings)
+    {
+        if (bc.type != building_type::extraction_site) continue;
+        if (w.provinces.province_of(bc.tile) != pid)    continue;
+        const auto ri = static_cast<std::size_t>(bc.target_resource);
+        if (ri < resource_count) ++built[ri];
+    }
+
+    // What could stand. One pass over the member tiles; a resource with no
+    // deposit anywhere in the province never enters the table at all, so the
+    // list is the province's own geology rather than the full 38-row roster.
+    for (const entity_id tid : pr->tiles)
+    {
+        const auto it = w.tiles.find(tid);
+        if (it == w.tiles.end()) continue;
+        const tile_component& tc = it->second;
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            if (tc.resource_deposit[r] <= 0.0f) continue;
+            const auto rt = static_cast<resource_type>(r);
+            // placement_result converts to bool by design (BL-071), so the plain
+            // negation is the idiomatic call — it carries no `ok` enumerator, only
+            // an ok() accessor. Only four resources are extractable at all today,
+            // and can_place is what knows that, so this table inherits the roster
+            // rather than restating it.
+            if (!placement_rules::can_place(tc, building_type::extraction_site, rt))
+                continue;
+            cap[r] += placement_rules::stack_capacity(tc, building_type::extraction_site, rt);
+        }
+    }
+
+    for (std::size_t r = 0; r < resource_count; ++r)
+        if (cap[r] > 0 || built[r] > 0)
+            t.rows.push_back({ static_cast<resource_type>(r), built[r], cap[r] });
+
+    // Richest first: the row a player acts on is the one with room left.
+    std::sort(t.rows.begin(), t.rows.end(),
+              [](const province_build_row& a, const province_build_row& b)
+              { return (a.max - a.built) > (b.max - b.built); });
+    return t;
 }
 
 } // namespace
@@ -2195,10 +2297,22 @@ void draw_tile_selection(world& w, ui_state& ui)
         ImGui::BeginChild("##tile_accordion", {center_w, total_h}, true,
                           ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
 
+        int& view = ui.card_tile_view;
+        view = std::clamp(view, 0, k_view_count - 1);
+
+        // The resource pages split in two: those backed by a real deposit (the
+        // Resources view) and the tile's own habitability/hazard scalars (the
+        // Terrain view). tile_metrics still builds one list, because the
+        // full-canvas fold charts the same pages by index and the two must agree
+        // on what page N is — so the split is a filter here, not a second builder.
+        std::vector<int> res_pages, terrain_pages;
+        for (int i = 0; i < static_cast<int>(pages.size()); ++i)
+            (pages[static_cast<std::size_t>(i)].resource_index >= 0 ? res_pages : terrain_pages)
+                .push_back(i);
+
         int&      page = ui.card_resource_page;
         const int n    = static_cast<int>(pages.size());
-        page = std::clamp(page, 0, n - 1);
-        const tile_metric& mp = pages[static_cast<std::size_t>(page)];
+        page = std::clamp(page, 0, std::max(0, n - 1));
 
         // Pager row: [prev]  Metric (i/N)  [next]  [full canvas]
         //
@@ -2213,27 +2327,149 @@ void draw_tile_selection(world& w, ui_state& ui)
         // `right` is the row's true right edge, and the pager's next-page button and
         // the disclosure control are both hung off it — so the control lands in the
         // same column it occupies on every other surface.
+        // BL-534 (Ben, 2026-08-22): the accordion pages VIEWS, not resources.
+        //
+        // It used to page one-per-deposited-resource, so reading the seventh
+        // resource cost six presses and there was nowhere to put anything that
+        // was not a resource graph. Three views now — Terrain, Resources,
+        // Available buildings — and the resource choice moves INTO the Resources
+        // view as a dropdown, which is the shape draw_lens_resource_combo already
+        // uses for the lenses. Ben named this set and did not pick Province or
+        // Ownership, which were offered; they are deliberately absent.
         const float aw    = ImGui::GetContentRegionAvail().x;
         const float right = ImGui::GetCursorPosX() + aw;
-        ImGui::BeginDisabled(page == 0);
-        if (ImGui::ArrowButton("##res_prev", ImGuiDir_Left)) --page;
+        ImGui::BeginDisabled(view == 0);
+        if (ImGui::ArrowButton("##view_prev", ImGuiDir_Left)) --view;
         ImGui::EndDisabled();
-        if (ImGui::IsItemHovered() && page > 0)
-            ImGui::SetTooltip("Previous");
+        if (ImGui::IsItemHovered() && view > 0)
+            ImGui::SetTooltip("Previous view");
 
         char hdr[64];
-        std::snprintf(hdr, sizeof hdr, "%s  (%d/%d)", mp.label.c_str(), page + 1, n);
+        std::snprintf(hdr, sizeof hdr, "%s  (%d/%d)", k_view_names[view], view + 1, k_view_count);
         const float name_w = ui::fit_width(hdr); // BL-215: measured through the shared module
         ImGui::SameLine(std::max(frame_h + style.ItemSpacing.x, (aw - name_w) * 0.5f));
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", hdr);
 
         ImGui::SameLine(right - 2.0f * frame_h - style.ItemSpacing.x);
-        ImGui::BeginDisabled(page == n - 1);
-        if (ImGui::ArrowButton("##res_next", ImGuiDir_Right)) ++page;
+        ImGui::BeginDisabled(view == k_view_count - 1);
+        if (ImGui::ArrowButton("##view_next", ImGuiDir_Right)) ++view;
         ImGui::EndDisabled();
-        if (ImGui::IsItemHovered() && page < n - 1)
-            ImGui::SetTooltip("Next");
+        if (ImGui::IsItemHovered() && view < k_view_count - 1)
+            ImGui::SetTooltip("Next view");
 
+        // ── View 2: Available buildings (BL-534) ──────────────────────────
+        // Per province throughout, by Ben's ruling. No chart: the question this
+        // view answers ("what can I still put here, and how much room is left")
+        // is a comparison of small integers, and a bar per resource would be
+        // chart furniture around two numbers.
+        if (view == 2)
+        {
+            const province_build_table pb = province_builds(w, sel);
+            ImGui::Spacing();
+            if (!pb.known)
+            {
+                ImGui::TextDisabled("This tile belongs to no province.");
+            }
+            else
+            {
+                // The province total first: it bounds every row beneath it, so
+                // reading a row without it is misleading. -1 is UNKNOWN by the
+                // BL-513 contract and is said, not silently rendered as room.
+                if (pb.ceiling >= 0)
+                {
+                    const int  room = pb.ceiling - pb.standing;
+                    const bool full = room <= 0;
+                    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
+                                       "Province capacity");
+                    ImGui::SameLine();
+                    if (full) ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative),
+                                                 "%d / %d  (full)", pb.standing, pb.ceiling);
+                    else      ImGui::Text("%d / %d  (%d free)", pb.standing, pb.ceiling, room);
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("Buildings of EVERY type standing in this province,\n"
+                                          "against the ceiling its area, infrastructure,\n"
+                                          "habitability and population support.\n"
+                                          "That ceiling MOVES as the province develops.");
+                }
+                else
+                {
+                    ImGui::TextDisabled("Province capacity unknown.");
+                }
+                ImGui::Separator();
+
+                if (pb.rows.empty())
+                {
+                    ImGui::TextDisabled("No workable deposits in this province.");
+                }
+                else if (ImGui::BeginTable("##prov_builds", 3,
+                                           ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg,
+                                           {ImGui::GetContentRegionAvail().x,
+                                            ImGui::GetContentRegionAvail().y - 2.0f}))
+                {
+                    ImGui::TableSetupScrollFreeze(0, 1);
+                    ImGui::TableSetupColumn("Resource");
+                    ImGui::TableSetupColumn("Built", ImGuiTableColumnFlags_WidthFixed, 46.0f);
+                    ImGui::TableSetupColumn("Max",   ImGuiTableColumnFlags_WidthFixed, 46.0f);
+                    ImGui::TableHeadersRow();
+                    for (const province_build_row& r : pb.rows)
+                    {
+                        const resource_presentation& rp = presentation_of(r.resource);
+                        ImGui::TableNextRow();
+                        ImGui::TableSetColumnIndex(0);
+                        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(rp.colour), "%s", rp.name);
+                        ImGui::TableSetColumnIndex(1);
+                        ImGui::Text("%d", r.built);
+                        ImGui::TableSetColumnIndex(2);
+                        if (r.built >= r.max) ImGui::TextDisabled("%d", r.max);
+                        else                  ImGui::Text("%d", r.max);
+                    }
+                    ImGui::EndTable();
+                }
+            }
+            ImGui::EndChild();
+        }
+        else
+        {
+        // ── Views 0/1: Terrain and Resources ──────────────────────────────
+        // Both are the metric chart; they differ in WHICH pages they offer and
+        // in how you choose between them. Resources gets the dropdown (Ben:
+        // "bundle the resource view into a dropdown"); Terrain has two pages at
+        // most, so it keeps the plain pager it already had.
+        const std::vector<int>& shown = (view == 1) ? res_pages : terrain_pages;
+        if (shown.empty())
+        {
+            ImGui::Spacing();
+            ImGui::TextDisabled(view == 1 ? "No deposits on this tile."
+                                          : "No terrain metrics for this tile.");
+            ImGui::EndChild();
+        }
+        else
+        {
+        // Keep `page` inside the shown set: switching view must not leave the
+        // chart on a page this view does not offer.
+        if (std::find(shown.begin(), shown.end(), page) == shown.end())
+            page = shown.front();
+
+        if (view == 1)
+        {
+            // The dropdown that replaces the carousel. Reading the seventh
+            // deposit used to cost six presses of the pager.
+            ImGui::Spacing();
+            ImGui::SetNextItemWidth(-FLT_MIN);
+            const tile_metric& cur = pages[static_cast<std::size_t>(page)];
+            if (ImGui::BeginCombo("##res_pick", cur.label.c_str()))
+            {
+                for (const int pi : shown)
+                {
+                    const tile_metric& q = pages[static_cast<std::size_t>(pi)];
+                    if (ImGui::Selectable(q.label.c_str(), pi == page))
+                        page = pi;
+                }
+                ImGui::EndCombo();
+            }
+        }
+
+        const tile_metric& mp = pages[static_cast<std::size_t>(page)];
         disclosure_controls(ui, detail_surface::selection_metric, page, /*in_place=*/false);
 
         // The current page's graph, filling the rest of the container. Deposited
@@ -2273,6 +2509,8 @@ void draw_tile_selection(world& w, ui_state& ui)
         draw_tile_metric_chart(ImGui::GetWindowDrawList(), p, {p.x + cw, p.y + gh}, mp);
 
         ImGui::EndChild();
+        }
+        }
     }
     ImGui::SameLine();
 
