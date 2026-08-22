@@ -75,21 +75,23 @@ which is the one place the CLAUDE.md doc map cannot route a reader to.
 
 | Subject | Runs in | Design currently lives | Proposed owner |
 |---|---|---|---|
-| **The nation as an actor** | `law.cpp`, `nation_component::treasury`, tariffs in `market_clearing` | NR-398, NR-400, MARKETS.md § Tariffs | **new `docs/politics/NATIONS.md`** |
-| **Law** | `law.cpp`, `condition_set.cpp` | BL-155 (law/policy surface), FINANCE.md § Levies | same |
+| ~~**The nation as an actor**~~ | `law.cpp`, `nation_component::treasury`, tariffs in `market_clearing` | — | **`docs/politics/NATIONS.md` — written 2026-08-22** |
+| ~~**Law**~~ | `law.cpp`, `condition_set.cpp` | — | same doc, § The enforcement seam |
 | **Stance and standing** | `stance.cpp`, `standing.cpp` | Header comments; MILITARY.md § absent | **new `docs/politics/RELATIONS.md`** |
 | **Conditions & modifiers** | `condition_set.cpp`, `modifier_set.hpp`, read by laws, techs, gates, units | Header comment; SYSTEMS.md § Conditions (one subsection) | **`docs/SYSTEMS.md`, promoted** |
 | **Province as a grain** | `province.cpp` (936 lines), unit position, battles, rendering | Split across TILE_GENERATION, PLANETARY, SELECTION | **new `docs/generation/PROVINCES.md`** |
 | **Interdiction** | BL-458 (supply lines cannot be cut) | Nowhere — the word appears in **no** authority doc | **`docs/economy/SUPPLY.md`** |
 | **The star map** | `star_map.cpp` — authored, seed-free, cross-campaign | Header comment only | **`docs/ui/MINIMAP.md`** |
 
-**Why the nation actor leads this list.** `NATION_GENERATION.md` line 7 says outright: *"Nation
-system design is an open item. This document covers only the generation strategy."* Since then a
-nation has gained a treasury, become a law's author, and been granted deterministic behaviour
-(standing rules, 2026-08-18). The only doc that could own it explicitly disclaims it.
+**The nation actor led this list, and is now done.** `NATION_GENERATION.md` line 7 said outright:
+*"Nation system design is an open item. This document covers only the generation strategy."* Since
+then a nation gained a treasury, became a law's author, and was granted deterministic behaviour
+(standing rules, 2026-08-18) — while the only doc that could own it went on disclaiming it.
 
-NR-398 states the open question plainly: nothing spends the treasury, and **money conservation is
-not a global property of this economy**. That is a design call nobody has made.
+**`docs/politics/NATIONS.md` now owns it** (2026-08-22), written as capture rather than design: what
+runs, what is absent, and six open questions left for Ben rather than answered by a session. The
+generation doc's disclaimer is struck through and re-pointed, and SYSTEMS.md § Policy, MARKETS.md
+§ Tariffs and FINANCE.md § Levies each carry a pointer at the half they do *not* own.
 
 **Why MARKETS.md is overloaded.** It is 657 lines and carries three systems that are not markets —
 procurement (53 lines), the contract worth model (47), and tariffs (38). The income loop of the
@@ -202,7 +204,7 @@ Ordered by what unblocks the most. Each is one session; each ends with prose in 
 | # | Session | Settles | Lands in |
 |---|---|---|---|
 | **1** | **Reopen the income loop** | BL-377's status; what Sprint 16 actually owes | `backlog.json`, ROADMAP |
-| **2** | **The nation as an actor** | Treasury purpose, money conservation, who enacts, tariff authoring | new `docs/politics/NATIONS.md` |
+| ~~**2**~~ | ~~**The nation as an actor**~~ | **Done 2026-08-22** — doc written; the four calls are now its § Open questions, 1–4 | `docs/politics/NATIONS.md` ✓ |
 | **3** | **Contracts leave the market doc** | The mercenary sell side as its own subject | new `docs/economy/CONTRACTS.md` |
 | **4** | **Ownership** | Syndicate tier, control gate, dividends, portfolio | new `docs/economy/OWNERSHIP.md` |
 | **5** | **Relations** | Stance vs standing, what hostility permits, sentiment | new `docs/politics/RELATIONS.md` |

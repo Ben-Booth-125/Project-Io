@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*215 entries — 197 open, 18 resolved.*
+*216 entries — 198 open, 18 resolved.*
 
 ---
 
@@ -1862,6 +1862,21 @@ docs/development/PHANTOMS.md is a new document class - a scan output that points
 > **Recommendation:** Option 2 as the destination, option 1 to get there - the file is useful right now because ten sessions are not yet run. Once each subject has an owner, its rows move into that owner's absent-list and the file goes away.
 
 *Files: `docs/development/PHANTOMS.md`*
+
+### NR-514 — Status drift runs BOTH ways — BL-480 (law has an author) shipped and its item still says 'designed'
+*observation · raised 2026-08-22 · from Documenting the nation as an actor (PHANTOMS.md session 2). Found while establishing what actually runs.*
+
+BL-377 was the false-complete. BL-480 is the opposite and is confirmed: commit c00bba8 'Merge BL-480 (law author + treasury) - Sprint D3' IS an ancestor of HEAD, nation_component::treasury and law::enacting_nation exist, budget_system.cpp runs the transfer, balance_ledger.cpp shows the read-only Laws section, and tools/verify/law_author_harness.cpp exists. The item's status is still 'designed'. A first-pass sweep - open, unparked items whose id appears anywhere in src/tools/scripts - returns 48 candidates, but it is NOISY: most hits are forward references in comments ('BL-315 will read this'), and BL-377 itself scores 1 for exactly that reason. So 48 is an upper bound on the drift, not a count of it.
+
+**Why it matters.** Two directions of the same defect. A false-complete hides owed work (BL-377, the income loop); a false-open hides landed work, which is how the same thing gets built twice and how a version's real content is understated. Neither is visible from any status view, because status is the thing that is wrong. A reliable check exists and is cheap: an item is landed if its named files carry its id AND a commit whose subject names the id is an ancestor of HEAD - subject, not body, to drop the forward references.
+
+- Reconcile all 48 candidates in one pass and fix the statuses.
+- Fix BL-480 now (confirmed) and leave the sweep for a session that can run the harnesses.
+- Write the check as a tool and fold it into backlog_lint.js, so drift is caught at close rather than found by accident.
+
+> **Recommendation:** Option 3, with option 2 alongside. The check belongs in backlog_lint - it already warns when a req group is complete and its item is not, which is the same class of drift caught from a different angle. Doing it by hand once fixes today and nothing after.
+
+*Files: `docs/development/backlog.json`, `tools/session/backlog_lint.js`*
 
 ---
 

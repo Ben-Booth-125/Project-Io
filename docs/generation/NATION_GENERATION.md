@@ -4,14 +4,27 @@ Nations are the political and territorial layer overlaid on the tile map. They d
 geopolitical backdrop at campaign start: who controls what land, what the diplomatic starting
 positions are, and what legal context corporations operate within.
 
-Nation system design is **an open item**. This document covers only the generation strategy.
-Mechanical behaviour — taxes, laws, military policy, diplomatic actions — is deferred.
+This document covers **only the generation strategy** — how a nation comes to exist. What a nation
+*does* afterwards is now owned by **[`docs/politics/NATIONS.md`](../politics/NATIONS.md)**, written
+2026-08-22: the treasury, law authorship and the 2026-08-18 nation-behaviour grant. Where the two
+disagree about a field, generation wins on how it is **set** and NATIONS.md wins on what it
+**means**.
 
-> **The "nations are backdrop" framing is scoped to v0.1.x.** Under BL-094 (governing-body pivot,
-> priority A) the player *becomes* one of these nations, and the deferred mechanics above — taxes,
-> laws, military policy — become the player's own levers rather than background. Forward pointer
-> only; authority propagates when the work lands (DELIVERY.md § Design state). Flagged 2026-08-04
-> because this doc is not in BL-094's file list and so carried no notice at all.
+> **Superseded 2026-08-22 — the sentence this doc opened with for seven weeks.** It read: *"Nation
+> system design is an open item... Mechanical behaviour — taxes, laws, military policy, diplomatic
+> actions — is deferred."* That was true when written and stopped being true incrementally: a
+> nation now holds a treasury (BL-480, law has an author), authors the seeded extraction levy, and
+> has been granted deterministic behaviour (standing rules, 2026-08-18). The disclaimer outlived
+> the deferral, and while it stood no doc owned the question — which is what the phantom-feature
+> scan found (`docs/development/PHANTOMS.md` § Class 1).
+
+> **The "nations are backdrop" framing is scoped to v0.1.x.** A forward pointer flagged 2026-08-04
+> under BL-094 (player-identity pivot) said the player would *become* one of these nations. **That
+> reading is superseded twice over**: BL-094's governing-body framing was replaced by the national
+> private militia on 2026-08-10, and the 2026-08-12 two-arcs split parked that whole arc for DLC
+> and put a **mercenary company** in the live seat. The player is a **law subject**, not a nation —
+> so these mechanics stay a nation's, and do not become the player's levers. Authority propagates
+> when the work lands (DELIVERY.md § Design state).
 
 ---
 
@@ -382,10 +395,14 @@ still reads only tiles: seed preference over habitable compositions and Pass 3's
 deposit-summed resource profile are *indirectly* downstream of the biosphere, but no endowment,
 region, or biography data is read at placement time.
 
-Nation system behaviour — taxes, laws, diplomatic actions, military response, territorial
-ambition — is **not implemented in the prototype**. Nations are generated and exist as data
-(territory, resource profile, political character, name), but take no autonomous actions.
-See § Open items.
+Nation system behaviour — diplomatic actions, military response, territorial ambition — is
+**still not implemented**: a nation takes no autonomous action on any tick, and no `nation_ai`,
+nation verb or nation command exists. *(Amended 2026-08-22: two of the items this paragraph
+originally listed have since moved. **Taxes and laws are no longer deferred** — a nation holds a
+treasury, authors the seeded extraction levy and is credited by it. What it still lacks is the
+means to decide any of that for itself. The whole live/absent split now lives in
+[`docs/politics/NATIONS.md`](../politics/NATIONS.md) § Build status and § What is absent, which is
+the authority; this paragraph is a pointer.)*
 
 ---
 
@@ -440,10 +457,12 @@ evolves across Eras — is an open design item. See `CORPORATION_GENERATION.md` 
 
 ## Open items
 
-**Nation system design.** What nations actually *do* — tax corporations, issue licences,
-declare war, provide infrastructure — is a major design task deferred from the prototype.
-The generation layer is implemented first so the world has political structure from turn one
-without requiring the system to be fully designed.
+**Nation system design.** *(Re-homed 2026-08-22 — this open item now has a document.)* What
+nations actually *do* — tax corporations, issue licences, declare war, provide infrastructure —
+is owned by [`docs/politics/NATIONS.md`](../politics/NATIONS.md), including the six open questions
+it is still short of an answer on. The generation layer was implemented first so the world had
+political structure from turn one without requiring the system to be fully designed, and that
+ordering held: taxation arrived before any nation could choose to levy it.
 
 **Era-based reform.** There is a working hypothesis that later Eras will see corporations
 become de-facto powers above states, with the nation layer diminishing in authority as the

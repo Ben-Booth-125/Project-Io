@@ -459,6 +459,10 @@ Verified by `tools/verify/money_conservation.cpp`.
 
 ## Tariffs — the first flow that pays a nation (Sprint D4, 2026-08-20)
 
+> **The nation half of this lives in [`docs/politics/NATIONS.md`](../politics/NATIONS.md)** — what a
+> treasury is, who may author a law, and why no tariff is reachable in a played game today (NR-400).
+> This section owns the **clearing-tick half**: how the duty is charged when a trade matches.
+
 A market has always resolved to a jurisdiction: `market_component::centre_tile` through
 `world::tile_to_nation`. The hook existed and nothing read it, because no sale in this economy had
 ever been a **cross-border** sale — only a sale.
