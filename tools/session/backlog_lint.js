@@ -295,6 +295,14 @@ function checkStatusDrift() {
   };
 
   for (const item of backlog.items) {
+    // A SUPERSEDED item is terminal without ever having been built, so neither
+    // arm applies: it never intended to write the files it names, and no commit
+    // ever landed it. `superseded_by` is the marker (introduced 2026-08-22 with
+    // BL-158 and BL-345). Its referential integrity is checked separately below,
+    // over every item rather than only those naming source paths — the bug that
+    // check's own negative test caught on its first run.
+    if (Array.isArray(item.superseded_by) && item.superseded_by.length) continue;
+
     const named = (item.files || []).filter((f) => typeof f === 'string')
       .flatMap(expand).filter(isSource);
     if (!named.length) continue;
@@ -339,6 +347,26 @@ function checkStatusDrift() {
   }
 }
 checkStatusDrift();
+
+// A retired item must name a REAL destination. Retiring an item whose strands go
+// to an id that does not exist is how a design gets lost while looking filed.
+function checkSupersessions() {
+  const ids = new Set(backlog.items.map((i) => i.id));
+  for (const item of backlog.items) {
+    if (!Array.isArray(item.superseded_by) || !item.superseded_by.length) continue;
+    if (!TERMINAL.has(item.status)) {
+      fail(`${item.id} (${item.short_name}) has superseded_by but status "${item.status}" — a superseded item is terminal.`);
+    }
+    const missing = item.superseded_by.filter((id) => !ids.has(id));
+    if (missing.length) {
+      fail(`${item.id} (${item.short_name}) is superseded_by ${missing.join(', ')}, which do(es) not exist — a retired item must name a real destination.`);
+    }
+    if (!item.resolution) {
+      warn(`${item.id} (${item.short_name}) is superseded with no resolution — record WHAT moved WHERE, or the reasoning is lost.`);
+    }
+  }
+}
+checkSupersessions();
 
 report();
 

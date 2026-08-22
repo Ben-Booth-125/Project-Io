@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*235 entries — 200 open, 35 resolved.*
+*237 entries — 202 open, 35 resolved.*
 
 ---
 
@@ -1901,6 +1901,40 @@ Ben chose "Yes, but signalled - a rival declaration surfaces to the player". NR-
 > **Recommendation:** Accept - the ruling is deliberate. Two things to carry: BL-458's design prose still argues from the ambush property and should be read with this in mind, and the rival-vs-rival visibility question needs an answer before BL-449 renders anything.
 
 *Files: `docs/politics/RELATIONS.md`, `docs/economy/LOGISTICS.md`, `src/world/stance.hpp`*
+
+### NR-534 — Backlog schema gains `superseded_by` — the first way to retire an item without claiming it was built
+*decision taken on your behalf · raised 2026-08-22 · from The designed/design-owed triage Ben asked for, 2026-08-22.*
+
+backlog.json's note says `complete` is the ONLY terminal status and that terminal items must be retained, never deleted. That left no way to express "this design is superseded and was never built" — the two available readings were both wrong: `complete` claims work landed (which is the BL-377 defect, deliberately re-introduced), and deletion loses the reasoning. Added a `superseded_by` array field carrying the ids that took the strands on, with status `complete` and a resolution opening SUPERSEDED, NOT BUILT. backlog_lint now (1) exempts such items from the false-complete arm — they never intended to write the files they name — and (2) FAILS if a superseded item names a destination id that does not exist, or carries superseded_by without being terminal. Both guards were negative-tested; the first draft of the exemption did not fire at all, because it sat after a guard that skips items naming no source paths.
+
+**Why it matters.** Retiring an item as `complete` would make the backlog lie in exactly the way the phantom scan was opened to catch, and the new drift check would either flag it forever or need allow-listing. This is a schema addition rather than a convention, so Ben should confirm it - two items now carry the field (BL-158, BL-345) and it is cheap to rename or restructure while that is true.
+
+- Keep `superseded_by` as an array of destination ids (what shipped).
+- Add a distinct terminal status `superseded` instead, and update the tooling that reads status.
+- Revert: retire by editing the resolution only, with no structured field.
+
+> **Recommendation:** Keep it. A structured field is queryable and the lint can enforce it; a status change would touch gyre.py, ship_items.js, apply_session_close.js and every progress count, for no more expressiveness.
+
+*Files: `docs/development/backlog.json`, `tools/session/backlog_lint.js`*
+
+### NR-535 — Triage result: 178 open items reviewed, 2 retired, 12 re-pointed, 1 title three framings behind — and the suspects were mostly not stale
+*observation · raised 2026-08-22 · from Ben, 2026-08-22: "let's do a pass on all designed and owed backlog items. We can reword them to fit the current auth docs, or drop things that are no longer relevant."*
+
+178 open items (149 designed, 29 design-owed). A keyword scan flagged 107 as touching a subject the new docs own, which was too coarse to act on — 'province' and 'law' alone matched 32 items each, nearly all of them ordinary mentions. What actually paid:
+
+RETIRED (2). BL-158 (politics datamodel stub) and BL-345 (politics relationship axis), both into BL-545. BL-345 is not merely superseded but CONTRADICTED: it proposed a SYMMETRIC per-pair scalar and Ben ruled directed. Its acceptance rule — 'a stub nothing reads is indistinguishable from no stub' — transferred to BL-545 and now binds it to land with a consumer.
+
+RE-POINTED (12) at the doc that now owns the subject, on a rule applied consistently: a UI item keeps its SURFACE doc, a subject item takes the subject doc. So BL-474/475 (stance surfaces) stayed on LENSES/SELECTION while BL-297/298 (diplomacy seam) moved to RELATIONS.
+
+CORRECTED (1). BL-186's title said the laws ledger is 'the surface for enacting/repealing laws' while its own body had struck exactly that as the overturned governing-body model. The body was right and the title was three framings behind — and a title is what a backlog query returns.
+
+**Why it matters.** The 2026-08-13 retire triage checked 14 suspects and ZERO retirements survived; this one checked more and two survived, for a specific reason worth recording: BL-545 did not exist in August 13. A retirement survives when the destination exists, and not before. That is also why BL-158's earlier refutation ('the character_preset strand would be orphaned') no longer holds — BL-155 has described that object since 2026-07-10 and now names it.
+
+The finding that reaches furthest: BL-158 proposed DIRECTED sentiment on 2026-08-02, with the same argument Ben used twenty days later ('a symmetric scalar cannot express A resents B, B is indifferent'). So NR-520 undercounted — FOUR designs were converging on one quantity, not three, and the earliest was already right about the axis.
+
+> **Recommendation:** Two axes remain unworked and both need a build to do honestly. The 13 FALSE-OPEN candidates the new lint reports each need checking against the code before a status flips - BL-458, BL-511 and BL-480 are near-certain, the rest are not. And the parked set (36 items, mostly space-arc) was left alone deliberately: a parked item legitimately carries its own arc's framing, and rewording it to the live arc would be the churn the two-arcs split exists to avoid.
+
+*Files: `docs/development/backlog.json`*
 
 ---
 
