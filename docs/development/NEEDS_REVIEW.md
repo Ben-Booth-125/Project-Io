@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*238 entries — 203 open, 35 resolved.*
+*239 entries — 204 open, 35 resolved.*
 
 ---
 
@@ -1956,6 +1956,33 @@ It also means the economy benchmark's deliberate red (NR-269/271/272) and this g
 > **Recommendation:** Re-run all three after integration and compare against these exact values. A moved state_hash on an all-zero-rates build is a FAILED inertness row, not a re-bless.
 
 *Files: `tools/verify/world_determinism.cpp`, `tools/verify/money_conservation.cpp`, `tools/verify/spectator_determinism.cpp`*
+
+### NR-537 — Hotspot audit: all four "serial" clusters are NOT serial, three more phantom-file declarations, and ~8 more false-opens
+*observation · raised 2026-08-22 · from Four-agent audit of the biggest file hotspots, run while Sprint N1 built. Every claim below was spot-checked by hand before acting.*
+
+A file-collision map over near-term open work said history_sim.cpp (24 items), body_surface_canvas.cpp (13), corp_ai.cpp (11) and components.hpp (11) were serial bottlenecks. AN AGENT READ EACH ONE. All four came back NOT SERIAL, and the file-level count was wrong in a different way each time.
+
+history_sim.cpp: 82% of the file is ONE 1,040-line function, so '24 items touch this file' is nearly '24 items touch this function'. What rescues it is a property stated in the file's own header - `salt` is a HASH, not a generator, so 'nothing here consumes a stream, and inserting a decision does not shift the numbers a later decision sees'. Concurrent edits are safe HERE and would not be in a seeded-stream design. Ten named split seams. Three residual serialisers, all narrow - and the load-bearing one is undocumented: THE SCORING-BLOCK ORDER IS SEMANTICALLY LOAD-BEARING (line 843: build_work is scored last because every earlier verb uses `>` against best_score), so two agents each inserting a scoring block merge into an arbitrary order that changes tie-breaks and therefore every generated world.
+
+components.hpp: THE APPEND-ONLY RULE DOES NOT BIND THIS CLUSTER AT ALL. The agent traced every enum to its consumers: not one of the 11 items appends a value to any enum in the file. I had assumed the opposite. The real append-only contention is in a file NOBODY declared - corp_command.hpp's `corp_decision_reason` (BL-446/447/450) and `corp_verb` (BL-377/472/511).
+
+body_surface_canvas.cpp: 'it is not even 13 items - three have already landed.'
+
+corp_ai.cpp: three independent concerns; export_corp_blackboard shares zero symbols with the scorer.
+
+THREE MORE PHANTOM FILES, the BL-377 shape: BL-505 declares src/world/name_generation.{hpp,cpp} (never existed; the generator is tongue.*), BL-551 declares src/world/contracts.cpp (does not exist - inherited from BL-377), BL-525 declares src/world/serialisation.cpp (does not exist and NO item creates it - the seam is sectional, not central). All three corrected.
+
+AND MORE FALSE-OPENS, each with a commit: BL-514 and BL-532 landed in c8a345a; BL-533's half in 3932eea; BL-408's canvas half at 57e596f; BL-480's treasury at 95a68d8; BL-511's components half at 3f2c7c6; BL-212 'LANDED 2026-07-28' per its own note with ZERO references in the file it declares; BL-439 and BL-440's corp_ai halves.
+
+**Why it matters.** THE METHOD FINDING IS THE BIGGEST ONE: a file-level collision map is systematically WRONG in both directions. It over-counts (two items at opposite ends of a 3,545-line file are not in each other's way) and under-counts (the real append-only contention was in corp_command.hpp, which the map never surfaced because few items declare it). collision_map.js's header already warns of exactly these two blind spots; this audit measured them.
+
+The scheduling consequence is large and favourable: v0.1.16's 36 items are NOT a serial queue. The audit proposes six waves for the Fall cluster with three-and-four-way parallel arms.
+
+The scheduling consequence that is UNfavourable: four v0.1.16 items are blocked by items in LATER minors. BL-491 requires BL-320 (v0.1.19); BL-493 requires BL-425 and BL-427 (both v0.1.22); BL-494 requires all four plus BL-462's territory (v0.1.22). A minor cannot cut while a quarter of its perf chain waits on three later minors.
+
+> **Recommendation:** Three things, in order. (1) The version-goal inconsistency is the one that would actually block a cut - either those four items move out of v0.1.16 or their blockers move in. It is a sequencing call and it is Ben's. (2) The confirmed false-opens want the same treatment BL-514 and BL-532 got here: verify by hand, then flip with the commit named. I did the two the audit called FULLY landed and left the partial ones (BL-533, BL-511, BL-408) with their halves stated, because a partial slice landing under an open item is exactly the case the lint warns not to flip blind. (3) The corp_command.hpp append contention should get the Fall-arc convention applied: one appender per batch, in a stated order.
+
+*Files: `docs/development/backlog.json`, `tools/session/collision_map.js`*
 
 ---
 
