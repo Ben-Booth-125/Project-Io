@@ -174,6 +174,12 @@ struct ui_state
     /// player opens it. One flag serves every legend: they are mutually
     /// exclusive by construction (a lens draws at most one).
     bool lens_key_open = false;
+    /// Which view the tile Selection accordion is showing: 0 Terrain,
+    /// 1 Resources, 2 Available buildings (BL-534, Ben 2026-08-22). It used to
+    /// page one-per-deposited-resource, so the seventh deposit cost six presses
+    /// and nothing that was not a resource graph had anywhere to live.
+    /// card_resource_page still selects WHICH resource, now through a dropdown.
+    int card_tile_view = 0;
     /// The time panel's measured height, published each frame by time_panel so
     /// the rest of the right chrome column knows where its own ceiling is.
     /// It is computed from font metrics inside time_panel and was previously

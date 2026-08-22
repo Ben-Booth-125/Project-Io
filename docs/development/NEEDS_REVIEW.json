@@ -2895,8 +2895,8 @@
    "files": [
     "src/ui/body_surface_canvas.cpp"
    ],
-   "status": "open",
-   "resolution": null
+   "status": "resolved",
+   "resolution": "RULED Ben, 2026-08-22 (UI session), and the ruling goes FURTHER than the entry proposed. Ben: \"I like the idea of NR-505, we can stop blending across national borders, and give a slight hue for each country, replacing the national lens entirely.\" So it is not option 2 (Country and Continent fill uniformly per province) — it is a different move altogether. The blend stops at NATIONAL borders rather than province ones, every tile carries a slight hue from the nation that holds it, and overlay_mode::country is RETIRED because the base map now answers the question the lens existed to answer. Filed as BL-535. NR-415, which recorded the original categorical refusal, is vindicated by the outcome even though its specific remedy was not the one taken."
   },
   {
    "id": "NR-506",
@@ -2950,6 +2950,27 @@
    "recommendation": "No new work yet, but this is evidence for NR-454 rather than a separate question — worth deciding them together.",
    "files": [
     "scripts/verify/lens_legend.lua"
+   ],
+   "status": "resolved",
+   "resolution": "ACCEPTED Ben, 2026-08-22 (UI session) — Ben: \"that's no problem.\" The pixel-aimed panel check stands as written. The underlying gap (panels publish no rect, so a check cannot ask where a control is) remains open as NR-454, which still wants a ruling before a target registry could be built; this entry is closed as an accepted cost rather than as a fixed problem."
+  },
+  {
+   "id": "NR-509",
+   "title": "BL-534's new tab makes NR-421 visible on its first frame: capacity 103, geology 24",
+   "raised": "2026-08-22",
+   "kind": "observation",
+   "source": "UI session 2026-08-22, accordion_view_buildings.png",
+   "what": "The Available buildings tab shipped and the very first province it rendered says: Province capacity 0 / 103 (103 free), over a table whose three workable rows are Agricultural Produce 0/9, Stone 0/9 and Timber 0/6 — 24 placement slots in total. So BL-513's ceiling stands more than four times above everything the province's own geology could ever support, and the binding constraint on building here is deposits, not the ceiling. NR-421 measured exactly this and called the per-province firm cap 'inert by ORDERS OF MAGNITUDE, not by a near miss'. BL-534's design note predicted this tab would be the first surface to make that legible to a player. It is, on frame one, without being asked to.",
+   "why_it_matters": "Two things follow. First, the tab reads oddly as shipped: a headline number of 103 sitting over a table that tops out at 24 invites the player to believe there is room they do not have. Second, this is now a PLAYER-VISIBLE statement of a tuning problem rather than an internal measurement — whatever is decided about k_province_buildings_per_sustain_unit, this surface will show it.",
+   "options": [
+    "Leave both numbers as they are — they are each true, and the gap is the honest reading",
+    "Show the effective ceiling alongside: min(province ceiling, sum of per-resource maxima), so the headline is what actually binds",
+    "Re-pin k_province_buildings_per_sustain_unit so the ceiling lands near what geology supports — a tuning change, not a UI one"
+   ],
+   "recommendation": "Option 2 for this surface, and treat option 3 separately. Naming what actually binds is the tab's job; re-pinning the constant is a balance decision that wants its own measurement, and NR-421 already holds that thread.",
+   "files": [
+    "src/ui/selection_panel.cpp",
+    "src/world/province.hpp"
    ],
    "status": "open",
    "resolution": null
