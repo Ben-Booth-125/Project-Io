@@ -34,6 +34,8 @@ Technology is organised into discrete trees, each unlocked by meeting a known pr
 ### Sentiment-based diplomacy
 Each faction maintains a sentiment value toward every other known faction, shaped by a small set of contributing factors such as trade history, territorial conflict, and ideological alignment. *Designed, not built* — no sentiment layer exists in code.
 
+> **Promoted 2026-08-22 (Ben, ruling on NR-520): sentiment is the SUBSTRATE.** This section has said "designed, not built" since the concept doc, and it is now the layer three separate designs were independently converging on — `corp_reputation` (a directed continuous float moved by conduct), BL-540's nation→corp Access/Trust, and the Era −1 grudges BL-541 reads. All three collapse onto it. The model is **two layers**: sentiment derived and continuous, **stance** declared and discrete on top, with the invariant that sentiment may inform a declaration and may never make one. The three contributing factors named above survive unchanged and are all computable from state the game already holds. Owned by BL-545 (sentiment substrate); the full model is `docs/politics/RELATIONS.md` § The settled model. Still unbuilt, so this section's own status line stands.
+
 ## Combat — conflict
 
 Conflict is the least-designed of the three pillars. *(Corrected 2026-08-10, NR-120: was "the governing body is the actor that commands force" — now the **national private militia** commands it, having procured it. BL-315, the conflict spine, is Sprint 8's route to making this pillar load-bearing.)* A battle resolver ships (BL-272, `src/world/combat.cpp`), used by the Era −1 history sim; nothing in the campaign layer commands it yet.

@@ -23,6 +23,10 @@ This table is the reason the document exists. Read it before touching any of the
 | **Embargo** | *Is A forbidden to trade in B's terms?* | a `condition_set` per corp | **authored** | **nothing — no author exists** |
 | **Standing** | *How strong is A?* | five bands on three axes | **derived** | nothing — it is a readout |
 
+> **Settled 2026-08-22 (Ben, ruling on NR-520): sentiment is the substrate.** The table above is
+> what the code holds *today*; the target is **two layers, not four quantities**. See § The
+> settled model directly below — read it before extending anything in this document.
+
 **Standing is the odd one and the naming is a known hazard.** It is not a relation at all: it is a
 coarse public read of how powerful a corporation is, with no second party anywhere in it. NR-304
 records the collision being noticed when stance was named — *"called it 'stance', not 'standing' —
@@ -30,6 +34,57 @@ the latter is taken by BL-262's power read."*
 
 The distinction that keeps them straight, from `stance.hpp`'s own header: **"stance is how a corp
 feels about another; standing is how strong it is."**
+
+---
+
+## The settled model — two layers
+
+Ben's ruling on NR-520, 2026-08-22. Putting all four quantities in one table made visible what none
+of them showed individually: **three designs were converging on the same continuous derived
+quantity and none knew about the other two** — CONCEPT.md's sentiment, BL-540's nation→corp
+Access/Trust, and `corp_reputation`.
+
+They converge deliberately now:
+
+    stance      DECLARED, discrete    — an act, always attributable to an ACTOR
+    sentiment   DERIVED,  continuous  — a reading, attributable to CONDUCT
+
+**Sentiment** is one directed, continuous, derived value from an **observer** to a **subject**,
+where an actor is a corporation or a nation. Directed, because every existing use already needs it
+— reputation is keyed (buyer, supplier), a nation reads a corp and never the reverse, a grudge is
+asymmetric by nature. Continuous, with bands as a *presentation* choice (the BL-262 precedent),
+never the storage.
+
+**Stance stays exactly as it is**, sitting on top as the declared layer.
+
+### The invariant: sentiment must never become hostility on its own
+
+Ben ruled on 2026-08-17 that hostility is **a declared state a corp opts into**, and that a rival
+*"may score and declare it, never acquire it ambiently."* That ruling stands, and the substrate must
+not quietly overturn it.
+
+So **sentiment informs a declaration; it never makes one.** A scorer may read sentiment and choose
+to `declare_hostile`. **No threshold anywhere may flip a stance table by itself.** A harness row
+asserts it directly: driving sentiment to any extreme, in either direction, mutates no stance table.
+
+### What the ruling dissolves
+
+| Was | Becomes |
+|---|---|
+| `corp_reputation`, its own serialised map | a **view** of sentiment at buyer→supplier grain (BL-546) |
+| BL-540's Access / Trust, a new per-nation table | **dimensions** of sentiment at nation→corp grain |
+| Era −1 grudges, read by BL-541 with nowhere to live | **seeded** nation→nation sentiment |
+| CONCEPT.md's sentiment, designed and never built | **the layer itself** |
+
+**BL-391's deadlock stops existing rather than getting fixed.** The reputation floor is
+unrecoverable because its only two writers are contract completion and cancellation, so the recovery
+path is a cycle with no entry. A continuous quantity that **decays toward neutral has no permanent
+floor by construction** — a burned relationship heals, and "wait" becomes a legitimate strategic
+move. The fix is a property of the substrate rather than a patch on procurement.
+
+*Owned by BL-545 (sentiment substrate) and BL-546 (reputation migration, which is the one relational
+quantity that IS serialised, so its migration is a save-format change rather than a rename).
+BL-540, BL-541 and BL-391 are reshaped onto it and all three now `require` it.*
 
 ---
 
@@ -180,23 +235,23 @@ and the second time the vocabulary has collided.
 
 ## Open questions
 
-1. **Is one relational substrate right, or four?** Stance, reputation, embargo and BL-540's two
-   dimensions are four mechanisms answering versions of *how do these two parties stand?* Each was
-   built for a real reason and none is obviously wrong. But nobody has ever asked whether they
-   should converge, and NR-304's naming collision is the symptom rather than the problem.
+1. ~~**Is one relational substrate right, or four?**~~ **Settled 2026-08-22** — see § The settled
+   model. Two layers: sentiment derived and continuous, stance declared and discrete. What remains
+   open is **how many dimensions sentiment carries** (NR-522): BL-540 needs Access and Trust
+   expressible separately, reputation reads as one, and a third must gate something before it
+   is added.
 
 2. **What does friendship permit?** Left as "a later call" when BL-448 landed 2026-08-19. Candidates
    with existing machinery: passage through territory, a preferential price, shared visibility under
    BL-068, immunity from interdiction. Until it permits something it is a button with no effect.
 
-3. **Does sentiment replace stance, or sit under it?** CONCEPT.md's sentiment is continuous and
-   derived; stance is discrete and declared. BL-540 arrives at a continuous derived quantity from a
-   different direction. **Three designs are converging on the same shape and none of them knows
-   about the other two.**
+3. ~~**Does sentiment replace stance, or sit under it?**~~ **Settled 2026-08-22: under it**, and
+   never able to reach up into it on its own. The invariant above is the whole answer.
 
-4. **Should reputation decay, and at what rate?** BL-391 proposes decay toward neutral and it is the
-   right shape. The rate is unset, and it wants the same treatment BL-543 gave value: an anchor, not
-   a guess. *How long should a burned relationship take to heal?* is a question a player can answer.
+4. **At what rate does sentiment decay?** *Whether* it decays is settled — the substrate does, which
+   is what dissolves BL-391's deadlock. The **rate** is unset and wants the treatment BL-543 gave
+   value: an anchor, not a guess. *How long should a burned relationship take to heal?* is a
+   question a player can answer.
 
 5. **Does a rival get to declare hostility on the player?** The 2026-08-18 grant says yes. Nothing
    has used it, so the first implementation is also the first test of whether it feels fair — and
@@ -224,7 +279,9 @@ and the second time the vocabulary has collided.
 `docs/economy/MARKETS.md` (§ Procurement, where reputation is spent),
 `docs/ai/AI_OPPONENT.md` (the scorer that will one day declare).
 
-**Backlog.** BL-391 (reputation floor deadlock, A) is the live defect. BL-450 (rivals score stance)
-holds the unused grant. BL-449 (stance needs a surface) is the UI half. BL-540 (nation→corp stance)
-is the fifth quantity. BL-390 (the seam has no read-back) owns making reputation visible.
+**Backlog.** **BL-545 (sentiment substrate)** is the spine, filed 2026-08-22 on Ben's NR-520
+ruling; **BL-546** migrates reputation onto it. **BL-540** (nation→corp stance), **BL-541**
+(directional tariffs) and **BL-391** (reputation floor deadlock) are all reshaped onto BL-545 and
+`require` it. BL-450 (rivals score stance) holds the unused 2026-08-18 grant; BL-449 (stance needs
+a surface) is the UI half; BL-390 (the seam has no read-back) owns making the value visible.
 BL-158 (politics datamodel stub) and BL-345 (politics relationship axis) are the older neighbours.

@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*223 entries — 203 open, 20 resolved.*
+*224 entries — 203 open, 21 resolved.*
 
 ---
 
@@ -1921,21 +1921,6 @@ A DAY TICK is one in-game day (sim_loop::m_day_tick); the survey system counts t
 
 *Files: `docs/GLOSSARY.md`, `src/core/sim_loop.hpp`, `src/world/budget_system.hpp`, `src/world/survey_system.hpp`*
 
-### NR-520 — Three designs are converging on the same continuous relational quantity and none of them knows about the other two
-*question · raised 2026-08-22 · from Writing docs/politics/RELATIONS.md (system 2 of the phantom scan).*
-
-Putting all four relational quantities in one table made this visible for the first time. (1) CONCEPT.md § Sentiment-based diplomacy: each faction holds a CONTINUOUS sentiment toward every other, shaped by trade history, territorial conflict and ideological alignment. Designed since the concept doc; MANUAL.md § 5 lists it [OWED]; nothing in code holds it. (2) BL-448 stance: DISCRETE and DECLARED, shipped 2026-08-19. (3) BL-540 (nation->corp stance), designed 2026-08-22 in the nations session: GRADED, multi-dimensional and DERIVED - which is sentiment's shape, arrived at from a different direction and without reference to it. Add w.corp_reputation (BL-350), which is already a continuous per-pair float moved by conduct, and there are arguably FOUR designs in the same space.
-
-**Why it matters.** Each was built for a real reason and none is wrong on its own. But the project is one implementation away from having two continuous derived relational quantities with different names, different owners and no stated relationship - which is how the stance/standing naming collision happened (NR-304), one level up. BL-540 is designed and unbuilt, so this is the cheapest moment it will ever be to decide.
-
-- Declare sentiment the substrate: BL-540's dimensions ARE sentiment at nation->corp grain, and corp_reputation is sentiment at buyer->supplier grain. Stance stays the discrete DECLARED layer on top.
-- Keep them separate and state the boundary in RELATIONS.md, so the next design knows which it is extending.
-- Defer until BL-540 is built and see whether the shapes actually converge in practice.
-
-> **Recommendation:** Option 1 or 2, but not 3 - deferring is what produced the current four. Option 1 is tidier and I lean to it: one continuous derived quantity per (observer, subject) grain, with stance as the discrete declared layer above it. That also gives CONCEPT.md's oldest unbuilt promise a real home instead of leaving it [OWED] indefinitely.
-
-*Files: `docs/politics/RELATIONS.md`, `docs/CONCEPT.md`, `docs/development/backlog.json`*
-
 ### NR-521 — MILITARY.md's 'stance gates nothing yet' was stale by three consumers, and friendship still gates zero
 *observation · raised 2026-08-22 · from Writing RELATIONS.md; checked every consumer of is_hostile/are_friends in src/.*
 
@@ -1946,6 +1931,21 @@ MILITARY.md § What is absent said stance 'still carries no consequence - stance
 > **Recommendation:** Give friendship something to permit, or say in RELATIONS.md that it is deliberately inert until BL-315's consequences land. Candidates with existing machinery: passage through territory, a preferential price, shared visibility under BL-068, immunity from interdiction. Filed as RELATIONS.md open question 2 rather than as an item, since choosing is design.
 
 *Files: `docs/military/MILITARY.md`, `docs/politics/RELATIONS.md`, `src/world/stance.cpp`*
+
+### NR-522 — How many dimensions does sentiment carry? The NR-520 ruling settled the architecture, not the count
+*question · raised 2026-08-22 · from Filing BL-545 after Ben's sentiment-is-the-substrate ruling.*
+
+Three existing designs imply three different answers. BL-540 proposed TWO - Access (may this corp operate in our borders) and Trust (would we contract it) - each gating something distinct. corp_reputation reads as ONE (will you deal with me again). CONCEPT.md describes a SINGLE value shaped by several contributing factors. BL-545 assumes the BL-540 pair generalised to every grain, and says so, but that is an assumption rather than a ruling.
+
+**Why it matters.** Collapsing to one makes Access and Trust inexpressible separately, which BL-540 needs - a nation might let a company operate while never contracting it, and those are different facts. Going past two is the failure mode of every multi-dimensional reputation system: dimensions that are stored, displayed and never read. The rule BL-545 adopts is that a dimension must GATE something before it is added, which keeps the count honest without fixing it now.
+
+- Two (Access, Trust), generalised to every grain - what BL-545 assumes.
+- One value plus per-consumer thresholds, with Access and Trust as different cuts of the same number.
+- Decide per grain: nation->corp carries two, corp->corp carries one.
+
+> **Recommendation:** Option 1. Two is the smallest count that expresses what BL-540 and BL-377 both need, and the gate-something rule stops it growing. Option 3 is tempting and should be resisted - a substrate whose shape varies by grain is not a substrate.
+
+*Files: `docs/politics/RELATIONS.md`, `docs/development/backlog.json`*
 
 ---
 
@@ -2251,4 +2251,21 @@ Ben: 'let's divorce wages from goods somewhat. My 1/2 figure can use base prices
 > **RESOLVED.** CLARIFIED BY BEN, 2026-08-22. BL-543 rewritten against base prices at authoring time; BL-544 filed for the gap it opens.
 
 *Files: `docs/development/backlog.json`, `docs/politics/NATIONS.md`, `scripts/economy.lua`, `scripts/world_gen.lua`*
+
+### NR-520 — Three designs are converging on the same continuous relational quantity and none of them knows about the other two
+*question · raised 2026-08-22 · from Writing docs/politics/RELATIONS.md (system 2 of the phantom scan).*
+
+Putting all four relational quantities in one table made this visible for the first time. (1) CONCEPT.md § Sentiment-based diplomacy: each faction holds a CONTINUOUS sentiment toward every other, shaped by trade history, territorial conflict and ideological alignment. Designed since the concept doc; MANUAL.md § 5 lists it [OWED]; nothing in code holds it. (2) BL-448 stance: DISCRETE and DECLARED, shipped 2026-08-19. (3) BL-540 (nation->corp stance), designed 2026-08-22 in the nations session: GRADED, multi-dimensional and DERIVED - which is sentiment's shape, arrived at from a different direction and without reference to it. Add w.corp_reputation (BL-350), which is already a continuous per-pair float moved by conduct, and there are arguably FOUR designs in the same space.
+
+**Why it matters.** Each was built for a real reason and none is wrong on its own. But the project is one implementation away from having two continuous derived relational quantities with different names, different owners and no stated relationship - which is how the stance/standing naming collision happened (NR-304), one level up. BL-540 is designed and unbuilt, so this is the cheapest moment it will ever be to decide.
+
+- Declare sentiment the substrate: BL-540's dimensions ARE sentiment at nation->corp grain, and corp_reputation is sentiment at buyer->supplier grain. Stance stays the discrete DECLARED layer on top.
+- Keep them separate and state the boundary in RELATIONS.md, so the next design knows which it is extending.
+- Defer until BL-540 is built and see whether the shapes actually converge in practice.
+
+> **Recommendation:** Option 1 or 2, but not 3 - deferring is what produced the current four. Option 1 is tidier and I lean to it: one continuous derived quantity per (observer, subject) grain, with stance as the discrete declared layer above it. That also gives CONCEPT.md's oldest unbuilt promise a real home instead of leaving it [OWED] indefinitely.
+
+> **RESOLVED.** RULED BY BEN, 2026-08-22: SENTIMENT IS THE SUBSTRATE (option 1). Propagated the same session. Model is two layers - sentiment derived and continuous, stance declared and discrete on top - recorded in RELATIONS.md § The settled model, with a dated promotion note in CONCEPT.md § Sentiment-based diplomacy, which had said 'designed, not built' since the concept doc. Filed BL-545 (sentiment substrate, A, v0.1.24) and BL-546 (reputation migration, B - the one relational quantity that IS serialised, so its migration is a save-format change rather than a rename). Reshaped three items onto it: BL-540's Access/Trust become dimensions rather than a new table, BL-541's Era -1 grudges become seeded nation->nation sentiment, and BL-391's deadlock stops existing rather than being fixed, since a decaying quantity has no permanent floor. All three now require BL-545. THE INVARIANT carried through everywhere: sentiment informs a declaration and never makes one - no threshold may flip a stance table by itself, preserving Ben's 2026-08-17 ruling that hostility is opted into and never acquired ambiently.
+
+*Files: `docs/politics/RELATIONS.md`, `docs/CONCEPT.md`, `docs/development/backlog.json`*
 

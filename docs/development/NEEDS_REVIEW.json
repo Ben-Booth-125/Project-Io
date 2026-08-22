@@ -3189,8 +3189,8 @@
     "docs/CONCEPT.md",
     "docs/development/backlog.json"
    ],
-   "status": "open",
-   "resolution": null
+   "status": "resolved",
+   "resolution": "RULED BY BEN, 2026-08-22: SENTIMENT IS THE SUBSTRATE (option 1). Propagated the same session. Model is two layers - sentiment derived and continuous, stance declared and discrete on top - recorded in RELATIONS.md § The settled model, with a dated promotion note in CONCEPT.md § Sentiment-based diplomacy, which had said 'designed, not built' since the concept doc. Filed BL-545 (sentiment substrate, A, v0.1.24) and BL-546 (reputation migration, B - the one relational quantity that IS serialised, so its migration is a save-format change rather than a rename). Reshaped three items onto it: BL-540's Access/Trust become dimensions rather than a new table, BL-541's Era -1 grudges become seeded nation->nation sentiment, and BL-391's deadlock stops existing rather than being fixed, since a decaying quantity has no permanent floor. All three now require BL-545. THE INVARIANT carried through everywhere: sentiment informs a declaration and never makes one - no threshold may flip a stance table by itself, preserving Ben's 2026-08-17 ruling that hostility is opted into and never acquired ambiently."
   },
   {
    "id": "NR-521",
@@ -3206,6 +3206,27 @@
     "docs/military/MILITARY.md",
     "docs/politics/RELATIONS.md",
     "src/world/stance.cpp"
+   ],
+   "status": "open",
+   "resolution": null
+  },
+  {
+   "id": "NR-522",
+   "title": "How many dimensions does sentiment carry? The NR-520 ruling settled the architecture, not the count",
+   "raised": "2026-08-22",
+   "kind": "question",
+   "source": "Filing BL-545 after Ben's sentiment-is-the-substrate ruling.",
+   "what": "Three existing designs imply three different answers. BL-540 proposed TWO - Access (may this corp operate in our borders) and Trust (would we contract it) - each gating something distinct. corp_reputation reads as ONE (will you deal with me again). CONCEPT.md describes a SINGLE value shaped by several contributing factors. BL-545 assumes the BL-540 pair generalised to every grain, and says so, but that is an assumption rather than a ruling.",
+   "why_it_matters": "Collapsing to one makes Access and Trust inexpressible separately, which BL-540 needs - a nation might let a company operate while never contracting it, and those are different facts. Going past two is the failure mode of every multi-dimensional reputation system: dimensions that are stored, displayed and never read. The rule BL-545 adopts is that a dimension must GATE something before it is added, which keeps the count honest without fixing it now.",
+   "options": [
+    "Two (Access, Trust), generalised to every grain - what BL-545 assumes.",
+    "One value plus per-consumer thresholds, with Access and Trust as different cuts of the same number.",
+    "Decide per grain: nation->corp carries two, corp->corp carries one."
+   ],
+   "recommendation": "Option 1. Two is the smallest count that expresses what BL-540 and BL-377 both need, and the gate-something rule stops it growing. Option 3 is tempting and should be resisted - a substrate whose shape varies by grain is not a substrate.",
+   "files": [
+    "docs/politics/RELATIONS.md",
+    "docs/development/backlog.json"
    ],
    "status": "open",
    "resolution": null
