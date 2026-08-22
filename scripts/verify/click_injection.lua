@@ -43,15 +43,10 @@ verify.capture("click_injection_01_clicked_province")
 
 local pid_click = t.selected_province
 
--- C2 — the click AGREES with the shortcut it replaces. verify.select_province
--- writes the state a click is supposed to produce; if the two disagree, one of
--- them is lying about the gesture, and until now nothing could tell which.
-verify.clear_selection()
-local pid_direct = verify.select_province(COL, ROW)
-verify.expect(pid_click == pid_direct,
-              string.format("C2 injected click and select_province agree (%d vs %d)",
-                            pid_click, pid_direct))
-
+-- ORDER MATTERS (NR-504, 2026-08-22): C3/C4 run IMMEDIATELY after C1, before
+-- C2's clear_selection()/select_province() teardown. Repeat-click detection keys
+-- on the previous CLICK, so a programmatic re-select in between made C3's press
+-- read as a FIRST click and re-select the province. Do not reorder these back.
 -- C3 — a SECOND press on the same tile cycles the rung (BL-511's UNIT >
 -- PROVINCE > BUILDING > TILE walk). This is the real evidence that press number
 -- two is a distinct press and not a repaint: a fresh click would re-select the
@@ -77,6 +72,16 @@ print(string.format("C4 after double click: province=%d has_entity=%s",
 verify.expect(t.selected_province == 0 and t.has_selection,
               "C4 double_click pressed twice (two rung advances, not one)")
 verify.capture("click_injection_03_double_click")
+
+-- C2 — the click AGREES with the shortcut it replaces. verify.select_province
+-- writes the state a click is supposed to produce; if the two disagree, one of
+-- them is lying about the gesture, and until now nothing could tell which.
+verify.clear_selection()
+local pid_direct = verify.select_province(COL, ROW)
+verify.expect(pid_click == pid_direct,
+              string.format("C2 injected click and select_province agree (%d vs %d)",
+                            pid_click, pid_direct))
+
 
 -- C5 — HOVER through the same seam. The pointer is placed and then DWELLS by
 -- frame count: the glance card appears at 30 frames and sticks at 150 (the fixed

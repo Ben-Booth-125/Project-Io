@@ -3349,12 +3349,19 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
 
                     state.selection_cycle_tile  = hovered_tile;
                     // Seed the anchor at the rung this click actually landed on,
-                    // in the four-rung order above, so the NEXT repeat click
+                    // in the FIVE-rung order above, so the NEXT repeat click
                     // advances from the right place rather than replaying a rung.
-                    state.selection_cycle_stage = (marker_hit != null_entity && unit_here == marker_hit) ? 0
-                                                 : (marker_hit != null_entity) ? 2   // a building marker
-                                                 : (fallback != null_entity)   ? 2
-                                                                               : 1;  // plain ground = province
+                    // These indices must track `stages[5]` exactly: BATTLE 0,
+                    // UNIT 1, PROVINCE 2, BUILDING 3, TILE 4. They were the
+                    // four-rung indices until 2026-08-22 and were never shifted
+                    // when BL-469 inserted the battle rung at 0, so plain ground
+                    // seeded 1 (the UNIT rung); a repeat click then advanced
+                    // 1 -> 2 and landed back on the province, which read as the
+                    // cycle not firing at all (NR-504).
+                    state.selection_cycle_stage = (marker_hit != null_entity && unit_here == marker_hit) ? 1
+                                                 : (marker_hit != null_entity) ? 3   // a building marker
+                                                 : (fallback != null_entity)   ? 3
+                                                                               : 2;  // plain ground = province
                 }
                 else
                 {

@@ -2807,6 +2807,72 @@
    ],
    "status": "open",
    "resolution": null
+  },
+  {
+   "id": "NR-501",
+   "title": "BL-519 and BL-520 are now RENDERED — the container-blind half of NR-451 and NR-457 is closed",
+   "raised": "2026-08-22",
+   "kind": "observation",
+   "source": "UI session 2026-08-22, local build",
+   "what": "Built ProjectIo locally (BUILD_OK, exe relinked 01:31) and ran tile_texture.lua, province_render.lua and click_injection.lua. NR-451 and NR-457 both recorded that BL-519 and BL-520 were compile-checked only, never rendered, because that container had no SDL3 and no display. That is now closed: 14 texture captures, 20 province captures and 6 click captures exist under build/screenshots/. The texture pass genuinely works — province_blend_close.png is the frame that shows it, with per-tile canopy ticks legible over a province blend that still reads as one continuous field, and texture_cinder_close.png shows the non-biotic chip/scratch grain doing the same on an airless body. Ocean draws nothing, as designed.",
+   "why_it_matters": "Two items shipped complete on a compile check alone. They now have eyeballed evidence, and the evidence supports the design rather than contradicting it.",
+   "files": [
+    "build/screenshots/",
+    "scripts/verify/tile_texture.lua"
+   ],
+   "status": "open"
+  },
+  {
+   "id": "NR-502",
+   "title": "tile_texture.lua ran GREEN while two of its load-bearing frames point at open water — the fixtures did not survive the repartition",
+   "raised": "2026-08-22",
+   "kind": "observation",
+   "source": "UI session 2026-08-22, tile_texture.lua",
+   "what": "The check reports \"0 golden failure(s)\" and every capture wrote. But its two framed close-reads are aimed at tiles that no longer hold what the script documents. center_tile(89,10,5) — commented as Kepler grass/scrub/forest/marsh, \"where the density scale actually varies\" — lands on ocean and ice (texture_density_close.png). center_tile(76,12,8) — commented as a run of same-substrate land tiles inside one province, the R1 negative half proving grain draws no seam — lands on pure open ocean, which by design draws nothing at all (texture_grain_no_seam.png). So R2 (density scaling) and R1-negative (no seam) are currently UNTESTED despite a green run. Same shape as NR-422: BL-515/BL-516 repartitioned the world and the hardcoded fixtures moved out from under the script.",
+   "why_it_matters": "This is the exact failure the verifier-visual skill names — a green pass over a frame that never showed the subject. The two claims the item most needs proven are the two that silently went untested.",
+   "options": [
+    "Re-aim both center_tile calls at tiles that actually carry the covers, and state the cover in the capture name",
+    "Give the verify API a find-tile-by-cover helper so the fixture is derived, not hardcoded"
+   ],
+   "recommendation": "Re-aim, and prefer the derived helper — hardcoded tile fixtures will break on the next repartition too.",
+   "files": [
+    "scripts/verify/tile_texture.lua"
+   ],
+   "status": "resolved",
+   "resolution": "FIXED 2026-08-22, in session. Both center_tile fixtures re-aimed onto (40,30)/(37,28) — the land province_render.lua frames, confirmed biotic. texture_density_close.png now shows neighbouring forest tiles at visibly different canopy densities, which is R2 actually being tested; texture_grain_no_seam.png is land-only, scrub above and closed canopy below, so the R1-negative claim is asserted over ground that could show a seam. Each fixture carries a comment naming NR-502 and warning that hardcoded tile fixtures will break on the next repartition. The derived find-tile-by-cover helper recommended above was NOT built — it needs a new verify API function, which is scope growth this session did not take. Left as the standing hazard."
+  },
+  {
+   "id": "NR-503",
+   "title": "The Country lens legend overflows its container and collides with the tile ledger beneath it",
+   "raised": "2026-08-22",
+   "kind": "observation",
+   "source": "UI session 2026-08-22, texture_lens_country.png",
+   "what": "At a 1600x1000 window the Countries legend lists 40 nations in one ungoverned column. It runs past the bottom of the canvas and overprints the tile ledger panel — \"Rutam\", \"Th Thuara\", \"Te Rerem\", \"Bethreibei Beise\", \"Zeithketh\", \"Beireth Reineth\", \"Shakei\", \"Taitamte Tammai\", \"Toko Roto\" are all drawn over the ledger buttons and the resource graph. Legible text on top of legible text, neither readable. Visible in build/screenshots/texture_lens_country.png.",
+   "why_it_matters": "Unrelated to BL-520 — the texture work simply made me look at this lens. It is a live clipping defect on a shipped lens at a supported window size, and text_overflow_floor would not catch it because nothing is clipped, it is overdrawn.",
+   "files": [
+    "src/ui/"
+   ],
+   "status": "open"
+  },
+  {
+   "id": "NR-504",
+   "title": "click_injection C3b and C4 FAIL — the press lands, but the selection cycle does not advance on a repeat click",
+   "raised": "2026-08-22",
+   "kind": "question",
+   "source": "UI session 2026-08-22, click_injection.lua",
+   "what": "The press itself is PROVEN, which closes the core of NR-416/NR-424: C1a (click_tile resolved and pressed), C1b (the injected click selected a province through the real handler), C2 (injected click and select_province agree, 22209 vs 22209) and all three hover assertions pass. But two fail. C3b expects a second press on the same tile to walk BL-511 rung UNIT>PROVINCE>BUILDING>TILE off the province to the bare tile; actual is province=22209 has_entity=false, i.e. unchanged. C4 (double_click delivers two presses) fails the same way. TWO candidate causes and I did not determine which: (a) the cycle genuinely does not advance, a real behaviour bug in the click handler; or (b) C2 tears the premise down — it calls verify.clear_selection() then verify.select_province(), so if repeat-click detection keys on the previous CLICK target rather than on selection state, C3s click is a first click by that reckoning and correctly re-selects the province. Cause (b) would make this a script bug, not a product bug.",
+   "why_it_matters": "BL-521 exists to close the live-check class. Its own check is now the thing reporting red, and the answer decides whether BL-511s selection walk is broken or the script is.",
+   "options": [
+    "Reorder the script so C3 follows C1 without the clear_selection teardown, and see if it goes green",
+    "Read the click handler cycle condition directly and settle it by inspection"
+   ],
+   "recommendation": "Try the reorder first — it is one edit and it distinguishes the two causes outright.",
+   "files": [
+    "scripts/verify/click_injection.lua",
+    "src/ui/"
+   ],
+   "status": "resolved",
+   "resolution": "ANSWERED AND FIXED 2026-08-22, in session. Cause (b) REFUTED empirically: reordering the script so C3/C4 run immediately after C1, with no clear_selection teardown between, reproduced the failure identically. A hover-before-click diagnostic changed nothing either, ruling out the injection path. Cause (a) confirmed — a REAL bug in shipped selection behaviour. Mechanism: body_surface_canvas.cpp seeded selection_cycle_stage with the OLD FOUR-RUNG indices, never shifted when BL-469 inserted the battle rung at index 0. stages[5] is BATTLE 0, UNIT 1, PROVINCE 2, BUILDING 3, TILE 4, but plain ground seeded 1 (the UNIT rung), so a repeat click walked 1 -> 2 and landed back on the province — reading as the cycle not firing at all. All four seed constants were one short. Shifted to 1/3/3/2, and the comment now states they must track stages[5]. click_injection.lua is 8/8 PASS; C3 reports province=0 has_entity=true. STILL OWED: a live click by Ben per the 2026-08-19 standing rule — the harness proves the press and the walk, not that it feels right."
   }
  ]
 }

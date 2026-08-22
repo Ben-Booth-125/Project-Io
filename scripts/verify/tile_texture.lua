@@ -41,14 +41,22 @@ verify.capture("texture_home_zoom")
 -- be distinguishable from each other — that is the whole argument for scaling the
 -- pattern with the scalar the economy already reads.
 verify.set_zoom(6)
-verify.center_tile(89, 10, 5)
+-- FIXTURE (re-aimed 2026-08-22, NR-502): (89,10) landed on ocean and ice after
+-- BL-515/BL-516 repartitioned the world, so this frame tested nothing while the
+-- check still reported green. (40,30) is the tile province_render.lua frames and
+-- is confirmed biotic land. Hardcoded fixtures WILL break on the next repartition.
+verify.center_tile(40, 30, 6)
 verify.capture("texture_density_close")
 
 -- R1's negative half: the grain must NOT draw a seam. A run of same-substrate
 -- tiles inside one province should still read as one shape (BL-511's blend), with
 -- the grain adding material and not an outline. If tile edges reappear here, the
 -- grain alpha is too high or its marks are too large.
-verify.center_tile(76, 12, 8)
+-- FIXTURE (re-aimed 2026-08-22, NR-502): (76,12) was pure open ocean, which draws
+-- NO texture by design — so the R1-negative claim (grain must not draw a seam) was
+-- being asserted over water that could never show one. Re-aimed onto the same
+-- confirmed land mass, offset so the frame is a run of ground rather than a coast.
+verify.center_tile(37, 28, 8)
 verify.capture("texture_grain_no_seam")
 
 -- Ocean draws NOTHING, on purpose — a flat sea is a correct reading of open water,
