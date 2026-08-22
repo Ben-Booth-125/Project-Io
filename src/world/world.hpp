@@ -548,6 +548,29 @@ struct world
     /// @return An FNV-1a 64-bit checksum of the canonicalised snapshot.
     uint64_t state_hash(int tick) const;
 
+    // --- Save-format access to the id counter (BL-536) -----------------------
+    //
+    // The allocator's cursor is SAVE STATE, for the same reason `next_order_id`
+    // and `next_convoy_id` are and say so: a load that restarted allocation at 1
+    // would hand out ids that live entities already hold, and the collision would
+    // surface as one entity silently becoming another. It stays private, with a
+    // reader and a restorer either side of the seam rather than a public field —
+    // nothing but the serialiser has any business setting it.
+
+    /// The next id `create_entity` will hand out. For the serialiser only.
+    /// @return The allocator's current cursor.
+    uint32_t next_entity_id() const { return m_next_id; }
+
+    /// Restore the allocator's cursor on load. For the serialiser only.
+    ///
+    /// Clamped up to 1 rather than trusting the stream: a zero would make the
+    /// next `create_entity` return `null_entity`, which every consumer reads as
+    /// "no entity". A corrupt stream should fail its own guards long before
+    /// this, and if one gets here it must not produce a world that looks valid.
+    ///
+    /// @param next Cursor read from the snapshot.
+    void set_next_entity_id(uint32_t next) { m_next_id = (next < 1u) ? 1u : next; }
+
 private:
     uint32_t m_next_id = 1; ///< Zero is null_entity; live IDs start at 1.
 };

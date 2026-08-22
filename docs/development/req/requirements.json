@@ -5164,6 +5164,63 @@
      "notes": "A NEGATIVE requirement, and it earns its place: BL-384's design predicted exactly this temptation, and the sprint on the board was aimed at combat. Written down so the scope is checkable rather than remembered."
     }
    ]
+  },
+  {
+   "brief": "world-save-snapshot",
+   "batch": "2026-08-22-bl-536-save-state",
+   "title": "A campaign can be saved and resumed - and a design pass can load one instead of generating",
+   "status": "pending",
+   "promoted_from": "backlog.json BL-536 (raised 2026-08-22); unblocks BL-107 (SAVE_FORMAT_VERSION)",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING (headless): A SAVE/LOAD ROUND TRIP IS THE IDENTITY. Generate the canonical world, write a snapshot, read it back into a fresh world, and the two are identical across every serialised field - store sizes, entity-id key sets, and value-for-value contents - AND world::state_hash(tick) agrees for the same tick. state_hash alone is not sufficient and is deliberately not trusted on its own: it folds only the fields a TICK may mutate, so a serialiser that dropped the province partition or a body name would still hash clean. The field walk is the assertion; the hash is the corroboration.",
+     "result_metric": null,
+     "verification": "headless - tools/verify/save_roundtrip.cpp",
+     "notes": "Extends determinism_harness's comparison walker rather than inventing a second one."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "A BAD STREAM IS REJECTED AND MUTATES NOTHING. A snapshot with a wrong magic, a mismatched version, a corrupt length prefix, or a truncated tail fails the load with a clear error - never a partial or garbage world. The destination world is left EXACTLY as it was: the read builds into a scratch world and moves it into place only on success. This is BL-107 applied to the world save, on the convention history_log/order_book/procurement already established.",
+     "result_metric": null,
+     "verification": "headless - tools/verify/save_roundtrip.cpp",
+     "notes": "BL-107 has been blocked on this serialiser existing since 2026-07-05; this row is what unblocks it."
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "DERIVED CACHES ARE REBUILT ON LOAD; ORDER-BEARING STATE IS NOT. The four pure caches (body_tile_index, astar_cost_cache, body_reach_cost, body_market_index + its two stamps) are cleared on load and rebuild to identical contents on first use, and ai_decisions/current_day_tick reset. corp_modifiers is the EXCEPTION and is serialised directly: it is derived in origin but its stored order is the earn order across ticks, which a re-fold from earned_techs x the gate table cannot reconstruct (see NR-510). The row asserts the consequence rather than the mechanism - a loaded corporation's modified_scalar returns exactly what it returned before the save, for a corp that earned its gates OUT of table order.",
+     "result_metric": null,
+     "verification": "headless - tools/verify/save_roundtrip.cpp",
+     "notes": "Supersedes BL-107's 2026-08-19 change-note, which prescribed the re-fold. The re-fold is wrong when add/subtract and multiply modifiers interleave, because they do not commute."
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "requirement": "A SAVE TAKEN MID-BATTLE RESTORES THE FIGHT. world::battles round-trips including campaign_battle_state::rng_state and stream_seed, and stepping a loaded battle to its end produces the SAME outcome as stepping the un-saved one. This reverses the standing assumption in world.hpp - \"NOT SERIALISED, deliberately... a save taken mid-battle therefore drops the fight\" - on Ben's 2026-08-22 call. The sorted (province, attacker, defender) order is preserved across the round trip, since that ordering is the contract that recovers order-independence.",
+     "result_metric": null,
+     "verification": "headless - tools/verify/save_roundtrip.cpp",
+     "notes": "world.hpp names this \"the thing to revisit first if that changes\". It changed."
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "requirement": "A LOADED WORLD RENDERS AS THE GENERATED ONE DID. The same verify script captured against a freshly generated world and against a snapshot of that world produces matching captures - the surfaces that read the app envelope included (the tile inspector biography, the generation ledger, the Continent lens). This is the row that makes the golden use case real: if a loaded save renders differently, capturing goldens from one is worthless.",
+     "result_metric": null,
+     "verification": "visual - scripts/verify/save_load.lua",
+     "notes": "The motivating use case: skip the ~25-38 s generation plus ~6 s warm start on every capture run."
+    },
+    {
+     "id": "R6",
+     "status": "pending",
+     "requirement": "THE APP ENVELOPE ROUND-TRIPS - all four parts Ben named on 2026-08-22. (a) sim tick and the active world_params; (b) the generation_report, in full, including both planetology_states, the continent plate_id raster and the tile_inputs the Generation Ledger regenerates from; (c) the app-owned per-tick histories (balance, income, expenditure, market plots, building rank); (d) the ui_state slice - primary_level, active_body, selected_entity, selected_province, overlay, and the three camera zoom/pan triples. The envelope is a SEPARATE stream section from the world snapshot, so world/* stays SDL- and UI-free and the headless harness can exercise the world half alone.",
+     "result_metric": null,
+     "verification": "headless - tools/verify/save_roundtrip.cpp (world half); visual - scripts/verify/save_load.lua (envelope surfaces)",
+     "notes": "generation_report is declared \"never enters world, stays off the serialisation seam\" in hard_coded_world.hpp - true of the WORLD seam, and this envelope is why that comment now needs a pointer rather than a contradiction."
+    }
+   ]
   }
  ]
 }

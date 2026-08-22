@@ -2974,6 +2974,39 @@
    ],
    "status": "open",
    "resolution": null
+  },
+  {
+   "id": "NR-510",
+   "title": "corp_modifiers is NOT recomputable from earned_techs - the save serialises it directly, against BL-107's own note",
+   "raised": "2026-08-22",
+   "kind": "decision-taken",
+   "source": "BL-536 (world snapshot save), writing the load path",
+   "what": "world.hpp calls corp_modifiers \"DERIVED state - recomputable from earned_techs x the gate table\", and BL-107 carries a 2026-08-19 change-note saying the save format \"owes a recompute-on-load (re-fold earned techs through the effect table) or loads will silently drop every earned buff\". I set out to write that re-fold and it does not reconstruct the right ANSWER.\n\nThe order is the problem. advance_tech_gates appends a corp's modify_scalar effects in GATE-TABLE order within one call, but it runs every tick, so the stored sequence is really sorted by (earn tick, gate index). A re-fold from earned_techs can only sort by (gate index). The two differ the moment a corp satisfies a higher-index gate before a lower-index one - and nothing stops that, since gate conditions are independent.\n\nIt matters because modified_scalar folds in stored order and apply_scalar_modifier mixes add/subtract with multiply, which do not commute. A re-fold would silently return a different number for a corp that earned its techs out of table order.\n\nDECISION TAKEN: corp_modifiers is SERIALISED directly rather than recomputed. It is small (a handful of entries per corp), and its stored ORDER carries information the earned set does not. This makes it state, not cache.",
+   "why_it_matters": "Two docs now say something inaccurate: world.hpp's 'DERIVED state - recomputable' comment, and BL-107's change-note prescribing the re-fold. I have corrected the code and the requirement row; the two prose claims want Ben's eye because the same reasoning may apply to any other field described as 'recomputable' whose consumer is order-sensitive.",
+   "proposed": "Keep the direct serialisation. Amend world.hpp's comment from 'DERIVED state - recomputable' to 'derived in ORIGIN but order-bearing, so serialised'. Consider whether any other append-ordered cache in world has the same property.",
+   "status": "open"
+  },
+  {
+   "id": "NR-511",
+   "title": "The two shipped binary streams keep private copies of the read/write primitives; the new header does not absorb them",
+   "raised": "2026-08-22",
+   "kind": "decision-taken",
+   "source": "BL-536 (world snapshot save), writing src/world/binary_io.hpp",
+   "what": "history_log.cpp (IOHL) and province.cpp each define file-local write_u32/read_u32/write_str/read_str, byte-identical to the ones binary_io.hpp now provides. I left both alone rather than refactoring them onto the shared header.\n\nReasoning: their bytes are shipped, a snapshot written by an older build must keep reading, and the refactor changes no behaviour a reader can observe. Against that, CLAUDE.md's tone section calls duplication a debt, and there are now three copies.",
+   "why_it_matters": "It is a small, deliberate piece of duplication in exactly the seam that is supposed to have ONE definition of its conventions. Worth a ruling now rather than discovering three more copies later.",
+   "proposed": "Either (a) leave as is and let binary_io.hpp be the header for NEW streams only - the note is already written into its comment block - or (b) fold the two shipped streams onto it in a separate Light change, with history_log_harness and province_partition_harness as the proof.",
+   "status": "open"
+  },
+  {
+   "id": "NR-512",
+   "title": "A world snapshot embeds the history-log stream whole, magic and all, rather than re-writing its records",
+   "raised": "2026-08-22",
+   "kind": "decision-taken",
+   "source": "BL-536 (world snapshot save)",
+   "what": "world::history_log and world::provinces already have a serialiser - write_history_log/read_history_log, which since BL-466 also carries the province section as its trailing block. The world snapshot calls those functions as one nested section instead of writing those two containers itself.\n\nThe consequence is that a snapshot contains a complete IOHL stream inside it, with its own magic and version header. That reads slightly odd on a hex dump, and it means the history log is version-guarded twice.",
+   "why_it_matters": "The alternative was a second definition of the same bytes - the NR-511 problem again, and this time for records that are genuinely intricate (the per-topic timestamp convention, the strictly-ascending province id check). Reuse looked clearly right, but a nested magic is the kind of thing worth stating out loud rather than letting someone find.",
+   "proposed": "Keep it. The nested header is a feature: an embedded section that fails its own guard fails the whole load, which is the behaviour wanted anyway.",
+   "status": "open"
   }
  ]
 }

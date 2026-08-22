@@ -216,3 +216,29 @@ whatever got built.
   constraint to a grain where firms actually compete.
 - **NR-415** — where does the per-lens reduction table live, and does every future
   lens inherit the obligation?
+
+---
+
+## BL-536 (world snapshot save) — promoted 2026-08-22
+
+Full mode. Requirement group `world-save-snapshot` (R1–R6) written first, per step 0.
+Ben's four calls, 2026-08-22: build now · field-wise writes · full four-part envelope ·
+battles serialised.
+
+**No sub-agent fan-out this session** (session instruction). Sequential in the main
+session; the collision map below is kept as the record of how it *would* have split.
+
+| # | Task | Files | Depends on |
+|---|---|---|---|
+| T1 | Binary primitives + the magic/version header contract | `src/world/binary_io.hpp` | — |
+| T2 | The world snapshot: header, well-known entities, every serialised store | `src/world/world_save.{hpp,cpp}` | T1 |
+| T3 | Load-side rebuild — clear derived caches, re-fold `corp_modifiers`, `m_next_id` accessor | `src/world/world_save.cpp`, `src/world/world.hpp` | T2 |
+| T4 | The app envelope — `generation_report`, sim tick, `world_params`, histories, `ui_state` slice | `src/core/save_game.{hpp,cpp}` | T1, T2 |
+| T5 | Wiring — `--load`, the save trigger, the `--verify` skip-generation hook | `src/main.cpp`, `src/core/app.{hpp,cpp}` | T4 |
+| T6 | Round-trip harness — R1–R4, R6 (world half) | `tools/verify/save_roundtrip.cpp` | T2, T3 |
+| T7 | Visual check — a loaded world renders as the generated one (R5) | `scripts/verify/save_load.lua` | T5 |
+| T8 | Docs — TECH_FOUNDATIONS present tense at last, BL-107 resolved, ACTIONS entry if a press lands | `docs/tech/TECH_FOUNDATIONS.md`, `docs/ai/ACTIONS.json` | T1–T7 |
+
+**Collision map (splitting heuristic).** T2+T3 are one vertical slice over `world/*`;
+T4+T5 are one over `core/*`; T6 and T7 are independent verifiers that only need the
+signatures. T1 is the shared foundation everything else includes — it lands first, alone.
