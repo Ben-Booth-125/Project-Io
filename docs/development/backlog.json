@@ -12014,9 +12014,9 @@
   {
    "id": "BL-514",
    "short_name": "GLOBAL_TILE_BLEND",
-   "title": "Blend all tiles, not only within provinces (HELD — awaiting Ben on the larger-province render)",
-   "status": "design-owed",
-   "priority": "C",
+   "title": "Blend all tiles, not only within provinces",
+   "status": "designed",
+   "priority": "A",
    "difficulty": "S",
    "version_goal": "v0.1.20",
    "category": "UI",
@@ -12025,7 +12025,7 @@
     "src/ui/body_surface_canvas.cpp",
     "docs/ui/PLANETARY.md"
    ],
-   "design": "## Held deliberately, awaiting Ben's look\n\nBen, 2026-08-21, on seeing province-grain rendering land:\n\n> \"I have a feeling that we should blend all tiles, not just within provinces,\n> but hold off on that until I see what it looks like with larger provinces.\"\n\nSo this is **not** a decision deferred through inattention — it is a decision\nBen has explicitly sequenced behind evidence he does not have yet. Do not build\nit, and do not fold it into a province-rendering task as a tidy-up.\n\n## What it would mean\n\nToday the blend stops at the province boundary by construction: vertices are\naveraged within a province, and the seam between two provinces stays a seam\n(softened to alpha 105, but present). Blending ALL tiles removes that stop —\nthe whole land surface becomes one continuous field, and province edges exist\nonly as the on-demand selection outline.\n\n## Why the sequencing is right\n\nThe current seam is visible *because* provinces are small. At 3-5 tiles the eye\nsees a dense clover mosaic, and the province edge is the dominant repeating\nfeature of the map. At **7-12 tiles** (the revised ruling, being built now) the\nseams are far fewer and much longer, and the same alpha may read completely\ndifferently — either as pleasing region definition, or as arbitrary lines\nacross continuous ground.\n\nWhich of those it is decides this item, and it cannot be decided from the\n4-tile screenshots.\n\n## What to have ready when Ben looks\n\n- The same close-zoom framing as `province_blend_close.png`, at the new size.\n- The map at play zoom, where the seam density is what actually reads.\n- A capture with province edges at alpha 0 as the A/B — that is this item's\n  proposal rendered, and it costs one constant to produce.\n\n## The consequence to name if it goes ahead\n\nOcean and BUILT tiles are currently outside the blend by construction, which is\nwhat keeps installations and coastline crisp. A global blend does not\nautomatically change that — but if the land reads as one field and buildings\nstill sit on visibly crisp hexes, the map still carries two visual languages\n(NR-417). Worth deciding both together rather than in sequence.\n"
+   "design": "## Held deliberately, awaiting Ben's look\n\nBen, 2026-08-21, on seeing province-grain rendering land:\n\n> \"I have a feeling that we should blend all tiles, not just within provinces,\n> but hold off on that until I see what it looks like with larger provinces.\"\n\nSo this is **not** a decision deferred through inattention — it is a decision\nBen has explicitly sequenced behind evidence he does not have yet. Do not build\nit, and do not fold it into a province-rendering task as a tidy-up.\n\n## What it would mean\n\nToday the blend stops at the province boundary by construction: vertices are\naveraged within a province, and the seam between two provinces stays a seam\n(softened to alpha 105, but present). Blending ALL tiles removes that stop —\nthe whole land surface becomes one continuous field, and province edges exist\nonly as the on-demand selection outline.\n\n## Why the sequencing is right\n\nThe current seam is visible *because* provinces are small. At 3-5 tiles the eye\nsees a dense clover mosaic, and the province edge is the dominant repeating\nfeature of the map. At **7-12 tiles** (the revised ruling, being built now) the\nseams are far fewer and much longer, and the same alpha may read completely\ndifferently — either as pleasing region definition, or as arbitrary lines\nacross continuous ground.\n\nWhich of those it is decides this item, and it cannot be decided from the\n4-tile screenshots.\n\n## What to have ready when Ben looks\n\n- The same close-zoom framing as `province_blend_close.png`, at the new size.\n- The map at play zoom, where the seam density is what actually reads.\n- A capture with province edges at alpha 0 as the A/B — that is this item's\n  proposal rendered, and it costs one constant to produce.\n\n## The consequence to name if it goes ahead\n\nOcean and BUILT tiles are currently outside the blend by construction, which is\nwhat keeps installations and coastline crisp. A global blend does not\nautomatically change that — but if the land reads as one field and buildings\nstill sit on visibly crisp hexes, the map still carries two visual languages\n(NR-417). Worth deciding both together rather than in sequence.\n\n## RULED — Ben, 2026-08-22 (UI session)\n\nBen, on being shown the province render at the 7-12 tile grain:\n\n> \"blur should cross province borders, it will probably look better\"\n\nand, asked whether the border line itself survives: **drop the stroke to 0**.\nSo this is the full form of the item, not the half — the land becomes one\ncontinuous field and a province edge is drawn ONLY as the on-demand selection\noutline. The alpha-105 stroke NR-417 called the one dial to move is now moved,\nto zero.\n\nThis also settles NR-443: BL-514 and BL-520 were to be decided together rather\nthan in sequence, and they now have been. Texture is what carries terrain\nlegibility once the seam is gone.\n\nThe consequence the item named still stands and is NOT waived: ocean and BUILT\ntiles remain outside the blend, so installations and coastline stay crisp. If\nthat reads as two visual languages once the land is continuous, that is the\nnext thing to look at, not a reason to delay this."
   },
   {
    "id": "BL-515",
@@ -12441,6 +12441,56 @@
    "authority_doc": "docs/development/DELIVERY.md",
    "summary": "apply_session_close.js writes all three of its targets with JSON.stringify(obj, null, 2). Measured stored indents: backlog.json 1, requirements.json 1, golden_log.json 2 — so two of three are reformatted end-to-end on every run, burying the handful of status flips a session-close commit exists to show. Fix by detecting and preserving each file’s existing indent. Filed from NR-498.",
    "design": "Found at session close on 2026-08-21 while checking whether the tool applied to a design session. It did not — nothing was delivered — but reading it surfaced this.\n\n## The defect\n\n`apply_session_close.js` writes all three targets with `JSON.stringify(obj, null, 2)` (lines 40, 61, 81). Measured stored indents:\n\n| File | Stored | Written | |\n|---|---|---|---|\n| `docs/development/backlog.json` | 1 | 2 | **reformatted** |\n| `docs/development/req/requirements.json` | 1 | 2 | **reformatted** |\n| `scripts/verify/golden_log.json` | 2 | 2 | ok |\n\n## Why it matters\n\nIt buries the change it exists to show. `backlog.json` is ~700 KB across ~490 items; a run that ships three items produces a diff touching every line, so the three status flips become unreviewable — and any accidental edit inside that diff becomes invisible.\n\nIt also fights the ordinary tooling. `backlog_query.js`, `backlog_lint.js` and the hand-append path all round-trip at indent 1, so the next tool to touch the file flips it back and the churn alternates forever.\n\n## Fix\n\n**Detect and preserve each file's existing indent** rather than hardcoding the other number. Three lines, and — unlike simply changing `2` to `1` — it cannot drift again if a store is reformatted for an unrelated reason later. Re-encoding a fixed assumption is what broke it the first time.\n\n## Verification\n\nRun the tool over a no-op session-close (empty `delivered_items`) and assert `git diff --stat` reports **zero changed lines** on all three stores. A tool that rewrites a file it changed nothing in is the whole bug, so that is the assertion that actually catches it."
+  },
+  {
+   "id": "BL-532",
+   "short_name": "LENS_PROVINCE_BLEND",
+   "title": "Lenses keep the province view — blend every lens across province vertices",
+   "status": "designed",
+   "priority": "A",
+   "difficulty": "M",
+   "version_goal": "v0.1.20",
+   "category": "UI",
+   "raised": "2026-08-22",
+   "files": [
+    "src/ui/body_surface_canvas.cpp",
+    "docs/ui/LENSES.md",
+    "docs/ui/PLANETARY.md"
+   ],
+   "design": "## Ben, 2026-08-22 (UI session)\n\n> \"lenses should not revert to render each tile in the previous mode, we can\n> keep the province view\"\n\nToday a lens that REFUSES province reduction falls back to per-tile fill, so\nswitching lens visibly drops the map back to the hex lattice. Ben wants the\nprovince view kept across every lens.\n\n## This OVERRULES the NR-415 refusals, knowingly\n\nAsked explicitly whether Country and Continent should fill uniformly per\nprovince (no invented colours) or blend across province vertices like every\nother lens, Ben chose **blend across province vertices too**, on an option\nlabelled as overruling NR-415.\n\nThe objection NR-415 recorded is real and is NOT resolved by the ruling, only\noutranked: the mean of two nation colours is a third nation colour, so a\nblended political map can draw a border where none exists and can tint a\nprovince toward a neighbour it does not belong to. Build it as asked. If it\nreads wrong on Country specifically, that is the thing to bring back to Ben —\nnot a licence to quietly reinstate the refusal.\n\n## Scope\n\nEvery lens in the reduction table now blends. The table survives as a record\nof what each lens MEANS, but its refusal column collapses."
+  },
+  {
+   "id": "BL-533",
+   "short_name": "LEGEND_IN_MINIMAP_QUADRANT",
+   "title": "Every legend moves beside the minimap, scrollable, in a fixed quarter of its space",
+   "status": "designed",
+   "priority": "A",
+   "difficulty": "M",
+   "version_goal": "v0.1.20",
+   "category": "UI",
+   "raised": "2026-08-22",
+   "files": [
+    "src/ui/body_surface_canvas.cpp",
+    "docs/ui/MINIMAP.md",
+    "docs/ui/LENSES.md"
+   ],
+   "design": "## Ben, 2026-08-22 (UI session)\n\n> \"Anything which needs a legend should use about 1/4 the minimap space with a\n> scrollable legend. Pairing this, we can try to keep names shorter, and use\n> text wrapping\"\n\nThree parts, all one item:\n\n1. **A fixed home.** Legends stop painting free-hand on the canvas and move to\n   a reserved region beside the minimap, sized at about a quarter of the\n   minimap space. Every lens that needs a legend uses the same region.\n2. **Scrollable.** The region does not grow to fit its contents. Forty nations\n   scroll; they do not overflow.\n3. **Shorter names and wrapping.** Long entries wrap rather than run out of the\n   box, and the labels themselves get shortened where they can be.\n\n## This is the fix for NR-503\n\nThe Country lens legend currently lists 40 nations in one ungoverned column,\nruns past the bottom of the canvas and overprints the tile ledger. It is drawn\nas a canvas overlay with no container, which is why nothing clips it and why\ntext_overflow_floor cannot see it — the text is not clipped, it is overdrawn.\nA reserved, scrolling region removes the whole failure class rather than\ntuning this one legend."
+  },
+  {
+   "id": "BL-534",
+   "short_name": "SELECTION_ACCORDION_AND_BUILDINGS",
+   "title": "Tile selection becomes an accordion, with an available-buildings tab at province grain",
+   "status": "designed",
+   "priority": "A",
+   "difficulty": "L",
+   "version_goal": "v0.1.20",
+   "category": "UI",
+   "raised": "2026-08-22",
+   "files": [
+    "src/ui/selection_panel.cpp",
+    "docs/ui/SELECTION.md"
+   ],
+   "design": "## Ben, 2026-08-22 (UI session)\n\n> \"we should rework tile selection. We should use the accordion for different\n> types of view, and bundle the resource view into a dropdown. One new accordion\n> tab would be something like an available buildings tab - which shows each\n> possible resource's maximum buildings, and how many are currently built. But\n> also the maximum capacity for buildings in that province\"\n\n## Three tabs, confirmed\n\nBen picked the set: **Terrain**, **Resources (dropdown)**, **Available\nbuildings**. Province and Ownership were offered and NOT chosen — do not add\nthem speculatively.\n\n## The resource view becomes a dropdown\n\nToday it is a carousel — \"Iron Ore (1/7)\" with prev/next arrows, so reading the\nseventh resource costs six presses. It becomes a dropdown, matching\ndraw_lens_resource_combo, which already does exactly this for the lenses.\n\n## Available buildings — PER PROVINCE THROUGHOUT\n\nBen ruled the grain explicitly: per province, not per tile with a province\nfooter. So every number on the tab is a province number:\n\n- per possible resource, the **maximum** buildings the province could carry\n- per possible resource, how many are **currently built**\n- the province's **overall building capacity**, which is BL-513's ceiling\n\n## The dependency worth naming\n\nThat capacity figure is BL-513 (province building limit), which landed complete\non 2026-08-21 — derived from area, infrastructure, habitability and population.\nNR-406 flagged it as the first ceiling in the game that MOVES during play, and\nNR-421 measured it as inert by orders of magnitude rather than by a near miss.\nThis tab is the first surface that shows it, so it is also the first thing that\nwill make either of those facts visible to a player."
   }
  ]
 }

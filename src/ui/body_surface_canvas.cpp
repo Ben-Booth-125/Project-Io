@@ -139,7 +139,35 @@ ImU32 mean_colour(const ImU32* c, int n)
 ///   - Reach and Supply-routes are body-level and paint no tile fill at all.
 bool lens_blend_mode(overlay_mode m)
 {
-    return m == overlay_mode::none || m == overlay_mode::resource;
+    // BL-532 (Ben, 2026-08-22): "lenses should not revert to render each tile in
+    // the previous mode, we can keep the province view."
+    //
+    // This OVERRULES the categorical and catchment refusals documented above,
+    // knowingly — Ben was asked whether Country and Continent should fill
+    // uniformly per province (inventing no colours) or blend across province
+    // vertices like everything else, and chose to blend. The objection is not
+    // withdrawn, only outranked: the mean of two nation colours IS a third
+    // nation colour, so Country can tint a province toward a neighbour it does
+    // not belong to. If that reads wrong in play it goes back to Ben (BL-532),
+    // rather than being quietly reinstated here.
+    //
+    // The SPARSE lenses are deliberately still absent, and that is not a partial
+    // application of the ruling. Industry, Corporation and Production already
+    // reduce per province and fill it flat (see the uniform pass), so they
+    // ALREADY keep the province view that the ruling asks for — vertex-blending
+    // them on top would spread one works' value onto the empty ground beside it,
+    // which is the one defect the province grain exists to remove. Population,
+    // Opportunity, Reach and Supply-routes paint no tile fill to blend at all.
+    switch (m)
+    {
+        case overlay_mode::none:
+        case overlay_mode::resource:
+        case overlay_mode::country:
+        case overlay_mode::continent:
+        case overlay_mode::market:
+        case overlay_mode::scarcity:  return true;
+        default:                      return false;
+    }
 }
 
 /// Emit @p verts as a 6-triangle fan with per-corner colours — the blend's draw
@@ -2128,7 +2156,15 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                         continue;
                     const tile_shade& ns =
                         shade_cache[static_cast<std::size_t>(nrow) * gw + ncol];
-                    if (!ns.blend || ns.province != prov_id || prov_id == 0)
+                    // BL-514 (Ben, 2026-08-22): the blend CROSSES province
+                    // borders. The province-match term that used to stand here
+                    // is deliberately gone — land is one continuous field now,
+                    // and a province edge is drawn only as the selection outline.
+                    // `ns.blend` still carries the two exclusions that remain:
+                    // ocean never sets it (it needs province != 0) and built
+                    // tiles never set it, so installations and coastline stay
+                    // crisp exactly as before.
+                    if (!ns.blend || prov_id == 0)
                         continue;
                     acc[n++] = ns.fill;
                 }
@@ -2204,32 +2240,15 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                                   tile.substrate, tile.cover, tile.cover_density,
                                   fill, texture_strength);
 
-            // Province edge (BL-511). Every side facing a DIFFERENT province takes
-            // a faint dark stroke. Deliberately faint: Ben ruled for softened
-            // borders, so this is a suggestion of a cell, not a wireframe over the
-            // map — the crisp affordance is the hover/selection outline below,
-            // which is drawn on demand rather than always on. Skipped under the
-            // coarse LOD, where a 1 px stroke on a 7 px hex is noise.
-            // `revealed` gates it: a province outline drawn through the survey
-            // mask would leak the shape of ground the player has not surveyed.
-            if (!coarse_fill && revealed && prov_id != 0)
-            {
-                // Stroked on the SAME vertices the blended fill uses, so the two
-                // provinces either side of a border lay their strokes exactly on
-                // top of each other rather than 1 px apart — two offset faint
-                // lines read as blur, one doubled line reads as an edge.
-                const ImVec2* ev = shade.blend ? blend_verts : verts;
-                for (int s = 0; s < 6; ++s)
-                {
-                    const auto nc   = hex_neighbors::neighbour(t_col, t_row, s);
-                    const int  ncol = ((nc.gx % gw) + gw) % gw;
-                    const entity_id nid = tile_at_rc(ncol, nc.gy);
-                    if (nid != null_entity && w.provinces.province_of(nid) == prov_id)
-                        continue;
-                    dl->AddLine(ev[k_side_verts[s][0]], ev[k_side_verts[s][1]],
-                                IM_COL32(8, 10, 16, 105), 1.0f);
-                }
-            }
+            // Province edge: NOT DRAWN. BL-511 stroked every side facing a
+            // different province at alpha 105, and NR-417 called that alpha the
+            // one dial to move. Ben moved it to zero (BL-514, 2026-08-22):
+            // "blur should cross province borders". Since the fill now blends
+            // across the boundary as well, a stroke here would be the only thing
+            // left asserting a cell — drawing it at any alpha would defeat the
+            // change rather than soften it, so the pass is gone rather than
+            // dialled down. The crisp affordance is unchanged and still on
+            // demand: the hover/selection outline below.
 
             // Masked region: locked fill only — no borders, markers, selection, or
             // hit-testing for this copy. This single gate also *is* the rival-marker
