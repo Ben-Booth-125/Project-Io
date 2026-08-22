@@ -294,15 +294,31 @@ price is argued against it.
 
 Both halves already exist in `scripts/economy.lua` § `unit_upkeep`, both at zero, both charged per
 head per tick. An economy tick is one quarter, so the annual factor of 4 appears on both sides and
-cancels — the anchor reduces to a per-tick identity with no calendar arithmetic:
+cancels — *"for that year"* needs no calendar arithmetic anywhere:
 
-    Σ ( goods_per_head[r] × price[r] )  ==  2 × credits_per_head
+    Σ ( goods_per_head[r] × base_price[r] )  ≈  2 × credits_per_head
+
+**Clarified the same session** — *"let's divorce wages from goods somewhat. My 1/2 figure can use
+base prices. We don't have to rederive wages every tick."* Three consequences, and together they
+make this much smaller than it first looked:
+
+- **`base_price`, never the resolved market price.** It is an **authored, seed-invariant table** in
+  `scripts/world_gen.lua` (ordnance 43.0, food_rations 6.0), so the anchor means the same thing in
+  every generated world and does not drift with local scarcity.
+- **Authoring-time, not runtime.** Nothing recomputes per tick. The upkeep pass charges the
+  authored rates exactly as it does today; the anchor is the *argument for what those rates should
+  be*, applied once and re-checked only when the base-price table or the roster moves.
+- **A band, not an identity.** The wage is authored independently and the goods draw is sized
+  against it. A class whose equipment is deliberately cheap or dear may sit outside the band and
+  say so.
 
 It also sets the **unit upkeep rate MILITARY.md lists as absent**, and turns the levy question into
 a legible one: *this nation's levy funds N units a year.*
 
-*Owned by BL-543 (value anchor). Land the anchor and upkeep first, re-measure, then rule on the
-levy — doing both at once makes the benchmark uninterpretable.*
+*Owned by BL-543 (value anchor). Divorcing the two halves leaves the wage itself unanchored — that
+gap is BL-544 (unit wage reference), `design-owed`, whose likely answer is a multiple of the
+civilian `base_wage` the game already pays. Land the anchor and upkeep first, re-measure, then rule
+on the levy — doing both at once makes the benchmark uninterpretable.*
 
 ### 4. Tariffs — **directional, and seeded from the pre-history**
 

@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*220 entries — 201 open, 19 resolved.*
+*221 entries — 201 open, 20 resolved.*
 
 ---
 
@@ -2212,4 +2212,17 @@ All six § Open questions answered in Ben's own words, and a new system raised b
 > **RESOLVED.** RULED BY BEN, 2026-08-22, in his own words on all six. Recorded in NATIONS.md § Settled with his phrasing quoted per ruling.
 
 *Files: `docs/politics/NATIONS.md`, `docs/development/backlog.json`*
+
+### NR-519 — Value anchor clarified to BASE prices and authoring-time — which shrank the item and opened a new gap (BL-544)
+*decision taken on your behalf · raised 2026-08-22 · from Ben's clarification on BL-543, same session as the six rulings.*
+
+Ben: 'let's divorce wages from goods somewhat. My 1/2 figure can use base prices. We don't have to rederive wages every tick.' BL-543's first draft had the ratio resolving LIVE market prices and read as a hard identity. Rewritten: (1) the ratio is stated against scripts/world_gen.lua's base_price table, which is AUTHORED and seed-invariant - verified this session; ordnance 43.0, food_rations 6.0. (2) It is an authoring-time calibration, re-checked only when the base-price table or the roster moves; nothing recomputes per tick. (3) It is a band with a tolerance, not an equality, so a class with deliberately cheap or dear equipment can sit outside it. The harness now reads the authored tables only - no world generation, no market resolution - making it one of the cheapest in the suite.
+
+**Why it matters.** The first draft would have made the same authored rates mean different things on different bodies, since a resolved price carries local scarcity. It would also have coupled the military cost base to every price movement in the game. Both are gone. The clarification also EXPOSES a gap: while the wage and goods were one locked identity, either could be the free variable; divorced, the wage is independently authored and nothing anchors it. Filed as BL-544 (unit wage reference), design-owed, recommending a multiple of the civilian base_wage (6.0-15.0 per workforce per tick) with the per-class spread taken from the roster's power_mod, per NR-322.
+
+> **Recommendation:** No action on BL-543. BL-544 needs a reference chosen before either rate is authored - the ratio is only as good as the quantity it is a ratio of.
+
+> **RESOLVED.** CLARIFIED BY BEN, 2026-08-22. BL-543 rewritten against base prices at authoring time; BL-544 filed for the gap it opens.
+
+*Files: `docs/development/backlog.json`, `docs/politics/NATIONS.md`, `scripts/economy.lua`, `scripts/world_gen.lua`*
 
