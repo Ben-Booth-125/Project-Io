@@ -118,6 +118,8 @@ Two different things share this word, and BL-094 separates them.
 Honestly, an extraction levy reaches economic outcomes and not military ones. What the item owed instead is that **nothing in the record or the effect dispatch assumes an economic subject** — `law_effect_kind` is an open taxonomy a military effect joins without reshaping anything, and the predicate already carries military subjects. Still open: the other nine laws, the other three effect families, enactment politics (BL-186 laws ledger, BL-345 relationship axis), negotiated rates (BL-280). Verified by `tools/verify/law_harness.cpp`.
 
 ### Conditions
+
+*(Authority since 2026-08-22: [`META_LAYER.md`](META_LAYER.md) owns the predicate and effect substrate in full — both vocabularies, their properties, and the wiring asymmetry between them. What follows is the overview.)*
 The shared predicate laws, techs and quests all read (**BL-342**, landed 2026-08-10) — `src/world/condition_set.{hpp,cpp}`. BL-155 and BL-156 had independently settled on the same object, *"a flat AND-list of atomic conditions — no nested OR-mesh"*, and neither built it; one small pure evaluator turned two design-forward minors into shippable ones.
 
 An atomic condition is `<subject> <comparator> <operand>` plus the qualifier its subject reads. Three properties are load-bearing:

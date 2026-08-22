@@ -78,7 +78,7 @@ which is the one place the CLAUDE.md doc map cannot route a reader to.
 | ~~**The nation as an actor**~~ | `law.cpp`, `nation_component::treasury`, tariffs in `market_clearing` | — | **`docs/politics/NATIONS.md` — written 2026-08-22** |
 | ~~**Law**~~ | `law.cpp`, `condition_set.cpp` | — | same doc, § The enforcement seam |
 | ~~**Stance and standing**~~ | `stance.cpp`, `standing.cpp` | — | **`docs/politics/RELATIONS.md` — written 2026-08-22** |
-| **Conditions & modifiers** | `condition_set.cpp`, `modifier_set.hpp`, read by laws, techs, gates, units | Header comment; SYSTEMS.md § Conditions (one subsection) | **`docs/SYSTEMS.md`, promoted** |
+| ~~**Conditions & modifiers**~~ | `condition_set.cpp`, `modifier_set.hpp`, read by laws, techs, gates, units | — | **`docs/META_LAYER.md` — written 2026-08-22** |
 | **Province as a grain** | `province.cpp` (936 lines), unit position, battles, rendering | Split across TILE_GENERATION, PLANETARY, SELECTION | **new `docs/generation/PROVINCES.md`** |
 | **Interdiction** | BL-458 (supply lines cannot be cut) | Nowhere — the word appears in **no** authority doc | **`docs/economy/SUPPLY.md`** |
 | **The star map** | `star_map.cpp` — authored, seed-free, cross-campaign | Header comment only | **`docs/ui/MINIMAP.md`** |
@@ -213,7 +213,7 @@ Ordered by what unblocks the most. Each is one session; each ends with prose in 
 | **3** | **Contracts leave the market doc** | The mercenary sell side as its own subject | new `docs/economy/CONTRACTS.md` |
 | **4** | **Ownership** | Syndicate tier, control gate, dividends, portfolio | new `docs/economy/OWNERSHIP.md` |
 | ~~**5**~~ | ~~**Relations**~~ | **Done 2026-08-22** — doc written; found a fourth quantity (embargo) and NR-520, three designs converging on one shape | `docs/politics/RELATIONS.md` ✓ |
-| **6** | **The predicate substrate** | `condition_set` / `modifier_set` as one owned vocabulary | SYSTEMS.md, promoted |
+| ~~**6**~~ | ~~**The predicate substrate**~~ | **Done 2026-08-22** — own doc rather than a SYSTEMS.md section; found the effect side is 1-of-6 wired and its shared-vocabulary claim unmet (NR-523/524) | `docs/META_LAYER.md` ✓ |
 | **7** | **Province as a grain** | The unit of position, rendering, battle and ceiling | new `docs/generation/PROVINCES.md` |
 | **8** | **Research as a currency** | BL-478's debit model — NR-387 says this needs design, not an implementer | new `docs/research/TECH.md` |
 | **9** | **The novel-work backlog** | NR-483, NR-458, NR-453, NR-454 ruled in one sitting | their named docs |

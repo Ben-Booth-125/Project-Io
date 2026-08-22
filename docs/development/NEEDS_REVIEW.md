@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*224 entries — 203 open, 21 resolved.*
+*226 entries — 205 open, 21 resolved.*
 
 ---
 
@@ -1946,6 +1946,36 @@ Three existing designs imply three different answers. BL-540 proposed TWO - Acce
 > **Recommendation:** Option 1. Two is the smallest count that expresses what BL-540 and BL-377 both need, and the gate-something rule stops it growing. Option 3 is tempting and should be resisted - a substrate whose shape varies by grain is not a substrate.
 
 *Files: `docs/politics/RELATIONS.md`, `docs/development/backlog.json`*
+
+### NR-523 — modifier_set.hpp claims to be the shared effect vocabulary for tech AND law, and law does not use it
+*observation · raised 2026-08-22 · from Writing docs/META_LAYER.md (system 3 of the phantom scan).*
+
+modifier_set.hpp's header states its own purpose as 'the closed list of scalars a tech (BL-479) OR A LAW (BL-480) may move... Authored once and shared - tech and law naming different subject enums would be the same defect as tech and law wording the same predicate differently, which is exactly what condition_set exists to prevent.' BL-480 then landed with law_effect_kind, its own enum. law.{hpp,cpp} includes condition_set.hpp and never modifier_set.hpp; the only two files that include modifier_set.hpp are world.hpp and tech_gate.hpp. IN FAIRNESS there is a real reason: modifier_subject moves SIMULATION SCALARS (units/tick, yield/batch) and a levy is a FLOW OF MONEY, so no subject in the list could express one and inventing one would distort the vocabulary rather than share it. So the effect side is two vocabularies for a defensible reason that nothing had written down - while the header goes on claiming it is one.
+
+**Why it matters.** The header is the design authority a future author will read before adding an effect, and it currently misleads about the shape of the thing they are extending. It is the same class of drift as tech_node::condition being a descriptive string - a stated intent the code does not honour - which is the failure the whole meta layer was built to fix. There are in fact THREE effect taxonomies with no mapping between them: BL-155's four families (margin/production/permission/relationship, named in no code), law_effect_kind's two, and modifier_subject's six.
+
+- Correct the header to describe a money-flow effect family alongside the scalar family - cheapest, and makes the two-vocabulary split deliberate.
+- Grow modifier_subject with subjects a levy could be expressed as, and make law use it.
+- Leave it and note the divergence in META_LAYER.md only.
+
+> **Recommendation:** Option 1. The split is right; only the claim is wrong. Doing nothing is the one bad option, because the header is what a future author reads before extending the vocabulary. Recorded in META_LAYER.md § The asymmetry either way.
+
+*Files: `src/world/modifier_set.hpp`, `src/world/law.hpp`, `docs/META_LAYER.md`*
+
+### NR-524 — Five of six modifier subjects are wired to nothing, and 'a shape is only proven by an instance' has no stopping condition
+*question · raised 2026-08-22 · from Writing docs/META_LAYER.md.*
+
+modifier_subject has six entries and ONE is wired: extraction_rate, applied in extraction_nominal. processing_yield, unit_upkeep, logistics_cost, wage_floor and collapse_strain are vocabulary only. The policy is explicit and defensible - 'wired when an item needs it and NOT before' - and it rests on a principle that appears twice in the code unnamed: a vocabulary claiming to be extensible is only PROVED extensible by carrying an entry of the awkward kind. BL-342 shipped two military condition subjects before anything read them for exactly this reason, and collapse_strain cites that precedent explicitly.
+
+**Why it matters.** The principle justifies the first unwired entry. It does not obviously justify the fifth. An unwired instance proves a shape; five unwired instances are a vocabulary waiting for consumers - which is the state tech_node::condition was in when it was a descriptive string, the defect the meta layer was built to fix. The header already carries a test ('a subject earns its row by being a scalar some real lever wants to move'); nothing checks it.
+
+- Set a cap - at most N unwired subjects at once, enforced by a harness row or backlog_lint.
+- Require each unwired subject to name the backlog item that will wire it, so vocabulary-only is a promise rather than a state.
+- Leave it; the policy is sound and the count is not yet a problem.
+
+> **Recommendation:** Option 2. It costs a comment per subject, keeps the proving-by-instance principle intact, and converts an unbounded state into a tracked one. A cap would be arbitrary; leaving it is how five becomes ten.
+
+*Files: `src/world/modifier_set.hpp`, `docs/META_LAYER.md`*
 
 ---
 
