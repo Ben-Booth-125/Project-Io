@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*202 entries — 193 open, 9 resolved.*
+*215 entries — 198 open, 17 resolved.*
 
 ---
 
@@ -1137,20 +1137,10 @@ The item specified entity_id convoy_tile_at(const world&, const convoy_component
 ### NR-414 — Scope taken in Lane U: blackboard facts for unit province and order destination
 *Lane U (BL-511 seam half, march_unit to province), merged and verified 2026-08-21. · raised 2026-08-21 · from The agent added unit_province and unit_order_dest_province to corp_ai.cpp blackboard export, beyond the literal task. Reason given, and it holds: without them an agent over the wire reads its unit position as a TILE but must name its destination as a PROVINCE, so the word interface would be unusable - it could not describe the move it is being asked to make. Small, in the spirit of the ruling, and stated rather than slipped in. Confirm or revert.*
 
-### NR-415 — novel-work: the per-lens reduction table is a NEW STANDING DESIGN ARTIFACT nobody has agreed to
-*novel-work · raised 2026-08-21 · from Lane R (BL-511 province render + selection), merged and verified 2026-08-21.*
-
-Province-grain rendering forces every lens to state how it reduces from tile to province - a blend, a sum, or a reasoned refusal. The agent decided all thirteen and wrote the table into PLANETARY.md. That table is the scope growth worth choosing deliberately: it is a CONTRACT every FUTURE lens now inherits, and neither LENSES.md nor PLANETARY.md previously had a slot for such a thing. Two calls for you. (1) Where does it live - LENSES.md has the better claim on lens-wide obligations, PLANETARY.md is where it landed. (2) Do you accept that adding a lens now means answering it? The refusals are the interesting content: Country and Continent refuse because the MEAN OF TWO NATION COLOURS IS A THIRD NATION COLOUR - a blended political map would draw borders that do not exist. Industry is the only computed reduction (a province sum, filled uniformly).
-
 ### NR-416 — BL-511 R1 is PARTIAL: the live click is owed, and the agent was right not to take it
 *observation · raised 2026-08-21 · from Lane R (BL-511 province render + selection), merged and verified 2026-08-21.*
 
 The agent declined to drive your desktop unattended to satisfy the LIVE half of requirement R1, which was the correct call for a non-interactive sub-agent session. What it did instead is real coverage rather than a dodge: it added verify.mouse plus two-frame hover captures so the canvas OWN distance-to-hex-centre hit-test resolves a province from a cursor position, and the click handler consumes exactly that hovered_tile. The resolution path is proven; the PRESS is not. Per the 2026-08-19 standing rule a scripted capture does not prove a press is reachable, so R1 stays partial until someone clicks. The app is open on your machine now.
-
-### NR-417 — The map now mixes two visual languages, and the edge alpha is the one dial
-*question · raised 2026-08-21 · from Lane R (BL-511 province render + selection), merged and verified 2026-08-21.*
-
-Blended provinces read as continuous painted ground; ocean and BUILT tiles stay crisp hexes by construction. In the integrated capture the result is a map that is soft in some regions and hard-edged in others, which may or may not be what you pictured. Also relevant: the first pass had province edges at alpha 70 and they were INVISIBLE - the map read as one field with no cells at all. The committed version is 105, with the stroke moved onto the blended vertices so two neighbours strokes coincide rather than sitting a pixel apart. Soft by design, since you ruled softened borders, with the crisp affordance being the on-demand selection outline. If the gradient reads too blurry at close zoom, edge alpha is the dial to move first and the blur radius second.
 
 ### NR-418 — Three small findings from the render work, all fixed or noted in place
 *observation · raised 2026-08-21 · from Lane R (BL-511 province render + selection), merged and verified 2026-08-21.*
@@ -1241,11 +1231,6 @@ province_capacity_probe's BL-513 ratio moved 12.2546 -> 12.2477 across the absor
 *observation · raised 2026-08-21 · from BL-519 / BL-520 design work, 2026-08-21.*
 
 BL-366's urban transform is documented as one-way and it OVERWRITES terrain_composition. So today, when a metallic tile's building stack fills, the tile stops being metallic - the fact is gone, not hidden. Nothing reads it afterwards, so nothing has broken visibly, but it means a city can never know what it was built on, and any future rule that wants to (a mine under a city, subsidence, resource exhaustion, a lens showing what the land WAS) has no data to read. BL-519 fixes this incidentally: with substrate separate from state, paving a tile leaves the substrate intact. Recorded separately from the item because it is a live data-loss bug, not merely a design awkwardness, and because if BL-519 is ever deferred this should be fixed on its own.
-
-### NR-443 — Texture and the province blend are in direct tension, and BL-514 sits in the middle of it
-*question · raised 2026-08-21 · from BL-519 / BL-520 design work, 2026-08-21.*
-
-The canvas blends colour across a province's tiles (BL-511) to smooth the lattice away. A texture does the opposite - it asserts where one tile ends. Run both naively and they fight. The resolution in BL-520 is to texture the SUBSTRATE (which the blend already averages) and pattern the COVER (which is per-tile and should read as per-tile), so a forest edge is information and a rock-to-rock seam is not. But this collides with BL-514 (blend ALL tiles, not just within provinces), which is HELD pending your look at the organic borders. If texture becomes the thing that makes the map read as terrain, the global blend may be unnecessary - or may be exactly what lets texture stay subtle. Worth deciding BL-514 and BL-520 together rather than in sequence, since each changes what the other is for.
 
 ### NR-444 — The composition migration is 330 references across 49 files, and the accessor decision shapes it
 *question · raised 2026-08-21 · from BL-519 / BL-520 design work, 2026-08-21.*
@@ -1788,12 +1773,134 @@ BL-523 makes `corp_ai.cpp` read a corporation KIND (today the file contains no r
 
 *Files: `src/world/corp_ai.cpp`, `docs/development/backlog.json`*
 
+### NR-501 — BL-519 and BL-520 are now RENDERED — the container-blind half of NR-451 and NR-457 is closed
+*observation · raised 2026-08-22 · from UI session 2026-08-22, local build*
+
+Built ProjectIo locally (BUILD_OK, exe relinked 01:31) and ran tile_texture.lua, province_render.lua and click_injection.lua. NR-451 and NR-457 both recorded that BL-519 and BL-520 were compile-checked only, never rendered, because that container had no SDL3 and no display. That is now closed: 14 texture captures, 20 province captures and 6 click captures exist under build/screenshots/. The texture pass genuinely works — province_blend_close.png is the frame that shows it, with per-tile canopy ticks legible over a province blend that still reads as one continuous field, and texture_cinder_close.png shows the non-biotic chip/scratch grain doing the same on an airless body. Ocean draws nothing, as designed.
+
+**Why it matters.** Two items shipped complete on a compile check alone. They now have eyeballed evidence, and the evidence supports the design rather than contradicting it.
+
+*Files: `build/screenshots/`, `scripts/verify/tile_texture.lua`*
+
+### NR-506 — There is no space to the RIGHT of the minimap — its right edge is flush to the screen edge by design (BL-312)
+*question · raised 2026-08-22 · from UI session 2026-08-22, shell_metrics.cpp*
+
+Your first framing put the legend "to the right of the mini-map", and the form answer sized it at "about 1/4 the minimap space". The first of those cannot be built as stated: minimap_rect returns { disp.x - w, ... }, so the minimap right edge IS the screen edge, deliberately, under BL-312 — the comment calls it an 8px gap with no neighbour to its right to justify it. Measurements, since they are all fixed: minimap_width = max(336, 0.28 * min(disp_x, disp_y)) and minimap_height = 0.75 * width. That floor of 336 wins on every common display — 1280x720, 1600x1000, 1720x1080 and 1920x1080 ALL give exactly 336 x 252 px. It only grows above roughly 1200px of minimum dimension (2560x1440 gives 403 x 302). So a quarter of the minimap space is about 21,168 px-squared, which is 84 x 252 as a side column, or 336 x 63 as a strip above or below it.
+
+**Why it matters.** Three readings produce materially different layouts and I do not want to guess between them. An 84px-wide column cannot hold a nation name at all, so that reading forces the shortened names and wrapping you already asked for, hard.
+
+- A strip 336 x 63 directly ABOVE the minimap, scrolling — full width, so names fit, and nothing moves
+- A column 84 x 252 to the LEFT of the minimap, scrolling — matches "beside it" but is very narrow
+- The legend overlays a quarter of the minimap itself, translucent
+- Shrink the minimap and put the legend in the space freed to its left
+
+> **Recommendation:** The strip above the minimap. It is the only one of the four where a nation name fits on one line at a readable size, and it costs the minimap none of its area.
+
+*Files: `src/ui/shell_metrics.cpp`, `src/ui/body_surface_canvas.cpp`*
+
+### NR-507 — BL-533 landed and found a real click-through defect: the canvas was taking presses meant for the legend
+*observation · raised 2026-08-22 · from UI session 2026-08-22, lens_legend.lua*
+
+Re-homing the legend surfaced a defect that predates it and would have applied to any background-draw-list surface. The legend paints through ImGui::GetBackgroundDrawList(), which draws pixels and registers no window, so io.WantCaptureMouse stayed false over it — and app.cpp derives the canvas primary_input from exactly that flag (primary_input = !mouse_in_mm && !panel_blocking). Measured symptom: clicking the legend header toggled the legend AND selected whatever tile lay underneath, moving the Selection panel to a tile the player never aimed at. Confirmed real rather than a harness artifact by hovering to settle WantCaptureMouse first, which changed nothing. Fixed with an empty always-on window over the box footprint. Proof: legend_country_collapsed.png and legend_country_recollapsed.png are now BYTE-IDENTICAL across an open-then-close cycle, where before the second capture carried a different selected tile.
+
+**Why it matters.** Any future on-canvas surface drawn the same way inherits the same hole, and it is invisible to every check we have — the surface looks correct in a capture while quietly stealing or leaking presses. Worth knowing before the next one is built.
+
+*Files: `src/ui/body_surface_canvas.cpp`, `src/core/app.cpp`*
+
+### NR-509 — BL-534's new tab makes NR-421 visible on its first frame: capacity 103, geology 24
+*observation · raised 2026-08-22 · from UI session 2026-08-22, accordion_view_buildings.png*
+
+The Available buildings tab shipped and the very first province it rendered says: Province capacity 0 / 103 (103 free), over a table whose three workable rows are Agricultural Produce 0/9, Stone 0/9 and Timber 0/6 — 24 placement slots in total. So BL-513's ceiling stands more than four times above everything the province's own geology could ever support, and the binding constraint on building here is deposits, not the ceiling. NR-421 measured exactly this and called the per-province firm cap 'inert by ORDERS OF MAGNITUDE, not by a near miss'. BL-534's design note predicted this tab would be the first surface to make that legible to a player. It is, on frame one, without being asked to.
+
+**Why it matters.** Two things follow. First, the tab reads oddly as shipped: a headline number of 103 sitting over a table that tops out at 24 invites the player to believe there is room they do not have. Second, this is now a PLAYER-VISIBLE statement of a tuning problem rather than an internal measurement — whatever is decided about k_province_buildings_per_sustain_unit, this surface will show it.
+
+- Leave both numbers as they are — they are each true, and the gap is the honest reading
+- Show the effective ceiling alongside: min(province ceiling, sum of per-resource maxima), so the headline is what actually binds
+- Re-pin k_province_buildings_per_sustain_unit so the ceiling lands near what geology supports — a tuning change, not a UI one
+
+> **Recommendation:** Option 2 for this surface, and treat option 3 separately. Naming what actually binds is the tab's job; re-pinning the constant is a balance decision that wants its own measurement, and NR-421 already holds that thread.
+
+*Files: `src/ui/selection_panel.cpp`, `src/world/province.hpp`*
+
+### NR-510 — BL-377 (mercenary contract seam) is marked complete and was NEVER BUILT — the game's income loop is filed as delivered
+*observation · raised 2026-08-22 · from Phantom-feature scan, 2026-08-22 (docs/development/PHANTOMS.md § Class 0).*
+
+BL-377 carries status 'complete'. Four independent checks say no code exists. (1) Its files name src/world/contracts.hpp, src/world/contracts.cpp and scripts/contracts.lua — `git log --all --diff-filter=A` finds NO creation commit for any of the three, on any branch. (2) A grep of src/ for 'BL-377' returns nothing. (3) corp_verb carries no contract verb; the design called for three appended verbs. (4) world.hpp holds procurement_quotes and procurement_contracts only — BL-350's BUY side. It was closed by commit bb4f612, 'Close BL-377 and BL-378 - two more landed items still listed as open'. BL-378 (minimap base render) genuinely HAD landed; BL-377 was swept up with it. MANUAL.md § 4.10 independently marks Contracts [DESIGNED] — the manual is right and the backlog is wrong.
+
+**Why it matters.** This is the player's INCOME under the ancient arc — be contracted, field force, be paid. BL-377's own design field calls it 'the item the refocused product stands on'. ROADMAP § The near sequence still names Sprint 16 as 'BL-377 (contract seam) playable end-to-end' and SPRINTS.md § Sprint 16 is OPEN, so the item is closed inside the sprint that would deliver it. Every status view — the dashboard, the roadmap's open count, any 'what's left' query — currently reads the mercenary loop as done. The design itself survives intact in archive/backlog-design-2026-Q3.json.
+
+> **Recommendation:** Reopen BL-377 as 'designed' with version goal v0.1.15, and re-check BL-378's sibling closures from the same sweep. Not done in this session: the scan was the ask, and flipping a status changes what every roadmap and sprint view reports. Ten minutes of work once you say go.
+
+*Files: `docs/development/backlog.json`, `docs/development/ROADMAP.md`, `docs/development/SPRINTS.md`, `docs/MANUAL.md`*
+
+### NR-511 — docs/lore/COLLAPSE.md is named as authority by 19 open items and declares itself NOT authority
+*question · raised 2026-08-22 · from Phantom-feature scan, 2026-08-22 (PHANTOMS.md § Class 3).*
+
+COLLAPSE.md opens 'Status: research scaffolding - the design conversation's home, not authority.' Nineteen OPEN backlog items name it in authority_doc. A reader following the pointer lands on a page telling them it settles nothing. Five sibling scaffolding docs carry the same banner and total 3,076 lines: ERA1_TECH_LANDSCAPE (882), ANCIENT_TECH_LADDER (739), STRATEGIES (475), COLLAPSE (439), LANGUAGE_POLICY_FEASIBILITY (271), TECH_EFFECTS (270). None of the six has ever graduated.
+
+**Why it matters.** The convention is sound - scaffolding is promoted when the work lands - but no promotion has ever happened, so 3,076 lines of settled thinking sit permanently one step short of readable. COLLAPSE is the case where the contradiction is load-bearing rather than cosmetic, because open items depend on it.
+
+- Graduate COLLAPSE.md to authority and drop its banner.
+- Re-home the 19 items' authority_doc onto docs/lore/HISTORY.md and leave COLLAPSE as scaffolding.
+- Leave it, and accept the pointer means 'read this for context'.
+
+> **Recommendation:** Option 1 for COLLAPSE specifically - nineteen dependants is what an authority doc looks like. The other five can stay scaffolding until their work lands.
+
+*Files: `docs/lore/COLLAPSE.md`, `docs/development/backlog.json`*
+
+### NR-512 — docs/CONCEPT.md is two framings behind, and CLAUDE.md sends every new session there first
+*observation · raised 2026-08-22 · from Phantom-feature scan, 2026-08-22 (PHANTOMS.md § Class 5).*
+
+CONCEPT.md carries the 2026-08-10 militia correction (NR-120) but NOT the 2026-08-12 two-arcs split, and not the 2026-08-21 syndicate tier. So it still describes solar-to-galactic scope, orbital logistics and planetary isolation as the live design, when the live arc is ancient and 0 CE with a mercenary company in the seat. CLAUDE.md § Documents says of it: 'Start here for questions about what the game is and how it should feel.' Separately and in the other direction, MANUAL.md § 5 still lists the campaign conflict layer as [OWED], which BL-467/BL-468/BL-469 falsified on 2026-08-21.
+
+**Why it matters.** The doc-map's designated first read is the one most out of date. The authority time-slice explains why - BL-094 is parked and unlanded, so its framing has not propagated - but the two-arcs split is not BL-094's to land, and CONCEPT.md carries no dated note for it the way it does for the militia.
+
+> **Recommendation:** A dated note at the head of CONCEPT.md naming the live arc, same shape as the existing 2026-08-10 correction. Cheap, and it stops the doc actively misleading until BL-094 lands. Filed rather than done: re-voicing CONCEPT.md is session 10 of the proposed sequence, and it is yours to voice.
+
+*Files: `docs/CONCEPT.md`, `docs/MANUAL.md`*
+
+### NR-513 — novel-work: the phantom register is a new standing artifact, and it has no lifecycle
+*novel-work · raised 2026-08-22 · from Phantom-feature scan, 2026-08-22.*
+
+docs/development/PHANTOMS.md is a new document class - a scan output that points at design sessions. Nothing in the corpus owns 'a list of things with no owner', and it overlaps three existing stores: NEEDS_REVIEW.json (open calls), backlog.json (work), and MILITARY.md § What is absent (a per-doc holes list, which is the pattern this file generalises). It is written as transient - stale by design once the sessions run - but nothing says who prunes it or when.
+
+**Why it matters.** An unowned list of unowned things is how a fourth store accretes. The alternative shape, and probably the better one, is no central file at all: every doc that owns a partially-built system carries its own 'What is absent' section, MILITARY.md's model, and the scan becomes a periodic check rather than a document.
+
+- Keep PHANTOMS.md as a transient scan output, pruned as sessions land.
+- Dissolve it into per-doc 'What is absent' sections and re-run the scan periodically instead.
+- Keep it and give it a query tool if it grows.
+
+> **Recommendation:** Option 2 as the destination, option 1 to get there - the file is useful right now because ten sessions are not yet run. Once each subject has an owner, its rows move into that owner's absent-list and the file goes away.
+
+*Files: `docs/development/PHANTOMS.md`*
+
 ---
 
 ## Resolved
 
 Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
 answer has landed in an authority doc.
+
+### NR-415 — novel-work: the per-lens reduction table is a NEW STANDING DESIGN ARTIFACT nobody has agreed to
+*novel-work · raised 2026-08-21 · from Lane R (BL-511 province render + selection), merged and verified 2026-08-21.*
+
+Province-grain rendering forces every lens to state how it reduces from tile to province - a blend, a sum, or a reasoned refusal. The agent decided all thirteen and wrote the table into PLANETARY.md. That table is the scope growth worth choosing deliberately: it is a CONTRACT every FUTURE lens now inherits, and neither LENSES.md nor PLANETARY.md previously had a slot for such a thing. Two calls for you. (1) Where does it live - LENSES.md has the better claim on lens-wide obligations, PLANETARY.md is where it landed. (2) Do you accept that adding a lens now means answering it? The refusals are the interesting content: Country and Continent refuse because the MEAN OF TWO NATION COLOURS IS A THIRD NATION COLOUR - a blended political map would draw borders that do not exist. Industry is the only computed reduction (a province sum, filled uniformly).
+
+> **RESOLVED.** RULED Ben, 2026-08-22 (UI session), and the ruling goes AGAINST the refusals. Asked whether Country and Continent should fill uniformly per province or blend across province vertices like every other lens, Ben chose to blend, on an option explicitly labelled as overruling this entry. So the answer to question (2) is: adding a lens no longer means answering a reduction question, because every lens now blends. The mean-of-two-nation-colours objection recorded here is outranked, not withdrawn — it is restated in BL-532 so it can be brought back if Country reads wrong in practice. Question (1), where the table lives, is untouched and still open.
+
+### NR-417 — The map now mixes two visual languages, and the edge alpha is the one dial
+*question · raised 2026-08-21 · from Lane R (BL-511 province render + selection), merged and verified 2026-08-21.*
+
+Blended provinces read as continuous painted ground; ocean and BUILT tiles stay crisp hexes by construction. In the integrated capture the result is a map that is soft in some regions and hard-edged in others, which may or may not be what you pictured. Also relevant: the first pass had province edges at alpha 70 and they were INVISIBLE - the map read as one field with no cells at all. The committed version is 105, with the stroke moved onto the blended vertices so two neighbours strokes coincide rather than sitting a pixel apart. Soft by design, since you ruled softened borders, with the crisp affordance being the on-demand selection outline. If the gradient reads too blurry at close zoom, edge alpha is the dial to move first and the blur radius second.
+
+> **RESOLVED.** RULED Ben, 2026-08-22 (UI session): the edge alpha goes to 0. Ben: "blur should cross province borders", and asked directly whether the stroke survives, chose to drop it. The map becomes one continuous field with province edges drawn only as the on-demand selection outline. The two-visual-languages observation is NOT thereby resolved — ocean and built tiles stay crisp by construction, so the mix remains and is now the next thing to look at. Carried into BL-514.
+
+### NR-443 — Texture and the province blend are in direct tension, and BL-514 sits in the middle of it
+*question · raised 2026-08-21 · from BL-519 / BL-520 design work, 2026-08-21.*
+
+The canvas blends colour across a province's tiles (BL-511) to smooth the lattice away. A texture does the opposite - it asserts where one tile ends. Run both naively and they fight. The resolution in BL-520 is to texture the SUBSTRATE (which the blend already averages) and pattern the COVER (which is per-tile and should read as per-tile), so a forest edge is information and a rock-to-rock seam is not. But this collides with BL-514 (blend ALL tiles, not just within provinces), which is HELD pending your look at the organic borders. If texture becomes the thing that makes the map read as terrain, the global blend may be unnecessary - or may be exactly what lets texture stay subtle. Worth deciding BL-514 and BL-520 together rather than in sequence, since each changes what the other is for.
+
+> **RESOLVED.** RULED Ben, 2026-08-22 (UI session): decided together, as this entry asked. The global blend goes ahead (BL-514) AND texture stays (BL-520) — so texture is what carries terrain legibility once the province seam is gone, rather than the two competing. The tension this entry named is resolved in favour of doing both.
 
 ### NR-489 — Sprint 28's real subject is verb competition — the scorer discards ~10M campaign candidates to reach zero wars
 *observation · raised 2026-08-21 · from Sprint 28 decomposition. history_conquest_gap campaign funnel, 8 worlds.*
@@ -1956,4 +2063,80 @@ Runners-up and why they lost:
 > **RESOLVED.** Filed as work: BL-531 (session-close indent preservation), version goal v0.1.22 (Harness truth — the tooling-truth minor). Recommendation carried into the item: detect and preserve each store's existing indent rather than hardcoding the other number, so it cannot drift again when a store is reformatted for an unrelated reason.
 
 *Files: `tools/session/apply_session_close.js`*
+
+### NR-502 — tile_texture.lua ran GREEN while two of its load-bearing frames point at open water — the fixtures did not survive the repartition
+*observation · raised 2026-08-22 · from UI session 2026-08-22, tile_texture.lua*
+
+The check reports "0 golden failure(s)" and every capture wrote. But its two framed close-reads are aimed at tiles that no longer hold what the script documents. center_tile(89,10,5) — commented as Kepler grass/scrub/forest/marsh, "where the density scale actually varies" — lands on ocean and ice (texture_density_close.png). center_tile(76,12,8) — commented as a run of same-substrate land tiles inside one province, the R1 negative half proving grain draws no seam — lands on pure open ocean, which by design draws nothing at all (texture_grain_no_seam.png). So R2 (density scaling) and R1-negative (no seam) are currently UNTESTED despite a green run. Same shape as NR-422: BL-515/BL-516 repartitioned the world and the hardcoded fixtures moved out from under the script.
+
+**Why it matters.** This is the exact failure the verifier-visual skill names — a green pass over a frame that never showed the subject. The two claims the item most needs proven are the two that silently went untested.
+
+- Re-aim both center_tile calls at tiles that actually carry the covers, and state the cover in the capture name
+- Give the verify API a find-tile-by-cover helper so the fixture is derived, not hardcoded
+
+> **Recommendation:** Re-aim, and prefer the derived helper — hardcoded tile fixtures will break on the next repartition too.
+
+> **RESOLVED.** FIXED 2026-08-22, in session. Both center_tile fixtures re-aimed onto (40,30)/(37,28) — the land province_render.lua frames, confirmed biotic. texture_density_close.png now shows neighbouring forest tiles at visibly different canopy densities, which is R2 actually being tested; texture_grain_no_seam.png is land-only, scrub above and closed canopy below, so the R1-negative claim is asserted over ground that could show a seam. Each fixture carries a comment naming NR-502 and warning that hardcoded tile fixtures will break on the next repartition. The derived find-tile-by-cover helper recommended above was NOT built — it needs a new verify API function, which is scope growth this session did not take. Left as the standing hazard.
+
+*Files: `scripts/verify/tile_texture.lua`*
+
+### NR-503 — The Country lens legend overflows its container and collides with the tile ledger beneath it
+*observation · raised 2026-08-22 · from UI session 2026-08-22, texture_lens_country.png*
+
+At a 1600x1000 window the Countries legend lists 40 nations in one ungoverned column. It runs past the bottom of the canvas and overprints the tile ledger panel — "Rutam", "Th Thuara", "Te Rerem", "Bethreibei Beise", "Zeithketh", "Beireth Reineth", "Shakei", "Taitamte Tammai", "Toko Roto" are all drawn over the ledger buttons and the resource graph. Legible text on top of legible text, neither readable. Visible in build/screenshots/texture_lens_country.png.
+
+**Why it matters.** Unrelated to BL-520 — the texture work simply made me look at this lens. It is a live clipping defect on a shipped lens at a supported window size, and text_overflow_floor would not catch it because nothing is clipped, it is overdrawn.
+
+> **RESOLVED.** SUPERSEDED BY BL-533, Ben, 2026-08-22 (UI session). Rather than tune this one legend, every legend moves to a reserved scrolling region beside the minimap at about a quarter of its space, with wrapping and shortened names. That removes the overdraw failure class outright — the Country legend cannot overflow a container that scrolls.
+
+*Files: `src/ui/`*
+
+### NR-504 — click_injection C3b and C4 FAIL — the press lands, but the selection cycle does not advance on a repeat click
+*question · raised 2026-08-22 · from UI session 2026-08-22, click_injection.lua*
+
+The press itself is PROVEN, which closes the core of NR-416/NR-424: C1a (click_tile resolved and pressed), C1b (the injected click selected a province through the real handler), C2 (injected click and select_province agree, 22209 vs 22209) and all three hover assertions pass. But two fail. C3b expects a second press on the same tile to walk BL-511 rung UNIT>PROVINCE>BUILDING>TILE off the province to the bare tile; actual is province=22209 has_entity=false, i.e. unchanged. C4 (double_click delivers two presses) fails the same way. TWO candidate causes and I did not determine which: (a) the cycle genuinely does not advance, a real behaviour bug in the click handler; or (b) C2 tears the premise down — it calls verify.clear_selection() then verify.select_province(), so if repeat-click detection keys on the previous CLICK target rather than on selection state, C3s click is a first click by that reckoning and correctly re-selects the province. Cause (b) would make this a script bug, not a product bug.
+
+**Why it matters.** BL-521 exists to close the live-check class. Its own check is now the thing reporting red, and the answer decides whether BL-511s selection walk is broken or the script is.
+
+- Reorder the script so C3 follows C1 without the clear_selection teardown, and see if it goes green
+- Read the click handler cycle condition directly and settle it by inspection
+
+> **Recommendation:** Try the reorder first — it is one edit and it distinguishes the two causes outright.
+
+> **RESOLVED.** ANSWERED AND FIXED 2026-08-22, in session. Cause (b) REFUTED empirically: reordering the script so C3/C4 run immediately after C1, with no clear_selection teardown between, reproduced the failure identically. A hover-before-click diagnostic changed nothing either, ruling out the injection path. Cause (a) confirmed — a REAL bug in shipped selection behaviour. Mechanism: body_surface_canvas.cpp seeded selection_cycle_stage with the OLD FOUR-RUNG indices, never shifted when BL-469 inserted the battle rung at index 0. stages[5] is BATTLE 0, UNIT 1, PROVINCE 2, BUILDING 3, TILE 4, but plain ground seeded 1 (the UNIT rung), so a repeat click walked 1 -> 2 and landed back on the province — reading as the cycle not firing at all. All four seed constants were one short. Shifted to 1/3/3/2, and the comment now states they must track stages[5]. click_injection.lua is 8/8 PASS; C3 reports province=0 has_entity=true. STILL OWED: a live click by Ben per the 2026-08-19 standing rule — the harness proves the press and the walk, not that it feels right.
+
+*Files: `scripts/verify/click_injection.lua`, `src/ui/`*
+
+### NR-505 — BL-532 shipped and the NR-415 artifact is REAL and VISIBLE — nation colours now gradient into a third colour at every border
+*observation · raised 2026-08-22 · from UI session 2026-08-22, province_lens_country.png*
+
+You overruled the NR-415 refusal knowingly, and I said the thing to do if it read wrong was bring it back rather than quietly reinstate it. It reads wrong, so here it is. In build/screenshots/province_lens_country.png the Country lens now keeps the province view as you asked — nations are soft continuous regions rather than a hex lattice, which is the win. But along the boundary between the mauve nation and the gold one there is a wide gradient band, and the colour in that band belongs to NEITHER nation. It resolves to an amber/orange that is itself a plausible nation colour. A player reading that frame cannot tell where one nation stops, and could reasonably read the band as a third nation between them. This is precisely the mean-of-two-nation-colours case NR-415 named, now measured rather than predicted.
+
+**Why it matters.** Country is the lens whose entire job is a categorical boundary. The blend is doing real damage to the one thing this lens exists to answer, in a way the continuous-field lenses (none, resource, market, scarcity) do not suffer, because their fields genuinely are continuous.
+
+- Keep as ruled — accept the soft political border as the price of the province view
+- Country and Continent alone fill uniformly per province: keeps the province view, invents no colour, and is NOT a return to per-tile rendering
+- Blend but narrow the gradient sharply for categorical lenses, so the band is a hairline rather than a wide wash
+
+> **Recommendation:** Option 2. It gives you exactly what you asked for — the province view, no revert to per-tile — while the boundary stays true. The gradient is only meaningful where the underlying field is continuous, and nationhood is not.
+
+> **RESOLVED.** RULED Ben, 2026-08-22 (UI session), and the ruling goes FURTHER than the entry proposed. Ben: "I like the idea of NR-505, we can stop blending across national borders, and give a slight hue for each country, replacing the national lens entirely." So it is not option 2 (Country and Continent fill uniformly per province) — it is a different move altogether. The blend stops at NATIONAL borders rather than province ones, every tile carries a slight hue from the nation that holds it, and overlay_mode::country is RETIRED because the base map now answers the question the lens existed to answer. Filed as BL-535. NR-415, which recorded the original categorical refusal, is vindicated by the outcome even though its specific remedy was not the one taken.
+
+*Files: `src/ui/body_surface_canvas.cpp`*
+
+### NR-508 — lens_legend.lua has to aim at the legend header BY PIXEL, and got it wrong three times before it landed
+*observation · raised 2026-08-22 · from UI session 2026-08-22, lens_legend.lua*
+
+The new check presses the legend header, and the only way to say where that is is to re-derive the shell geometry in Lua: minimap size from its own formula, then shell_margin, then the published time_panel_h, then a guess at the header band. It missed three times in a row — first by aiming below the collapsed box, then by assuming the box grew upward, then by landing on the Market lens resource combo, which stacks ABOVE the header and shifts it 26px down. Each miss silently did something else instead (panned the canvas, opened the good-picker) rather than failing, so each one needed a capture read to diagnose. The constant now reads `local time_panel_h = 84 -- measured off the capture, not assumed`, which is honest but is a number copied from a screenshot, and it will drift the moment the font or the panel changes.
+
+**Why it matters.** This is NR-454 arriving exactly as predicted: BL-521 closed the live-check class for canvases, where click_tile can ask the canvas where a tile is, but NOT for panels, which publish no rect. The first real panel check after that entry needed four attempts, and the fragility is now committed in a script rather than being hypothetical.
+
+- Accept it — panel checks re-derive geometry and are refreshed when they break
+- Give the shell a target registry: each clickable surface publishes {name, rect} into ui_state, and verify gains click("lens.legend.header") — the thing NR-454 says needs a ruling before it can be built
+
+> **Recommendation:** No new work yet, but this is evidence for NR-454 rather than a separate question — worth deciding them together.
+
+> **RESOLVED.** ACCEPTED Ben, 2026-08-22 (UI session) — Ben: "that's no problem." The pixel-aimed panel check stands as written. The underlying gap (panels publish no rect, so a check cannot ask where a control is) remains open as NR-454, which still wants a ruling before a target registry could be built; this entry is closed as an accepted cost rather than as a fixed problem.
+
+*Files: `scripts/verify/lens_legend.lua`*
 
