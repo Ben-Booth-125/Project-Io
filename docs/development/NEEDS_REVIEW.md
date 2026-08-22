@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*234 entries — 212 open, 22 resolved.*
+*235 entries — 200 open, 35 resolved.*
 
 ---
 
@@ -1157,11 +1157,6 @@ The agent declined to drive your desktop unattended to satisfy the LIVE half of 
 
 k was pinned at 12.6468 as (pooled per-tile capacity / sustain units) aggregated over the world. Both sides are sums over TILES, so the prediction was that province size cannot move the aggregate. Measured after repartition: 12.5535, a 0.74% move, well inside the pre-existing 28.59% per-seed spread, with ceilings totalling 100.75% of pooled per-tile capacity. k was NOT adjusted. What did change completely is the per-province distribution: ceilings now run 1..262 per province against a previously narrow spread. Worth knowing if the ceiling ever starts to bind.
 
-### NR-421 — The per-province firm cap is inert by ORDERS OF MAGNITUDE, not by a near miss
-*question · raised 2026-08-21 · from Province repartition to 7-12 tiles, merged and verified 2026-08-21.*
-
-BL-512 per_province_firm_cap = 2 was measured as nearly inert against 4-tile provinces, and the hope was that 9-tile provinces would make the spatial half of the two-level firm budget do real work. It does not. Measured across 8 seeds after repartition: 296 background firms anchored across 295 DISTINCT provinces; the busiest province holds ONE firm on 7 of 8 seeds; exactly one province in the entire sweep reaches the cap of 2. The reason is structural, not a tuning miss - there are ~24-50 background firms per world against ~3,500 provinces. A per-province cap cannot bind at that ratio at any plausible value. So the two-level budget is really a one-level budget: the per-RESOURCE cap carries the entire result (it took every seed to its coverage target), and the per-province cap is decoration. Three options: drop it as dead weight, keep it as a bound that only matters once player density arrives, or move the spatial constraint to the grain where firms actually compete. It costs nothing today either way, which is why this is a question and not a defect.
-
 ### NR-422 — The march harness fixtures could not survive the repartition, and that is information
 *observation · raised 2026-08-21 · from Province repartition to 7-12 tiles, merged and verified 2026-08-21.*
 
@@ -1196,11 +1191,6 @@ I briefed the agent to append height to the tile record because 'the tile record
 *observation · raised 2026-08-21 · from BL-517 (retain the heightmap), merged and verified 2026-08-21.*
 
 BL-517's scope included exposing height to the Generation Ledger's field overlay, 'where it is already designed'. It is designed and not built: GENERATION_LEDGER.md's own status table reads 'Field lenses ... Partial substrate - the generation_record seam exists and is filled on demand; no lens built'. So there was nothing to expose it to, and no UI change was made (src/ui was outside the agent's file scope in any case). The retained field is exactly what such a lens would read without regenerating, so the item still paid for the lens - it just did not build it. Not a gap to fix now; a note so the scope line in BL-517 is not read later as unfinished work.
-
-### NR-433 — 12% of provinces are below the HARD 3-tile floor, and that needs your eye
-*question · raised 2026-08-21 · from BL-515 (organic province borders), merged and verified 2026-08-21.*
-
-Distribution against the 3x3 partition it replaces: 24,498 provinces (was 21,161), mean 7.87 (was 9.11), max 12 and now ABSOLUTE (was 18 overshoot), min 1, 74.71% in the 7-12 band (was 97.90%). The band drop is expected and was explicitly not chased - organic borders are supposed to be irregular. What I want your eye on is a different number: 6,195 provinces under 7, of which 3,008 are under 3 - i.e. roughly 12% sit below the HARD 3-12 target you set. You also ruled 'do not reject tiny provinces', so keeping them is correct per the ruling and the agent was right not to merge them away. But the two rulings pull against each other at this volume, and the visible consequence is in the alpha-220 capture: in places the map reads as a hex lattice again, because a 1-2 tile province is a hex with a border drawn round it. That is the look you moved away from. Options if it bothers you: raise the seed density so fewer pockets are enclosed, let a sub-floor pocket join a neighbour (a softer rule than the merge pass you removed), or accept it and let the blend hide it at play zoom.
 
 ### NR-434 — The agent corrected its own mechanism mid-task, and the correction is the interesting part
 *observation · raised 2026-08-21 · from BL-515 (organic province borders), merged and verified 2026-08-21.*
@@ -1807,36 +1797,6 @@ Re-homing the legend surfaced a defect that predates it and would have applied t
 
 *Files: `src/ui/body_surface_canvas.cpp`, `src/core/app.cpp`*
 
-### NR-509 — BL-534's new tab makes NR-421 visible on its first frame: capacity 103, geology 24
-*observation · raised 2026-08-22 · from UI session 2026-08-22, accordion_view_buildings.png*
-
-The Available buildings tab shipped and the very first province it rendered says: Province capacity 0 / 103 (103 free), over a table whose three workable rows are Agricultural Produce 0/9, Stone 0/9 and Timber 0/6 — 24 placement slots in total. So BL-513's ceiling stands more than four times above everything the province's own geology could ever support, and the binding constraint on building here is deposits, not the ceiling. NR-421 measured exactly this and called the per-province firm cap 'inert by ORDERS OF MAGNITUDE, not by a near miss'. BL-534's design note predicted this tab would be the first surface to make that legible to a player. It is, on frame one, without being asked to.
-
-**Why it matters.** Two things follow. First, the tab reads oddly as shipped: a headline number of 103 sitting over a table that tops out at 24 invites the player to believe there is room they do not have. Second, this is now a PLAYER-VISIBLE statement of a tuning problem rather than an internal measurement — whatever is decided about k_province_buildings_per_sustain_unit, this surface will show it.
-
-- Leave both numbers as they are — they are each true, and the gap is the honest reading
-- Show the effective ceiling alongside: min(province ceiling, sum of per-resource maxima), so the headline is what actually binds
-- Re-pin k_province_buildings_per_sustain_unit so the ceiling lands near what geology supports — a tuning change, not a UI one
-
-> **Recommendation:** Option 2 for this surface, and treat option 3 separately. Naming what actually binds is the tab's job; re-pinning the constant is a balance decision that wants its own measurement, and NR-421 already holds that thread.
-
-*Files: `src/ui/selection_panel.cpp`, `src/world/province.hpp`*
-
-### NR-511 — docs/lore/COLLAPSE.md is named as authority by 19 open items and declares itself NOT authority
-*question · raised 2026-08-22 · from Phantom-feature scan, 2026-08-22 (PHANTOMS.md § Class 3).*
-
-COLLAPSE.md opens 'Status: research scaffolding - the design conversation's home, not authority.' Nineteen OPEN backlog items name it in authority_doc. A reader following the pointer lands on a page telling them it settles nothing. Five sibling scaffolding docs carry the same banner and total 3,076 lines: ERA1_TECH_LANDSCAPE (882), ANCIENT_TECH_LADDER (739), STRATEGIES (475), COLLAPSE (439), LANGUAGE_POLICY_FEASIBILITY (271), TECH_EFFECTS (270). None of the six has ever graduated.
-
-**Why it matters.** The convention is sound - scaffolding is promoted when the work lands - but no promotion has ever happened, so 3,076 lines of settled thinking sit permanently one step short of readable. COLLAPSE is the case where the contradiction is load-bearing rather than cosmetic, because open items depend on it.
-
-- Graduate COLLAPSE.md to authority and drop its banner.
-- Re-home the 19 items' authority_doc onto docs/lore/HISTORY.md and leave COLLAPSE as scaffolding.
-- Leave it, and accept the pointer means 'read this for context'.
-
-> **Recommendation:** Option 1 for COLLAPSE specifically - nineteen dependants is what an authority doc looks like. The other five can stay scaffolding until their work lands.
-
-*Files: `docs/lore/COLLAPSE.md`, `docs/development/backlog.json`*
-
 ### NR-512 — docs/CONCEPT.md is two framings behind, and CLAUDE.md sends every new session there first
 *observation · raised 2026-08-22 · from Phantom-feature scan, 2026-08-22 (PHANTOMS.md § Class 5).*
 
@@ -1862,120 +1822,6 @@ docs/development/PHANTOMS.md is a new document class - a scan output that points
 > **Recommendation:** Option 2 as the destination, option 1 to get there - the file is useful right now because ten sessions are not yet run. Once each subject has an owner, its rows move into that owner's absent-list and the file goes away.
 
 *Files: `docs/development/PHANTOMS.md`*
-
-### NR-514 — Status drift runs BOTH ways — BL-480 (law has an author) shipped and its item still says 'designed'
-*observation · raised 2026-08-22 · from Documenting the nation as an actor (PHANTOMS.md session 2). Found while establishing what actually runs.*
-
-BL-377 was the false-complete. BL-480 is the opposite and is confirmed: commit c00bba8 'Merge BL-480 (law author + treasury) - Sprint D3' IS an ancestor of HEAD, nation_component::treasury and law::enacting_nation exist, budget_system.cpp runs the transfer, balance_ledger.cpp shows the read-only Laws section, and tools/verify/law_author_harness.cpp exists. The item's status is still 'designed'. A first-pass sweep - open, unparked items whose id appears anywhere in src/tools/scripts - returns 48 candidates, but it is NOISY: most hits are forward references in comments ('BL-315 will read this'), and BL-377 itself scores 1 for exactly that reason. So 48 is an upper bound on the drift, not a count of it.
-
-**Why it matters.** Two directions of the same defect. A false-complete hides owed work (BL-377, the income loop); a false-open hides landed work, which is how the same thing gets built twice and how a version's real content is understated. Neither is visible from any status view, because status is the thing that is wrong. A reliable check exists and is cheap: an item is landed if its named files carry its id AND a commit whose subject names the id is an ancestor of HEAD - subject, not body, to drop the forward references.
-
-- Reconcile all 48 candidates in one pass and fix the statuses.
-- Fix BL-480 now (confirmed) and leave the sweep for a session that can run the harnesses.
-- Write the check as a tool and fold it into backlog_lint.js, so drift is caught at close rather than found by accident.
-
-> **Recommendation:** Option 3, with option 2 alongside. The check belongs in backlog_lint - it already warns when a req group is complete and its item is not, which is the same class of drift caught from a different angle. Doing it by hand once fixes today and nothing after.
-
-*Files: `docs/development/backlog.json`, `tools/session/backlog_lint.js`*
-
-### NR-516 — Delegated calls in the v0.1.24 filing: a new minor number, one version goal, and three shapes chosen on Ben's behalf
-*decision taken on your behalf · raised 2026-08-22 · from Filing the seven items from the 2026-08-22 nations design session.*
-
-Five calls taken so the items could be filed. (1) VERSION: the six channel items carry v0.1.24, the next free minor - v0.1.23 is 'Who owns whom' (the syndicate tier). The minor is unnamed and unnamed in ROADMAP; Ben should name it or fold the cluster elsewhere. (2) BL-543 (value anchor) put at v0.1.21 instead, with the economy-tuning items - it is a calibration that unblocks NR-382 and should not wait on a politics minor. (3) TARIFF SHAPE: recommended the tariff stay a `law` and gain a `target_nation` field with an `all_nations` sentinel, rather than moving rates onto a nation-pair table; the fork is stated in BL-541 rather than hidden. (4) TWO DIMENSIONS, not 'possibly multiple' - Access and Trust, each gating something, with a third resisted until it does. (5) LOBBYING FEE assumed CONSUMED rather than credited to the treasury; called out in BL-539 and left open below.
-
-**Why it matters.** A version goal is a sequencing commitment and a new minor number is Ben's to name. The tariff-record shape is the one call that is expensive to reverse later, since it lands on a serialised record.
-
-> **Recommendation:** Confirm or rename v0.1.24, and sanity-check the tariff record shape before BL-541 starts. The other three are cheap to overturn.
-
-*Files: `docs/development/backlog.json`, `docs/development/ROADMAP.md`*
-
-### NR-517 — Your ruling needed: does the nation grant reach a RIVAL acting politically against the player, and is a lobbying fee consumed or banked
-*question · raised 2026-08-22 · from Designing BL-539 (lobbying) and BL-540 (nation->corp stance), 2026-08-22.*
-
-TWO CALLS, both blocking the player-facing halves of those items.
-
-(1) THE GRANT'S REACH. A rival corporation lobbying to shift a law that binds the player's corp, and a nation's Access stance gating the player out of a territory, are both consequences imposed on A CORP A HUMAN OWNS by an actor the player does not control. Every widening of that prohibition to date has been explicit and dated - BL-079, BL-202/203, BL-293, BL-324, BL-181, BL-409, and BL-450 (rivals score stance), which is the closest precedent because it was the first RELATIONAL action against the player's corp. The 2026-08-18 grant (ruling 4 of NR-331) covers a NATION acting in a deterministic scored-utility shape. It does not obviously cover a rival corporation acting politically against the player, and reading it as though it does would set exactly the quiet precedent the standing rules exist to prevent.
-
-(2) THE LOBBYING FEE. Consumed, or credited to the lobbied nation's treasury? Consumed reads as influence-buying and keeps the treasury's inflows purely legal (levy, tariff, charter fees). Credited closes another money loop but makes lobbying a second tax, and means a nation profits from being lobbied - which would give BL-542's scorer an incentive to be corruptible.
-
-- Grant the rival half on the same terms as BL-450 - deterministic, seeded, scored-utility, legal verbs only.
-- Withhold it: nations may act politically, rivals may not, and lobbying is a player-only verb for now.
-- Grant it but gate it behind a visibility rule, so a lobbied law is always attributable to whoever bought it.
-
-> **Recommendation:** Option 1 for the grant, on the BL-450 precedent - a rival that cannot lobby while the player can is the unreachable-capability defect BL-458's design complains about, from the other side. But it is your call and the items are written to stop short of it. On the fee: CONSUMED, which is what BL-539 assumes; a nation that profits from lobbying is one the scorer will learn to invite.
-
-*Files: `.claude/rules/io-standing-rules.md`, `docs/politics/NATIONS.md`, `docs/development/backlog.json`*
-
-### NR-518 — Io has TWO clocks and the word 'tick' means both - harmless today, load-bearing the moment anything is priced per year
-*observation · raised 2026-08-22 · from Deriving BL-543's value anchor, which needed to know how many ticks a year is.*
-
-A DAY TICK is one in-game day (sim_loop::m_day_tick); the survey system counts these, and survey_system.hpp says 'one tick = one day'. An ECONOMY TICK is 90 of them - sim_loop::econ_tick_days = days_per_month(30) x months_per_econ(3) - so k_ticks_per_year = 4, and budget_system.hpp, corp_ai.cpp and construction_panel.cpp all say 'a tick is one quarter'. BOTH READINGS ARE CORRECT about different clocks, so this is not a defect. It is a naming collision that has already produced two apparently contradictory statements in the corpus, and it cost this session a detour to resolve.
-
-**Why it matters.** It stopped being cosmetic the moment a design was priced 'for that year' (Ben's value anchor). It happens to cancel there - both halves of the ratio are per-head-per-tick, so the factor of 4 disappears - but the next annualised quantity may not be so lucky. GLOSSARY.md defines neither term.
-
-- Add both terms to GLOSSARY.md and leave the code alone.
-- Rename one in code (econ_tick vs day_tick) so the ambiguity cannot be read.
-- Leave it; the comments are individually correct.
-
-> **Recommendation:** Option 1 - it is a doc gap, not a code defect, and GLOSSARY.md is exactly where a term with two live meanings should be pinned. Not done here: the glossary is a canonical-terms authority and adding two entries is a small design call of its own.
-
-*Files: `docs/GLOSSARY.md`, `src/core/sim_loop.hpp`, `src/world/budget_system.hpp`, `src/world/survey_system.hpp`*
-
-### NR-521 — MILITARY.md's 'stance gates nothing yet' was stale by three consumers, and friendship still gates zero
-*observation · raised 2026-08-22 · from Writing RELATIONS.md; checked every consumer of is_hostile/are_friends in src/.*
-
-MILITARY.md § What is absent said stance 'still carries no consequence - stance gates nothing yet'. True when BL-448 landed 2026-08-19; false since 2026-08-21. Hostility now gates THREE things: interdiction (supply_system.cpp, BL-458), battle engagement (battle_system.cpp walks corp_hostile_pairs to open a battle, BL-467), and the march queue (economy_system.cpp, BL-470/NR-344). Corrected in place and re-pointed at RELATIONS.md. FRIENDSHIP, by contrast, still gates exactly nothing - are_friends has no consumer outside stance.cpp itself and the corporation panel. It can be offered, accepted and dissolved, and no behaviour reads it.
-
-**Why it matters.** Two directions of the same doc-drift the phantom scan exists to catch: an absent-list entry that outlived its absence, and a shipped surface (four verbs, a UI column) whose effect is still zero. The second is the more interesting one - offer_friendship, accept_friendship and half of return_to_neutral are player-reachable presses that change a table nothing reads.
-
-> **Recommendation:** Give friendship something to permit, or say in RELATIONS.md that it is deliberately inert until BL-315's consequences land. Candidates with existing machinery: passage through territory, a preferential price, shared visibility under BL-068, immunity from interdiction. Filed as RELATIONS.md open question 2 rather than as an item, since choosing is design.
-
-*Files: `docs/military/MILITARY.md`, `docs/politics/RELATIONS.md`, `src/world/stance.cpp`*
-
-### NR-522 — How many dimensions does sentiment carry? The NR-520 ruling settled the architecture, not the count
-*question · raised 2026-08-22 · from Filing BL-545 after Ben's sentiment-is-the-substrate ruling.*
-
-Three existing designs imply three different answers. BL-540 proposed TWO - Access (may this corp operate in our borders) and Trust (would we contract it) - each gating something distinct. corp_reputation reads as ONE (will you deal with me again). CONCEPT.md describes a SINGLE value shaped by several contributing factors. BL-545 assumes the BL-540 pair generalised to every grain, and says so, but that is an assumption rather than a ruling.
-
-**Why it matters.** Collapsing to one makes Access and Trust inexpressible separately, which BL-540 needs - a nation might let a company operate while never contracting it, and those are different facts. Going past two is the failure mode of every multi-dimensional reputation system: dimensions that are stored, displayed and never read. The rule BL-545 adopts is that a dimension must GATE something before it is added, which keeps the count honest without fixing it now.
-
-- Two (Access, Trust), generalised to every grain - what BL-545 assumes.
-- One value plus per-consumer thresholds, with Access and Trust as different cuts of the same number.
-- Decide per grain: nation->corp carries two, corp->corp carries one.
-
-> **Recommendation:** Option 1. Two is the smallest count that expresses what BL-540 and BL-377 both need, and the gate-something rule stops it growing. Option 3 is tempting and should be resisted - a substrate whose shape varies by grain is not a substrate.
-
-*Files: `docs/politics/RELATIONS.md`, `docs/development/backlog.json`*
-
-### NR-523 — modifier_set.hpp claims to be the shared effect vocabulary for tech AND law, and law does not use it
-*observation · raised 2026-08-22 · from Writing docs/META_LAYER.md (system 3 of the phantom scan).*
-
-modifier_set.hpp's header states its own purpose as 'the closed list of scalars a tech (BL-479) OR A LAW (BL-480) may move... Authored once and shared - tech and law naming different subject enums would be the same defect as tech and law wording the same predicate differently, which is exactly what condition_set exists to prevent.' BL-480 then landed with law_effect_kind, its own enum. law.{hpp,cpp} includes condition_set.hpp and never modifier_set.hpp; the only two files that include modifier_set.hpp are world.hpp and tech_gate.hpp. IN FAIRNESS there is a real reason: modifier_subject moves SIMULATION SCALARS (units/tick, yield/batch) and a levy is a FLOW OF MONEY, so no subject in the list could express one and inventing one would distort the vocabulary rather than share it. So the effect side is two vocabularies for a defensible reason that nothing had written down - while the header goes on claiming it is one.
-
-**Why it matters.** The header is the design authority a future author will read before adding an effect, and it currently misleads about the shape of the thing they are extending. It is the same class of drift as tech_node::condition being a descriptive string - a stated intent the code does not honour - which is the failure the whole meta layer was built to fix. There are in fact THREE effect taxonomies with no mapping between them: BL-155's four families (margin/production/permission/relationship, named in no code), law_effect_kind's two, and modifier_subject's six.
-
-- Correct the header to describe a money-flow effect family alongside the scalar family - cheapest, and makes the two-vocabulary split deliberate.
-- Grow modifier_subject with subjects a levy could be expressed as, and make law use it.
-- Leave it and note the divergence in META_LAYER.md only.
-
-> **Recommendation:** Option 1. The split is right; only the claim is wrong. Doing nothing is the one bad option, because the header is what a future author reads before extending the vocabulary. Recorded in META_LAYER.md § The asymmetry either way.
-
-*Files: `src/world/modifier_set.hpp`, `src/world/law.hpp`, `docs/META_LAYER.md`*
-
-### NR-524 — Five of six modifier subjects are wired to nothing, and 'a shape is only proven by an instance' has no stopping condition
-*question · raised 2026-08-22 · from Writing docs/META_LAYER.md.*
-
-modifier_subject has six entries and ONE is wired: extraction_rate, applied in extraction_nominal. processing_yield, unit_upkeep, logistics_cost, wage_floor and collapse_strain are vocabulary only. The policy is explicit and defensible - 'wired when an item needs it and NOT before' - and it rests on a principle that appears twice in the code unnamed: a vocabulary claiming to be extensible is only PROVED extensible by carrying an entry of the awkward kind. BL-342 shipped two military condition subjects before anything read them for exactly this reason, and collapse_strain cites that precedent explicitly.
-
-**Why it matters.** The principle justifies the first unwired entry. It does not obviously justify the fifth. An unwired instance proves a shape; five unwired instances are a vocabulary waiting for consumers - which is the state tech_node::condition was in when it was a descriptive string, the defect the meta layer was built to fix. The header already carries a test ('a subject earns its row by being a scalar some real lever wants to move'); nothing checks it.
-
-- Set a cap - at most N unwired subjects at once, enforced by a harness row or backlog_lint.
-- Require each unwired subject to name the backlog item that will wire it, so vocabulary-only is a promise rather than a state.
-- Leave it; the policy is sound and the count is not yet a problem.
-
-> **Recommendation:** Option 2. It costs a comment per subject, keeps the proving-by-instance principle intact, and converts an unbounded state into a tracked one. A cap would be arbitrary; leaving it is how five becomes ten.
-
-*Files: `src/world/modifier_set.hpp`, `docs/META_LAYER.md`*
 
 ### NR-525 — REVIEW: docs/economy/LOGISTICS.md — the network authority (Ben flagged this one as the priority)
 *question · raised 2026-08-22 · from Phantom-scan documentation pass, 2026-08-22. Ben asked for a review item per doc: "I'll read them in full and let you know where I would want to change things."*
@@ -2032,17 +1878,6 @@ New 212-line design-owed doc from your 2026-08-22 ask. The interesting problem i
 
 *Files: `docs/EVENTS.md`*
 
-### NR-530 — REVIEW: SYSTEMS.md § The progression chain — your interconnectivity ask, written as a design test
-*question · raised 2026-08-22 · from Phantom-scan documentation pass, 2026-08-22. Ben asked for a review item per doc: "I'll read them in full and let you know where I would want to change things."*
-
-Your words, 2026-08-22: "we really want interconnectivity, so a player only progresses so far using one system before the next becomes a natural consequence." Written into SYSTEMS.md as a named principle - EACH SYSTEM'S CEILING IS THE NEXT SYSTEM'S DOOR - and as a three-part design test every system must answer: what forces a player in, what does it open, what does it cap them at. A table applies it to six rungs and names each rung's current ceiling. Every new doc written this session carries a § Where this sits in the chain section against it. | ANSWER FORM: https://claude.ai/code/artifact/debe7b8f-7315-429a-a805-0e295e9405bc - this doc's open questions are a section of the design register, with the evidence, the options and a free-text field. Answers copy back as one block.
-
-**Why it matters.** Ben asked to read each new authority doc in full and mark what he wants changed. This entry is the place to record his verdict; resolve it with the changes made, or with "accepted as written".
-
-> **Recommendation:** Two claims in it are mine rather than yours and worth checking. First: the chain CLOSES rather than ending, because force's ceiling is supply, which is the logistics rung again - which makes BL-464 a bigger item than its size suggests. Second: a staircase is a solved sequence, which is the argument for EVENTS.md cutting across it.
-
-*Files: `docs/SYSTEMS.md`*
-
 ### NR-532 — The design register is live — 41 open calls across ten sections, as a form
 *observation · raised 2026-08-22 · from Ben, 2026-08-22: "now please revisit each one and open forms for answering the open questions."*
 
@@ -2055,6 +1890,17 @@ The generator is committed rather than being a one-off (CLAUDE.md § Tool creati
 > **Recommendation:** Answer in any order. The four that change the most downstream: LOGISTICS Q1 (what generates LP), EVENTS Q4 (drive the collapse metagame or express it - it decides the system's size), PEOPLE Q2 (one bias or several - cheapest to overturn now), and NATIONS Q1 (whether the grant reaches a rival, which blocks the player-facing halves of two items).
 
 *Files: `tools/session/register/questions.js`, `tools/session/register/build.js`*
+
+### NR-533 — A rival hostility declaration is now SIGNALLED, which overturns NR-350 and removes the ambush property for the player
+*decision taken on your behalf · raised 2026-08-22 · from Ben's answer to RELATIONS Q4 in the design register.*
+
+Ben chose "Yes, but signalled - a rival declaration surfaces to the player". NR-350 had a declaration stay SILENT, discovered on contact rather than announced, and BL-448 shipped on that. Newest-dated wins, so the reversal stands and is recorded rather than quietly applied.
+
+**Why it matters.** stance.hpp's directed hostility exists so that "a corp can be at war and not know it yet" - the AMBUSH PROPERTY BL-458's interdiction was designed around. Signalling removes that property FOR THE PLAYER: interdiction becomes a known risk rather than a surprise, and the first lost convoy stops being the first news. Directedness itself is untouched - hostility still needs no reciprocation. What the ruling does NOT settle is whether rival-vs-rival declarations are equally visible, which is a BL-068 question.
+
+> **Recommendation:** Accept - the ruling is deliberate. Two things to carry: BL-458's design prose still argues from the ambush property and should be read with this in mind, and the rival-vs-rival visibility question needs an answer before BL-449 renders anything.
+
+*Files: `docs/politics/RELATIONS.md`, `docs/economy/LOGISTICS.md`, `src/world/stance.hpp`*
 
 ---
 
@@ -2076,6 +1922,20 @@ Province-grain rendering forces every lens to state how it reduces from tile to 
 Blended provinces read as continuous painted ground; ocean and BUILT tiles stay crisp hexes by construction. In the integrated capture the result is a map that is soft in some regions and hard-edged in others, which may or may not be what you pictured. Also relevant: the first pass had province edges at alpha 70 and they were INVISIBLE - the map read as one field with no cells at all. The committed version is 105, with the stroke moved onto the blended vertices so two neighbours strokes coincide rather than sitting a pixel apart. Soft by design, since you ruled softened borders, with the crisp affordance being the on-demand selection outline. If the gradient reads too blurry at close zoom, edge alpha is the dial to move first and the blur radius second.
 
 > **RESOLVED.** RULED Ben, 2026-08-22 (UI session): the edge alpha goes to 0. Ben: "blur should cross province borders", and asked directly whether the stroke survives, chose to drop it. The map becomes one continuous field with province edges drawn only as the on-demand selection outline. The two-visual-languages observation is NOT thereby resolved — ocean and built tiles stay crisp by construction, so the mix remains and is now the next thing to look at. Carried into BL-514.
+
+### NR-421 — The per-province firm cap is inert by ORDERS OF MAGNITUDE, not by a near miss
+*question · raised 2026-08-21 · from Province repartition to 7-12 tiles, merged and verified 2026-08-21.*
+
+BL-512 per_province_firm_cap = 2 was measured as nearly inert against 4-tile provinces, and the hope was that 9-tile provinces would make the spatial half of the two-level firm budget do real work. It does not. Measured across 8 seeds after repartition: 296 background firms anchored across 295 DISTINCT provinces; the busiest province holds ONE firm on 7 of 8 seeds; exactly one province in the entire sweep reaches the cap of 2. The reason is structural, not a tuning miss - there are ~24-50 background firms per world against ~3,500 provinces. A per-province cap cannot bind at that ratio at any plausible value. So the two-level budget is really a one-level budget: the per-RESOURCE cap carries the entire result (it took every seed to its coverage target), and the per-province cap is decoration. Three options: drop it as dead weight, keep it as a bound that only matters once player density arrives, or move the spatial constraint to the grain where firms actually compete. It costs nothing today either way, which is why this is a question and not a defect.
+
+> **RESOLVED.** RULED BY BEN, 2026-08-22: DROP THE CEILING TO WHERE IT BITES - and Ben added the half neither option named: "Use technology for deeper mines and denser facilities which use more of the cap." So the ceiling becomes a real constraint AND technology becomes what relieves it, which makes BL-513 the first consumer of a modifier subject that does not exist yet. Under the same day's NR-524 ruling every unwired subject must name the item that will wire it, and BL-513 is now the namer for processing_yield. Whether "denser facility" is fewer slots per building or more output per slot is the small call still owed in BL-513.
+
+### NR-433 — 12% of provinces are below the HARD 3-tile floor, and that needs your eye
+*question · raised 2026-08-21 · from BL-515 (organic province borders), merged and verified 2026-08-21.*
+
+Distribution against the 3x3 partition it replaces: 24,498 provinces (was 21,161), mean 7.87 (was 9.11), max 12 and now ABSOLUTE (was 18 overshoot), min 1, 74.71% in the 7-12 band (was 97.90%). The band drop is expected and was explicitly not chased - organic borders are supposed to be irregular. What I want your eye on is a different number: 6,195 provinces under 7, of which 3,008 are under 3 - i.e. roughly 12% sit below the HARD 3-12 target you set. You also ruled 'do not reject tiny provinces', so keeping them is correct per the ruling and the agent was right not to merge them away. But the two rulings pull against each other at this volume, and the visible consequence is in the alpha-220 capture: in places the map reads as a hex lattice again, because a 1-2 tile province is a hex with a border drawn round it. That is the look you moved away from. Options if it bothers you: raise the seed density so fewer pockets are enclosed, let a sub-floor pocket join a neighbour (a softer rule than the merge pass you removed), or accept it and let the blend hide it at play zoom.
+
+> **RESOLVED.** RULED BY BEN, 2026-08-22: ACCEPT IT. 12% of provinces below the hard 3-tile floor is the "don't reject tiny provinces" ruling working as intended, not a defect. PROVINCES.md § Open questions 1 struck through with the ruling.
 
 ### NR-443 — Texture and the province blend are in direct tension, and BL-514 sits in the middle of it
 *question · raised 2026-08-21 · from BL-519 / BL-520 design work, 2026-08-21.*
@@ -2322,6 +2182,23 @@ The new check presses the legend header, and the only way to say where that is i
 
 *Files: `scripts/verify/lens_legend.lua`*
 
+### NR-509 — BL-534's new tab makes NR-421 visible on its first frame: capacity 103, geology 24
+*observation · raised 2026-08-22 · from UI session 2026-08-22, accordion_view_buildings.png*
+
+The Available buildings tab shipped and the very first province it rendered says: Province capacity 0 / 103 (103 free), over a table whose three workable rows are Agricultural Produce 0/9, Stone 0/9 and Timber 0/6 — 24 placement slots in total. So BL-513's ceiling stands more than four times above everything the province's own geology could ever support, and the binding constraint on building here is deposits, not the ceiling. NR-421 measured exactly this and called the per-province firm cap 'inert by ORDERS OF MAGNITUDE, not by a near miss'. BL-534's design note predicted this tab would be the first surface to make that legible to a player. It is, on frame one, without being asked to.
+
+**Why it matters.** Two things follow. First, the tab reads oddly as shipped: a headline number of 103 sitting over a table that tops out at 24 invites the player to believe there is room they do not have. Second, this is now a PLAYER-VISIBLE statement of a tuning problem rather than an internal measurement — whatever is decided about k_province_buildings_per_sustain_unit, this surface will show it.
+
+- Leave both numbers as they are — they are each true, and the gap is the honest reading
+- Show the effective ceiling alongside: min(province ceiling, sum of per-resource maxima), so the headline is what actually binds
+- Re-pin k_province_buildings_per_sustain_unit so the ceiling lands near what geology supports — a tuning change, not a UI one
+
+> **Recommendation:** Option 2 for this surface, and treat option 3 separately. Naming what actually binds is the tab's job; re-pinning the constant is a balance decision that wants its own measurement, and NR-421 already holds that thread.
+
+> **RESOLVED.** Superseded by the NR-421 ruling of 2026-08-22 - the ceiling drops to where it bites, and technology raises effective density. The 103-vs-24 measurement this entry reported is what the ruling was made against.
+
+*Files: `src/ui/selection_panel.cpp`, `src/world/province.hpp`*
+
 ### NR-510 — BL-377 (mercenary contract seam) is marked complete and was NEVER BUILT — the game's income loop is filed as delivered
 *observation · raised 2026-08-22 · from Phantom-feature scan, 2026-08-22 (docs/development/PHANTOMS.md § Class 0).*
 
@@ -2335,6 +2212,40 @@ BL-377 carries status 'complete'. Four independent checks say no code exists. (1
 
 *Files: `docs/development/backlog.json`, `docs/development/ROADMAP.md`, `docs/development/SPRINTS.md`, `docs/MANUAL.md`*
 
+### NR-511 — docs/lore/COLLAPSE.md is named as authority by 19 open items and declares itself NOT authority
+*question · raised 2026-08-22 · from Phantom-feature scan, 2026-08-22 (PHANTOMS.md § Class 3).*
+
+COLLAPSE.md opens 'Status: research scaffolding - the design conversation's home, not authority.' Nineteen OPEN backlog items name it in authority_doc. A reader following the pointer lands on a page telling them it settles nothing. Five sibling scaffolding docs carry the same banner and total 3,076 lines: ERA1_TECH_LANDSCAPE (882), ANCIENT_TECH_LADDER (739), STRATEGIES (475), COLLAPSE (439), LANGUAGE_POLICY_FEASIBILITY (271), TECH_EFFECTS (270). None of the six has ever graduated.
+
+**Why it matters.** The convention is sound - scaffolding is promoted when the work lands - but no promotion has ever happened, so 3,076 lines of settled thinking sit permanently one step short of readable. COLLAPSE is the case where the contradiction is load-bearing rather than cosmetic, because open items depend on it.
+
+- Graduate COLLAPSE.md to authority and drop its banner.
+- Re-home the 19 items' authority_doc onto docs/lore/HISTORY.md and leave COLLAPSE as scaffolding.
+- Leave it, and accept the pointer means 'read this for context'.
+
+> **Recommendation:** Option 1 for COLLAPSE specifically - nineteen dependants is what an authority doc looks like. The other five can stay scaffolding until their work lands.
+
+> **RESOLVED.** RULED BY BEN, 2026-08-22: GRADUATE IT. docs/lore/COLLAPSE.md is authority; its "research scaffolding - not authority" banner is withdrawn, and the provenance it carried is kept below the new status line. Nineteen open dependants is what an authority document looks like. Its five sibling scaffolding docs keep their banners until their own work lands. It also now owns something outright: Ben ruled the same day that events EXPRESS the collapse metagame rather than driving it, so the strain accumulator stays with this doc and BL-477, and the event layer reads it.
+
+*Files: `docs/lore/COLLAPSE.md`, `docs/development/backlog.json`*
+
+### NR-514 — Status drift runs BOTH ways — BL-480 (law has an author) shipped and its item still says 'designed'
+*observation · raised 2026-08-22 · from Documenting the nation as an actor (PHANTOMS.md session 2). Found while establishing what actually runs.*
+
+BL-377 was the false-complete. BL-480 is the opposite and is confirmed: commit c00bba8 'Merge BL-480 (law author + treasury) - Sprint D3' IS an ancestor of HEAD, nation_component::treasury and law::enacting_nation exist, budget_system.cpp runs the transfer, balance_ledger.cpp shows the read-only Laws section, and tools/verify/law_author_harness.cpp exists. The item's status is still 'designed'. A first-pass sweep - open, unparked items whose id appears anywhere in src/tools/scripts - returns 48 candidates, but it is NOISY: most hits are forward references in comments ('BL-315 will read this'), and BL-377 itself scores 1 for exactly that reason. So 48 is an upper bound on the drift, not a count of it.
+
+**Why it matters.** Two directions of the same defect. A false-complete hides owed work (BL-377, the income loop); a false-open hides landed work, which is how the same thing gets built twice and how a version's real content is understated. Neither is visible from any status view, because status is the thing that is wrong. A reliable check exists and is cheap: an item is landed if its named files carry its id AND a commit whose subject names the id is an ancestor of HEAD - subject, not body, to drop the forward references.
+
+- Reconcile all 48 candidates in one pass and fix the statuses.
+- Fix BL-480 now (confirmed) and leave the sweep for a session that can run the harnesses.
+- Write the check as a tool and fold it into backlog_lint.js, so drift is caught at close rather than found by accident.
+
+> **Recommendation:** Option 3, with option 2 alongside. The check belongs in backlog_lint - it already warns when a req group is complete and its item is not, which is the same class of drift caught from a different angle. Doing it by hand once fixes today and nothing after.
+
+> **RESOLVED.** RULED BY BEN, 2026-08-22: BUILD THE CHECK INTO backlog_lint. Landed this session, both arms, and mutation-tested. FALSE COMPLETE: an item is flagged when it names a source path with NO CREATION COMMIT ON ANY BRANCH - the precise fact that identified BL-377. Three earlier drafts were rejected by their own tests: "every named path absent" could not have caught BL-377 (it named ten files, seven of which exist); pairing with "the id appears nowhere in src/" was defeated by a forward reference in scripts/economy.lua. What ships is the precise signal plus a seeded allow-list of the 14 known-benign paths, each with its reason - renames from before the squashed import, the serialisation.cpp gap NR-349 already records, and one retired surface. FALSE OPEN: an item is flagged when a commit whose SUBJECT names it is an ancestor of HEAD, matched against the two landing shapes measured in this repo's history ("BL-N: ..." and "Merge BL-N ...") and excluding lifecycle subjects (File/Close/Pause/...). That narrowed 30 candidates to 13. Both are warnings, never fails - git may be absent, and a partial slice can land under a legitimately open item. Proven by mutation: re-introducing the BL-377 defect makes the check name it and its three never-written paths; a clean tree is silent.
+
+*Files: `docs/development/backlog.json`, `tools/session/backlog_lint.js`*
+
 ### NR-515 — NATIONS.md's six questions all settled by Ben in one session, plus a system he raised alongside them
 *decision taken on your behalf · raised 2026-08-22 · from Design session 2026-08-22, immediately after the nations doc was written.*
 
@@ -2347,6 +2258,55 @@ All six § Open questions answered in Ben's own words, and a new system raised b
 > **RESOLVED.** RULED BY BEN, 2026-08-22, in his own words on all six. Recorded in NATIONS.md § Settled with his phrasing quoted per ruling.
 
 *Files: `docs/politics/NATIONS.md`, `docs/development/backlog.json`*
+
+### NR-516 — Delegated calls in the v0.1.24 filing: a new minor number, one version goal, and three shapes chosen on Ben's behalf
+*decision taken on your behalf · raised 2026-08-22 · from Filing the seven items from the 2026-08-22 nations design session.*
+
+Five calls taken so the items could be filed. (1) VERSION: the six channel items carry v0.1.24, the next free minor - v0.1.23 is 'Who owns whom' (the syndicate tier). The minor is unnamed and unnamed in ROADMAP; Ben should name it or fold the cluster elsewhere. (2) BL-543 (value anchor) put at v0.1.21 instead, with the economy-tuning items - it is a calibration that unblocks NR-382 and should not wait on a politics minor. (3) TARIFF SHAPE: recommended the tariff stay a `law` and gain a `target_nation` field with an `all_nations` sentinel, rather than moving rates onto a nation-pair table; the fork is stated in BL-541 rather than hidden. (4) TWO DIMENSIONS, not 'possibly multiple' - Access and Trust, each gating something, with a third resisted until it does. (5) LOBBYING FEE assumed CONSUMED rather than credited to the treasury; called out in BL-539 and left open below.
+
+**Why it matters.** A version goal is a sequencing commitment and a new minor number is Ben's to name. The tariff-record shape is the one call that is expensive to reverse later, since it lands on a serialised record.
+
+> **Recommendation:** Confirm or rename v0.1.24, and sanity-check the tariff record shape before BL-541 starts. The other three are cheap to overturn.
+
+> **RESOLVED.** RULED BY BEN, 2026-08-22: CONFIRM v0.1.24 AND NAME IT. Named "Who answers to whom" - a deliberate echo of v0.1.23 "Who owns whom": that minor settles who owns whom, this one settles who answers to whom, and BL-399 is literally COMPANY_ANSWERABILITY. Added to ROADMAP with the cluster spelled out (BL-537 through BL-542, plus BL-545/546 sentiment, BL-549 friendship, BL-550 national insolvency). The other four calls in that entry - BL-543 at v0.1.21, the tariff record shape, two dimensions not "possibly multiple", and the consumed lobbying fee - are all now settled elsewhere in this session.
+
+*Files: `docs/development/backlog.json`, `docs/development/ROADMAP.md`*
+
+### NR-517 — Your ruling needed: does the nation grant reach a RIVAL acting politically against the player, and is a lobbying fee consumed or banked
+*question · raised 2026-08-22 · from Designing BL-539 (lobbying) and BL-540 (nation->corp stance), 2026-08-22.*
+
+TWO CALLS, both blocking the player-facing halves of those items.
+
+(1) THE GRANT'S REACH. A rival corporation lobbying to shift a law that binds the player's corp, and a nation's Access stance gating the player out of a territory, are both consequences imposed on A CORP A HUMAN OWNS by an actor the player does not control. Every widening of that prohibition to date has been explicit and dated - BL-079, BL-202/203, BL-293, BL-324, BL-181, BL-409, and BL-450 (rivals score stance), which is the closest precedent because it was the first RELATIONAL action against the player's corp. The 2026-08-18 grant (ruling 4 of NR-331) covers a NATION acting in a deterministic scored-utility shape. It does not obviously cover a rival corporation acting politically against the player, and reading it as though it does would set exactly the quiet precedent the standing rules exist to prevent.
+
+(2) THE LOBBYING FEE. Consumed, or credited to the lobbied nation's treasury? Consumed reads as influence-buying and keeps the treasury's inflows purely legal (levy, tariff, charter fees). Credited closes another money loop but makes lobbying a second tax, and means a nation profits from being lobbied - which would give BL-542's scorer an incentive to be corruptible.
+
+- Grant the rival half on the same terms as BL-450 - deterministic, seeded, scored-utility, legal verbs only.
+- Withhold it: nations may act politically, rivals may not, and lobbying is a player-only verb for now.
+- Grant it but gate it behind a visibility rule, so a lobbied law is always attributable to whoever bought it.
+
+> **Recommendation:** Option 1 for the grant, on the BL-450 precedent - a rival that cannot lobby while the player can is the unreachable-capability defect BL-458's design complains about, from the other side. But it is your call and the items are written to stop short of it. On the fee: CONSUMED, which is what BL-539 assumes; a nation that profits from lobbying is one the scorer will learn to invite.
+
+> **RESOLVED.** RULED BY BEN, 2026-08-22 (design register). (1) THE GRANT REACHES A RIVAL - granted on the same terms as BL-450: deterministic, seeded, scored-utility, legal verbs only, never a planner. A rival may lobby a nation against the player, and a nation's derived stance may gate the player's corp out of a territory. Recorded as a dated widening in .claude/rules/io-standing-rules.md, since its subject is the one actor the prohibition exists to protect. What it does NOT admit: a rival ENACTING law (only a nation can), and influence acquired by any route other than the lobby verb. The player-facing halves of BL-539 and BL-540 are unblocked. (2) THE LOBBYING FEE IS CONSUMED - a cost, not a transfer, so the treasury's inflows stay purely legal and a nation never profits from being lobbied. That last part is the reason: a nation that profited would give BL-542's scorer an incentive to be corruptible. It is the one flow in the corp-nation channel that deliberately does not conserve, and BL-539's harness row says so.
+
+*Files: `.claude/rules/io-standing-rules.md`, `docs/politics/NATIONS.md`, `docs/development/backlog.json`*
+
+### NR-518 — Io has TWO clocks and the word 'tick' means both - harmless today, load-bearing the moment anything is priced per year
+*observation · raised 2026-08-22 · from Deriving BL-543's value anchor, which needed to know how many ticks a year is.*
+
+A DAY TICK is one in-game day (sim_loop::m_day_tick); the survey system counts these, and survey_system.hpp says 'one tick = one day'. An ECONOMY TICK is 90 of them - sim_loop::econ_tick_days = days_per_month(30) x months_per_econ(3) - so k_ticks_per_year = 4, and budget_system.hpp, corp_ai.cpp and construction_panel.cpp all say 'a tick is one quarter'. BOTH READINGS ARE CORRECT about different clocks, so this is not a defect. It is a naming collision that has already produced two apparently contradictory statements in the corpus, and it cost this session a detour to resolve.
+
+**Why it matters.** It stopped being cosmetic the moment a design was priced 'for that year' (Ben's value anchor). It happens to cancel there - both halves of the ratio are per-head-per-tick, so the factor of 4 disappears - but the next annualised quantity may not be so lucky. GLOSSARY.md defines neither term.
+
+- Add both terms to GLOSSARY.md and leave the code alone.
+- Rename one in code (econ_tick vs day_tick) so the ambiguity cannot be read.
+- Leave it; the comments are individually correct.
+
+> **Recommendation:** Option 1 - it is a doc gap, not a code defect, and GLOSSARY.md is exactly where a term with two live meanings should be pinned. Not done here: the glossary is a canonical-terms authority and adding two entries is a small design call of its own.
+
+> **RESOLVED.** RULED BY BEN, 2026-08-22: RENAME ONE IN CODE - econ_tick vs day_tick - so the ambiguity cannot be read. Filed as BL-552 with the scope measured rather than estimated: 28 references across 13 source files, including the mirrored econ_tick_days_world in logistics.hpp which must move with it (world/* must not depend on core/*, and the stepped-clock harness already asserts the two agree). NOT done in the session that found it: no build tree and no compiler check were available, and a 28-site cross-file rename with no compile is the shape of change that ships a typo. GLOSSARY.md gains both terms as part of the same work.
+
+*Files: `docs/GLOSSARY.md`, `src/core/sim_loop.hpp`, `src/world/budget_system.hpp`, `src/world/survey_system.hpp`*
 
 ### NR-519 — Value anchor clarified to BASE prices and authoring-time — which shrank the item and opened a new gap (BL-544)
 *decision taken on your behalf · raised 2026-08-22 · from Ben's clarification on BL-543, same session as the six rulings.*
@@ -2377,6 +2337,83 @@ Putting all four relational quantities in one table made this visible for the fi
 > **RESOLVED.** RULED BY BEN, 2026-08-22: SENTIMENT IS THE SUBSTRATE (option 1). Propagated the same session. Model is two layers - sentiment derived and continuous, stance declared and discrete on top - recorded in RELATIONS.md § The settled model, with a dated promotion note in CONCEPT.md § Sentiment-based diplomacy, which had said 'designed, not built' since the concept doc. Filed BL-545 (sentiment substrate, A, v0.1.24) and BL-546 (reputation migration, B - the one relational quantity that IS serialised, so its migration is a save-format change rather than a rename). Reshaped three items onto it: BL-540's Access/Trust become dimensions rather than a new table, BL-541's Era -1 grudges become seeded nation->nation sentiment, and BL-391's deadlock stops existing rather than being fixed, since a decaying quantity has no permanent floor. All three now require BL-545. THE INVARIANT carried through everywhere: sentiment informs a declaration and never makes one - no threshold may flip a stance table by itself, preserving Ben's 2026-08-17 ruling that hostility is opted into and never acquired ambiently.
 
 *Files: `docs/politics/RELATIONS.md`, `docs/CONCEPT.md`, `docs/development/backlog.json`*
+
+### NR-521 — MILITARY.md's 'stance gates nothing yet' was stale by three consumers, and friendship still gates zero
+*observation · raised 2026-08-22 · from Writing RELATIONS.md; checked every consumer of is_hostile/are_friends in src/.*
+
+MILITARY.md § What is absent said stance 'still carries no consequence - stance gates nothing yet'. True when BL-448 landed 2026-08-19; false since 2026-08-21. Hostility now gates THREE things: interdiction (supply_system.cpp, BL-458), battle engagement (battle_system.cpp walks corp_hostile_pairs to open a battle, BL-467), and the march queue (economy_system.cpp, BL-470/NR-344). Corrected in place and re-pointed at RELATIONS.md. FRIENDSHIP, by contrast, still gates exactly nothing - are_friends has no consumer outside stance.cpp itself and the corporation panel. It can be offered, accepted and dissolved, and no behaviour reads it.
+
+**Why it matters.** Two directions of the same doc-drift the phantom scan exists to catch: an absent-list entry that outlived its absence, and a shipped surface (four verbs, a UI column) whose effect is still zero. The second is the more interesting one - offer_friendship, accept_friendship and half of return_to_neutral are player-reachable presses that change a table nothing reads.
+
+> **Recommendation:** Give friendship something to permit, or say in RELATIONS.md that it is deliberately inert until BL-315's consequences land. Candidates with existing machinery: passage through territory, a preferential price, shared visibility under BL-068, immunity from interdiction. Filed as RELATIONS.md open question 2 rather than as an item, since choosing is design.
+
+> **RESOLVED.** RULED BY BEN, 2026-08-22: FRIENDSHIP PERMITS PASSAGE THROUGH TERRITORY AND IMMUNITY FROM INTERDICTION. Filed as BL-549. The immunity half is cheap and safe because declare_hostile already dissolves a friendship row atomically, so the friendship test is an early-out on a pair hostility has already excluded rather than a competing predicate. The passage half needs a reading and BL-549 recommends one: a friend's anchors counting toward your reach field, which makes friendship a logistics fact and cannot be confused with BL-540's Access dimension. The stale MILITARY.md line this entry also reported was corrected on 2026-08-22.
+
+*Files: `docs/military/MILITARY.md`, `docs/politics/RELATIONS.md`, `src/world/stance.cpp`*
+
+### NR-522 — How many dimensions does sentiment carry? The NR-520 ruling settled the architecture, not the count
+*question · raised 2026-08-22 · from Filing BL-545 after Ben's sentiment-is-the-substrate ruling.*
+
+Three existing designs imply three different answers. BL-540 proposed TWO - Access (may this corp operate in our borders) and Trust (would we contract it) - each gating something distinct. corp_reputation reads as ONE (will you deal with me again). CONCEPT.md describes a SINGLE value shaped by several contributing factors. BL-545 assumes the BL-540 pair generalised to every grain, and says so, but that is an assumption rather than a ruling.
+
+**Why it matters.** Collapsing to one makes Access and Trust inexpressible separately, which BL-540 needs - a nation might let a company operate while never contracting it, and those are different facts. Going past two is the failure mode of every multi-dimensional reputation system: dimensions that are stored, displayed and never read. The rule BL-545 adopts is that a dimension must GATE something before it is added, which keeps the count honest without fixing it now.
+
+- Two (Access, Trust), generalised to every grain - what BL-545 assumes.
+- One value plus per-consumer thresholds, with Access and Trust as different cuts of the same number.
+- Decide per grain: nation->corp carries two, corp->corp carries one.
+
+> **Recommendation:** Option 1. Two is the smallest count that expresses what BL-540 and BL-377 both need, and the gate-something rule stops it growing. Option 3 is tempting and should be resisted - a substrate whose shape varies by grain is not a substrate.
+
+> **RESOLVED.** RULED BY BEN, 2026-08-22: TWO dimensions - Access and Trust - generalised to every grain. Not one, not per-grain. Access gates operating rights inside a jurisdiction; Trust is what a contract client reads. A third must gate something before it is added. Recorded in BL-545 and BL-540, and in RELATIONS.md § The settled model.
+
+*Files: `docs/politics/RELATIONS.md`, `docs/development/backlog.json`*
+
+### NR-523 — modifier_set.hpp claims to be the shared effect vocabulary for tech AND law, and law does not use it
+*observation · raised 2026-08-22 · from Writing docs/META_LAYER.md (system 3 of the phantom scan).*
+
+modifier_set.hpp's header states its own purpose as 'the closed list of scalars a tech (BL-479) OR A LAW (BL-480) may move... Authored once and shared - tech and law naming different subject enums would be the same defect as tech and law wording the same predicate differently, which is exactly what condition_set exists to prevent.' BL-480 then landed with law_effect_kind, its own enum. law.{hpp,cpp} includes condition_set.hpp and never modifier_set.hpp; the only two files that include modifier_set.hpp are world.hpp and tech_gate.hpp. IN FAIRNESS there is a real reason: modifier_subject moves SIMULATION SCALARS (units/tick, yield/batch) and a levy is a FLOW OF MONEY, so no subject in the list could express one and inventing one would distort the vocabulary rather than share it. So the effect side is two vocabularies for a defensible reason that nothing had written down - while the header goes on claiming it is one.
+
+**Why it matters.** The header is the design authority a future author will read before adding an effect, and it currently misleads about the shape of the thing they are extending. It is the same class of drift as tech_node::condition being a descriptive string - a stated intent the code does not honour - which is the failure the whole meta layer was built to fix. There are in fact THREE effect taxonomies with no mapping between them: BL-155's four families (margin/production/permission/relationship, named in no code), law_effect_kind's two, and modifier_subject's six.
+
+- Correct the header to describe a money-flow effect family alongside the scalar family - cheapest, and makes the two-vocabulary split deliberate.
+- Grow modifier_subject with subjects a levy could be expressed as, and make law use it.
+- Leave it and note the divergence in META_LAYER.md only.
+
+> **Recommendation:** Option 1. The split is right; only the claim is wrong. Doing nothing is the one bad option, because the header is what a future author reads before extending the vocabulary. Recorded in META_LAYER.md § The asymmetry either way.
+
+> **RESOLVED.** RULED BY BEN, 2026-08-22: CORRECT THE HEADER. The split is right; only the claim was wrong. modifier_set.hpp now describes TWO effect families - scalar effects (this file, read by tech) and money-flow effects (law_effect_kind, where a levy or tariff is a transfer between balances rather than a scalar the simulation computes). The one-vocabulary rule still binds WITHIN a family and does not apply across them, because they are not the same kind of thing. modifier_subject deliberately does NOT grow subjects a levy could be expressed as. Landed in the header this session.
+
+*Files: `src/world/modifier_set.hpp`, `src/world/law.hpp`, `docs/META_LAYER.md`*
+
+### NR-524 — Five of six modifier subjects are wired to nothing, and 'a shape is only proven by an instance' has no stopping condition
+*question · raised 2026-08-22 · from Writing docs/META_LAYER.md.*
+
+modifier_subject has six entries and ONE is wired: extraction_rate, applied in extraction_nominal. processing_yield, unit_upkeep, logistics_cost, wage_floor and collapse_strain are vocabulary only. The policy is explicit and defensible - 'wired when an item needs it and NOT before' - and it rests on a principle that appears twice in the code unnamed: a vocabulary claiming to be extensible is only PROVED extensible by carrying an entry of the awkward kind. BL-342 shipped two military condition subjects before anything read them for exactly this reason, and collapse_strain cites that precedent explicitly.
+
+**Why it matters.** The principle justifies the first unwired entry. It does not obviously justify the fifth. An unwired instance proves a shape; five unwired instances are a vocabulary waiting for consumers - which is the state tech_node::condition was in when it was a descriptive string, the defect the meta layer was built to fix. The header already carries a test ('a subject earns its row by being a scalar some real lever wants to move'); nothing checks it.
+
+- Set a cap - at most N unwired subjects at once, enforced by a harness row or backlog_lint.
+- Require each unwired subject to name the backlog item that will wire it, so vocabulary-only is a promise rather than a state.
+- Leave it; the policy is sound and the count is not yet a problem.
+
+> **Recommendation:** Option 2. It costs a comment per subject, keeps the proving-by-instance principle intact, and converts an unbounded state into a tracked one. A cap would be arbitrary; leaving it is how five becomes ten.
+
+> **RESOLVED.** RULED BY BEN, 2026-08-22: EACH UNWIRED SUBJECT NAMES THE ITEM THAT WILL WIRE IT - vocabulary-only becomes a promise, not a state. Landed in modifier_set.hpp this session: processing_yield -> BL-513 (denser facilities raise the province ceiling), unit_upkeep -> BL-543 (the value anchor turns the rates on), logistics_cost -> BL-464 (active LP resolution costs credits), wage_floor -> BL-538 (the schooling budget line), collapse_strain -> BL-477, which keeps the accumulator since Ben ruled that events EXPRESS the metagame rather than driving it. A subject that cannot name an item has not earned its row.
+
+*Files: `src/world/modifier_set.hpp`, `docs/META_LAYER.md`*
+
+### NR-530 — REVIEW: SYSTEMS.md § The progression chain — your interconnectivity ask, written as a design test
+*question · raised 2026-08-22 · from Phantom-scan documentation pass, 2026-08-22. Ben asked for a review item per doc: "I'll read them in full and let you know where I would want to change things."*
+
+Your words, 2026-08-22: "we really want interconnectivity, so a player only progresses so far using one system before the next becomes a natural consequence." Written into SYSTEMS.md as a named principle - EACH SYSTEM'S CEILING IS THE NEXT SYSTEM'S DOOR - and as a three-part design test every system must answer: what forces a player in, what does it open, what does it cap them at. A table applies it to six rungs and names each rung's current ceiling. Every new doc written this session carries a § Where this sits in the chain section against it. | ANSWER FORM: https://claude.ai/code/artifact/debe7b8f-7315-429a-a805-0e295e9405bc - this doc's open questions are a section of the design register, with the evidence, the options and a free-text field. Answers copy back as one block.
+
+**Why it matters.** Ben asked to read each new authority doc in full and mark what he wants changed. This entry is the place to record his verdict; resolve it with the changes made, or with "accepted as written".
+
+> **Recommendation:** Two claims in it are mine rather than yours and worth checking. First: the chain CLOSES rather than ending, because force's ceiling is supply, which is the logistics rung again - which makes BL-464 a bigger item than its size suggests. Second: a staircase is a solved sequence, which is the argument for EVENTS.md cutting across it.
+
+> **RESOLVED.** CONFIRMED BY BEN, 2026-08-22, both claims. (1) THE CHAIN CLOSES - force's ceiling is supply, which is the logistics rung again, so logistics is the recurring constraint. That makes BL-464 a bigger item than its size suggests. (2) THE STAIRCASE ARGUMENT HOLDS, BOUNDED: variance in texture, never in the sequence itself. A learnable order is the point; what varies is how a rung FEELS on a given campaign. Ben added the tone ruling that belongs with it - "Events should usually be boring. Occasional high stress chains" - now recorded in SYSTEMS.md § The progression chain and in BL-548.
+
+*Files: `docs/SYSTEMS.md`*
 
 ### NR-531 — CORRECTION: the star map was NOT a phantom — MINIMAP.md already owns it, and the scan's detection missed prose ownership
 *observation · raised 2026-08-22 · from Writing the remaining Class 1 docs; opened MINIMAP.md to add a star-map section and found one already there.*

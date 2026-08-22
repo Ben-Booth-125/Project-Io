@@ -189,6 +189,157 @@ try {
   }
 } catch { /* REFINED optional */ }
 
+// ---------------------------------------------------------------------------
+// Status drift, both directions (Ben's ruling, 2026-08-22, on NR-514)
+// ---------------------------------------------------------------------------
+// Two defects, one cause: an item's status disagreeing with the tree.
+//
+//   FALSE COMPLETE  the item says landed; the code was never written.
+//                   BL-377 (the mercenary contract seam, the player's INCOME)
+//                   sat like this for ten days after a sweep mistook it for a
+//                   sibling. It hides owed work.
+//   FALSE OPEN      the item says designed; the work merged long ago. BL-480
+//                   was found this way. It hides landed work, which is how the
+//                   same thing gets built twice.
+//
+// Neither is visible from any status view, because status is the thing that is
+// wrong. The check is deliberately CONSERVATIVE in both directions — a lint
+// that cries wolf gets ignored, and the earlier hand-sweep returned 48
+// candidates that were mostly forward references in comments ("BL-315 will
+// read this"). So:
+//
+//   * false-complete needs EVERY named source path to be absent. A rename
+//     (src/app.cpp -> src/core/app.cpp) leaves some paths present and is not
+//     reported here; those are stale paths, not drift.
+//   * false-open needs a commit whose SUBJECT LINE names the id and which is an
+//     ancestor of HEAD. Subject, not body, is what drops the forward references
+//     — a commit that merely mentions an id in its body is not a landing.
+//
+// Both are WARNINGS, never fails: git may be unavailable (a fresh clone, a
+// tarball), and a legitimately-open item can carry a subject-line commit from a
+// partial slice. A warning that names the evidence is the right weight.
+
+// Known-benign never-written paths, seeded 2026-08-22 when the check was added.
+// An entry here is a CLAIM WITH A REASON, not a mute: the check is precise about
+// what it measures ("this path has no creation commit on any branch") and the
+// three reasons that fact can be innocent are all pre-history, so they can be
+// enumerated once rather than guessed at every run.
+//
+//   RENAME BEFORE THE IMPORT — the repo's history begins with one squashed
+//   commit, so a file renamed before it has no creation record under its old
+//   name. src/app.cpp -> src/core/app.cpp, chart -> charts, globe_preview ->
+//   generation_preview, economy_ledger -> balance_ledger, render_ux_questions
+//   -> render_question_log.
+//   A GAP THAT IS ALREADY RECORDED — src/world/serialisation.cpp has never
+//   existed and NR-349 says so; the items that name it landed and skipped the
+//   serialiser deliberately. BL-107 owns it.
+//   A RETIRED SURFACE — ledger_history.cpp was retired by the item that names it.
+//
+// Anything NOT in this list is a path an item claims and nobody ever wrote,
+// which is exactly the BL-377 defect. Add entries only with the reason.
+const NEVER_WRITTEN_OK = new Set([
+  'BL-008:src/app.cpp',                             // renamed -> src/core/app.cpp
+  'BL-085:src/app.cpp',                             // renamed -> src/core/app.cpp
+  'BL-248:src/ui/app.cpp',                          // renamed -> src/core/app.cpp
+  'BL-197:src/ui/chart.hpp',                        // renamed -> src/ui/charts.hpp
+  'BL-197:src/ui/chart.cpp',                        // renamed -> src/ui/charts.cpp
+  'BL-198:src/ui/chart.cpp',                        // renamed -> src/ui/charts.cpp
+  'BL-256:src/ui/globe_preview.cpp',                // became src/ui/generation_preview.cpp
+  'BL-256:src/ui/globe_preview.hpp',                // became src/ui/generation_preview.hpp
+  'BL-260:tools/session/render_ux_questions.js',    // renamed -> render_question_log.js
+  'BL-281:src/ui/ledger_history.cpp',               // the view this item RETIRED
+  'BL-343:src/ui/economy_ledger.cpp',               // renamed -> src/ui/balance_ledger.cpp
+  'BL-398:src/world/corp_blackboard.cpp',           // blackboard folded into corp_ai
+  'BL-263:src/world/serialisation.cpp',             // no serialiser exists at all — NR-349, BL-107
+  'BL-517:src/world/serialisation.cpp',             // same
+  'BL-448:src/world/serialization.cpp',             // same, US spelling
+]);
+
+function checkStatusDrift() {
+  const { execFileSync } = require('child_process');
+  const git = (args) => {
+    try {
+      return execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+    } catch (e) {
+      return null;
+    }
+  };
+  if (git(['rev-parse', '--git-dir']) === null) return; // no git here; skip silently
+
+  // Expand "src/world/foo.{hpp,cpp}" and strip a trailing "(new)" annotation.
+  const expand = (f) => {
+    const clean = String(f).replace(/\s*\([^)]*\)\s*$/, '').trim();
+    const m = clean.match(/^(.*)\{([^}]*)\}(.*)$/);
+    return m ? m[2].split(',').map((x) => m[1] + x.trim() + m[3]) : [clean];
+  };
+  const isSource = (f) => /^(src|scripts|tools)\//.test(f);
+
+  // A LANDING COMMIT, not merely a commit that mentions an id. Measured against
+  // this repo's actual history: the shapes that mean "this item landed" are
+  //   "BL-480: ..."            an item commit          (57 instances)
+  //   "Merge BL-480 (...)"     a lane/worktree merge   (17)
+  // and the shapes that name an id while meaning the OPPOSITE are filings and
+  // lifecycle moves — "File BL-521 ...", "Close BL-377 ...", "Pause BL-435 ...".
+  // Anything that mentions an id mid-subject ("... (BL-467)") is prose about the
+  // work, not a landing, and is deliberately not matched: that looseness is what
+  // made the first hand-sweep return 48 candidates, most of them noise.
+  const NOT_A_LANDING = /^(file|close|reopen|pause|park|defer|split|rescope|retire|revert)\b/i;
+  let subjects = null;
+  const subjectLanded = (id) => {
+    if (subjects === null) {
+      const out = git(['log', '--format=%s', 'HEAD']);
+      subjects = out === null ? [] : out.split('\n');
+    }
+    const re = new RegExp('^(merge\\s+)?' + id + '\\b', 'i');
+    return subjects.some((sub) => re.test(sub) && !NOT_A_LANDING.test(sub));
+  };
+
+  for (const item of backlog.items) {
+    const named = (item.files || []).filter((f) => typeof f === 'string')
+      .flatMap(expand).filter(isSource);
+    if (!named.length) continue;
+
+    if (TERMINAL.has(item.status)) {
+      // The precise tell, taken from how BL-377 was actually found: a named
+      // path that has NO CREATION COMMIT ANYWHERE IN HISTORY — nobody ever
+      // wrote that file, on any branch. That is what separates a never-written
+      // file from a RENAME (src/app.cpp -> src/core/app.cpp), where the old
+      // path is absent today but has a creation commit behind it. Thirteen of
+      // the fifteen absent paths in this backlog are renames; only the real
+      // defect has no creation.
+      //
+      // An earlier draft warned only when EVERY named path was absent. That
+      // draft could not have caught BL-377, which named ten files of which
+      // seven existed — the mutation test that proved so is why this arm reads
+      // per-path instead.
+      const neverWritten = named.filter((f) => {
+        if (fs.existsSync(P(f))) return false;
+        const created = git(['log', '--all', '--diff-filter=A', '--format=%H', '--', f]);
+        return created !== null && created.trim() === '';
+      });
+      // Second piece of evidence, and it is what makes the arm usable. This
+      // repo's history begins with one squashed import, so a file renamed
+      // BEFORE that import also has no creation commit — "never written" alone
+      // fires on fifteen items, thirteen of them ancient renames.
+      //
+      // The pair that actually identified BL-377 was: a named path nobody ever
+      // wrote, AND NOT ONE REFERENCE TO THE ITEM'S ID anywhere in src/, tools/
+      // or scripts/. Landed work cites its own id in the code it landed —
+      // BL-343 is all over law.cpp, BL-448 all over stance.hpp. Work that was
+      // never written cites nothing, because there is nothing to cite.
+      const flagged = neverWritten.filter((f) => !NEVER_WRITTEN_OK.has(`${item.id}:${f}`));
+      if (flagged.length) {
+        warn(`${item.id} (${item.short_name}) is "${item.status}" but named path(s) nobody ever wrote on any branch — possible FALSE COMPLETE, the BL-377 shape: ${flagged.join(', ')}. If this is a rename or a known gap, add it to NEVER_WRITTEN_OK with the reason.`);
+      }
+    } else if (!item.parked) {
+      if (subjectLanded(item.id)) {
+        warn(`${item.id} (${item.short_name}) is "${item.status}" but a commit whose SUBJECT names it is an ancestor of HEAD — possible FALSE OPEN, the BL-480 shape. Verify against the code before flipping it — a partial slice can land under an item that is legitimately still open.`);
+      }
+    }
+  }
+}
+checkStatusDrift();
+
 report();
 
 function report() {

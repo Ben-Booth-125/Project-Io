@@ -219,23 +219,29 @@ None of the three maps onto either of the others.
 
 ## Open questions
 
-1. **Should the effect side be one vocabulary or two?** The header says one; the code is two, for
-   the defensible reason above. Either the header is corrected to describe a money-flow effect
-   family alongside the scalar family, or `modifier_subject` grows subjects a levy could be
-   expressed as. **Doing nothing is the only bad option**, because the header currently misleads.
+All four were settled on 2026-08-22 (Ben, design register).
 
-2. **What is the stopping condition for vocabulary-only subjects?** *"A shape is only proven by an
-   instance"* justifies the first unwired entry. It does not obviously justify the fifth. A rule
-   like *"a subject earns its row by being a scalar some real lever wants to move"* is already in
-   the header — it just has no test.
+1. ~~**One vocabulary or two?**~~ **Two, and the header is corrected.** The split is right; only
+   the claim was wrong. `modifier_set.hpp` now describes a **money-flow effect family alongside the
+   scalar family**, so a future author extending the vocabulary reads the shape that exists rather
+   than the shape once intended. `modifier_subject` does **not** grow subjects a levy could be
+   expressed as — a levy is a flow, not a scalar the simulation computes, and forcing it into the
+   list would distort the vocabulary rather than share it.
 
-3. **Does anything ever need OR?** If yes, the flat-list decision has to be revisited deliberately
-   rather than worked around by authoring two near-duplicate rules — which is how a mesh arrives
-   without anyone choosing it.
+2. ~~**The stopping condition for vocabulary-only subjects?**~~ **Each unwired subject names the
+   backlog item that will wire it** — so vocabulary-only is a **promise**, not a state. It costs a
+   comment per subject, keeps *a shape is only proven by an instance* intact, and converts an
+   unbounded condition into a tracked one. The header carries the named items; a subject that
+   cannot name one has not earned its row.
 
-4. **Should `condition_text` be the AI's rendering too?** It exists so two UI surfaces cannot word a
-   predicate differently. The word interface (`ACTIONS.json`, the blackboard) is a third surface
-   that will need to word predicates, and nothing says it uses this.
+3. ~~**Does anything ever need OR?**~~ **No — keep the flat list.** Where alternatives are needed,
+   author two rules. The expressive limit is accepted deliberately rather than worked around, which
+   is what stops a mesh arriving without anyone choosing it.
+
+4. ~~**Should `condition_text` be the AI's rendering too?**~~ **Both.** The agent gets the
+   **structured** form — a predicate it can reason over, not prose it must parse — and
+   `condition_text` renders anything human-readable the agent *emits*. So the one-wording rule still
+   holds wherever a human reads the output, and the machine path is not made to go through prose.
 
 ---
 

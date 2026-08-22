@@ -18,16 +18,27 @@ and one 936-line source file. This document is its home.
 **A province is a deterministic, seeded partition of a body's tiles into small, contiguous, purely
 spatial cells.** Every tile on every body belongs to exactly one.
 
-> **It is NOT a region.** No name, no owner, no culture, no economy.
+> **It is NOT a region.** No name, no culture, no economy of its own.
+
+> **Corrected 2026-08-22 (Ben, design register).** This document originally said *"no **owner**"*
+> and that was wrong. Ben: **"Provinces are always parts of a nation."** Ownership is not the axis
+> the restraint is about — a province sits inside a nation's territory like every other piece of
+> ground. What a province lacks is a **name, a culture and an economy of its own**; what it has, and
+> always had, is a place in the political map. `world::tile_to_nation` already gives every tile an
+> owner, so a province's owner is **derived from its tiles** and needs no new field.
 
 That restraint is the design. The province exists because **BL-467 (battle state) needed an
 engagement envelope with a stable identity** — something a battle could happen *in*, whose id could
 be folded into the battle's seed stream. Everything else it now carries was added on top of that
 one requirement.
 
-**Not the same thing as a nation's territory.** A nation owns tiles (`nation_component::tiles`,
-`world::tile_to_nation`); provinces partition space regardless of who owns it. The two indexes are
-independent and a province may span an ownership boundary.
+**How it relates to a nation's territory.** A nation owns tiles (`nation_component::tiles`,
+`world::tile_to_nation`); the partition cuts space into cells. **A province is always part of a
+nation** (Ben, 2026-08-22) — its owner is read off its tiles rather than stored. The open detail is
+what happens at a boundary: the partition is grown from terrain and settlement, not from borders, so
+a province *can* straddle two nations' tiles. Either the partition learns to stop at a border, or a
+province's owner is its majority holder. **That call is owed and is now the substance of § Open
+questions 3.**
 
 ---
 
@@ -180,17 +191,28 @@ Ben's ruling accepts that in exchange for one visual language across the whole m
 
 ## Open questions
 
-1. **Is 12% below the 3-tile floor acceptable?** (NR-433) Open since 2026-08-21 and unruled. It is
-   the one measured property of the partition that nobody has accepted or rejected.
-2. **What is the province ceiling FOR, if geology already binds four times harder?** (NR-421,
-   NR-509) Either the ceiling drops to where it bites, or it is documented as a backstop against a
-   future in which deposits stop binding.
-3. **Does a province ever gain an owner?** Every downstream use so far is spatial. The moment a
-   province is *held* — by conquest, by charter, by garrison — it stops being anonymous and becomes
-   the region this design explicitly refused. **BL-518 (war redraws borders) is where that pressure
-   will first arrive**, and it is `design-owed`.
-4. **Do sea provinces get a naval model, or stay addressable empty space?** They were built as the
-   latter, deliberately. Nothing says which they become.
+1. ~~**Is 12% below the 3-tile floor acceptable?**~~ **Settled 2026-08-22: accepted.** Tiny
+   provinces are the *"don't reject tiny provinces"* ruling working as intended, not a defect.
+   NR-433 closed.
+2. ~~**What is the province ceiling FOR?**~~ **Settled 2026-08-22: drop it to where it bites** —
+   and Ben added the half neither option named: *"Use technology for deeper mines and denser
+   facilities which use more of the cap."* So the ceiling becomes a real constraint **and
+   technology becomes the thing that relieves it**, which makes this the first consumer of a
+   modifier subject that does not exist yet. See BL-513, and META_LAYER § the stopping condition —
+   under Ben's ruling there, every unwired subject must name the item that will wire it, and this
+   is the namer.
+3. ~~**Does a province ever gain an owner?**~~ **Settled 2026-08-22: a province is always part of
+   a nation** — see the correction at the head of this document. **What is now open is the
+   boundary case:** the partition is grown from terrain and settlement, so a province can straddle
+   two nations' tiles. Either the growth passes learn to stop at a border — which would make
+   borders a fourth boundary rule alongside rivers, elevation and roads — or a province's owner is
+   its **majority holder** and a straddling province simply belongs to whoever holds most of it.
+   The second is cheaper and needs no repartition. **BL-518 (war redraws borders) is where this
+   first bites**, because conquest moves tiles and therefore moves majorities.
+4. ~~**Do sea provinces get a naval model?**~~ **Settled 2026-08-22: eventually yes — ships,
+   blockade, coastal trade — and deferred for now** (Ben: *"we can defer this for now"*). So sea
+   provinces stay addressable empty space in the near term, and the design is not closed against
+   filling them. BL-188 (coastal ports) is the first thing that would.
 
 ---
 

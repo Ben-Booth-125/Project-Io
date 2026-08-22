@@ -173,6 +173,18 @@ one-directional: the tile's holder must have **declared** hostility toward the c
 *"a corp that has been declared against but has not answered is a victim, not a raider."* Your own
 escort is never your ambusher.
 
+**And since 2026-08-22, a friend is never an interceptor** (Ben, design register — friendship now
+permits *immunity from interdiction*). The check is safe rather than contradictory because
+`declare_hostile` **dissolves a friendship row atomically**, so the two states cannot both hold: the
+friendship test is an early-out on a pair hostility has already excluded, not a competing predicate.
+*Owned by BL-549.*
+
+**One consequence of a separate ruling belongs here.** A rival's hostility declaration is now
+**signalled** to the player, overturning NR-350's discovered-on-contact rule. Interdiction therefore
+becomes **a known risk rather than a surprise** — the ambush property `stance.hpp`'s directed
+hostility was built for still holds between rivals, but the player's first lost convoy is no longer
+the player's first news.
+
 **Capture, with destruction as the fallback** (Ben, 2026-08-17). Cargo leaves the source pool at
 dispatch, so the goods are already committed and either answer conserves. On interception the cargo
 credits the interceptor's pool at the interception tile's body; if no pool is reachable there it is
@@ -205,6 +217,41 @@ rulings and two rejected first cuts, and was reachable only inside a backlog ite
 **A per-tick RATE, not a stock** (Ben, ruling on NR-343, 2026-08-20). Regenerated throughput, used
 or wasted each tick, never banked; **what carries over is the goods it moved, never the points.**
 LP is the pipe; the tanks are separate.
+
+**And it is BIFOLD** (Ben, 2026-08-22, design register):
+
+> *"Let's go with city generation, but only because cities have to affect automatic trading. LP
+> should be bifold then, passive and active. Militaries can only use active LP, and what's more, it
+> should cost actual money to resolve LP usage."*
+
+| | **Passive LP** | **Active LP** |
+|---|---|---|
+| Serves | automatic trading — the convoy layer that runs itself | movement a player or rival **directs** |
+| Drawn by | the market's own flow | **militaries draw active only** |
+| Owned? | ambient — the network's | **owned**, and not a rival's to use |
+
+**Cities generate it.** That answers two of the seven findings at once: finding 4 said a
+node-generated rate would be fictional because no corp is seeded a hub — cities are generated in
+the hundreds, so the rate is real from turn one; and finding 2 said LP had no spatial locus — a
+city is one.
+
+**The split is what stops free-riding.** Ben, on whether rivals should build hubs: *"the passive /
+active split explains how we would be unable to use rival active LP."* Ambient throughput serves
+everyone; directed throughput is yours. It also dissolves finding 5's asymmetry, since the half
+that serves trade is not owned by anybody.
+
+### Active use costs credits — and that is not a reversal of "a cap, not a price"
+
+> *"It should cost actual money to resolve LP usage. This can be in the form of moving units, or
+> supplying items."*
+
+The cap/price split holds. What changes is **which side of the game pays**. A convoy already pays
+credits per unit-distance. **A marching unit pays nothing at all today** — it spends march points
+against traversal cost and no money changes hands.
+
+So: **passive LP caps trade, which is already priced; active LP caps force, which this ruling now
+prices.** Read that way it is a widening of the existing rule rather than an exception to it — and
+it closes a real gap, because moving an army being free is not a decision anyone made either.
 
 Three consequences, all in Io's favour: a rate crosses no tick boundary, so it needs no `state_hash`
 entry and no serialisation; a stock that accumulates while never binding is the `military_points`
@@ -284,18 +331,33 @@ sorted set, never first-come by iteration order.
 
 ## Open questions
 
-1. **What generates LP, at what rate, and what is the smallest honest first cut?** Ruled: a rate,
-   a cap, node-half-only, with its consumer. Unruled: the numbers, and the two consumers that both
-   already exist (`commit_convoy` and `run_unit_upkeep`).
-2. **Does an over-subscribed network fail, queue, or degrade?** Named as open when BL-464 was filed
-   and still open. It decides whether LP reads as a wall or as friction.
-3. **Does the player see LP as a number, a lens, or only as a refusal?** A refusal-only mechanic is
-   cheap and is how BL-458 shipped silent.
-4. **Should a hub be buildable by a rival?** Finding 5 says the AI cannot build what it would pay
-   for. Either the scorer gains a candidate or LP is asymmetric on arrival.
-5. **What does the network cost to maintain?** BL-538's *logistics maintenance* budget line assumes
-   a nation can pay for road upkeep. Nothing decays, so nothing needs paying for — the line has no
-   sink to fill.
+All five were settled on 2026-08-22 (Ben, design register).
+
+1. ~~**What generates LP?**~~ **Cities**, and LP is **bifold** — see § Logistic Points above. Still
+   owed before code: the rates for both halves, which consumer lands first, the order-independent
+   allocation rule, and the credit cost of active resolution, which should be argued against
+   BL-543's value anchor rather than guessed.
+2. ~~**Fail, queue, or degrade?**~~ **Fail — refused outright, and the player is told why.** A
+   refused leg is legible; a queued one is not. The cost is that LP reads as a wall, which is the
+   honest trade. **It also makes surfacing non-optional** — a refusal nobody sees is BL-458's silent
+   interdiction again, and the same mistake twice is a pattern rather than an oversight.
+3. ~~**A number, a lens, or a refusal?**~~ **A lens**, extending Reach. The Reach lens already shows
+   a binary field; throughput is that field with a magnitude, so this is a small step from something
+   built rather than a new surface.
+4. ~~**Should a hub be buildable by a rival?**~~ **Yes — add the build candidate to `corp_ai.cpp`
+   before LP lands**, which closes finding 5.
+5. ~~**What does the network cost to maintain?**~~ **Nothing decays; nations pay tax to support it,
+   and a nation that over-extends can go bankrupt.** Ben: *"Roads do not decay, but nations have to
+   pay tax to support them. If a nation runs into too much debt supporting infrastructure, it can go
+   bankrupt with major penalties. **But between these states nothing changes.**"*
+
+   The last clause is the load-bearing one: the cost is **binary, not graduated**. A solvent
+   nation's roads behave exactly as they do today; a bankrupt one suffers major penalties; there is
+   no middle band where a strained network degrades. A graduated version would be a second decay
+   model wearing a budget's clothes, which is what the first half of the ruling rejects.
+
+   **This is what BL-538's *logistics maintenance* line actually buys** — the line had no sink, and
+   this is the sink. It also gives a nation its **first failure state**. *Owned by BL-550.*
 
 ---
 
@@ -313,7 +375,7 @@ sorted set, never first-come by iteration order.
 **Related authorities.** [`SUPPLY.md`](SUPPLY.md) (convoys — the flow on this network),
 [`../military/MILITARY.md`](../military/MILITARY.md) (BL-325 ruling 3 in its military reading),
 [`TILES.md`](TILES.md) (the landform multipliers), [`../politics/RELATIONS.md`](../politics/RELATIONS.md)
-(stance, which is interdiction's only predicate), [`PRODUCTION.md`](PRODUCTION.md) (§ Logistics and
+(stance and friendship, which are interdiction's two predicates), [`PRODUCTION.md`](PRODUCTION.md) (§ Logistics and
 transport capacity, an older open note this document supersedes).
 
 **Backlog.** **BL-464 (logistic points)** is the live design, `design-owed`, A. BL-458

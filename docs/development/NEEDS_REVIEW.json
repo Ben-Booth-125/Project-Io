@@ -1885,9 +1885,10 @@
    "title": "The per-province firm cap is inert by ORDERS OF MAGNITUDE, not by a near miss",
    "raised": "2026-08-21",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "Province repartition to 7-12 tiles, merged and verified 2026-08-21.",
-   "what": "BL-512 per_province_firm_cap = 2 was measured as nearly inert against 4-tile provinces, and the hope was that 9-tile provinces would make the spatial half of the two-level firm budget do real work. It does not. Measured across 8 seeds after repartition: 296 background firms anchored across 295 DISTINCT provinces; the busiest province holds ONE firm on 7 of 8 seeds; exactly one province in the entire sweep reaches the cap of 2. The reason is structural, not a tuning miss - there are ~24-50 background firms per world against ~3,500 provinces. A per-province cap cannot bind at that ratio at any plausible value. So the two-level budget is really a one-level budget: the per-RESOURCE cap carries the entire result (it took every seed to its coverage target), and the per-province cap is decoration. Three options: drop it as dead weight, keep it as a bound that only matters once player density arrives, or move the spatial constraint to the grain where firms actually compete. It costs nothing today either way, which is why this is a question and not a defect."
+   "what": "BL-512 per_province_firm_cap = 2 was measured as nearly inert against 4-tile provinces, and the hope was that 9-tile provinces would make the spatial half of the two-level firm budget do real work. It does not. Measured across 8 seeds after repartition: 296 background firms anchored across 295 DISTINCT provinces; the busiest province holds ONE firm on 7 of 8 seeds; exactly one province in the entire sweep reaches the cap of 2. The reason is structural, not a tuning miss - there are ~24-50 background firms per world against ~3,500 provinces. A per-province cap cannot bind at that ratio at any plausible value. So the two-level budget is really a one-level budget: the per-RESOURCE cap carries the entire result (it took every seed to its coverage target), and the per-province cap is decoration. Three options: drop it as dead weight, keep it as a bound that only matters once player density arrives, or move the spatial constraint to the grain where firms actually compete. It costs nothing today either way, which is why this is a question and not a defect.",
+   "resolution": "RULED BY BEN, 2026-08-22: DROP THE CEILING TO WHERE IT BITES - and Ben added the half neither option named: \"Use technology for deeper mines and denser facilities which use more of the cap.\" So the ceiling becomes a real constraint AND technology becomes what relieves it, which makes BL-513 the first consumer of a modifier subject that does not exist yet. Under the same day's NR-524 ruling every unwired subject must name the item that will wire it, and BL-513 is now the namer for processing_yield. Whether \"denser facility\" is fewer slots per building or more output per slot is the small call still owed in BL-513."
   },
   {
    "id": "NR-422",
@@ -1957,9 +1958,10 @@
    "title": "12% of provinces are below the HARD 3-tile floor, and that needs your eye",
    "raised": "2026-08-21",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "BL-515 (organic province borders), merged and verified 2026-08-21.",
-   "what": "Distribution against the 3x3 partition it replaces: 24,498 provinces (was 21,161), mean 7.87 (was 9.11), max 12 and now ABSOLUTE (was 18 overshoot), min 1, 74.71% in the 7-12 band (was 97.90%). The band drop is expected and was explicitly not chased - organic borders are supposed to be irregular. What I want your eye on is a different number: 6,195 provinces under 7, of which 3,008 are under 3 - i.e. roughly 12% sit below the HARD 3-12 target you set. You also ruled 'do not reject tiny provinces', so keeping them is correct per the ruling and the agent was right not to merge them away. But the two rulings pull against each other at this volume, and the visible consequence is in the alpha-220 capture: in places the map reads as a hex lattice again, because a 1-2 tile province is a hex with a border drawn round it. That is the look you moved away from. Options if it bothers you: raise the seed density so fewer pockets are enclosed, let a sub-floor pocket join a neighbour (a softer rule than the merge pass you removed), or accept it and let the blend hide it at play zoom."
+   "what": "Distribution against the 3x3 partition it replaces: 24,498 provinces (was 21,161), mean 7.87 (was 9.11), max 12 and now ABSOLUTE (was 18 overshoot), min 1, 74.71% in the 7-12 band (was 97.90%). The band drop is expected and was explicitly not chased - organic borders are supposed to be irregular. What I want your eye on is a different number: 6,195 provinces under 7, of which 3,008 are under 3 - i.e. roughly 12% sit below the HARD 3-12 target you set. You also ruled 'do not reject tiny provinces', so keeping them is correct per the ruling and the agent was right not to merge them away. But the two rulings pull against each other at this volume, and the visible consequence is in the alpha-220 capture: in places the map reads as a hex lattice again, because a 1-2 tile province is a hex with a border drawn round it. That is the look you moved away from. Options if it bothers you: raise the seed density so fewer pockets are enclosed, let a sub-floor pocket join a neighbour (a softer rule than the merge pass you removed), or accept it and let the blend hide it at play zoom.",
+   "resolution": "RULED BY BEN, 2026-08-22: ACCEPT IT. 12% of provinces below the hard 3-tile floor is the \"don't reject tiny provinces\" ruling working as intended, not a defect. PROVINCES.md § Open questions 1 struck through with the ruling."
   },
   {
    "id": "NR-434",
@@ -2972,8 +2974,8 @@
     "src/ui/selection_panel.cpp",
     "src/world/province.hpp"
    ],
-   "status": "open",
-   "resolution": null
+   "status": "resolved",
+   "resolution": "Superseded by the NR-421 ruling of 2026-08-22 - the ceiling drops to where it bites, and technology raises effective density. The 103-vs-24 measurement this entry reported is what the ruling was made against."
   },
   {
    "id": "NR-510",
@@ -3012,8 +3014,8 @@
     "docs/lore/COLLAPSE.md",
     "docs/development/backlog.json"
    ],
-   "status": "open",
-   "resolution": null
+   "status": "resolved",
+   "resolution": "RULED BY BEN, 2026-08-22: GRADUATE IT. docs/lore/COLLAPSE.md is authority; its \"research scaffolding - not authority\" banner is withdrawn, and the provenance it carried is kept below the new status line. Nineteen open dependants is what an authority document looks like. Its five sibling scaffolding docs keep their banners until their own work lands. It also now owns something outright: Ben ruled the same day that events EXPRESS the collapse metagame rather than driving it, so the strain accumulator stays with this doc and BL-477, and the event layer reads it."
   },
   {
    "id": "NR-512",
@@ -3070,8 +3072,8 @@
     "docs/development/backlog.json",
     "tools/session/backlog_lint.js"
    ],
-   "status": "open",
-   "resolution": null
+   "status": "resolved",
+   "resolution": "RULED BY BEN, 2026-08-22: BUILD THE CHECK INTO backlog_lint. Landed this session, both arms, and mutation-tested. FALSE COMPLETE: an item is flagged when it names a source path with NO CREATION COMMIT ON ANY BRANCH - the precise fact that identified BL-377. Three earlier drafts were rejected by their own tests: \"every named path absent\" could not have caught BL-377 (it named ten files, seven of which exist); pairing with \"the id appears nowhere in src/\" was defeated by a forward reference in scripts/economy.lua. What ships is the precise signal plus a seeded allow-list of the 14 known-benign paths, each with its reason - renames from before the squashed import, the serialisation.cpp gap NR-349 already records, and one retired surface. FALSE OPEN: an item is flagged when a commit whose SUBJECT names it is an ancestor of HEAD, matched against the two landing shapes measured in this repo's history (\"BL-N: ...\" and \"Merge BL-N ...\") and excluding lifecycle subjects (File/Close/Pause/...). That narrowed 30 candidates to 13. Both are warnings, never fails - git may be absent, and a partial slice can land under a legitimately open item. Proven by mutation: re-introducing the BL-377 defect makes the check name it and its three never-written paths; a clean tree is silent."
   },
   {
    "id": "NR-515",
@@ -3104,8 +3106,8 @@
     "docs/development/backlog.json",
     "docs/development/ROADMAP.md"
    ],
-   "status": "open",
-   "resolution": null
+   "status": "resolved",
+   "resolution": "RULED BY BEN, 2026-08-22: CONFIRM v0.1.24 AND NAME IT. Named \"Who answers to whom\" - a deliberate echo of v0.1.23 \"Who owns whom\": that minor settles who owns whom, this one settles who answers to whom, and BL-399 is literally COMPANY_ANSWERABILITY. Added to ROADMAP with the cluster spelled out (BL-537 through BL-542, plus BL-545/546 sentiment, BL-549 friendship, BL-550 national insolvency). The other four calls in that entry - BL-543 at v0.1.21, the tariff record shape, two dimensions not \"possibly multiple\", and the consumed lobbying fee - are all now settled elsewhere in this session."
   },
   {
    "id": "NR-517",
@@ -3125,8 +3127,8 @@
     "docs/politics/NATIONS.md",
     "docs/development/backlog.json"
    ],
-   "status": "open",
-   "resolution": null
+   "status": "resolved",
+   "resolution": "RULED BY BEN, 2026-08-22 (design register). (1) THE GRANT REACHES A RIVAL - granted on the same terms as BL-450: deterministic, seeded, scored-utility, legal verbs only, never a planner. A rival may lobby a nation against the player, and a nation's derived stance may gate the player's corp out of a territory. Recorded as a dated widening in .claude/rules/io-standing-rules.md, since its subject is the one actor the prohibition exists to protect. What it does NOT admit: a rival ENACTING law (only a nation can), and influence acquired by any route other than the lobby verb. The player-facing halves of BL-539 and BL-540 are unblocked. (2) THE LOBBYING FEE IS CONSUMED - a cost, not a transfer, so the treasury's inflows stay purely legal and a nation never profits from being lobbied. That last part is the reason: a nation that profited would give BL-542's scorer an incentive to be corruptible. It is the one flow in the corp-nation channel that deliberately does not conserve, and BL-539's harness row says so."
   },
   {
    "id": "NR-518",
@@ -3148,8 +3150,8 @@
     "src/world/budget_system.hpp",
     "src/world/survey_system.hpp"
    ],
-   "status": "open",
-   "resolution": null
+   "status": "resolved",
+   "resolution": "RULED BY BEN, 2026-08-22: RENAME ONE IN CODE - econ_tick vs day_tick - so the ambiguity cannot be read. Filed as BL-552 with the scope measured rather than estimated: 28 references across 13 source files, including the mirrored econ_tick_days_world in logistics.hpp which must move with it (world/* must not depend on core/*, and the stepped-clock harness already asserts the two agree). NOT done in the session that found it: no build tree and no compiler check were available, and a 28-site cross-file rename with no compile is the shape of change that ships a typo. GLOSSARY.md gains both terms as part of the same work."
   },
   {
    "id": "NR-519",
@@ -3207,8 +3209,8 @@
     "docs/politics/RELATIONS.md",
     "src/world/stance.cpp"
    ],
-   "status": "open",
-   "resolution": null
+   "status": "resolved",
+   "resolution": "RULED BY BEN, 2026-08-22: FRIENDSHIP PERMITS PASSAGE THROUGH TERRITORY AND IMMUNITY FROM INTERDICTION. Filed as BL-549. The immunity half is cheap and safe because declare_hostile already dissolves a friendship row atomically, so the friendship test is an early-out on a pair hostility has already excluded rather than a competing predicate. The passage half needs a reading and BL-549 recommends one: a friend's anchors counting toward your reach field, which makes friendship a logistics fact and cannot be confused with BL-540's Access dimension. The stale MILITARY.md line this entry also reported was corrected on 2026-08-22."
   },
   {
    "id": "NR-522",
@@ -3228,8 +3230,8 @@
     "docs/politics/RELATIONS.md",
     "docs/development/backlog.json"
    ],
-   "status": "open",
-   "resolution": null
+   "status": "resolved",
+   "resolution": "RULED BY BEN, 2026-08-22: TWO dimensions - Access and Trust - generalised to every grain. Not one, not per-grain. Access gates operating rights inside a jurisdiction; Trust is what a contract client reads. A third must gate something before it is added. Recorded in BL-545 and BL-540, and in RELATIONS.md § The settled model."
   },
   {
    "id": "NR-523",
@@ -3250,8 +3252,8 @@
     "src/world/law.hpp",
     "docs/META_LAYER.md"
    ],
-   "status": "open",
-   "resolution": null
+   "status": "resolved",
+   "resolution": "RULED BY BEN, 2026-08-22: CORRECT THE HEADER. The split is right; only the claim was wrong. modifier_set.hpp now describes TWO effect families - scalar effects (this file, read by tech) and money-flow effects (law_effect_kind, where a levy or tariff is a transfer between balances rather than a scalar the simulation computes). The one-vocabulary rule still binds WITHIN a family and does not apply across them, because they are not the same kind of thing. modifier_subject deliberately does NOT grow subjects a levy could be expressed as. Landed in the header this session."
   },
   {
    "id": "NR-524",
@@ -3271,8 +3273,8 @@
     "src/world/modifier_set.hpp",
     "docs/META_LAYER.md"
    ],
-   "status": "open",
-   "resolution": null
+   "status": "resolved",
+   "resolution": "RULED BY BEN, 2026-08-22: EACH UNWIRED SUBJECT NAMES THE ITEM THAT WILL WIRE IT - vocabulary-only becomes a promise, not a state. Landed in modifier_set.hpp this session: processing_yield -> BL-513 (denser facilities raise the province ceiling), unit_upkeep -> BL-543 (the value anchor turns the rates on), logistics_cost -> BL-464 (active LP resolution costs credits), wage_floor -> BL-538 (the schooling budget line), collapse_strain -> BL-477, which keeps the accumulator since Ben ruled that events EXPRESS the metagame rather than driving it. A subject that cannot name an item has not earned its row."
   },
   {
    "id": "NR-525",
@@ -3367,8 +3369,8 @@
    "files": [
     "docs/SYSTEMS.md"
    ],
-   "status": "open",
-   "resolution": null
+   "status": "resolved",
+   "resolution": "CONFIRMED BY BEN, 2026-08-22, both claims. (1) THE CHAIN CLOSES - force's ceiling is supply, which is the logistics rung again, so logistics is the recurring constraint. That makes BL-464 a bigger item than its size suggests. (2) THE STAIRCASE ARGUMENT HOLDS, BOUNDED: variance in texture, never in the sequence itself. A learnable order is the point; what varies is how a rung FEELS on a given campaign. Ben added the tone ruling that belongs with it - \"Events should usually be boring. Occasional high stress chains\" - now recorded in SYSTEMS.md § The progression chain and in BL-548."
   },
   {
    "id": "NR-531",
@@ -3400,6 +3402,24 @@
    "files": [
     "tools/session/register/questions.js",
     "tools/session/register/build.js"
+   ],
+   "status": "open",
+   "resolution": null
+  },
+  {
+   "id": "NR-533",
+   "title": "A rival hostility declaration is now SIGNALLED, which overturns NR-350 and removes the ambush property for the player",
+   "raised": "2026-08-22",
+   "kind": "decision-taken",
+   "source": "Ben's answer to RELATIONS Q4 in the design register.",
+   "what": "Ben chose \"Yes, but signalled - a rival declaration surfaces to the player\". NR-350 had a declaration stay SILENT, discovered on contact rather than announced, and BL-448 shipped on that. Newest-dated wins, so the reversal stands and is recorded rather than quietly applied.",
+   "why_it_matters": "stance.hpp's directed hostility exists so that \"a corp can be at war and not know it yet\" - the AMBUSH PROPERTY BL-458's interdiction was designed around. Signalling removes that property FOR THE PLAYER: interdiction becomes a known risk rather than a surprise, and the first lost convoy stops being the first news. Directedness itself is untouched - hostility still needs no reciprocation. What the ruling does NOT settle is whether rival-vs-rival declarations are equally visible, which is a BL-068 question.",
+   "options": [],
+   "recommendation": "Accept - the ruling is deliberate. Two things to carry: BL-458's design prose still argues from the ambush property and should be read with this in mind, and the rival-vs-rival visibility question needs an answer before BL-449 renders anything.",
+   "files": [
+    "docs/politics/RELATIONS.md",
+    "docs/economy/LOGISTICS.md",
+    "src/world/stance.hpp"
    ],
    "status": "open",
    "resolution": null

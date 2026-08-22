@@ -1,6 +1,19 @@
 # Collapse — polity strategies and culminating events for Era −1
 
-> **Status: research scaffolding — the design conversation's home, not authority.** Written
+> **Status: AUTHORITY since 2026-08-22 (Ben's ruling, design register).** It carried a
+> *"research scaffolding — not authority"* banner while **nineteen open backlog items named it as
+> their authority doc** — so a reader following the pointer landed on a page telling them it settles
+> nothing. Nineteen dependants is what an authority document looks like, and the banner is
+> withdrawn. Its five sibling scaffolding docs (`ai/STRATEGIES.md`, `research/TECH_EFFECTS.md`,
+> `research/ERA1_TECH_LANDSCAPE.md`, `research/ANCIENT_TECH_LADDER.md`,
+> `ai/LANGUAGE_POLICY_FEASIBILITY.md`) keep theirs until their own work lands.
+>
+> **One thing it now owns outright.** Ben ruled on 2026-08-22 that campaign events *express* the
+> collapse metagame rather than driving it ([`../EVENTS.md`](../EVENTS.md)), so **the strain
+> accumulator stays here and in BL-477** — this document holds the mechanic, and the event layer
+> reads it.
+>
+> *Provenance, kept:* written
 > 2026-08-20 from Ben's ask: *consider different high-level strategies / metagames for
 > surpassing the Era −1 Collapse*, extended same session to *different culminating events —
 > the British empire gave away its colonies; there are tonnes of examples of cultures facing

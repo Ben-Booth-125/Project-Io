@@ -385,7 +385,35 @@ parallel axis invented for it.
 
 ## Still open
 
-Two, both raised by the rulings above rather than left over from before.
+*(Both were answered on 2026-08-22 — the section is kept, with its answers, because the questions
+are the reason the items are shaped as they are.)*
+
+### 1. The grant DOES reach a rival acting politically against the player — **granted**
+
+Ben granted it on the same terms as BL-450: deterministic, seeded, scored-utility, legal verbs
+only, never a planner. A rival may **lobby** a nation against the player, and a nation's derived
+stance may **gate the player's corp** out of a territory.
+
+It is recorded as a dated widening in `.claude/rules/io-standing-rules.md`, because its subject is
+the one actor the prohibition exists to protect. It was raised rather than assumed precisely
+because reading the 2026-08-18 nation grant as already covering it would have set the quiet
+precedent that section exists to prevent.
+
+**What the grant does not admit:** a rival *enacting* law — only a nation can — and influence
+acquired by any route other than the `lobby` verb.
+
+### 2. A lobbying fee is **consumed**
+
+A cost, not a transfer. The treasury's inflows stay purely legal — levy, tariff, charter fees — and
+**a nation never profits from being lobbied**, which is the real reason: a nation that profited
+would give BL-542's scorer an incentive to be corruptible.
+
+This is the one flow in the corp↔nation channel that deliberately does **not** conserve, and the
+harness must say so where a reader would otherwise assume the channel's rule.
+
+---
+
+## The questions as they were asked
 
 1. **Does the nation grant reach a rival acting politically against the player?** (NR-517) A rival
    lobbying to shift a law that binds the player's corp, or a nation gating the player out of a

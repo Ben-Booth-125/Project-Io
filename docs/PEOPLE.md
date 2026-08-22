@@ -155,7 +155,43 @@ succession advance on the economy tick in sorted seat order. **No wall clock, no
 
 ---
 
-## Open questions — the calls for Ben
+## Settled — Ben's rulings, 2026-08-22
+
+All six answered from the design register. **One overturns this document's own proposal.**
+
+**All five roles, in the proposed order:** company head → counsel → commander → minister → contact.
+
+**SEVERAL biases, not one.** *"People are a real optimisation axis."* The proposal argued for one,
+on the grounds that a person with five modifiers is a spreadsheet with a name. **That is overturned**,
+and the concern is kept rather than deleted — because it names the failure mode the design must now
+guard against by other means. The guard is no longer *scarcity* of modifiers; it has to be
+**legibility of the set**. A person is a build choice, and a build choice you cannot read is a
+spreadsheet whatever its length.
+
+**People are MORTAL.** Age and replacement, deterministically — so succession is real, and it is
+what makes a person more than a permanent modifier wearing a name.
+
+**The player's own figure is CHOSEN AT START, bias included.** So the company head is a build
+decision at campaign setup rather than a portrait, which makes it a New World wizard concern
+(`ui/STARTUP.md`) as well as a generation one.
+
+**Banded like everything else** (BL-068). You learn who a rival's people are as you learn the rest
+of them. No special case, and the visibility question needs no new machinery.
+
+**A few exist in the pre-history** — only the figures whose deeds the campaign world still
+remembers. `history_log` already records deeds with nobody to attribute them to; this names the
+memorable ones and leaves the rest institutional.
+
+### The consequence that reaches another document
+
+**PEOPLE now gates EVENTS.** Ben chose *personal* as the first event family
+([`EVENTS.md`](EVENTS.md)), and that family depends on this one. What ranked fourth by available
+machinery is first by ruling, so this document's system moves **ahead** of the event system rather
+than beside it.
+
+---
+
+## The questions as they were asked
 
 1. **Which roles, and in what order?** Five are proposed. **Company head (BL-370) is the obvious
    first** because it is your own ask and needs no other system. **Minister is the highest-value**

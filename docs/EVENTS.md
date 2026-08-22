@@ -167,7 +167,47 @@ lands with its message, in the same change.** Io already has the surface — the
 
 ---
 
-## Open questions — the calls for Ben
+## Settled — Ben's rulings, 2026-08-22
+
+All six answered from the design register.
+
+**PERSONAL first**, not environmental — succession, death, defection. **So [`PEOPLE.md`](PEOPLE.md)
+gates this system**, and the family that ranked fourth by available machinery is first by ruling.
+
+**SEASONAL** — one every few years, so a decade has a shape. An economy tick is a quarter, so that
+is single digits per decade, not per year.
+
+**YES, the player chooses** — a bounded choice with priced outcomes. This is the answer that moves
+events closest to BL-087's quests, and the boundary now needs stating: **an event's choice is priced
+and immediate; a quest is a predicate held open over time.** Nothing else separates them.
+
+**Events EXPRESS the collapse metagame; they do not drive it.** Strain accumulates elsewhere and
+events are how the player learns about it. **That bounds this system's size** — it is a notification
+and consequence layer, not the metagame's engine, and BL-477 keeps the accumulator.
+
+**SYMMETRIC.** Everyone is subject, and watching a rival get hit is content. Harder to balance, and
+it removes the *difficulty dial pointed at the player* failure entirely.
+
+**BL-289 stays generation-side only**, as a pre-history divergence rather than a campaign event.
+
+### The tone ruling — the most useful line in the answers
+
+> **"Events should usually be boring. Occasional high stress chains."**
+
+Two things follow and neither was in the proposal.
+
+**The default register is LOW.** A baseline event should be unremarkable — texture, not incident.
+That is the opposite of how most event systems are tuned, and it is what makes the occasional one
+land.
+
+**Events CHAIN.** A high-stress period is a *linked sequence*, not one large roll. That needs two
+things the flat authored table above does not have: an event able to **name its successor**, and a
+cooldown that gates **the chain** rather than each link. Without those, "occasional high stress" is
+just a rarer roll of the same die.
+
+---
+
+## The questions as they were asked
 
 1. **Which family first?** Environmental is cheapest — it reads generated state and lands on the one
    wired modifier. Political is most valuable, because BL-537/BL-539/BL-541 are producing dateable

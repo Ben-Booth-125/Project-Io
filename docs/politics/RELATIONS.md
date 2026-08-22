@@ -241,22 +241,53 @@ and the second time the vocabulary has collided.
    expressible separately, reputation reads as one, and a third must gate something before it
    is added.
 
-2. **What does friendship permit?** Left as "a later call" when BL-448 landed 2026-08-19. Candidates
-   with existing machinery: passage through territory, a preferential price, shared visibility under
-   BL-068, immunity from interdiction. Until it permits something it is a button with no effect.
+2. ~~**What does friendship permit?**~~ **Settled 2026-08-22: passage through territory, and
+   immunity from interdiction.** Friendship finally gates something, and both consumers read an
+   existing predicate at an existing site.
+
+   **Immunity is the cheap half and the invariant makes it safe.** `declare_hostile` already
+   dissolves a friendship row *atomically*, so the two states cannot both hold — a friendship check
+   in the interception path is not a competing predicate, it is an early-out on a pair hostility has
+   already excluded.
+
+   **Passage is the larger half** and needs a reading: friend's anchors counting toward your reach
+   field (recommended — it makes friendship a *logistics* fact, and cannot be confused with BL-540's
+   Access), or placement permission (which overlaps Access at a different grain). *Owned by BL-549.*
 
 3. ~~**Does sentiment replace stance, or sit under it?**~~ **Settled 2026-08-22: under it**, and
    never able to reach up into it on its own. The invariant above is the whole answer.
 
-4. **At what rate does sentiment decay?** *Whether* it decays is settled — the substrate does, which
-   is what dissolves BL-391's deadlock. The **rate** is unset and wants the treatment BL-543 gave
-   value: an anchor, not a guess. *How long should a burned relationship take to heal?* is a
-   question a player can answer.
+4. ~~**At what rate does sentiment decay?**~~ **Settled 2026-08-22: anchored, not authored** — the
+   rate takes BL-543's treatment, expressed against something the player already understands.
 
-5. **Does a rival get to declare hostility on the player?** The 2026-08-18 grant says yes. Nothing
-   has used it, so the first implementation is also the first test of whether it feels fair — and
-   `is_hostile` being **silent** by design (NR-350: a declaration is discovered on contact, never
-   announced) means the player's first signal will be a lost convoy.
+   Ben widened the question while answering it, and the widening matters more than the rate:
+
+   > *"Certain actions might make a rival wary, such as buying a background firm that they wanted.
+   > There are tonnes of realistic ways to affect sentiment."*
+
+   That is a ruling about **factors**, not decay. Two consequences for BL-545: a factor must be
+   **authored data, not a code branch** — weights in `economy.lua`, a new factor is a table row,
+   because anything else makes *"tonnes of realistic ways"* unaffordable. And **acquisition is a
+   named factor from the start**: buying a firm a rival wanted is BL-524's equity purchase, and
+   sentiment is where an acquisition's *political* cost lands. Nothing else in the design has a
+   place for it.
+
+5. ~~**Does a rival get to declare hostility on the player?**~~ **Settled 2026-08-22: yes, and it
+   is SIGNALLED.**
+
+   > **This overturns NR-350.** That entry had a declaration *"stay silent, discovered on contact
+   > rather than announced"*, and BL-448 shipped on it. Newest-dated wins, and the reversal is
+   > recorded rather than quietly applied.
+
+   **The cost is real and is worth naming.** `stance.hpp`'s directed hostility exists so *"a corp
+   can be at war and not know it yet"* — the **ambush property** BL-458's interdiction was designed
+   around. Signalling removes that property *for the player*: interdiction becomes a known risk
+   rather than a surprise, and the first lost convoy stops being the first news.
+
+   Directedness itself is untouched — hostility still needs no reciprocation, and a rival can still
+   be declared against without answering. What changes is that the player is **told**. Whether
+   rival-vs-rival declarations are equally visible is a BL-068 question this ruling does not
+   settle.
 
 ---
 

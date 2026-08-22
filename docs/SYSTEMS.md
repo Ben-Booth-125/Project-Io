@@ -177,10 +177,18 @@ again at a higher grain — which is exactly BL-325 ruling 3 (*economic reach IS
 read as progression rather than as architecture. That is why Logistic Points (BL-464) is a bigger
 item than its size suggests: it is the rung the whole chain currently plateaus at.
 
-**A staircase is a solved sequence.** A chain of systems each unlocked by the last is learned once
-and then followed. [`EVENTS.md`](EVENTS.md) is the argument for something that cuts across it —
-so the same rung feels different on a second campaign, which a ~100-hour target across many
-campaigns needs.
+**A staircase is a solved sequence — but the variance is bounded.** A chain each rung of which is
+unlocked by the last is learned once and then followed, so [`EVENTS.md`](EVENTS.md) is the argument
+for something cutting across it. **Settled 2026-08-22 (Ben): variance in texture, never in the
+sequence itself.** A learnable order is the point; what varies is how a given rung *feels* on a
+given campaign, not which rung comes next.
+
+His tone ruling for events belongs here too, because it is really a statement about the chain:
+**"Events should usually be boring. Occasional high stress chains."** The default register is low,
+and pressure arrives as a linked sequence rather than as one large roll.
+
+*Both claims in this section were checked with Ben on 2026-08-22 (NR-530): the chain closing was
+confirmed, and the staircase argument was confirmed with the bound above.*
 
 ---
 

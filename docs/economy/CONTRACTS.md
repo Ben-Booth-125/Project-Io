@@ -213,15 +213,32 @@ and another *corporation* rather than a polity. Any narrative or dialogue layer.
 
 ## Open questions
 
-1. **Does a fee come out of the national budget line, or is it minted?** NATIONS.md settles that
-   actor-to-actor transfers conserve exactly. A contract fee is such a transfer, so a nation that
-   cannot afford a contract **must not be able to offer it** — which couples offer generation to
-   BL-537's budget and is not yet stated anywhere.
-2. **Inline predicate or template index?** Recommended above, unruled.
-3. **Should a rival company take contracts too?** If not, the player is the only mercenary in a
-   world of polities that need one — and BL-446's *"shipped and unexercised"* defect repeats.
-4. **What does a contract look like on screen?** Procurement's answer is *nothing at all*, which is
-   the state BL-445 exists to fix. The sell side should not repeat it.
+All four were settled on 2026-08-22 (Ben, design register).
+
+1. ~~**Budget or minted?**~~ **From the budget.** A nation cannot offer what it cannot pay, and
+   **offers dry up when treasuries do** — which couples offer generation to BL-537 and preserves
+   the conservation rule with no exception. It also gives the contract market a second source of
+   rhythm besides political tension: a war-poor nation stops hiring.
+2. ~~**Inline or template index?**~~ **Template index.** The record stays fixed-size, contract kinds
+   stay data, and a save outliving a template change rejects rather than reinterprets.
+3. ~~**Should rivals take contracts?**~~ **Yes — they compete for the same work, and losing a bid is
+   a real outcome.** An offer stops being addressed to the player and becomes **contested**. It also
+   forecloses BL-446's *shipped and unexercised* defect before it can repeat at a larger scale, and
+   it makes reputation bite in a second direction: today it gates whether you may *request* work,
+   under bidding it decides whether you *win* it. *Owned by BL-551.*
+4. ~~**What does it look like on screen?**~~ **A ledger and the map** — offers, active contracts and
+   terminal states in the fold-out column, with the objective province marked. Ben added a third
+   thing neither option named:
+
+   > *"Contracts consume resources, I believe we should be able to render moving contracts
+   > (convoys)."*
+
+   So a contract is not only an agreement, it is **materiel in motion**: fulfilment draws goods, and
+   those goods move on the logistics network as convoys. **The contract layer and the supply layer
+   share a surface**, and a player watching a convoy is watching a contract being delivered. That
+   couples this document to [`LOGISTICS.md`](LOGISTICS.md) far more tightly than the original design
+   assumed — and is the strongest argument yet that a contract is a *logistics* object rather than
+   only a financial one.
 
 ---
 

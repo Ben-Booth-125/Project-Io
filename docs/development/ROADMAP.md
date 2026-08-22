@@ -95,6 +95,21 @@ async loading screen, and the startup-hang fix. SPRINTS.md § Sprint 15 is the r
   lazy-sim cost (**BL-425**), the stale-exe gate guard (**BL-426**), the verify world-snapshot
   cache (**BL-427**), harnesses measuring a different sim than ships (**BL-462**), and
   settlement count being seed-invariant (**BL-463**).
+- **v0.1.24 — Who answers to whom.** *(Named 2026-08-22 on Ben's ruling, resolving NR-516.)*
+  *Theme: the two-way channel between corporations and nations.* The treasury stops being a
+  scoreboard and becomes a **weighted budget** over priority lines (**BL-537**, **BL-538**), so
+  money makes a full loop — corp → nation → corp — instead of draining into a field nobody reads.
+  **Lobbying** (**BL-539**) is the forward half and the player's first lever on law without ceasing
+  to be a law subject: *you do not pass it, you pay someone who does.* Under it sits **sentiment**
+  (**BL-545**, **BL-546**), one continuous derived quantity replacing four separately-designed
+  relational reads, with **stance** left as the declared layer on top. **BL-540** gives a nation a
+  graded read of a corporation that gates who may operate inside its borders; **BL-541** makes
+  tariffs directional and seeds them from the pre-history; **BL-542** gives a nation an objective
+  that is *positional, not accumulative* — niche fit and conflict avoidance under historical
+  grudges. **BL-549** finally gives friendship something to permit, and **BL-550** gives a nation
+  its first failure state. The name echoes v0.1.23 deliberately: that minor settled who owns whom,
+  this one settles who answers to whom.
+
 - **v0.1.23 — Who owns whom.** *(Named 2026-08-21 on Ben's ruling, resolving NR-494.)* *Theme:
   ownership separates from identity, and profit becomes a position rather than a payroll.*
   **BL-524** (syndicate tier) splits the two jobs `corporation_component` does at once: a

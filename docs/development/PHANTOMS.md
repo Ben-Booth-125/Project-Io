@@ -280,3 +280,43 @@ PRODUCTION.md, TILE_GENERATION.md, MILITARY.md, and CONCEPT.md.
 NR-511) and Class 5 (the map, now much smaller: five docs were added to it this session). Per
 NR-513's recommendation, the rows should keep migrating into each owner's own *What is absent*
 section until the file has nothing left to hold.
+
+
+---
+
+## Third pass — the register answered, 2026-08-22
+
+All **41 open questions** across the eight documents were answered in one sitting and propagated the
+same session. Two things changed that this file should record.
+
+**Class 3 shrank by its largest dependant.** `docs/lore/COLLAPSE.md` is **authority** now, its
+banner withdrawn — nineteen open items pointed at a document telling them it settles nothing
+(NR-511). The five sibling scaffolding docs keep their banners until their own work lands.
+
+**Class 5 lost its detector problem.** The status-drift check Ben ruled for (NR-514) is in
+`backlog_lint` and mutation-tested: re-introduce the BL-377 defect and it names the item and its
+three never-written paths; a clean tree is silent. **Class 0 is now a check rather than a finding.**
+
+Three earlier drafts of that check were rejected by their own tests, and the reason is worth keeping
+here because it is the same lesson the star-map false positive taught:
+
+> A detector is only as good as the fact it measures. *"Every named path is absent"* could not have
+> caught BL-377, which named ten files of which seven exist. Pairing it with *"the id appears
+> nowhere in `src/`"* was defeated by **a forward reference in a comment**. What ships measures one
+> precise fact — a path with no creation commit on any branch — and carries a seeded allow-list of
+> the fourteen benign cases, each with its reason.
+
+**Five rulings reached outside the document that raised them**, which is the argument for having
+written them as one corpus rather than eight:
+
+| Ruling | Reached |
+|---|---|
+| Friendship permits immunity from interdiction | LOGISTICS' interception predicate |
+| Rival hostility is **signalled** | overturns NR-350, and removes interdiction's ambush property |
+| Events *express* the collapse metagame | fixes `collapse_strain`'s owner, answering NR-524 |
+| Tech raises facility density | makes BL-513 the namer for `processing_yield` |
+| Personal events first | **PEOPLE now gates EVENTS** — a sequencing inversion |
+
+**What remains in this file.** Class 3's five ungraduated scaffolding docs, and Class 5's map — now
+much smaller. Per NR-513, the rows should keep migrating into each owner's *What is absent* section
+until nothing is left to hold.
