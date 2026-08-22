@@ -1,0 +1,541 @@
+// Headless save/load round-trip harness (BL-536). No SDL / Lua / ImGui.
+//
+// Verifies the world-snapshot serialiser against requirement group
+// `world-save-snapshot` rows R1-R4 and R6's world half:
+//
+//   P1  R1  A round trip preserves every serialised field.
+//   P2  R1  state_hash agrees across the round trip, at the same tick.
+//   P3  R2  A bad magic / bad version / truncated stream is REJECTED, and the
+//           destination world is left untouched.
+//   P4  R3  Derived caches are cleared on load and rebuild identically.
+//   P5  R3  corp_modifiers survives with its ORDER intact -- the case a re-fold
+//           from earned_techs would get wrong (NR-510).
+//   P6  R4  A battle round-trips mid-fight and continues on the same RNG stream.
+//   P7  R1  Container coverage: every container the canonical world populates is
+//           non-empty on the far side, so an omitted section cannot pass vacuously.
+//
+// ON THE TWO KINDS OF CHECK IN P1. Byte-equality of a RE-serialisation
+// (write -> read -> write, compare the two streams) proves the read and write
+// sides agree field for field, and it cannot miss a field the way a hand-written
+// comparison walker can. What it CANNOT catch is a container nobody serialises at
+// all: omitted from the write, empty after the read, omitted from the re-write,
+// bytes equal, bug shipped. P7 is the coverage half that closes that hole, and
+// the two are only sound together.
+//
+// Exits 0 on PASS, non-zero on any failure (naming it). Kept outside src/ so the
+// CMake game glob does not pull it into the build.
+
+#include "world/campaign_battle.hpp"
+#include "world/hard_coded_world.hpp"
+#include "world/history_log.hpp"
+#include "world/logistics.hpp"
+#include "world/modifier_set.hpp"
+#include "world/world.hpp"
+#include "world/world_save.hpp"
+#include "harness_params.hpp"
+
+#include <cstdio>
+#include <cstring>
+#include <sstream>
+#include <string>
+#include <vector>
+
+namespace {
+
+int g_failures = 0;
+
+void check(bool ok, const char* what)
+{
+    std::printf("%s %s\n", ok ? "PASS" : "FAIL", what);
+    if (!ok)
+        ++g_failures;
+}
+
+void note(const char* fmt, unsigned long long a)
+{
+    std::printf("     %s%llu\n", fmt, a);
+}
+
+/// Serialise @p w to a string.
+std::string to_bytes(const world& w)
+{
+    std::ostringstream out(std::ios::binary);
+    write_world_snapshot(w, out);
+    return out.str();
+}
+
+/// Read a snapshot from @p bytes into @p w.
+bool from_bytes(const std::string& bytes, world& w)
+{
+    std::istringstream in(bytes, std::ios::binary);
+    return read_world_snapshot(w, in);
+}
+
+} // namespace
+
+int main()
+{
+    // One generation, reused by every phase below -- make_hard_coded_world is
+    // the expensive thing in this file by two orders of magnitude, and none of
+    // the phases need a second, differently-seeded world.
+    generation_report report;
+    world w = make_hard_coded_world(no_prehistory(), &report);
+    seed_genesis_history(w, report);
+
+    std::printf("Generated world: %llu tiles, %llu bodies, %llu corps, %llu history entries\n\n",
+                (unsigned long long)w.tiles.size(), (unsigned long long)w.bodies.size(),
+                (unsigned long long)w.corporations.size(),
+                (unsigned long long)w.history_log.size());
+
+    // -----------------------------------------------------------------------
+    // P1 (R1) -- a round trip preserves every serialised field
+    // -----------------------------------------------------------------------
+    const std::string bytes_once = to_bytes(w);
+    note("snapshot bytes: ", (unsigned long long)bytes_once.size());
+
+    world loaded;
+    const bool read_ok = from_bytes(bytes_once, loaded);
+    check(read_ok, "P1 a freshly written snapshot reads back without rejection");
+
+    const std::string bytes_twice = read_ok ? to_bytes(loaded) : std::string();
+    check(read_ok && bytes_once == bytes_twice,
+          "P1 re-serialising the loaded world reproduces the snapshot byte for byte");
+
+    // -----------------------------------------------------------------------
+    // P2 (R1) -- state_hash agrees, at the same tick
+    // -----------------------------------------------------------------------
+    // Corroboration, not the assertion: state_hash folds only the fields a TICK
+    // may mutate, so on its own it would pass over a dropped body name or a lost
+    // province partition. P1 is the assertion; this catches the narrower class of
+    // bug where a value round-trips structurally but changes numerically.
+    {
+        const int tick = 4242;
+        const uint64_t before = w.state_hash(tick);
+        const uint64_t after  = loaded.state_hash(tick);
+        check(before == after, "P2 state_hash agrees across the round trip at the same tick");
+        if (before != after)
+            std::printf("     before=%016llX after=%016llX\n",
+                        (unsigned long long)before, (unsigned long long)after);
+    }
+
+    // -----------------------------------------------------------------------
+    // P3 (R2) -- a bad stream is rejected AND mutates nothing
+    // -----------------------------------------------------------------------
+    // The second half is the one worth having. A loader that rejects cleanly but
+    // has already half-replaced the caller's world has not rejected at all.
+    {
+        // A sentinel world the rejected loads are aimed at. If any of them writes
+        // through, these fields move.
+        world victim;
+        victim.player_entity = 12345;
+        victim.home_body     = 999;
+        victim.next_order_id = 77;
+        const entity_id keep_player = victim.player_entity;
+        const entity_id keep_home   = victim.home_body;
+        const uint32_t  keep_order  = victim.next_order_id;
+
+        {
+            std::string bad = bytes_once;
+            bad[0] = 'X'; // corrupt the magic
+            check(!from_bytes(bad, victim), "P3 a wrong magic is rejected");
+        }
+        {
+            std::string bad = bytes_once;
+            // The version is the second uint32; bump it past what we accept.
+            const uint32_t wrong = world_save_version + 1;
+            std::memcpy(&bad[4], &wrong, sizeof wrong);
+            check(!from_bytes(bad, victim), "P3 a mismatched version is rejected");
+        }
+        {
+            // Truncated mid-way through the tile store -- far enough in that a
+            // naive reader would already have replaced several containers.
+            const std::string bad = bytes_once.substr(0, bytes_once.size() / 2);
+            check(!from_bytes(bad, victim), "P3 a truncated stream is rejected");
+        }
+        {
+            check(!from_bytes(std::string(), victim), "P3 an empty stream is rejected");
+        }
+
+        check(victim.player_entity == keep_player && victim.home_body == keep_home
+                  && victim.next_order_id == keep_order && victim.tiles.empty()
+                  && victim.bodies.empty(),
+              "P3 every rejected load left the destination world untouched");
+    }
+
+    // -----------------------------------------------------------------------
+    // P4 (R3) -- derived caches are cleared on load and rebuild identically
+    // -----------------------------------------------------------------------
+    {
+        check(loaded.body_tile_index.empty() && loaded.astar_cost_cache.empty()
+                  && loaded.body_reach_cost.empty() && loaded.body_market_index.empty()
+                  && loaded.body_market_index_count == 0
+                  && loaded.body_market_index_max_id == null_entity,
+              "P4 the loaded world starts with every derived cache cleared");
+
+        check(loaded.ai_decisions.entries.empty() && loaded.ai_decisions.total == 0,
+              "P4 the AI decision ring is not resurrected across a load");
+
+        // Rebuild the two expensive ones on both sides and compare. `w`'s caches
+        // may already be warm from generation, so clear it the same way a load
+        // does -- otherwise this would compare a warm cache against a cold one
+        // and prove nothing about the rebuild.
+        world fresh_side = w;
+        clear_derived_state(fresh_side);
+
+        const entity_id home = loaded.home_body;
+        const std::vector<entity_id>& grid_a = body_tile_grid(fresh_side, home);
+        const std::vector<entity_id>& grid_b = body_tile_grid(loaded, home);
+        check(grid_a == grid_b, "P4 body_tile_index rebuilds to identical contents");
+
+        const std::vector<float>& reach_a = body_reach_field(fresh_side, home);
+        const std::vector<float>& reach_b = body_reach_field(loaded, home);
+        check(reach_a == reach_b, "P4 body_reach_cost rebuilds to identical contents");
+        note("home reach field cells: ", (unsigned long long)reach_b.size());
+    }
+
+    // -----------------------------------------------------------------------
+    // P5 (R3) -- corp_modifiers keeps its ORDER, which a re-fold cannot
+    // -----------------------------------------------------------------------
+    // The canonical world earns no modify_scalar tech, so this is built rather
+    // than found: the property under test is about ORDER, and it is only visible
+    // when a non-commuting pair is stored in a deliberate sequence.
+    {
+        world m = w;
+        const entity_id corp = m.player_entity;
+
+        // add-then-multiply. Reversed, the same two modifiers give a different
+        // answer, which is exactly why the stored order is state and not a cache.
+        m.corp_modifiers[corp] = {
+            scalar_modifier{ modifier_subject::extraction_rate, modifier_op::add, 2.0f },
+            scalar_modifier{ modifier_subject::extraction_rate, modifier_op::multiply, 3.0f },
+        };
+        // A second corp holding the reverse order, so the check cannot pass by
+        // accident on a symmetric fold.
+        entity_id other = null_entity;
+        for (const auto& kv : m.corporations)
+            if (kv.first != corp)
+            {
+                other = kv.first;
+                break;
+            }
+        if (other != null_entity)
+            m.corp_modifiers[other] = {
+                scalar_modifier{ modifier_subject::extraction_rate, modifier_op::multiply, 3.0f },
+                scalar_modifier{ modifier_subject::extraction_rate, modifier_op::add, 2.0f },
+            };
+
+        const float base   = 10.0f;
+        const float want_a = m.modified_scalar(corp, modifier_subject::extraction_rate, base);
+        const float want_b = (other == null_entity)
+                                 ? 0.0f
+                                 : m.modified_scalar(other, modifier_subject::extraction_rate, base);
+
+        check(other == null_entity || want_a != want_b,
+              "P5 the two orders really do give different answers (the test is not vacuous)");
+
+        world back;
+        const bool ok = from_bytes(to_bytes(m), back);
+        check(ok, "P5 a world carrying scalar modifiers round-trips");
+
+        const float got_a = ok ? back.modified_scalar(corp, modifier_subject::extraction_rate, base)
+                               : -1.0f;
+        const float got_b = (ok && other != null_entity)
+                                ? back.modified_scalar(other, modifier_subject::extraction_rate, base)
+                                : 0.0f;
+        check(ok && got_a == want_a && got_b == want_b,
+              "P5 modified_scalar returns the same value after a load, order intact");
+        std::printf("     add-then-multiply=%.1f  multiply-then-add=%.1f\n", got_a, got_b);
+    }
+
+    // -----------------------------------------------------------------------
+    // P6 (R4) -- a battle round-trips mid-fight and continues on the same stream
+    // -----------------------------------------------------------------------
+    // world.hpp said of `battles`: "NOT SERIALISED, deliberately... a save taken
+    // mid-battle therefore drops the fight - acceptable while nothing can save
+    // mid-tick, and the thing to revisit first if that changes." It changed
+    // (Ben, 2026-08-22). This is the row that proves the revisit landed.
+    {
+        world b = w;
+
+        campaign_battle_identity id;
+        id.attacker   = 11;
+        id.defender   = 22;
+        id.province   = 7;
+        id.tick       = 900;
+        id.world_seed = 4242;
+
+        const std::vector<army_stack_entry> att = {
+            { 1, unit_class::infantry, 40, 0 },
+            { 2, unit_class::cavalry, 12, 0 },
+        };
+        const std::vector<army_stack_entry> def = {
+            { 1, unit_class::infantry, 35, 0 },
+            { 3, unit_class::ranged, 10, 0 },
+        };
+
+        active_battle ab;
+        ab.province       = id.province;
+        ab.attacker       = id.attacker;
+        ab.defender       = id.defender;
+        ab.attacker_units = { 101, 102 };
+        ab.defender_units = { 201 };
+        ab.state = begin_campaign_battle(id, att, doctrine_row{}, def, doctrine_row{},
+                                         terrain_substrate::sedimentary, terrain_cover::grass,
+                                         150u, terrain_landform::plains, season::summer,
+                                         1000, 1000);
+
+        // Fight a round or two so the save is taken MID-fight, with the stream
+        // already advanced -- a battle saved before its first round would not
+        // test the thing this row is about.
+        step_campaign_battle(ab.state);
+        check(ab.state.end == campaign_battle_end::in_progress,
+              "P6 the test battle is still in progress when the snapshot is taken");
+        note("rng_state at save: ", (unsigned long long)ab.state.rng_state);
+
+        b.battles.push_back(ab);
+
+        world after;
+        const bool ok = from_bytes(to_bytes(b), after);
+        check(ok, "P6 a world carrying an in-progress battle round-trips");
+        check(ok && after.battles.size() == 1, "P6 the battle survives the load");
+
+        if (ok && after.battles.size() == 1)
+        {
+            const active_battle& r = after.battles[0];
+            check(r.province == ab.province && r.attacker == ab.attacker
+                      && r.defender == ab.defender && r.attacker_units == ab.attacker_units
+                      && r.defender_units == ab.defender_units,
+                  "P6 the battle's identity and unit membership survive");
+            check(r.state.rng_state == ab.state.rng_state
+                      && r.state.stream_seed == ab.state.stream_seed
+                      && r.state.rounds_fought == ab.state.rounds_fought,
+                  "P6 the RNG stream position and round count survive");
+
+            // Continue both to conclusion. If the stream really was restored,
+            // the two fights end identically -- same rounds, same losses.
+            campaign_battle_state live  = ab.state;
+            campaign_battle_state saved = after.battles[0].state;
+            while (step_campaign_battle(live)) {}
+            while (step_campaign_battle(saved)) {}
+
+            const campaign_battle_outcome ol = campaign_battle_result(live);
+            const campaign_battle_outcome os = campaign_battle_result(saved);
+            check(ol.end == os.end && ol.result == os.result
+                      && ol.rounds_fought == os.rounds_fought
+                      && ol.attacker_losses_permille == os.attacker_losses_permille
+                      && ol.defender_losses_permille == os.defender_losses_permille,
+                  "P6 continuing the LOADED battle produces the same outcome as continuing the live one");
+            std::printf("     both fights: %d rounds, attacker -%d permille, defender -%d permille\n",
+                        os.rounds_fought, os.attacker_losses_permille, os.defender_losses_permille);
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // P7 (R1) -- container coverage, so P1 cannot pass vacuously
+    // -----------------------------------------------------------------------
+    // Every container the CANONICAL world actually populates must be non-empty on
+    // the far side. A container this world leaves empty is reported rather than
+    // asserted -- an honest "not covered here" beats a check that always passes.
+    {
+        struct row { const char* name; std::size_t before; std::size_t after; };
+        const std::vector<row> rows = {
+            { "bodies", w.bodies.size(), loaded.bodies.size() },
+            { "tiles", w.tiles.size(), loaded.tiles.size() },
+            { "buildings", w.buildings.size(), loaded.buildings.size() },
+            { "stockpiles", w.stockpiles.size(), loaded.stockpiles.size() },
+            { "markets", w.markets.size(), loaded.markets.size() },
+            { "units", w.units.size(), loaded.units.size() },
+            { "population_centres", w.population_centres.size(), loaded.population_centres.size() },
+            { "population_centre_tile", w.population_centre_tile.size(), loaded.population_centre_tile.size() },
+            { "population_centre_name", w.population_centre_name.size(), loaded.population_centre_name.size() },
+            { "nations", w.nations.size(), loaded.nations.size() },
+            { "tile_to_nation", w.tile_to_nation.size(), loaded.tile_to_nation.size() },
+            { "corporations", w.corporations.size(), loaded.corporations.size() },
+            { "corp_body_pools", w.corp_body_pools.size(), loaded.corp_body_pools.size() },
+            { "workforce_supply_overrides", w.workforce_supply_overrides.size(), loaded.workforce_supply_overrides.size() },
+            { "corp_reputation", w.corp_reputation.size(), loaded.corp_reputation.size() },
+            { "convoys", w.convoys.size(), loaded.convoys.size() },
+            { "trade_routes", w.trade_routes.size(), loaded.trade_routes.size() },
+            { "body_last_glimpse_tick", w.body_last_glimpse_tick.size(), loaded.body_last_glimpse_tick.size() },
+            { "sell_orders", w.sell_orders.size(), loaded.sell_orders.size() },
+            { "buy_orders", w.buy_orders.size(), loaded.buy_orders.size() },
+            { "procurement_quotes", w.procurement_quotes.size(), loaded.procurement_quotes.size() },
+            { "procurement_contracts", w.procurement_contracts.size(), loaded.procurement_contracts.size() },
+            { "corp_embargo_conditions", w.corp_embargo_conditions.size(), loaded.corp_embargo_conditions.size() },
+            { "corp_hostile_pairs", w.corp_hostile_pairs.size(), loaded.corp_hostile_pairs.size() },
+            { "corp_friend_pairs", w.corp_friend_pairs.size(), loaded.corp_friend_pairs.size() },
+            { "corp_friend_offers", w.corp_friend_offers.size(), loaded.corp_friend_offers.size() },
+            { "earned_techs", w.earned_techs.size(), loaded.earned_techs.size() },
+            { "laws", w.laws.size(), loaded.laws.size() },
+            { "corp_modifiers", w.corp_modifiers.size(), loaded.corp_modifiers.size() },
+            { "battles", w.battles.size(), loaded.battles.size() },
+            { "history_log", w.history_log.size(), loaded.history_log.size() },
+            { "provinces", w.provinces.provinces.size(), loaded.provinces.provinces.size() },
+            { "provinces.tile_province", w.provinces.tile_province.size(), loaded.provinces.tile_province.size() },
+        };
+
+        bool all_match = true;
+        int  covered = 0, vacuous = 0;
+        std::printf("\n  container                      generated     loaded\n");
+        for (const row& r : rows)
+        {
+            const bool same = r.before == r.after;
+            all_match = all_match && same;
+            if (r.before == 0)
+                ++vacuous;
+            else
+                ++covered;
+            std::printf("  %-28s %10llu %10llu%s%s\n", r.name,
+                        (unsigned long long)r.before, (unsigned long long)r.after,
+                        same ? "" : "   <-- MISMATCH", r.before == 0 ? "   (empty here)" : "");
+        }
+        std::printf("\n");
+        check(all_match, "P7 every container has the same element count after the round trip");
+        std::printf("     %d container(s) genuinely covered, %d empty in this world\n",
+                    covered, vacuous);
+
+        // The well-known entities and the id counters are single fields rather
+        // than containers, and a snapshot that lost one would still pass P7's
+        // table -- so they are named here explicitly.
+        check(loaded.player_entity == w.player_entity && loaded.star_body == w.star_body
+                  && loaded.home_body == w.home_body,
+              "P7 the well-known entities survive");
+        check(loaded.next_entity_id() == w.next_entity_id()
+                  && loaded.next_convoy_id == w.next_convoy_id
+                  && loaded.next_order_id == w.next_order_id
+                  && loaded.next_procurement_id == w.next_procurement_id,
+              "P7 every id counter survives, allocator cursor included");
+        check(loaded.belt.inner_radius_au == w.belt.inner_radius_au
+                  && loaded.belt.outer_radius_au == w.belt.outer_radius_au,
+              "P7 the asteroid belt survives");
+        note("next entity id: ", (unsigned long long)loaded.next_entity_id());
+    }
+
+    // -----------------------------------------------------------------------
+    // P8 (R1) -- the containers a FRESH world leaves empty
+    // -----------------------------------------------------------------------
+    // P7 reports that roughly half the containers on `world` are empty in the
+    // canonical world, which means P1 proved nothing about them. Those are also
+    // the ones most likely to carry a bug, because they hold the intricate
+    // records -- a nested set of strings, a condition_set inside a map, three
+    // pair-keyed sets. So they are POPULATED here with deliberately distinctive
+    // values and round-tripped on their own.
+    //
+    // Distinctive matters: a field written in the wrong order or read into the
+    // wrong member still round-trips if every value is 0. Nothing below is 0.
+    {
+        world f = w;
+        const entity_id c1 = 11, c2 = 22, c3 = 33, b1 = 44, b2 = 55;
+
+        f.workforce_supply_overrides[{ c1, b1 }] = 7.25f;
+        f.workforce_supply_overrides[{ c2, b2 }] = 1.5f;
+        f.corp_reputation[{ c1, c2 }] = -0.75f;
+        f.corp_reputation[{ c2, c1 }] = 3.5f;
+
+        convoy_component cv;
+        cv.source_market = 101; cv.dest_market = 202; cv.mode = convoy_mode::sea;
+        cv.cargo_resource = resource_type::ordnance; cv.cargo_qty = 12.5f;
+        cv.progress = 0.375f; cv.speed = 2.25f; cv.corp = c1; cv.arrived = false;
+        cv.id = 9; cv.held = true; cv.cost_paid = 44.5f;
+        f.convoys.push_back(cv);
+        cv.mode = convoy_mode::space; cv.id = 10; cv.held = false; cv.arrived = true;
+        f.convoys.push_back(cv);
+
+        f.trade_routes.push_back({ b1, b2, c1, 1234, 7 });
+        f.body_last_glimpse_tick[b1] = 555;
+        f.body_last_glimpse_tick[b2] = -3; // negative on purpose: signedness bugs hide in ticks
+
+        f.sell_orders.push_back({ 5, c1, b1, resource_type::steel, 30.0f, 2.5f });
+        f.sell_orders.push_back({ 6, c2, b2, resource_type::propellant, 4.0f, 0.0f });
+        f.buy_orders.push_back({ 7, c2, b1, resource_type::machinery, 8.0f, 99.5f, c1 });
+
+        f.procurement_quotes.push_back({ 3, c1, c2, b1, b2, resource_type::alloys,
+                                         15.0f, 3.25f, 6, 12.5f });
+        f.procurement_contracts.push_back({ 4, c2, c1, b2, resource_type::electronics, b1,
+                                            20.0f, 7.5f, 8, 3, 25.0f, 6.25f });
+
+        condition_set embargo;
+        embargo.all.push_back({ condition_subject::science, condition_comparator::greater_than,
+                                42.5f, resource_type::coffee, building_type::launchpad,
+                                "embargo-key" });
+        embargo.all.push_back({ condition_subject::military_units, condition_comparator::at_most,
+                                3.0f, resource_type::furs, building_type::military_base, "" });
+        f.corp_embargo_conditions[c3] = embargo;
+
+        f.corp_hostile_pairs.insert({ c1, c2 });
+        f.corp_hostile_pairs.insert({ c3, c1 });
+        f.corp_friend_pairs.insert({ c1, c3 });
+        f.corp_friend_offers.insert({ c2, c3 });
+
+        f.earned_techs[c1] = { "rocketry", "metallurgy" };
+        f.earned_techs[c2] = { "optics" };
+
+        f.corp_modifiers[c1] = {
+            { modifier_subject::logistics_cost, modifier_op::subtract, 0.125f },
+            { modifier_subject::wage_floor, modifier_op::multiply, 1.75f },
+        };
+
+        law l;
+        l.id = "levy-test"; l.name = "Test Levy"; l.conditions = embargo;
+        l.effect = law_effect_kind::import_tariff; l.enacted = true;
+        l.enacting_nation = 66; l.rate = 0.135f;
+        l.scope_resource = static_cast<int>(resource_type::timber);
+        f.laws.push_back(l);
+
+        world back;
+        const bool ok = from_bytes(to_bytes(f), back);
+        check(ok, "P8 a world with every container populated round-trips");
+
+        // Byte-equality of the re-serialisation is the fidelity proof, exactly as
+        // in P1 -- but now over records P1 never reached.
+        check(ok && to_bytes(f) == to_bytes(back),
+              "P8 re-serialising reproduces the populated snapshot byte for byte");
+
+        if (ok)
+        {
+            // A handful of values read back by hand, because byte-equality would
+            // also hold if a pair of same-typed fields were consistently swapped
+            // on both sides.
+            check(back.convoys.size() == 2 && back.convoys[0].mode == convoy_mode::sea
+                      && back.convoys[0].held && back.convoys[0].cargo_qty == 12.5f
+                      && back.convoys[1].arrived && back.convoys[1].mode == convoy_mode::space,
+                  "P8 convoy fields land in the right members");
+            check(back.body_last_glimpse_tick.at(b2) == -3,
+                  "P8 a negative glimpse tick survives (no unsigned round trip)");
+            check(back.buy_orders.size() == 1 && back.buy_orders[0].preferred_seller == c1
+                      && back.buy_orders[0].max_price == 99.5f,
+                  "P8 the buy side keeps its preferred seller");
+            check(back.procurement_contracts.size() == 1
+                      && back.procurement_contracts[0].delivery_body == b1
+                      && back.procurement_contracts[0].ticks_elapsed == 3,
+                  "P8 a procurement contract keeps delivery body and elapsed ticks");
+            const auto& e = back.corp_embargo_conditions.at(c3);
+            check(e.all.size() == 2 && e.all[0].key == "embargo-key"
+                      && e.all[0].subject == condition_subject::science
+                      && e.all[1].structure == building_type::military_base,
+                  "P8 a condition_set nested in a map survives, strings included");
+            check(back.earned_techs.at(c1) == std::set<std::string>{ "metallurgy", "rocketry" }
+                      && back.earned_techs.at(c2).count("optics") == 1,
+                  "P8 the per-corp earned-tech string sets survive");
+            check(back.corp_hostile_pairs.size() == 2 && back.corp_friend_pairs.size() == 1
+                      && back.corp_friend_offers.count({ c2, c3 }) == 1
+                      && back.corp_hostile_pairs.count({ c1, c2 }) == 1,
+                  "P8 the three stance tables stay distinct and keep their directions");
+            const law& lb = back.laws.back();
+            check(lb.id == "levy-test" && lb.enacted && lb.rate == 0.135f
+                      && lb.effect == law_effect_kind::import_tariff
+                      && lb.conditions.all.size() == 2,
+                  "P8 a law survives with its conditions and effect");
+            check(back.workforce_supply_overrides.at({ c1, b1 }) == 7.25f
+                      && back.corp_reputation.at({ c2, c1 }) == 3.5f,
+                  "P8 the pair-keyed float tables keep key orientation");
+        }
+    }
+
+    std::printf("\n");
+    if (g_failures == 0)
+        std::printf("SAVE ROUND TRIP OK - a snapshot restores the world it was taken from.\n");
+    else
+        std::printf("SAVE ROUND TRIP FAIL - %d failure(s).\n", g_failures);
+    return g_failures == 0 ? 0 : 1;
+}

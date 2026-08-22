@@ -350,10 +350,22 @@ struct world
     /// `modify_scalar` effects (BL-479; laws join via BL-480). Per-corp and
     /// append-ordered: `advance_tech_gates` appends a tech's effects at the
     /// earn moment, in gate-table order, so the fold order below is the earn
-    /// order and is deterministic. DERIVED state — recomputable from
-    /// `earned_techs` × the gate table — so it is deliberately NOT folded into
-    /// `state_hash`: the canonical fact is the earned set, and hashing a cache
-    /// of it would only double-count. `std::map` for deterministic iteration
+    /// order and is deterministic. NOT folded into `state_hash`: the canonical
+    /// fact is the earned set, and hashing an accumulation of it would only
+    /// double-count.
+    ///
+    /// DERIVED IN ORIGIN BUT ORDER-BEARING, SO IT IS SERIALISED (BL-536,
+    /// NR-510). This comment used to say "recomputable from `earned_techs`
+    /// × the gate table", and BL-107 carried a change-note instructing the save
+    /// format to re-fold it on load. Both were wrong; the save does neither.
+    /// `advance_tech_gates` appends in gate-table order WITHIN ONE CALL, but it
+    /// runs every tick — so the stored sequence is ordered by (earn tick, gate
+    /// index), while a re-fold can only reproduce (gate index). The two diverge
+    /// as soon as a corp satisfies a higher-index gate before a lower-index one,
+    /// which nothing prevents. It matters because `modified_scalar` folds in
+    /// stored order across `add` and `multiply`, which do not commute. The order
+    /// is information the earned set does not carry, so it is state.
+    /// `std::map` for deterministic iteration
     /// (the `corp_body_pools` rationale). Empty at world setup, and stays
     /// empty for the life of any world whose techs carry only
     /// unlock_structure — which is what keeps such a world bit-identical to
@@ -547,6 +559,29 @@ struct world
     /// @param tick The sim day tick this snapshot is taken at (folded into the hash).
     /// @return An FNV-1a 64-bit checksum of the canonicalised snapshot.
     uint64_t state_hash(int tick) const;
+
+    // --- Save-format access to the id counter (BL-536) -----------------------
+    //
+    // The allocator's cursor is SAVE STATE, for the same reason `next_order_id`
+    // and `next_convoy_id` are and say so: a load that restarted allocation at 1
+    // would hand out ids that live entities already hold, and the collision would
+    // surface as one entity silently becoming another. It stays private, with a
+    // reader and a restorer either side of the seam rather than a public field —
+    // nothing but the serialiser has any business setting it.
+
+    /// The next id `create_entity` will hand out. For the serialiser only.
+    /// @return The allocator's current cursor.
+    uint32_t next_entity_id() const { return m_next_id; }
+
+    /// Restore the allocator's cursor on load. For the serialiser only.
+    ///
+    /// Clamped up to 1 rather than trusting the stream: a zero would make the
+    /// next `create_entity` return `null_entity`, which every consumer reads as
+    /// "no entity". A corrupt stream should fail its own guards long before
+    /// this, and if one gets here it must not produce a world that looks valid.
+    ///
+    /// @param next Cursor read from the snapshot.
+    void set_next_entity_id(uint32_t next) { m_next_id = (next < 1u) ? 1u : next; }
 
 private:
     uint32_t m_next_id = 1; ///< Zero is null_entity; live IDs start at 1.

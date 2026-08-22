@@ -552,6 +552,22 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         m_ui.planetary_pan_x += dx;
         m_ui.planetary_pan_y += dy;
     });
+    // Save / load (BL-536), exposed so a capture script can pay the ~30-45 s
+    // cold start ONCE and then open from a snapshot on every later run --
+    // which is the development motive that raised the item. `save` returns
+    // true on success; `load` returns false rather than throwing when the file
+    // is missing or rejected, so a script can branch on "generate or load"
+    // in one line:
+    //
+    //   if not verify.load("golden.iosave") then verify.save("golden.iosave") end
+    //
+    v.set_function("save", [this](const std::string& path) {
+        return save_game_to(path);
+    });
+    v.set_function("load", [this](const std::string& path) {
+        return load_game_from(path);
+    });
+
     // The BL-204 tick-boundary checksum, exposed so a script (or a batch-mode
     // equivalence hunt — how BL-423's restore was proven) can print whether two
     // runs hold the same world without comparing pixels.
@@ -864,6 +880,10 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         else if (name == "tech_tree")    m_ui.show_tech_tree = open;    // F9 mock viewer (BL-087)
         else if (name == "decisions")    m_ui.show_decision_feed = open; // AI decision feed (BL-407)
         else if (name == "strategy")     m_ui.show_strategy_readout = open; // Strategy readout (BL-411)
+        // BL-536: the Generation Ledger had no name here, so no script could open
+        // it. That mattered the moment a save had to prove it restores the
+        // generation_report — this ledger is one of the two surfaces that read it.
+        else if (name == "generation_ledger") m_ui.show_generation_ledger = open;
     });
 
     // Spectator mode (BL-409). Set BEFORE econ_step: step_economy reads
@@ -1429,9 +1449,20 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // Discrete navigation by the shared command vocabulary — the same dispatch the
     // keyboard uses (see canvas_command.hpp), so a script reads as a key sequence.
     // Unknown command names are ignored.
+    //
+    // ROUTED THROUGH dispatch_action SINCE BL-536, not apply_canvas_command. The
+    // comment above always claimed parity with the keyboard and did not have it:
+    // a key press goes through app::dispatch_action, which handles the commands
+    // that need app members — the time controls, and now quick save/load — before
+    // falling through to apply_canvas_command for everything else. Calling the
+    // inner function directly meant `verify.command("pause_toggle")` silently did
+    // nothing, and would have meant the same for the two save bindings.
+    //
+    // Behaviour-identical for every existing caller: the committed scripts drive
+    // only ascend/descend/zoom_in, which dispatch_action forwards unchanged.
     v.set_function("command", [this](const std::string& name) {
         if (auto cmd = ui::canvas_command_from_name(name))
-            ui::apply_canvas_command(m_world, m_ui, *cmd);
+            dispatch_action(*cmd);
     });
 
     // Centre a Planetary tile without replicating the canvas transform in Lua:

@@ -43,6 +43,7 @@ namespace {
 // and delegates every request line to agent_protocol::service_line.
 
 // --serve [--ticks N] [--as <corp-id|any>]  (BL-278)
+// --load <path>                             (BL-536 - open a saved campaign)
 //
 // Headless, persistent: builds the canonical world once (identical warm-up to
 // --export-blackboard), then reads one request per line from stdin until EOF
@@ -472,9 +473,19 @@ int main(int argc, char* argv[])
                 return a.run_autostart();
             }
 
+        // --load <path>: open straight into a saved campaign (BL-536). Checked
+        // last, alongside the plain interactive path it modifies, because it is
+        // that path with a different starting point -- not a mode of its own.
         {
+            std::string load_path;
+            for (int i = 1; i < argc; ++i)
+                if (std::string(argv[i]) == "--load" && i + 1 < argc)
+                    load_path = argv[i + 1];
+
             app a;
             a.host_agent(agent_port);
+            if (!load_path.empty())
+                a.open_save(load_path);
             return a.run();
         }
     }

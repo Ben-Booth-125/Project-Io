@@ -50,6 +50,26 @@ public:
     /// (`advance_days(econ_tick_days)`) without touching the speed dial.
     void advance_days(int days);
 
+    /// Restore the clock from a save (BL-536).
+    ///
+    /// The three counters and the elapsed-days accumulator ARE the clock; the
+    /// frame-pacing members (`m_accum_ms`, `m_last_ms`) deliberately are not
+    /// restored -- they measure wall-clock time between frames, and a save
+    /// carries no meaningful value for "how long since the last frame". They
+    /// re-seed on the next `tick()`.
+    ///
+    /// The speed is restored as SAVED rather than forced to paused. A campaign
+    /// that was running at 4x resumes at 4x, which is what a player means by
+    /// "resume"; the alternative silently changes a setting on every load.
+    ///
+    /// @param sim_tick_v     Sim tick to resume at.
+    /// @param day_tick_v     Day tick to resume at.
+    /// @param econ_tick_v    Econ tick to resume at.
+    /// @param elapsed_days_v Fractional elapsed days.
+    /// @param speed_v        Speed index, clamped to [0, max_speed].
+    void restore(uint64_t sim_tick_v, uint64_t day_tick_v, uint64_t econ_tick_v,
+                 double elapsed_days_v, int speed_v);
+
     int  speed()  const { return m_speed; }
     bool paused() const { return m_speed == 0; }
 

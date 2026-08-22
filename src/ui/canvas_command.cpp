@@ -143,6 +143,13 @@ void apply_canvas_command(const world& w, ui_state& ui, canvas_command cmd)
         case canvas_command::help_toggle:
         case canvas_command::options_toggle:
         case canvas_command::tech_tree_toggle:
+        // Save/load reach the world and the app's own state, neither of which
+        // this function has; app::dispatch_action handles them before the
+        // fallthrough that would land here. Listed so the switch stays
+        // exhaustive rather than acquiring a `default` that would silently
+        // swallow the NEXT command someone forgets to wire.
+        case canvas_command::quick_save:
+        case canvas_command::quick_load:
             break;
     }
 }
@@ -150,7 +157,7 @@ void apply_canvas_command(const world& w, ui_state& ui, canvas_command cmd)
 std::optional<canvas_command> canvas_command_from_name(std::string_view name)
 {
     // Pairs the command vocabulary (verify scripts + keybinding table) to the enum.
-    static const std::array<std::pair<std::string_view, canvas_command>, 22> table = {{
+    static const std::array<std::pair<std::string_view, canvas_command>, 24> table = {{
         {"descend",       canvas_command::descend},
         {"ascend",        canvas_command::ascend},
         {"body_next",     canvas_command::body_next},
@@ -170,6 +177,8 @@ std::optional<canvas_command> canvas_command_from_name(std::string_view name)
         {"speed_3",       canvas_command::speed_3},
         {"speed_4",       canvas_command::speed_4},
         {"speed_5",       canvas_command::speed_5},
+        {"quick_save",    canvas_command::quick_save},
+        {"quick_load",    canvas_command::quick_load},
         {"help_toggle",   canvas_command::help_toggle},
         {"options_toggle", canvas_command::options_toggle},
         {"tech_tree_toggle", canvas_command::tech_tree_toggle},

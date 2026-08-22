@@ -1,6 +1,7 @@
 #include "app.hpp"
 
 #include "png_writer.hpp"
+#include "save_game.hpp" // BL-536 quick save / quick load
 #include "session_history.hpp" // step_economy's post-step presentation (BL-361)
 
 #include <imgui.h>
@@ -95,7 +96,7 @@ struct key_binding
     const char*        key_name; ///< Human-readable key string (F1 overlay)
 };
 
-static const std::array<key_binding, 22> s_bindings = {{
+static const std::array<key_binding, 24> s_bindings = {{
     // Canvas navigation
     {SDL_SCANCODE_RETURN,       false, ui::canvas_command::descend,      "Descend rung",      "Enter"},
     {SDL_SCANCODE_BACKSPACE,    false, ui::canvas_command::ascend,       "Ascend rung",       "Backspace"},
@@ -119,6 +120,8 @@ static const std::array<key_binding, 22> s_bindings = {{
     {SDL_SCANCODE_4,            false, ui::canvas_command::speed_4,      "Speed IV (4×)",     "4"},
     {SDL_SCANCODE_5,            false, ui::canvas_command::speed_5,      "Speed V  (16×)",    "5"},
     // UI
+    {SDL_SCANCODE_F5,           false, ui::canvas_command::quick_save,   "Quick save",        "F5"},
+    {SDL_SCANCODE_F6,           false, ui::canvas_command::quick_load,   "Quick load",        "F6"},
     {SDL_SCANCODE_F1,           false, ui::canvas_command::help_toggle,  "Key bindings",      "F1"},
     {SDL_SCANCODE_F9,           false, ui::canvas_command::tech_tree_toggle, "Tech tree (mock)", "F9"},
     {SDL_SCANCODE_F10,          false, ui::canvas_command::options_toggle, "Options",         "F10"},
@@ -255,6 +258,23 @@ int app::run(autostart_mode autostart)
     // player finishes it (start_new_game), so nothing simulates behind either screen
     // and the clock starts when play does.
     m_screen = app_screen::menu;
+
+    // --load <path>: open straight into a saved campaign, skipping the menu, the
+    // wizard and the ~25-38 s generation plus ~6 s warm start that follow it. THE
+    // reason BL-536 was raised -- a capture run that iterates on one surface pays
+    // that cold start on every launch, and this is what stops it. A failed load
+    // falls through to the menu with the reason posted to the comms log, rather
+    // than exiting: a missing file should not look like a crash.
+    if (!m_pending_load.empty())
+    {
+        const std::string path = m_pending_load;
+        m_pending_load.clear();
+        if (load_game_from(path))
+            std::printf("[load] opened %s\n", path.c_str());
+        else
+            std::printf("[load] FAILED to open %s - falling back to the menu\n", path.c_str());
+        std::fflush(stdout);
+    }
 
     // --autostart-windowed: press "Begin" as the wizard would — surface build left
     // in flight, generation on the worker — but with the REAL frame loop below
@@ -1584,6 +1604,18 @@ void app::dispatch_action(ui::canvas_command cmd)
         case ui::canvas_command::speed_4: m_prev_speed = 4; m_sim_loop.set_speed(4); return;
         case ui::canvas_command::speed_5: m_prev_speed = 5; m_sim_loop.set_speed(5); return;
 
+        // Save / load (BL-536). Here rather than in apply_canvas_command for
+        // the same reason the time controls are: they touch app members that
+        // function never sees. The quick-slot path is deliberately the SIMPLEST
+        // thing that works -- one fixed file beside the executable. Slots, named
+        // saves and an overwrite prompt are a UI item, not this one.
+        case ui::canvas_command::quick_save:
+            save_game_to(quick_save_path());
+            return;
+        case ui::canvas_command::quick_load:
+            load_game_from(quick_save_path());
+            return;
+
         // UI toggles.
         case ui::canvas_command::help_toggle:
             m_show_help = !m_show_help;
@@ -1599,6 +1631,124 @@ void app::dispatch_action(ui::canvas_command cmd)
         default:
             ui::apply_canvas_command(m_world, m_ui, cmd);
     }
+}
+
+// ---------------------------------------------------------------------------
+// Save / load (BL-536)
+// ---------------------------------------------------------------------------
+
+std::string app::quick_save_path() const
+{
+    return std::string("quicksave") + save_game_extension;
+}
+
+bool app::save_game_to(const std::string& path)
+{
+    save_envelope env;
+
+    env.sim_tick     = m_sim_loop.sim_tick();
+    env.day_tick     = m_sim_loop.day_tick();
+    env.econ_tick    = m_sim_loop.econ_tick();
+    env.elapsed_days = m_sim_loop.elapsed_days();
+    env.speed        = m_sim_loop.speed();
+
+    env.params = m_active_world_params;
+    env.report = m_generation_report;
+
+    env.balance_history     = m_balance_history;
+    env.income_history      = m_income_history;
+    env.expenditure_history = m_expenditure_history;
+    env.market_history      = m_market_history;
+    // deque -> vector on the seam; the container choice is an app detail.
+    env.building_rank_hist.assign(m_building_rank_hist.begin(), m_building_rank_hist.end());
+
+    env.primary_level     = m_ui.primary_level;
+    env.overlay           = m_ui.overlay;
+    env.active_body       = m_ui.active_body;
+    env.selected_entity   = m_ui.selected_entity;
+    env.selected_province = m_ui.selected_province;
+    env.solar_zoom        = m_ui.solar_zoom;
+    env.solar_pan_x       = m_ui.solar_pan_x;
+    env.solar_pan_y       = m_ui.solar_pan_y;
+    env.circum_zoom       = m_ui.circum_zoom;
+    env.circum_pan_x      = m_ui.circum_pan_x;
+    env.circum_pan_y      = m_ui.circum_pan_y;
+    env.planetary_zoom    = m_ui.planetary_zoom;
+    env.planetary_pan_x   = m_ui.planetary_pan_x;
+    env.planetary_pan_y   = m_ui.planetary_pan_y;
+
+    const bool ok = write_save_game(path, m_world, env);
+
+    ui::chat_post(m_chat, static_cast<int>(m_sim_loop.day_tick()), null_entity,
+                  ui::chat_state::k_field_channel,
+                  ok ? ("Saved to " + path) : ("SAVE FAILED: could not write " + path));
+    return ok;
+}
+
+bool app::load_game_from(const std::string& path)
+{
+    world         w;
+    save_envelope env;
+
+    // Reads into scratch, so a rejected file leaves the running campaign whole.
+    if (!read_save_game(path, w, env))
+    {
+        ui::chat_post(m_chat, static_cast<int>(m_sim_loop.day_tick()), null_entity,
+                      ui::chat_state::k_field_channel,
+                      "LOAD FAILED: " + path + " is missing, corrupt, or from another version");
+        return false;
+    }
+
+    m_world               = std::move(w);
+    m_generation_report   = std::move(env.report);
+    m_active_world_params = env.params;
+
+    m_sim_loop.restore(env.sim_tick, env.day_tick, env.econ_tick, env.elapsed_days, env.speed);
+    m_prev_speed     = (env.speed > 0) ? env.speed : 1;
+    m_last_econ_tick = env.econ_tick;
+    // `world::current_day_tick` is the mirror app refreshes each frame; seeding
+    // it here means the activity fog reads the right age on the FIRST frame
+    // after a load rather than on the second.
+    m_world.current_day_tick = static_cast<int>(env.day_tick);
+
+    m_balance_history     = std::move(env.balance_history);
+    m_income_history      = std::move(env.income_history);
+    m_expenditure_history = std::move(env.expenditure_history);
+    m_market_history      = std::move(env.market_history);
+    m_building_rank_hist.assign(env.building_rank_hist.begin(), env.building_rank_hist.end());
+
+    m_ui.primary_level     = env.primary_level;
+    m_ui.overlay           = env.overlay;
+    m_ui.active_body       = env.active_body;
+    m_ui.selected_entity   = env.selected_entity;
+    m_ui.selected_province = env.selected_province;
+    m_ui.solar_zoom        = env.solar_zoom;
+    m_ui.solar_pan_x       = env.solar_pan_x;
+    m_ui.solar_pan_y       = env.solar_pan_y;
+    m_ui.circum_zoom       = env.circum_zoom;
+    m_ui.circum_pan_x      = env.circum_pan_x;
+    m_ui.circum_pan_y      = env.circum_pan_y;
+    m_ui.planetary_zoom    = env.planetary_zoom;
+    m_ui.planetary_pan_x   = env.planetary_pan_x;
+    m_ui.planetary_pan_y   = env.planetary_pan_y;
+
+    // App-side transients that describe the world just replaced. Left alone
+    // they would keep drawing the PREVIOUS campaign's numbers until the next
+    // econ tick overwrote them -- a stale panel is worse than an empty one.
+    m_last_econ_report = economy_report{};
+    m_last_corp_standings.clear();
+    m_body_resource_hist.clear();
+    m_tile_resource_hist.clear();
+
+    // Selection state that indexes into the replaced world.
+    m_ui.card_stack.clear();
+    m_ui.clear_battle_selection();
+
+    m_screen = app_screen::in_game;
+
+    ui::chat_post(m_chat, static_cast<int>(env.day_tick), null_entity,
+                  ui::chat_state::k_field_channel, "Loaded " + path);
+    return true;
 }
 
 void app::render()
