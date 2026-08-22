@@ -2919,6 +2919,40 @@
    ],
    "status": "open",
    "resolution": null
+  },
+  {
+   "id": "NR-507",
+   "title": "BL-533 landed and found a real click-through defect: the canvas was taking presses meant for the legend",
+   "raised": "2026-08-22",
+   "kind": "observation",
+   "source": "UI session 2026-08-22, lens_legend.lua",
+   "what": "Re-homing the legend surfaced a defect that predates it and would have applied to any background-draw-list surface. The legend paints through ImGui::GetBackgroundDrawList(), which draws pixels and registers no window, so io.WantCaptureMouse stayed false over it — and app.cpp derives the canvas primary_input from exactly that flag (primary_input = !mouse_in_mm && !panel_blocking). Measured symptom: clicking the legend header toggled the legend AND selected whatever tile lay underneath, moving the Selection panel to a tile the player never aimed at. Confirmed real rather than a harness artifact by hovering to settle WantCaptureMouse first, which changed nothing. Fixed with an empty always-on window over the box footprint. Proof: legend_country_collapsed.png and legend_country_recollapsed.png are now BYTE-IDENTICAL across an open-then-close cycle, where before the second capture carried a different selected tile.",
+   "why_it_matters": "Any future on-canvas surface drawn the same way inherits the same hole, and it is invisible to every check we have — the surface looks correct in a capture while quietly stealing or leaking presses. Worth knowing before the next one is built.",
+   "files": [
+    "src/ui/body_surface_canvas.cpp",
+    "src/core/app.cpp"
+   ],
+   "status": "open",
+   "resolution": null
+  },
+  {
+   "id": "NR-508",
+   "title": "lens_legend.lua has to aim at the legend header BY PIXEL, and got it wrong three times before it landed",
+   "raised": "2026-08-22",
+   "kind": "observation",
+   "source": "UI session 2026-08-22, lens_legend.lua",
+   "what": "The new check presses the legend header, and the only way to say where that is is to re-derive the shell geometry in Lua: minimap size from its own formula, then shell_margin, then the published time_panel_h, then a guess at the header band. It missed three times in a row — first by aiming below the collapsed box, then by assuming the box grew upward, then by landing on the Market lens resource combo, which stacks ABOVE the header and shifts it 26px down. Each miss silently did something else instead (panned the canvas, opened the good-picker) rather than failing, so each one needed a capture read to diagnose. The constant now reads `local time_panel_h = 84 -- measured off the capture, not assumed`, which is honest but is a number copied from a screenshot, and it will drift the moment the font or the panel changes.",
+   "why_it_matters": "This is NR-454 arriving exactly as predicted: BL-521 closed the live-check class for canvases, where click_tile can ask the canvas where a tile is, but NOT for panels, which publish no rect. The first real panel check after that entry needed four attempts, and the fragility is now committed in a script rather than being hypothetical.",
+   "options": [
+    "Accept it — panel checks re-derive geometry and are refreshed when they break",
+    "Give the shell a target registry: each clickable surface publishes {name, rect} into ui_state, and verify gains click(\"lens.legend.header\") — the thing NR-454 says needs a ruling before it can be built"
+   ],
+   "recommendation": "No new work yet, but this is evidence for NR-454 rather than a separate question — worth deciding them together.",
+   "files": [
+    "scripts/verify/lens_legend.lua"
+   ],
+   "status": "open",
+   "resolution": null
   }
  ]
 }

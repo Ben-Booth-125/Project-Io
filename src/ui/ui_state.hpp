@@ -167,6 +167,21 @@ struct ui_state
     // active lens reads it. The Resource lens is always single-resource (BL-019),
     // so it carries no highest-value toggle.
     resource_type lens_resource = resource_type::iron_ore; ///< Selected resource (Resource deposit / Scarcity shortfall) / good (Market price surface).
+    /// Is the lens legend expanded? BL-533 (Ben, 2026-08-22) re-homed every
+    /// legend into the right chrome column above the minimap and made it a
+    /// dropdown that is COLLAPSED BY DEFAULT — so a lens switch no longer
+    /// throws a forty-row list over the map. Only the header shows until the
+    /// player opens it. One flag serves every legend: they are mutually
+    /// exclusive by construction (a lens draws at most one).
+    bool lens_key_open = false;
+    /// The time panel's measured height, published each frame by time_panel so
+    /// the rest of the right chrome column knows where its own ceiling is.
+    /// It is computed from font metrics inside time_panel and was previously
+    /// visible nowhere else — which is why shell_metrics::pinned_panel_rect,
+    /// the one function that needs it, has never had a caller. BL-533 needs the
+    /// same number: an expanded legend grows upward out of the minimap and must
+    /// stop below the time panel rather than drawing over it.
+    float time_panel_h = 0.0f;
 
     // --- navigation pane state ---
     // Policy: all ledgers start closed. The player opens them deliberately from

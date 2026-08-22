@@ -1804,7 +1804,7 @@ void app::render()
     // Time panel — top-right (BL-138/BL-313), extracted to ui::draw_time_panel
     // (BL-361). Shares m_prev_speed with the keyboard speed bindings so pause
     // restores whichever tier was last active, wherever it was set.
-    ui::draw_time_panel(m_sim_loop, m_prev_speed, disp);
+    ui::draw_time_panel(m_ui, m_sim_loop, m_prev_speed, disp);
 
     // In-app system menu (BL-070) — the corner gear + popup, extracted to
     // ui::draw_system_menu (BL-361). Esc toggles the same popup (handle_key_down).

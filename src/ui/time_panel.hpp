@@ -16,7 +16,10 @@ namespace ui {
 /// @param prev_speed Speed remembered across a pause, so unpausing restores it
 ///                   (app's m_prev_speed, shared with the keyboard bindings).
 /// @param disp       ImGui display size for the frame.
-void draw_time_panel(sim_loop& sim, int& prev_speed, const ImVec2& disp);
+/// @param state  Receives the panel's measured height (state.time_panel_h), which
+///               is derived from font metrics here and exists nowhere else. The
+///               right chrome column below needs it to find its own ceiling.
+void draw_time_panel(ui_state& state, sim_loop& sim, int& prev_speed, const ImVec2& disp);
 
 /// Draw the in-app system menu (BL-070) — the corner gear button and its popup
 /// (Pause/Resume + Exit Game with inline confirm). Esc toggles the same popup
