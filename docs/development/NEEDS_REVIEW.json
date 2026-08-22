@@ -2974,6 +2974,25 @@
    ],
    "status": "open",
    "resolution": null
+  },
+  {
+   "id": "NR-510",
+   "title": "Seven bug reports filed as eight items: two calls taken on Ben’s behalf",
+   "raised": "2026-08-22",
+   "kind": "decision-taken",
+   "source": "Ben, 2026-08-22, seven numbered bug reports (single plate / non-viable starts / lack of industrialisation / provinces cross borders / bundle selection / mountains as elevation / legends in the minimap).",
+   "what": "Filed as BL-537 through BL-544. Two partition calls were taken rather than asked, plus one status call across three items.\n\n(1) BUG 3 WAS SPLIT INTO TWO ITEMS. Ben wrote it as one sentence — \"Surprising lack of industrialisation (need more worked tiles, and these should not be filled on the default lens)\" — and it is one thought, but the two halves land in different layers: the density is generate_background_firms in src/world/ (BL-539), the fill is built_plate_colour in src/ui/ (BL-540). They are cross-linked in both directions and BL-539 lists BL-540 in unblocks, so the connection is not lost; but they can be built independently and one item spanning both layers would have carried two collision maps and two verification classes.\n\n(2) HALF OF BUG 4 WAS NOT FILED, BECAUSE IT ALREADY IS. Ben wrote \"Provinces cross country boundaries, and country boundaries should not diffuse together\". The first half is genuinely new and is BL-541. The SECOND half is BL-535 (national hue replaces the Country lens), which carries his own ruling from earlier the same day that the corner blend stops at national borders — designed, not yet built. Filing it again would have created two items for one change. BL-541 says so explicitly rather than silently omitting it.\n\n(3) THREE ITEMS FILED design-owed, NOT designed. BL-537 (which of gate / design-around / retune), BL-538 (the sentence has two readings and no predicate), BL-539 (direction is clear, the lever is not, and the measurement seam should run first). The other five are designed — the mechanism is traced and the change is stated.",
+   "why_it_matters": "The split and the omission both change what Ben sees when he next queries the backlog: seven reports come back as eight rows, and one of his sentences has no row of its own. If either call is wrong it is cheap to undo now and expensive once tasks are promoted against them.",
+   "options": [
+    "Accept both calls — BL-539/BL-540 stay separate, bug 4’s second half stays with BL-535",
+    "Merge BL-539 and BL-540 back into one item if the fill and the density should land together",
+    "Re-file bug 4’s second half as its own item if BL-535 is going to be re-scoped or dropped"
+   ],
+   "recommendation": "Accept. The strongest argument for the split is that BL-540 is worth doing on its own merits even if the density never moves, and the strongest argument against re-filing bug 4 is that BL-535 already carries Ben’s own wording on it.",
+   "files": [
+    "docs/development/backlog.json"
+   ],
+   "status": "open"
   }
  ]
 }
