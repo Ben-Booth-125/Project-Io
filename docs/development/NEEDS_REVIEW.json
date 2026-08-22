@@ -3460,6 +3460,24 @@
    ],
    "status": "open",
    "resolution": null
+  },
+  {
+   "id": "NR-536",
+   "title": "Sprint N1 pre-change baseline captured — state_hash B4D09255AF346008, and the one red is the known pre-existing one",
+   "raised": "2026-08-22",
+   "kind": "observation",
+   "source": "Opening Sprint N1. An inertness claim can only be proven against a measurement taken BEFORE the change.",
+   "what": "Built the world layer by the NR-264 recipe and ran three baselines at commit d85416e, before a line of Sprint N1 was written.\n\n  world_determinism        ALL PASS (0 failures) - 400-year era pass, identical across two same-seed runs\n  money_conservation       ALL PASS (0 failures) - including P3.0, total corporate cash never moves over 8 ticks\n  spectator_determinism    1 FAILURE, and it is PRE-EXISTING\n\nThe failure is R2 byte-identity: golden=344A9FE48306E93A observed=B4D09255AF346008. Those are the SAME TWO VALUES NR-484 and NR-487 record as red on origin/main, so it is attributed and is not this sprint's.\n\nTHE USEFUL PART: B4D09255AF346008 is the observed state_hash of an unspectated played session at the pre-N1 commit. All three Sprint N1 items claim INERTNESS at authored-zero rates. If integration leaves that value unchanged, the claim is proven at the strongest available level - the whole world hashing identically - rather than by a harness asserting its own narrow property.",
+   "why_it_matters": "Three requirement rows across three items say 'bit-identical to the pre-item build'. Without a pre-change number those rows can only be self-asserted by the harness that ships with the change, which is the false-green failure mode the adversarial pass exists to catch. This is the number they are checked against.\n\nIt also means the economy benchmark's deliberate red (NR-269/271/272) and this golden's red are both accounted for BEFORE the batch, so anything new that goes red is the batch's.",
+   "options": [],
+   "recommendation": "Re-run all three after integration and compare against these exact values. A moved state_hash on an all-zero-rates build is a FAILED inertness row, not a re-bless.",
+   "files": [
+    "tools/verify/world_determinism.cpp",
+    "tools/verify/money_conservation.cpp",
+    "tools/verify/spectator_determinism.cpp"
+   ],
+   "status": "open",
+   "resolution": null
   }
  ]
 }

@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*237 entries — 202 open, 35 resolved.*
+*238 entries — 203 open, 35 resolved.*
 
 ---
 
@@ -1935,6 +1935,27 @@ The finding that reaches furthest: BL-158 proposed DIRECTED sentiment on 2026-08
 > **Recommendation:** Two axes remain unworked and both need a build to do honestly. The 13 FALSE-OPEN candidates the new lint reports each need checking against the code before a status flips - BL-458, BL-511 and BL-480 are near-certain, the rest are not. And the parked set (36 items, mostly space-arc) was left alone deliberately: a parked item legitimately carries its own arc's framing, and rewording it to the live arc would be the churn the two-arcs split exists to avoid.
 
 *Files: `docs/development/backlog.json`*
+
+### NR-536 — Sprint N1 pre-change baseline captured — state_hash B4D09255AF346008, and the one red is the known pre-existing one
+*observation · raised 2026-08-22 · from Opening Sprint N1. An inertness claim can only be proven against a measurement taken BEFORE the change.*
+
+Built the world layer by the NR-264 recipe and ran three baselines at commit d85416e, before a line of Sprint N1 was written.
+
+  world_determinism        ALL PASS (0 failures) - 400-year era pass, identical across two same-seed runs
+  money_conservation       ALL PASS (0 failures) - including P3.0, total corporate cash never moves over 8 ticks
+  spectator_determinism    1 FAILURE, and it is PRE-EXISTING
+
+The failure is R2 byte-identity: golden=344A9FE48306E93A observed=B4D09255AF346008. Those are the SAME TWO VALUES NR-484 and NR-487 record as red on origin/main, so it is attributed and is not this sprint's.
+
+THE USEFUL PART: B4D09255AF346008 is the observed state_hash of an unspectated played session at the pre-N1 commit. All three Sprint N1 items claim INERTNESS at authored-zero rates. If integration leaves that value unchanged, the claim is proven at the strongest available level - the whole world hashing identically - rather than by a harness asserting its own narrow property.
+
+**Why it matters.** Three requirement rows across three items say 'bit-identical to the pre-item build'. Without a pre-change number those rows can only be self-asserted by the harness that ships with the change, which is the false-green failure mode the adversarial pass exists to catch. This is the number they are checked against.
+
+It also means the economy benchmark's deliberate red (NR-269/271/272) and this golden's red are both accounted for BEFORE the batch, so anything new that goes red is the batch's.
+
+> **Recommendation:** Re-run all three after integration and compare against these exact values. A moved state_hash on an all-zero-rates build is a FAILED inertness row, not a re-bless.
+
+*Files: `tools/verify/world_determinism.cpp`, `tools/verify/money_conservation.cpp`, `tools/verify/spectator_determinism.cpp`*
 
 ---
 
