@@ -368,6 +368,43 @@ function checkSupersessions() {
 }
 checkSupersessions();
 
+// An item cannot be scheduled into a minor its own blockers land AFTER. A minor
+// cannot cut while part of it waits on a later one, so a version goal that sits
+// earlier than a blocker's is a scheduling claim the dependency graph
+// contradicts.
+//
+// Found 2026-08-22 by the hotspot audit, which caught four v0.1.16 items waiting
+// on v0.1.19 and v0.1.22 blockers — a quarter of a minor's perf chain. The sweep
+// that followed found two more, one of them created the same session by a ruling
+// that added a `requires` without moving the version goal to match. That is the
+// shape this check exists for: the inversion arrives as a SIDE EFFECT of an
+// otherwise-correct edit, and nothing else notices.
+//
+// WARNING, not a fail: a parked blocker is a legitimate reason to sit inverted
+// (the item is waiting on a decision, not a build), and a version goal is a plan
+// rather than a contract.
+function checkVersionInversion() {
+  const ORD = (v) => {
+    const m = String(v || '').match(/^v(\d+)\.(\d+)\.(\d+)$/);
+    return m ? (+m[1] * 10000 + +m[2] * 100 + +m[3]) : null;
+  };
+  const byId = new Map(backlog.items.map((i) => [i.id, i]));
+  for (const item of backlog.items) {
+    if (TERMINAL.has(item.status) || item.parked) continue;
+    const mine = ORD(item.version_goal);
+    if (mine === null) continue;
+    for (const r of item.requires || []) {
+      const dep = byId.get(r);
+      if (!dep || TERMINAL.has(dep.status)) continue;
+      const theirs = ORD(dep.version_goal);
+      if (theirs === null || theirs <= mine) continue;
+      const parked = dep.parked ? ' (blocker is PARKED — may be legitimate)' : '';
+      warn(`${item.id} (${item.short_name}) targets ${item.version_goal} but requires ${r}, which targets ${dep.version_goal}${parked} — a minor cannot cut while part of it waits on a later one.`);
+    }
+  }
+}
+checkVersionInversion();
+
 report();
 
 function report() {

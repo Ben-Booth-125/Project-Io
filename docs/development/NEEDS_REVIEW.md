@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*239 entries — 204 open, 35 resolved.*
+*240 entries — 205 open, 35 resolved.*
 
 ---
 
@@ -1982,7 +1982,26 @@ The scheduling consequence that is UNfavourable: four v0.1.16 items are blocked 
 
 > **Recommendation:** Three things, in order. (1) The version-goal inconsistency is the one that would actually block a cut - either those four items move out of v0.1.16 or their blockers move in. It is a sequencing call and it is Ben's. (2) The confirmed false-opens want the same treatment BL-514 and BL-532 got here: verify by hand, then flip with the commit named. I did the two the audit called FULLY landed and left the partial ones (BL-533, BL-511, BL-408) with their halves stated, because a partial slice landing under an open item is exactly the case the lint warns not to flip blind. (3) The corp_command.hpp append contention should get the Fall-arc convention applied: one appender per batch, in a stated order.
 
+> **RESOLVED.** PARTLY RULED BY BEN, 2026-08-22: move the inverted items out of v0.1.16. Done, and the count was three rather than four - BL-492's inversion had already been dissolved by correcting its dependency (it named BL-491 where its own text needs strain, which is BL-504 at the same minor), so it is startable in v0.1.16 and was deliberately left there with the reason written into the item so a later pass does not sweep it along. BL-491 -> v0.1.19 (needs BL-320). BL-493 -> v0.1.22 (needs BL-425 and BL-427). BL-494 -> v0.1.22 (latest blocker sets the floor; also missing hard_coded_world.cpp from its file list, where its deliverable actually lives - added). v0.1.16 falls from 36 open items to 33. The audit's other findings - the six-wave batching for the Fall cluster, the corp_command.hpp append contention, the remaining confirmed false-opens - are untouched and still open.
+
 *Files: `docs/development/backlog.json`, `tools/session/collision_map.js`*
+
+### NR-538 — A version-goal inversion sweep found two more, and one was created THIS SESSION by an otherwise-correct ruling
+*decision taken on your behalf · raised 2026-08-22 · from Moving the inverted v0.1.16 items out, on Ben's instruction.*
+
+Having moved the three the audit named, I swept the whole backlog for the same defect - an open item whose version goal sits EARLIER than a blocker's. Two more turned up.
+
+BL-391 (reputation floor deadlock) at v0.1.15 requiring BL-546 at v0.1.24. THIS SESSION CREATED IT: the sentiment ruling made BL-391 require BL-546, and nothing moved the version goal to match. Moved to v0.1.24 and the reasoning written into the item. THE COST IS STATED RATHER THAN BURIED: this is a priority-A LIVE defect - a player measured reputation -6 against a floor of -5 with no mechanic anywhere that could move it back - and it now ships two minors later than it did this morning. The alternative is landing decay standalone at v0.1.15 and migrating it in BL-546, which is the double-build the substrate ruling exists to avoid. If that trade is wrong it is Ben's to overturn.
+
+BL-211 (player-facing history ledger) at v0.1.11 requiring BL-210 at v0.4.0. PRE-EXISTING and NOT moved: BL-210 is PARKED, so this is an item waiting on a decision rather than on a build, which is a different problem from a scheduling inversion. Left alone deliberately and flagged by the new check as 'blocker is PARKED - may be legitimate'.
+
+Added checkVersionInversion() to backlog_lint. Negative-tested: re-introducing BL-494's inversion makes it name all three blockers by version. It is a WARNING not a fail, because a parked blocker can be legitimate and a version goal is a plan rather than a contract.
+
+**Why it matters.** The shape is what makes it worth a permanent check rather than a one-off fix: THE INVERSION ARRIVES AS A SIDE EFFECT OF AN OTHERWISE-CORRECT EDIT. Adding a `requires` is right; forgetting that it re-dates the item is invisible, and nothing else in the tooling notices. That is the third defect class this session that was invisible from every status view - after the false-complete (BL-377) and the false-open (BL-514, BL-532) - and all three now lint.
+
+> **Recommendation:** Confirm or overturn BL-391's move. It is the only one of the five with a real cost, and it is a priority-A defect slipping two minors.
+
+*Files: `docs/development/backlog.json`, `tools/session/backlog_lint.js`*
 
 ---
 
