@@ -79,9 +79,17 @@ which is the one place the CLAUDE.md doc map cannot route a reader to.
 | ~~**Law**~~ | `law.cpp`, `condition_set.cpp` | — | same doc, § The enforcement seam |
 | ~~**Stance and standing**~~ | `stance.cpp`, `standing.cpp` | — | **`docs/politics/RELATIONS.md` — written 2026-08-22** |
 | ~~**Conditions & modifiers**~~ | `condition_set.cpp`, `modifier_set.hpp`, read by laws, techs, gates, units | — | **`docs/META_LAYER.md` — written 2026-08-22** |
-| **Province as a grain** | `province.cpp` (936 lines), unit position, battles, rendering | Split across TILE_GENERATION, PLANETARY, SELECTION | **new `docs/generation/PROVINCES.md`** |
-| **Interdiction** | BL-458 (supply lines cannot be cut) | Nowhere — the word appears in **no** authority doc | **`docs/economy/SUPPLY.md`** |
-| **The star map** | `star_map.cpp` — authored, seed-free, cross-campaign | Header comment only | **`docs/ui/MINIMAP.md`** |
+| ~~**Province as a grain**~~ | `province.cpp` (936 lines), unit position, battles, rendering | — | **`docs/generation/PROVINCES.md` — written 2026-08-22** |
+| ~~**Interdiction**~~ | BL-458 (supply lines cannot be cut) | — | **`docs/economy/LOGISTICS.md` § Interdiction — written 2026-08-22** |
+| ~~**The star map**~~ | `star_map.cpp` | **FALSE POSITIVE** — see below | already owned by `docs/ui/MINIMAP.md` |
+
+> **One row of this table was wrong, and the method that produced it is the part worth correcting**
+> (NR-531). The star map was listed on the strength of a grep finding no *heading* matching it in
+> any authority doc. `docs/ui/MINIMAP.md` § The top rung documents it fully — the ladder wrapping
+> back to the ground, what it draws, that it turns once a year against the campaign date, and the
+> load-bearing property that *the sky is fixed and the world is not*. **Heading-based ownership
+> detection misses a doc that covers a subject in prose under a differently-named section.** The
+> other six rows were checked by other means and stand.
 
 **The nation actor led this list, and is now done.** `NATION_GENERATION.md` line 7 said outright:
 *"Nation system design is an open item. This document covers only the generation strategy."* Since
@@ -210,11 +218,11 @@ Ordered by what unblocks the most. Each is one session; each ends with prose in 
 |---|---|---|---|
 | **1** | **Reopen the income loop** | BL-377's status; what Sprint 16 actually owes | `backlog.json`, ROADMAP |
 | ~~**2**~~ | ~~**The nation as an actor**~~ | **Done 2026-08-22** — doc written, then all six questions settled by Ben the same day; seven items filed (BL-537–BL-543) | `docs/politics/NATIONS.md` ✓ |
-| **3** | **Contracts leave the market doc** | The mercenary sell side as its own subject | new `docs/economy/CONTRACTS.md` |
+| ~~**3**~~ | ~~**Contracts leave the market doc**~~ | **Done 2026-08-22** — both siblings, and the nations session's two answers folded in | `docs/economy/CONTRACTS.md` ✓ |
 | **4** | **Ownership** | Syndicate tier, control gate, dividends, portfolio | new `docs/economy/OWNERSHIP.md` |
 | ~~**5**~~ | ~~**Relations**~~ | **Done 2026-08-22** — doc written; found a fourth quantity (embargo) and NR-520, three designs converging on one shape | `docs/politics/RELATIONS.md` ✓ |
 | ~~**6**~~ | ~~**The predicate substrate**~~ | **Done 2026-08-22** — own doc rather than a SYSTEMS.md section; found the effect side is 1-of-6 wired and its shared-vocabulary claim unmet (NR-523/524) | `docs/META_LAYER.md` ✓ |
-| **7** | **Province as a grain** | The unit of position, rendering, battle and ceiling | new `docs/generation/PROVINCES.md` |
+| ~~**7**~~ | ~~**Province as a grain**~~ | **Done 2026-08-22** | `docs/generation/PROVINCES.md` ✓ |
 | **8** | **Research as a currency** | BL-478's debit model — NR-387 says this needs design, not an implementer | new `docs/research/TECH.md` |
 | **9** | **The novel-work backlog** | NR-483, NR-458, NR-453, NR-454 ruled in one sitting | their named docs |
 | **10** | **Re-voice CONCEPT.md** | The live arc, in the doc every session reads first | `docs/CONCEPT.md` |
@@ -236,3 +244,39 @@ Recorded so the next scan does not re-derive them.
   a doc that owns them, sized to the system.
 - **The code comments are good.** `stance.hpp`, `standing.hpp`, `condition_set.hpp` and
   `star_map.hpp` each carry real design reasoning. The problem is location, not quality.
+
+
+---
+
+## Second pass — 2026-08-22
+
+Written after the register itself, in one sitting, at Ben's instruction to *"just go ahead and write
+each one."*
+
+**Five new authorities**, all Class 1 or Class 2 closures:
+
+| Doc | Closes |
+|---|---|
+| `docs/politics/NATIONS.md` | the nation as an actor, and law |
+| `docs/politics/RELATIONS.md` | stance, reputation, embargo, standing |
+| `docs/META_LAYER.md` | the predicate and effect substrate |
+| `docs/economy/LOGISTICS.md` | the network — Ben's named priority |
+| `docs/generation/PROVINCES.md` | the spatial unit of consequence |
+| `docs/economy/CONTRACTS.md` | the income loop, out of the market doc |
+
+**Two new systems opened**, both `design-owed` and both explicitly proposals rather than settled
+design: `docs/PEOPLE.md` (BL-547) and `docs/EVENTS.md` (BL-548).
+
+**One principle named.** SYSTEMS.md § The progression chain — *each system's ceiling is the next
+system's door* — written as a **three-part design test** rather than a description, and applied as
+a section in every doc above.
+
+**Six older docs retrofitted** so none of them now contradicts a new authority: SUPPLY.md (scope
+narrowed, and the per-node-throughput exclusion BL-464 overturned is flagged), MARKETS.md,
+PRODUCTION.md, TILE_GENERATION.md, MILITARY.md, and CONCEPT.md.
+
+**What this file is now for.** Classes 0, 1 and most of 2 are closed. What remains is Class 3
+(3,076 lines of research scaffolding that never graduated, and COLLAPSE.md's nineteen dependants —
+NR-511) and Class 5 (the map, now much smaller: five docs were added to it this session). Per
+NR-513's recommendation, the rows should keep migrating into each owner's own *What is absent*
+section until the file has nothing left to hold.

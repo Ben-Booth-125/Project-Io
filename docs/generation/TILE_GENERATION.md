@@ -520,6 +520,11 @@ monotonic descent / no cycles, discount ordering) and a bitmask-identity check f
 
 ## Province partition (BL-515, landed 2026-08-21)
 
+> **[`PROVINCES.md`](PROVINCES.md) is the authority for the province as a game object** since
+> 2026-08-22 — what it is, the three size constants and why there are three, the three domains, what
+> reads it, and the rulings behind all of it. This section keeps the **generation-pass** view: where
+> the partition sits in the pipeline and what it consumes.
+
 The last generation pass over a body's land: `build_province_partition`
 (`src/world/province.{hpp,cpp}`), run from `make_hard_coded_world` after nations,
 corporations, population centres, rivers and roads exist — because it reads all of

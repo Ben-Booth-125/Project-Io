@@ -419,6 +419,11 @@ The Launchpad is the physical gate to space: a corp must hold one on the source 
 
 ## Logistics and transport capacity (open design note)
 
+> **Superseded 2026-08-22 by [`LOGISTICS.md`](LOGISTICS.md)**, which owns the network in full, and
+> by **BL-464 (logistic points)**, which is the designed answer to transport capacity and carries
+> two rulings plus seven findings from a rejected first cut. This note predates both; read it as
+> history.
+
 Transport capacity is a constraint on supply throughput, not a direct modifier on market price. The intended behaviour is: **a body that cannot move its output does not accumulate surplus, rather than accumulating surplus at a suppressed price**.
 
 Concretely: if a mine produces iron ore faster than the body's port and convoy network can carry it away, the excess ore sits in the building's stockpile but does not flow into the market. The market sees normal or high iron ore prices (no supply glut) while production slows because the stockpile fills. This prevents unrealistically cheap goods appearing in landlocked markets, and makes transport infrastructure a genuine bottleneck rather than purely a cost reduction.

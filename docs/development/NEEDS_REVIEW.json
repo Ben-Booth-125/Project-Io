@@ -3273,6 +3273,119 @@
    ],
    "status": "open",
    "resolution": null
+  },
+  {
+   "id": "NR-525",
+   "title": "REVIEW: docs/economy/LOGISTICS.md — the network authority (Ben flagged this one as the priority)",
+   "raised": "2026-08-22",
+   "kind": "question",
+   "source": "Phantom-scan documentation pass, 2026-08-22. Ben asked for a review item per doc: \"I'll read them in full and let you know where I would want to change things.\"",
+   "what": "New 322-line authority, split from SUPPLY.md on the line \"Logistics is the road; Supply is the traffic\". Ben, 2026-08-22: \"Pay extra attention to the logistic system, as that is the most substantial part which I feel I haven't given a firm authority on.\" Owns BL-325 ruling 3 in general form, the shared traversal-cost function, reach as the placement constraint, roads and tiers, physical scale and travel time, cache invalidation, interdiction, and the whole BL-464 Logistic Points design - two rulings, three settled rules, and the seven findings that rejected its first cut. Five open questions at the end.",
+   "why_it_matters": "Ben asked to read each new authority doc in full and mark what he wants changed. This entry is the place to record his verdict; resolve it with the changes made, or with \"accepted as written\".",
+   "options": [],
+   "recommendation": "Read § Logistic Points first - it is the largest section and the one carrying settled rulings that were only ever inside a backlog item. The finding worth your attention is the last one: goods-vs-force priority is currently decided invisibly by tick phase order, so \"the army goes unsupplied\" is an inherited default nobody chose.",
+   "files": [
+    "docs/economy/LOGISTICS.md"
+   ],
+   "status": "open",
+   "resolution": null
+  },
+  {
+   "id": "NR-526",
+   "title": "REVIEW: docs/generation/PROVINCES.md — the spatial unit of consequence",
+   "raised": "2026-08-22",
+   "kind": "question",
+   "source": "Phantom-scan documentation pass, 2026-08-22. Ben asked for a review item per doc: \"I'll read them in full and let you know where I would want to change things.\"",
+   "what": "New 217-line authority for the province as a game object, gathered from province.hpp, TILE_GENERATION.md, PLANETARY.md and SELECTION.md. Owns the four partition rulings, the three size constants (7 soft / 12 preferred / 20 hard) and why the hard cap is asserted rather than imposed, the three domains, unit position at province grain (NR-405), and your 2026-08-22 ruling that every lens blends. Four open questions, two of which are your existing unruled review entries (NR-433 on the 3-tile floor, NR-421 on the inert ceiling).",
+   "why_it_matters": "Ben asked to read each new authority doc in full and mark what he wants changed. This entry is the place to record his verdict; resolve it with the changes made, or with \"accepted as written\".",
+   "options": [],
+   "recommendation": "The open question worth deciding is 3 - whether a province ever gains an OWNER. Every use so far is spatial, and BL-518 (war redraws borders) is where that pressure first arrives.",
+   "files": [
+    "docs/generation/PROVINCES.md"
+   ],
+   "status": "open",
+   "resolution": null
+  },
+  {
+   "id": "NR-527",
+   "title": "REVIEW: docs/economy/CONTRACTS.md — the income loop, out of the market doc",
+   "raised": "2026-08-22",
+   "kind": "question",
+   "source": "Phantom-scan documentation pass, 2026-08-22. Ben asked for a review item per doc: \"I'll read them in full and let you know where I would want to change things.\"",
+   "what": "New 250-line authority carving procurement and the mercenary contract out of MARKETS.md, where the game's income loop had been a subsection of the market document. Records BL-377's full design - the condition_set spine, offers derived from history_sim's campaign scorer, the four settled answers, three terminal states - plus what the nations session changed: the client is now a nation with a treasury, and the relationship rides sentiment's Trust dimension rather than a parallel axis.",
+   "why_it_matters": "Ben asked to read each new authority doc in full and mark what he wants changed. This entry is the place to record his verdict; resolve it with the changes made, or with \"accepted as written\".",
+   "options": [],
+   "recommendation": "Open question 1 is the one that needs you: a contract fee is an actor-to-actor transfer, which NATIONS.md says must conserve - so a nation that cannot afford a contract must not be able to offer it. That couples offer generation to BL-537 budget and is not stated anywhere yet.",
+   "files": [
+    "docs/economy/CONTRACTS.md"
+   ],
+   "status": "open",
+   "resolution": null
+  },
+  {
+   "id": "NR-528",
+   "title": "REVIEW: docs/PEOPLE.md — named people and roles (NEW system, proposal not design)",
+   "raised": "2026-08-22",
+   "kind": "question",
+   "source": "Phantom-scan documentation pass, 2026-08-22. Ben asked for a review item per doc: \"I'll read them in full and let you know where I would want to change things.\"",
+   "what": "New 196-line design-owed doc from your 2026-08-22 ask. Everything past § Precedent is a PROPOSAL, not settled design. Builds on BL-207 (persona counsel packs, already fully designed) and BL-370 (corp leader figure, your own 2026-08-11 ask) rather than inventing a rival. Proposes: a person is a name, a role, a seat, a tenure and AT MOST ONE bias; a cast not a population; and mortality, because a person who never leaves is a permanent modifier wearing a name. Six open questions. Filed as BL-547.",
+   "why_it_matters": "Ben asked to read each new authority doc in full and mark what he wants changed. This entry is the place to record his verdict; resolve it with the changes made, or with \"accepted as written\".",
+   "options": [],
+   "recommendation": "Question 2 is the cheapest to overturn now and the most likely to be wrong: one bias, or several. Question 1 sets the order - company head is your own earlier ask and needs no other system; minister is the highest value because it gives lobbying a target.",
+   "files": [
+    "docs/PEOPLE.md"
+   ],
+   "status": "open",
+   "resolution": null
+  },
+  {
+   "id": "NR-529",
+   "title": "REVIEW: docs/EVENTS.md — random events (NEW system, proposal not design)",
+   "raised": "2026-08-22",
+   "kind": "question",
+   "source": "Phantom-scan documentation pass, 2026-08-22. Ben asked for a review item per doc: \"I'll read them in full and let you know where I would want to change things.\"",
+   "what": "New 212-line design-owed doc from your 2026-08-22 ask. The interesting problem is the word \"random\": Io is deterministic, so the doc reuses YOUR OWN BL-315 ruling 4 - uncertain to the player, deterministic to the engine, drawn from a seeded stream folded from the subject's identity. Second finding: the meta layer already supplies two thirds of an event (condition_set = predicate, modifier_set = effect), so only the trigger is new - and it is the consumer collapse_strain has been waiting for. Filed as BL-548.",
+   "why_it_matters": "Ben asked to read each new authority doc in full and mark what he wants changed. This entry is the place to record his verdict; resolve it with the changes made, or with \"accepted as written\".",
+   "options": [],
+   "recommendation": "Question 4 decides how large this system is: do events DRIVE the collapse metagame or merely express it. Question 2 - how often is an event - is the single number separating texture from chaos, and nothing has established a target rhythm.",
+   "files": [
+    "docs/EVENTS.md"
+   ],
+   "status": "open",
+   "resolution": null
+  },
+  {
+   "id": "NR-530",
+   "title": "REVIEW: SYSTEMS.md § The progression chain — your interconnectivity ask, written as a design test",
+   "raised": "2026-08-22",
+   "kind": "question",
+   "source": "Phantom-scan documentation pass, 2026-08-22. Ben asked for a review item per doc: \"I'll read them in full and let you know where I would want to change things.\"",
+   "what": "Your words, 2026-08-22: \"we really want interconnectivity, so a player only progresses so far using one system before the next becomes a natural consequence.\" Written into SYSTEMS.md as a named principle - EACH SYSTEM'S CEILING IS THE NEXT SYSTEM'S DOOR - and as a three-part design test every system must answer: what forces a player in, what does it open, what does it cap them at. A table applies it to six rungs and names each rung's current ceiling. Every new doc written this session carries a § Where this sits in the chain section against it.",
+   "why_it_matters": "Ben asked to read each new authority doc in full and mark what he wants changed. This entry is the place to record his verdict; resolve it with the changes made, or with \"accepted as written\".",
+   "options": [],
+   "recommendation": "Two claims in it are mine rather than yours and worth checking. First: the chain CLOSES rather than ending, because force's ceiling is supply, which is the logistics rung again - which makes BL-464 a bigger item than its size suggests. Second: a staircase is a solved sequence, which is the argument for EVENTS.md cutting across it.",
+   "files": [
+    "docs/SYSTEMS.md"
+   ],
+   "status": "open",
+   "resolution": null
+  },
+  {
+   "id": "NR-531",
+   "title": "CORRECTION: the star map was NOT a phantom — MINIMAP.md already owns it, and the scan's detection missed prose ownership",
+   "raised": "2026-08-22",
+   "kind": "observation",
+   "source": "Writing the remaining Class 1 docs; opened MINIMAP.md to add a star-map section and found one already there.",
+   "what": "PHANTOMS.md § Class 1 listed the star map as a system running in code with no doc that owns it, on the strength of a grep that found no HEADING matching \"star map\" in any authority doc. That grep was the wrong instrument. docs/ui/MINIMAP.md § The top rung documents it fully and better than the replacement would have been: the ladder wrapping back to the ground rather than inventing a further rung, what it draws, the galactic band and core, six constellations, deep-sky objects, that it turns one revolution per year against the campaign date, and the load-bearing property - \"the sky is fixed; the world is not\", nothing reads a seed, it is the one fixture a player carries between campaigns, and names are invented per the standing rule.",
+   "why_it_matters": "One row of a seven-row table was a false positive, and the method that produced it is worth correcting rather than the row alone: heading-based ownership detection misses a doc that covers a subject in PROSE under a differently-named section. The other six rows were checked by other means and stand. Corrected in PHANTOMS.md in place rather than quietly dropped.",
+   "options": [],
+   "recommendation": "No action. Recorded so the next scan uses a better instrument than a heading grep.",
+   "files": [
+    "docs/development/PHANTOMS.md",
+    "docs/ui/MINIMAP.md"
+   ],
+   "status": "resolved",
+   "resolution": "Self-corrected 2026-08-22 at the moment it was found. PHANTOMS.md § Class 1 marks the row as a false positive with the reason."
   }
  ]
 }

@@ -534,6 +534,10 @@ This is the most load-bearing military decision taken so far. It is BL-325's (mi
 supply) ruling 3, Ben's own words on 2026-08-08: *"a nation's reach for economy is also the
 military reach."*
 
+> **The network itself is owned by [`../economy/LOGISTICS.md`](../economy/LOGISTICS.md)** since
+> 2026-08-22 — traversal cost, the reach field, roads, physical scale and travel time, and the
+> designed Logistic Points layer. This section owns the *military reading* of that one ruling.
+
 **There is deliberately no second reach field.** The proposed parallel base-anchored supply
 envelope was overridden. `body_reach_field` — the existing economic logistics network — *is* the
 military supply envelope.

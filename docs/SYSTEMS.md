@@ -148,6 +148,42 @@ The channel-based chat log (added 2026-07-31) — the surface of the diplomacy-a
 
 ---
 
+## The progression chain
+
+> **Each system's ceiling is the next system's door.**
+> — the shape Ben named on 2026-08-22: *"we really want interconnectivity, so a player only
+> progresses so far using one system before the next becomes a natural consequence."*
+
+This is a **design test**, not a description of what is built. It applies to every system in this
+document and to every new one: *what forces a player into it, what does it open, and what does it
+cap them at?* A system that answers only the middle question is a feature. A system that answers all
+three is a rung.
+
+The intended chain, and where each rung's ceiling is today:
+
+| Rung | You enter because | It opens | Its ceiling |
+|---|---|---|---|
+| **Extraction** | you start with a tile | output, and a balance | one tile's deposits run thin |
+| **Logistics** | the good tile is far from the market | distant markets and deposits | **reach is binary** — the network says *can this be reached*, never *how much can move* |
+| **Markets** | output is worth more elsewhere | price, arbitrage, scale | anonymous, instant, price-only — no lead time, no memory |
+| **Contracts** | you need a counterparty who can refuse | equipment you cannot make; **income that is not extraction** | reputation |
+| **Force** | a contract asks for an outcome, not a good | territory, interdiction, a third name | supply — and supply is the logistics rung again |
+| **Territory / politics** | force without law is banditry | jurisdiction, treasury, lobbying | attention |
+
+**Two things the table is meant to make visible.**
+
+**The chain closes rather than ending.** Force's ceiling is supply, which is the logistics rung
+again at a higher grain — which is exactly BL-325 ruling 3 (*economic reach IS military reach*)
+read as progression rather than as architecture. That is why Logistic Points (BL-464) is a bigger
+item than its size suggests: it is the rung the whole chain currently plateaus at.
+
+**A staircase is a solved sequence.** A chain of systems each unlocked by the last is learned once
+and then followed. [`EVENTS.md`](EVENTS.md) is the argument for something that cuts across it —
+so the same rung feels different on a second campaign, which a ~100-hour target across many
+campaigns needs.
+
+---
+
 ## Cross-cutting notes
 
 **Supply spans both pillars.** It is the connective tissue between economic production and military projection, and a target in both. It deserves particular attention during prototype scoping.

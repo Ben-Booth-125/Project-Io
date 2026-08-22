@@ -359,6 +359,13 @@ What follows from the move:
 
 ## Procurement — a layer over the market, not a second market (BL-350, 2026-08-11)
 
+> **Re-homed 2026-08-22: [`CONTRACTS.md`](CONTRACTS.md) is now the authority for contracting** —
+> both the buy side (procurement, shipped) and the sell side (the mercenary contract, BL-377,
+> designed and unbuilt). This section is kept as the **market-facing** account: how procurement sits
+> against the market rather than replacing it. The counterparty model, the terminal states, the
+> reputation axis and the whole sell side live there. *The game's income loop was a subsection of
+> the market document, which is what the phantom-feature scan found.*
+
 A procurement contract is **a build order placed with someone else**: BL-095's own
 commit-on-affordability, draw-materials-per-tick, pay-across-the-build shape, with the materials
 drawn against the **supplier's** market and the output delivered to the **buyer's** pool. The
