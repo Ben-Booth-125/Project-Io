@@ -2993,6 +2993,65 @@
     "docs/development/backlog.json"
    ],
    "status": "open"
+  },
+  {
+   "id": "NR-511",
+   "title": "The conquest half of Ben’s BL-541 answer was split into BL-545 rather than carried in the generation item",
+   "raised": "2026-08-22",
+   "kind": "decision-taken",
+   "source": "Ben, 2026-08-22, elicitation form, answering past the three BL-541 options: \"Generate provinces alongside national borders, and have it be impossible to conquer a tile without also controlling the province\".",
+   "what": "The answer carries two rulings and they were separated. The FIRST (co-generate provinces with national borders) stayed in BL-541 and rewrote it: the item had proposed rejecting cross-nation candidates inside the existing fill, and Ben’s answer is the stronger design — regions grown to FIT the border rather than grown across it and trimmed. That also dissolved the frontier-fragmentation question the form asked, which is why no merge pass is in the ruling: offcuts never exist to merge.\n\nThe SECOND (a tile cannot be conquered without the province) became BL-545, category Military, requires BL-541. Reasons for splitting rather than carrying: it lands in components.hpp / world.hpp / MILITARY.md rather than province.cpp; it is a FORWARD constraint on a system that does not exist rather than a fix to one that does; and it is design-owed where BL-541 is now designed, so carrying it would have held a buildable generation fix behind an unsettled military question.",
+   "why_it_matters": "BL-541 can be promoted and built now; BL-545 cannot, and should not block it. If the split is wrong the cost is two rows where Ben wanted one, which is cheap to merge back before either is promoted.",
+   "options": [
+    "Accept the split — BL-541 builds now, BL-545 carries the conquest invariant",
+    "Merge BL-545 back into BL-541 if the conquest rule should land with the generation change"
+   ],
+   "recommendation": "Accept. BL-541 has a headless requirement that fails on today’s build and a clear fix; BL-545 has four genuinely open questions and a documented architectural collision. Holding the first behind the second buys nothing.",
+   "files": [
+    "docs/development/backlog.json"
+   ],
+   "status": "open"
+  },
+  {
+   "id": "NR-512",
+   "title": "BL-539: raising max_firms_per_body may be INERT — the two stop bounds are in series, not in parallel",
+   "raised": "2026-08-22",
+   "kind": "observation",
+   "source": "Ben, 2026-08-22, elicitation form: chose \"Raise max_firms_per_body now\" over running the measurement seam first.",
+   "what": "Recorded because it is a caveat against a decision Ben took explicitly, and it should be visible as a flagged risk rather than buried in a design field.\n\ngenerate_background_firms loops `for (iter < max_iterations_per_body && firms_this_body < max_firms_per_body)` and BREAKS EARLY when production_ratio(production, demand) >= target_ratio (0.90f, corporation_generation.cpp:1718). The bounds are therefore in SERIES: whichever is reached first ends the loop. If the ratio is what currently stops it, the loop never approaches the 200-firm cap, and raising that cap adds exactly zero firms.\n\nThe ruling is not thereby wrong — the cap may well be binding, and its own comment records it was already raised once from 40, which is weak evidence that it has been binding before. But the change is a coin-flip between \"works\" and \"no-op\" until someone reports which bound fired.",
+   "why_it_matters": "The failure mode is not a bug, it is a SILENT no-op: the constant changes, the build succeeds, the world regenerates, and nothing moves — which reads as \"the lever was too small\" and invites raising it again. The distinguishing measurement costs almost nothing (measure_production_ratio was added on 2026-08-20 for exactly this question), so the design now requires reporting which bound fired as PART OF landing the change rather than as a preliminary study Ben declined.",
+   "options": [
+    "Land the raise with the which-bound-fired report attached, as the design now says",
+    "Run the seam first after all, if the no-op case seems likely",
+    "Raise both target_ratio and max_firms_per_body together, so the change cannot be inert"
+   ],
+   "recommendation": "The first. It honours Ben’s choice of lever, costs one extra printed line in whatever harness or generation report carries it, and makes the no-op case self-diagnosing instead of silent.",
+   "files": [
+    "src/world/corporation_generation.cpp",
+    "docs/development/backlog.json"
+   ],
+   "status": "open"
+  },
+  {
+   "id": "NR-513",
+   "title": "Campaign-era conquest (BL-545) collides with the documented reason provinces sit outside state_hash — and BL-536 is designing the save format right now",
+   "raised": "2026-08-22",
+   "kind": "observation",
+   "source": "Tracing Ben’s 2026-08-22 conquest ruling against world.hpp:250 and BL-518.",
+   "what": "world.hpp:250 excludes `provinces` from state_hash and gives the reason explicitly: \"state_hash folds the fields a TICK may mutate ... the partition is generation output and never moves once built\". BL-518 states the same arrangement as Ben’s own earlier ruling (borders move during generation only, fixed once the campaign starts) and then warns, in as many words: \"If this item ever grew into campaign-era border changes, that whole arrangement would need revisiting.\"\n\nBen’s conquest ruling is that growth. The reconciling reading — and BL-545 recommends it rather than assuming it — is that the two things must be separated: the PARTITION (which tiles compose province P) stays fixed generation output, and only OWNERSHIP (which nation holds P) moves. That satisfies the rule exactly, since tiles are then not what changes hands, and it leaves provinces immutable, outside state_hash, still checked by determinism_harness across two generations, and still safe as a BL-467 battle-seed input.\n\nWhat does become live tick-mutable under that reading is nation_component::tiles, documented as \"populated by Pass 2 (territory expansion) and STABLE THEREAFTER\". That stops being true, and the field then has to enter state_hash and the save format.",
+   "why_it_matters": "BL-536 (world-snapshot save) was designed on 2026-08-22 — the same day — and is being built now. It decides field-wise what is serialised. If nation ownership is about to become mutable campaign state, BL-536 should know that while its format is still being written, not after IOSV has a version number in the wild. The cost of knowing now is a comment; the cost of knowing later is a format version bump.",
+   "options": [
+    "Tell BL-536 now, so the envelope anticipates mutable nation ownership even if nothing writes it yet",
+    "Leave BL-536 alone — the save version field exists precisely so the format can move, and BL-545 is design-owed with no build date",
+    "Settle BL-545’s partition-vs-ownership question first, since it is what determines the answer"
+   ],
+   "recommendation": "The third, then the first. The partition-vs-ownership call is small, it is the thing everything else depends on, and it is Ben’s. Once it is made, BL-536 either needs nothing or needs one section — and either way it finds out cheaply.",
+   "files": [
+    "src/world/world.hpp",
+    "src/world/components.hpp",
+    "docs/development/backlog.json"
+   ],
+   "status": "open"
   }
  ]
 }
