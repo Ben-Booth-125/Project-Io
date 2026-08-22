@@ -5164,6 +5164,153 @@
      "notes": "A NEGATIVE requirement, and it earns its place: BL-384's design predicted exactly this temptation, and the sprint on the board was aimed at combat. Written down so the scope is checkable rather than remembered."
     }
    ]
+  },
+  {
+   "brief": "national-budget",
+   "batch": "2026-08-22-lane-n-sprint-n1",
+   "title": "BL-537 - a nation spends its treasury down weighted priority lines",
+   "status": "pending",
+   "promoted_from": "backlog.json BL-537 (designed 2026-08-22), sprints.json Sprint N1",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING (headless): CONSERVATION. Over any tick span, the sum debited from every nation's treasury equals the sum credited to corporation balances, BIT-EXACTLY. This is the row the whole item rests on - Ben's Q2 ruling is that payment to corps is DIRECT and not on the market, so a budget line that leaked would be the BL-392 class of silent value destruction re-introduced at nation grain.",
+     "result_metric": null,
+     "verification": "headless - tools/verify/nation_budget_harness.cpp",
+     "notes": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "INERTNESS: with every weight zero, the world runs BIT-IDENTICAL to the pre-item build - every balance, every treasury, every budget line, every tick. The pattern BL-343 (law), BL-480 (treasury) and BL-454 (upkeep) all shipped under.",
+     "result_metric": null,
+     "verification": "headless - tools/verify/nation_budget_harness.cpp",
+     "notes": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "RESERVE: a nation with weights summing to 1.0 and reserve_fraction 0.2 never spends more than 80% of what it holds, and an underspent line ACCUMULATES rather than evaporating. Ben: 'Nations should be able to save up.'",
+     "result_metric": null,
+     "verification": "headless - tools/verify/nation_budget_harness.cpp",
+     "notes": null
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "requirement": "EMPTY TREASURY: a nation holding nothing spends nothing and errors nowhere. No negative treasury, no partial debit.",
+     "result_metric": null,
+     "verification": "headless - tools/verify/nation_budget_harness.cpp",
+     "notes": null
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "requirement": "DETERMINISM: two runs of one seed produce identical treasuries and identical per-corp credits. Sorted nation-id walk, fixed line order, fixed float sequence.",
+     "result_metric": null,
+     "verification": "headless - tools/verify/nation_budget_harness.cpp",
+     "notes": null
+    }
+   ]
+  },
+  {
+   "brief": "sentiment-substrate",
+   "batch": "2026-08-22-lane-n-sprint-n1",
+   "title": "BL-545 - one directed continuous derived value under every relational read",
+   "status": "pending",
+   "promoted_from": "backlog.json BL-545 (designed 2026-08-22, Ben ruling on NR-520), sprints.json Sprint N1",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING (headless): THE STANCE INVARIANT. Driving sentiment to any value, in either direction, on any pair, mutates NO stance table - not corp_hostile_pairs, not corp_friend_pairs, not corp_friend_offers. Ben's 2026-08-17 ruling that hostility is a state a corp OPTS INTO and 'may never acquire ambiently' stands, and this row is what stops the substrate quietly overturning it.",
+     "result_metric": null,
+     "verification": "headless - tools/verify/sentiment_harness.cpp",
+     "notes": "THE row. Sentiment informs a declaration; it never makes one."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "DIRECTEDNESS: A->B and B->A move independently. Setting one never moves the other, on either dimension.",
+     "result_metric": null,
+     "verification": "headless - tools/verify/sentiment_harness.cpp",
+     "notes": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "DECAY HAS NO FLOOR: a value driven to an extreme returns toward neutral within the authored window, and there is NO value it cannot leave. This is BL-391's reputation deadlock asserted as a passing row rather than fixed as a special case.",
+     "result_metric": null,
+     "verification": "headless - tools/verify/sentiment_harness.cpp",
+     "notes": null
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "requirement": "TWO DIMENSIONS: Access and Trust are stored and move independently, at every grain (corp->corp, nation->corp, nation->nation). Ben's NR-522 ruling; a substrate whose shape varies by grain is not a substrate.",
+     "result_metric": null,
+     "verification": "headless - tools/verify/sentiment_harness.cpp",
+     "notes": null
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "requirement": "INERTNESS: with all factor weights and the decay rate at zero, the world runs BIT-IDENTICAL to the pre-item build.",
+     "result_metric": null,
+     "verification": "headless - tools/verify/sentiment_harness.cpp",
+     "notes": null
+    },
+    {
+     "id": "R6",
+     "status": "pending",
+     "requirement": "DETERMINISM: two runs of one seed produce identical sentiment tables. Any iteration over pairs is a SORTED WALK over ids, never over an unordered container - BL-158's rule, taken verbatim, and load-bearing at ~1,850 ordered pairs for 43 nations.",
+     "result_metric": null,
+     "verification": "headless - tools/verify/sentiment_harness.cpp",
+     "notes": null
+    }
+   ]
+  },
+  {
+   "brief": "value-anchor",
+   "batch": "2026-08-22-lane-n-sprint-n1",
+   "title": "BL-543 - the check that guards the ratio, not the numbers",
+   "status": "pending",
+   "promoted_from": "backlog.json BL-543 (designed 2026-08-22, Ben ruling + clarification), sprints.json Sprint N1",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "requirement": "ITEM-SPANNING (headless): THE BAND HOLDS. For every roster class, the authored unit_upkeep goods draw valued at world_gen.lua's BASE PRICES sits within a stated tolerance of 2x the authored credits_per_head. Ben's clarification is explicit that it is base prices and an authoring-time calibration, not a runtime coupling - so the harness reads the authored tables and resolves no market.",
+     "result_metric": null,
+     "verification": "headless - tools/verify/value_anchor.cpp",
+     "notes": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "requirement": "IT FAILS WHEN PERTURBED. Move a rate or a base price and the check goes red. A check that cannot fail is not a check - and this is the row that earns the harness, because it is what catches a base-price edit silently invalidating the calibration.",
+     "result_metric": null,
+     "verification": "headless - tools/verify/value_anchor.cpp",
+     "notes": "Mutation row. Assert the failure, do not merely claim it."
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "requirement": "INERT AT ZERO: with every unit_upkeep rate at 0.0 - the shipped state - the check reports the calibration as INERT and passes, moving no golden. Turning the rates on is a later data change this check already guards.",
+     "result_metric": null,
+     "verification": "headless - tools/verify/value_anchor.cpp",
+     "notes": null
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "requirement": "IT REPORTS THE IMPLIED FIGURE: the derived 'units funded per year' for the seeded extraction levy, so NR-382's rate question can be answered against a number rather than a feeling.",
+     "result_metric": null,
+     "verification": "headless - tools/verify/value_anchor.cpp",
+     "notes": null
+    }
+   ]
   }
  ]
 }

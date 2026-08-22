@@ -216,3 +216,80 @@ whatever got built.
   constraint to a grain where firms actually compete.
 - **NR-415** — where does the per-lens reduction table live, and does every future
   lens inherit the obligation?
+
+
+---
+
+# Sprint N1 — "The two spines, landed inert" (Lane N) — opened 2026-08-22
+
+**Why now.** This session designed the whole corp↔nation channel and settled 41 open calls.
+**None of it exists in code.** This sprint lands the two spines the rest of v0.1.24 requires, plus
+one check.
+
+**The batch's single organising decision: everything lands INERT.** Authored rates at zero, so a
+world runs bit-identical to today. That is the pattern BL-343 (law), BL-480 (treasury) and BL-454
+(upkeep) all shipped under, and it is the only way to add two subsystems and a check without moving
+a single golden — which matters more than usual here, because the economy benchmark is *already*
+deliberately red (NR-269/271/272) and a change that moved it would be unattributable.
+
+## The build recipe — this container CAN verify (NR-264, re-proven 2026-08-22)
+
+`cmake` configure **fails**: SDL3 and Lua arrive by FetchContent and the network policy refuses the
+download, so no target is generated and every harness *looks* unbuildable. It is not.
+
+```
+ls src/world/*.cpp | grep -Ev '(recipe_registry|works_registry|tech_tree|world_gen_config)\.cpp$'
+g++ -std=c++20 -O1 -Isrc -c <each>          # 47 TUs, xargs -P8, ~17s
+ar rcs libioworld.a obj/*.o
+g++ -std=c++20 -O1 -Isrc tools/verify/<h>.cpp libioworld.a -o <h>   # ~5s
+```
+
+Re-verified this session: `law_author_harness` green at 14/14. **This is the answer to NR-392** —
+a worktree agent now has a sanctioned way to build a harness, and every agent brief carries it.
+New harnesses need **no CMakeLists edit**: `file(GLOB IO_VERIFY_HARNESSES tools/verify/*.cpp)`.
+
+## Tasks
+
+### N1-A — BL-543, the value anchor's CHECK *(no C++ struct change; cleanest slice)*
+- **A1** `tools/verify/value_anchor.cpp` — read `scripts/economy.lua` § `unit_upkeep` and
+  `scripts/world_gen.lua` § `base_price`; assert the band `Σ(goods × base_price) ≈ 2 × credits`
+  per roster class, within a stated tolerance.
+- **A2** The mutation row: perturb a rate in-harness and assert the check goes **red**.
+- **A3** Report the implied *units funded per year* for the seeded extraction levy, so NR-382 can
+  be answered against a number.
+- *Scope: `tools/verify/value_anchor.cpp` only. **Authors no rate** — the numbers wait on BL-544.*
+
+### N1-B — BL-545, the sentiment substrate
+- **B1** `src/world/sentiment.{hpp,cpp}` — a directed, continuous value per (observer, subject)
+  over **two dimensions** (Access, Trust), for corps and nations alike.
+- **B2** Storage on `world` + the decay/factor pass, authored in `economy.lua` at **zero**.
+- **B3** `tools/verify/sentiment_harness.cpp` — the six requirement rows, the **stance invariant**
+  first.
+- *Files: `src/world/sentiment.{hpp,cpp}` (new), `src/world/world.hpp` (hotspot — main session),
+  `scripts/economy.lua` (hotspot — main session), the harness.*
+
+### N1-C — BL-537, the national budget
+- **C1** `src/world/nation_budget.{hpp,cpp}` — weights over priority lines, `reserve_fraction`,
+  the per-tick spend pass.
+- **C2** The field on `nation_component`, and the hook in `apply_budget`.
+- **C3** `tools/verify/nation_budget_harness.cpp` — conservation first.
+- *Files: `src/world/nation_budget.{hpp,cpp}` (new), `src/world/components.hpp` (hotspot),
+  `src/world/budget_system.cpp` (hotspot), `scripts/economy.lua` (hotspot), the harness.*
+
+## Collision map — a splitting heuristic, not a gate
+
+| File | N1-A | N1-B | N1-C | Handling |
+|---|---|---|---|---|
+| `tools/verify/*` (3 new) | ✔ | ✔ | ✔ | disjoint — no collision |
+| `src/world/sentiment.*` | | ✔ | | new TU, slice-owned |
+| `src/world/nation_budget.*` | | | ✔ | new TU, slice-owned |
+| `src/world/world.hpp` | | ✔ | | **hotspot — main session** |
+| `src/world/components.hpp` | | | ✔ | **hotspot — main session** |
+| `src/world/budget_system.cpp` | | | ✔ | **hotspot — main session** |
+| `scripts/economy.lua` | reads | ✔ | ✔ | **hotspot — main session** |
+| `CMakeLists.txt` | | | | none — harnesses are glob-picked |
+
+**The call:** three worktree slices for the new TUs and harnesses; **every shared-header and
+`economy.lua` edit is done by the main session at integration.** That is the DELIVERY rule
+(hotspot/integration wiring stays in the main session) and it is what keeps two difficulty-5 items
+in one batch tractable.

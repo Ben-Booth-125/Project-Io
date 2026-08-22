@@ -887,6 +887,22 @@
    "done_when": "The style sheet names a settled colour guide and global rules, backed by at least one composite render the direction was actually judged against.",
    "risk": "A composite render mixing UI/map/icons/tiles takes more than one pass to get looking finished enough to judge by; early iterations may read as too rough to rule on.",
    "notes": "Design-track sprint, run by Joe rather than the usual dev-sprint rhythm; not tied to a backlog item while it stays exploratory. Promote settled decisions into a real authority doc (or a UI backlog item) once the style is narrowed."
+  },
+  {
+   "id": "N1",
+   "theme": "The two spines, landed inert",
+   "author": "session 2026-08-22",
+   "state": "open",
+   "opened_date": "2026-08-22",
+   "goal": "Lane N opens - the v0.1.24 minor Ben named \"Who answers to whom\". This session designed the whole corp-nation channel and settled 41 open calls; nothing of it exists in code. This sprint lands the TWO SPINES everything else in the minor requires - a nation's weighted budget (BL-537) and the sentiment substrate (BL-545) - plus the value anchor's CHECK (BL-543). All three land INERT: authored rates at zero, so a world runs bit-identical to today, which is the pattern BL-343, BL-480 and BL-454 all shipped under and the only way to add three subsystems without moving a single golden.",
+   "planned": [
+    "BL-537 (national budget) - the object, the pass, the conservation guarantee",
+    "BL-545 (sentiment substrate) - the directed continuous value, two dimensions, decay",
+    "BL-543 (value anchor) - the harness that guards the ratio, not the numbers"
+   ],
+   "done_when": "Three new headless harnesses are green; each subsystem is bit-identical to the pre-item build at zero rates; a nation's treasury debits equal corp credits to the last float; sentiment is directed, decays, and mutates NO stance table at any value; and the value-anchor check FAILS when a rate is perturbed.",
+   "risk": "Two difficulty-5 items in one batch. Mitigated by landing inert and by the collision map: all three touch scripts/economy.lua and two touch world.hpp, so the hotspot wiring stays in the main session and only the new TUs go to worktrees.",
+   "notes": "Build recipe for this container, from NR-264 and proven again this session: cmake configure FAILS (SDL3/Lua come by FetchContent and the network policy refuses them), but the 47 src/world/*.cpp sources minus the four Lua registry TUs compile directly. g++ -std=c++20 -O1 -Isrc, xargs -P8, ~17s, ar into a static lib, link each harness against it in ~5s. law_author_harness re-verified green at 14/14 this session. This is the answer to NR-392 (a worktree agent had no sanctioned way to build a harness) and every agent brief carries it."
   }
  ],
  "status_table": [
