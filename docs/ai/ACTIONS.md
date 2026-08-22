@@ -16,7 +16,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*139 entries — 25 gameplay · 24 canvas · 15 lens · 45 ledger · 30 chrome.*
+*142 entries — 25 gameplay · 24 canvas · 15 lens · 45 ledger · 33 chrome.*
 
 ---
 
@@ -2017,4 +2017,42 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Expected output.** The stage expands from its verdict line into its full chart-and-explanation view, or folds back. Purely presentational; no preference or preview state changes. This is the same fold idiom the in-game ledgers use — the wizard is where it is taught.
 
 **Reason to select.** To inspect what the current roll actually produced for a stage before setting or judging a preference; the charts are the only honest feedback (no raw values are printed).
+
+### `chrome.quick_save_key` — Keyboard.
+
+**Press.** Press F5.
+
+**Valid when:**
+- The app is in-game and no ImGui text field has keyboard focus.
+
+**Expected output.** Writes the whole campaign to the quick-save slot — a single file `quicksave.iosave` beside the executable, overwritten each time without a prompt. The file carries the world snapshot (every component store, the order book, procurement, stance, laws, research, battles in progress, the province partition and the history log) plus the app envelope (sim clock, world_params, the full generation report, the per-tick histories, and the view slice: rung, framing, lens, selection). The outcome is posted to the Field comms channel either way — a save that silently did nothing is worse than one that says it failed. The sim, view and selection are otherwise untouched.
+
+**Reason to select.** Fix a point to come back to before doing something irreversible, or before a long run whose outcome you may want to compare against a re-run from here.
+
+### `chrome.quick_load_key` — Keyboard.
+
+**Press.** Press F6.
+
+**Valid when:**
+- The app is in-game and no ImGui text field has keyboard focus.
+- A quick-save exists (F5 has been pressed at least once in some session).
+
+**Expected output.** Replaces the live campaign with the quick-save slot's contents, restoring the world, the clock, the generation report, the histories and the view exactly as saved. NO CONFIRMATION PROMPT — the current campaign is discarded. If the file is missing, corrupt, or written by a build with a different save-format version, the load is REFUSED and the running campaign is left completely untouched, with the reason posted to the Field comms channel; a refused load costs nothing. Panel open/closed state is not restored, deliberately.
+
+**Reason to select.** Return to the last fixed point — undo a run of decisions wholesale, or re-open the same starting position to try a different line from it.
+
+### `chrome.load_cli` — Command line.
+
+**Press.** Launch with `ProjectIo --load <path>`.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `path` | `string` | undefined |
+
+**Valid when:**
+- The named file exists and was written by a build with the same save-format version.
+
+**Expected output.** Opens straight into the saved campaign, skipping the main menu, the New World wizard, and the world generation plus pre-game warm start that follow them (~30-45 s). A failed load falls through to the main menu with the reason printed, rather than exiting — a missing file must not look like a crash.
+
+**Reason to select.** Resume a campaign directly, or open a fixed world for a capture run without paying generation on every launch — the reason the save format exists (BL-536).
 

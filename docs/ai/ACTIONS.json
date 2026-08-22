@@ -2357,6 +2357,49 @@
    ],
    "expected_output": "The withdrawal is RECORDED, not applied. It is honoured at the START of the next tick's battle pass, before that tick's round batch — which is what makes the window a real window rather than a same-instant escape. When honoured, the resolver's three-term cost (a flat base, plus a term per round already fought, plus a pursuit term scaled by how far behind the withdrawing side is) reduces that side's strength, the loss is distributed across its units proportional to count with the remainder by ascending unit id, and the side that stayed holds the field. A rejection mutates nothing at all.",
    "reason_to_select": "The ONLY decision a commander has once contact is made — a battle opens because two hostile forces share a province, not because anyone asked for it, so there is no 'attack' verb to weigh against this one. Weigh it on the cost curve rather than on the odds alone: the price rises with every round already fought AND with how badly you are losing, and the rounds themselves have already cost their own attrition, so a late withdrawal compounds twice. Breaking off early from a fight you are losing is cheap; breaking off late from one you are losing badly is where armies die. At the shipped pacing (3 rounds a tick, 6 to a stalemate) a full battle spans two ticks, so there is exactly ONE real opportunity to use this. THE CARD QUOTES THE PRICE BEFORE YOU PAY IT — base, per-round and pursuit shown separately, taken from the resolver's own arithmetic — so the cost curve is readable rather than something to infer from the rules."
+  },
+  {
+   "id": "chrome.quick_save_key",
+   "family": "chrome",
+   "surface": "Keyboard.",
+   "press": "Press F5.",
+   "args": [],
+   "preconditions": [
+    "The app is in-game and no ImGui text field has keyboard focus."
+   ],
+   "expected_output": "Writes the whole campaign to the quick-save slot — a single file `quicksave.iosave` beside the executable, overwritten each time without a prompt. The file carries the world snapshot (every component store, the order book, procurement, stance, laws, research, battles in progress, the province partition and the history log) plus the app envelope (sim clock, world_params, the full generation report, the per-tick histories, and the view slice: rung, framing, lens, selection). The outcome is posted to the Field comms channel either way — a save that silently did nothing is worse than one that says it failed. The sim, view and selection are otherwise untouched.",
+   "reason_to_select": "Fix a point to come back to before doing something irreversible, or before a long run whose outcome you may want to compare against a re-run from here."
+  },
+  {
+   "id": "chrome.quick_load_key",
+   "family": "chrome",
+   "surface": "Keyboard.",
+   "press": "Press F6.",
+   "args": [],
+   "preconditions": [
+    "The app is in-game and no ImGui text field has keyboard focus.",
+    "A quick-save exists (F5 has been pressed at least once in some session)."
+   ],
+   "expected_output": "Replaces the live campaign with the quick-save slot's contents, restoring the world, the clock, the generation report, the histories and the view exactly as saved. NO CONFIRMATION PROMPT — the current campaign is discarded. If the file is missing, corrupt, or written by a build with a different save-format version, the load is REFUSED and the running campaign is left completely untouched, with the reason posted to the Field comms channel; a refused load costs nothing. Panel open/closed state is not restored, deliberately.",
+   "reason_to_select": "Return to the last fixed point — undo a run of decisions wholesale, or re-open the same starting position to try a different line from it."
+  },
+  {
+   "id": "chrome.load_cli",
+   "family": "chrome",
+   "surface": "Command line.",
+   "press": "Launch with `ProjectIo --load <path>`.",
+   "args": [
+    {
+     "name": "path",
+     "type": "string",
+     "description": "Path to a .iosave file."
+    }
+   ],
+   "preconditions": [
+    "The named file exists and was written by a build with the same save-format version."
+   ],
+   "expected_output": "Opens straight into the saved campaign, skipping the main menu, the New World wizard, and the world generation plus pre-game warm start that follow them (~30-45 s). A failed load falls through to the main menu with the reason printed, rather than exiting — a missing file must not look like a crash.",
+   "reason_to_select": "Resume a campaign directly, or open a fixed world for a capture run without paying generation on every launch — the reason the save format exists (BL-536)."
   }
  ]
 }

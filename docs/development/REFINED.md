@@ -239,6 +239,25 @@ session; the collision map below is kept as the record of how it *would* have sp
 | T7 | Visual check — a loaded world renders as the generated one (R5) | `scripts/verify/save_load.lua` | T5 |
 | T8 | Docs — TECH_FOUNDATIONS present tense at last, BL-107 resolved, ACTIONS entry if a press lands | `docs/tech/TECH_FOUNDATIONS.md`, `docs/ai/ACTIONS.json` | T1–T7 |
 
+**All eight tasks completed 2026-08-22; requirement group `world-save-snapshot` complete (R1–R6).
+Commits: `3832eb6` (world half), plus the envelope/wiring/docs commit.**
+
+Two things came out of the work that were not in the plan:
+
+- **`corp_modifiers` is not recomputable** (NR-510). The re-fold BL-107 prescribed cannot
+  reconstruct cross-tick earn order, and `modified_scalar` folds non-commuting operations.
+  Serialised directly; `world.hpp`'s comment and BL-107's note both corrected.
+- **`verify.command` never routed through `dispatch_action`** (NR-513), so nine commands —
+  every time control and UI toggle — silently did nothing through it. Fixed; behaviour-
+  identical for all existing callers, which drive only navigation commands.
+
+**Verification honestly stated.** R1–R4 headless (`save_roundtrip`, 36 assertions). R5/R6
+via `save_load.lua`: three byte-identical before/after capture pairs, plus a live `--load`
+launch. The F5/F6 keys were exercised through `dispatch_action` (the function the key table
+calls) and their presence in `s_bindings` confirmed via the generated F1 overlay — **an actual
+SDL keypress was not machine-driven**; computer-use could not resolve a locally-built exe.
+The app is left open on the save for Ben to press them.
+
 **Collision map (splitting heuristic).** T2+T3 are one vertical slice over `world/*`;
 T4+T5 are one over `core/*`; T6 and T7 are independent verifiers that only need the
 signatures. T1 is the shared foundation everything else includes — it lands first, alone.

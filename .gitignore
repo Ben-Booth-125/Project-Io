@@ -68,3 +68,6 @@ _run.bat
 
 .claude/worktrees/
 tools/session/.timer_state
+
+# Save files written by F5 quick-save / verify.save (BL-536).
+*.iosave

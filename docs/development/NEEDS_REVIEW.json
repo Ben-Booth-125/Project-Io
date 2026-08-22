@@ -3007,6 +3007,39 @@
    "why_it_matters": "The alternative was a second definition of the same bytes - the NR-511 problem again, and this time for records that are genuinely intricate (the per-topic timestamp convention, the strictly-ascending province id check). Reuse looked clearly right, but a nested magic is the kind of thing worth stating out loud rather than letting someone find.",
    "proposed": "Keep it. The nested header is a feature: an embedded section that fails its own guard fails the whole load, which is the behaviour wanted anyway.",
    "status": "open"
+  },
+  {
+   "id": "NR-513",
+   "title": "verify.command never routed through dispatch_action, so every app-level command it named silently did nothing",
+   "raised": "2026-08-22",
+   "kind": "observation",
+   "source": "BL-536, wiring the F5/F6 quick-slot bindings",
+   "what": "verify_api.cpp's `command` hook called ui::apply_canvas_command directly, under a comment claiming it was \"the same dispatch the keyboard uses\". It was not. A key press goes through app::dispatch_action, which handles the commands needing app members - the six time controls, the three UI toggles - and only then falls through to apply_canvas_command. So verify.command(\"pause_toggle\") did nothing at all, and neither did speed_1..speed_5, help_toggle, options_toggle or tech_tree_toggle.\n\nNothing caught it because no committed script uses one: a grep of scripts/verify shows only ascend, descend and zoom_in, all of which apply_canvas_command handles. The gap was invisible precisely because it sat under the part of the vocabulary nobody had scripted yet.\n\nFIXED as part of BL-536 (it had to be, or the two new save bindings would have been the tenth and eleventh commands to silently no-op). Behaviour-identical for every existing caller.",
+   "why_it_matters": "A verify hook that quietly does nothing is worse than one that errors: a script reads as if it drove the clock, the capture looks plausible, and the claim is false. Worth knowing that nine commands were in that state, in case any past reasoning leaned on one.",
+   "proposed": "No action needed on the fix. Flagged in case a script or a past golden was written expecting a time control to work through verify.command - none found, but I only checked the committed scripts.",
+   "status": "open"
+  },
+  {
+   "id": "NR-514",
+   "title": "Save is a discrete act, not the per-tick autosnapshot TECH_FOUNDATIONS described",
+   "raised": "2026-08-22",
+   "kind": "decision-taken",
+   "source": "BL-536 (world snapshot save)",
+   "what": "TECH_FOUNDATIONS' save-model paragraph specified a tick-boundary snapshot: \"the full simulation state will be serialised at each economy tick... manual save is a named copy of the most recent snapshot\". I did not build that. Saving happens only when asked - F5, --load's counterpart, or verify.save.\n\nReason: a snapshot is 18.7 MB. Writing one every economy tick would put a multi-megabyte serialise and file write on the tick path, for a rollback feature nothing has asked for. The stated benefit was \"clean, deterministic save points\", and that is already what world::state_hash provides for debugging, at no I/O cost.\n\nI rewrote the paragraph to describe what exists and to say plainly that the autosnapshot was never built.",
+   "why_it_matters": "It reverses a written technical decision rather than merely implementing it, which is Ben's call, not mine. If the intent was rollback or a replay/debug facility, that is a different item and the design should say so.",
+   "proposed": "Keep discrete saving. If a rollback or crash-recovery autosave is wanted later, file it as its own item with a cadence and a retention policy - a per-tick 18.7 MB write needs both.",
+   "status": "open"
+  },
+  {
+   "id": "NR-515",
+   "title": "Quick save/load has no confirmation and one unnamed slot",
+   "raised": "2026-08-22",
+   "kind": "decision-taken",
+   "source": "BL-536 (world snapshot save)",
+   "what": "F5 overwrites `quicksave.iosave` without asking; F6 discards the live campaign without asking. One slot, no naming, no listing, no menu entry. BL-536's design said explicitly \"no autosave cadence, no save-slot UI\", so this is in scope as written - but it is the part a player touches, and the failure mode is real: F6 pressed by mistake loses everything since the last F5.\n\nAgainst that: a refused load costs nothing (the read builds into scratch), and the quick-slot convention is well understood from other games.",
+   "why_it_matters": "It is the one place this item can lose a player's work, and the mitigation is a UI item rather than a format one.",
+   "proposed": "Either accept the quick-slot convention as-is, or file a small follow-on for named slots plus a Load confirmation when the live campaign has advanced since the last save. My leaning is the follow-on - the format already carries everything a slot list would need to show (date, seed, corp).",
+   "status": "open"
   }
  ]
 }

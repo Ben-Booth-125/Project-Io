@@ -350,10 +350,22 @@ struct world
     /// `modify_scalar` effects (BL-479; laws join via BL-480). Per-corp and
     /// append-ordered: `advance_tech_gates` appends a tech's effects at the
     /// earn moment, in gate-table order, so the fold order below is the earn
-    /// order and is deterministic. DERIVED state — recomputable from
-    /// `earned_techs` × the gate table — so it is deliberately NOT folded into
-    /// `state_hash`: the canonical fact is the earned set, and hashing a cache
-    /// of it would only double-count. `std::map` for deterministic iteration
+    /// order and is deterministic. NOT folded into `state_hash`: the canonical
+    /// fact is the earned set, and hashing an accumulation of it would only
+    /// double-count.
+    ///
+    /// DERIVED IN ORIGIN BUT ORDER-BEARING, SO IT IS SERIALISED (BL-536,
+    /// NR-510). This comment used to say "recomputable from `earned_techs`
+    /// × the gate table", and BL-107 carried a change-note instructing the save
+    /// format to re-fold it on load. Both were wrong; the save does neither.
+    /// `advance_tech_gates` appends in gate-table order WITHIN ONE CALL, but it
+    /// runs every tick — so the stored sequence is ordered by (earn tick, gate
+    /// index), while a re-fold can only reproduce (gate index). The two diverge
+    /// as soon as a corp satisfies a higher-index gate before a lower-index one,
+    /// which nothing prevents. It matters because `modified_scalar` folds in
+    /// stored order across `add` and `multiply`, which do not commute. The order
+    /// is information the earned set does not carry, so it is state.
+    /// `std::map` for deterministic iteration
     /// (the `corp_body_pools` rationale). Empty at world setup, and stays
     /// empty for the life of any world whose techs carry only
     /// unlock_structure — which is what keeps such a world bit-identical to

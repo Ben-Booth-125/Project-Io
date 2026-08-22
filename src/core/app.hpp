@@ -68,6 +68,11 @@ public:
     /// run().
     void host_agent(uint16_t port) { m_agent_port = port; }
 
+    /// Open into this save on the next `run()` instead of the main menu.
+    /// Set by `--load <path>`; consumed once. Empty = the normal menu entry.
+    /// @param path Save file to open.
+    void open_save(std::string path) { m_pending_load = std::move(path); }
+
     /// Run a non-interactive visual-verification session: set up a deterministic
     /// world (seeded, sim paused), expose the `verify` Lua API (which drives view
     /// and overlay state directly and captures named PNG frames), execute the
@@ -108,6 +113,38 @@ private:
     /// found the honest way: a header sparkline showed six points where a solo
     /// run shows four. Any new per-tick app member belongs in here.
     void reset_verify_transients();
+
+    // --- Save / load (BL-536) -----------------------------------------------
+
+    /// Path of the quick-save slot -- one fixed file beside the executable.
+    /// Deliberately the simplest thing that works: named slots, an overwrite
+    /// prompt and a load menu are a UI item, not this one.
+    /// @return The quick-save file path.
+    std::string quick_save_path() const;
+
+    /// Write the live world plus its app-layer envelope to @p path.
+    ///
+    /// Gathers the four envelope parts off `app` (clock, params, generation
+    /// report, histories + the ui_state slice) and hands them to
+    /// `write_save_game`. Posts the outcome to the comms log either way -- a
+    /// save that silently does nothing is worse than one that says it failed.
+    ///
+    /// @param path Destination file.
+    /// @return     True on success.
+    bool save_game_to(const std::string& path);
+
+    /// Replace the live campaign with the save at @p path.
+    ///
+    /// Leaves the running campaign untouched if the read fails -- `read_save_game`
+    /// builds into scratch, so a corrupt file costs the player nothing. On
+    /// success it also drops the app-side transients that belong to the world
+    /// being replaced (the econ report, the standings, the BL-198 deposit
+    /// series), which would otherwise describe a campaign that is no longer
+    /// loaded.
+    ///
+    /// @param path Source file.
+    /// @return     True on success.
+    bool load_game_from(const std::string& path);
 
     void process_events(bool& running);
 
@@ -315,6 +352,8 @@ private:
     // block further down for why it cannot sit anywhere else.
     enum class app_screen { menu, generating, building, choosing_corp, in_game };
     app_screen m_screen = app_screen::menu;
+    /// Pending `--load` target, consumed by run() before the frame loop.
+    std::string m_pending_load;
     bool       m_quit_requested = false;  ///< Set by the menu's Quit button; breaks the run() loop.
 
     SDL_Window*   m_window   = nullptr;
