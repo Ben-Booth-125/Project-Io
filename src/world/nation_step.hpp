@@ -78,3 +78,42 @@ struct earmark_result
 /// `report.earmarks` and `report.budgets[corp].subsidies`.
 void run_nation_step(world& w, const recipe_registry& reg, economy_report& report,
                      int econ_tick);
+
+// ---------------------------------------------------------------------------
+// BL-571 — garrison upkeep, the `military_research` line's first consumer
+// ---------------------------------------------------------------------------
+// "Upkeep is a budget claim, not the corp vector" (MILITARY.md § Nation
+// garrisons) — but a `budget_claim` (nation_budget.hpp) is structurally a
+// request that a NAMED CORPORATION be paid; a garrison has no corp on the
+// other end, so it cannot be one. This pass instead RECOMPUTES the same
+// share formula `run_national_budget` uses (spendable = treasury x
+// (1 - reserve); share(L) = spendable x weight(L) / sum(weights)) for the
+// `military_research` line alone, and spends it as a direct expenditure —
+// debited from the treasury, credited to nobody, exactly the credit-wage
+// precedent `budget_system.cpp`'s corp `upkeep` term already sets (soldiers'
+// wages leave the modelled economy; they are not a transfer between two
+// entities the world tracks).
+//
+// The BILL reuses the SAME authored table a corp unit's credit wage does
+// (`recipe_registry::military().upkeep`, unit_roster.hpp's
+// `resolve_unit_upkeep(u, p).credits`) — "there is no second mechanism"
+// (MILITARY.md): one upkeep table, two payers. Every rate defaults to zero,
+// so this pass is INERT at the shipped rates, matching the corp path.
+//
+// SHORTFALL reads exactly like `run_unit_upkeep`'s own decay rule: unmet
+// (paid < bill) decays every one of that nation's garrison units'
+// `supply_factor_permille` by `supply_decay_permille`; met (bill fully paid,
+// or no bill at all) recovers by `supply_recovery_permille`. One bill per
+// nation, not one draw per unit — a garrison's upkeep is a single credit
+// figure, not a per-unit goods draw, so there is nothing to distribute
+// per-unit the way `distribute_losses` has to.
+//
+// Runs from `run_nation_step`, after `run_national_budget` (step 3) — the
+// SAME treasury and the SAME `w.nation_budgets` weights a claim on any other
+// line would read this tick, just without going through the claim/transfer
+// machinery a corp-payee line needs.
+//
+// DETERMINISTIC: nations walked in ascending id (`std::map`, built from the
+// unordered `w.units`/`w.nations` and sorted first); each nation's garrison
+// unit ids ascending.
+void run_nation_garrison_upkeep(world& w, const recipe_registry& reg);

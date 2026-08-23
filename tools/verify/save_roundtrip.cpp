@@ -159,12 +159,24 @@ int main()
             // misparse whatever followed. The whole stream is refused instead --
             // a v3 save is not migrated, it is rejected, and the destination is
             // not touched.
-            static_assert(world_save_version == 4,
+            static_assert(world_save_version == 5,
                           "P9 names v3 as the refused predecessor; re-read this row on a bump");
             std::string bad = bytes_once;
             const uint32_t v3 = 3;
             std::memcpy(&bad[4], &v3, sizeof v3);
-            check(!from_bytes(bad, victim), "P9 a v3-versioned stream is refused (format is v4)");
+            check(!from_bytes(bad, victim), "P9 a v3-versioned stream is refused (format is v5)");
+        }
+        {
+            // Sprint 16, BL-571: the IMMEDIATE previous format. A v4 stream's
+            // nation record is one w_id short (no capital_tile) -- not a
+            // trailing gap but a MID-RECORD one, so a reader that accepted it
+            // would misread every field of every nation after the first and
+            // everything serialised after `nations` besides. Refused whole, same
+            // contract as every prior bump.
+            std::string bad = bytes_once;
+            const uint32_t v4 = 4;
+            std::memcpy(&bad[4], &v4, sizeof v4);
+            check(!from_bytes(bad, victim), "P10 a v4-versioned stream is refused (format is v5)");
         }
         {
             // Truncated mid-way through the tile store -- far enough in that a

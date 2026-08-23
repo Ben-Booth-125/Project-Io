@@ -78,7 +78,14 @@ inline constexpr uint32_t world_save_magic =
 /// stream simply ends where this one continues, so it is refused whole on the
 /// same strict-equality contract as every prior bump — there is no partial
 /// read of a v3 stream as a v4 with an empty holder vector.
-inline constexpr uint32_t world_save_version = 4;
+///
+/// Bumped to 5 by BL-571 (nation garrisons): `nation_component::capital_tile`
+/// (one entity_id) is a new field IN THE MIDDLE of the existing per-nation
+/// record (`w_nation`/`r_nation`), not a trailing section — every nation
+/// record written before this item is one `w_id` short, so a v4 stream reads
+/// misaligned from the first nation onward rather than merely truncated. The
+/// same strict-equality contract refuses it whole.
+inline constexpr uint32_t world_save_version = 5;
 
 /// Write @p w as a complete world snapshot.
 ///
