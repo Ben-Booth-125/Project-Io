@@ -443,24 +443,43 @@ in `tools/verify/README.md`.
   silently measures the old economy. S4 asserts the census is identical across two generations of one
   seed; S0–S3 report and assert nothing about the finding.
 
-- **`history_conquest_gap`** — WHY the Era −1 sim fights and never conquers (BL-384, 2026-08-21).
-  **Report-only by design**, and the model to copy when a harness's job is to EXPLAIN a red rather
-  than to add another one: `history_sim_harness`'s B384a/B384b already assert that a region changes
-  hands by war, so this one asserts nothing about the gap and instruments it instead. It reads
-  `history_sim_state::battle_traces`, populated only under `history_sim_params::trace_battles`.
+- **`history_conquest_gap`** — WHY the Era −1 sim fights and never conquers (BL-384), measured on
+  **the era generation actually runs** (BL-462, 2026-08-23). Takes an optional sweep width:
+  `history_conquest_gap 32`. Instruments rather than re-asserts — `history_sim_harness`'s
+  B384a/B384b already assert that a region changes hands by war — but it is **no longer
+  report-only**: it now carries the acceptance test for BL-462.
 
-  It is built to REFUTE its own hypothesis, which is what it did. BL-384's design named a specific
-  mechanism — the scorer estimating odds with no terrain term while the resolver applies one — and
-  the harness separates that from two rival explanations (the scored hub differing from the levying
-  hub; the fight being won but the transfer bar never cleared) so a reading cannot be mistaken for
-  a guess. Measured over 8 worlds: the scorer is calibrated to −0.0pp, hub mismatch is 0/1226, and
-  99.8% of victories convert — all three mechanisms refuted. What it found instead is that **2 of 8
-  worlds fight no war at all** while the rest conquer heavily.
+  **Read this before trusting any number it prints.** Until 2026-08-23 this harness, like every
+  other Era −1 check, took `history_sim_params`'s struct default: a 4000 BCE → 0 CE span on a
+  six-band clock, null creeds, the bare world seed, no works, and the report's POST-sim settlement.
+  Generation runs 400 years on one 4-year band with real creeds and a folded seed. **Six
+  divergences, so every earlier finding described a sim the game does not run** — including "2 of 8
+  worlds fight nothing" and its n=32 restatement. All six are closed by
+  `world/era_minus_one.hpp`: the derivations live in one place that `make_hard_coded_world` calls,
+  and everything a caller cannot re-derive is captured at generation's own call site into
+  `era_minus_one_fixture`. The harness hands those values straight back and constructs nothing.
 
-  Its own two assertions are about the INSTRUMENT, not the finding: T1 that tracing is inert (a
-  traced run matches an untraced one in every other output — an instrument that perturbs what it
-  measures is worse than none), and T2 that it caught something. Runs ~8 real 0→1960 sims; budget
-  several minutes.
+  **A1 is the row that makes the rest mean anything**: for every swept seed the re-run's
+  battles/conquests/foundings must equal `generation_report::prehistory_*` from the same
+  generation, bit for bit. Green at 32/32. Red would mean no other number applies. R1 (the fork is
+  answered for every seed), R2 (the classification comes from counters, never from a battle set),
+  R3 (the pinned 8-seed table — re-pinned 2026-08-23, old values kept in the source comment) and
+  R4 (tracing is inert AND gated) sit under it.
+
+  **THE ONE REMAINING GAP, printed as a banner on every run:** `scripts/works.lua` is Lua-authored
+  and a headless harness cannot load it, so `build_work` is gated out and the run scores **four**
+  verbs where the shipped game scores five. Both sides of A1 pass the same null registry, so A1
+  stays exact — but any statement it makes about what beats Campaign is about a four-verb contest.
+  It was deliberately not closed by transcribing works.lua into C++, which would put the roster in
+  two places and rebuild BL-462's own failure mode one layer down.
+
+  What it finds on the real fixture at n=32: **11 of 32 worlds fight nothing** (not 17 of 32);
+  every one of those clears the campaign threshold and loses the argmax on every round, so the
+  fork's durable answer survives; **Settle takes 83–100% of the rounds Campaign loses** on every
+  world; and neither ceiling-vs-floor (32/32 overlap) nor score level separates a silent world from
+  a fighting one. BL-384's three original mechanisms stay refuted: hub mismatch 0/2503, 92.7% of
+  victories convert. Runs `2 × n` real 400-year sims plus `n` generations; ~28 s at n=8, ~7 min at
+  n=32.
 
 - **`interdiction_harness`** — Can a supply line be cut? (BL-458, Sprint C3, 2026-08-21.) The
   item-spanning check for the mechanic that makes a convoy a military object: a hostile unit
