@@ -56,18 +56,25 @@ async loading screen, and the startup-hang fix. SPRINTS.md § Sprint 15 is the r
   v0.1.19–v0.1.22 below, with the ancient tech ladder (BL-296) and the debt floor (BL-443) to
   v0.1.11; Era −1 logistics (BL-316), the shared-currency scorer (BL-318) and the works roster
   (BL-321) had already landed.
-- **v0.1.17 — Economy breadth.** *Theme: the chain is the growth track.* Named 2026-08-15 on Ben's
-  steer that the economy needs "robust and expansive building options, production methods, and an
-  implied growth track that we can refine tech and politics around". Four rulings settle its shape:
-  the growth spine is **chain depth** (how far down the production graph a corp can reach gates its
-  next building — not a tier ladder, not a tech gate); the roster goes past **20 building types**;
-  buildings offer **alternate production methods with real trade-offs**, not upgrades; and it comes
-  **before** the military sprint. Carries **BL-428** (the depth spine), **BL-429** (ancient
-  roster), **BL-430** (alternate methods), **BL-431** (method/chain UI), **BL-432** (guard harness)
-  and **BL-433** (the Launchpad and petroleum chain still shipping inside a 0 CE product). The
+- **v0.1.17 — The ancient roster becomes a ladder.** *Theme: the chain is the growth track.* Named
+  2026-08-15 on Ben's steer that the economy needs "robust and expansive building options,
+  production methods, and an implied growth track that we can refine tech and politics around".
+  Four rulings settle its shape and still hold: the growth spine is **chain depth** (how far down
+  the production graph a corp can reach gates its next building — not a tier ladder, not a tech
+  gate); the roster goes past **20 building types**; buildings offer **alternate production
+  methods with real trade-offs**, not upgrades; and it comes **before** the military sprint. The
   ancient tech ladder (**BL-296**) and the politics stub then *refine* this spine rather than
-  replace it — which is the whole reason a second unlock system was rejected. Cut by **Sprint 17**;
-  done-definition owed at the cut, per NR-103.
+  replace it — the whole reason a second unlock system was rejected.
+  **Re-planned 2026-08-23** against the code rather than the archived designs: the minor's
+  original carry set (BL-428, BL-429, BL-430, BL-431, BL-432, BL-433) is retired — three landed
+  (BL-428 the depth spine, BL-432 the guard harness, BL-433 the era-band split) and the rest were
+  absorbed by later work (BL-434 sub-facility groups, BL-460 the ancient ordnance route, BL-436's
+  extraction calibration). Ten fresh items carry it now, **BL-585** through **BL-594** — the
+  enum/save-format append, the wide ancient roster, alternate methods, a tech-gated recipe, a
+  narrow start gate, per-building materials, the dashboard depth readout, the breadth guard, the
+  Build door and the playthrough/cut. Sprint 17 holds to start after **Sprint 16** merges to
+  `main`, except **BL-587** (alternate methods), which touches no file Sprint 16 owns and landed
+  standalone 2026-08-23. Cut by **Sprint 17**; done-definition owed at the cut, per NR-103.
 - **v0.1.18 — The economy tells the truth.** *(Defined 2026-08-19 — Ben chose define over
   dissolve; the version had existed in the backlog since the Sprint 25a era while the Sprint-26
   split that owed its ROADMAP entry was dropped, NR-377.)* *Theme: the measured economy
@@ -347,7 +354,7 @@ everything after it by one.*
 | ~~14~~ | ~~v0.2.0~~ | **Superseded 2026-08-12** — the AI opponent parked with the space arc after its third deferral. Never opened. |
 | 15 | *(no tag)* | **The 0 CE refocus.** ✅ Retro-recorded 2026-08-12 — the tangent that became the product; see SPRINTS.md § Sprint 15. |
 | 16 | **v0.1.15** | **The mercenary vertical slice** — BL-377 (contract seam) playable end-to-end, BL-315 (conflict spine) on the critical path. |
-| 17 | **v0.1.17** | **Economy breadth** — named in the minor's own bullet; row added 2026-08-19 so the table covers the live arc. |
+| 17 | **v0.1.17** | **The ancient roster becomes a ladder** — named in the minor's own bullet; row added 2026-08-19, re-planned 2026-08-23. |
 | W1 | **v0.1.16** | **The watch** — BL-412 (agent seam), BL-408 (god view), BL-411 (strategy readout). Opened 2026-08-19. |
 | D1+D3 | **v0.1.11** | **Meta opens** — BL-479 (tech effect union), BL-480 (law author + treasury), one batch. Opened 2026-08-19. |
 
