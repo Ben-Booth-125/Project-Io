@@ -143,6 +143,47 @@ std::vector<sentiment_event> wide_stream(const std::vector<entity_id>& actors)
     return s;
 }
 
+/// A stream with MANY events on ONE key — which is what `wide_stream` does not
+/// have, and why an order-independence row built on it proves nothing: with a
+/// single event per ordered pair, nothing ever accumulates, so the canonicalising
+/// sort in `apply_sentiment_events` is inert and its removal is invisible.
+/// (Sprint N1 adversarial pass, 2026-08-22: `std::stable_sort` was deleted from
+/// `sentiment.cpp` and all 39 rows still passed.)
+///
+/// Every event on a key differs in (kind, magnitude) — including two that share a
+/// kind, so the comparator's magnitude tiebreak is exercised — which makes the
+/// canonical result well defined. And the shape is chosen so the fold is
+/// genuinely order-SENSITIVE: the positive events drive the pair to `limit`, and
+/// SATURATION makes what happens next depend on what came before it. Fold
+/// +15 then -2 and the row sits at 98; fold -2 then +15 and it sits at 100. That
+/// is a structural difference, not a low bit, which is what a row guarding a
+/// canonicalising sort needs — a low bit could be lost to a compiler's licence,
+/// two whole points cannot.
+///
+/// Verified by mutation, 2026-08-23: deleting `std::stable_sort` from
+/// `sentiment.cpp` moves this stream's table by 2.0 and fails R6d-R6f. On
+/// `wide_stream` it moves it by nothing at all.
+std::vector<sentiment_event> dense_stream(const std::vector<entity_id>& actors)
+{
+    std::vector<sentiment_event> s;
+    for (const entity_id a : actors)
+        for (const entity_id b : actors)
+        {
+            if (a == b)
+                continue;
+            // Canonical order is (kind, magnitude), so these fold as listed:
+            // complete 0.5, complete 3.0, trade 4.0, cancel 0.4, force 0.15.
+            // Any other arrival order that reaches the fold un-canonicalised
+            // lands somewhere else.
+            s.push_back(ev(a, b, sentiment_factor_kind::contract_cancelled, 0.4f));
+            s.push_back(ev(a, b, sentiment_factor_kind::contract_completed, 3.0f));
+            s.push_back(ev(a, b, sentiment_factor_kind::force_used,         0.15f));
+            s.push_back(ev(a, b, sentiment_factor_kind::contract_completed, 0.5f));
+            s.push_back(ev(a, b, sentiment_factor_kind::trade_conducted,    4.0f));
+        }
+    return s;
+}
+
 } // namespace
 
 int main()
@@ -456,22 +497,54 @@ int main()
         // The stronger claim: the SAME events in a DIFFERENT order also land
         // bit-identically, because the fold canonicalises its batch. An emitter
         // that gathered from an unordered container cannot leak that order.
-        std::vector<sentiment_event> reversed(stream.rbegin(), stream.rend());
+        //
+        // It has to be tested on a stream with SEVERAL events per key. On one
+        // event per key the claim is vacuous — nothing accumulates, so no order
+        // can matter and the sort could be deleted without a row noticing. That
+        // is exactly what this row used to do.
+        const std::vector<sentiment_event> dense = dense_stream({a, b, c, d});
+        sentiment_table base;
+        for (int tick = 0; tick < 250; ++tick)
+            run_sentiment_step(base, p, dense);
+        check(!base.pairs.empty() && dense.size() > stream.size(),
+              "R6c the order-independence rows run on a stream with SEVERAL "
+              "events per key - on one per key the claim is vacuous");
+
+        std::vector<sentiment_event> reversed(dense.rbegin(), dense.rend());
         sentiment_table run3;
         for (int tick = 0; tick < 250; ++tick)
             run_sentiment_step(run3, p, reversed);
-        check(tables_identical(run1, run3),
-              "R6c ...and so does the same stream folded in reverse order - "
-              "order-independent by construction");
+        check(tables_identical(base, run3),
+              "R6d ...and that stream folded in reverse order lands "
+              "bit-identically - order-independent by construction");
 
         // A rotated batch too, so the reversal is not passing by symmetry.
-        std::vector<sentiment_event> rotated(stream.begin() + 1, stream.end());
-        rotated.push_back(stream.front());
+        std::vector<sentiment_event> rotated(dense.begin() + 1, dense.end());
+        rotated.push_back(dense.front());
         sentiment_table run4;
         for (int tick = 0; tick < 250; ++tick)
             run_sentiment_step(run4, p, rotated);
-        check(tables_identical(run1, run4),
-              "R6d ...and a rotated batch, so R6c is not passing by symmetry");
+        check(tables_identical(base, run4),
+              "R6e ...and a rotated batch, so R6d is not passing by symmetry");
+
+        // And a shuffled batch, deterministically permuted: the two above are
+        // structured permutations, this one is not.
+        std::vector<sentiment_event> shuffled = dense;
+        for (std::size_t i = shuffled.size(); i > 1; --i)
+            std::swap(shuffled[i - 1], shuffled[(i * 7919u) % i]);
+        bool actually_permuted = false;
+        for (std::size_t i = 0; i < dense.size(); ++i)
+            if (shuffled[i].observer != dense[i].observer ||
+                shuffled[i].subject  != dense[i].subject  ||
+                shuffled[i].kind     != dense[i].kind     ||
+                shuffled[i].magnitude != dense[i].magnitude)
+                actually_permuted = true;
+        sentiment_table run5;
+        for (int tick = 0; tick < 250; ++tick)
+            run_sentiment_step(run5, p, shuffled);
+        check(actually_permuted && tables_identical(base, run5),
+              "R6f ...and an arbitrary permutation, which is the shape an "
+              "unordered_map emitter would actually hand over");
     }
 
     // --- S: serialisation ----------------------------------------------------

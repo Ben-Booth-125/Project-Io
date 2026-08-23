@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*247 entries — 212 open, 35 resolved.*
+*250 entries — 215 open, 35 resolved.*
 
 ---
 
@@ -2081,6 +2081,51 @@ The practical consequence is a real one: any Sprint N1 or v0.1.24 item that appe
 > **Recommendation:** Re-run the components.hpp half of the hotspot audit against the merged tree before briefing any agent on that cluster. The other three hotspot verdicts are unaffected - history_sim, corp_ai and body_surface_canvas do not turn on what is serialised.
 
 *Files: `docs/development/backlog.json`, `docs/politics/RELATIONS.md`, `docs/META_LAYER.md`, `src/world/world_save.cpp`*
+
+### NR-546 — BL-537: bit-exact conservation is not achievable over arbitrary float weights — the claim was narrowed rather than the code changed
+*decision taken on your behalf · raised 2026-08-23 · from Fixing the Sprint N1 C-budget slice (BL-537, national budget) after the adversarial pass found conservation failing at ordinary weights.*
+
+The national budget's requirement R1 said world credit is 'conserved bit-exactly over any tick span'. The adversarial pass showed it holds only because the fixture is built from dyadic rationals: at ordinary weights 1.53e-05 vanished in one tick. The decision taken, rather than escalating: the claim was wrong, not the code. Bit-exact conservation of a float transfer requires BOTH endpoints to represent it exactly, and `corporation_component::balance += amount` cannot once the balance has outgrown the credit — the identical rounding `apply_budget`'s `cc.balance += delta` has carried since it shipped. So R1 was split into the half that IS exact for any inputs (the pass debits precisely what it credits: paid, total_transferred and the treasury delta are ONE accumulation) and the half that is not (the world total afterwards). The harness now proves the distinction instead of assuming it: one 64-tick span at ordinary weights whose balances are swept moves world credit by EXACTLY zero; an identical span whose balances accumulate drifts within the destinations' own rounding budget, and the two spans transfer a bit-identical total.
+
+**Why it matters.** It is a design answer, not a code change, and it reaches back into what BL-537's requirement group promises. If Ben wants literal conservation to the bit at any weights, the only construction that delivers it is integer or fixed-point credits — which is a money-model change spanning apply_budget, the market and every balance in the game, not a change to this pass. Worth knowing that the bound was measured rather than assumed: over 512 generated shapes the residual sits at ~5e-8 of everything moved, its sign varies, and it vanishes entirely when the destination can hold the credit.
+
+- Accept the narrowed claim (done). The pass conserves exactly; the destinations round, as they always have.
+- Move credits to fixed-point across the money loop, and get literal conservation everywhere. Large, and touches every balance in the game.
+- Leave a per-tick reconciliation that sweeps the residual somewhere. Rejected — it hides rounding rather than removing it, and gives the residual a destination nobody chose.
+
+> **Recommendation:** Accept the narrowed claim. The residual is float rounding at the destination, not a leak, and it is the rounding every other money flow already carries — a special case here would be inconsistent as well as expensive.
+
+*Files: `src/world/nation_budget.hpp`, `src/world/nation_budget.cpp`, `tools/verify/nation_budget_harness.cpp`*
+
+### NR-547 — Sprint N1's real lesson: all three harnesses were green, two subjects were defective, and every defect was found by mutating content or turning on a sanitizer
+*observation · raised 2026-08-23 · from Closing out the Sprint N1 fixes (BL-537, BL-543, BL-545).*
+
+Three implementing agents each wrote the code AND its harness. All three harnesses passed — 17/17, 39/39, 25/25 — and two of the three subjects were unsound. Not one defect was found by reading. They were found by: authoring the harness's own solved fixture into the real economy.lua (BL-543's check went RED on the day the anchor was satisfied); multiplying all 33 base prices by ten and watching nothing move (the content claim bound nothing); deleting a std::stable_sort and watching 39 rows still pass (the order-independence rows tested no order); compiling under AddressSanitizer (a heap-buffer-overflow the 34 value rows could not see); and running 512 generated shapes instead of one authored fixture (156 overdraws and 26 negative treasuries the authored fixture could not reach). Every fix in this pass added the check that would have caught its own defect, and each was mutation-tested against the pre-fix code before being accepted.
+
+**Why it matters.** The project's verification model is authorship — 'the docs are the audit'. That works for coverage and fails for adequacy: an author writing their own check writes the fixture their code passes. The cheap, repeatable counter is four moves, none of which need a second person: mutate the CONTENT the check reads, mutate the CODE the check guards, generate shapes instead of authoring one, and turn on a sanitizer. Worth considering whether the verifier-headless skill should require the mutation step for a NEW harness the way it now requires a repo-root working directory.
+
+- Add a 'prove the row has teeth' step to verifier-headless: every new assertion must be shown failing against a stated mutation before it is accepted.
+- Leave it to authorship, as with the doc audit.
+- Require it only for harnesses covering a determinism, conservation or memory-safety claim.
+
+> **Recommendation:** The third. The mutation step costs minutes on a rule/arithmetic row and would have caught all four false greens here; requiring it on every row would tax the cheap regression harnesses that are already fine.
+
+*Files: `.claude/skills/verifier-headless/SKILL.md`, `tools/verify/nation_budget_harness.cpp`, `tools/verify/sentiment_harness.cpp`, `tools/verify/value_anchor.cpp`*
+
+### NR-548 — spectator_determinism's golden is MSVC-derived and fails under g++ — every cloud/Linux session will see one red row that is not a regression
+*observation · raised 2026-08-23 · from Regression-running the existing harnesses after the Sprint N1 fixes, in the Linux remote container.*
+
+spectator_determinism reports 'R2 byte-identity: the unspectated hash equals the pre-BL-409 golden' as FAILED here: golden 344A9FE48306E93A, observed B4D09255AF346008. This is not caused by the Sprint N1 work — rebuilding the world library with nation_budget.o and sentiment.o REMOVED produces the identical observed hash. The harness's own provenance log already says why: 'MSVC-derived; this golden is toolchain-specific (float clearing arithmetic differs under g++)'. The two rows that carry real meaning both pass — R2's reproducibility (two independently built worlds agree) and R3 (spectating is deterministic).
+
+**Why it matters.** A permanently-red row trains a reader to ignore the harness, which is exactly how a real regression gets waved through. And it will be red in every session that is not on Ben's Windows box, which now includes every cloud session. Two honest fixes exist; blessing the g++ value is NOT one of them, because it would then be red on MSVC instead.
+
+- Carry TWO goldens, one per toolchain, and check the one matching the compiler. Small, and makes the toolchain dependence visible rather than a footnote.
+- Make the row report rather than assert when the compiler is not the one the golden was taken on — same shape as value_anchor's R3 branch.
+- Leave it, and rely on the provenance comment being read.
+
+> **Recommendation:** The first. It is a few lines, it keeps the row's teeth on both toolchains, and it turns a footnote into a check.
+
+*Files: `tools/verify/spectator_determinism.cpp`*
 
 ---
 

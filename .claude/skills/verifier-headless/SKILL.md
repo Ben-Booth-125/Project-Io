@@ -519,6 +519,72 @@ in `tools/verify/README.md`.
   Debug, so the three-seed default is ~186 s in a Debug tree — inside 25% of the long tier, the
   flaky-by-luck margin BL-288 re-tiered the suite to remove. `substrate_census.exe [seeds]`.
 
+- **`value_anchor`** — Does the content honour Ben's value anchor? (BL-543, Sprint N1, 2026-08-22;
+  reworked 2026-08-23.) Ben's sentence — *"a unit's annual equipment costs about twice their annual
+  salary"* — is the only thing in the project anchoring military value to money, and nothing checked
+  it because nothing could: both halves of BL-454's upkeep vector ship at zero. So this is **the
+  argument for what the rates should be, not a gate on what they are.** It authors no rate; it reads
+  `scripts/economy.lua`'s `unit_upkeep`, `scripts/world_gen.lua`'s `base_price` and
+  `scripts/recipes.lua`'s baskets out of the Lua *text* (the Lua TUs are the excluded set here) and
+  states the identity they must satisfy, at **base prices** and at **authoring time** — both
+  narrowings Ben's.
+
+  **R3 IS A BRANCH, NOT AN ASSERTION, and that is the point of it.** The first cut hard-asserted the
+  shipped rates were zero, so it would have gone RED on the one day it exists for. The adversarial
+  pass authored the harness's own solved fixture into `economy.lua` and got exit 1 *with the anchor
+  satisfied and all 19 rows in band.* It now asks which state the content is in and asserts the
+  invariant belonging to that state — inert: nothing is drawn at any scale; authored: R1's band is a
+  claim about shipped content. Verified in both directions.
+
+  **It is scale-invariant and says so (R6).** Multiply all 33 base prices by ten and every row stays
+  green — because the anchor is a *ratio*. That was a silent false green; it is now an asserted
+  property, paired with the row that does bind an absolute price: ordnance's markup over its own
+  recipe basket, against the five Advanced-Fabrication peers `recipes.lua` id 27 says it was derived
+  from (1.415–1.443; ordnance 1.433). Tripling steel alone drops it out of the band.
+
+  **Run from the repo root** — it refuses to run without the authored Lua rather than measure a
+  default. Links `combat.cpp`, `law.cpp`, `unit_roster.cpp`, `world.cpp`. 22 assertions.
+
+- **`nation_budget_harness`** — The national budget's spend side (BL-537, Sprint N1, 2026-08-22;
+  fixed and re-verified 2026-08-23). Exercises `run_national_budget` against the three rules in
+  `nation_budget.hpp`: every credit out is a direct transfer to a named corporation, nations save,
+  and a nation is never overdrawn.
+
+  **RUN IT UNDER AddressSanitizer AS WELL AS PLAIN.** R4f is a *memory* row — a claim naming a line
+  outside `budget_priority` (whose underlying type is `uint8_t`, so 0..255 are valid values while
+  only 0..8 index the weight vector) was an out-of-bounds write, and an out-of-bounds write is not
+  something a value assertion can see. The unfixed pass scores 34/34 on a plain build and aborts at
+  `nation_budget.cpp:62` the moment ASan is on. Build it with
+  `-fsanitize=address,undefined` and treat the clean run as part of the pass.
+
+  Two of its rows are **generated rather than authored** (R4g/R4h): 512 seeded shapes, varying
+  nation and corp counts, treasuries, reserves, weight sets and claim volumes. Measured against the
+  pre-fix pass they catch 156 overdraws and 26 solvent treasuries driven negative — none of which
+  the authored fixtures could reach, because the bound only fails once enough claims land on enough
+  lines. The generator is a fixed-order xorshift: pure, replayable, part of the check and not of the
+  simulation.
+
+  Its dyadic reference fixture proves the *arithmetic*; `make_awkward_fixture` (non-dyadic weights,
+  awkward reserve, off-grid prices) proves the arithmetic is not what was making the reference
+  fixture pass. Links `world.cpp`, `nation_budget.cpp`. 36 assertions.
+
+- **`sentiment_harness`** — The sentiment substrate (BL-545, Sprint N1, 2026-08-22; one row rebuilt
+  2026-08-23). Checks `sentiment.{hpp,cpp}` against the stance invariant (*sentiment informs a
+  declaration and may never make one*), directedness, decay with no floor, two independent
+  dimensions, inertness at authored zero, determinism and the flat-binary round trip.
+
+  R1's strongest form is **structural and cannot be printed**: `sentiment.cpp` is never handed a
+  `world&`, so it has no reach to a stance table at all. The harness asserts it anyway — a
+  structural argument nobody checks is one refactor away from being false.
+
+  **The order-independence rows run on `dense_stream`, not `wide_stream`, and that distinction is
+  the whole row.** `wide_stream` emits exactly one event per ordered pair, so nothing accumulates,
+  so no order can matter: the adversarial pass deleted `std::stable_sort` from `sentiment.cpp:159`
+  and all 39 rows still passed. `dense_stream` puts five events on every key and drives the pair to
+  the saturation limit, which makes the fold order-*sensitive* by two whole points rather than by a
+  low bit. Verified by mutation: without the sort, R6d–R6f fail. Links `world.cpp`, `sentiment.cpp`,
+  `stance.cpp`. 41 assertions.
+
 ## Running the whole suite (CTest — BL-104)
 
 As of BL-104 every `tools/verify/*.cpp` is a registered CTest test, so the whole logic tier runs

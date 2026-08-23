@@ -40,17 +40,31 @@ void run_national_budget(world& w,
     // the accumulation order is (nation, line, corp, arrival) always.
     //
     // A claim is DROPPED HERE, before any arithmetic, when it names a corp that
-    // does not exist, a nation with no authored budget, or a non-positive /
-    // non-finite amount. Dropping at gather time is the point: a claim admitted
-    // into the demand total and then found unpayable would debit a treasury
-    // with nothing to credit, which is exactly the money destruction BL-480
-    // removed from the levy.
+    // does not exist, a nation with no authored budget, a line outside the enum,
+    // or a non-positive / non-finite amount. Dropping at gather time is the
+    // point: a claim admitted into the demand total and then found unpayable
+    // would debit a treasury with nothing to credit, which is exactly the money
+    // destruction BL-480 removed from the levy.
+    //
+    // THE LINE CHECK IS NOT DEFENSIVE PADDING. `budget_priority` has a `uint8_t`
+    // underlying type, so every one of 0..255 is a valid VALUE of the enum while
+    // only 0..8 is a valid INDEX into a `priority_count`-long array. Without the
+    // check the gather loop writes out of bounds on any claim carrying a line it
+    // did not author — AddressSanitizer confirmed the write (Sprint N1 adversarial
+    // pass, 2026-08-22). Claims are producer-supplied and BL-538's consumers are
+    // in-process today, but the standing rule is that an AI-facing seam is an
+    // untrusted input boundary: the moment a claim arrives over `--serve` this is
+    // a wire-reachable overflow. Validate as the value that lands in the
+    // destination, and drop the whole claim rather than clamping it onto a line
+    // nobody asked for.
     std::map<entity_id, line_claims> by_nation;
     for (const budget_claim& c : claims)
     {
         if (c.corp == null_entity || c.nation == null_entity)
             continue;
         if (!std::isfinite(c.amount) || c.amount <= 0.0f)
+            continue;
+        if (static_cast<std::size_t>(c.line) >= priority_count)
             continue;
         if (budgets.find(c.nation) == budgets.end())
             continue;
@@ -119,11 +133,33 @@ void run_national_budget(world& w,
 
         const auto claims_it = by_nation.find(nation);
 
-        // `remaining` is the hard bound. Every share is derived from `spendable`
-        // independently, so their sum can exceed it by a float ULP even with a
-        // normalised weight set; the running bound means an overdraw is not
-        // merely unlikely but unreachable.
-        float remaining   = res.spendable;
+        // ---- The bound ----------------------------------------------------
+        // Every share is derived from `spendable` independently, so their sum
+        // can exceed it by a float ULP even with a normalised weight set. What
+        // holds the total down is `nation_paid` — the running total of what this
+        // nation has actually paid, accumulated UPWARD from zero — with the
+        // headroom re-derived from it on every pay.
+        //
+        // It is deliberately NOT a decremented remainder, which is the shape this
+        // pass shipped with and is unsound: `remaining -= pay` rounds straight
+        // back to `remaining` once `pay` falls below half a ULP of it, so a
+        // nation facing enough small claims pays every one of them while its
+        // bound never moves. An overdraw, with a bound in plain sight. (Sprint N1
+        // adversarial pass, 2026-08-22 — defect 2, against rule 3's "never
+        // overdrawn".)
+        //
+        // It is also deliberately not a per-transfer debit off the live treasury,
+        // which fails the same way in the other direction and worse: a 1e-5 pay
+        // against a treasury of 1000 is BELOW half a ULP of it, so the debit
+        // rounds away to nothing while the credit lands in full — money created,
+        // which is the leak this item exists to not have. Small quantities are
+        // summed together FIRST and applied to the large one ONCE.
+        //
+        // The residual: `nation_paid` itself stalls if a single pay falls below
+        // half a ULP of the running total, which needs the claim count on one
+        // nation in one tick to reach ~2^24. That is not a world Io generates,
+        // and unlike the two shapes above it is a bound stated rather than a
+        // bound assumed.
         float nation_paid = 0.0f;
 
         for (std::size_t i = 0; i < priority_count; ++i)
@@ -160,27 +196,35 @@ void run_national_budget(world& w,
 
             for (const auto& [corp, amount] : bucket)
             {
+                const float headroom = res.spendable - nation_paid;
+                if (!(headroom > 0.0f))
+                    break; // this nation has spent its whole allotment
+
                 float pay = ration ? (amount * scale) : amount;
-                pay = std::min(pay, remaining);
+                pay = std::min(pay, headroom);
                 if (!(pay > 0.0f))
                     continue;
 
-                remaining   -= pay;
                 nation_paid += pay;
                 line.paid   += pay;
 
-                // Rule 1: a direct transfer to a NAMED corporation. The debit
-                // below and this credit are the same float — no market, no
-                // clearing, no price.
+                // Rule 1: a direct transfer to a NAMED corporation. This credit
+                // and the treasury's debit below are the same float — no market,
+                // no clearing, no price.
                 corp_credits.emplace_back(corp, nation, pay);
             }
 
             line.fill_fraction = line.paid / line.demand;
         }
 
-        // The debit half, applied ONCE per nation so the treasury delta and the
-        // reported total are the same float rather than two accumulations that
-        // agree only approximately.
+        // The debit half, applied ONCE per nation, so the treasury's delta and the
+        // reported total are the SAME float rather than two accumulations that
+        // agree only approximately — and so that a tick's many small transfers
+        // are summed among themselves before they meet a treasury large enough to
+        // absorb them individually.
+        //
+        // `nation_paid <= spendable <= treasury` by the headroom bound above, so
+        // this subtraction cannot drive the treasury negative.
         if (nation_paid != 0.0f)
         {
             nat->second.treasury -= nation_paid;

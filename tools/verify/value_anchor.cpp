@@ -267,6 +267,51 @@ float scalar_at(const std::string& s, const std::string& key, const char* what)
     return std::strtof(s.c_str() + at, &end);
 }
 
+/// The `inputs = { ... }` or `outputs = { ... }` basket of the recipe whose
+/// `name` is @p recipe_name, read out of the comment-stripped recipes.lua text.
+/// FATAL if the recipe has moved or been renamed — a silently-empty basket would
+/// make the markup rows below vacuous, which is the exact failure mode this
+/// harness keeps catching.
+std::array<float, resource_count> recipe_basket(const std::string& recipes,
+                                                const char*        recipe_name,
+                                                const char*        which)
+{
+    const std::string quoted = std::string("\"") + recipe_name + "\"";
+    std::size_t       at     = std::string::npos;
+    for (std::size_t i = recipes.find(quoted); i != std::string::npos;
+         i = recipes.find(quoted, i + 1))
+    {
+        // Must be the value of a `name =` assignment, not a mention elsewhere.
+        std::size_t j = i;
+        while (j > 0 && std::isspace(static_cast<unsigned char>(recipes[j - 1]))) --j;
+        if (j == 0 || recipes[j - 1] != '=') continue;
+        --j;
+        while (j > 0 && std::isspace(static_cast<unsigned char>(recipes[j - 1]))) --j;
+        if (j < 4 || recipes.compare(j - 4, 4, "name") != 0) continue;
+        at = i;
+        break;
+    }
+    if (at == std::string::npos)
+    {
+        std::printf("FATAL: no recipe named '%s' in scripts/recipes.lua - it has moved or "
+                    "been renamed.\n", recipe_name);
+        std::exit(2);
+    }
+    const std::size_t basket = find_assignment(recipes, which, at);
+    if (basket == std::string::npos)
+    {
+        std::printf("FATAL: recipe '%s' has no %s table.\n", recipe_name, which);
+        std::exit(2);
+    }
+    const auto pairs = parse_pairs(brace_block(recipes, basket, recipe_name));
+    if (pairs.empty())
+    {
+        std::printf("FATAL: recipe '%s' parsed to an EMPTY %s basket.\n", recipe_name, which);
+        std::exit(2);
+    }
+    return resource_table(pairs, recipe_name);
+}
+
 /// The two authored tables, read once.
 struct authored
 {
@@ -274,6 +319,10 @@ struct authored
     std::array<float, resource_count> base_price{};
     int                               priced_resources = 0;
     int                               named_goods      = 0;
+
+    /// The comment-stripped recipes.lua text, for the markup row. Kept as text
+    /// rather than parsed up front: only a handful of baskets are read.
+    std::string                       recipes;
 };
 
 authored read_authored()
@@ -315,6 +364,8 @@ authored read_authored()
     const auto price_pairs = parse_pairs(brace_block(gen, price, "base_price"));
     a.base_price           = resource_table(price_pairs, "world_gen.kepler_market.base_price");
     a.priced_resources     = static_cast<int>(price_pairs.size());
+
+    a.recipes = strip_comments(read_text("scripts/recipes.lua"));
 
     return a;
 }
@@ -586,22 +637,37 @@ int main()
     }
 
     // -----------------------------------------------------------------------
-    // R3 — inert at zero (read before R2, because R2 needs a live fixture)
+    // R3 — WHICH STATE THE CONTENT IS IN. Read before R2, because R2 needs a
+    //      live fixture either way.
     // -----------------------------------------------------------------------
-    std::printf("-- R3  INERT at the shipped rates --\n");
+    // R3 IS A BRANCH, NOT AN ASSERTION, and that is the whole point of it.
+    // BL-454 landed the upkeep vector INERT: both halves ship at bit-exact zero.
+    // The obvious row to write is "assert they are zero" — and it is the wrong
+    // row, because it goes RED on the one day this harness exists for, the day
+    // Ben authors a rate and the anchor finally has something to bind. A check
+    // that fails when its subject is satisfied is worse than no check.
+    //
+    // So R3 asks which state the content is in and asserts the invariant that
+    // belongs to that state. Inert: nothing is drawn, at any scale, and the
+    // sweep says INERT rather than green. Authored: something IS drawn, the
+    // sweep is live rather than inert, and R1's band — already asserted above —
+    // is a claim about the shipped content rather than about a fixture.
+    // (Sprint N1 adversarial pass, 2026-08-22, finding F1: the reviewer authored
+    // this harness's own solved fixture into economy.lua and got exit 1 with the
+    // anchor satisfied and all 19 rows in band.)
+    std::printf("-- R3  which state is the content in? --\n");
+    const bool rates_authored = !(a.upkeep.credits_per_head == 0.0f &&
+                                  a.upkeep.credits_per_head_per_power == 0.0f &&
+                                  [&] {
+                                      for (std::size_t r = 0; r < resource_count; ++r)
+                                          if (a.upkeep.goods_per_head[r] != 0.0f)
+                                              return false;
+                                      return true;
+                                  }());
     {
-        const bool rates_zero = a.upkeep.credits_per_head == 0.0f &&
-                                a.upkeep.credits_per_head_per_power == 0.0f;
-        bool goods_zero = true;
-        for (std::size_t r = 0; r < resource_count; ++r)
-            goods_zero = goods_zero && a.upkeep.goods_per_head[r] == 0.0f;
-
-        check(rates_zero && goods_zero,
-              "R3a every authored upkeep rate is bit-exactly zero (BL-454 landed inert)");
-
-        // Inertness proven THROUGH the resolver, not asserted in a comment:
-        // whatever the formula does, at these rates it must produce nothing.
-        bool draws_nothing = true;
+        // What the resolver actually does at the authored rates, proven THROUGH
+        // it rather than asserted in a comment.
+        bool draws_nothing = true, draws_something = false;
         for (std::size_t i = 0; i < table.size(); ++i)
         {
             unit_component u{};
@@ -610,17 +676,39 @@ int main()
             u.count    = 10000; // a large force: a rate of zero is zero at any scale
             u.type     = static_cast<std::uint16_t>(i);
             const unit_upkeep_draw d = resolve_unit_upkeep(u, a.upkeep);
-            draws_nothing = draws_nothing && d.credits == 0.0f && !d.any_goods;
+            bool row_zero = d.credits == 0.0f && !d.any_goods;
             for (std::size_t r = 0; r < resource_count; ++r)
-                draws_nothing = draws_nothing && d.goods[r] == 0.0f;
+                row_zero = row_zero && d.goods[r] == 0.0f;
+            draws_nothing   = draws_nothing && row_zero;
+            draws_something = draws_something || !row_zero;
         }
-        check(draws_nothing,
-              "R3b resolve_unit_upkeep draws bit-exactly nothing for every row at 10000 heads "
-              "- the world is unchanged, not approximately unchanged");
-        check(authored_sweep.inert == static_cast<int>(table.size()),
-              "R3c the calibration reports INERT for the whole roster, not a vacuous green");
-        std::printf("     -> the anchor has nothing to bind yet. R2/R4/R5 run against a "
-                    "calibrated fixture.\n\n");
+
+        if (!rates_authored)
+        {
+            std::printf("     state: INERT - scripts/economy.lua ships both halves of the "
+                        "upkeep vector at zero.\n");
+            check(draws_nothing,
+                  "R3a INERT: resolve_unit_upkeep returns a bit-exactly zero draw for every "
+                  "roster row at 10000 heads - no credits, no goods, at any scale");
+            check(authored_sweep.inert == static_cast<int>(table.size()),
+                  "R3b INERT: the calibration reports INERT for the whole roster rather than "
+                  "a vacuous green");
+            std::printf("     -> the anchor has nothing to bind yet. R2/R4/R5 run against a "
+                        "calibrated fixture.\n\n");
+        }
+        else
+        {
+            std::printf("     state: AUTHORED - the anchor now binds the SHIPPED content, and "
+                        "R1 above is the row that matters.\n");
+            check(draws_something,
+                  "R3a AUTHORED: resolve_unit_upkeep draws a real cost for at least one roster "
+                  "row - the authored rates reach the resolver");
+            check(authored_sweep.inert == 0,
+                  "R3b AUTHORED: no roster row reports INERT, so R1a's band is a statement "
+                  "about the shipped rates and not about a fixture");
+            std::printf("     -> R1a's green is now load-bearing. R2/R5 still run against the "
+                        "solved fixture, which is a control.\n\n");
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -647,21 +735,52 @@ int main()
         check(wage_up_sweep.out_of_band == static_cast<int>(table.size()),
               "R2b a wage 50% above the anchor turns EVERY row RED");
 
+        // PERTURBATION SIZES ARE DERIVED FROM THE BAND, not picked. The ratio is
+        // equipment / wage, so scaling the ordnance line by f moves the ratio by
+        //     1 + (f - 1) x ordnance_share
+        // where ordnance_share is ordnance's fraction of the equipment basket.
+        // In band needs the ratio inside [1 - tol, 1 + tol] of the control, so
+        // the smallest f that must break it is 1 + (tol / share) and the largest
+        // that must not is 1 + (tol / share) x 0.5. Both follow the band: widen
+        // k_tolerance and both rows move with it, instead of R2c quietly
+        // becoming a check that cannot discriminate.
+        const float ordnance_value =
+            cal.params.goods_per_head[static_cast<std::size_t>(resource_type::ordnance)] *
+            a.base_price[static_cast<std::size_t>(resource_type::ordnance)];
+        const float ordnance_share = (cal.equipment > 0.0f) ? ordnance_value / cal.equipment : 0.0f;
+        const float break_factor   = 1.0f + (k_tolerance / ordnance_share) * 1.25f; // clear of the edge
+        const float hold_factor    = 1.0f + (k_tolerance / ordnance_share) * 0.50f; // clear inside it
+        const float price_break    = break_factor;
+        const float price_hold     = hold_factor;
+        std::printf("     ordnance is %.1f%% of the equipment basket, so the band breaks at a "
+                    "%.2fx ordnance move\n       and holds at %.2fx - both derived from "
+                    "k_tolerance (%.0f%%), neither picked.\n",
+                    ordnance_share * 100.0f, break_factor, hold_factor, k_tolerance * 100.0f);
+
         // (b) a goods rate moves.
         unit_upkeep_params goods_up = cal.params;
-        goods_up.goods_per_head[static_cast<std::size_t>(resource_type::ordnance)] *= 4.0f;
+        goods_up.goods_per_head[static_cast<std::size_t>(resource_type::ordnance)] *= break_factor;
         const sweep goods_up_sweep = sweep_roster(goods_up, a.base_price);
         check(goods_up_sweep.out_of_band == static_cast<int>(table.size()),
-              "R2c a 4x ordnance draw turns EVERY row RED");
+              "R2c an ordnance draw scaled past the band turns EVERY row RED");
+
+        unit_upkeep_params goods_nudge = cal.params;
+        goods_nudge.goods_per_head[static_cast<std::size_t>(resource_type::ordnance)] *= hold_factor;
+        const sweep goods_nudge_sweep = sweep_roster(goods_nudge, a.base_price);
+        check(goods_nudge_sweep.out_of_band == 0,
+              "R2g ...and one scaled to half that stays GREEN - the size is the band's, "
+              "not a magic 4x");
 
         // (c) a BASE PRICE moves — the half of the identity that lives in
-        // world_gen.lua, and the one a check built only on economy.lua would
-        // be blind to. This is the row that says the anchor is content-wide.
+        // world_gen.lua, and the one a check built only on economy.lua would be
+        // blind to. It says the anchor spans BOTH authored files. It does NOT
+        // say the anchor is content-wide; R6 below says what it is instead.
         std::array<float, resource_count> dearer = a.base_price;
-        dearer[static_cast<std::size_t>(resource_type::ordnance)] *= 8.0f;
+        dearer[static_cast<std::size_t>(resource_type::ordnance)] *= price_break;
         const sweep price_up_sweep = sweep_roster(cal.params, dearer);
         check(price_up_sweep.out_of_band == static_cast<int>(table.size()),
-              "R2d ordnance repriced 8x in base_price turns EVERY row RED, with no rate touched");
+              "R2d ordnance repriced past the band in base_price turns EVERY row RED, "
+              "with no rate touched - the anchor spans both authored files");
 
         // (d) ...and a small move does NOT, or the band is an equality wearing
         // a tolerance's clothes.
@@ -671,12 +790,125 @@ int main()
         check(nudged_sweep.out_of_band == 0,
               "R2e a 10% wage move stays GREEN - it is a band, not an equality");
 
-        std::printf("     ratios: control %.3f | wage+50%% %.3f | ordnance x4 %.3f | "
-                    "price x8 %.3f | wage+10%% %.3f\n\n",
+        // (e) ...and a price move JUST INSIDE the band does not either. Paired
+        // with R2d this is what makes the perturbation sizes meaningful rather
+        // than magic: both are derived from k_tolerance below, so widening the
+        // band moves both rows together instead of silently making R2d pass on a
+        // check that no longer discriminates.
+        std::array<float, resource_count> dearer_a_little = a.base_price;
+        dearer_a_little[static_cast<std::size_t>(resource_type::ordnance)] *= price_hold;
+        const sweep price_hold_sweep = sweep_roster(cal.params, dearer_a_little);
+        check(price_hold_sweep.out_of_band == 0,
+              "R2f ...while a reprice just INSIDE the band leaves every row GREEN - the two "
+              "sizes bracket the band edge rather than straddling it by a magic factor");
+
+        std::printf("     ratios: control %.3f | wage+50%% %.3f | ordnance x%.2f %.3f | "
+                    "price x%.2f %.3f | wage+10%% %.3f\n\n",
                     green.rows.front().ratio, wage_up_sweep.rows.front().ratio,
-                    goods_up_sweep.rows.front().ratio, price_up_sweep.rows.front().ratio,
+                    break_factor, goods_up_sweep.rows.front().ratio,
+                    price_break, price_up_sweep.rows.front().ratio,
                     nudged_sweep.rows.front().ratio);
     }
+
+    // -----------------------------------------------------------------------
+    // R6 — WHAT THE ANCHOR DOES AND DOES NOT CONSTRAIN
+    // -----------------------------------------------------------------------
+    // R2d turns red when ordnance is repriced, and it is tempting to read that
+    // as "the anchor is content-wide". It is not, and the Sprint N1 adversarial
+    // pass proved it the direct way: multiply ALL 33 authored base prices by ten
+    // and every row stays green (finding F2). That is not a bug — it is what a
+    // RATIO is. `calibrate()` solves the wage from the same prices it values the
+    // basket with, so a uniform reprice moves numerator and denominator together
+    // and the anchor cannot see it. Nor should it: "equipment costs twice the
+    // salary" is a statement about relative value, and relative value survives a
+    // change of unit.
+    //
+    // So R6 does two things the original rows did not. It ASSERTS the invariance
+    // rather than being quietly carried by it, and it adds the row that DOES
+    // bind an absolute price relation — one that a non-uniform edit breaks,
+    // which is the edit that actually happens.
+    std::printf("-- R6  the anchor is scale-invariant; the markup band is what binds a price --\n");
+    {
+        // (a) A uniform reprice cannot move the anchor. Stated, not assumed.
+        std::array<float, resource_count> tenfold = a.base_price;
+        for (float& p : tenfold)
+            p *= 10.0f;
+        const calibration cal10 = [&] {
+            authored scaled = a;
+            scaled.base_price = tenfold;
+            return calibrate(scaled);
+        }();
+        const sweep control = sweep_roster(cal.params, a.base_price);
+        const sweep scaled  = sweep_roster(cal10.params, tenfold);
+        bool ratios_identical = control.rows.size() == scaled.rows.size();
+        for (std::size_t i = 0; ratios_identical && i < control.rows.size(); ++i)
+            ratios_identical = control.rows[i].ratio == scaled.rows[i].ratio;
+        check(ratios_identical && !control.rows.empty(),
+              "R6a every base price x10 leaves every roster row's ratio BIT-IDENTICAL - the "
+              "anchor is a ratio, so it is scale-invariant and constrains no price on its own");
+
+        // (b) What does bind a price: the markup a processed good carries over
+        // its own input basket. recipes.lua id 27 states the rule in its own
+        // words - "PRICE IS DERIVED, NOT PICKED" - and names the peers it was
+        // derived against. This row holds the content to that sentence.
+        //
+        // Only the Advanced-Fabrication tier is in the band. The roster as a
+        // whole is NOT tight (markups run 0.36 to 4.00 across all 40 recipes,
+        // measured 2026-08-23), so a roster-wide band would be a false claim in
+        // the other direction. The peers are the five the comment names.
+        static const char* const peers[] = {
+            "machinery", "alloys", "electronics", "spacecraft_components", "refined_fuel",
+        };
+        auto markup = [&](const char* recipe, resource_type out) {
+            const auto  in  = recipe_basket(a.recipes, recipe, "inputs");
+            const auto  o   = recipe_basket(a.recipes, recipe, "outputs");
+            const float qty = o[static_cast<std::size_t>(out)];
+            const float bas = basket_value(in, a.base_price);
+            return (bas > 0.0f && qty > 0.0f)
+                       ? (a.base_price[static_cast<std::size_t>(out)] * qty) / bas
+                       : 0.0f;
+        };
+
+        float peer_min = 0.0f, peer_max = 0.0f;
+        std::printf("     markup over input basket, at world_gen.lua base prices:\n");
+        for (std::size_t i = 0; i < sizeof peers / sizeof peers[0]; ++i)
+        {
+            bool                ok = false;
+            const resource_type r  = resource_names::resource_from_name(peers[i], ok);
+            if (!ok)
+            {
+                std::printf("FATAL: peer good '%s' is not a resource.\n", peers[i]);
+                std::exit(2);
+            }
+            const float m = markup(peers[i], r);
+            std::printf("       %-24s %.3f\n", peers[i], m);
+            peer_min = (i == 0 || m < peer_min) ? m : peer_min;
+            peer_max = (i == 0 || m > peer_max) ? m : peer_max;
+        }
+        const float ordnance_markup = markup("ordnance", resource_type::ordnance);
+        std::printf("       %-24s %.3f   <- the good the anchor draws\n",
+                    "ordnance", ordnance_markup);
+
+        check(peer_min > 0.0f && (peer_max / peer_min) <= 1.05f,
+              "R6b the Advanced-Fabrication peers price within 5% of one common markup - "
+              "the band recipes.lua id 27 says ordnance was derived against exists");
+        check(ordnance_markup >= peer_min && ordnance_markup <= peer_max,
+              "R6c ...and ordnance sits INSIDE it, so its base_price is derived and not "
+              "picked - repriced ordnance, steel or machinery alone and this goes red");
+
+        // The vacuity guard: a non-uniform edit must actually break it, or the
+        // row is measuring nothing. Repricing steel alone moves the basket and
+        // not the output.
+        std::array<float, resource_count> steel_dear = a.base_price;
+        steel_dear[static_cast<std::size_t>(resource_type::steel)] *= 3.0f;
+        const auto  in_ord   = recipe_basket(a.recipes, "ordnance", "inputs");
+        const float broken   = a.base_price[static_cast<std::size_t>(resource_type::ordnance)] /
+                               basket_value(in_ord, steel_dear);
+        check(broken < peer_min,
+              "R6d ...and tripling STEEL alone - one price, in one file - drops ordnance's "
+              "markup out of the band, which a uniform reprice never would");
+    }
+    std::printf("\n");
 
     // -----------------------------------------------------------------------
     // R5 — the finding: the anchor BOUNDS credits_per_head_per_power
@@ -709,13 +941,19 @@ int main()
                     "       because it costs exactly 1.000x to EQUIP.\n",
                     (1.0f + k_tolerance) / (1.0f - k_tolerance));
 
-        // At the bound, everything fits.
+        // At the bound, everything fits — placed a clear margin INSIDE it rather
+        // than on the edge. `wage_low` is the exact ratio boundary, and a row
+        // that sits on a boundary is decided by which way the last float rounds:
+        // it would pass or fail on a compiler's licence rather than on the
+        // finding it is stating. Step 2% of the band's width in from each end.
+        const float inset                    = (wage_high - wage_low) * 0.02f;
         unit_upkeep_params at_bound          = cal.params;
-        at_bound.credits_per_head            = wage_low;
-        at_bound.credits_per_head_per_power  = per_power_max * 0.98f; // just inside
+        at_bound.credits_per_head            = wage_low + inset;
+        at_bound.credits_per_head_per_power  = (per_power_max - 2.0f * inset / span) * 0.98f;
         const sweep at_bound_sweep           = sweep_roster(at_bound, a.base_price);
         check(at_bound_sweep.out_of_band == 0,
-              "R5a just INSIDE the derived per-power bound the whole roster is in band");
+              "R5a a clear margin INSIDE the derived per-power bound the whole roster is in "
+              "band - measured off the edge, not on it");
 
         // Past it, the heaviest row leaves the band while the lightest stays —
         // the asymmetry is the finding, and a check that only asserted the
@@ -755,12 +993,28 @@ int main()
         const float authored_year = (a.upkeep.credits_per_head +
                                      basket_value(a.upkeep.goods_per_head, a.base_price)) *
                                     k_ticks_per_year;
-        std::printf("     at the AUTHORED rates one head costs %.4f cr/year -> the levy funds an\n"
-                    "       UNBOUNDED force. The question is degenerate until a rate is authored;\n"
-                    "       the table below answers it for the calibrated fixture instead.\n\n",
-                    authored_year);
-        check(authored_year == 0.0f,
-              "R4b ...and that degeneracy is exactly the inertness R3 asserts, not a measurement");
+        if (!rates_authored)
+        {
+            std::printf("     at the AUTHORED rates one head costs %.4f cr/year -> the levy funds an\n"
+                        "       UNBOUNDED force. The question is degenerate until a rate is authored;\n"
+                        "       the table below answers it for the calibrated fixture instead.\n\n",
+                        authored_year);
+            check(authored_year == 0.0f,
+                  "R4b INERT: the degeneracy is exactly the inertness R3 reports, not a "
+                  "measurement");
+        }
+        else
+        {
+            // The branch this row exists for: once a rate is authored, NR-382's
+            // question stops being degenerate and gets a real answer.
+            std::printf("     at the AUTHORED rates one head costs %.4f cr/year -> the levy funds\n"
+                        "       %.1f heads per 1000 units/tick of taxed raw output.\n\n",
+                        authored_year,
+                        (1000.0f * static_cast<float>(k_ticks_per_year) * levy.rate) / authored_year);
+            check(authored_year > 0.0f && std::isfinite(authored_year),
+                  "R4b AUTHORED: one head-year costs a positive finite number of credits, so "
+                  "NR-382's question has a real answer rather than a degenerate one");
+        }
 
         // The rate-independent half of the answer: how much taxed raw output one
         // head-year costs. This is the number NR-382 can be answered against,

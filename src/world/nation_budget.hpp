@@ -32,10 +32,22 @@ struct world; // forward-declared; nation_budget.cpp reads it.
 //     ruling: "Payment to corps is direct and not on the market." A budget
 //     line does not bid, does not clear, and never touches `clear_markets` —
 //     it debits the treasury and credits a corporation balance in the SAME
-//     float, the same tick, so the sum is conserved by construction rather
-//     than by reconciliation. This is the same discipline BL-480 applied to
-//     the levy, and for the same reason: a leak here would be the BL-392 class
-//     of silent value destruction, one grain up.
+//     float, the same tick. This is the same discipline BL-480 applied to the
+//     levy, and for the same reason: a leak here would be the BL-392 class of
+//     silent value destruction, one grain up.
+//
+//     WHAT "CONSERVED" MEANS HERE, EXACTLY (narrowed 2026-08-23, Sprint N1).
+//     The pass debits precisely what it credits: `nation_budget_result::paid`,
+//     `national_budget_tick::total_transferred` and the treasury's delta are
+//     ONE accumulation, not three that agree approximately, and that identity
+//     is bit-exact for any weights however awkward. What is not guaranteed is
+//     the world's total credit afterwards, because `balance += amount` rounds
+//     once the destination has outgrown the credit — the same rounding
+//     `apply_budget` has always carried. So: bit-exact when each credit is
+//     representable at its destination, and otherwise off by the destinations'
+//     own rounding and nothing else. The harness proves the distinction rather
+//     than assuming it, by running one span whose balances are swept (residual
+//     exactly zero) against an identical span whose balances accumulate.
 //
 //  2. NATIONS SAVE. `reserve_fraction` is withheld from the tick's spendable
 //     total, and an UNDERSPENT LINE ACCUMULATES rather than evaporating —
@@ -49,7 +61,13 @@ struct world; // forward-declared; nation_budget.cpp reads it.
 //  3. BOUNDED BY THE TREASURY. A nation cannot allocate what it does not hold.
 //     Where a line's demand exceeds its share the line is PARTIALLY FILLED and
 //     says so (`budget_line_result::fill_fraction` < 1) — never overdrawn, and
-//     never silently dropped.
+//     never silently dropped. The bound is a RUNNING TOTAL of what has been
+//     paid, never a decremented remainder: a remainder drops the low bits of
+//     every pay it subtracts, so it under-counts, and a nation facing enough
+//     claims pays past its allotment while its bound says there is room. That
+//     shipped, and it drove solvent treasuries negative — which is not cosmetic,
+//     because the `treasury > 0` gate then locks the nation out of spending on
+//     every following tick. See `run_national_budget`'s § The bound.
 //
 // DETERMINISM. Once per economy tick, over nations in ASCENDING ID, over lines
 // in the fixed authored enum order, over each line's claims in ascending
@@ -107,6 +125,13 @@ struct nation_budget
 /// One claim on one nation's budget line: a NAMED corporation asking a NAMED
 /// nation for credits, on one line, this tick.
 ///
+/// EVERY FIELD IS VALIDATED AT GATHER TIME, `line` included. `budget_priority`
+/// has a `uint8_t` underlying type, so every one of 0..255 is a valid VALUE while
+/// only 0..8 is a valid INDEX — a claim carrying anything else is dropped whole,
+/// never clamped onto a line nobody asked for. Claims are in-process today, but
+/// the standing rule that an AI-facing seam is an untrusted input boundary makes
+/// this wire-reachable the moment one arrives over `--serve`.
+///
 /// Claims are produced upstream (BL-538's per-line consumers) and passed in,
 /// exactly as `apply_budget` takes `production` rather than deriving it — the
 /// mechanics here stay pure over the claim list and know nothing about what any
@@ -154,8 +179,9 @@ struct national_budget_tick
     std::vector<nation_budget_result> nations;
 
     /// Sum of every credit transferred, accumulated in the pass's own order.
-    /// Equal, bit-for-bit, to the sum of the treasury debits accumulated in that
-    /// same order — the conservation property, stated where a caller can check it.
+    /// Equal, bit-for-bit, to the treasury debits — they are the same
+    /// accumulation, so the identity holds for any weights. See rule 1 for what
+    /// this does and does not say about the world's total credit.
     float total_transferred = 0.0f;
 };
 
