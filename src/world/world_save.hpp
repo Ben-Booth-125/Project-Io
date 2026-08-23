@@ -98,7 +98,15 @@ inline constexpr uint32_t world_save_magic =
 /// independently bumped to 5 in their own worktrees; integrating both landed
 /// two new fields, so the version needed two bumps, not one — v5 exists only
 /// as the intermediate BL-570-alone shape and was never itself released.)
-inline constexpr uint32_t world_save_version = 6;
+///
+/// Bumped to 7 by BL-572 (contract offers): `world::mercenary_offers` (open
+/// mercenary-contract offers, one `mercenary_offer` record each) and
+/// `world::next_offer_id` (its allocator cursor) are written as a new TRAILING
+/// section, directly after `province_holder` (itself the previous last
+/// section) — the same shape BL-569 used to add `province_holder` onto v3. A
+/// v6 stream simply ends where this one continues, so it is refused whole on
+/// the same strict-equality contract as every prior bump.
+inline constexpr uint32_t world_save_version = 7;
 
 /// Write @p w as a complete world snapshot.
 ///

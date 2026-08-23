@@ -117,3 +117,113 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
 // unordered `w.units`/`w.nations` and sorted first); each nation's garrison
 // unit ids ascending.
 void run_nation_garrison_upkeep(world& w, const recipe_registry& reg);
+
+// ---------------------------------------------------------------------------
+// BL-572 — contract offers, the `contracted_force` line's first consumer
+// ---------------------------------------------------------------------------
+// docs/economy/CONTRACTS.md § Where offers come from is the design authority;
+// this is its implementation note. `derive_contract_offers` is the SAME shape
+// as `run_nation_garrison_upkeep` above and for the same reason: a
+// `budget_claim` names a corp payee, and neither a garrison unit nor a
+// not-yet-accepted mercenary offer has one, so this pass RECOMPUTES the
+// `contracted_force` line's share directly from `w.nation_budgets` rather than
+// routing through `run_national_budget`'s claim/gather machinery — a direct
+// expenditure, exactly like the garrison bill, except the credit lands in a
+// `mercenary_offer::offer_escrow` instead of leaving the modelled economy.
+//
+// ONE PASS, FOUR MOVES, PER TICK, over every nation in ASCENDING id:
+//
+//  1. EXPIRE. Any of `w.mercenary_offers` whose `issued_tick` is more than
+//     `offer_ttl_ticks` behind `econ_tick` is dropped, its `offer_escrow`
+//     refunded to `client`'s treasury — CONTRACTS.md's "expires... returning
+//     its escrow". Run FIRST and over every nation at once (not nested inside
+//     the per-nation loop below) so a freed slot and a freed credit are both
+//     visible to the SAME tick's targeting and funding.
+//  2. SHARE. The `contracted_force` line's spendable share this tick, by the
+//     identical formula `run_nation_garrison_upkeep` uses for
+//     `military_research` (spendable = treasury x (1 - reserve); share =
+//     spendable x weight / sum(weights)). Zero for a nation with no treasury,
+//     no authored budget, or no weight on this line — which is what makes
+//     this pass INERT, matching every prior budget-adjacent pass, for a
+//     nation that has never been funded (NR-580's gap: every generated
+//     world's treasuries start at 0.0, so a fresh world issues no offer).
+//     Nothing below runs when the share is <= 0 — targeting a province a
+//     nation cannot even begin to fund would create an offer no tick could
+//     ever progress, which is the inert-by-construction choice this file's
+//     report flags explicitly (no threat gate exists separately from this
+//     one: "threatened" is operationalised as "has money behind the line",
+//     the same axis CONTRACTS.md's "fees come from the budget... offers dry
+//     up when treasuries do" already names).
+//  3. TARGET. `nation_highest_grudge_neighbour` (nation_ai.hpp) names the
+//     neighbour; among ITS provinces (`province_holder_for`, BL-569) that
+//     touch this nation's own territory on a tile edge, the one with the
+//     LOWEST `garrison_strength_in` (BL-571) that does not already have an
+//     open offer from this nation is the new target — deterministic argmin,
+//     ascending province id on a tie (`w.provinces.provinces`' own walk
+//     order). At most ONE new offer is opened per nation per tick; the set of
+//     eligible border provinces is what naturally bounds how many offers a
+//     nation ever holds concurrently.
+//  4. FUND. The share from step 2 is applied to this nation's OPEN offers,
+//     sorted (issued_tick, id) ascending — oldest first — until each is
+//     either full (`offer_escrow == fee`, and it stops taking) or the share
+//     is exhausted. An offer that clears its fee simply stops asking; nothing
+//     here binds it into a `mercenary_contract` (BL-573's `accept_offer`) or
+//     removes it from `w.mercenary_offers`.
+//
+// TEMPLATE. This pass always issues the "take" kind — the target province is
+// never this nation's own (§ Which province only ever names a NEIGHBOUR's
+// province), which is exactly what "take" means (contract_template.hpp:
+// "seize a province the client does not currently hold"). `fee` and
+// `deadline_ticks` are read from `contract_offer_params`, NOT from a live
+// `contract_template_registry` lookup — that registry needs sol2/Lua
+// (contract_template.hpp's own comment on why its .cpp is excluded from the
+// Lua-free `world/*` superset this file is part of), so wiring a live
+// instance in reachable from here is out of this item's file list. The
+// values below are legible placeholders matching scripts/contracts.lua's
+// authored "take" row (fee_mult 1.0, deadline_ticks 180) — the same
+// discipline NR-579 already flagged BL-570's own placeholders under, and
+// BL-573 is the natural point to replace this with a real lookup once
+// `accept_offer` needs one anyway.
+//
+// DETERMINISTIC: nations walked ascending id; `w.mercenary_offers` walked in
+// its own storage order (append-only within a tick, erase-remove preserves
+// relative order) for expiry, and re-sorted by (issued_tick, id) for funding.
+struct contract_offer_params
+{
+    /// Credits the escrow of a newly-issued "take" offer must reach —
+    /// contract_template's `fee_mult` folded in already, since this pass only
+    /// ever issues the one kind (see the file comment above). Placeholder
+    /// pending BL-544 (unit wage reference), same discipline as
+    /// `nation_garrison_params::min_count`.
+    float base_fee = 400.0f;
+
+    /// Ticks from issuance to the DEADLINE FIELD this offer carries — mirrors
+    /// scripts/contracts.lua's authored "take" row (`deadline_ticks = 180`).
+    /// Not this offer's own expiry; see `offer_ttl_ticks`.
+    int deadline_ticks = 180;
+
+    /// Ticks an offer may sit unanswered before it expires and returns its
+    /// escrow (step 1 above). Counted from `issued_tick`, unconditionally —
+    /// a fully-funded offer nobody has accepted still expires on this clock,
+    /// the same as a still-filling one.
+    int offer_ttl_ticks = 60;
+
+    /// `contract_template_registry` index this pass targets. 0 is "take" in
+    /// scripts/contracts.lua's authored order today — a plain int rather than
+    /// a live lookup, for the reason the file comment above gives.
+    int template_index = 0;
+};
+
+/// Run one economy tick of contract-offer derivation and escrow funding — see
+/// the file comment above for the four moves. Mutates `w.mercenary_offers`
+/// and nation treasuries; nothing else.
+///
+/// @param w         World; offers and nation treasuries are mutated.
+/// @param reg       Recipe registry, for `reg.nation_ai()` — the scorer
+///                  tunables `nation_highest_grudge_neighbour` reads.
+/// @param econ_tick The economy tick — `issued_tick`'s clock, and what
+///                  `offer_ttl_ticks` and `deadline_ticks` are measured
+///                  against.
+/// @param params    Tunables. Defaults are the values named above.
+void derive_contract_offers(world& w, const recipe_registry& reg, int econ_tick,
+                            const contract_offer_params& params = {});
