@@ -2976,45 +2976,45 @@
    "resolution": null
   },
   {
-   "id": "NR-510",
+   "id": "NR-559",
    "title": "Seven bug reports filed as eight items: two calls taken on Ben’s behalf",
    "raised": "2026-08-22",
    "kind": "decision-taken",
    "source": "Ben, 2026-08-22, seven numbered bug reports (single plate / non-viable starts / lack of industrialisation / provinces cross borders / bundle selection / mountains as elevation / legends in the minimap).",
-   "what": "Filed as BL-537 through BL-544. Two partition calls were taken rather than asked, plus one status call across three items.\n\n(1) BUG 3 WAS SPLIT INTO TWO ITEMS. Ben wrote it as one sentence — \"Surprising lack of industrialisation (need more worked tiles, and these should not be filled on the default lens)\" — and it is one thought, but the two halves land in different layers: the density is generate_background_firms in src/world/ (BL-539), the fill is built_plate_colour in src/ui/ (BL-540). They are cross-linked in both directions and BL-539 lists BL-540 in unblocks, so the connection is not lost; but they can be built independently and one item spanning both layers would have carried two collision maps and two verification classes.\n\n(2) HALF OF BUG 4 WAS NOT FILED, BECAUSE IT ALREADY IS. Ben wrote \"Provinces cross country boundaries, and country boundaries should not diffuse together\". The first half is genuinely new and is BL-541. The SECOND half is BL-535 (national hue replaces the Country lens), which carries his own ruling from earlier the same day that the corner blend stops at national borders — designed, not yet built. Filing it again would have created two items for one change. BL-541 says so explicitly rather than silently omitting it.\n\n(3) THREE ITEMS FILED design-owed, NOT designed. BL-537 (which of gate / design-around / retune), BL-538 (the sentence has two readings and no predicate), BL-539 (direction is clear, the lever is not, and the measurement seam should run first). The other five are designed — the mechanism is traced and the change is stated.",
+   "what": "Filed as BL-559 through BL-566. Two partition calls were taken rather than asked, plus one status call across three items.\n\n(1) BUG 3 WAS SPLIT INTO TWO ITEMS. Ben wrote it as one sentence — \"Surprising lack of industrialisation (need more worked tiles, and these should not be filled on the default lens)\" — and it is one thought, but the two halves land in different layers: the density is generate_background_firms in src/world/ (BL-561), the fill is built_plate_colour in src/ui/ (BL-562). They are cross-linked in both directions and BL-561 lists BL-562 in unblocks, so the connection is not lost; but they can be built independently and one item spanning both layers would have carried two collision maps and two verification classes.\n\n(2) HALF OF BUG 4 WAS NOT FILED, BECAUSE IT ALREADY IS. Ben wrote \"Provinces cross country boundaries, and country boundaries should not diffuse together\". The first half is genuinely new and is BL-563. The SECOND half is BL-535 (national hue replaces the Country lens), which carries his own ruling from earlier the same day that the corner blend stops at national borders — designed, not yet built. Filing it again would have created two items for one change. BL-563 says so explicitly rather than silently omitting it.\n\n(3) THREE ITEMS FILED design-owed, NOT designed. BL-559 (which of gate / design-around / retune), BL-560 (the sentence has two readings and no predicate), BL-561 (direction is clear, the lever is not, and the measurement seam should run first). The other five are designed — the mechanism is traced and the change is stated.",
    "why_it_matters": "The split and the omission both change what Ben sees when he next queries the backlog: seven reports come back as eight rows, and one of his sentences has no row of its own. If either call is wrong it is cheap to undo now and expensive once tasks are promoted against them.",
    "options": [
-    "Accept both calls — BL-539/BL-540 stay separate, bug 4’s second half stays with BL-535",
-    "Merge BL-539 and BL-540 back into one item if the fill and the density should land together",
+    "Accept both calls — BL-561/BL-562 stay separate, bug 4’s second half stays with BL-535",
+    "Merge BL-561 and BL-562 back into one item if the fill and the density should land together",
     "Re-file bug 4’s second half as its own item if BL-535 is going to be re-scoped or dropped"
    ],
-   "recommendation": "Accept. The strongest argument for the split is that BL-540 is worth doing on its own merits even if the density never moves, and the strongest argument against re-filing bug 4 is that BL-535 already carries Ben’s own wording on it.",
+   "recommendation": "Accept. The strongest argument for the split is that BL-562 is worth doing on its own merits even if the density never moves, and the strongest argument against re-filing bug 4 is that BL-535 already carries Ben’s own wording on it.",
    "files": [
     "docs/development/backlog.json"
    ],
    "status": "open"
   },
   {
-   "id": "NR-511",
-   "title": "The conquest half of Ben’s BL-541 answer was split into BL-545 rather than carried in the generation item",
+   "id": "NR-560",
+   "title": "The conquest half of Ben’s BL-563 answer was split into BL-567 rather than carried in the generation item",
    "raised": "2026-08-22",
    "kind": "decision-taken",
-   "source": "Ben, 2026-08-22, elicitation form, answering past the three BL-541 options: \"Generate provinces alongside national borders, and have it be impossible to conquer a tile without also controlling the province\".",
-   "what": "The answer carries two rulings and they were separated. The FIRST (co-generate provinces with national borders) stayed in BL-541 and rewrote it: the item had proposed rejecting cross-nation candidates inside the existing fill, and Ben’s answer is the stronger design — regions grown to FIT the border rather than grown across it and trimmed. That also dissolved the frontier-fragmentation question the form asked, which is why no merge pass is in the ruling: offcuts never exist to merge.\n\nThe SECOND (a tile cannot be conquered without the province) became BL-545, category Military, requires BL-541. Reasons for splitting rather than carrying: it lands in components.hpp / world.hpp / MILITARY.md rather than province.cpp; it is a FORWARD constraint on a system that does not exist rather than a fix to one that does; and it is design-owed where BL-541 is now designed, so carrying it would have held a buildable generation fix behind an unsettled military question.",
-   "why_it_matters": "BL-541 can be promoted and built now; BL-545 cannot, and should not block it. If the split is wrong the cost is two rows where Ben wanted one, which is cheap to merge back before either is promoted.",
+   "source": "Ben, 2026-08-22, elicitation form, answering past the three BL-563 options: \"Generate provinces alongside national borders, and have it be impossible to conquer a tile without also controlling the province\".",
+   "what": "The answer carries two rulings and they were separated. The FIRST (co-generate provinces with national borders) stayed in BL-563 and rewrote it: the item had proposed rejecting cross-nation candidates inside the existing fill, and Ben’s answer is the stronger design — regions grown to FIT the border rather than grown across it and trimmed. That also dissolved the frontier-fragmentation question the form asked, which is why no merge pass is in the ruling: offcuts never exist to merge.\n\nThe SECOND (a tile cannot be conquered without the province) became BL-567, category Military, requires BL-563. Reasons for splitting rather than carrying: it lands in components.hpp / world.hpp / MILITARY.md rather than province.cpp; it is a FORWARD constraint on a system that does not exist rather than a fix to one that does; and it is design-owed where BL-563 is now designed, so carrying it would have held a buildable generation fix behind an unsettled military question.",
+   "why_it_matters": "BL-563 can be promoted and built now; BL-567 cannot, and should not block it. If the split is wrong the cost is two rows where Ben wanted one, which is cheap to merge back before either is promoted.",
    "options": [
-    "Accept the split — BL-541 builds now, BL-545 carries the conquest invariant",
-    "Merge BL-545 back into BL-541 if the conquest rule should land with the generation change"
+    "Accept the split — BL-563 builds now, BL-567 carries the conquest invariant",
+    "Merge BL-567 back into BL-563 if the conquest rule should land with the generation change"
    ],
-   "recommendation": "Accept. BL-541 has a headless requirement that fails on today’s build and a clear fix; BL-545 has four genuinely open questions and a documented architectural collision. Holding the first behind the second buys nothing.",
+   "recommendation": "Accept. BL-563 has a headless requirement that fails on today’s build and a clear fix; BL-567 has four genuinely open questions and a documented architectural collision. Holding the first behind the second buys nothing.",
    "files": [
     "docs/development/backlog.json"
    ],
    "status": "open"
   },
   {
-   "id": "NR-512",
-   "title": "BL-539: raising max_firms_per_body may be INERT — the two stop bounds are in series, not in parallel",
+   "id": "NR-561",
+   "title": "BL-561: raising max_firms_per_body may be INERT — the two stop bounds are in series, not in parallel",
    "raised": "2026-08-22",
    "kind": "observation",
    "source": "Ben, 2026-08-22, elicitation form: chose \"Raise max_firms_per_body now\" over running the measurement seam first.",
@@ -3033,17 +3033,17 @@
    "status": "open"
   },
   {
-   "id": "NR-513",
-   "title": "Campaign-era conquest (BL-545) collides with the documented reason provinces sit outside state_hash — and BL-536 is designing the save format right now",
+   "id": "NR-562",
+   "title": "Campaign-era conquest (BL-567) collides with the documented reason provinces sit outside state_hash — and BL-536 is designing the save format right now",
    "raised": "2026-08-22",
    "kind": "observation",
    "source": "Tracing Ben’s 2026-08-22 conquest ruling against world.hpp:250 and BL-518.",
-   "what": "world.hpp:250 excludes `provinces` from state_hash and gives the reason explicitly: \"state_hash folds the fields a TICK may mutate ... the partition is generation output and never moves once built\". BL-518 states the same arrangement as Ben’s own earlier ruling (borders move during generation only, fixed once the campaign starts) and then warns, in as many words: \"If this item ever grew into campaign-era border changes, that whole arrangement would need revisiting.\"\n\nBen’s conquest ruling is that growth. The reconciling reading — and BL-545 recommends it rather than assuming it — is that the two things must be separated: the PARTITION (which tiles compose province P) stays fixed generation output, and only OWNERSHIP (which nation holds P) moves. That satisfies the rule exactly, since tiles are then not what changes hands, and it leaves provinces immutable, outside state_hash, still checked by determinism_harness across two generations, and still safe as a BL-467 battle-seed input.\n\nWhat does become live tick-mutable under that reading is nation_component::tiles, documented as \"populated by Pass 2 (territory expansion) and STABLE THEREAFTER\". That stops being true, and the field then has to enter state_hash and the save format.",
+   "what": "world.hpp:250 excludes `provinces` from state_hash and gives the reason explicitly: \"state_hash folds the fields a TICK may mutate ... the partition is generation output and never moves once built\". BL-518 states the same arrangement as Ben’s own earlier ruling (borders move during generation only, fixed once the campaign starts) and then warns, in as many words: \"If this item ever grew into campaign-era border changes, that whole arrangement would need revisiting.\"\n\nBen’s conquest ruling is that growth. The reconciling reading — and BL-567 recommends it rather than assuming it — is that the two things must be separated: the PARTITION (which tiles compose province P) stays fixed generation output, and only OWNERSHIP (which nation holds P) moves. That satisfies the rule exactly, since tiles are then not what changes hands, and it leaves provinces immutable, outside state_hash, still checked by determinism_harness across two generations, and still safe as a BL-467 battle-seed input.\n\nWhat does become live tick-mutable under that reading is nation_component::tiles, documented as \"populated by Pass 2 (territory expansion) and STABLE THEREAFTER\". That stops being true, and the field then has to enter state_hash and the save format.",
    "why_it_matters": "BL-536 (world-snapshot save) was designed on 2026-08-22 — the same day — and is being built now. It decides field-wise what is serialised. If nation ownership is about to become mutable campaign state, BL-536 should know that while its format is still being written, not after IOSV has a version number in the wild. The cost of knowing now is a comment; the cost of knowing later is a format version bump.",
    "options": [
     "Tell BL-536 now, so the envelope anticipates mutable nation ownership even if nothing writes it yet",
-    "Leave BL-536 alone — the save version field exists precisely so the format can move, and BL-545 is design-owed with no build date",
-    "Settle BL-545’s partition-vs-ownership question first, since it is what determines the answer"
+    "Leave BL-536 alone — the save version field exists precisely so the format can move, and BL-567 is design-owed with no build date",
+    "Settle BL-567’s partition-vs-ownership question first, since it is what determines the answer"
    ],
    "recommendation": "The third, then the first. The partition-vs-ownership call is small, it is the thing everything else depends on, and it is Ben’s. Once it is made, BL-536 either needs nothing or needs one section — and either way it finds out cheaply.",
    "files": [
