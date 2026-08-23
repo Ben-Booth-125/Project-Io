@@ -72,6 +72,24 @@ void sim_loop::advance_days(int days)
     m_elapsed_days += static_cast<double>(days);
 }
 
+void sim_loop::restore(uint64_t sim_tick_v, uint64_t day_tick_v, uint64_t econ_tick_v,
+                       double elapsed_days_v, int speed_v)
+{
+    m_sim_tick     = sim_tick_v;
+    m_day_tick     = day_tick_v;
+    m_econ_tick    = econ_tick_v;
+    m_elapsed_days = elapsed_days_v;
+    set_speed(speed_v); // clamps, so a corrupt speed cannot run the sim off the table
+
+    // NOT restored, deliberately: m_accum_ms and m_last_ms are the frame-pacing
+    // accumulator, and they mean "time since the previous frame". A save has no
+    // answer for that. Zeroing m_accum_ms drops at most one partial sim step;
+    // leaving m_last_ms alone lets the next tick() re-seed it against the real
+    // clock. Restoring a stale m_last_ms would instead hand tick() an enormous
+    // delta and burn the whole catch-up budget on the first frame after a load.
+    m_accum_ms = 0.0;
+}
+
 void sim_loop::on_sim_step()
 {
     ++m_sim_tick;

@@ -42,8 +42,18 @@ enum class canvas_command
     speed_4,      ///< Set speed to tier IV (4×).
     speed_5,      ///< Set speed to tier V (16×, fast-forward).
 
+    // Save / load (BL-536). In the shared vocabulary rather than handled as raw
+    // keys beside F11/F12, because unlike the frame HUD and the screen capture
+    // these are PLAYER actions, not dev instruments: they belong in the F1
+    // overlay, in ACTIONS.json, and in reach of a verify script. Both are
+    // handled in app::dispatch_action -- they need app members (the world, the
+    // clock, the histories) that apply_canvas_command does not see, exactly as
+    // the time controls do.
+    quick_save,
+    quick_load,
+
     // UI toggles.
-    help_toggle,      ///< Toggle the key-binding cheat-sheet overlay (F1).
+    help_toggle,///< Toggle the key-binding cheat-sheet overlay (F1).
     options_toggle,   ///< Toggle the display/options window (F10).
     tech_tree_toggle, ///< Toggle the read-only mock tech-tree viewer (F9, BL-087 design aid).
 };
