@@ -46,6 +46,7 @@
 #include "ui/tile_inspector.hpp"
 #include "ui/view_nav.hpp"
 #include "world/budget_system.hpp"
+#include "world/nation_step.hpp"
 #include "world/construction.hpp"
 #include "world/tech_gate.hpp" // BL-344: gating_tech_for (refusal names the missing tech)
 #include "world/corp_ai.hpp"
@@ -1256,6 +1257,13 @@ void app::step_economy()
                  &m_last_econ_report.budgets,
                  &m_last_econ_report.buildings); // BL-343: law enforcement seam
     lap(3); // budget
+    // Sprint N3: the nation step — score the due nations' weights, spend the
+    // treasury against this tick's claims, dispatch the earmarked surveys. After
+    // apply_budget so the treasury holds this quarter's levy and tariff; before
+    // the tech gates so a `surplus` gate reads the moved balance. Keyed on the
+    // econ counter (BL-568), which step_economy set at its top.
+    run_nation_step(m_world, m_registry, m_last_econ_report, m_world.current_econ_tick);
+    lap(3); // nation step (folded into the budget phase)
     // BL-344: evaluate the tech gates once per economy tick, after the money loop
     // has moved balances (a `surplus` gate should read this quarter's balance, not
     // last quarter's). Monotonic and deterministic; a no-op once everything

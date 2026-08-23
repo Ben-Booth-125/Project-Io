@@ -3,6 +3,7 @@
 #include "core/sim_loop.hpp"
 #include "scripting/lua_state.hpp"
 #include "world/budget_system.hpp"
+#include "world/nation_step.hpp"
 #include "world/corp_ai.hpp"
 #include "world/corp_command.hpp"
 #include "world/corporation_generation.hpp"
@@ -152,6 +153,7 @@ int run_serve(int ticks, long long as_corp, bool as_any)
         auto flows = clear_markets(w, reg, report);
         apply_budget(w, reg, flows, report.workforce_contention, &report.budgets,
                      &report.buildings); // BL-343: law enforcement seam
+        run_nation_step(w, reg, report, t); // Sprint N3: nations score, spend, dispatch
         advance_tech_gates(w); // BL-344: earn techs whose gate is now satisfied
         credit_arrived_convoys(w, t);
         // Age any dispatched survey by the days this tick spans (app.cpp does the
@@ -233,6 +235,7 @@ int run_blackboard_export(const std::string& which, const std::string& out_dir, 
         auto flows = clear_markets(w, reg, report);
         apply_budget(w, reg, flows, report.workforce_contention, &report.budgets,
                      &report.buildings); // BL-343: law enforcement seam
+        run_nation_step(w, reg, report, t); // Sprint N3: nations score, spend, dispatch
         advance_tech_gates(w); // BL-344: earn techs whose gate is now satisfied
         credit_arrived_convoys(w, t);
     }

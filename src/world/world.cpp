@@ -222,6 +222,41 @@ uint64_t world::state_hash(int tick) const
         }
     }
 
+    // NATIONS AS ACTORS (Sprint N3, 2026-08-23). The treasury and the authored
+    // weight map are folded ONLY when non-trivial, on the battles precedent
+    // above: a world where no nation has ever been credited or scored hashes
+    // exactly as it did before nations acted, so every empty-nation fixture's
+    // pinned value survives. Sorted walks: `nations` is unordered, so its ids
+    // are collected and sorted first; `nation_budgets` is a std::map.
+    {
+        bool any_treasury = false;
+        for (const auto& [nid, nc] : nations)
+            if (nc.treasury != 0.0f) { any_treasury = true; break; }
+        if (any_treasury)
+        {
+            std::vector<entity_id> ids;
+            ids.reserve(nations.size());
+            for (const auto& [nid, nc] : nations) ids.push_back(nid);
+            std::sort(ids.begin(), ids.end());
+            fnv1a_u32(h, static_cast<uint32_t>(ids.size()));
+            for (const entity_id nid : ids)
+            {
+                fnv1a_u32(h, nid);
+                fnv1a_f32(h, nations.at(nid).treasury);
+            }
+        }
+        if (!nation_budgets.empty())
+        {
+            fnv1a_u32(h, static_cast<uint32_t>(nation_budgets.size()));
+            for (const auto& [nid, nb] : nation_budgets)
+            {
+                fnv1a_u32(h, nid);
+                for (const float wgt : nb.weights) fnv1a_f32(h, wgt);
+                fnv1a_f32(h, nb.reserve_fraction);
+            }
+        }
+    }
+
     return h;
 }
 

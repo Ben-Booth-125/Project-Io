@@ -5650,49 +5650,54 @@
             "rows": [
                 {
                     "id": "R1",
-                    "status": "pending",
+                    "status": "complete",
                     "class": "headless",
                     "requirement": "ITEM-SPANNING (headless): THE LOOP CLOSES. In a world with an enacted levy and the production sink passed to apply_budget, within cadence_k ticks of the first treasury credit some nation's weight vector is authored (w.nation_budgets non-empty), a cash-gated rival's survey claim on public_exploration is PAID, and the survey of the claimed body is DISPATCHED the same tick — observed on economy_report::national_budget.transfers and on the survey state, through run_nation_step as the drivers call it, never through the budget pass alone.",
-                    "notes": "tools/verify/nation_wiring.cpp. The row that makes the sprint real: a green nation_budget_harness proves the arithmetic, this proves somebody calls it."
+                    "notes": "tools/verify/nation_wiring.cpp. The row that makes the sprint real: a green nation_budget_harness proves the arithmetic, this proves somebody calls it.",
+                    "result_metric": "nation_wiring R1a-R1e: mechanism closes on a funded off-cadence claimant — paid + dispatched same tick"
                 },
                 {
                     "id": "R2",
-                    "status": "pending",
+                    "status": "complete",
                     "class": "headless",
                     "requirement": "CONSERVATION THROUGH THE WHOLE CHAIN. Treasury debit == corp credit == survey cost debited, bit-exact per transfer; Σ transfers.credits == national_budget_tick::total_transferred; money_conservation's world total moves by exactly the survey spend and nothing else.",
-                    "notes": "nation_wiring.cpp + money_conservation.cpp extended to call run_nation_step."
+                    "notes": "nation_wiring.cpp + money_conservation.cpp extended to call run_nation_step.",
+                    "result_metric": "R2a-R2d: Σ transfers == total_transferred bit-exact; treasury falls by exactly the dispatched earmarks; corp balances restored"
                 },
                 {
                     "id": "R3",
-                    "status": "pending",
+                    "status": "complete",
                     "class": "headless",
                     "requirement": "EARMARKED, NOT FUNGIBLE (Ben, NR-568). A paid exploration claim dispatches the survey of the NAMED body; the credit is never left on the corp's balance for its next evaluation to spend on a build. Asserted: after the tick, corp balance delta == 0 from the subsidy (credit in, cost out) and the body's survey is in progress.",
-                    "notes": "The negative control: a claim with a null subject is rejected whole at gather, mutating nothing."
+                    "notes": "The negative control: a claim with a null subject is rejected whole at gather, mutating nothing.",
+                    "result_metric": "R3a-R3c: whole-or-nothing fill, not a subsidy, clawback path exercised"
                 },
                 {
                     "id": "R4",
-                    "status": "pending",
+                    "status": "complete",
                     "class": "headless",
                     "requirement": "INERTNESS HOLDS WHERE IT SHOULD. A world with no enacted levy or tariff (every treasury at zero) is BYTE-IDENTICAL in state_hash to the pre-sprint build across a full run; the conditional fold of treasuries + nation_budgets adds nothing to an empty-nation fixture's hash.",
-                    "notes": "spectator_determinism's fixture is exactly this; its (already-stale, NR-452) golden must not move by a second cause."
+                    "notes": "spectator_determinism's fixture is exactly this; its (already-stale, NR-452) golden must not move by a second cause.",
+                    "result_metric": "R4a-R4c: zero treasury moves nothing; balances bit-identical to step-absent; weights still authored"
                 },
                 {
                     "id": "R5",
-                    "status": "pending",
+                    "status": "complete",
                     "class": "headless",
                     "requirement": "DETERMINISM AND CADENCE. Two runs of one seed produce identical transfers field-for-field and identical state_hash; the nation cadence is an index over the SORTED nation set keyed on current_econ_tick (BL-568), and admitting a nation with the highest id shifts no other nation's slot.",
-                    "notes": "nation_scorer_harness R2 already covers the slot rule for the scorer; this row covers it through run_nation_step."
+                    "notes": "nation_scorer_harness R2 already covers the slot rule for the scorer; this row covers it through run_nation_step.",
+                    "result_metric": "R5a-R5c: identical transfers field-for-field and identical state_hash across two runs"
                 },
                 {
                     "id": "R6",
-                    "status": "pending",
+                    "status": "complete",
                     "class": "headless",
                     "requirement": "SAVE SEAM. world_save_version 2→3; a v2 stream is refused whole with the destination untouched; nation_budgets round-trips exactly (weights and reserve_fraction per nation) so a loaded campaign spends identically to an unsaved one on its next tick.",
                     "notes": "save_roundtrip row."
                 },
                 {
                     "id": "R7",
-                    "status": "pending",
+                    "status": "complete",
                     "class": "headless",
                     "requirement": "SENTIMENT DECAYS. With economy.lua authoring trust_decay_per_tick = 1 − 2^(−1/9), a −2 cancellation on an otherwise-quiet pair halves in 9 ticks (±1 fixed-point step) and reaches zero, never a floor; a non-finite authored rate is rejected at load naming the key.",
                     "notes": "sentiment_harness row, or a sibling; the anchor is Ben's (NR-568)."
@@ -5703,6 +5708,14 @@
                     "class": "visual",
                     "requirement": "LIVE CHECK (standing rule 2026-08-19): in the built app, a nation's treasury falls and a rival's survey starts without the player doing anything; the goldens that move (treasury fold, funded surveys, BL-568's rotation) are re-blessed with dated provenance as a correction.",
                     "notes": "Owed to the integrating build; one re-bless covers BL-568 R4 too. Surfaces (BL-555/BL-558) come after, in their own items."
+                },
+                {
+                    "id": "R9",
+                    "status": "pending",
+                    "class": "headless",
+                    "requirement": "THE LOOP CLOSES AT REALISTIC WEIGHTS, or the reason is filed. At the scorer's own exploration weight a survey earmark is funded in a played game — OR the gap is recorded with a chosen fix. nation_wiring's § REALISTIC measures the shortfall.",
+                    "result_metric": "OPEN: does not close at ~1.3% weight (needs ~89k cr treasury/survey); no levy enacted by default. See NR-572.",
+                    "notes": "The boundary between wired (R1-R5, done) and playing. NR-572 options A-E; recommendation D then A. This row stays pending until Ben rules."
                 }
             ]
         }

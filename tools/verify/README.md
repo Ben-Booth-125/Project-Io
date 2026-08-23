@@ -546,6 +546,32 @@ Each exits non-zero on a failed assertion. The economy *panel* (the visual class
 is verified separately via `ProjectIo --verify scripts/verify/economy_panel.lua`
 (the `verifier-visual` skill).
 
+## nation_wiring (Sprint N3 slice 1)
+
+Does anybody CALL the nation spines? N1 proved the national budget's arithmetic and N2 the
+scorer's purity, and a world ran bit-identical with both unreachable from the tick — a green
+harness on a function nobody calls. This drives the tick as the drivers do (economy → clearing →
+budget → run_nation_step → tech gates) on the real generated world and asserts the loop closes:
+a nation authors weights, a cash-gated rival's survey claim is PAID, the survey is DISPATCHED the
+same tick, and every credit conserves (treasury falls by the dispatched earmarks; the corp's
+balance returns to where it started — credit in, survey cost out). R4 asserts inertness (zero
+treasury → nothing moves, balances bit-identical to a run with the step absent); R5 replay
+determinism through the step, including the state_hash fold.
+
+**Read its § REALISTIC block, which asserts nothing and is the point.** At the scorer's own
+~1.3% exploration weight, one tick's line share (33–913 cr on a 5000-cr treasury) is far below
+the cheapest survey the producer files (16,290 cr), and Ben's earmark ruling makes the claim
+whole-or-nothing — so at realistic weights the loop does NOT close, and a nation needs ~89k cr of
+treasury to fund one survey in a tick. The default world enacts no levy, so treasuries are 0. R1
+therefore proves the MECHANISM on a funded fixture (a fat exploration weight authored on an
+off-cadence claimant, which the scorer will not overwrite) rather than pretending the scorer funds
+it. The gap is NR-572.
+
+```
+cmake --build build --target nation_wiring
+ctest --test-dir build -R nation_wiring
+```
+
 ## cadence_schedule (BL-568)
 
 Does every rival get its turn on the schedule the LIVE APP runs? corp_ai's stagger

@@ -5,6 +5,7 @@
 #include "battle_system.hpp" // battle_dispatch (BL-467/BL-468)
 #include "nation_ai.hpp"     // nation_scorer_report (BL-542; Sprint N3 T4)
 #include "nation_budget.hpp" // budget_claim, national_budget_tick (BL-537; Sprint N3 T4)
+#include "nation_step.hpp"   // earmark_result (Sprint N3 T6)
 #include "world.hpp"
 
 #include <array>
@@ -246,6 +247,12 @@ struct economy_report
     /// nation DUE on the cadence, plus the coverage counts that keep a sweep
     /// from passing vacuously. BL-558 renders it.
     nation_scorer_report nation_scores;
+
+    /// What each paid EARMARK did this tick (Sprint N3 T6): the survey a nation
+    /// bought for a corp, dispatched or clawed back. An earmark is not a subsidy
+    /// — it leaves the corp's balance where it found it — so it is reported here
+    /// rather than folded into `budgets[corp].subsidies`. BL-555's line.
+    std::vector<earmark_result> earmarks;
 };
 
 /// Run one economy step over every corporation's buildings: extraction credits

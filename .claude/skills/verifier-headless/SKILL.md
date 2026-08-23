@@ -506,6 +506,18 @@ in `tools/verify/README.md`.
   two-arg form every existing caller uses still cuts and still credits. An interception is an
   EVENT, not state — nothing is stored on `world`, serialised, or folded into `state_hash`.
 
+- **`nation_wiring`** — Does anybody CALL the nation spines? (Sprint N3 slice 1, 2026-08-23.) The
+  item-spanning check that BL-537/BL-542/BL-538-line-5 are reachable from the tick, not just green
+  in isolation: it drives economy → clearing → budget → `run_nation_step` → tech gates on the real
+  generated world and asserts a cash-gated rival's survey claim is paid and the survey dispatched
+  the same tick, with conservation (treasury falls by the dispatched earmarks; the corp balance
+  returns to start) and replay determinism through the fold. **Its § REALISTIC block asserts nothing
+  and is the finding**: at the scorer's ~1.3% exploration weight one tick's line share is far below
+  the cheapest survey, and Ben's whole-or-nothing earmark rule means the loop does not close at
+  realistic treasuries (NR-572) — so R1 proves the mechanism on a funded off-cadence claimant the
+  scorer will not overwrite, rather than rigging the scorer's weight. Needs a reconfigure to be
+  globbed in.
+
 - **`cadence_schedule`** — Does every rival get its turn on the schedule the LIVE APP runs?
   (BL-568, 2026-08-23.) corp_ai's stagger was keyed on the DAY tick, which is 90n at every
   quarter boundary in the app, and 90n mod 4 is only ever 0 or 2 — so half the rival roster

@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*271 entries — 234 open, 37 resolved.*
+*274 entries — 237 open, 37 resolved.*
 
 ---
 
@@ -2412,6 +2412,48 @@ a) world::nation_budgets (std::map<entity_id, nation_budget>) is the persistent 
 - Overturn (d): gate the pass on spectating like corp_ai.
 
 > **Recommendation:** Confirm.
+
+### NR-570 — Sprint N3 slice S2 — six calls taken in the budget pass and the claim producer (earmark subject validated against w.bodies; per-claim fill_fraction; fixture line swapped to schooling)
+*decision taken on your behalf · raised 2026-08-23 · from Worktree agent S2 (b560a1d1), Sprint N3 slice 1.*
+
+1) A public_exploration claim whose subject is null OR not in w.bodies is rejected whole at gather (brief asked only for null) — 'validate as the value that lands', since dispatch_survey refuses an unknown body. 2) budget_transfer::fill_fraction is THIS CLAIM's fill (credits/amount), not the line's; the line's is already in lines[]. 3) Rule 3a (earmarked claims whole-or-nothing, Ben NR-568) is tested against the computed float remaining share, so a claim equal to the share within one ULP can be skipped this tick and funded next — measure-zero, and the share accumulates. 4) A two-line clip keeps 'paid never more than share' true on a MIXED earmarked/unearmarked line — unreachable today, documented as a guard. 5) nation_budget_harness's R1 pro-rata fixtures moved from public_exploration to schooling because the exploration line now rejects subject-less claims; arithmetic identical to the bit. 6) The 512-shape fuzz generator gained two bodies with index-derived subjects WITHOUT drawing from its RNG stream, so the N1 defect's shapes are unchanged; ~1 in 3 exploration claims now drop at gather.
+
+**Why it matters.** (1) and (2) are seam shape a surface will read; (5) silently changes which line the arithmetic rows exercise.
+
+- Confirm all six.
+- Overturn (1): null-only validation, let dispatch refuse.
+- Overturn (5): keep the fixtures on exploration with synthetic subjects.
+
+> **Recommendation:** Confirm.
+
+### NR-571 — Sprint N3 slice S3 — sentiment decay authored at 0.074125 (six figures, not the form's 0.0741); non-number rates rejected rather than defaulted; RELATIONS.md edited outside the slice's map
+*decision taken on your behalf · raised 2026-08-23 · from Worktree agent S3 (f1e802b2), Sprint N3 slice 1.*
+
+1) economy.lua authors trust_decay_per_tick = access_decay_per_tick = 0.074125 — the same derivation (half-life 9 ticks, 1 − 2^(−1/9)) to six significant figures, because 0.0741 puts the 9-tick result 2.5e-4 off −1.0 and six figures keep it within 3e-6. 2) The loader's read_unit_rate() rejects a NON-NUMBER under either key (not only non-finite / out-of-range), naming the key — stricter than get_or's silent default elsewhere in the file. 3) docs/politics/RELATIONS.md:183 and :235 both asserted 'decay is unauthored'; struck through and dated, outside S3's collision map. 4) A second stale save-format note in components.hpp:85-91 (resource_type) fixed in passing. 5) Rows R3h–R3m added to the existing sentiment_harness rather than a new harness. 6) The harness tolerance is 1e-5 (binary32 multiplicative decay has no 'fixed-point step'); stated in the harness comment.
+
+**Why it matters.** (1) is Ben's number rendered more precisely, not changed; (2) is a deliberate reading of the seam rule as covering type. Recorded so the six-figure constant is not mistaken for a tuning.
+
+- Confirm.
+- Author 0.0741 and loosen the harness tolerance to match.
+
+> **Recommendation:** Confirm.
+
+### NR-572 — The nation spines are wired live but the exploration loop does not CLOSE at realistic weights — an indivisible survey earmark can't be met from a ~1.3% line's single-tick share, and the default world enacts no levy so treasuries are 0
+*blocker · raised 2026-08-23 · from Sprint N3 slice 1 integration; nation_wiring.cpp § REALISTIC.*
+
+run_nation_step now runs every tick in all three drivers (app, --serve, --export-blackboard): the scorer authors weights, the budget pass spends, earmarked survey claims dispatch, and conservation + determinism hold — nation_wiring.cpp R1-R5 green, and the mechanism closes on a funded fixture. But at the SCORER's own exploration weight it does not close in a played game, for two independent reasons. (1) INDIVISIBILITY vs THIN SHARE: a nation's exploration line gets treasury × (1 − reserve 0.35) × ~0.013 weight ≈ 33–913 cr on a 5000-cr treasury, while corp_ai's top-scoring gated survey claim costs 2,390–16,290 cr; Ben's ruling (NR-568) makes an earmark whole-or-nothing, and a line's share is 'a claim on THIS tick's spendable, not a pot' (nation_budget.hpp rule 2), so the share never accumulates toward the survey unless the TREASURY grows. Measured: a nation needs ~89k cr of treasury to fund the cheapest survey in one tick, ~1.9M for the one corp_ai actually claims. (2) NO INCOME: the default generated world enacts no levy or tariff, so treasuries are 0 (nation_wiring R4, money_conservation had to enact a tariff by hand to see any treasury move) — the spend side has nothing to spend. N1 already called the treasury 'a scoreboard with no game attached'; this is the same gap seen from the spend side.
+
+**Why it matters.** The wiring is done and correct — the inertness gap the sprint targeted is closed, and BL-555/BL-558 can now render a treasury, weights and (once funded) transfers. But a player will not SEE a nation fund a survey until both halves are addressed, so the live-check half of the sprint (R8) will show a treasury and weights but no payments. This is the boundary between 'wired' and 'playing'.
+
+- A) Earmark lines ACCUMULATE toward an indivisible purchase — a per-line pot for earmarked lines only, an explicit exception to rule 2's 'not a pot'. Closes (1); needs a serialisation field for the pot.
+- B) Raise the exploration weight (nation scorer / nation_ai_params) so one tick's share clears a survey at plausible treasuries — a tuning change, closes (1) without a data-model change but starves the other eight lines.
+- C) Make survey cost payable in instalments (dispatch on partial funding, scan proceeds as credits arrive) — closes (1) by making the purchase divisible; larger survey_system change.
+- D) Wire nation INCOME first (levy/tariff enactment in generation, or a nation scorer that enacts) so treasuries are non-zero — closes (2); orthogonal to (1) and arguably the prerequisite.
+- E) Accept for this cut: the wiring is the deliverable, funding is BL-538's remaining lines + a nation-income item; file both and move to the surfaces.
+
+> **Recommendation:** D then A. (2) is the prerequisite — nothing spends without income — and it is the older gap (N1's 'scoreboard with no game'). Then (A) for the indivisibility, because it preserves Ben's whole-or-nothing earmark AND the weight model, at the cost of one serialised pot field. (B) fights the weight model; (C) is the biggest change. Either way the wiring stands.
+
+*Files: `src/world/nation_step.cpp`, `src/world/nation_budget.hpp`, `src/world/nation_ai.cpp`, `tools/verify/nation_wiring.cpp`*
 
 ---
 
