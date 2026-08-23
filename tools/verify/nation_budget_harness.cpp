@@ -42,6 +42,15 @@
 //   R5  DETERMINISM: two runs of one fixture are identical, and so is a run
 //       whose claim vector arrives in the opposite order (the pass sorts into
 //       its own walk order rather than trusting the producer's).
+//   R6  THE TRANSFER RECORD AND THE EARMARK (Sprint N3 T3, 2026-08-23). Every
+//       credit moved is recorded on `national_budget_tick::transfers` — who
+//       paid whom, on which line, for what — sorted (corp, nation, line), and
+//       re-walked in the pass's order the records reproduce `paid` and
+//       `total_transferred` BIT-EXACTLY (one accumulation, recorded). A
+//       `public_exploration` claim must name the body it would survey, or it
+//       is refused whole at gather; and an earmarked claim is paid WHOLE OR
+//       NOTHING (rule 3a, Ben's NR-568 ruling) while an unearmarked one keeps
+//       rule 3's pro-rata fill.
 //
 // Every number in the REFERENCE fixture is a dyadic rational chosen so the float
 // arithmetic is exact: those assertions are bit equality, deliberately not
@@ -75,11 +84,19 @@ void check(bool ok, const char* what)
 bool same(float a, float b) { return a == b; } // bit-identical, deliberately not epsilon
 
 constexpr std::size_t k_logistics   = static_cast<std::size_t>(budget_priority::logistics_maintenance);
+constexpr std::size_t k_schooling   = static_cast<std::size_t>(budget_priority::schooling);
 constexpr std::size_t k_exploration = static_cast<std::size_t>(budget_priority::public_exploration);
 constexpr std::size_t k_charters    = static_cast<std::size_t>(budget_priority::charters);
 
 /// Two nations, two corporations. Nation A authors a budget; nation B is the
 /// control (present, funded, but authoring nothing).
+///
+/// The pro-rata rows (R1) run on `schooling`, a line that takes no subject.
+/// They ran on `public_exploration` until Sprint N3 made that line EARMARKED
+/// (rule 3a: a subject is required and a claim is whole or nothing), which is a
+/// different mechanic with its own rows (R6). The arithmetic is unchanged by
+/// the move — a share is spendable x weight / total whatever the index — so
+/// every reference constant below still holds to the bit.
 struct fixture
 {
     world     w;
@@ -91,6 +108,32 @@ struct fixture
     std::map<entity_id, nation_budget> budgets;
     std::vector<budget_claim>          claims;
 };
+
+/// A body for an earmarked claim to name. Survey state is irrelevant to the
+/// budget pass (the dispatch is T6's); only existence in `w.bodies` is checked.
+entity_id add_body(world& w, const char* name)
+{
+    const entity_id b = w.create_entity();
+    body_component bc{};
+    bc.name        = name;
+    bc.type        = body_type::planet;
+    bc.grid_width  = 4;
+    bc.grid_height = 4;
+    w.bodies[b] = bc;
+    return b;
+}
+
+/// An earmarked claim: `public_exploration`, subject = `body`.
+budget_claim exploration_claim(entity_id nation, entity_id corp, float amount, entity_id body)
+{
+    budget_claim c{};
+    c.nation  = nation;
+    c.corp    = corp;
+    c.line    = budget_priority::public_exploration;
+    c.amount  = amount;
+    c.subject = body;
+    return c;
+}
 
 entity_id add_nation(world& w, const char* name, float treasury)
 {
@@ -115,7 +158,7 @@ entity_id add_corp(world& w, const char* name, float balance)
 /// The reference fixture. Treasury 1000, reserve 1/4 -> spendable 750.
 /// Weights 1/2, 1/4, 1/4 -> shares 375, 187.5, 187.5.
 ///   logistics   : corp_1 200 + corp_2 100 = 300 demand <= 375 share -> paid in full
-///   exploration : corp_1 100 + corp_2 150 = 250 demand >  187.5      -> rationed x 0.75
+///   schooling   : corp_1 100 + corp_2 150 = 250 demand >  187.5      -> rationed x 0.75
 ///   charters    : no claim at all                                    -> skipped
 /// So corp_1 takes 200 + 75 = 275, corp_2 takes 100 + 112.5 = 212.5,
 /// the treasury pays 487.5 and keeps 512.5.
@@ -130,15 +173,15 @@ fixture make_fixture()
     nation_budget nb{};
     nb.reserve_fraction         = 0.25f;
     nb.weights[k_logistics]     = 0.5f;
-    nb.weights[k_exploration]   = 0.25f;
+    nb.weights[k_schooling]     = 0.25f;
     nb.weights[k_charters]      = 0.25f;
     f.budgets[f.nation_a] = nb;
 
     f.claims = {
         {f.nation_a, f.corp_1, budget_priority::logistics_maintenance, 200.0f},
         {f.nation_a, f.corp_2, budget_priority::logistics_maintenance, 100.0f},
-        {f.nation_a, f.corp_1, budget_priority::public_exploration,    100.0f},
-        {f.nation_a, f.corp_2, budget_priority::public_exploration,    150.0f},
+        {f.nation_a, f.corp_1, budget_priority::schooling,             100.0f},
+        {f.nation_a, f.corp_2, budget_priority::schooling,             150.0f},
     };
     return f;
 }
@@ -204,15 +247,15 @@ fixture make_awkward_fixture()
     nation_budget nb{};
     nb.reserve_fraction       = 0.13f;
     nb.weights[k_logistics]   = 0.37f;
-    nb.weights[k_exploration] = 0.21f;
+    nb.weights[k_schooling]   = 0.21f;
     nb.weights[k_charters]    = 0.42f;
     f.budgets[f.nation_a] = nb;
 
     f.claims = {
         {f.nation_a, f.corp_1, budget_priority::logistics_maintenance, 123.457f},
         {f.nation_a, f.corp_2, budget_priority::logistics_maintenance,  77.13f},
-        {f.nation_a, f.corp_1, budget_priority::public_exploration,    311.9f},
-        {f.nation_a, f.corp_2, budget_priority::public_exploration,     88.888f},
+        {f.nation_a, f.corp_1, budget_priority::schooling,             311.9f},
+        {f.nation_a, f.corp_2, budget_priority::schooling,              88.888f},
         {f.nation_a, f.corp_2, budget_priority::charters,              404.04f},
         {f.nation_a, f.corp_1, budget_priority::charters,               19.191f},
     };
@@ -234,6 +277,59 @@ const nation_budget_result* result_for(const national_budget_tick& t, entity_id 
     return nullptr;
 }
 
+/// Re-sum `t.transfers` in the PASS'S OWN order — per nation ascending, each
+/// nation's credits in (line, corp, arrival) order, the per-nation totals then
+/// summed — so the result is the same float accumulation `total_transferred`
+/// and each `nation_budget_result::paid` came from. The report is sorted
+/// (corp, nation, line) for the payee's benefit, and float addition is not
+/// associative, so a flat sum over it would agree only to rounding; this is the
+/// walk that makes the identity bit-exact rather than approximate.
+struct rewalk
+{
+    float total            = 0.0f;
+    bool  per_nation_exact = true; ///< Every nation's re-sum == its `paid`, bit-exact.
+};
+
+rewalk rewalk_transfers(const national_budget_tick& t)
+{
+    rewalk r;
+    for (const nation_budget_result& n : t.nations)
+    {
+        // Filtering the (corp, nation, line)-sorted list by nation keeps
+        // (corp, line, arrival); a stable sort by line then gives
+        // (line, corp, arrival) — exactly the pay loop's order.
+        std::vector<budget_transfer> mine;
+        for (const budget_transfer& x : t.transfers)
+            if (x.nation == n.nation)
+                mine.push_back(x);
+        std::stable_sort(mine.begin(), mine.end(),
+                         [](const budget_transfer& a, const budget_transfer& b) {
+                             return static_cast<int>(a.line) < static_cast<int>(b.line);
+                         });
+        float paid = 0.0f;
+        for (const budget_transfer& x : mine)
+            paid += x.credits;
+        r.per_nation_exact = r.per_nation_exact && same(paid, n.paid);
+        if (paid != 0.0f)
+            r.total += paid;
+    }
+    return r;
+}
+
+/// The report's stated order: (corp, nation, line), non-decreasing.
+bool transfers_sorted(const national_budget_tick& t)
+{
+    for (std::size_t i = 1; i < t.transfers.size(); ++i)
+    {
+        const budget_transfer& a = t.transfers[i - 1];
+        const budget_transfer& b = t.transfers[i];
+        if (a.corp != b.corp)     { if (a.corp > b.corp) return false; continue; }
+        if (a.nation != b.nation) { if (a.nation > b.nation) return false; continue; }
+        if (static_cast<int>(a.line) > static_cast<int>(b.line)) return false;
+    }
+    return true;
+}
+
 } // namespace
 
 int main()
@@ -251,7 +347,7 @@ int main()
         check(a != nullptr &&
               same(a->spendable, 750.0f) &&
               same(a->lines[k_logistics].share,   375.0f) &&
-              same(a->lines[k_exploration].share, 187.5f) &&
+              same(a->lines[k_schooling].share, 187.5f) &&
               same(a->lines[k_charters].share,    187.5f),
               "R1a shares are spendable x normalised weight (750 -> 375 / 187.5 "
               "/ 187.5)");
@@ -315,10 +411,10 @@ int main()
               same(a->lines[k_logistics].paid, 300.0f),
               "R1i a line whose demand fits is filled in full and says so");
         check(a != nullptr &&
-              a->lines[k_exploration].rationed &&
-              same(a->lines[k_exploration].demand, 250.0f) &&
-              same(a->lines[k_exploration].paid,   187.5f) &&
-              same(a->lines[k_exploration].fill_fraction, 0.75f),
+              a->lines[k_schooling].rationed &&
+              same(a->lines[k_schooling].demand, 250.0f) &&
+              same(a->lines[k_schooling].paid,   187.5f) &&
+              same(a->lines[k_schooling].fill_fraction, 0.75f),
               "R1j an over-subscribed line is PARTIALLY FILLED pro rata and "
               "says so (250 asked, 187.5 paid, fill 0.75) - never overdrawn, "
               "never silently dropped");
@@ -665,7 +761,8 @@ int main()
             };
 
             bool never_overpaid = true, never_negative = true;
-            int  scenarios = 0;
+            bool record_exact = true, earmarks_whole = true, record_sorted = true;
+            int  scenarios = 0, earmarked_paid = 0, earmarked_skipped = 0;
             for (std::uint32_t seed = 1; seed <= 512; ++seed)
             {
                 std::uint32_t st = seed;
@@ -677,6 +774,15 @@ int main()
                     nats.push_back(add_nation(s.w, "Fuzzland", real(st, -50.0f, 5000.0f)));
                 for (int i = 0; i < n_corps; ++i)
                     corps.push_back(add_corp(s.w, "Claimant", real(st, 0.0f, 20000.0f)));
+                // Two bodies for the earmarked line to name. Added WITHOUT a
+                // draw from `st`, so the 512 shapes above (treasuries, weights,
+                // claim amounts) are the same ones the Sprint N1 defect was
+                // measured on; what changed is that a `public_exploration`
+                // claim now needs a subject (rule 3a), assigned below from the
+                // claim index rather than the stream, and one in three carries
+                // none and is dropped at gather.
+                const entity_id body_a = add_body(s.w, "Fuzzworld A");
+                const entity_id body_b = add_body(s.w, "Fuzzworld B");
                 for (entity_id n : nats)
                 {
                     if (next(st) % 5 == 0)
@@ -696,6 +802,8 @@ int main()
                     c.corp   = corps[next(st) % corps.size()];
                     c.line   = static_cast<budget_priority>(next(st) % priority_count);
                     c.amount = real(st, -10.0f, 3000.0f); // some non-positive, dropped
+                    if (c.line == budget_priority::public_exploration)
+                        c.subject = (i % 3 == 0) ? body_a : (i % 3 == 1) ? body_b : null_entity;
                     s.claims.push_back(c);
                 }
 
@@ -708,10 +816,29 @@ int main()
                 const auto t = run(s);
                 ++scenarios;
                 for (const auto& r : t.nations)
+                {
                     never_overpaid = never_overpaid && r.paid <= r.spendable;
+                    earmarked_skipped += r.lines[k_exploration].skipped;
+                }
                 for (const auto& [id, nc] : s.w.nations)
                     if (before[id] >= 0.0f)
                         never_negative = never_negative && nc.treasury >= 0.0f;
+
+                // The transfer record, under every shape: re-walked in the
+                // pass's order it IS the total, bit for bit; every earmarked
+                // entry is whole; the list is in its stated order.
+                const rewalk rw = rewalk_transfers(t);
+                record_exact  = record_exact && rw.per_nation_exact &&
+                                same(rw.total, t.total_transferred);
+                record_sorted = record_sorted && transfers_sorted(t);
+                for (const budget_transfer& x : t.transfers)
+                {
+                    if (x.subject == null_entity)
+                        continue;
+                    ++earmarked_paid;
+                    earmarks_whole = earmarks_whole && same(x.fill_fraction, 1.0f) &&
+                                     x.line == budget_priority::public_exploration;
+                }
             }
             check(scenarios == 512 && never_overpaid,
                   "R4g across 512 generated shapes no nation ever pays out more "
@@ -720,6 +847,18 @@ int main()
             check(never_negative,
                   "R4h ...and none is driven to a negative treasury, which would "
                   "lock it out of spending on every following tick");
+            check(record_exact,
+                  "R6h across the same 512 shapes the transfer record, re-walked "
+                  "in the pass's order, reproduces every nation's `paid` and the "
+                  "tick's total_transferred BIT-EXACTLY - one accumulation, "
+                  "recorded, not a second one that agrees approximately");
+            check(earmarked_paid > 0 && earmarked_skipped > 0 && earmarks_whole,
+                  "R6i ...and every earmarked transfer in them is whole (fill "
+                  "1.0) while some earmarked claims were skipped - rule 3a "
+                  "exercised both ways, not vacuously");
+            check(record_sorted,
+                  "R6j ...and every record is in its stated (corp, nation, line) "
+                  "order");
         }
 
         // A nation named by a claim but authoring no budget pays nothing.
@@ -761,6 +900,177 @@ int main()
         check(order_free,
               "R5b a reversed claim vector produces bit-identical balances - "
               "the pass does not trust the producer's order");
+    }
+
+    // --- R6: the transfer record, and the earmark (Sprint N3 T3) ------------
+    std::printf("\n-- R6  who paid whom, for what - and whole or nothing --\n");
+    {
+        // The record on the reference fixture: four claims paid, four records,
+        // in (corp, nation, line) order, each carrying ITS OWN fill and the
+        // line's rationed flag. Sums re-walked in the pass's order are the
+        // pass's own floats.
+        fixture     f = make_fixture();
+        const auto  t = run(f);
+        const auto& x = t.transfers;
+        check(x.size() == 4 && transfers_sorted(t) &&
+              x[0].corp == f.corp_1 && x[0].line == budget_priority::logistics_maintenance &&
+              x[1].corp == f.corp_1 && x[1].line == budget_priority::schooling &&
+              x[2].corp == f.corp_2 && x[2].line == budget_priority::logistics_maintenance &&
+              x[3].corp == f.corp_2 && x[3].line == budget_priority::schooling,
+              "R6a one record per claim paid, sorted (corp, nation, line) - the "
+              "payee's view of who is paying it");
+        check(x.size() == 4 &&
+              same(x[0].credits, 200.0f) && same(x[0].fill_fraction, 1.0f)  && !x[0].rationed &&
+              same(x[1].credits,  75.0f) && same(x[1].fill_fraction, 0.75f) &&  x[1].rationed &&
+              same(x[2].credits, 100.0f) && same(x[2].fill_fraction, 1.0f)  && !x[2].rationed &&
+              same(x[3].credits, 112.5f) && same(x[3].fill_fraction, 0.75f) &&  x[3].rationed &&
+              x[0].nation == f.nation_a && x[0].subject == null_entity,
+              "R6b each record carries the credits that moved, THIS claim's "
+              "fill (1.0 / 0.75), the line's rationed flag, and no earmark on "
+              "a line that takes none");
+
+        const rewalk rw = rewalk_transfers(t);
+        check(rw.per_nation_exact && same(rw.total, t.total_transferred) &&
+              same(rw.total, k_paid_per_tick),
+              "R6c re-walked in the pass's order the records sum to "
+              "total_transferred bit-exactly (487.5)");
+
+        // ...and at ordinary weights, where the identity is the point.
+        fixture    g  = make_awkward_fixture();
+        const auto gt = run(g);
+        const rewalk gw = rewalk_transfers(gt);
+        check(gt.transfers.size() == 6 && gw.per_nation_exact &&
+              same(gw.total, gt.total_transferred),
+              "R6d ...and at non-dyadic weights too: six records, re-walked, "
+              "ARE the total to the bit - the same accumulation, recorded");
+
+        // THE EARMARK. A `public_exploration` claim names the body it would
+        // survey; without one there is nothing for the credit to dispatch, so
+        // the claim is refused whole at gather and the tick is bit-identical to
+        // the one without it. A body the world does not hold is the same.
+        {
+            fixture    h  = make_fixture();
+            fixture    k  = make_fixture();
+            h.budgets[h.nation_a].weights[k_exploration] = 0.25f;
+            k.budgets[k.nation_a].weights[k_exploration] = 0.25f;
+            budget_claim bare{};
+            bare.nation = k.nation_a;
+            bare.corp   = k.corp_1;
+            bare.line   = budget_priority::public_exploration;
+            bare.amount = 50.0f; // subject left null
+            k.claims.push_back(bare);
+            k.claims.push_back(exploration_claim(k.nation_a, k.corp_2, 60.0f, 9999u)); // no such body
+            const auto ht = run(h);
+            const auto kt = run(k);
+            const auto* kr = result_for(kt, k.nation_a);
+            check(snapshot(h.w) == snapshot(k.w) &&
+                  same(ht.total_transferred, kt.total_transferred) &&
+                  ht.transfers.size() == kt.transfers.size() &&
+                  kr != nullptr && same(kr->lines[k_exploration].demand, 0.0f) &&
+                  same(kr->lines[k_exploration].paid, 0.0f),
+                  "R6e a public_exploration claim with no subject, or a subject "
+                  "the world does not hold, is rejected whole at gather - no "
+                  "demand, no debit, no record; the tick is bit-identical");
+        }
+
+        // RULE 3a, both ways. Treasury 1000, reserve 1/4 -> spendable 750;
+        // exploration and schooling weighted 1/4 each (shares 187.5), logistics
+        // 1/2 with no claim. The SAME two amounts, 100 and 150, on each line:
+        //   exploration (earmarked)  : corp_1 100 <= 187.5 -> paid WHOLE;
+        //                              corp_2 150 >  87.5  -> SKIPPED, not 87.5
+        //   schooling   (unearmarked): rationed x 0.75 -> 75 and 112.5, as R1j
+        // So the treasury pays 100 + 187.5 = 287.5 and the 87.5 the skipped
+        // claim would have taken is still in it.
+        {
+            fixture m;
+            m.nation_a = add_nation(m.w, "Earmarker", 1000.0f);
+            m.corp_1   = add_corp(m.w, "Payee One", 0.0f);
+            m.corp_2   = add_corp(m.w, "Payee Two", 0.0f);
+            const entity_id body_a = add_body(m.w, "Near");
+            const entity_id body_b = add_body(m.w, "Far");
+            nation_budget nb{};
+            nb.reserve_fraction       = 0.25f;
+            nb.weights[k_logistics]   = 0.5f;
+            nb.weights[k_schooling]   = 0.25f;
+            nb.weights[k_exploration] = 0.25f;
+            m.budgets[m.nation_a] = nb;
+            m.claims = {
+                exploration_claim(m.nation_a, m.corp_1, 100.0f, body_a),
+                exploration_claim(m.nation_a, m.corp_2, 150.0f, body_b),
+                {m.nation_a, m.corp_1, budget_priority::schooling, 100.0f},
+                {m.nation_a, m.corp_2, budget_priority::schooling, 150.0f},
+            };
+            const auto  mt = run(m);
+            const auto* mr = result_for(mt, m.nation_a);
+            const budget_line_result& ex = mr->lines[k_exploration];
+            const budget_line_result& sc = mr->lines[k_schooling];
+
+            check(mr != nullptr &&
+                  same(ex.share, 187.5f) && same(ex.demand, 250.0f) &&
+                  same(ex.paid, 100.0f) && ex.skipped == 1 && ex.rationed &&
+                  same(ex.fill_fraction, 0.4f),
+                  "R6f (3a) an earmarked claim above the line's remaining share "
+                  "is SKIPPED WHOLE - 100 paid in full, 150 paid nothing rather "
+                  "than 87.5; the line says so (skipped 1, rationed, fill 0.4)");
+            check(same(m.w.corporations.at(m.corp_2).balance, 112.5f) &&
+                  same(m.w.corporations.at(m.corp_1).balance, 175.0f) &&
+                  same(m.w.nations.at(m.nation_a).treasury, 1000.0f - 287.5f) &&
+                  same(mr->paid, 287.5f),
+                  "R6g ...the treasury is untouched by the skipped claim (pays "
+                  "287.5, keeps the 87.5), and the skipped corp receives nothing "
+                  "on that line - no fraction of a survey");
+            check(sc.rationed && sc.skipped == 0 &&
+                  same(sc.paid, 187.5f) && same(sc.fill_fraction, 0.75f),
+                  "R6k ...while the same two amounts on an UNEARMARKED line are "
+                  "still partially filled pro rata (75 + 112.5) - rule 3 is "
+                  "unchanged where no earmark is in play");
+
+            // The one earmarked record: whole, on the body it named, flagged
+            // with the line's rationing; the skipped claim has no record.
+            int ear = 0; bool ear_ok = true;
+            for (const budget_transfer& r : mt.transfers)
+                if (r.line == budget_priority::public_exploration)
+                {
+                    ++ear;
+                    ear_ok = ear_ok && r.corp == m.corp_1 && r.subject == body_a &&
+                             same(r.credits, 100.0f) && same(r.fill_fraction, 1.0f) &&
+                             r.rationed;
+                }
+            check(ear == 1 && ear_ok && mt.transfers.size() == 3,
+                  "R6l the earmarked record names the body, is whole (fill 1.0), "
+                  "carries the line's rationed flag, and the skipped claim left "
+                  "no record at all");
+
+            // Determinism of the record: the reversed claim vector yields the
+            // identical list, field for field. A fresh world built in the same
+            // order, so the ids agree.
+            fixture p;
+            p.nation_a = add_nation(p.w, "Earmarker", 1000.0f);
+            p.corp_1   = add_corp(p.w, "Payee One", 0.0f);
+            p.corp_2   = add_corp(p.w, "Payee Two", 0.0f);
+            const entity_id pa = add_body(p.w, "Near");
+            const entity_id pb = add_body(p.w, "Far");
+            p.budgets = m.budgets;
+            p.claims = {
+                {p.nation_a, p.corp_2, budget_priority::schooling, 150.0f},
+                {p.nation_a, p.corp_1, budget_priority::schooling, 100.0f},
+                exploration_claim(p.nation_a, p.corp_2, 150.0f, pb),
+                exploration_claim(p.nation_a, p.corp_1, 100.0f, pa),
+            };
+            const auto pt = run(p);
+            bool identical = pt.transfers.size() == mt.transfers.size();
+            for (std::size_t i = 0; identical && i < pt.transfers.size(); ++i)
+            {
+                const budget_transfer& a = mt.transfers[i];
+                const budget_transfer& b = pt.transfers[i];
+                identical = a.corp == b.corp && a.nation == b.nation && a.line == b.line &&
+                            a.subject == b.subject && same(a.credits, b.credits) &&
+                            same(a.fill_fraction, b.fill_fraction) && a.rationed == b.rationed;
+            }
+            check(identical,
+                  "R6m the record is the same list, field for field, when the "
+                  "claims arrive in the opposite order");
+        }
     }
 
     std::printf("\n=== %d passed, %d failed ===\n", g_pass, g_fail);
