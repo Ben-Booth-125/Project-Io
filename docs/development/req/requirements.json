@@ -5845,19 +5845,21 @@
         {
             "brief": "contract-record-and-verbs",
             "title": "The mercenary contract: accept an offer with a named force, evaluate it each tick, pay or fail",
-            "status": "pending",
+            "status": "complete",
+            "resolved": "2026-08-23",
+            "resolution": "Landed on main (worktree-agent-a426dc003723cf20f, merged). mercenary_contract_harness (51/51, new); save_roundtrip clean (world_save_version 7->8).",
             "promoted_from": "backlog.json BL-573 (CONTRACT_RECORD_AND_VERBS) — Sprint 16, the mercenary vertical slice",
             "batch": "2026-08-23-sprint-16-mercenary-slice",
             "rows": [
                 {
                     "id": "R1",
-                    "status": "pending",
+                    "status": "complete",
                     "verification": [
                         "headless"
                     ],
                     "requirement": "ITEM-SPANNING: corp_verb::accept_offer and abandon_contract are reachable through corp_command with the seam's untrusted-boundary rule (a rejection mutates nothing), a mercenary_contract evaluates each tick after run_battles into completed/failed/abandoned with the deposit/remainder split CONTRACTS.md specifies, failure folds sentiment_factor_kind::contract_failed and is measurably the hardest reputation move, committed units cannot be disbanded or double-committed, and the record round-trips through world_save.cpp.",
-                    "notes": "docs/ai/ACTIONS.json gains the two verbs.",
-                    "result_metric": ""
+                    "notes": "docs/ai/ACTIONS.json gains the two verbs. Payout is a direct transfer from the offer's already-funded escrow, not a second budget_claim draw (would double-debit — BL-572's escrow already pulled the treasury). contract_failed's -4.0 Trust magnitude is a ratio (2x contract_cancelled), not measured — NR-582.",
+                    "result_metric": "mercenary_contract_harness: 51 checks, 0 failures"
                 }
             ]
         },

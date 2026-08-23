@@ -82,33 +82,35 @@ boundary, never loaded by `world/*` itself).
 
 ---
 
-### Wave 4 (after BL-572)
+### Wave 4 — DONE (2026-08-23)
 
-#### BL-573 — CONTRACT_RECORD_AND_VERBS
+**BL-573 (contract record and verbs)** landed and merged to `main`
+(worktree-agent-a426dc003723cf20f, a clean fast-forward). `complete` in backlog.json, design
+prose archived. New harness `tools/verify/mercenary_contract_harness.cpp` (51 checks) proves
+accept/evaluate/pay-or-fail works at all — **BL-574 below extends this existing file with the
+M1–M7 terminal-state cases, it does not create a new one.** `save_roundtrip` clean
+(`world_save_version` 7→8). `contract_template_registry` now threaded from the app-layer
+boundary the way `recipe_registry` is (closes NR-581's deferred half); BL-571's
+`active_mercenary_contract_for` stub now resolves for real, so the corp-vs-nation garrison
+battle trigger is live. `spectator_determinism`'s golden held.
 
-Requirements: § contract-record-and-verbs. Files: `components.hpp`, `corp_command.{hpp,cpp}`,
-`economy_system.cpp`, `sentiment.hpp`, `world.hpp`, `world_save.cpp`, `docs/ai/ACTIONS.json`.
-
-1. `mercenary_contract{id, client, contractor, template, province, fee, deposit_paid,
-   deadline, accepted_tick, units[8], state}`; `world::mercenary_contracts`. **Consumes:**
-   `world::mercenary_offers` (BL-572), the condition-template shape (BL-570) — this is also
-   where `contract_template_registry` needs to become reachable for real (NR-581): thread it
-   through the same way `recipe_registry` already is, a plain parameter from the app-layer
-   boundary, not a `world/*`-side Lua load. **Provides:**
-   `mercenary_contract`, `corp_verb::accept_offer`, `corp_verb::abandon_contract`,
-   `sentiment_factor_kind::contract_failed`. This is what BL-571's placeholder
-   `active_mercenary_contract_for` should resolve against — wire it for real here.
-2. `accept_offer` / `abandon_contract` on the corp-command seam, untrusted-boundary rule.
-3. Tick evaluation after `run_battles`: completed/failed/abandoned, deposit/remainder split.
-4. Committed-unit lock (no disband/double-commit); save round-trip; ACTIONS.json entries.
+One deliberate deviation from the item's own original brief, correctly caught in-flight: payout
+is a direct transfer from the offer's already-fully-funded escrow, not a second `budget_claim`
+draw — the treasury was already debited in full while BL-572's escrow accumulated, so a fresh
+claim would double-debit the same contract. One flagged number: `NR-582`, `contract_failed`'s
+sentiment magnitude (-4.0 Trust, double `contract_cancelled`'s -2.0) is a ratio, not measured —
+same discipline as NR-579/580's placeholders, revisit at playtest.
 
 ---
 
 ### Wave 5 (after BL-573; BL-576 also needs BL-575)
 
 #### BL-574 — CONTRACT_HARNESS
-Requirements: § contract-harness. Files: `tools/verify/mercenary_contract_harness.cpp`.
-**Consumes:** `mercenary_contract` + verbs (BL-573). One task: M1–M7 cases per the item design.
+Requirements: § contract-harness. Files: `tools/verify/mercenary_contract_harness.cpp` —
+**this file already exists** (BL-573 created it with an accept/evaluate/pay-or-fail smoke
+suite); extend it, do not replace or duplicate it.
+**Consumes:** `mercenary_contract` + verbs (BL-573, landed). One task: M1–M7 cases per the item
+design.
 
 #### BL-576 — CONTRACTS_LEDGER
 Requirements: § contracts-ledger. Files: `src/ui/contracts_ledger.{hpp,cpp}`, `nav_pane.cpp`,

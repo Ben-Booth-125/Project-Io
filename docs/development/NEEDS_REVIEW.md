@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*7 entries — 7 open, 0 resolved.*
+*8 entries — 8 open, 0 resolved.*
 
 ---
 
@@ -104,6 +104,19 @@ Two things worth a look, neither blocking: (1) `contract_offer_params` hardcodes
 **Why it matters.** (1) is pure sequencing information for whoever builds BL-573 — worth a one-line pointer in REFINED.md so it isn't rediscovered. (2) only matters once BL-577 (contract messages) exists to surface it; flagging now so it isn't a surprise mid-implementation.
 
 > **Recommendation:** No action needed now. When BL-573 lands, thread contract_template_registry through derive_contract_offers's call chain the way recipe_registry already is. When BL-577 lands, consider collapsing an expire+reopen on the same province in the same tick into one 'renewed' message rather than two.
+
+### NR-582 — contract_failed's sentiment magnitude (-4.0 Trust) is authored double contract_cancelled's (-2.0), a ratio not derived from CONTRACTS.md
+*decision taken on your behalf · raised 2026-08-23 · from BL-573 (CONTRACT_RECORD_AND_VERBS), authoring sentiment_factor_kind::contract_failed in scripts/economy.lua.*
+
+CONTRACTS.md's Q2 table settles the ORDERING — failed is 'down hardest', cancelled/abandoned is 'down, but less' — but names no numbers. contract_failed was authored at -4.0 Trust, exactly double contract_cancelled's existing -2.0, a legible round ratio rather than a measured or playtested one.
+
+**Why it matters.** This is the first real magnitude on the mercenary loop's downside; BL-578's playthrough is the first point anyone will actually feel whether a failed contract stings twice as much as walking away, or whether that ratio reads as arbitrary. Cheap to retune (one Lua constant) if it doesn't.
+
+- Confirm 2x.
+- Pick a different ratio.
+- Defer to playtest feel once BL-578's slice is playable.
+
+> **Recommendation:** Defer to playtest feel — this is exactly the kind of number CONTRACTS.md itself says should be iterated, not authored once and forgotten (the same discipline NR-579's fee_mult/deadline_ticks placeholders are held to).
 
 ---
 

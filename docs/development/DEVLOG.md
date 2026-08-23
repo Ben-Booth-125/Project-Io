@@ -115,6 +115,37 @@ once BL-577 exists to announce it.
 Item flipped `complete`, design prose archived, `REFINED.md` Wave 3 drained — with a pointer
 left in Wave 4's brief for the `contract_template_registry` threading. Wave 4 (BL-573) is next.
 
+**UPDATE, same session: Wave 4 lands (BL-573, contract record and verbs).** The widest-reaching
+item in the batch so far — the first real consumer of `budget_claim` against `contracted_force`,
+and the item BL-571's stub battle trigger has been waiting on since Wave 2. `mercenary_contract`
++ `world::mercenary_contracts`; `corp_verb::accept_offer`/`abandon_contract` appended after
+`withdraw_from_battle` on the corp-command seam (full untrusted-boundary validation); tick
+evaluation after `run_battles` settling completed/failed; `contract_template_registry` threaded
+from the app-layer boundary into `world/*` the way `recipe_registry` already is, closing
+NR-581's deferred half; `active_mercenary_contract_for` (BL-571's stub) now resolves for real.
+New harness `tools/verify/mercenary_contract_harness.cpp` (51 checks); `save_roundtrip` clean
+(`world_save_version` 7→8). All six re-run harnesses (the new one, `save_roundtrip`,
+`nation_wiring`, `condition_set_harness`, `sentiment_harness`, `nation_scorer_harness`)
+independently confirmed green — `nation_scorer_harness`'s 2 pre-existing R1c failures unchanged.
+`spectator_determinism`'s golden held.
+
+**One brief-correcting deviation, caught and right:** the task brief said pay the completion
+remainder through the existing `budget_claim` rail; the implementation instead pays directly
+from the offer's own escrow, because the treasury was already debited in full while BL-572's
+escrow filled — routing it through `budget_claim` again would have double-debited the same
+contract. Verified against the code: `derive_contract_offers` genuinely does `nc.treasury -=
+pay` at accumulation time, so the direct-transfer call was correct and the brief's wording was
+the one that was wrong.
+
+One flagged number, not a blocker: `NR-582` — `contract_failed`'s sentiment magnitude (-4.0
+Trust) is authored at exactly double `contract_cancelled`'s (-2.0), a ratio rather than a
+measured value, same discipline as NR-579/580's placeholders.
+
+Item flipped `complete`, design prose archived, `REFINED.md` Wave 4 drained — with a correction
+left in Wave 5's brief: `mercenary_contract_harness.cpp` now already exists (BL-573 created it
+with a smoke suite); BL-574 extends it with the M1–M7 terminal-state cases rather than creating
+a new file. Wave 5 (BL-574, BL-576, BL-577 — the three-way fan-out) is next.
+
 ---
 
 ## Session — The docs go state-independent, and the backlog is rebuilt around one sprint (BL-569–BL-578, NR-573–NR-575) (2026-08-23, latest)
