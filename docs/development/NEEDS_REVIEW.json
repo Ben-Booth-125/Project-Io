@@ -3753,19 +3753,19 @@
     },
     {
       "id": "NR-554",
-      "title": "CORRECTED: the zero-war worlds are the MODAL outcome, and the fix direction I first reported was refuted",
+      "title": "ANSWERED IN PART: the corrected Era -1 says 11 of 32 worlds fight nothing, and nothing yet separates them",
       "raised": "2026-08-23",
       "kind": "question",
       "status": "open",
       "source": "Sprint N2 lane C (Sprint 28 lane A T1/T2), reproduced independently by the main session.",
-      "what": "SUPERSEDES WHAT THIS ENTRY FIRST SAID, which was written from an n=8 sweep and was wrong in three of its four claims. WHAT HOLDS: wherever a world fights no battle, the campaign score CLEARS its threshold and LOSES the argmax on every round - never the case that it fails to clear. Confirmed on all 17 silent seeds at n=32. WHAT WAS REFUTED, by an adversarial pass and by the main session's own n=32 run, which agree seed for seed: (a) the ceiling-below-floor separation holds on only 3 of 17 silent seeds, worst counterexample seed 18 overlapping by 142, and is not monotone with the outcome; (b) 'no salt could have won those worlds a round' is true of seeds 0 and 4 (margins 37, 65 against a 0..15 salt) and false of silent seeds 18/20/27 (margins 6/7/8); (c) 'the defect is the LEVEL of the campaign score relative to Settle' is unsupported - seed 8 clears 27,452 and fights 676 battles while seed 30 clears 2,338,095 and fights zero; (d) the base rate is 17 of 32 (53%), not 2 of 8. AND the fixture is not the generated Era -1 at all - six divergences from the app's own invocation, one gating build_work out of the contest (BL-462, which already owned this defect - BL-554 was filed as a duplicate the same day and retired into it), and seed 0's generated era fights 8 battles.",
-      "why_it_matters": "Zero-war being the MODAL outcome rather than a rare pathology changes the shape of the problem, and it makes Ben's 2026-08-21 ruling bite harder: if a zero-war world means 'many ancient tech quests would not be unlockable', then over half the worlds this fixture generates are unfinishable. But the counter-pressure is unchanged - BL-224's non-hegemony invariant wants some worlds multipolar - so the target is still a rate inside a stated band across seeds, reported and never clamped. What has changed is that NOBODY YET KNOWS WHAT MOVES THAT RATE. The two candidate diagnoses both failed on the wider sweep, and the instrument that produced them is measuring the wrong sim.",
+      "what": "RE-MEASURED 2026-08-23 on the CORRECTED fixture (BL-462), which supersedes both earlier readings - the n=8 one this entry first carried and the n=32 one that refuted it. Both were about a sim the game does not run.\n\nWHAT THE REAL ERA -1 SAYS, verified independently by the integrating session on its own rebuild: 11 of 32 worlds fight nothing (34%). The fork answer SURVIVES unchanged - all 11 silent worlds show the campaign score clearing its threshold and losing the argmax on every round, never failing to clear. And BL-384's founding premise is dead: 2,503 battles produce 1,789 conquests (71.5%), with no seed anywhere fighting and taking nothing.\n\nNOTHING SEPARATES silent worlds from fighting ones, and both earlier diagnoses fail harder on the real fixture than they did on the wrong one. Ceiling-vs-floor: 32 of 32 seeds OVERLAP, none disjoint (it was 3 of 17 before). Score level: silent ceilings 275-439 (median 348) against fighting 350-531 (median 405), with 15 of 21 fighting seeds inside the silent range - a shift, not a separation. Four further candidates were tested (cleared candidates, scored candidates, contacts, foundings) and none separates.\n\nONE THING DOES HOLD ACROSS EVERY WORLD: Settle takes 83-100% of the rounds Campaign loses, silent and fighting alike (silent median 99.2%, fighting 95.8%). So the open question is not the LEVEL of either score but their PER-ROUND JOINT BEHAVIOUR - whether Campaign's good rounds ever coincide with Settle's bad ones. verb_contest_trace already carries year and polity; nothing slices it that way yet.",
+      "why_it_matters": "Zero-war at 34% is a third of every world generated, which keeps Ben's 2026-08-21 ruling biting - if a zero-war world means many ancient tech quests are unreachable, a third of worlds are unfinishable - while sitting further from BL-224's non-hegemony invariant than the 53% figure did. The target is still a rate inside a stated band, reported and never clamped. What has changed is that the measurement is now trustworthy and the diagnosis is genuinely open: three candidate separators have been tested and refuted, so the next move is a real question rather than a tuning pass. AND THE MEASUREMENT IS STILL BOUNDED: build_work cannot enter the contest headlessly (NR-558), so every statement here is about a four-verb contest where the game scores five.",
       "options": [
-        "Fix the instrument first (BL-554), re-measure the GENERATED era, and only then choose a fix - the honest order, and the one that avoids tuning a scorer weight on a number from a simulation the game does not run.",
-        "Tune the campaign score's level now on the n=8 reading - explicitly rejected: it was refuted at n=32 and would be tuning on a wrong fixture as well as a wrong sample.",
-        "Treat the fork's answer as sufficient and go straight to making Campaign commensurable with Settle (the BL-318 shape) without re-measuring - cheaper, but it commits to a mechanism the measurement no longer supports."
+        "Slice verb_contest_trace by (year, polity) to test the joint-behaviour hypothesis - the data already exists and nothing reads it that way. Cheapest next measurement and the only one the evidence currently points at.",
+        "Close the works gap first (NR-558) so the contest has all five verbs, then re-measure. Slower, but every finding until then carries an asterisk.",
+        "Accept 34% as the rate and rule on the band it should sit in, treating the mechanism as a later question."
       ],
-      "recommendation": "The first, and the ordering is the whole recommendation. BL-462 is priority A for exactly this reason: every Era -1 number acted on so far - BL-384's premise, the conquest rate that refuted it, and this sprint's finding - came off an instrument running a 4000-year six-band sim with no creeds and no works on an already-simulated settlement. Re-pointing it at the app's own call is a day's work and it is the precondition for every later decision here.",
+      "recommendation": "The first, then the second. The joint-behaviour slice is a report-only change to an instrument that is now trustworthy, and it is the only hypothesis the measurement has not yet eliminated. But build_work missing from the contest is a real asterisk on any conclusion about which verb wins, so NR-558 should be settled before a fix is chosen rather than after.",
       "files": [
         "src/world/history_sim.cpp",
         "tools/verify/history_conquest_gap.cpp",
@@ -3801,6 +3801,50 @@
       "files": [
         "docs/development/backlog.json",
         "docs/development/DELIVERY.md"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-557",
+      "title": "A new pattern landed without an owner: generation hands a harness its own arguments back",
+      "raised": "2026-08-23",
+      "kind": "novel-work",
+      "status": "open",
+      "source": "BL-462's fix; flagged by the implementing lane under the novelty rule and confirmed at merge.",
+      "what": "To let a harness reproduce the Era -1 exactly, `make_hard_coded_world` gained an optional out-parameter that captures the arguments the sim was actually called with - params, seed, creeds, settlement. Nothing in TILE_GENERATION.md, GENERATION_LEDGER.md or DEVELOPMENT_PRACTICES.md owns this shape. The two established precedents are different things: `generation_report` is a presentation record of generation's OUTPUTS, and `generation_record` holds per-pass intermediates regenerated on demand. This is a third - a capture of a call's INPUTS so a check can re-run it faithfully. It is deliberately off the save seam and costs nothing when unrequested.",
+      "why_it_matters": "It is the right answer to BL-462 and it generalises: any generation pass a harness might want to re-run faithfully has the same problem, and this shape solves it without a save-format change or a second construction of the value. That is exactly why it wants a decision before it spreads. The rejected alternatives are recorded in the requirement group - re-deriving the creeds in the harness (a second construction of the same value, the defect the item exists to remove) and putting creeds on `body_entry` (a save-format change carrying pantheons and tongues to deliver one integer per culture, and it would not have solved the settlement half at all).",
+      "options": [
+        "Adopt it as a named pattern in DEVELOPMENT_PRACTICES.md, so the next harness that needs it does the same thing rather than inventing a third shape.",
+        "Leave it local to the Era -1 and treat a second instance as the trigger to generalise.",
+        "Reject it and take the save-format route after all."
+      ],
+      "recommendation": "The first. The argument for the pattern is the same argument BL-462 makes - two constructions of one call WILL drift - and it applies to every generation pass, not just this one. Naming it costs a paragraph.",
+      "files": [
+        "src/world/era_minus_one.hpp",
+        "src/world/hard_coded_world.cpp",
+        "docs/development/DEVELOPMENT_PRACTICES.md"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-558",
+      "title": "No headless harness can measure the shipped configuration exactly — two Lua-authored inputs reach generation and none can load them",
+      "raised": "2026-08-23",
+      "kind": "question",
+      "status": "open",
+      "source": "BL-462's fix; the sixth divergence it could not close.",
+      "what": "`make_hard_coded_world` reads two Lua-authored inputs a headless harness cannot load: `scripts/works.lua` (BL-321's Era -1 works table) and `scripts/world_gen.lua`. The four excluded TUs for a headless build are exactly the Lua ones (NR-264). The consequence is concrete and current: `history_sim.cpp:896` gates `build_work` on a non-empty works registry, so THE HARNESS SCORES FOUR VERBS WHERE THE SHIPPED GAME SCORES FIVE - and verb competition is what that harness exists to measure. The lane declined to transcribe works.lua into C++ because that puts the roster in two places and stales the harness the next time the table moves, which is BL-462's own failure mode one layer down. It passes null on both sides through the shared fixture so they cannot diverge, and prints a banner on every run.",
+      "why_it_matters": "DEVELOPMENT_PRACTICES.md treats headless harnesses as THE verification path for `world/*` logic. This says that path has a ceiling: it can verify mechanisms exactly and can never verify the shipped configuration exactly. BL-462's premise - 'no check measures the run that actually generates a world' - is now 5/6 closed, and the last sixth is structural. It also bounds what the Era -1 findings can claim: any statement about which verb wins is a statement about a four-verb contest.",
+      "options": [
+        "A Lua-free authoring path for works and world_gen that PRODUCTION also uses - the tables become data the C++ side can read without sol2. Largest, and it removes the class.",
+        "A Lua-capable verification path: extend `ProjectIo --verify` to run these checks with the real registries, as the live-Lua harnesses (haulage_measure, substrate_census) already do.",
+        "Accept the ceiling, keep the banner, and require every Era -1 finding to state the verb count it was measured under."
+      ],
+      "recommendation": "The second, scoped to the harnesses that need it. The live-Lua pattern already exists in the repo and is understood; extending it is cheaper than re-authoring two content files, and it closes the gap for world_gen.lua at the same time. The third is the honest interim and is already in place.",
+      "files": [
+        "tools/verify/history_conquest_gap.cpp",
+        "docs/development/DEVELOPMENT_PRACTICES.md",
+        "scripts/works.lua"
       ],
       "resolution": null
     }

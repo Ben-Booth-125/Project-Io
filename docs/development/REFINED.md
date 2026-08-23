@@ -32,61 +32,39 @@ statistic folded Campaign's *winning* scores into the ceiling, conditioning it o
 explains; re-derived over lost rounds only it changes one cell in eight and no verdict, and the
 merge took the honest form.
 
-### ⚠ Lane N2-c's INTERPRETATION was refuted after the merge — the instrument stands, the conclusion does not
+### Lane N2-c: the interpretation was refuted, the instrument was fixed, and the era re-measured
 
-An adversarial pass over the merged lane, plus an n=32 sweep the main session ran itself, agree
-seed for seed. **What survives** is the fork's answer, and it is worth having: *wherever a world in
-this fixture fights no battle, the campaign score CLEARS its threshold and LOSES the argmax on every
-round* — true on all 17 silent seeds at n=32.
+The sequence is worth keeping because it took three passes to get one true number.
 
-**What was withdrawn:**
+1. **n=8 said** two of eight worlds fight nothing, and Campaign's score ceiling sits below the
+   winner's floor on exactly those two.
+2. **n=32 refuted the separation** — 3 of 17 silent seeds disjoint, 14 overlapping, worst by 142.
+3. **BL-462 refuted the fixture itself.** Six divergences from `hard_coded_world.cpp`'s own
+   invocation; the harness was measuring a 4000-year six-band run with no creeds and no works on an
+   already-simulated settlement. Both earlier readings were about a sim the game does not run.
 
-| Claim | Refutation |
+**The corrected era, verified on an independent rebuild** (acceptance test: the harness's re-run
+reproduces `generation_report::prehistory_*` bit-equal on 32 of 32 seeds):
+
+| | corrected |
 |---|---|
-| ceiling below floor on *exactly* the silent worlds | 3 of 17 silent seeds disjoint, 14 overlap; worst seed 18 by **142**, and not monotone with the outcome |
-| "no salt could have won those worlds a round" | true of seeds 0 and 4 (margins 37, 65 vs a 0–15 salt); silent seeds 18/20/27 have margins **6/7/8** |
-| "the defect is the LEVEL relative to Settle" | unsupported — seed 8 clears 27,452 and fights **676**; seed 30 clears 2,338,095 and fights **zero** |
-| "two of eight worlds" | **17 of 32 (53%)** in this fixture — zero-war is the *modal* outcome, which makes it more urgent, not less |
-| the 1–3 margin bucket | recorded as 13, and as "none" by the lane; the harness prints **39** (0 on both silent seeds — the only safe scoping) |
+| worlds that fight nothing | **11 of 32 (34%)** |
+| BL-384's premise | **dead** — 2,503 battles → 1,789 conquests (71.5%); no seed fights and takes nothing |
+| the fork's answer | **survives** — all 11 silent worlds clear the threshold and lose every round |
+| ceiling-vs-floor | **32 of 32 overlap**, none disjoint |
+| score level | silent 275–439 (med 348) vs fighting 350–531 (med 405) — 15 of 21 fighting seeds inside the silent range: a shift, not a separation |
 
-**And the fixture is not the generated Era −1 at all.** Six divergences from
-`hard_coded_world.cpp`'s own invocation — 4000 years vs 400, six tick bands vs one, a bare seed vs
-`seed ^ 0x415C1E17`, null creeds, **no works (which gates `build_work` out of the contest entirely,
-so the harness scores four verbs where the app scores five)**, and the *post-sim* settlement state.
-Seed 0's generated era fights 8 battles. → **BL-554**, priority A, and the precondition for every
-later decision here: BL-384's premise, the conquest rate that refuted it, and this sprint's finding
-all came off this instrument.
+**Nothing yet separates silent worlds from fighting ones.** Six candidates tested and refuted. The
+one thing true of every world: **Settle takes 83–100% of the rounds Campaign loses**, silent and
+fighting alike. So the open question is the *per-round joint behaviour* — whether Campaign's good
+rounds ever coincide with Settle's bad ones — and `verb_contest_trace` already carries `year` and
+`polity` for it. NR-554 carries the ruling.
 
-Two harness fixes landed with the correction: the sweep width is **decoupled** from the pinned
-regression table (`pinned[r.seed]` was indexed by a seed the sweep could exceed, so widening read
-out of bounds — *that coupling is the mechanical reason an n=2 claim was the best available*), and
-R3 now pins only the seeds it holds rows for and asserts it reached all 8. `growth-extinguishes-war`
-R4 is **re-opened**; it was closed on the false margin figure. NR-554 is rewritten, NR-555 files the
-cross-group row flips Rule 0c required.
-
-### What N2 leaves owed
-
-- **Every spine still has no caller.** `run_national_budget` takes budgets as a parameter;
-  `score_national_budgets` returns them and nothing joins the two. BL-538 (what a line buys) is the
-  join, and it is the next item.
-- **`scripts/economy.lua` needs the sentiment block** — the decay rate that puts BL-391's fix in
-  play. **The number is Ben's call** and wants BL-543's treatment: a reason, not a value.
-- **`recipe_registry.cpp`'s new `economy.sentiment` reader is uncompiled** (sol2 absent, NR-264).
-  Its symbols check out against `sentiment.hpp` by inspection and its inline half in
-  `recipe_registry.hpp` *is* compiler-verified; the unverified surface is ~40 lines. The integrating
-  build on Ben's machine is what closes it.
-- **`docs/economy/CONTRACTS.md:178`** still describes BL-546 in the future tense — one line.
-
-**Hotspots stay with the main session**, as always: `scripts/economy.lua` (5 open items declare it),
-`src/world/components.hpp` (4), `src/world/world.hpp`, `CMakeLists.txt`. N2-b may legitimately need
-`world.hpp` to remove `corp_reputation`; that edit is flagged for checking at merge rather than
-forbidden.
-
-**Every lane is briefed to MUTATION-TEST its own rows** and report which mutation it ran per row.
-That is the N1 lesson applied (NR-547): three agents wrote the code *and* its harness, all three
-harnesses passed, two of three subjects were unsound, and not one defect was found by reading.
-
----
+**Still open, and it bounds every finding above:** `build_work` cannot enter the contest headlessly,
+because `works.lua` cannot be loaded without Lua and transcribing it would be BL-462's own failure
+mode one layer down. Every run prints a banner: **four verbs, where the shipped game scores five**
+(NR-558). Two harness fixes landed alongside — the sweep width is decoupled from the pinned table,
+and R3 pins only the seeds it covers.
 
 ---
 
